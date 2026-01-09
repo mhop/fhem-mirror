@@ -1,4 +1,55 @@
-defmod Stromboerse DOIF 1_$SELF_PriceInfo\
+defmod Stromboerse DOIF ## Startup Befehle für den WebSocket vom EVU_Tibber_connect\
+init\
+{ \
+  Log(0, "$SELF 0   init       : ▶️  $SELF init");;\
+  if ( [?$SELF_connect:conf_EVU,"null"] eq "Tibber_Live" ) {\
+    fhem("setreading $SELF_connect ws_cmd connect");; \
+    if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 0   WebSocket  : ▶️  $SELF_connect start Websocket";;\
+    }\
+  }\
+  Log(0, "$SELF 0   init       : 🏁 $SELF init done for ".[?$SELF_connect:conf_EVU,"null"]);;\
+}\
+\
+################################################################################################################\
+## EVU_Tibber_connect start/stop WebSocket\
+0_$SELF_connect_Tibber_Live_ws\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+#    or  [$SELF:ui_command_2]                                             ## Hier wird das uiTable select ausgewertet\
+    and [$SELF:ui_command_2] ne "---"\
+   ) {\
+    if ( [?$SELF_connect:conf_EVU,"null"] eq "Tibber_Live" ) {\
+      fhem("setreading $SELF_connect ws_cmd ".[?$SELF:ui_command_2]);; \
+    }\
+    set_Reading("ui_command_2","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+\
+################################################################################################################\
+## Tibber_Live Kosten abholen\
+0_$SELF_connect_Tibber_Live_Kosten\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and [:03]                                                            ##\
+    and [?$SELF_connect:conf_EVU,"null"] eq "Tibber"\
+#    or  [$SELF:ui_command_2]                                             ## Hier wird das uiTable select ausgewertet\
+#    and [$SELF:ui_command_2] ne "---"\
+   ) {\
+    ::CommandGet(undef, "$SELF_connect 03_consumption_hour");;\
+    if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 1   Kosten     : Kosten der letzten Stunden für ".[?$SELF_connect:conf_EVU,"null"]." abgeholt";;\
+    }\
+\
+    set_Reading("ui_command_2","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+  }\
+}\
+\
+#################################### Ende Tibber_Live ##########################################################\
+\
+\
+1_$SELF_PriceInfo\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
     and\
     (     [:00] or [:15] or [:30] or [:45]                               ## jede 15 Minuten\
@@ -109,7 +160,7 @@ defmod Stromboerse DOIF 1_$SELF_PriceInfo\
 }\
 
 attr Stromboerse DbLogExclude .*
-attr Stromboerse comment Version 2025.12.11 15:00 \
+attr Stromboerse comment Version 2026.01.09 15:00 \
 Dieses Device benötigt EPEX_Spot_connect als Verbindung zu EPEX_Spot.
 attr Stromboerse disable 0
 attr Stromboerse group PV Steuerung EVU
@@ -125,7 +176,7 @@ package ui_Table;;\
   $TD{0..6}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
 }\
 \
-"Kommando<dd>Auswahl</dd>" |widget([$SELF:ui_command_1],"uzsuDropDown,---,1_Aktueller_Preis,2_Preis_Info,3_Diagramm") |"Börse <br>".widget([$SELF_connect:conf_EVU],"uzsuDropDown,EPEX_Spot,Tibber,Tibber_Live,aWATTar")|""|""\
+"Kommando<dd>Auswahl</dd>" |widget([$SELF:ui_command_1],"uzsuDropDown,---,1_Aktueller_Preis,2_Preis_Info,3_Diagramm") |"Börse <br>".widget([$SELF_connect:conf_EVU],"uzsuDropDown,EPEX_Spot,Tibber,Tibber_Live,aWATTar")| "Tibber_Live<br>".widget([$SELF:ui_command_2],"uzsuDropDown,---,connect,disconnect") |[$SELF_connect:ws_cmd] \
 \
 "Strompreis<br>".card([$SELF_connect:current_price:bar1day],undef,undef,0,60,90,0,"fc0  ".::ReadingsVal("$SELF_connect","current_currency",""),undef,"1","130,,,,,,220").card([$SELF_connect:current_level:bar1day],undef,undef,0,60,90,0,"fc1  ".::ReadingsVal("$SELF_connect","current_currency",""),undef,"1","130,,,,,,220")|\
 "<span style=font-weight:bold>avg nächste 3h</span><br><br>".$SELF_Price(1)."<br>".$SELF_Price(2)."<br>".$SELF_Price(3)|"<span style=font-weight:bold>Statistik fc0</span><br><br>".::ReadingsVal("$SELF_connect","fc_min",0)." min<br>".::ReadingsVal("$SELF_connect","fc_avg",0)." avg<br>".::ReadingsVal("$SELF_connect","fc_med",0)." med<br>".::ReadingsVal("$SELF_connect","fc_max",0)." max"|\
@@ -214,7 +265,7 @@ sub $SELF_Format {\
                  ::ReadingsVal("$SELF_connect","fc0_trigger_start","00:00")." bis ".::ReadingsVal("$SELF_connect","fc0_trigger_stop","00:00")."<br>unter ".\
                  ::ReadingsVal("$SELF_connect","fc_trigger_price","null")." ct</span>" );;\
     } elsif ($i eq "trigger_1") {\
-      if (::ReadingsVal(EPEX_Spot_Device(),"fc1_00_startsAt","null") ne "null") {\
+      if (::ReadingsVal("$SELF_connect","fc1_0000_startsAt","null") ne "null") {\
         return ((::ReadingsVal("$SELF_connect","fc1_trigger_start","null") eq "null" ) ?\
               "<span style='color:red'>Morgen kein Trigger <br>mehr unter ".\
                    ::ReadingsVal("$SELF_connect","fc_trigger_price","null")." ct</span>" :\
@@ -240,4 +291,5 @@ sub $SELF_Format {\
 ## "Einspeisung ins Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] <= 0 ? abs(::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0)) :  0) )|""|""|""
 attr Stromboerse verbose 3
 
-setstate Stromboerse 2025-12-19 11:15:00 ui_command_1 ---
+setstate Stromboerse 2026-01-09 17:15:02 ui_command_1 ---
+setstate Stromboerse 2026-01-09 17:03:00 ui_command_2 ---

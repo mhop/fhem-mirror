@@ -160,7 +160,8 @@ defmod LWP_PV_Perl DOIF ########################################################
                                                                          ## Es wird die Soll Temperatur um die Hysterese angehoben \
      ::CommandSet(undef, "Heizung hotWaterTemperatureTarget ".(ReadingsVal("Heizung","hotWaterTemperature",48)+5));;\
                                                                          ## Das zurücksetzen auf den Standard von 50° erfolgt generell beim Abschalten\
-     set_Reading("LWP_Status","Nachheizen");;\
+     set_Exec("LWP_Man_timer",300,'set_Reading("LWP_Status","Nachheizen")');; ## Den Status verzögert ändern\
+##     set_Reading("LWP_Status","Nachheizen");;\
 \
      if (AttrVal("$SELF","verbose",0) >=3)\
         {Log 3, "$SELF 04_1 : LWP hotWaterTemperatureTarget ".ReadingsVal("Heizung","hotWaterTemperatureTarget",0)};;\
@@ -178,7 +179,7 @@ defmod LWP_PV_Perl DOIF ########################################################
     and\
     (    [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMaxSOC_fc1_Limit]  ## Im Herbst/Winter ist wenig zu erwarten\
      and [WR_1:SW_Total_PV_P_reserve] >= 2000                            ## es besteht jedoch noch eine Reserve und der\
-     and [shelly02:power_0] > 800                                        ## Pool wird gerade aufgeheizt, was im Winter auch in der Nacht passiert\
+     and [shellyplus2pm_b0a73246a024_CH1:CH1_apower] > 800               ## Pool wird gerade aufgeheizt, was im Winter auch in der Nacht passiert\
      and [WR_1:Act_state_of_charge] > 60                                 ## Der Speicher sollte schon 60 % gefüllt sein\
      and [Heizung:hotWaterTemperature] < 60                              ## und die WW Temperatur noch unter 60°\
      and [$SELF:LWP_Priority] eq "frei"                                  ## Aber nur einmal am Tag\
@@ -207,11 +208,21 @@ defmod LWP_PV_Perl DOIF ########################################################
         or [$SELF:LWP_Status] eq "manuell"\
         or [$SELF:LWP_Status] eq "Nachheizen"\
        )\
-     and [LWP_Counter:pulseTimePerDay] >= [$SELF:RunTimeMin]\
-     and ([Heizung:opStateHeatPump1] ne "Wärmepumpe läuft" or [Heizung:opStateHeatPump3] eq "Luftabtauen" )\
+     and (   [LWP_Counter:pulseTimePerDay] >= [$SELF:RunTimeMin]                ## In dieser Zeit sollte WW und Heizung fertig sein\
+          or\
+           (     [LWP_Counter:pulseTimePerDay] >= [$SELF:RunTimeMin] /2         ## Im Sommer wird nur WW gemacht, was schneller fertig ist\
+             and [$SELF:TimeStartHeizung] eq [$SELF:TimeStartHeizungUebergang]  ## Es sollte bereits Sommer sein\
+           )\
+         )\
+     and  ([Heizung:opStateHeatPump1] ne "Wärmepumpe läuft" \
+       and [Heizung:opStateHeatPump3] ne "Luftabtauen"\
+       and [Heizung:opStateHotWater]  ne "Aufheizen" )\
     )\
     or [$SELF:ui_command_1] eq "05___LWP_Ende"                           ## Hier wird das uiTable select ausgewertet\
    ) {\
+    if (AttrVal("$SELF","verbose",0) >=3)\
+       {Log 3, "$SELF 05__ : LWP run finished"};;\
+\
     if (AttrVal("$SELF","verbose",0) >=3)\
        {Log 3, "$SELF 05__ : LWP run finished"};;\
 \
@@ -359,6 +370,24 @@ defmod LWP_PV_Perl DOIF ########################################################
 }\
 \
 ################################################################################################################\
+## Warmwasser Bereitung auf Automatik\
+##\
+07_7_Warmwasser_Zirkulation\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+    and\
+       [$SELF:ui_command_1] eq "07_7_Warmwasser_Zirkulation"             ## Hier wird das uiTable select ausgewertet\
+   ) {\
+     if (AttrVal("$SELF","verbose",0) >=3)\
+        {Log 3, "$SELF 07_6 : LWP Warmwasser Zirkulation"};;\
+     ::CommandSet(undef, "Heizung hotWaterCircPumpRun on");;              ## Die Warmwasserzirkulation wird geartet\
+     ::CommandSet(undef, "Heizung statusRequest");;                       ## Einen aktuellen Status abholen\
+\
+    set_Reading("ui_command_1","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+}\
+\
+################################################################################################################\
 ## 12 Stromboerse\
 ##\
 12_Stromboerse\
@@ -367,13 +396,13 @@ defmod LWP_PV_Perl DOIF ########################################################
       ((   [WR_ctl:Yield_fc0_day] < [WR_1_Speicher_1_ExternControl:SpeicherMinSOC_fc1_Limit]  ## Im Herbst/Winter ist wenig zu erwarten\
 \
        and [$SELF:LWP_Stromboerse]  eq "Tibber"                          ## Soll Tibber verwendet werden?\
-       and [EVU_Tibber_connect:fc0_trigger]                              ## Wurde der Trigger geändert\
+       and [Stromboerse_connect:fc0_trigger]                              ## Wurde der Trigger geändert\
        )\
        or [$SELF:ui_command_4] eq "12_Stromboerse"                       ## Hier wird das uiTable select ausgewertet\
       )\
    ) {\
 \
-    if ([?EVU_Tibber_connect:fc0_trigger] eq "on") {\
+    if ([?Stromboerse_connect:fc0_trigger] eq "on") {\
       set_Reading("LWP_TriggerLaden","An");;\
 \
       if ([?Heizung:opModeHeating] eq "Off") {                           ## Ist die Heizung abgeschaltet ?\
@@ -443,17 +472,42 @@ attr LWP_PV_Perl group PV Eigenverbrauch-Steuerung
 attr LWP_PV_Perl icon sani_earth_source_heat_pump
 attr LWP_PV_Perl room Heizung->System,Strom->Photovoltaik
 attr LWP_PV_Perl sortby 411
-attr LWP_PV_Perl uiTable {\
+attr LWP_PV_Perl uiState {\
 package ui_Table;;\
   $TABLE = "style='width:100%;;'";;\
 \
-  $TD{0..10}{0}     = "align='center' style='font-size:16px;;border-right-style:solid;;border-color:darkgreen;;border-right-width:2px;;width:26%'";;\
+  $TD{0..6}{0} = "style='border-top-style:solid;;border-bottom-style:solid;;border-left-style:solid;;border-left-width:2px;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..6}{1..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..6}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
 \
-  $TD{0..10}{1} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
-  $TD{0..10}{2..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
-  $TD{0..10}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+sub $SELF_Device {\
+    return "Stromboerse_connect";;\
+  }\
 \
-sub FUNC_Status {\
+sub $SELF_Format {\
+  my($i)=@_;;\
+\
+  if ($i eq "trigger_0") {\
+      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_price",0)\
+                 or ::ReadingsVal($SELF_Device(),"fc0_trigger_start","") eq "null" ) ?\
+            "<span style='color:red'>Heute kein Trigger <br>mehr unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" :\
+            "<span style='color:green'>Trigger von<br>".\
+                 ::ReadingsVal($SELF_Device(),"fc0_trigger_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc0_trigger_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" ;;\
+    } elsif ($i eq "trigger_1") {\
+      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_price",0)\
+                 or ::ReadingsVal($SELF_Device(),"fc1_trigger_start","") eq "null" ) ?\
+            "<span style='color:red'>Morgen kein Trigger <br>mehr unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" :\
+            "<span style='color:green'>Morgen ein Trigger von<br>".\
+                 ::ReadingsVal($SELF_Device(),"fc1_trigger_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc1_trigger_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" ;;\
+    }\
+  return "null";;\
+  }\
+\
+sub $SELF_FUNC_Status {\
     my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
     my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
     return $ret;;\
@@ -461,46 +515,52 @@ sub FUNC_Status {\
 \
 }\
 \
-"$SELF"|\
-::ReadingsTimestamp("Heizung","counterHeatQTotal","")."<dd>Status / LWP Status / Brauchwasser</dd>" |\
-widget([$SELF:ui_command_1],"uzsuDropDown,---,01_1_Eigenverbrauch_automatisch_An,01_2_Eigenverbrauch_manuell_An,01_3_Eigenverbrauch_manuell_Aus,02_1_Eigenverbrauch_abschalten_Laufzeit,02_2_Eigenverbrauch_abschalten_PV_Min,03___Stop_Wait_Timer,04_1_LWP_Nachheizen_WW,04_2_LWP_Prioritaet_An,05___LWP_Ende,06___LWP_Prioritaet_Reset,07_1_Heizung_An,07_2_Heizung_Aus,07_3_Heizung_WZ_19_Grad,07_4_Heizung_WZ_22_Grad,07_5_Warmwasser_aus,07_6_Warmwasser_an") |\
+"LWP Zeit ".[Heizung:deviceTimeCalc]."<dd>Status / LWP Status / Brauchwasser</dd>" |\
+widget([$SELF:ui_command_1],"uzsuDropDown,---,01_1_Eigenverbrauch_automatisch_An,01_2_Eigenverbrauch_manuell_An,01_3_Eigenverbrauch_manuell_Aus,02_1_Eigenverbrauch_abschalten_Laufzeit,02_2_Eigenverbrauch_abschalten_PV_Min,03___Stop_Wait_Timer,04_1_LWP_Nachheizen_WW,04_2_LWP_Prioritaet_An,05___LWP_Ende,06___LWP_Prioritaet_Reset,07_1_Heizung_An,07_2_Heizung_Aus,07_3_Heizung_WZ_19_Grad,07_4_Heizung_WZ_22_Grad,07_5_Warmwasser_aus,07_6_Warmwasser_an,07_7_Warmwasser_Zirkulation") |\
 [Heizung:opStateHeatPump1]." ".[Heizung:opStateHeatPump2]|\
 [Heizung:opStateHeatPump3]|\
-FUNC_Status([Heizung:hotWaterTemperature],47,"orange",[Heizung:hotWaterTemperature],"green",[Heizung:hotWaterTemperature],53,"red",[Heizung:hotWaterTemperature])." °C"\
+$SELF_FUNC_Status([Heizung:hotWaterTemperature],47,"orange",[Heizung:hotWaterTemperature],"green",[Heizung:hotWaterTemperature],53,"red",[Heizung:hotWaterTemperature])." °C ist<br>".[Heizung:hotWaterTemperatureTarget]." °C soll"\
 \
-|\
 "Konfiguration<dd>PowerLevelMinTime, | PowerLimit On/Off | Time Start/End</dd><dd>RunTime Min/PerDay</dd>"|\
 ""|\
 widget([$SELF:PowerLevelMinTime],"selectnumbers,60,60,900,0,lin")."<br>".widget([$SELF:RunTimeMin],"selectnumbers,300,300,7200,0,lin").widget([$SELF:RunTimePerDay],"selectnumbers,900,300,28800,0,lin")|\
 widget([$SELF:PowerLimitOn],"selectnumbers,1000,250,4000,0,lin").widget([$SELF:PowerLimitOff],"selectnumbers,1000,250,4000,0,lin")|\
 widget([$SELF:TimeStart],"time").widget([$SELF:TimeEnd],"time")\
 \
-|\
 "<dd>PV-Modus / Heiz-Modus / Winter, Übergangszeit Heiz Start/Ende</dd>"|\
 "PV-Modus:<br>".[$SELF:LWP_Priority]." / ".(([$SELF:LWP_Status] ne "Aus")?'<span style="color:green">'.[$SELF:LWP_Status].'</span>' : '<span style="color:black">'.[$SELF:LWP_Status].'</span>')|\
 "Heizung: ".[Heizung:opModeHeating]."<br>Warmwasser: ".[Heizung:opModeHotWater]|\
 widget([$SELF:TimeStartHeizungWinter],"time").widget([$SELF:TimeStartHeizungUebergang],"time")|\
 [$SELF:TimeStartHeizung].widget([$SELF:TimeEndHeizung],"time")\
 \
-|\
 "Strombörse<dd>Auswahl / Ladefenster / Trigger Status </dd>" |\
 widget([$SELF:LWP_Stromboerse],"uzsuDropDown,Aus,Tibber") | \
-"<span style=font-weight:bold>Trigger fc0</span><br><br>".Format("trigger_0")|\
-"<span style=font-weight:bold>Trigger fc1</span><br><br>".Format("trigger_1")|\
-[EVU_Tibber_connect:fc0_trigger]\
+"<span style=font-weight:bold>Trigger fc0</span><br><br>".$SELF_Format("trigger_0")|\
+"<span style=font-weight:bold>Trigger fc1</span><br><br>".$SELF_Format("trigger_1")|\
+[Stromboerse_connect:fc0_trigger]
+attr LWP_PV_Perl uiTable {\
+package ui_Table;;\
+  $TABLE = "style='width:100%;;'";;\
 \
-|"Statistiken"|"Zähler"|""|"Information"|"Wert"\
-|""|"EVU"|""|"Gesamt"|sprintf("%06d kWh",[EVU_StromZaehler:Strom_Status-02])\
-|""|"Heizung"|""|"LWP/KWL"|sprintf("%06d kWh",[StromZaehler_Heizung:SMAEM1901401955_Bezug_Wirkleistung_Zaehler])\
-|""|"LWP"|""|"Heizung"|sprintf("%06d kWh",[Heizung:counterHeatQHeating])\
-|""|"LWP"|""|"Warmwasser"|sprintf("%06d kWh",[Heizung:counterHeatQHotWater])\
-|""|"LWP"|""|"Photovoltaik"|sprintf("%06d kWh",[Heizung:counterHeatQPool])\
-|""|"LWP"|""|"Gesamt"|sprintf("%06d kWh",[Heizung:counterHeatQTotal])\
+   $TD{0..18}{0} = "style='border-top-style:solid;;border-bottom-style:solid;;border-left-style:solid;;border-left-width:2px;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..18}{1..5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..18}{6} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
+\
+}\
+\
+"Statistiken"|"Zähler"|""|""|""|"Information"|"Wert"\
+""|"EVU"|""|""|""|"Gesamt"|sprintf("%06d kWh",[EVU_StromZaehler:Strom_Status-02])\
+""|"Heizung"|""|""|""|"LWP/KWL"|sprintf("%06d kWh",[StromZaehler_Heizung:SMAEM1901401955_Bezug_Wirkleistung_Zaehler])\
+""|"LWP"|""|""|""|"Heizung"|sprintf("%06d kWh",[Heizung:counterHeatQHeating])\
+""|"LWP"|""|""|""|"Warmwasser"|sprintf("%06d kWh",[Heizung:counterHeatQHotWater])\
+""|"LWP"|""|""|""|"Photovoltaik"|sprintf("%06d kWh",[Heizung:counterHeatQPool])\
+""|"LWP"|""|""|""|"Gesamt"|sprintf("%06d kWh",[Heizung:counterHeatQTotal])\
 
 attr LWP_PV_Perl verbose 3
 
-setstate LWP_PV_Perl 2024-02-07 23:55:00 LWP_Priority frei
-setstate LWP_PV_Perl 2024-02-05 11:09:07 LWP_Status Aus
+setstate LWP_PV_Perl 2026-01-09 17:08:00 Device shellyplus2pm_b0a73246a024_CH1
+setstate LWP_PV_Perl 2026-01-08 23:55:00 LWP_Priority frei
+setstate LWP_PV_Perl 2026-01-04 15:26:12 LWP_Status Aus
 setstate LWP_PV_Perl 2023-12-11 14:54:21 LWP_Stromboerse Aus
 setstate LWP_PV_Perl 2023-12-11 14:54:19 LWP_TriggerLaden Aus
 setstate LWP_PV_Perl 2022-05-13 12:21:48 PowerLevelMinTime 600
@@ -508,13 +568,13 @@ setstate LWP_PV_Perl 2022-05-10 15:51:44 PowerLimitOff 3000
 setstate LWP_PV_Perl 2022-05-10 15:50:44 PowerLimitOn 2250
 setstate LWP_PV_Perl 2022-10-25 19:00:12 RunTimeMin 2400
 setstate LWP_PV_Perl 2022-05-10 15:55:35 RunTimePerDay 28800
-setstate LWP_PV_Perl 2022-05-10 16:23:06 SetCmdOff set shelly01 off 0
-setstate LWP_PV_Perl 2022-05-10 16:23:24 SetCmdOn set shelly01 on 0
+setstate LWP_PV_Perl 2025-09-13 13:19:49 SetCmdOff set shellyplus1pm_a0dd6c2b7418_CH1 off
+setstate LWP_PV_Perl 2025-09-13 13:19:34 SetCmdOn set shellyplus1pm_a0dd6c2b7418_CH1 on
 setstate LWP_PV_Perl 2022-05-10 15:50:37 TimeEnd 15:05
 setstate LWP_PV_Perl 2023-02-07 13:27:25 TimeEndHeizung 18:35
 setstate LWP_PV_Perl 2022-05-10 15:50:19 TimeStart 11:30
-setstate LWP_PV_Perl 2024-02-07 18:35:00 TimeStartHeizung 09:50
-setstate LWP_PV_Perl 2022-05-13 16:37:59 TimeStartHeizungUebergang 09:50
+setstate LWP_PV_Perl 2026-01-08 18:35:00 TimeStartHeizung 02:05
+setstate LWP_PV_Perl 2025-04-30 09:52:25 TimeStartHeizungUebergang 09:55
 setstate LWP_PV_Perl 2022-12-17 16:11:07 TimeStartHeizungWinter 02:05
 
 setstate LWP_PV_Perl 2024-02-08 09:50:00 ui_command_1 ---

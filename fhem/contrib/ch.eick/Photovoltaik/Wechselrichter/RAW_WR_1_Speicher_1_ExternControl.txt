@@ -19,7 +19,7 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
     ::CommandGet(undef, "WR_1_API 22_Battery_InternControl");;\
     ::CommandGet(undef, "WR_1_API 23_Battery_ExternControl");;\
     ::CommandGet(undef, "WR_1_API 25_Battery_EM_State");;\
-
+\
     if (AttrVal("$SELF","verbose",0) >=4) {\
       Log 3, "$SELF cmd_1  : Speicher Status abfrage"\
     }\
@@ -55,6 +55,7 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 \
     ::CommandSet(undef, "WR_1_API 22_03_Battery_MinHomeConsumption 30000");; ## Speicher für Entladung sperren\
     set_Reading("SpeicherExternTrigger","gesperrt");;                     ## Externe Trigger verriegeln \
+\
     if (AttrVal("$SELF","verbose",0) >=3)\
        {Log 3, "$SELF cmd_2.1: smart_laden aktiviert";;\
         Log 3, "$SELF cmd_2.1: SpeicherExternTrigger, Entlademodus gesperrt";;\
@@ -64,8 +65,8 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 \
 2_smart_Laden_start_WB\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
-     and (   [WB_1:lp_1_ChargeStat]      eq "loading"                    ## Ein Fahrzeug wird gerade geladen\
-          or [WB_1:lp_2_ChargeStat]      eq "loading" )\
+     and (   [WB_1:cp_6_get_charge_state] eq "loading"                   ## Ein Fahrzeug wird gerade geladen\
+          or [WB_1:cp_7_get_charge_state] eq "loading" )\
      and [$SELF:SpeicherWB_buffer] eq "Aus"                              ## Der Speicher darf nicht zum Laden verwendet werden\
      or\
        [$SELF:ui_command_1] eq "smart_Laden_starten_WB"                  ## Hier wird das uiTable select ausgewertet\
@@ -80,11 +81,11 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
     if( [?$SELF:WB_smart_laden_before] eq "---" ) {\
       if([?$SELF:SpeicherExternTrigger] eq "gesperrt" and\
          [?WR_1_API:Battery_InternControl_MinHomeConsumption] eq "30000" ) {\
-        set_Reading("WB_smart_laden_before","aktiv");;                     ## Externe Trigger verriegeln \
+        set_Reading("WB_smart_laden_before","aktiv");;                    ## Den vorherigen Zustand merken \
         if (AttrVal("$SELF","verbose",0) >= 0)\
            {Log 3, "$SELF cmd_2.2: WallBox smart_laden_before aktiv"};;\
       } else {\
-        fhem("setreading $SELF WB_smart_laden_before inaktiv");;          ## Den vorherigen Zustand merken\
+        set_Reading("WB_smart_laden_before","inaktiv");;                  ## Den vorherigen Zustand merken \
         if (AttrVal("$SELF","verbose",0) >= 0)\
            {Log 3, "$SELF cmd_2.2: WallBox smart_laden_before inaktiv"};;\
       }\
@@ -96,7 +97,7 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
     ::CommandSet(undef, "WR_1_API 22_03_Battery_MinHomeConsumption 30000");; ## Speicher für Entladung sperren\
     set_Reading("SpeicherExternTrigger","gesperrt");;                     ## Externe Trigger verriegeln \
     if (AttrVal("$SELF","verbose",0) >=3)\
-       {Log 3, "$SELF cmd_2.2: smart_laden aktiviert";;\
+       {Log 3, "$SELF cmd_2.2: Wallbox smart_laden aktiviert";;\
         Log 3, "$SELF cmd_2.2: SpeicherExternTrigger, Entlademodus gesperrt";;\
     }\
   }\
@@ -113,10 +114,8 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
      [$SELF:WB_smart_laden_before] eq "---"                              ## Es wird gerade kein Fahrzeug geladen\
      and\
      (\
-      (\
-       [WR_1_API:Battery_InternControl_MinHomeConsumption] > 100         ## Das Speicher Entladen ist geperrt\
-       and\
-       [WR_1:Act_state_of_charge] >= 80                                  ## Der Speicher ist bereits 80% voll\
+      (    [WR_1_API:Battery_InternControl_MinHomeConsumption] > 100     ## Das Speicher Entladen ist geperrt\
+       and [WR_1:Act_state_of_charge] >= 80                              ## Der Speicher ist bereits 80% voll\
        )\
       or [$SELF:ui_command_1] eq "smart_Laden_beenden"                   ## Hier wird das uiTable select ausgewertet\
      )\
@@ -140,12 +139,9 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
      and\
      (\
-      (\
-       [WB_1:lp_1_ChargeStat] ne "loading"                               ## Es wird gerade kein Fahrzeug geladen\
-      and\
-       [WB_1:lp_2_ChargeStat] ne "loading"\
-      and\
-       [$SELF:WB_smart_laden_before] eq "inaktiv"                        ## Vorher war es nicht aktiv\
+      (    [WB_1:cp_6_get_charge_state]  ne "loading"                    ## Es wird gerade kein Fahrzeug geladen\
+       and [WB_1:cp_7_get_charge_state]  ne "loading"\
+       and [$SELF:WB_smart_laden_before] eq "inaktiv"                    ## Vorher war es nicht aktiv\
       )\
      or  [$SELF:SpeicherWB_buffer] eq "An"                               ## Der Speicher darf zum Laden verwendet werden\
      or  [$SELF:ui_command_1] eq "smart_Laden_beenden_WB"                ## Hier wird das uiTable select ausgewertet\
@@ -166,9 +162,11 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
        Log 3, "$SELF cmd_3.2: Batterie auf ".[?WR_1:Act_state_of_charge]." %, Entlademodus freigegeben"};;\
     ::CommandSet(undef, "WR_1_API 22_03_Battery_MinHomeConsumption 50");;\
 \
-    if (   (   [?WB_1:lp_1_ChargeStat] eq "loading"                       ## Es wird ein Auto geladen\
-            or [?WB_1:lp_2_ChargeStat] eq "loading")\
+    if (   (   [?WB_1:cp_6_get_charge_state] eq "loading"               ## Es wird ein Auto geladen\
+            or [?WB_1:cp_7_get_charge_state] eq "loading")\
         and [?$SELF:SpeicherWB_buffer] eq "An") {\
+      set_Reading("SpeicherMaxSOC_Actual","100");;                       ## Sobald das Auto geladen wird, sollte besser nicht der \
+      set_Reading("SpeicherMaxSOCControlRunning","Aus");;                ## MaxSOC limitiert werden, damit mehr gepuffert werden kann\
       if (AttrVal("$SELF","verbose",0) >=3)\
         {Log 3, "$SELF cmd_3.2: MaxSOC Limitierung wegen Wallboxnutzung abgeschaltet";;}\
     }\
@@ -183,12 +181,9 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 3_smart_Laden_umschalten_WB\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
      and\
-     (\
-       [WB_1:lp_1_ChargeStat] ne "loading"                               ## Es wird gerade kein Fahrzeug geladen\
-      and\
-       [WB_1:lp_2_ChargeStat] ne "loading" \
-      and\
-       [$SELF:WB_smart_laden_before] eq "aktiv"                          ## Vorher war es nicht aktiv\
+     (    [WB_1:cp_6_get_charge_state]  ne "loading"                     ## Es wird gerade kein Fahrzeug geladen\
+      and [WB_1:cp_7_get_charge_state]  ne "loading" \
+      and [$SELF:WB_smart_laden_before] eq "aktiv"                       ## Vorher war es nicht aktiv\
      )\
    ) {\
 \
@@ -202,7 +197,7 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 \
     if (AttrVal("$SELF","verbose",0) >=3)\
       {Log 3, "$SELF cmd_3.3: Batterie wird mit ".[?$SELF:SpeicherEntladung]." Steuerung gesteuert";;\
-       Log 3, "$SELF cmd_3.3: WB_1 laden beendet, reaktivieren des smart_Laden"};;\
+       Log 3, "$SELF cmd_3.3: Wallbox laden beendet, reaktivieren des smart_Laden"};;\
     ::CommandSet(undef, "WR_1_API 22_03_Battery_MinHomeConsumption 30000");;\
     set_Reading("SpeicherExternTrigger","gesperrt");;                     ## Externe Trigger verriegeln \
     if (AttrVal("$SELF","verbose",0) >=3)\
@@ -327,7 +322,7 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
        [$SELF:SpeicherCmdRepeatRunning] eq "An" and                      ## Wenn es  ExternControl Kommandos zum Senden gibt\
        [  {sunrise_abs("HORIZON=+5.0",0,"6:00","08:35")}                 ## Innerhalb der Photovoltaik Zeit\
         - {sunset_abs("HORIZON=+8.0",0,"15:00","21:00")} ] and\
-       [+([WR_1_API:Battery_ComMonitor_Time]-30)]                        ## Den Befehl nach eingestellter Zeit wiederholen\
+       [+([WR_1_API:Battery_ComMonitor_Time]-10)]                        ## Den Befehl nach eingestellter Zeit wiederholen\
       )\
       or [$SELF:ui_command_1] eq "Kommando_Wiederholung"                 ## Hier wird das uiTable select ausgewertet\
      )\
@@ -382,6 +377,7 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 ## Das wurde auskommentiert, damit das BEV mehr 70% Laden kann\
 ##         fhem("setreading WR_ctl Yield_fc0_middayhigh_start ".$wait);;\
 ##         ::CommandSet(undef, "WR_1_API 23_07_Battery_ExternControl_MaxChargePowerAbs 0");;\
+####         fhem("set WR_1_API 23_07_Battery_ExternControl_MaxChargePowerAbs 0");;\
 \
        } else {                                                                 ## auch jetzt nicht mit voller Leistung laden\
 \
@@ -390,9 +386,8 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 \
            my $MaxChargePowerLimit   = (1 - ::round($MaxChargePowerTime,2) * [?$SELF:SpeicherMidday_MaxChargePowerSteigung]);;  ## Zu Beginn etwas langsamer anfangen, empirisch ermittelt\
 \
-           $MaxChargePowerAbs_midday = ::round( [?WR_1:Battery_work_capacity] * ([?$SELF:SpeicherMaxSOC_Actual] - [?WR_1:Act_state_of_charge]) / 100 * $MaxChargePowerLimit, 0);;\
+           $MaxChargePowerAbs_midday = ::round( [?WR_1:Battery_work_capacity_x] * ([?$SELF:SpeicherMaxSOC_Actual] - [?WR_1:Act_state_of_charge]) / 100 * $MaxChargePowerLimit, 0);;\
 \
-##           Log 3, "$SELF cmd_6  : Test ".$MaxChargePowerTime." ".$MaxChargePowerLimit." ".$MaxChargePowerAbs_midday." vorher ".::round( [?WR_1:Battery_work_capacity] * ([?$SELF:SpeicherMaxSOC_Actual] - [?WR_1:Act_state_of_charge]) / 100 * (1 - ::round($MaxChargePowerTime,2) * [?$SELF:SpeicherMidday_MaxChargePowerSteigung]), 0);;\
 \
            if ($MaxChargePowerAbs_midday < 500) { $MaxChargePowerAbs_midday = 500 };;## Nicht unter 1000\
            Log 3, "$SELF cmd_6  : Mittags $MaxChargePowerTime h mit $MaxChargePowerAbs_midday W laden";;\
@@ -707,38 +702,86 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 }\
 \
 ################################################################################################################\
-## 6 Wiederhole alle 180s die Kommandos der ExternControl Steuerung\
-##\
-16_Stop_Standby_Entladung\
+## 13 WR_1_Speicher_1 Status aktualisieren.\
+##   Dies ist momentan nur für den BYD HV Speicher, da der BYD HVS eine direkte Abfrage nicht unterstützt.\
+##   Wer keinen BYD HV Speicher hat kann das löschen\
+13_Status_WR_1_Speicher_1_BYD\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+     and\
+      ([+:06] and !([:00] or [:30]))\
+      or\
+      [$SELF:ui_command_1] eq "Status_WR_1_Speicher_1_BYD"               ## Hier wird das uiTable select ausgewertet\
+   ) {\
+   if( [?$SELF:ui_command_1] eq "Status_WR_1_Speicher_1_BYD" ) {          ## Hier wurde manuell eingeschaltet\
+     set_Reading("ui_command_1_before",[?$SELF:ui_command_1]);;\
+     set_Reading("ui_command_1","---");;                                  ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+\
+   ::CommandGet(undef, "WR_1_Speicher_1 BatteryInformation");;\
+   ::CommandGet(undef, "WR_1_Speicher_1 StatisticInformation");;\
+\
+    if (AttrVal("$SELF","verbose",0) >=4) {\
+      Log 3, "$SELF cmd_13 : Speicher Status abfrage, BYD HV direkt"\
+    }\
+  }\
+}\
+\
+################################################################################################################\
+## 14_Lüfter_ein\
+14_Luefter_ein\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
      and\
       ((\
-       [WR_1_API:Battery_Control] > 0 and                                ## Wenn die ExternControl am WR konfiguriert ist\
-       [$SELF:SpeicherCmdRepeatActive]  eq "An" and                      ## Wenn die ExternControl Aktiviert ist\
-       [$SELF:SpeicherExternTrigger] eq "gesperrt" and                   ## Das smart_Laden\
-       [WR_1_API:Battery_InternControl_MinHomeConsumption] == 30000 and  ##      aktiviert wurde\
-       [WR_1:Total_Active_P_EM] > 0 and                                  ## Es wird nicht ins Netz eingespeist\
-       [$SELF:SpeicherDcPowerAbs] == 5000 and                               ## Es wird anderweitig kein Wert vorgegeben       <<< ist nicht mehr aktiv\
-       [+([WR_1_API:Battery_ComMonitor_Time]-30)]                        ## Den Befehl nach eingestellter Zeit wiederholen\
+        [03:00 - 06:00] and [WR_1:Battery_temperature] > 20              ## in diesem Zeitraum runter Kühlen\
+        or\
+        [09:00 - 18:00] and [WR_1:Battery_temperature] > 25              ## in diesem Zeitraum da wird es zu warm\
+       )\
+       and [WR_1_API:DigitalOutputs_ConfigurationFlags] eq 0             ## Der Ausgang ist abgeschaltet\
       )\
-      or [$SELF:ui_command_1] eq "Stop_Standby_Entladung"                ## Hier wird das uiTable select ausgewertet\
-     )\
+      or\
+      [$SELF:ui_command_1] eq "14_Luefter_ein"                           ## Hier wird das uiTable select ausgewertet\
    ) {\
-\
-    if( [?$SELF:ui_command_1] eq "Stop_Standby_Entladung" ) {             ## Hier wurde manuell eingeschaltet\
-      set_Reading("ui_command_1_before",[?$SELF:ui_command_1]);;\
-    }\
-\
-   ::CommandSet(undef, "WR_1_API 23_05_Battery_ExternControl_DcPowerAbs -10");;\
-   set_Exec("16_Battery_EM_State",30,'::CommandGet(undef, "WR_1_API 25_Battery_EM_State")');;\
-\
-   if (AttrVal("$SELF","verbose",0) >=4) {\
-     Log 3, "$SELF cmd_16 : Battery_ExternControl_DcPowerAbs auf -10 gesetzt";;\
-   };;\
-\
-   set_Reading("ui_command_1","---");;                                    ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+   if( [?$SELF:ui_command_1] eq "14_Luefter_ein" ) {                      ## Hier wurde manuell eingeschaltet\
+     set_Reading("ui_command_1_before",[?$SELF:ui_command_1]);;\
+     set_Reading("ui_command_1","---");;                                  ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
                                                                          ## kann das Kommando nicht sofort wiederholt werden\
    }\
+\
+   fhem("set WR_1_API 41_01_DigitalOutputs 9");;                          ## Das schaltet des Ausgang ein\
+   set_Exec("Luefter_runtime",[WR_1_API:DigitalOutputs_TimeMode_RunTime]*60,'Log 3, "$SELF cmd_14 : ExternControl Lüfter max Laufzeit"');;\
+\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+     {Log 3, "$SELF cmd_14 : ExternControl Lüfter eingeschaltet"};;\
+  }\
+}\
+\
+\
+################################################################################################################\
+## 15_Lüfter_aus\
+15_Luefter_aus\
+{if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
+     and\
+      (    [06:00 - 03:00]                                               ## in diesem Zeitraum\
+       and [WR_1:Battery_temperature] < 20                               ## das ist kühl genug\
+       and [?WR_1_API:DigitalOutputs_ConfigurationFlags] eq 9             ## Der Ausgang ist eingeschaltet\
+      )\
+      or   [06:00] or [19:30]                                            ## Hier wird abgeschaltet, da nicht mehr soviel Abwärme entsteht\
+      or   [$SELF:ui_command_1] eq "15_Luefter_aus"                      ## Hier wird das uiTable select ausgewertet\
+   ) {\
+   if( [?$SELF:ui_command_1] eq "15_Luefter_aus" ) {                      ## Hier wurde manuell eingeschaltet\
+     set_Reading("ui_command_1_before",[?$SELF:ui_command_1]);;\
+     set_Reading("ui_command_1","---");;                                  ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
+                                                                         ## kann das Kommando nicht sofort wiederholt werden\
+   }\
+\
+   del_Exec("Luefter_runtime");;\
+   fhem("set WR_1_API 41_01_DigitalOutputs 9");;                          ## Das schaltet des Ausgang aus\
+   set_Exec("wait_Luefter_aus",2,'fhem("set WR_1_API 41_01_DigitalOutputs 0")');;\
+\
+   if (AttrVal("$SELF","verbose",0) >=3)\
+     {Log 3, "$SELF cmd_14 : ExternControl Lüfter ausgeschaltet"};;\
+  }\
 }\
 \
 ################################################################################################################\
@@ -750,13 +793,13 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
       ((\
            [$SELF:SpeicherTriggerLaden] eq "An"                          ## Ist der Trigger für das Zwangsladen aktiv?\
        and [$SELF:SpeicherDcPowerAbs]   ne 0                             ## Wurde eine Lade/Entlade Leistung eingestellt?\
-       and (   [+58]                                                     ## Den Befehl nach eingestellter Zeit wiederholen\
-            or [$SELF:SpeicherDcPowerAbs]\
+       and (   [+([WR_1_API:Battery_ComMonitor_Time]-10)]                ## Den Befehl nach eingestellter Zeit wiederholen\
+            or [$SELF:SpeicherDcPowerAbs]                                ##    oder wenn SpeicherDcPowerAbs verändert wurde\
            )\
       )\
       or [$SELF:ui_command_1] eq "Kommando_Wiederholung_DcPowerAbs"      ## Hier wird das uiTable select ausgewertet\
       or     [$SELF:SpeicherTriggerLaden] eq "Aus"                       ## Hier wird die externe Steuerung beendet\
-         and [$SELF:SpeicherDcPowerAbs]   ne 0\
+         and [$SELF:SpeicherDcPowerAbs]   ne 0                           ##    oder wenn SpeicherDcPowerAbs auf 0 gesetzt wird\
      )\
    ) {\
 \
@@ -794,14 +837,14 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
      and\
       ((\
            [$SELF:SpeicherStromboerse] eq "Tibber"                       ## Soll Tibber verwendet werden?\
-       and [EVU_Tibber_connect:fc0_trigger]                              ## Wurde der Trigger geändert\
+       and [Stromboerse_connect:fc0_trigger]                             ## Wurde der Trigger geändert\
 \
        )\
        or [$SELF:ui_command_1] eq "SpeicherStromboerse"                  ## Hier wird das uiTable select ausgewertet\
       )\
    ) {\
 \
-    if ([?EVU_Tibber_connect:fc0_trigger] eq "on") {\
+    if ([?Stromboerse_connect:fc0_trigger] eq "on") {\
       set_Reading("SpeicherDcPowerAbs",[?$SELF:SpeicherStromboerseDcPowerAbs]);;\
       fhem("setreading $SELF SpeicherTriggerLaden An");;\
     } else {\
@@ -815,7 +858,7 @@ defmod WR_1_Speicher_1_ExternControl DOIF ######################################
 }
 attr WR_1_Speicher_1_ExternControl DbLogExclude .*
 attr WR_1_Speicher_1_ExternControl alias WR_1_Speicher_1_ExternControl
-attr WR_1_Speicher_1_ExternControl comment Version 2023.06.21 14:00\
+attr WR_1_Speicher_1_ExternControl comment Version 2026.01.09 12:00\
 \
 Hier können externe Trigger für die Ladung und Entladung Der Batterie gesetzt werden.\
 Die Zeiten können z.B. durch den WeekDayTimer entsprechend an einen Stromtarif angepasst werden.\
@@ -864,51 +907,55 @@ attr WR_1_Speicher_1_ExternControl readingList SpeicherExternTrigger SpeicherCmd
 attr WR_1_Speicher_1_ExternControl room 2_PV_Steuerung,Strom->Photovoltaik
 attr WR_1_Speicher_1_ExternControl setList SpeicherExternTrigger:frei,gesperrt SpeicherCmdRepeatActive:0,1 SpeicherZeitStart:time SpeicherZeitEnde:time SpeicherEntladung:Automatik,Zeit,Trigger SpeicherTrigger:entladen,gesperrt,none SpeicherMiddayControlActive:0,1 SpeicherMidday_Inverter_Max_Power:slider,3000,500,20000 SpeicherMidday_MaxChargePowerAbs_morning:slider,0,50,1000 SpeicherMidday_MaxChargePowerAbs_midday:slider,0,100,4700 SpeicherMidday_MaxChargePowerSteigung SpeicherMidday_MaxSOC:slider,20,5,50 SpeicherMidday_NotBefore:time SpeicherMinSOC_Sommer:slider,5,1,20 SpeicherMinSOC_Winter:slider,5,1,20 SpeicherMinSOC_fc1_Limit:slider,7000,500,17000 SpeicherMaxSOCControlActive:0,1 SpeicherMaxSOC_Actual:slider,60,5,100 SpeicherMaxSOC_DayBefore:slider,15,5,100 SpeicherMaxSOC_fc1_Limit:slider,10000,2000,50000
 attr WR_1_Speicher_1_ExternControl sortby 122
-attr WR_1_Speicher_1_ExternControl uiTable {\
+attr WR_1_Speicher_1_ExternControl uiState {\
 package ui_Table;;\
-##  $TR{0} = "style='color:yellow;;text-align:left;;font-weight:bold;;font-size:18px'";;                                                         ## Reihe 0 für Überschrift\
   $TABLE = "style='width:100%;;'";;\
 \
-  $TD{0..9}{0}     = "align='center' style='font-size:16px;;border-right-style:solid;;border-color:darkgreen;;border-right-width:2px;;width:26%'";;\
-\
-  $TD{0..9}{1} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
-  $TD{0..9}{2..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
+  $TD{0..9}{0} = "style='border-top-style:solid;;border-bottom-style:solid;;border-left-style:solid;;border-left-width:2px;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:36%;;font-weight:bold;;'";;\
+  $TD{0..9}{1..4} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
   $TD{0..9}{5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
 \
-sub FUNC_batt {\
+sub $SELF_FUNC_batt {\
     my($val)=@_;;\
     my $ret="position:absolute;;left:".(90*$val/100)."px;;width:90px;;height:20px;;background:linear-gradient( to right,#F8F8E0 ".(90-(90*$val/100))."px,rgba(0,0,0,0) ".(90-(90*$val/100))."px);;";;\
     return $ret;;\
   }\
-sub FUNC_Status {\
+\
+sub $SELF_FUNC_batt_new {\
+    my($val)=@_;;\
+    my $ret="position:absolute;;left:0px;;width:".(90*$val/100)."px;;height:20px;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;";;\
+    return $ret;;\
+  }\
+\
+sub $SELF_FUNC_Status {\
     my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
     my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
     return $ret;;\
   }\
 \
-sub Device {\
-    return "EVU_Tibber_connect";;\
+sub $SELF_Device {\
+    return "Stromboerse_connect";;\
   }\
 \
-sub Format {\
+sub $SELF_Format {\
   my($i)=@_;;\
 \
   if ($i eq "trigger_0") {\
-      return (    ::ReadingsVal(Device(),"fc_min",0) > ::ReadingsVal(Device(),"fc_trigger_price",0)\
-                 or ::ReadingsVal(Device(),"fc0_trigger_start","") eq "null" ) ?\
+      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_price",0)\
+                 or ::ReadingsVal($SELF_Device(),"fc0_trigger_start","") eq "null" ) ?\
             "<span style='color:red'>Heute kein Trigger <br>mehr unter ".\
-                 ::ReadingsVal(Device(),"fc_trigger_price","null")." ct</span>" :\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" :\
             "<span style='color:green'>Trigger von<br>".\
-                 ::ReadingsVal(Device(),"fc0_trigger_start","00:00")." bis ".::ReadingsVal(Device(),"fc0_trigger_stop","00:00")."<br>unter ".\
-                 ::ReadingsVal(Device(),"fc_trigger_price","null")." ct</span>" ;;\
+                 ::ReadingsVal($SELF_Device(),"fc0_trigger_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc0_trigger_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" ;;\
     } elsif ($i eq "trigger_1") {\
-      return (    ::ReadingsVal(Device(),"fc_min",0) > ::ReadingsVal(Device(),"fc_trigger_price",0)\
-                 or ::ReadingsVal(Device(),"fc1_trigger_start","") eq "null" ) ?\
+      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_price",0)\
+                 or ::ReadingsVal($SELF_Device(),"fc1_trigger_start","") eq "null" ) ?\
             "<span style='color:red'>Morgen kein Trigger <br>mehr unter ".\
-                 ::ReadingsVal(Device(),"fc_trigger_price","null")." ct</span>" :\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" :\
             "<span style='color:green'>Morgen ein Trigger von<br>".\
-                 ::ReadingsVal(Device(),"fc1_trigger_start","00:00")." bis ".::ReadingsVal(Device(),"fc1_trigger_stop","00:00")."<br>unter ".\
-                 ::ReadingsVal(Device(),"fc_trigger_price","null")." ct</span>" ;;\
+                 ::ReadingsVal($SELF_Device(),"fc1_trigger_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc1_trigger_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" ;;\
     }\
   return "null";;\
   }\
@@ -917,69 +964,70 @@ sub Format {\
 #########################################################\
 ## "Spalte 0"|"Spalte 1"|"Spalte 2"|"Spalte 3"|"Spalte 4"|"Spalte 5"\
 \
-"$SELF"|"Kommando<dd>Auswahl / DcPowerAbs / Status</dd>" | widget([$SELF:ui_command_1],"uzsuDropDown,---,Status_Speicher,smart_Laden_start,smart_Laden_beenden,smart_Laden_starten_WB,smart_Laden_beenden_WB,Kommando_Wiederholung,SOC_Calculation,Reset,DC_Power_Abs,Sommer,Winter,Speicher_voll,14_Luefter_ein,15_Luefter_aus,Status_WR_1_Speicher_1_BYD") | widget([$SELF:SpeicherDcPowerAbs],"selectnumbers,-4500,250,4500,0,lin")."W".widget([$SELF:SpeicherTriggerLaden],"uzsuDropDown,An,Aus,manuell") |[WR_1_API:Battery_EM_State]|([$SELF:SpeicherExternTrigger] eq "gesperrt" and [WR_1_API:Battery_InternControl_MinHomeConsumption] == 30000)?'<span style="color:red">smart_Laden aktiv</span>':""\
+"Kommando<dd>Auswahl / DcPowerAbs / Status</dd>" | widget([$SELF:ui_command_1],"uzsuDropDown,---,Status_Speicher,smart_Laden_start,smart_Laden_beenden,smart_Laden_starten_WB,smart_Laden_beenden_WB,Kommando_Wiederholung,SOC_Calculation,Reset,DC_Power_Abs,Sommer,Winter,Speicher_voll,14_Luefter_ein,15_Luefter_aus,Status_WR_1_Speicher_1_BYD") | widget([$SELF:SpeicherDcPowerAbs],"selectnumbers,-4500,250,4500,0,lin")."W".widget([$SELF:SpeicherTriggerLaden],"uzsuDropDown,An,Aus,manuell") |[WR_1_API:Battery_EM_State]|([$SELF:SpeicherExternTrigger] eq "gesperrt" and [WR_1_API:Battery_InternControl_MinHomeConsumption] == 30000)?'<span style="color:red">smart_Laden aktiv</span>':""\
 \
-|"Speicher<dd>Steuerung</dd>" | widget([$SELF:SpeicherEntladung],"uzsuDropDown,Automatik,Trigger,Zeit") |"WB Laden ".widget([$SELF:SpeicherWB_buffer],"uzsuToggle,Aus,An")|\
-FUNC_Status([WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],-10,"green","Laden","orange","Standby",15,"red","Entladen")."<br>".FUNC_Status([WR_1:Act_state_of_charge],15,"red","Speicher SOC","orange","Speicher SOC",49,"green","Speicher SOC")|\
+"Speicher<dd>Steuerung</dd>" | widget([$SELF:SpeicherEntladung],"uzsuDropDown,Automatik,Trigger,Zeit") |"WB Laden ".widget([$SELF:SpeicherWB_buffer],"uzsuToggle,Aus,An")|\
+$SELF_FUNC_Status([WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],-10,"green","Laden","orange","Standby",15,"red","Entladen")."<br>".$SELF_FUNC_Status([WR_1:Act_state_of_charge],15,"red","Speicher SOC","orange","Speicher SOC",49,"green","Speicher SOC")|\
 \
- FUNC_Status([WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],-10,"green",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],"orange",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],15,"red",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P])." W"."<div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",FUNC_batt([WR_1:Act_state_of_charge])).STY(::round([WR_1:Act_state_of_charge],0)."%","font-size:16px;;position:absolute;;top:2px;;left:30px")."</div>"\
+$SELF_FUNC_Status([WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],-10,"green",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],"orange",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P],15,"red",[WR_1:Actual_Battery_charge_-minus_or_discharge_-plus_P])." W<br><div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;padding:0px 0px;;display:inline-block;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",$SELF_FUNC_batt([WR_1:Act_state_of_charge])).STY(::round([WR_1:Act_state_of_charge],0)."%","font-size:16px;;position:absolute;;top:2px;;left:30px")."</div>"\
 \
+"Trigger<dd>Status / ExternTrigger / Start / Ende</dd>" | widget([$SELF:SpeicherTrigger],"uzsuDropDown,entladen,gesperrt,none") | widget([$SELF:SpeicherExternTrigger],"uzsuDropDown,frei,gesperrt,none") | widget([$SELF:SpeicherZeitStart],"time") | widget([$SELF:SpeicherZeitEnde],"time")\
 \
-|"Trigger<dd>Status / ExternTrigger / Start / Ende</dd>" | widget([$SELF:SpeicherTrigger],"uzsuDropDown,entladen,gesperrt,none") | widget([$SELF:SpeicherExternTrigger],"uzsuDropDown,frei,gesperrt,none") | widget([$SELF:SpeicherZeitStart],"time") | widget([$SELF:SpeicherZeitEnde],"time")\
-\
-|"Strombörse<dd>Auswahl/Ladeleistung / Ladefenster fc0/fc1 / Trigger Status </dd>" | widget([$SELF:SpeicherStromboerse],"uzsuDropDown,Aus,Tibber")."<br>".widget([$SELF:SpeicherStromboerseDcPowerAbs],"selectnumbers,-4500,250,0,0,lin")."W"  | \
+"Strombörse<dd>Auswahl/Ladeleistung / Ladefenster fc0/fc1 / Trigger Status </dd>" | widget([$SELF:SpeicherStromboerse],"uzsuDropDown,Aus,Tibber")."<br>".widget([$SELF:SpeicherStromboerseDcPowerAbs],"selectnumbers,-4500,250,0,0,lin")."W"  | \
 "<span style=font-weight:bold>Trigger fc0</span><br><br>".Format("trigger_0")|\
 "<span style=font-weight:bold>Trigger fc1</span><br><br>".Format("trigger_1")|\
-[EVU_Tibber_connect:fc0_trigger] \
+[Stromboerse_connect:fc0_trigger] \
 \
-|"Kommando Wiederholung<dd>aktiviert / läuft</dd>" | widget([$SELF:SpeicherCmdRepeatActive],"uzsuToggle,Aus,An") | widget([$SELF:SpeicherCmdRepeatRunning],"uzsuToggle,Aus,An") |""|""\
+"Kommando Wiederholung<dd>aktiviert / läuft</dd>" | widget([$SELF:SpeicherCmdRepeatActive],"uzsuToggle,Aus,An") | widget([$SELF:SpeicherCmdRepeatRunning],"uzsuToggle,Aus,An") |""|""\
 \
-|"MaxSOC Kontrolle<dd>aktiviert / läuft</dd>" | widget([$SELF:SpeicherMaxSOCControlActive],"uzsuToggle,Aus,An") | widget([$SELF:SpeicherMaxSOCControlRunning],"uzsuToggle,Aus,An") |""|""\
+"MaxSOC Kontrolle<dd>aktiviert / läuft</dd>" | widget([$SELF:SpeicherMaxSOCControlActive],"uzsuToggle,Aus,An") | widget([$SELF:SpeicherMaxSOCControlRunning],"uzsuToggle,Aus,An") |""|""\
 \
-|"MaxSOC Limit<dd>fc1_Limit / Minimum SOC Zeit / gestern / geplant</dd>" |\
-FUNC_Status([WR_ctl:Yield_fc1_day],[$SELF:SpeicherMaxSOC_fc1_Limit],"red","<",0,0,([$SELF:SpeicherMaxSOC_fc1_Limit]-1),"green",">="). widget([$SELF:SpeicherMaxSOC_fc1_Limit],"selectnumbers,2000,1000,40000,0,lin") | ([$SELF:SpeicherMaxSOC_MinSOC_Time] eq "gefunden")?(POSIX::strftime("%H:%M",::localtime(::time_str2num(::ReadingsTimestamp("$SELF","SpeicherMaxSOC_MinSOC_MinSOC",""))))." ".[$SELF:SpeicherMaxSOC_MinSOC_MinSOC]." %"):"wartet" |\
-"<div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",FUNC_batt([$SELF:SpeicherMaxSOC_DayBefore])).STY("gestern","font-size:12px;;position:absolute;;top:3px;;left:25px")."</div>".widget([$SELF:SpeicherMaxSOC_DayBefore],"selectnumbers,5,1,100,0,lin")."%" |\
-"<div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",FUNC_batt([$SELF:SpeicherMaxSOC_Actual])).STY("geplant","font-size:12px;;position:absolute;;top:3px;;left:25px")."</div>".widget([$SELF:SpeicherMaxSOC_Actual],"selectnumbers,5,1,100,0,lin")."%"\
+"MaxSOC Limit<dd>fc1_Limit / Minimum SOC Zeit / gestern / geplant</dd>" |\
+$SELF_FUNC_Status([WR_ctl:Yield_fc1_day],[$SELF:SpeicherMaxSOC_fc1_Limit],"red","<",0,0,([$SELF:SpeicherMaxSOC_fc1_Limit]-1),"green",">="). widget([$SELF:SpeicherMaxSOC_fc1_Limit],"selectnumbers,2000,1000,40000,0,lin") | ([$SELF:SpeicherMaxSOC_MinSOC_Time] eq "gefunden")?(POSIX::strftime("%H:%M",::localtime(::time_str2num(::ReadingsTimestamp("$SELF","SpeicherMaxSOC_MinSOC_MinSOC",""))))." ".[$SELF:SpeicherMaxSOC_MinSOC_MinSOC]." %"):"wartet" |\
 \
-|"Mittags Kontrolle<dd>aktiviert / läuft</dd>" | widget([$SELF:SpeicherMiddayControlActive],"uzsuToggle,Aus,An") | widget([$SELF:SpeicherMiddayControlRunning],"uzsuToggle,Aus,An")|""|""\
+"<div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;padding:0px 0px;;display:inline-block;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",$SELF_FUNC_batt([$SELF:SpeicherMaxSOC_DayBefore])).STY("gestern","font-size:12px;;position:absolute;;top:3px;;left:25px")."</div><br>".widget([$SELF:SpeicherMaxSOC_DayBefore],"selectnumbers,5,1,100,0,lin")."%" |\
 \
-|"Mittags Limits<dd>Inverter_Max_Power / Laden nicht vor / Start /Stop<br>MaxSOC morgens / Power morgens / Power mittags</dd>" | widget([$SELF:SpeicherMidday_Inverter_Max_Power],"selectnumbers,1000,250,15000,0,lin")."W<br>".widget([$SELF:SpeicherMidday_MaxSOC],"selectnumbers,5,1,100,0,lin")."%" | widget([$SELF:SpeicherMidday_NotBefore],"time").widget([$SELF:SpeicherMidday_MaxChargePowerAbs_morning],"selectnumbers,0,50,1000,0,lin")."W" | widget([WR_ctl:Yield_fc0_middayhigh_start],"time").widget([$SELF:SpeicherMidday_MaxChargePowerAbs_midday],"selectnumbers,0,100,4700,0,lin")."W" | widget([WR_ctl:Yield_fc0_middayhigh_stop],"time").([$SELF:SpeicherMidday_MaxChargePowerAbs_midday] == 0)?"dynamisch":""\
+"<div style='border-width:2px;;border-style:solid;;border-color:gray;;position:relative;;width:90px;;height:20px;;padding:0px 0px;;display:inline-block;;background:linear-gradient( to right, red 0px,yellow 30px,green 50px);;'>".STY(" ",$SELF_FUNC_batt([$SELF:SpeicherMaxSOC_Actual])).STY("geplant","font-size:12px;;position:absolute;;top:3px;;left:25px")."</div><br>".widget([$SELF:SpeicherMaxSOC_Actual],"selectnumbers,5,1,100,0,lin")."%"\
 \
-|"MinSOC Steuerung<dd>fc1_Limit / Winter | Sommer /aktuell</dd>"|\
+"Mittags Kontrolle<dd>aktiviert / läuft</dd>" | widget([$SELF:SpeicherMiddayControlActive],"uzsuToggle,Aus,An") | widget([$SELF:SpeicherMiddayControlRunning],"uzsuToggle,Aus,An")|""|""\
+\
+"Mittags Limits<dd>Inverter_Max_Power / Laden nicht vor / Start /Stop<br>MaxSOC morgens / Power morgens / Power mittags</dd>" | widget([$SELF:SpeicherMidday_Inverter_Max_Power],"selectnumbers,1000,250,15000,0,lin")."W<br>".widget([$SELF:SpeicherMidday_MaxSOC],"selectnumbers,5,1,100,0,lin")."%" | widget([$SELF:SpeicherMidday_NotBefore],"time").widget([$SELF:SpeicherMidday_MaxChargePowerAbs_morning],"selectnumbers,0,50,1000,0,lin")."W" | widget([WR_ctl:Yield_fc0_middayhigh_start],"time").widget([$SELF:SpeicherMidday_MaxChargePowerAbs_midday],"selectnumbers,0,100,4700,0,lin")."W" | widget([WR_ctl:Yield_fc0_middayhigh_stop],"time").([$SELF:SpeicherMidday_MaxChargePowerAbs_midday] == 0)?"dynamisch":""\
+\
+"MinSOC Steuerung<dd>fc1_Limit / Winter | Sommer /aktuell</dd>"|\
  FUNC_Status([WR_ctl:Yield_fc1_day],[$SELF:SpeicherMinSOC_fc1_Limit],"red","<",0,0,([$SELF:SpeicherMinSOC_fc1_Limit]-1),"green",">=").widget([$SELF:SpeicherMinSOC_fc1_Limit],"selectnumbers,2000,1000,40000,0,lin")."wh" |\
  widget([$SELF:SpeicherMinSOC_Winter],"selectnumbers,10,1,30,0,lin").widget([$SELF:SpeicherMinSOC_Sommer],"selectnumbers,5,1,10,0,lin")."%" |""|[WR_1_API:Battery_InternControl_MinSoc]." %"
 attr WR_1_Speicher_1_ExternControl verbose 3
 
 setstate WR_1_Speicher_1_ExternControl 2023-02-28 10:09:32 SpeicherCmdRepeatActive An
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 16:00:00 SpeicherCmdRepeatRunning Aus
-setstate WR_1_Speicher_1_ExternControl 2024-01-19 11:21:57 SpeicherDcPowerAbs 0
+setstate WR_1_Speicher_1_ExternControl 2026-01-09 16:00:02 SpeicherCmdRepeatRunning Aus
+setstate WR_1_Speicher_1_ExternControl 2025-12-18 16:42:37 SpeicherDcPowerAbs 0
 setstate WR_1_Speicher_1_ExternControl 2022-12-18 11:28:13 SpeicherEntladung Automatik
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 11:37:02 SpeicherExternTrigger none
-setstate WR_1_Speicher_1_ExternControl 2023-02-28 10:09:31 SpeicherMaxSOCControlActive An
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 16:00:00 SpeicherMaxSOCControlRunning Aus
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 16:00:00 SpeicherMaxSOC_Actual 100
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 16:00:00 SpeicherMaxSOC_DayBefore 93.00
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 09:13:02 SpeicherMaxSOC_MinSOC_MinSOC 67
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 16:00:00 SpeicherMaxSOC_MinSOC_Time NULL
+setstate WR_1_Speicher_1_ExternControl 2026-01-08 10:16:20 SpeicherExternTrigger gesperrt
+setstate WR_1_Speicher_1_ExternControl 2025-07-27 10:30:18 SpeicherMaxSOCControlActive An
+setstate WR_1_Speicher_1_ExternControl 2026-01-09 16:00:02 SpeicherMaxSOCControlRunning Aus
+setstate WR_1_Speicher_1_ExternControl 2026-01-09 16:00:02 SpeicherMaxSOC_Actual 100
+setstate WR_1_Speicher_1_ExternControl 2026-01-09 16:00:02 SpeicherMaxSOC_DayBefore 10.00
+setstate WR_1_Speicher_1_ExternControl 2026-01-05 09:40:01 SpeicherMaxSOC_MinSOC_MinSOC 13
+setstate WR_1_Speicher_1_ExternControl 2026-01-09 16:00:02 SpeicherMaxSOC_MinSOC_Time NULL
 setstate WR_1_Speicher_1_ExternControl 2021-12-03 10:38:43 SpeicherMaxSOC_fc1_Limit 30000
-setstate WR_1_Speicher_1_ExternControl 2023-02-28 10:09:29 SpeicherMiddayControlActive An
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 16:00:00 SpeicherMiddayControlRunning Aus
+setstate WR_1_Speicher_1_ExternControl 2025-07-27 10:30:17 SpeicherMiddayControlActive An
+setstate WR_1_Speicher_1_ExternControl 2026-01-09 16:00:02 SpeicherMiddayControlRunning Aus
 setstate WR_1_Speicher_1_ExternControl 2023-06-15 12:35:46 SpeicherMidday_Inverter_Max_Power 9000
 setstate WR_1_Speicher_1_ExternControl 2022-08-07 14:40:51 SpeicherMidday_MaxChargePowerAbs_midday 0
-setstate WR_1_Speicher_1_ExternControl 2023-02-07 13:24:17 SpeicherMidday_MaxChargePowerAbs_morning 450
+setstate WR_1_Speicher_1_ExternControl 2025-07-27 10:26:59 SpeicherMidday_MaxChargePowerAbs_morning 450
 setstate WR_1_Speicher_1_ExternControl 2022-08-24 14:43:16 SpeicherMidday_MaxChargePowerSteigung 0.25
-setstate WR_1_Speicher_1_ExternControl 2021-12-03 10:39:28 SpeicherMidday_MaxSOC 30
+setstate WR_1_Speicher_1_ExternControl 2025-07-27 10:27:33 SpeicherMidday_MaxSOC 30
 setstate WR_1_Speicher_1_ExternControl 2022-03-03 09:21:27 SpeicherMidday_NotBefore 09:00
 setstate WR_1_Speicher_1_ExternControl 2022-02-28 18:45:27 SpeicherMinSOC_Sommer 5
 setstate WR_1_Speicher_1_ExternControl 2023-10-25 14:26:37 SpeicherMinSOC_Winter 10
 setstate WR_1_Speicher_1_ExternControl 2022-12-19 18:27:53 SpeicherMinSOC_fc1_Limit 16000
-setstate WR_1_Speicher_1_ExternControl 2023-12-09 07:45:25 SpeicherStromboerse Aus
-setstate WR_1_Speicher_1_ExternControl 2023-12-08 12:51:40 SpeicherStromboerseDcPowerAbs -4500
+setstate WR_1_Speicher_1_ExternControl 2025-11-17 11:50:19 SpeicherStromboerse Aus
+setstate WR_1_Speicher_1_ExternControl 2024-10-09 17:07:42 SpeicherStromboerseDcPowerAbs -2000
 setstate WR_1_Speicher_1_ExternControl 2022-12-14 07:00:00 SpeicherTrigger entladen
-setstate WR_1_Speicher_1_ExternControl 2024-01-19 11:21:57 SpeicherTriggerLaden Aus
-setstate WR_1_Speicher_1_ExternControl 2024-01-09 17:23:01 SpeicherWB_buffer Aus
+setstate WR_1_Speicher_1_ExternControl 2025-12-18 16:42:37 SpeicherTriggerLaden Aus
+setstate WR_1_Speicher_1_ExternControl 2025-12-15 14:49:44 SpeicherWB_buffer Aus
 setstate WR_1_Speicher_1_ExternControl 2022-12-13 16:51:11 SpeicherZeitEnde 17:00
 setstate WR_1_Speicher_1_ExternControl 2023-01-09 11:44:35 SpeicherZeitStart 07:00
-setstate WR_1_Speicher_1_ExternControl 2024-01-22 05:30:39 WB_smart_laden_before ---
-setstate WR_1_Speicher_1_ExternControl 2024-01-24 16:00:00 ui_command_1 ---
-setstate WR_1_Speicher_1_ExternControl 2024-01-20 09:28:57 ui_command_1_before ---
+setstate WR_1_Speicher_1_ExternControl 2026-01-08 10:16:20 WB_smart_laden_before ---
+setstate WR_1_Speicher_1_ExternControl 2026-01-09 16:52:00 ui_command_1 ---
+setstate WR_1_Speicher_1_ExternControl 2026-01-07 17:32:03 ui_command_1_before DC_Power_Abs

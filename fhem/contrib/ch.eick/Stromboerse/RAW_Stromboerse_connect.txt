@@ -1,5 +1,5 @@
 defmod Stromboerse_connect HTTPMOD none
-attr Stromboerse_connect userattr conf_EVU_Tibber_Grundgebuehr_EUR_Jahr conf_EVU_Tibber_Korrektur conf_EVU_Tibber_Zuschlag_ct_kWh conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr conf_EVU_aWATTar_Zuschlag_ct_kWh conf_Netz_Jahresverbrauch_kWh conf_VAT conf_VNB conf_VNB_Arbeitspreis_ct_kWh conf_VNB_KWKG_ct_kWh conf_VNB_Konzession_ct_kWh conf_VNB_Leistungspreis_EUR_Jahr conf_VNB_MSB_iMSys_EUR_Jahr conf_VNB_MSB_mME_EUR_Jahr conf_VNB_Messstelle conf_VNB_Netzentgelt_ct_kWh conf_VNB_Paragraph_19_Umlage_ct_kWh conf_VNB_Stromsteuer_ct_kWh
+attr Stromboerse_connect userattr conf_EVU_Tibber_Grundgebuehr_EUR_Jahr conf_EVU_Tibber_Korrektur conf_EVU_Tibber_Zuschlag_ct_kWh conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr conf_EVU_aWATTar_Zuschlag_ct_kWh conf_Netz_Jahresverbrauch_kWh conf_VAT conf_VNB conf_VNB_Arbeitspreis_ct_kWh conf_VNB_KWKG_ct_kWh conf_VNB_Konzession_ct_kWh conf_VNB_Leistungspreis_EUR_Jahr conf_VNB_MSB_iMSys_EUR_Jahr conf_VNB_MSB_mME_EUR_Jahr conf_VNB_Messstelle conf_VNB_Netzentgelt_ct_kWh conf_VNB_Paragraph_19_Umlage_ct_kWh conf_VNB_Stromsteuer_ct_kWh ws_homeId ws_minInterval ws_myId ws_token ws_websocketURL
 attr Stromboerse_connect DbLogValueFn {\
   if ($READING =~ /fc0_trigger/) {\
     my ($sec, $min, $hour, $mday, $mon, $year) = localtime(time_str2num($TIMESTAMP));;\
@@ -11,11 +11,12 @@ attr Stromboerse_connect DbLogValueFn {\
 \
   }\
 }
-attr Stromboerse_connect comment https://api.energy-charts.info\
+attr Stromboerse_connect comment Version: 20251223 13:00\
+\
+https://api.energy-charts.info\
 https://api.energy-charts.info/price?bzn=DE-LU&start=2025-06-25&end=2025-06-25\
 \
 https://api.energy-charts.info/price?bzn=DE-LU 3600\
-\
 \
 \
 Tibber Formel mit Kosten für 64560 bei e-Netz Südhessen\
@@ -32,12 +33,27 @@ Rechnung (alle Werte in ct/kWh)\
   Konzessionsabgabe: Konz = 1.59\
   Arbeitspreis (Netznutzung): A = 2.14 ct/kWh\
   moderne Messeinrichtungen (mME): 25.00 € / Jahr brutto  => 21.01 € / Jahr Netto\
-  \
-  \
 \
 \
+Tibber_Live\
 \
+https://developer.tibber.com/explorer\
 \
+In der FHEM Kommandozeile könnt Ihr das token und die homeID im KeyStore ablegen.\
+Bitte lest dazu das Thema KeyStore im Wiki und legt die Funktion in Eure 99_myUtils.\
+\
+{KeyValue("store","EVU_Tibber_connect_token","5K4MVS-OjfWhK_4yrjOlFe1F6kJXPVf7eQYggo8ebAE")}\
+{KeyValue("store","EVU_Tibber_connect_homeID","96a14971-525a-4420-aae9-e5aedaa129ff")}\
+\
+Hierduch kann man einen wirtschaftlicheren trigger_price berechnen lassen:\
+setreading EVU_Tibber compensation_grid <Eure Einspeisevergütung>\
+\
+# Berechnung eines Default Schwellwertes als täglicher Niedrigpreis\
+    (fc_avg - fc_min)  /2 + fc_min\
+\
+# Abschätzung von Wirtschaftlichkeit beim Speicher Laden, falls Tibber zu teuer wird\
+# compensation_grid kann auch auf einen für Euch passenden Wert gesetzt werden\
+    (fc_avg - compensation_grid) *0.85\
 
 attr Stromboerse_connect conf_EVU_Tibber_Grundgebuehr_EUR_Jahr 57.84
 attr Stromboerse_connect conf_EVU_Tibber_Korrektur 0.755
@@ -578,6 +594,7 @@ attr Stromboerse_connect get02-325OExpr $val * 100
 attr Stromboerse_connect get02-329Name fc0_2000_total
 attr Stromboerse_connect get02-329OExpr $val * 100
 attr Stromboerse_connect get02-333Name fc0_2015_total
+attr Stromboerse_connect get02-333OExpr $val * 100
 attr Stromboerse_connect get02-337Name fc0_2030_total
 attr Stromboerse_connect get02-337OExpr $val * 100
 attr Stromboerse_connect get02-33Name fc0_0130_total
@@ -844,6 +861,309 @@ attr Stromboerse_connect get02Name 02_Preis_Info_Tibber_Live
 attr Stromboerse_connect get02RegOpt g
 attr Stromboerse_connect get02Regex "total":(-*\d+.\d+)|"startsAt":"(\d+-\d+-\d+T\d+:\d+:\d+).*(?="today")|\[\{"total":(-*\d+.\d+),"startsAt":"(\d+-\d+-\d+T\d+:\d+:\d+)
 attr Stromboerse_connect get02URL https://api.tibber.com/v1-beta/gql
+attr Stromboerse_connect get03-1Name nodes_00_00_from
+attr Stromboerse_connect get03-1OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get03-2Name nodes_00_00_cost
+attr Stromboerse_connect get03-2OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get03-3Name nodes_00_00_consumption
+attr Stromboerse_connect get03-4Name nodes_00_01_from
+attr Stromboerse_connect get03-4OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get03-50OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get03-5Name nodes_00_01_cost
+attr Stromboerse_connect get03-5OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get03-6Name nodes_00_01_consumption
+attr Stromboerse_connect get03-7Name nodes_00_02_from
+attr Stromboerse_connect get03-7OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get03-8Name nodes_00_02_cost
+attr Stromboerse_connect get03-8OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get03-9Name nodes_00_02_consumption
+attr Stromboerse_connect get03Data { "query": "{viewer {home(id:\"%%homeID%%\") {consumption(resolution: HOURLY, last: 3) {nodes {from cost consumption }}}}}"}
+attr Stromboerse_connect get03Header01 Content-Type: application/json
+attr Stromboerse_connect get03Header02 Authorization: Bearer %%token%%
+attr Stromboerse_connect get03Name 03_consumption_hour
+attr Stromboerse_connect get03RegOpt g
+attr Stromboerse_connect get03Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|-*\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
+attr Stromboerse_connect get03URL https://api.tibber.com/v1-beta/gql
+attr Stromboerse_connect get04-10Name nodes_24_03_from
+attr Stromboerse_connect get04-10OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-11Name nodes_24_03_cost
+attr Stromboerse_connect get04-11OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-12Name nodes_24_03_consumption
+attr Stromboerse_connect get04-13Name nodes_24_04_from
+attr Stromboerse_connect get04-13OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-14Name nodes_24_04_cost
+attr Stromboerse_connect get04-14OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-15Name nodes_24_04_consumption
+attr Stromboerse_connect get04-16Name nodes_24_05_from
+attr Stromboerse_connect get04-16OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-17Name nodes_24_05_cost
+attr Stromboerse_connect get04-17OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-18Name nodes_24_05_consumption
+attr Stromboerse_connect get04-19Name nodes_24_06_from
+attr Stromboerse_connect get04-19OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-1Name nodes_24_00_from
+attr Stromboerse_connect get04-1OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-20Name nodes_24_06_cost
+attr Stromboerse_connect get04-20OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-21Name nodes_24_06_consumption
+attr Stromboerse_connect get04-22Name nodes_24_07_from
+attr Stromboerse_connect get04-22OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-23Name nodes_24_07_cost
+attr Stromboerse_connect get04-23OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-24Name nodes_24_07_consumption
+attr Stromboerse_connect get04-25Name nodes_24_08_from
+attr Stromboerse_connect get04-25OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-26Name nodes_24_08_cost
+attr Stromboerse_connect get04-26OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-27Name nodes_24_08_consumption
+attr Stromboerse_connect get04-28Name nodes_24_09_from
+attr Stromboerse_connect get04-28OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-29Name nodes_24_09_cost
+attr Stromboerse_connect get04-29OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-2Name nodes_24_00_cost
+attr Stromboerse_connect get04-2OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-30Name nodes_24_09_consumption
+attr Stromboerse_connect get04-31Name nodes_24_10_from
+attr Stromboerse_connect get04-31OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-32Name nodes_24_10_cost
+attr Stromboerse_connect get04-32OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-33Name nodes_24_10_consumption
+attr Stromboerse_connect get04-34Name nodes_24_11_from
+attr Stromboerse_connect get04-34OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-35Name nodes_24_11_cost
+attr Stromboerse_connect get04-35OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-36Name nodes_24_11_consumption
+attr Stromboerse_connect get04-37Name nodes_24_12_from
+attr Stromboerse_connect get04-37OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-38Name nodes_24_12_cost
+attr Stromboerse_connect get04-38OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-39Name nodes_24_12_consumption
+attr Stromboerse_connect get04-3Name nodes_24_00_consumption
+attr Stromboerse_connect get04-40Name nodes_24_13_from
+attr Stromboerse_connect get04-40OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-41Name nodes_24_13_cost
+attr Stromboerse_connect get04-41OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-42Name nodes_24_13_consumption
+attr Stromboerse_connect get04-43Name nodes_24_14_from
+attr Stromboerse_connect get04-43OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-44Name nodes_24_14_cost
+attr Stromboerse_connect get04-44OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-45Name nodes_24_14_consumption
+attr Stromboerse_connect get04-46Name nodes_24_15_from
+attr Stromboerse_connect get04-46OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-47Name nodes_24_15_cost
+attr Stromboerse_connect get04-47OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-48Name nodes_24_15_consumption
+attr Stromboerse_connect get04-49Name nodes_24_16_from
+attr Stromboerse_connect get04-49OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-4Name nodes_24_01_from
+attr Stromboerse_connect get04-4OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-50Name nodes_24_16_cost
+attr Stromboerse_connect get04-50OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-51Name nodes_24_16_consumption
+attr Stromboerse_connect get04-52Name nodes_24_17_from
+attr Stromboerse_connect get04-52OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-53Name nodes_24_17_cost
+attr Stromboerse_connect get04-53OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-54Name nodes_24_17_consumption
+attr Stromboerse_connect get04-55Name nodes_24_18_from
+attr Stromboerse_connect get04-55OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-56Name nodes_24_18_cost
+attr Stromboerse_connect get04-56OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-57Name nodes_24_18_consumption
+attr Stromboerse_connect get04-58Name nodes_24_19_from
+attr Stromboerse_connect get04-58OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-59Name nodes_24_19_cost
+attr Stromboerse_connect get04-59OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-5Name nodes_24_01_cost
+attr Stromboerse_connect get04-5OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-60Name nodes_24_19_consumption
+attr Stromboerse_connect get04-61Name nodes_24_20_from
+attr Stromboerse_connect get04-61OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-62Name nodes_24_20_cost
+attr Stromboerse_connect get04-62OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-63Name nodes_24_20_consumption
+attr Stromboerse_connect get04-64Name nodes_24_21_from
+attr Stromboerse_connect get04-64OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-65Name nodes_24_21_cost
+attr Stromboerse_connect get04-65OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-66Name nodes_24_21_consumption
+attr Stromboerse_connect get04-67Name nodes_24_22_from
+attr Stromboerse_connect get04-67OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-68Name nodes_24_22_cost
+attr Stromboerse_connect get04-68OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-69Name nodes_24_22_consumption
+attr Stromboerse_connect get04-6Name nodes_24_01_consumption
+attr Stromboerse_connect get04-70Name nodes_24_23_from
+attr Stromboerse_connect get04-70OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-71Name nodes_24_23_cost
+attr Stromboerse_connect get04-71OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-72Name nodes_24_23_consumption
+attr Stromboerse_connect get04-7Name nodes_24_02_from
+attr Stromboerse_connect get04-7OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get04-8Name nodes_24_02_cost
+attr Stromboerse_connect get04-8OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get04-9Name nodes_24_02_consumption
+attr Stromboerse_connect get04Data { "query": "{viewer {home(id:\"%%homeID%%\") {consumption(resolution: HOURLY, last: 24) {nodes {from cost consumption}}}}}"}
+attr Stromboerse_connect get04Header01 Content-Type: application/json
+attr Stromboerse_connect get04Header02 Authorization: Bearer %%token%%
+attr Stromboerse_connect get04Name 04_consumption_hour_24
+attr Stromboerse_connect get04RegOpt g
+attr Stromboerse_connect get04Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|-*\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
+attr Stromboerse_connect get04URL https://api.tibber.com/v1-beta/gql
+attr Stromboerse_connect get05AutoNumLen 4
+attr Stromboerse_connect get05Data { "query": "{viewer {home(id:\"%%homeID%%\") {consumption(resolution: HOURLY, last: 100) {nodes {from cost consumption}}}}}"}
+attr Stromboerse_connect get05Header01 Content-Type: application/json
+attr Stromboerse_connect get05Header02 Authorization: Bearer %%token%%
+attr Stromboerse_connect get05JSON data_viewer_home
+attr Stromboerse_connect get05Name 05_consumption_hourly_100
+attr Stromboerse_connect get05URL https://api.tibber.com/v1-beta/gql
+attr Stromboerse_connect get06-10Name Adresse_07_Telefon
+attr Stromboerse_connect get06-11Name Adresse_01_Vorname
+attr Stromboerse_connect get06-12Name Adresse_02_Nachname
+attr Stromboerse_connect get06-1Name Adresse_03_Strasse
+attr Stromboerse_connect get06-2Name Adresse_05_Ort
+attr Stromboerse_connect get06-3Name Adresse_06_Land
+attr Stromboerse_connect get06-4Name Adresse_05_Ort
+attr Stromboerse_connect get06-5Name Adresse_06_Land
+attr Stromboerse_connect get06-6Name Adresse_09_latitude
+attr Stromboerse_connect get06-7Name Adresse_10_longitude
+attr Stromboerse_connect get06-8Name Adresse_04_Plz
+attr Stromboerse_connect get06-9Name Adresse_08_eMail
+attr Stromboerse_connect get06Data { "query": "{viewer {home(id:\"%%homeID%%\") {address {address1 address2 address3 postalCode city country latitude longitude} owner {firstName lastName contactInfo {email mobile}}}}}" }
+attr Stromboerse_connect get06Header01 Content-Type: application/json
+attr Stromboerse_connect get06Header02 Authorization: Bearer %%token%%
+attr Stromboerse_connect get06JSON data_viewer_home
+attr Stromboerse_connect get06Name 06_address
+attr Stromboerse_connect get06URL https://api.tibber.com/v1-beta/gql
+attr Stromboerse_connect get07-10Name nodes_24_03_from
+attr Stromboerse_connect get07-10OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-11Name nodes_24_03_cost
+attr Stromboerse_connect get07-11OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-12Name nodes_24_03_consumption
+attr Stromboerse_connect get07-13Name nodes_24_04_from
+attr Stromboerse_connect get07-13OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-14Name nodes_24_04_cost
+attr Stromboerse_connect get07-14OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-15Name nodes_24_04_consumption
+attr Stromboerse_connect get07-16Name nodes_24_05_from
+attr Stromboerse_connect get07-16OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-17Name nodes_24_05_cost
+attr Stromboerse_connect get07-17OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-18Name nodes_24_05_consumption
+attr Stromboerse_connect get07-19Name nodes_24_06_from
+attr Stromboerse_connect get07-19OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-1Name features_realTimeConsumptionEnabled
+attr Stromboerse_connect get07-1OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-20Name nodes_24_06_cost
+attr Stromboerse_connect get07-20OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-21Name nodes_24_06_consumption
+attr Stromboerse_connect get07-22Name nodes_24_07_from
+attr Stromboerse_connect get07-22OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-23Name nodes_24_07_cost
+attr Stromboerse_connect get07-23OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-24Name nodes_24_07_consumption
+attr Stromboerse_connect get07-25Name nodes_24_08_from
+attr Stromboerse_connect get07-25OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-26Name nodes_24_08_cost
+attr Stromboerse_connect get07-26OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-27Name nodes_24_08_consumption
+attr Stromboerse_connect get07-28Name nodes_24_09_from
+attr Stromboerse_connect get07-28OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-29Name nodes_24_09_cost
+attr Stromboerse_connect get07-29OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-2Name features_id
+attr Stromboerse_connect get07-2OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-30Name nodes_24_09_consumption
+attr Stromboerse_connect get07-31Name nodes_24_10_from
+attr Stromboerse_connect get07-31OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-32Name nodes_24_10_cost
+attr Stromboerse_connect get07-32OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-33Name nodes_24_10_consumption
+attr Stromboerse_connect get07-34Name nodes_24_11_from
+attr Stromboerse_connect get07-34OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-35Name nodes_24_11_cost
+attr Stromboerse_connect get07-35OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-36Name nodes_24_11_consumption
+attr Stromboerse_connect get07-37Name nodes_24_12_from
+attr Stromboerse_connect get07-37OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-38Name nodes_24_12_cost
+attr Stromboerse_connect get07-38OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-39Name nodes_24_12_consumption
+attr Stromboerse_connect get07-3Name nodes_24_00_consumption
+attr Stromboerse_connect get07-40Name nodes_24_13_from
+attr Stromboerse_connect get07-40OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-41Name nodes_24_13_cost
+attr Stromboerse_connect get07-41OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-42Name nodes_24_13_consumption
+attr Stromboerse_connect get07-43Name nodes_24_14_from
+attr Stromboerse_connect get07-43OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-44Name nodes_24_14_cost
+attr Stromboerse_connect get07-44OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-45Name nodes_24_14_consumption
+attr Stromboerse_connect get07-46Name nodes_24_15_from
+attr Stromboerse_connect get07-46OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-47Name nodes_24_15_cost
+attr Stromboerse_connect get07-47OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-48Name nodes_24_15_consumption
+attr Stromboerse_connect get07-49Name nodes_24_16_from
+attr Stromboerse_connect get07-49OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-4Name nodes_24_01_from
+attr Stromboerse_connect get07-4OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-50Name nodes_24_16_cost
+attr Stromboerse_connect get07-50OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-51Name nodes_24_16_consumption
+attr Stromboerse_connect get07-52Name nodes_24_17_from
+attr Stromboerse_connect get07-52OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-53Name nodes_24_17_cost
+attr Stromboerse_connect get07-53OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-54Name nodes_24_17_consumption
+attr Stromboerse_connect get07-55Name nodes_24_18_from
+attr Stromboerse_connect get07-55OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-56Name nodes_24_18_cost
+attr Stromboerse_connect get07-56OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-57Name nodes_24_18_consumption
+attr Stromboerse_connect get07-58Name nodes_24_19_from
+attr Stromboerse_connect get07-58OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-59Name nodes_24_19_cost
+attr Stromboerse_connect get07-59OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-5Name nodes_24_01_cost
+attr Stromboerse_connect get07-5OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-60Name nodes_24_19_consumption
+attr Stromboerse_connect get07-61Name nodes_24_20_from
+attr Stromboerse_connect get07-61OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-62Name nodes_24_20_cost
+attr Stromboerse_connect get07-62OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-63Name nodes_24_20_consumption
+attr Stromboerse_connect get07-64Name nodes_24_21_from
+attr Stromboerse_connect get07-64OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-65Name nodes_24_21_cost
+attr Stromboerse_connect get07-65OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-66Name nodes_24_21_consumption
+attr Stromboerse_connect get07-67Name nodes_24_22_from
+attr Stromboerse_connect get07-67OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-68Name nodes_24_22_cost
+attr Stromboerse_connect get07-68OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-69Name nodes_24_22_consumption
+attr Stromboerse_connect get07-6Name nodes_24_01_consumption
+attr Stromboerse_connect get07-70Name nodes_24_23_from
+attr Stromboerse_connect get07-70OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-71Name nodes_24_23_cost
+attr Stromboerse_connect get07-71OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-72Name nodes_24_23_consumption
+attr Stromboerse_connect get07-7Name nodes_24_02_from
+attr Stromboerse_connect get07-7OExpr $val =~ s/T/ /g ;; substr($val,0,19)
+attr Stromboerse_connect get07-8Name nodes_24_02_cost
+attr Stromboerse_connect get07-8OExpr ($val ne "0" and $val ne "null")? round($val*AttrVal($name,"conf_VAT",0),4) : $val
+attr Stromboerse_connect get07-9Name nodes_24_02_consumption
+attr Stromboerse_connect get07Data { "query": "{viewer {home(id:\"%%homeID%%\") {id features{realTimeConsumptionEnabled} } } }" }
+attr Stromboerse_connect get07Header01 Content-Type: application/json
+attr Stromboerse_connect get07Header02 Authorization: Bearer %%token%%
+attr Stromboerse_connect get07JSON data_viewer_home
+attr Stromboerse_connect get07Name 07_realTimeConsumptionEnabled
+attr Stromboerse_connect get07RegOpt g
+attr Stromboerse_connect get07Regex \{"from":"([\d+-]+T[\d+:]+\.000[+-][\d+:]+)","cost":(null|-*\d+\.\d+|0),"consumption":(null|\d+\.\d+|0)\}
+attr Stromboerse_connect get07URL https://api.tibber.com/v1-beta/gql
 attr Stromboerse_connect group PV Steuerung EVU
 attr Stromboerse_connect icon stromzaehler_icon
 attr Stromboerse_connect replacement01Mode expression
@@ -862,7 +1182,211 @@ attr Stromboerse_connect room Strom->Boerse
 attr Stromboerse_connect showBody 0
 attr Stromboerse_connect sortby 413
 attr Stromboerse_connect timeout 10
-attr Stromboerse_connect userReadings conf_EVU_Summe_ct_kWh:conf_EVU.* {\
+attr Stromboerse_connect userReadings ws_connect:ws_cmd:.connect {\
+    my $hash = $defs{$name};;\
+    my $devState = DevIo_IsOpen($hash);;\
+    return "Device already open" if (defined($devState));;\
+    \
+    # establish connection to websocket\
+    # format must also include portnumber if a path is to be specified\
+    $hash->{DeviceName} = AttrVal($name, "ws_websocketURL", "wss:echo.websocket.org:443");;\
+    \
+    # special headers needed for Tibber, see also Developer Tools in Browser\
+    $hash->{header}{'Sec-WebSocket-Protocol'} = 'graphql-transport-ws';;\
+    $hash->{header}{'Host'} = 'websocket-api.tibber.com';;\
+    $hash->{header}{'Origin'} = 'https://developer.tibber.com';;\
+    \
+    # callback function when "select()" signals data for us\
+    # websocket Ping/Pongs are treated in DevIo but still call this function\
+    $hash->{directReadFn} = sub () {\
+        my $hash = $defs{$name};;\
+        \
+        # we can read without closing the DevIo, because select() signalled data\
+        my $buf = DevIo_SimpleRead($hash);;\
+        \
+        # if read fails, close device\
+        if(!defined($buf)) {\
+            DevIo_CloseDev($hash);;\
+            $buf = "not_connected";;\
+        }\
+        \
+        #Log(3, "$name:$reading: websocket data: >>>$buf<<<");;\
+        \
+        # only update our reading if buffer is not empty and if last update is older than minInterval\
+        if ($buf ne "") {\
+            my $websocketDataAge = ReadingsAge($name, "ws_websocketData", 3600);;\
+            my $minInterval = AttrVal($name, "ws_minInterval", 0);;\
+            my $isNext = ($buf =~ /.*id.*type.*next.*payload.*data.*liveMeasurement.*/s);;\
+            \
+            readingsBeginUpdate($hash);;\
+            readingsBulkUpdate($hash, "ws_websocketData", "$buf") if ($isNext && $websocketDataAge > $minInterval);;\
+            readingsBulkUpdate($hash, "ws_websocketData", "$buf") if (!$isNext);;\
+            readingsEndUpdate($hash, 1);;\
+            #Log(3, "$name:$reading: websocket data written to reading");;\
+        }\
+    };;\
+    \
+    # open DevIo websocket\
+    DevIo_OpenDev($hash, 0, undef, sub(){\
+        my ($hash, $error) = @_;;\
+        return "$error" if ($error);;\
+        \
+        my $token = AttrVal($name, "ws_token", "???");;\
+           $token = KeyValue("read","EVU_Tibber_connect_token") if ($token eq "???");;\
+\
+        DevIo_SimpleWrite($hash, '{"type":"connection_init","payload":{"token":"'.$token.'"}}', 2);;\
+    });;\
+    readingsBulkUpdate($hash, "ws_websocketData", "");;\
+    #Log(3, "$name:$reading: websocket data cleared in reading");;\
+      \
+    return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+},\
+\
+ws_disconnect:ws_cmd:.disconnect {\
+    Log(3, "$name: disconnect");;\
+    my $hash = $defs{$name};;\
+    RemoveInternalTimer($hash);;\
+    DevIo_SimpleRead($hash);;\
+    DevIo_CloseDev($hash);;\
+\
+    return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+},\
+\
+ws_onDisconnect {\
+  if ( ReadingsVal($name, "conf_EVU", "???") eq "Tibber_Live" ) {\
+    my $myState = ReadingsVal($name, "state", "???");;\
+    my $myData = ReadingsVal($name, "ws_websocketData", "???");;\
+    return if ($myState ne "disconnected" and $myData ne "not_connected");;\
+    \
+	## timer callback function, called after a few seconds to initiate a reconnect\
+	my $timerFunction = sub() {\
+		my ($arg) = @_;;\
+		my $hash = $defs{$name};;\
+		my $devState = DevIo_IsOpen($hash);;\
+		\
+		# only re-connect if device is not connected\
+		readingsSingleUpdate($hash, "ws_cmd", "connect", 1) if (!defined($devState));;\
+	};;\
+	RemoveInternalTimer($name.$reading.'Timer');;\
+	\
+	# wait a random time before reconnect (exponential backoff TBD):\
+	my $rwait = int(rand(200)) + 30;;\
+	InternalTimer(gettimeofday() + $rwait, $timerFunction, $name.$reading.'Timer');;\
+	\
+	#set cmd to a new value, informs user and allows to retrigger when timer expires\
+	my $hash = $defs{$name};;\
+	readingsBulkUpdate($hash, "ws_cmd", "reconnect attempt in $rwait seconds");;\
+	return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+  }\
+ else {\
+    return "No Tibber_Live configured";;\
+  }\
+},\
+\
+ws_onTimeout:ws_websocketData:.* {\
+	#re-establish websocket connection if no data received in the past ten minutes\
+	#but only if our reading "ws_cmd" was not set to the value "disconnect"\
+\
+        #Log(3, "$name:$reading: websocket data triggert ws_onTimeout");;\
+\
+	#timeout in seconds when the connection is considered dead\
+	my $timeoutTime = 600;;\
+	\
+	# function to execute when timeout expired\
+	# defining the function here in the userReading, allows us to insert variables directly\
+	my $timerFunction = sub() {\
+		my ($arg) = @_;;\
+		my $hash = $defs{$name};;\
+		my $rCmd = ReadingsVal($name, "ws_cmd", "???");;\
+		my $age  = ReadingsAge($name, "ws_websocketData", 0);;\
+		\
+		Log(3, "$name: onTimeoutTimer triggered >>$arg<<");;\
+		\
+		#do not do anything further if disconnect is on purpose\
+		if ( $rCmd eq "disconnect" ) {\
+			Log(3, "$name: ws_cmd was set to disconnect");;\
+			return;;\
+		}\
+		\
+		# for whatever reason, we triggered to soon (80%)\
+		if ( $age < $timeoutTime*0.8 ) {\
+			Log(3, "$name: ws_websocketData is not outdated");;\
+			return;;\
+		}\
+		\
+		DevIo_CloseDev($hash);;\
+		Log(3, "$name: onTimeoutTimer closed DevIo...");;\
+		\
+		readingsSingleUpdate($hash, "ws_cmd", "connect", 1);;\
+		Log(3, "$name: onTimeoutTimer set ws_cmd to value 'connect'");;\
+	};;\
+\
+        #Log(3, "$name:$reading: onTimeout function defined");;\
+\
+	#remove/cancel previous timers, because we got fresh data and countdown starts again\
+	RemoveInternalTimer($name.$reading.'Timer');;\
+	\
+	#set timer to expire and execute function defined above, give special arg as identifier\
+	InternalTimer(gettimeofday() + $timeoutTime, $timerFunction, $name.$reading.'Timer');;\
+	\
+	return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+},\
+\
+ws_onConnectionAck:ws_websocketData:.*connection_ack.* {\
+    #ws_websocketData contains the string "connection_ack"\
+    Log(3, "$name:$reading: got connection ack");;\
+    \
+    # do not proceed if connection is lost\
+    my $hash = $defs{$name};;\
+    my $devState = DevIo_IsOpen($hash);;\
+    return "Device not open" if (!defined($devState));;\
+\
+    readingsBulkUpdate($hash, "ws_cmd", "got connection ack");;\
+    \
+    my $homeId = AttrVal($name, "ws_homeId", "???");;\
+       $homeId = KeyValue("read","EVU_Tibber_connect_homeID") if ($homeId eq "???");;\
+\
+    my $myId = AttrVal($name, "ws_myId", "???");;\
+       $myId = KeyValue("read","EVU_Tibber_connect_homeID") if ($myId eq "???");;\
+    \
+    # build the query, do it in pieces, the comma at the end caused perl errors\
+    # so we put it together in this not very elegant way\
+    my $json = '{ "id":"'. $myId .'", "type":"subscribe"'.", ";;\
+    $json .= '"payload":{';;\
+    $json .= '"variables":{}'.", ";;\
+    $json .= '"extensions":{}'.", ";;\
+    $json .= '"query":"subscription { liveMeasurement( homeId: \"'.$homeId.'\" ) ';;\
+    #$json .= '{ timestamp power accumulatedConsumption accumulatedCost currency minPower averagePower maxPower signalStrength }}"';;\
+    $json .= '{ timestamp power lastMeterConsumption accumulatedConsumption accumulatedProduction ';;\
+    $json .= 'accumulatedProductionLastHour accumulatedCost accumulatedReward currency minPower averagePower maxPower ';;\
+    $json .= 'powerProduction powerReactive powerProductionReactive minPowerProduction maxPowerProduction lastMeterProduction ';;\
+    $json .= 'powerFactor voltagePhase1 voltagePhase2 voltagePhase3 signalStrength }}"';;\
+    $json .= '}}';;\
+    \
+    #send the string via websocket as ASCII\
+    #Log(3, "$name:$reading: sending JSON: >>>$json<<<");;\
+    DevIo_SimpleWrite($hash, $json, 2);;\
+        \
+    return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+},\
+\
+ws_onNextLiveMeasurement:ws_websocketData:.*next.*payload.*data.*liveMeasurement.* {\
+    #websocketData contains next-live-measurement-data\
+    my $val = ReadingsVal($name, "ws_websocketData", "{}");;\
+    my %res = %{json2nameValue($val, undef, undef, "payload_data_liveMeasurement.*")};;\
+    \
+    my $ret = "got values for:\n";;\
+    foreach my $k (sort keys %res) {\
+        $ret .= "$k\n";;\
+        readingsBulkUpdate($hash, makeReadingName($k), $res{$k});;\
+    }\
+    return $ret;;\
+\
+####################################### Ende Tibber_Live ###################################\
+},\
+\
+\
+conf_EVU_Summe_ct_kWh:conf_EVU.* {\
 ## Berechnung des Zuschlages pro kWh, alle Kosten müssen als Nettopreis angegeben werden\
 \
   my $conf_EVU = ReadingsVal("$NAME","conf_EVU","EPEX_Spot") ;;\
@@ -956,27 +1480,31 @@ current_level:fc._0000_total.* {\
 \
 fc_avg:current_price.* {\
 ## Berechnung des durchschnitt Wertes über alle Werte von fc0 und fc1\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
   my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
   my $fc_avg = 0;;\
 \
-  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {      ## Der nächste Tag ist bereits da\
     if (AttrVal("$NAME","verbose",0) >=3) {\
       Log 3, "$NAME  ur_3  : Daten für fc1 sind bereits da";;\
     }\
     $fc  = 1;;\
   } # end if\
-\
+  \
+  my $start=$hour;;\
   for (my $j=0;;$j<=$fc ;;$j++){ # heute und eventuell morgen durchlaufen\
-    for (my $k=0;;$k<=23;;$k++) {                                          ## Summe  berechnen\
+    if ($j==1) {$start=0}                                                                   ## Den nächsten Tag bei Stunde 0 beginnen\
+    for (my $k=$start;;$k<=23;;$k++) {                                                ## Summe  berechnen\
       for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
         $fc_avg += ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j, $k, $quarter*15),0);;\
+# print sprintf("fc%d %02d:%02d",$j, $k, $quarter*15)." ".$fc_avg."\n";;\
       } # end $quarter\
     } # end $k\
   } # end $j\
   if (AttrVal("$NAME","verbose",0) >=3) {\
     Log 3, "$NAME  ur_3  : berechne Durchschnittspreis";;\
   }\
-  return round($fc_avg / (96 *(1+$fc)) ,2);;                     ## Durchschnitt berechnen\
+  return round($fc_avg / ( (96 - $hour*4) + (96 *$fc) ) ,2);;               ## Durchschnitt berechnen\
 },\
 \
 fc_med:current_price.* {\
@@ -988,7 +1516,7 @@ fc_med:current_price.* {\
            SELECT\
              cast( (   (SUBSTRING_INDEX(SUBSTRING_INDEX(group_concat(VALUE order by VALUE), ',', floor(1+((count(VALUE)-1) / 2)))  , ',', -1))\
                        + (SUBSTRING_INDEX(SUBSTRING_INDEX(group_concat(VALUE order by VALUE), ',', ceiling(1+((count(VALUE)-1) / 2))), ',', -1))\
-                     )/2 *100\
+                     )/2\
              AS DECIMAL(4,2))\
            FROM history\
            WHERE DEVICE='".$NAME."'\
@@ -998,6 +1526,7 @@ fc_med:current_price.* {\
 \
 fc_min:current_price.* {\
 ##  Ermittlung des minimal Wertes\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
   my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
   my $fc_min = 0;;\
   my $fc_tmp = 0;;\
@@ -1007,10 +1536,12 @@ fc_min:current_price.* {\
   } # end if\
 \
   for (my $j=0;;$j<=$fc;;$j++){\
-    for (my $k=0;;$k<=23;;$k++) {\
+    for (my $k=$hour;;$k<=23;;$k++) {\
       for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
         $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j,$k, $quarter*15),0);;\
-        if (($fc_tmp < $fc_min) or ($j == 0 and $k == 0 and $quarter == 0)) {\
+# print sprintf("fc%d %02d:%02d",$j, $k, $quarter*15)." ".$fc_tmp."\n";;\
+        if (($fc_tmp < $fc_min) or ($j == 0 and $k == $hour and $quarter == 0)) {\
+# print sprintf("fc%d %02d:%02d",$j, $k, $quarter*15)." ".$fc_tmp."\n";;\
           $fc_min = $fc_tmp;;\
         }\
       } # end $quarter\
@@ -1019,11 +1550,12 @@ fc_min:current_price.* {\
   if (AttrVal("$NAME","verbose",0) >=3) {\
     Log 3, "$NAME  ur_5  : berechne Minimalpreis";;\
   }\
-  return round($fc_min ,2);;                             ## Von Euro auf Cent umrechnen\
+  return round($fc_min ,2);;                             ## Min Wert gerundet in Cent ausgeben\
 },\
 \
 fc_max:current_price.* {\
 ##  Ermittlung des minimal Wertes\
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
   my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
   my $fc_max = 0;;\
   my $fc_tmp = 0;;\
@@ -1033,9 +1565,10 @@ fc_max:current_price.* {\
   } # end if\
 \
   for (my $j=0;;$j<=$fc;;$j++){\
-    for (my $k=0;;$k<=23;;$k++) {\
+    for (my $k=$hour;;$k<=23;;$k++) {\
       for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
         $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j,$k, $quarter*15),0);;\
+# print sprintf("fc%d %02d:%02d",$j, $k, $quarter*15)." ".$fc_tmp."\n";;\
         if (($fc_tmp > $fc_max) or ($j == 0 and $k == 0 and $quarter == 0)) {\
           $fc_max = $fc_tmp;;\
         }\
@@ -1045,7 +1578,7 @@ fc_max:current_price.* {\
   if (AttrVal("$NAME","verbose",0) >=3) {\
     Log 3, "$NAME  ur_6  : berechne Maximalpreis";;\
   }\
-  return round($fc_max ,2);;                             ## Von Euro auf Cent umrechnen\
+  return round($fc_max ,2);;                             ## Max Wert gerundet in Cent ausgeben\
 },\
 \
 fc_trigger_price:fc_avg.* {\
@@ -1054,11 +1587,11 @@ fc_trigger_price:fc_avg.* {\
   my $fc_min = ReadingsVal("$NAME","fc_min",0);;\
 \
   # Berechnung eines Default Schwellwertes als täglicher Niedrigpreis\
-  my $price_level = round( ($fc_avg - $fc_min)/2 + $fc_min , 1);;\
+  my $price_level = round( ($fc_avg - $fc_min)/2 + $fc_min , 2);;\
   \
   # Abschätzung von Wirtschaftlichkeit beim Speicher Laden, falls die Börse zu teuer wird\
   if ( ReadingsVal("$NAME","compensation_grid",0) != 0 ) {\
-    my $price_level_battery = round( ($fc_avg - ReadingsVal("$NAME","compensation_grid",0)) *0.85 , 1) ;;\
+    my $price_level_battery = round( ($fc_avg - ReadingsVal("$NAME","compensation_grid",0)) *0.85 , 2) ;;\
     if ( $price_level > $price_level_battery ) {\
       $price_level = $price_level_battery;;\
     }\
@@ -1075,12 +1608,17 @@ fc0_trigger_start:fc_trigger_price.* {\
 \
   # Ermitteln des nächsten Trigger Fensters\
   my $fc_total = 0;;\
+  my $fc_trigger_start_quarter = int($min / 15);;\
+\
 \
     for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+      for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
         $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
 # print sprintf("fc0 Start %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
         if ( $fc_total < $fc_trigger_price ) {\
+          if (AttrVal("$NAME","verbose",0) >=3) {\
+            Log 3, "$NAME  ur_8  : fc0_trigger_start ".sprintf("%02d:%02d",$loop_hour ,$quarter*15);;\
+          }\
           return(sprintf("%02d:%02d",$loop_hour ,$quarter*15)) ;;\
         }\
       } # end $quarter\
@@ -1108,21 +1646,24 @@ fc0_trigger_stop:fc0_trigger_start.* {\
 \
     for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
       for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
-# print sprintf("fc0 Stop  %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $quarter*15),0);;\
+# print sprintf("fc%d Stop  %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
         if ( $fc_total < $fc_trigger_price ) {\
           $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
         } else {\
+          if (AttrVal("$NAME","verbose",0) >=3) {\
+            Log 3, "$NAME  ur_8  : fc0_trigger_stop   ".sprintf("%02d:%02d",$loop_hour, $quarter*15);;\
+            }\
           return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
         }\
 \
       # wenn es 23:45 is wechsel zum nächsten Tag\
        if ($loop_hour == 23 and $fc == 0 and $quarter == 3) {\
          if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {   # Der nächste Tag ist bereits da\
-           $fc = 1;\
-           $loop_hour = -1;                                                                # beginne wieder bei 00:00\
+           $fc = 1;;\
+           $loop_hour = -1;;                                                                # beginne wieder bei 00:00\
          } else {\
-           $fc_trigger_stop = "23:59";                                                 # fc0 stop ist um 00:00\
+           $fc_trigger_stop = "23:59";;                                                 # fc0 stop ist um 00:00\
          }\
        }\
 \
@@ -1131,8 +1672,29 @@ fc0_trigger_stop:fc0_trigger_start.* {\
       } # end $quarter\
     } # end for loop_hour\
   }\
- \
+  if (AttrVal("$NAME","verbose",0) >=3) {\
+    Log 3, "$NAME  ur_8  : fc0_trigger_stop   $fc_trigger_stop";;\
+  }\
   return($fc_trigger_stop);;\
+},\
+\
+fc0_trigger_dauer:fc0_trigger_stop.* {\
+# Berechnung des Trigger Fensters in Minuten\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_start","null");;\
+  if ( $fc_trigger_start ne "null" ) {\
+    my $fc_trigger_stop = ReadingsVal("$NAME","fc0_trigger_stop","null");;\
+    if ( $fc_trigger_stop lt "00:00" ) { $fc_trigger_stop = "24:00" };;\
+    my ($h1,$m1) = split(":", $fc_trigger_start);;\
+    my ($h2,$m2) = split(":", $fc_trigger_stop);;\
+\
+    if ( $h2 < $h1 ) { $h2 += 24 };;\
+\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_8  : fc0_trigger_dauer  ".(($h2*60 + $m2) - ($h1*60 + $m1));;\
+    }\
+    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
+  }\
+  return "null";;\
 },\
 \
 fc0_trigger:fc0_trigger_stop.* {\
@@ -1199,14 +1761,25 @@ fc1_trigger_stop:fc0_trigger_start.* {\
   return($fc_trigger_stop);;\
 },\
 \
+fc1_trigger_dauer:fc1_trigger_stop.* {\
+# Berechnung des Trigger Fensters in Minuten\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_start","null");;\
+  if ( $fc_trigger_start ne "null" ) {\
+    my $fc_trigger_stop = ReadingsVal("$NAME","fc1_trigger_stop","null");;\
+    if ( $fc_trigger_stop eq "00:00" ) { $fc_trigger_stop = "24:00" };;\
+    my ($h1,$m1) = split(":", $fc_trigger_start);;\
+    my ($h2,$m2) = split(":", $fc_trigger_stop);;\
+    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
+  }\
+  return "null";;\
+},\
+\
 fc_trigger_max:fc_avg.* {\
   my $fc_avg = ReadingsVal("$NAME","fc_avg",0);;\
   my $fc_max = ReadingsVal("$NAME","fc_max",0);;\
 \
   # Berechnung eines Schwellwertes als täglichen Maximalpreises\
-  my $price_level = round( ($fc_max - $fc_avg)/2 + $fc_avg , 0);;\
-  \
-$price_level;;\
+  return round( ($fc_max - $fc_avg)/2 + $fc_avg , 2);;\
 },\
 \
 fc0_trigger_max_start:fc_trigger_max.* {\
@@ -1268,6 +1841,18 @@ fc0_trigger_max_stop:fc0_trigger_max_start.* {\
   }\
  \
   return($fc_trigger_max_stop);;\
+},\
+\
+fc0_trigger_max_dauer:fc0_trigger_max_stop.* {\
+# Berechnung des Trigger Fensters in Minuten\
+  my $fc_trigger_max_start = ReadingsVal("$NAME","fc0_trigger_max_start","null");;\
+  if ( $fc_trigger_max_start ne "null" ) {\
+    my $fc_trigger_max_stop = ReadingsVal("$NAME","fc0_trigger_max_stop","null");;\
+    my ($h1,$m1) = split(":", $fc_trigger_max_start);;\
+    my ($h2,$m2) = split(":", $fc_trigger_max_stop);;\
+    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
+  }\
+  return "null";;\
 },\
 \
 fc0_trigger_max:fc0_trigger_max_stop.* {\
@@ -1335,6 +1920,18 @@ fc1_trigger_max_stop:fc1_trigger_max_start.* {\
   return($fc_trigger_max_stop);;\
 },\
 \
+fc1_trigger_max_dauer:fc1_trigger_max_stop.* {\
+# Berechnung des Trigger Fensters in Minuten\
+  my $fc_trigger_max_start = ReadingsVal("$NAME","fc1_trigger_max_start","null");;\
+  if ( $fc_trigger_max_start ne "null" ) {\
+    my $fc_trigger_max_stop = ReadingsVal("$NAME","fc1_trigger_max_stop","null");;\
+    my ($h1,$m1) = split(":", $fc_trigger_max_start);;\
+    my ($h2,$m2) = split(":", $fc_trigger_max_stop);;\
+    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
+  }\
+  return "null";;\
+},\
+\
 next1_quarter:current_price.* {\
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
   my $quarter = int($min / 15);; # aktuelle Viertelstunde 0–3\
@@ -1370,8 +1967,231 @@ next1_hour:current_price.* {\
     }\
 \
   return round($j/4,2);; # Für die nächste Stunde wird der Durchschnitt ausgegeben\
- }\
+ },\
 \
+nodes_TIMESTAMP:nodes_00_00_cost.* {\
+my ($timestamp,$value) = 2x0;;\
+my $tmp = 0;;\
 \
+for (my $loop_last = 0;; $loop_last <= 2;; $loop_last++) {\
+  $timestamp = ReadingsVal("$NAME","nodes_00_".sprintf("%02d",$loop_last)."_from","null");;\
+  $value = ReadingsVal("$NAME","nodes_00_".sprintf("%02d",$loop_last)."_cost","null");;\
+\
+  if ( $value ne "null" ) {\
+    # Eintragen der Kosten für die Stunde\
+    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                VALUES('".$timestamp."','$NAME','Tibber','nodes_cost','".$value."')\
+              ON DUPLICATE KEY UPDATE\
+                VALUE='".$value."';;") ;;\
+    # Eintragen des Verbrauchs für die Stunde\
+    $value = ReadingsVal("$NAME","nodes_00_".sprintf("%02d",$loop_last)."_consumption","null");;\
+    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                VALUES('".$timestamp."','$NAME','Tibber','nodes_consumption','".$value."')\
+              ON DUPLICATE KEY UPDATE\
+                VALUE='".$value."';;") ;;\
+  } else {\
+    $tmp = "null";;\
+  }\
+} # end for\
+if ($tmp eq "null") {\
+  $timestamp = $tmp\
+}\
+$timestamp;;\
+},\
+\
+nodes_TIMESTAMP:nodes_24_00_cost.* {\
+my ($timestamp,$value) = 2x0;;\
+my $tmp = 0;;\
+\
+for (my $loop_last = 0;; $loop_last <= 23;; $loop_last++) {\
+  $timestamp = ReadingsVal("$NAME","nodes_24_".sprintf("%02d",$loop_last)."_from","null");;\
+  $value = ReadingsVal("$NAME","nodes_24_".sprintf("%02d",$loop_last)."_cost","null");;\
+\
+  if ( $value ne "null" ) {\
+    # Eintragen der Kosten für die Stunde\
+    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                VALUES('".$timestamp."','$NAME','Tibber','nodes_cost','".$value."')\
+              ON DUPLICATE KEY UPDATE\
+                VALUE='".$value."';;") ;;\
+    # Eintragen des Verbrauchs für die Stunde\
+    $value = ReadingsVal("$NAME","nodes_24_".sprintf("%02d",$loop_last)."_consumption","null");;\
+    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                VALUES('".$timestamp."','$NAME','Tibber','nodes_consumption','".$value."')\
+              ON DUPLICATE KEY UPDATE\
+                VALUE='".$value."';;") ;;\
+  } else {\
+    $tmp = "null";;\
+  }\
+} # end for\
+if ($tmp eq "null") {\
+  $timestamp = $tmp\
+}\
+$timestamp;;\
+},\
+\
+nodes_TIMESTAMP:05_consumption_hourly_100-0001.* {\
+  my ($timestamp,$value) = 2x0;;\
+\
+  for (my $loop_last = 1;; $loop_last <= 300;; $loop_last += 3) {\
+\
+    $timestamp =  ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last+2),"null");; # timestamp\
+    $timestamp =~ s/T/ /g ;;\
+    $timestamp =  substr($timestamp,0,19);;\
+\
+    # cost aus tibber-Api ohne MwSt\
+    $value = ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last+1),"null");;\
+\
+    if ( $value ne "" ) {\
+      # Berechnung der Kosten inkl. 19% MwSt für die Stunde\
+      $value = round($value*AttrVal($NAME,"conf_VAT",0),4);;\
+# print $timestamp." ".$value."\n";;\
+\
+      # Schreiben der Kosten für die Stunde in die Datenbank\
+      ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+                INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                  VALUES('".$timestamp."','$NAME','Tibber','nodes_cost','".$value."')\
+                ON DUPLICATE KEY UPDATE\
+                  VALUE='".$value."';;") ;;\
+      # Schreiben des Verbrauchs für die Stunde in die Datenbank\
+      $value = ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last),"null");;  # consumption\
+      $value = round($value,4);;\
+      ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+                INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                  VALUES('".$timestamp."','$NAME','Tibber','nodes_consumption','".$value."')\
+                ON DUPLICATE KEY UPDATE\
+                  VALUE='".$value."';;") ;;\
+    }\
+  } # end for\
+\
+  $timestamp;;\
+},\
+\
+nodes_cost_avg:nodes_TIMESTAMP.* {\
+## Berechnung des Tages Wertes\
+  if ( ReadingsVal("$NAME","nodes_TIMESTAMP","null") ne "null" ) {\
+    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+           SELECT cast(avg(VALUE) AS DECIMAL(4,2)) FROM history\
+           WHERE DEVICE='".$NAME."'\
+             AND READING='nodes_cost'\
+             AND TIMESTAMP >= curdate() ;;") ;;\
+  } else {\
+    ReadingsVal("$NAME","nodes_cost_avg","null")\
+  }\
+},\
+\
+nodes_cost_min:nodes_TIMESTAMP.* {\
+##  Ermittlung des minimal Wertes\
+  if ( ReadingsVal("$NAME","nodes_TIMESTAMP","null") ne "null" ) {\
+    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+           SELECT cast(min(VALUE) AS DECIMAL(4,2)) FROM history\
+           WHERE DEVICE='".$NAME."'\
+             AND READING='nodes_cost'\
+             AND TIMESTAMP >= curdate() ;;") ;;\
+  } else {\
+    ReadingsVal("$NAME","nodes_cost_min","null")\
+  }\
+},\
+\
+nodes_cost_max:nodes_TIMESTAMP.* {\
+## Ermittlung des maximal Wertes\
+  if ( ReadingsVal("$NAME","nodes_TIMESTAMP","null") ne "null" ) {\
+    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+           SELECT cast(max(VALUE) AS DECIMAL(4,2)) FROM history\
+           WHERE DEVICE='".$NAME."'\
+             AND READING='nodes_cost'\
+             AND TIMESTAMP >= curdate() ;;") ;;\
+  } else {\
+    ReadingsVal("$NAME","nodes_cost_max","null")\
+  }\
+},\
+\
+nodes_consumption_day:nodes_TIMESTAMP.* {\
+## Berechnung des Tages Verbrauches\
+  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
+             WHERE DEVICE='".$NAME."'\
+               AND READING='nodes_consumption'\
+               AND date(TIMESTAMP) = curdate() ;;") ;;\
+},\
+\
+nodes_consumption_month:nodes_TIMESTAMP.* {\
+## Berechnung des Monats Verbrauches\
+  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
+             WHERE DEVICE='".$NAME."'\
+               AND READING='nodes_consumption'\
+               AND YEAR(TIMESTAMP) = YEAR(curdate())\
+               AND MONTH(TIMESTAMP) = MONTH(curdate()) ;;") ;;\
+},\
+\
+nodes_consumption_year:nodes_TIMESTAMP.* {\
+## Berechnung des Jahres Verbrauches\
+  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
+             WHERE DEVICE='".$NAME."'\
+               AND READING='nodes_consumption'\
+               AND YEAR(TIMESTAMP) = YEAR(curdate()) ;;") ;;\
+},\
+\
+total_cost_day:nodes_TIMESTAMP.* {\
+## Berechnung des Tages Wertes\
+  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+             SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
+             FROM history\
+             WHERE DEVICE='".$NAME."'\
+               AND READING='nodes_cost'\
+               AND date(TIMESTAMP) = curdate() ;;") ;;\
+},\
+\
+total_cost_month:nodes_TIMESTAMP.* {\
+## Berechnung des monats Wertes\
+  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+             SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
+             FROM history\
+             WHERE DEVICE='".$NAME."'\
+               AND READING='nodes_cost'\
+               AND YEAR(TIMESTAMP) = YEAR(curdate())\
+               AND MONTH(TIMESTAMP) = MONTH(curdate()) ;;") ;;\
+},\
+\
+total_cost_year:nodes_TIMESTAMP.* {\
+## Berechnung des Jahres Wertes\
+  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+             SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
+             FROM history\
+             WHERE DEVICE='".$NAME."'\
+               AND READING='nodes_cost'\
+               AND YEAR(TIMESTAMP) = YEAR(curdate()) ;;") ;;\
+},\
+\
+fc_DbLog:fc0_0000_total.* {\
+# Schreibt die redings fc*_hhmm_total als fc*_total mit passendem TIMESTAMP in die Datenbank\
+  my ($timestamp,$date,$hour,$value,$loop_fc_next) = 5x0;;\
+\
+  for (my $loop_fc = 0;; $loop_fc <= 1;; $loop_fc++) {\
+    $loop_fc_next = $loop_fc +1;;\
+    $date = ReadingsVal("$NAME","fc".$loop_fc."_0000_startsAt","null");;\
+    if ($date ne "null" and $date ne "") {\
+      $date =~ /([\d+-]+)/;; $date = $1 ;;\
+      for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
+        $hour = sprintf("%02d",$loop_hour);;\
+        for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+          $timestamp = $date." ".$hour.":".($quarter*15).":00";;\
+          $value = ReadingsVal("$NAME","fc".$loop_fc."_".$hour.sprintf("%02d",$quarter*15)."_total","null");;\
+          ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
+                            INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+                              VALUES('".$timestamp."','$NAME','Tibber','fc".$loop_fc."_total','".$value."')\
+                            ON DUPLICATE KEY UPDATE\
+                              VALUE='".$value."';;") ;;\
+        }\
+      }\
+    }\
+  }\
+  ReadingsTimestamp("$NAME","fc0_0000_startsAt","null");;\
+}\
 
 attr Stromboerse_connect verbose 3

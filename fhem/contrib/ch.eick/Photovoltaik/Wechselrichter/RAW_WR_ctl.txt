@@ -36,7 +36,7 @@ defmod WR_ctl DOIF #############################################################
 ################################################################################################################\
 ## 2 Start der KI Prognose\
 ## Der Reading Name und das Device werden in LogDBRep_PV_KI_Prognose im executeAfterProc eingestellt\
-##  "/opt/fhem/python/bin/PV_KI_Prognose.py 192.168.178.40 192.168.178.40 LogDBRep_PV_KI_Prognose WR_1_ctl Yield_fc"\
+##  "/opt/fhem/python/bin/PV_KI_Prognose.py 192.168.178.60 192.168.178.60 LogDBRep_PV_KI_Prognose WR_1_ctl Yield_fc"\
 ##\
 2_KI_Prognose\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
@@ -55,9 +55,9 @@ defmod WR_ctl DOIF #############################################################
    ) {\
 \
   if ($hour == 5) {\
-    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load_new('full',curdate(),'none')");;\
+    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load('full',curdate(),'none')");;\
   } else {\
-    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load_new('update',curdate(),'none')");;\
+    ::CommandSet(undef, "LogDBRep_PV_KI_Prognose sqlCmd call dwd_load('update',curdate(),'none')");;\
   }\
 \
   if (AttrVal("$SELF","verbose",0) >=3) {\
@@ -218,7 +218,7 @@ widget([$SELF:ui_command_1],"uzsuDropDown,---,2_KI_Prognose,3_WR_ctl_Diagramm") 
 ""|\
 "MySQL ".[LogDBRep_PV_KI_Prognose:state]."<br> KI ".([LogDBRep_PV_KI_Prognose:state] ne "done") ? "waiting" : [LogDBRep_PV_KI_Prognose:PV_KI_Prognose]\
 \
-"Statistiken  <a href='http://192.168.178.40:4001/d/W-Y51Dmgk/pv_anlage_1?orgId=1&from=now%2Fd&to=now%2Fd&refresh=5m'>=> Grafana Diagramme</a>"|\
+"Statistiken  <a href='http://192.168.178.60:4001/d/W-Y51Dmgk/pv_anlage_1?orgId=1&from=now%2Fd&to=now%2Fd&refresh=5m'>=> Grafana Diagramme</a>"|\
 Yield(0)|\
 Yield('Tag')|\
 Yield('4h')|\

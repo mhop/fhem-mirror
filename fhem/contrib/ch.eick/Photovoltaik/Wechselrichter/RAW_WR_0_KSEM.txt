@@ -1,8 +1,9 @@
 defmod WR_0_KSEM ModbusAttr 1 60 192.168.178.17:502 TCP
 attr WR_0_KSEM DbLogExclude .*
-attr WR_0_KSEM DbLogInclude Active_energy.*
+attr WR_0_KSEM DbLogInclude Active_energy.*,Home_consumption
 attr WR_0_KSEM alias WR_0_KSEM
-attr WR_0_KSEM comment Version 2024.02.08 12:00\
+attr WR_0_KSEM alignTime 00:00
+attr WR_0_KSEM comment Version 2026.01.09 12:00\
 Der KSEM ermittelt nicht alle Werte, welche in der SunSpec spezifiziert sind.\
 Alle nicht unterstützen Werte sind mit 0x8000 gekennzeichnet.\
 Für die nicht unterstützten Zählerstände wird die 0x800000000 ausgegeben.\
@@ -10,7 +11,10 @@ Für die nicht unterstützten Zählerstände wird die 0x800000000 ausgegeben.\
 Der Summenstrom M_AC_Current (sum of active phases) kann aber durch den Endanwender selber\
 berechnet werden aus der Summe der Einzelwerte (Phase A AC current, Phase B AC current Phase C AC current)\
 \
-Die einzelnen Spannungen zwischen den Phasen können nicht gemessen werden und werden deshalb nicht ausgegeben.
+Die einzelnen Spannungen zwischen den Phasen können nicht gemessen werden und werden deshalb nicht ausgegeben.\
+\
+Falls man auf dem EVU_StromZaehler keinen Lesekopf hat kann man im userreadings die 1.8.0 und 2.8.0 Zähler berechnen lassen.\
+Das Logging ist für diese Werte nicht aktiviert.
 attr WR_0_KSEM dev-h-defPoll 1
 attr WR_0_KSEM dev-type-INT16-len 1
 attr WR_0_KSEM dev-type-INT16-unpack s>
@@ -58,7 +62,7 @@ attr WR_0_KSEM dev-type-UINT64-format %s
 attr WR_0_KSEM dev-type-UINT64-len 4
 attr WR_0_KSEM dev-type-UINT64-unpack Q>
 attr WR_0_KSEM disable 0
-attr WR_0_KSEM event-on-change-reading Active_energy.*,M_AC_Current_.*,M_AC_Power,Home_consumption
+attr WR_0_KSEM event-on-change-reading Active_energy.*,EVU_StromZaehler.*,M_AC_Current_.*,M_AC_Power,Home_consumption
 attr WR_0_KSEM group PV Eigenverbrauch
 attr WR_0_KSEM icon measure_power
 attr WR_0_KSEM obj-h40072-reading M_AC_Current_A
@@ -180,5 +184,8 @@ attr WR_0_KSEM obj-h8244-reading MeasuringInterval
 attr WR_0_KSEM obj-h8244-type UINT16
 attr WR_0_KSEM room Strom->Photovoltaik
 attr WR_0_KSEM sortby 140
-attr WR_0_KSEM userReadings M_AC_Current:M_AC_Current_.* { ReadingsVal($NAME,"M_AC_Current_A",0) + ReadingsVal($NAME,"M_AC_Current_B",0) + ReadingsVal($NAME,"M_AC_Current_C",0) }
+attr WR_0_KSEM userReadings M_AC_Current:M_AC_Current_.* { ReadingsVal($NAME,"M_AC_Current_A",0) + ReadingsVal($NAME,"M_AC_Current_B",0) + ReadingsVal($NAME,"M_AC_Current_C",0) },\
+\
+EVU_StromZaehler_1_8_0:Active_energy\+.* monotonic { ReadingsVal($NAME,"Active_energy+",0) -2253 },\
+EVU_StromZaehler_2_8_0:Active_energy\-.* monotonic { ReadingsVal($NAME,"Active_energy-",0) -1371 }
 attr WR_0_KSEM verbose 0
