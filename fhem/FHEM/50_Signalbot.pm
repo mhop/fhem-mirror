@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.21";
+my $Signalbot_VERSION="3.22";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -170,7 +170,6 @@ sub Signalbot_sendMsg($@) {
 sub Signalbot_Set($@) {					#
 
 	my ( $hash, $name, @args ) = @_;
-
 	### Check Args
 	my $numberOfArgs  = int(@args);
 	return "Signalbot_Set: No cmd specified for set" if ( $numberOfArgs < 1 );
@@ -1259,8 +1258,20 @@ sub Signalbot_setup($@){
 	$hash->{FD}=$dbus->fileno();
 	$selectlist{"$name.dbus"} = $hash;
 	$hash->{STATE}="Connecting";
-	Signalbot_fetchFile($hash,"svn.fhem.de","/fhem/trunk/fhem/contrib/signal/signal_install.sh","www/signal/signal_install.sh");
-	chmod 0755, "www/signal/signal_install.sh";
+	my $filename="www/signal/signal_install.sh";
+	Signalbot_fetchFile($hash,"svn.fhem.de","/fhem/trunk/fhem/contrib/signal/signal_install.sh",$filename);
+	chmod 0755, $filename;
+	$hash->{helper}{currentversion}=0;
+	open my $fh, '<', $filename or return;
+	while (my $line = <$fh>) {
+		if ($line =~ /^\s*SIGNALVERSION\s*=\s*["']?([\d.]+)["']?/) {
+			$hash->{helper}{textversion}=$1;
+			my @ver=split /\./, $1;
+			$hash->{helper}{currentversion} = $ver[0]*10000+$ver[1]*100+$ver[2];
+			last;
+		}
+	}
+	close $fh;
 	return undef;
 }
 
@@ -2276,6 +2287,9 @@ sub Signalbot_Detail {
 	}
 	if($version<1100 || $multi==0) {
 		$ret .= '<br>You can download the installer <a href="fhem/www/signal/signal_install.sh" download>here</a> or your www/signal directory and run it with<br><b>sudo ./signal_install.sh</b><br><br>';
+	}
+	if ($version<$hash->{helper}{currentversion}) {
+		$ret .= "There is a newer version ".$hash->{helper}{textversion}." of signal-cli available. Consider updating by running signal_install.sh<br><br>";
 	}
 	return $ret if ($hash->{helper}{version}<1100);
 	
