@@ -2199,10 +2199,9 @@ SVG_render($$$$$$$$$$)
         ($x1, $y1) = (int($x+$dxp->[$i]),
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
 
-        next if($x1 == $lx && $y1 == $ly);
-
         # calc ymin/ymax for points with the same x coordinates
         if($x1 == $lx && $i < $maxIdx) {
+          next if($y1 == $ly);
           $ymin = $y1 if($y1 < $ymin);
           $ymax = $y1 if($y1 > $ymax);
           $ly = $y1;
