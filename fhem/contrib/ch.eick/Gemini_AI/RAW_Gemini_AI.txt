@@ -6,7 +6,7 @@ attr Gemini_AI KI_Instr00 Du bist die Smart-Home-KI für FHEM. Antworte NUR mit 
 attr Gemini_AI KI_Instr01 Mehrere Befehle trenne mit ;;;;
 attr Gemini_AI KI_Instr02 Deine GERÄTE-LISTE: - Das Hauptlicht heißt: Küche
 attr Gemini_AI KI_Instr03 Es gibt Rollos in allen Räumen. Wohnzimmer -> WZ;; Küche -> KU;; Schlafzimmer -> SC;; Bad -> BA;; Arbeitszimmer -> AR;;
-attr Gemini_AI KI_Instr04 WZ hat je 1 Ost und West, KU 1 Süd, SC 1 West, BA 1 Nord und AR 1 Ost Rollo. Es gibt Kommandos open, close und position mit 0 bis 100.
+attr Gemini_AI KI_Instr04 WZ hat je 1 Ost und West, KU 1 Süd, SC 1 West, BA 1 Nord und AZ 1 Ost Rollo. Es gibt Kommandos open, close und position mit 0 bis 100.
 attr Gemini_AI KI_Instr05 Die Gerätenamen entsprechen folgendem Syntax mit _ als Trennzeichen: 'Kurzname des Raums' 'Kurzname der Himmelsrichtung' 'Rollo'
 attr Gemini_AI KI_Instr06 Die Himmelsrichtungen werden mit dem ersten Buchstaben abgekürzt.
 attr Gemini_AI comment 2026-01-11 17:00\
@@ -14,8 +14,9 @@ attr Gemini_AI comment 2026-01-11 17:00\
 Zuerst den Key holen: https://aistudio.google.com/api-keys\
 \
 Dann im FHEM ablegen\
-{KeyValue("store","Gemini_AI_Key","DEIN_API_KEY_HIER")}\
-\
+{KeyValue("store","Gemini_AI_Key_0","DEIN_API_KEY_HIER")}\
+Verwendet man zwei Keys ist dieses reading anzulegen: setreading Gemini_AI Gemini_AI_Key 0\
+{KeyValue("store","Gemini_AI_Key_1","DEIN_ZWEITER_API_KEY_HIER")}\
 \
 Nutzerfrage: Mach ma Küche hell und dann wieder aus.\
 responce: set MQTT2_zigbee_Ku_Licht ON;;;; set MQTT2_zigbee_Ku_Licht OFF\
@@ -51,7 +52,21 @@ attr Gemini_AI reading05JSON candidates_01_content_parts
 attr Gemini_AI reading05Name response
 attr Gemini_AI replacement01Mode expression
 attr Gemini_AI replacement01Regex %%KEY%%
-attr Gemini_AI replacement01Value {KeyValue("read","Gemini_AI_Key")}
+attr Gemini_AI replacement01Value { my $key = ReadingsVal($name,"Gemini_AI_Key","null");;\
+  my $j;;\
+  if ( $key eq "null" ) { \
+    $j = 0;;\
+  } else {\
+    for (my $i=int($key);;$i<=1;;$i++) {\
+      $j = $i;;\
+      if ($i < 1) { fhem("setreading $name Gemini_AI_Key ".($i+1));;last;;}\
+      else { fhem("setreading $name Gemini_AI_Key 0");;}\
+    }\
+  }\
+  my $tmp = KeyValue("read","Gemini_AI_Key_".$j);;\
+  return defined($tmp) ? $tmp : undef;;\
+}\
+
 attr Gemini_AI replacement05Mode expression
 attr Gemini_AI replacement05Regex %%KI_Instructions%%
 attr Gemini_AI replacement05Value { my $tmp = "";; my $KI_Instr = "";;\
