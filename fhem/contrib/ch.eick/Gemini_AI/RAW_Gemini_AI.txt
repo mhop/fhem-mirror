@@ -1,0 +1,90 @@
+defmod Gemini_AI HTTPMOD none
+attr Gemini_AI userattr KI_CMD00 KI_CMD01 KI_CMD02 KI_CMD03 KI_CMD04 KI_CMD05 KI_CMD06 KI_CMD07 KI_CMD08 KI_CMD09 KI_CMD10 KI_Instr00 KI_Instr01 KI_Instr02 KI_Instr03 KI_Instr04 KI_Instr05 KI_Instr06 KI_Instr07 KI_Instr08 KI_Instr09 KI_Instr10
+attr Gemini_AI KI_CMD00 BEISPIELE:
+attr Gemini_AI KI_CMD01 'Es ist dunkel in der Küche' -> set MQTT2_zigbee_Ku_Licht ON  'Licht aus in der Küche' -> set MQTT2_zigbee_Ku_Licht OFF
+attr Gemini_AI KI_Instr00 Du bist die Smart-Home-KI für FHEM. Antworte NUR mit dem FHEM-Befehl.
+attr Gemini_AI KI_Instr01 Mehrere Befehle trenne mit ;;;;
+attr Gemini_AI KI_Instr02 Deine GERÄTE-LISTE: - Das Hauptlicht heißt: Küche
+attr Gemini_AI KI_Instr03 Es gibt Rollos in allen Räumen. Wohnzimmer -> WZ;; Küche -> KU;; Schlafzimmer -> SC;; Bad -> BA;; Arbeitszimmer -> AR;;
+attr Gemini_AI KI_Instr04 WZ hat je 1 Ost und West, KU 1 Süd, SC 1 West, BA 1 Nord und AR 1 Ost Rollo. Es gibt Kommandos open, close und position mit 0 bis 100.
+attr Gemini_AI KI_Instr05 Die Gerätenamen entsprechen folgendem Syntax mit _ als Trennzeichen: 'Kurzname des Raums' 'Kurzname der Himmelsrichtung' 'Rollo'
+attr Gemini_AI KI_Instr06 Die Himmelsrichtungen werden mit dem ersten Buchstaben abgekürzt.
+attr Gemini_AI comment 2026-01-11 17:00\
+\
+Zuerst den Key holen: https://aistudio.google.com/api-keys\
+\
+Dann im FHEM ablegen\
+{KeyValue("store","Gemini_AI_Key","DEIN_API_KEY_HIER")}\
+\
+\
+Nutzerfrage: Mach ma Küche hell und dann wieder aus.\
+responce: set MQTT2_zigbee_Ku_Licht ON;;;; set MQTT2_zigbee_Ku_Licht OFF\
+\
+Nutzerfrage: Küche dunkel\
+responce: set MQTT2_zigbee_Ku_Licht OFF\
+\
+Nutzerfrage: Küche an\
+responce: set MQTT2_zigbee_Ku_Licht ON\
+\
+Nutzerfrage: Küche is echt grell\
+responce: set MQTT2_zigbee_Ku_Licht OFF\
+\
+Nutzerfrage: Generiere mir alle vorhandenen Rollo Namen mit einem 'set' davor und 'open' dahinter. Für das Arbeitszimmer soll es auf 40 gesetzt werden.\
+response: set WZ_O_Rollo open;;;;set WZ_W_Rollo open;;;;set KU_S_Rollo open;;;;set SC_W_Rollo open;;;;set BA_N_Rollo open;;;;set AR_O_Rollo position 40
+attr Gemini_AI get02AutoNumLen 3
+attr Gemini_AI get02ExtractAllJSON 1
+attr Gemini_AI get02Header01 Content-Type: application/json
+attr Gemini_AI get02Name 05_ListModels
+attr Gemini_AI get02URL https://generativelanguage.googleapis.com/v1/models?key=%%KEY%%
+attr Gemini_AI group Gemini
+attr Gemini_AI reading01DeleteIfUnmatched 1
+attr Gemini_AI reading01JSON error_message
+attr Gemini_AI reading01Name error_message
+attr Gemini_AI reading02DeleteIfUnmatched 1
+attr Gemini_AI reading02JSON error_status
+attr Gemini_AI reading02Name error_status
+attr Gemini_AI reading03DeleteIfUnmatched 1
+attr Gemini_AI reading03JSON error_code
+attr Gemini_AI reading03Name error_code
+attr Gemini_AI reading05DeleteIfUnmatched 1
+attr Gemini_AI reading05JSON candidates_01_content_parts
+attr Gemini_AI reading05Name response
+attr Gemini_AI replacement01Mode expression
+attr Gemini_AI replacement01Regex %%KEY%%
+attr Gemini_AI replacement01Value {KeyValue("read","Gemini_AI_Key")}
+attr Gemini_AI replacement05Mode expression
+attr Gemini_AI replacement05Regex %%KI_Instructions%%
+attr Gemini_AI replacement05Value { my $tmp = "";; my $KI_Instr = "";;\
+  for (my $j=0;;$j<=99;;$j++){\
+    $tmp = AttrVal($name,sprintf("KI_Instr%02d",$j),"null");;\
+    if ( $tmp ne "null" ) { $KI_Instr .= $tmp."\n" } else { last };;\
+  }\
+  for (my $j=0;;$j<=99;;$j++){\
+    $tmp = AttrVal($name,sprintf("KI_CMD%02d",$j),"null");;\
+    if ( $tmp ne "null" ) { $KI_Instr .= $tmp."\n" } else { last };;\
+  }\
+  return $KI_Instr;;\
+}
+attr Gemini_AI room Neu
+attr Gemini_AI set01Data {"contents": [{"parts":[{"text": "$val"}]}]}
+attr Gemini_AI set01ExtractAllJSON 0
+attr Gemini_AI set01Header01 Content-Type: application/json
+attr Gemini_AI set01Header02 x-goog-api-key: %%KEY%%
+attr Gemini_AI set01Method POST
+attr Gemini_AI set01Name 01_ask
+attr Gemini_AI set01ParseResponse 1
+attr Gemini_AI set01TextArg 1
+attr Gemini_AI set01URL https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent
+attr Gemini_AI set05Data {"contents": [{"role": "user", "parts": [{"text": "INSTRUKTION: %%KI_Instructions%% NUTZERFRAGE: $val"}]}]}
+attr Gemini_AI set05ExtractAllJSON 0
+attr Gemini_AI set05Header01 Content-Type: application/json
+attr Gemini_AI set05Header02 x-goog-api-key: %%KEY%%
+attr Gemini_AI set05Method POST
+attr Gemini_AI set05Name 02_FHEM_CMD
+attr Gemini_AI set05ParseResponse 1
+attr Gemini_AI set05TextArg 1
+attr Gemini_AI set05URL https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent
+attr Gemini_AI showBody 1
+attr Gemini_AI showError 0
+attr Gemini_AI timeout 15
+attr Gemini_AI verbose 0
