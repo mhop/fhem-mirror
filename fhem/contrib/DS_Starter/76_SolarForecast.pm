@@ -162,11 +162,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.0.0"  => "10.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
+  "2.0.0"  => "11.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
                            "new consumer type 'heatpump', new readings Today_CONdeviation, Today_CONforecast, Today_CONreal ".
                            "show Con deviation in UI, new key aiControl->aiConProfile, calculate con_quantile30 ".
+                           "__setConsRcmdState: add Current_GridConsumption to function ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
@@ -1756,7 +1757,6 @@ trends => sub {
         $f->{trend_break},                                                  # Trendbruch (Peak oder Lastabwurf)
     ];
 },
-
 
 # --------------------------------------------------------
 # Wetter
@@ -15138,12 +15138,14 @@ sub __setConsRcmdState {
   my $hash       = $defs{$name};
   my $nompower   = ConsumerVal ($name, $c, 'power',     0);                               # Consumer nominale Leistungsaufnahme (W)
   my $pvshare    = ConsumerVal ($name, $c, 'pvshare', 100);                               # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden
-  my $pvsharepow = $nompower * $pvshare / 100;                                            # Anteil PV an Leistungsaufnahme in Watt
-  my $gridshare  = $nompower - $pvsharepow;                                               # Anteil Netzleistung an Leistungsaufnahme in Watt
+  my $gcons      = ReadingsNum ($name, 'Current_GridConsumption', 0);                     # Netzbezug
+  my $pvpow      = $nompower * $pvshare / 100;                                            # Anteil PV an Leistungsaufnahme in Watt
+  my $gridshare  = $nompower - $pvpow;                                                    # Anteil Netzleistung an Leistungsaufnahme in Watt
 
   my $ccr        = AttrVal          ($name, 'ctrlConsRecommendReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
   my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbrauch nach Einschaltung Consumer
-
+  my $surpreduce = $rescons > $pvpow ? $pvpow : $rescons;
+  
   my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
 
   $data{$name}{consumers}{$c}{surpmethResult} = defined $surplus
@@ -15156,8 +15158,10 @@ sub __setConsRcmdState {
 
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - ConsumptionRecommended calc method: $method, surplus: }.
-                         (defined $surplus ? $surplus : 'undef'));
+                        (defined $surplus ? $surplus : 'undef'));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - method base: $spser}) if($method =~ /average|median/xs);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - current Grid power consumption: $gcons W});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Power splitting - Grid: $gridshare W, PV: $pvpow W});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - additional consumption after switching on (if currently 'off'): $rescons W});
   }
 
@@ -15172,7 +15176,10 @@ sub __setConsRcmdState {
   if (!defined $surplus) {                                                                # $surplus kann undef sein! -> dann bisherigen isConsumptionRecommended verwenden
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = ReadingsVal ($name, "consumer${c}_ConsumptionRecommended", 0);
   }
-  elsif (!$pvsharepow || $surplus - $rescons > 0 - $gridshare || $spignore) {
+  elsif (!$pvpow 
+        || $surplus > 0 && ($surplus - $surpreduce >= 0)
+        || $spignore
+        ) {
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = 1;                          # Einschalten des Consumers günstig bzw. Freigabe für "on" von Überschußseite erteilt
   }
   else {
@@ -24362,19 +24369,19 @@ return ($res, $bc, $zone);
 sub aiFannDetectDrift {
   my $name    = shift;
   my $fanntyp = shift;
-  my $window  = shift // 150;                                                          # Anzahl Stunden für Driftanalyse -> default 6.25 Tage
+  my $window  = shift // 150;                                                           # Anzahl Stunden für Driftanalyse -> default 6.25 Tage
     
   my (@abs_errors, @targets, @preds);
   
-  my $rawref = $data{$name}{aidectree}{airaw};                                         # Zugriff auf die Rohdaten
+  my $rawref = $data{$name}{aidectree}{airaw};                                          # Zugriff auf die Rohdaten
   return unless $rawref && ref $rawref eq 'HASH';
                                                                 
-  my $mae_model = AiNeuralVal ($name, $fanntyp, 'Mae', 1);                             # Trainings-MAE aus dem Modell
+  my $mae_model = AiNeuralVal ($name, $fanntyp, 'Mae', 1);                              # Trainings-MAE aus dem Modell
 
   my @indices = sort { $a <=> $b } keys %$rawref;
   return unless @indices;
 
-  my @tail_idx = @indices[-$window .. -1];                                             # nur die letzten $window Datensätze verwenden
+  my @tail_idx = @indices[-$window .. -1];                                              # nur die letzten $window Datensätze verwenden
   return unless (scalar (@tail_idx) >= $window);
     
   for my $idx (@tail_idx) {
@@ -24392,13 +24399,13 @@ sub aiFannDetectDrift {
   }
 
   my $n             = @abs_errors || return;
-  my $mae_live      = sum (@abs_errors) / $n;                                         # MAE_live
-  my $rmse_live     = sqrt ( sum (map { $_**2 } @abs_errors) / $n );                  # RMSE_live
-  my $median        = medianArray (\@targets) || 1;                                   # Medianverbrauch bestimmen
-  my $rmse_rel_live = ($rmse_live / $median) * 100;                                   # RMSE_rel_live (%)
-  my $drift_score   = $mae_live / $mae_model;                                         # DriftScore (MAE-basiert)
+  my $mae_live      = sum (@abs_errors) / $n;                                           # MAE_live
+  my $rmse_live     = sqrt ( sum (map { $_**2 } @abs_errors) / $n );                    # RMSE_live
+  my $median        = medianArray (\@targets) || 1;                                     # Medianverbrauch bestimmen
+  my $rmse_rel_live = ($rmse_live / $median) * 100;                                     # RMSE_rel_live (%)
+  my $drift_score   = $mae_live / $mae_model;                                           # DriftScore (MAE-basiert)
 
-  my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);                                  # Slope/Bias für Drift
+  my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);                                    # Slope/Bias für Drift
     
   for my $i (0 .. $#targets) {
       $sum_x  += $targets[$i];
@@ -24410,23 +24417,63 @@ sub aiFannDetectDrift {
   my $den        = $n * $sum_xx - $sum_x * $sum_x;                                    
   my $slope_live = $den != 0 ? ($n * $sum_xy - $sum_x * $sum_y) / $den : 0;
   my $bias_live  = ($sum_y - $slope_live * $sum_x) / $n;
+  
+  my $semantics_active = 0;                                                             # Semantikindikatoren berechnen
+  my $peak_active      = 0;
 
-  my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);                   # Slope/Bias aus Training
-  my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias', 0); 
+  for my $i (0 .. $#targets) {
+      my $actual = $targets[$i];
+      my $pred   = $preds[$i];
 
-  my $slope_drift = abs ($slope_live - $slope_model);                                 # Drift in Slope/Bias
+      # Semantik aktiv: wenn delta > 300W oder Verbrauch > 1.5 × Median
+      $semantics_active++ if (abs($pred - $actual) > 300);
+      $peak_active++      if ($actual > 1.5 * $median);
+  }
+
+  my $semantics_ratio = $semantics_active / $n;
+  my $peak_ratio      = $peak_active / $n;
+
+
+  my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);                     # Slope/Bias aus Training
+  my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0); 
+
+  my $slope_drift = abs ($slope_live - $slope_model);                                   # Drift in Slope/Bias
   my $bias_drift  = abs ($bias_live  - $bias_model);
 
-  my $drift_flag;                                                                     # Drift-Ampel
-  if ($drift_score > 2.0 || $rmse_rel_live > 35 || $slope_drift > 0.40) {
+  my $drift_flag;                                                                       # Drift-Ampel
+
+  # --- SEVERE nur, wenn Metrik + Semantik beide kritisch ---
+  if ($drift_score     > 2.5 &&
+      $rmse_rel_live   > 50  &&
+      $slope_drift     > 0.4 &&
+      $semantics_ratio < 0.2 &&                                                         # Modell reagiert kaum
+      $peak_ratio      < 0.1                                                            # keine Peaks erkannt
+  ) {
       $drift_flag = "severe";
   }
-  elsif ($drift_score > 1.5 || $rmse_rel_live > 20 || $slope_drift > 0.25) {
+
+  # --- MODERATE, wenn Metrik auffällig, aber Semantik aktiv ---
+  elsif (
+      $drift_score     >  2.0 &&
+      $rmse_rel_live   >  35  &&
+      $slope_drift     >  0.3 &&
+      $semantics_ratio >= 0.2 &&
+      $peak_ratio      >= 0.1
+  ) {
       $drift_flag = "moderate";
   }
-  elsif ($drift_score > 1.2 || $rmse_rel_live > 10) {
+
+  # --- MILD, wenn Metrik leicht abweicht, aber Semantik gut arbeitet ---
+  elsif (
+      $drift_score     >  1.5 &&
+      $rmse_rel_live   >  20  &&
+      $slope_drift     >  0.2 &&
+      $semantics_ratio >= 0.3
+  ) {
       $drift_flag = "mild";
   }
+
+  # --- NONE, wenn Modell lebendig und plausibel ---
   else {
       $drift_flag = "none";
   }
