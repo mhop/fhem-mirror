@@ -1415,7 +1415,7 @@ CommandInclude($$;$)
   }
   
   Log 1, "Including $arg";
-  if(!$init_done && $arg ne $stf && $arg ne $gcfg && !$skipComment) {
+  if(!$init_done && $arg ne $stf && $arg ne $gcfg && $skipComment ne 1) {
     my $nr =  $devcount++;
     $comments{$nr}{TEXT} = "include $arg";
     $comments{$nr}{CFGFN} = $currcfgfile if($currcfgfile ne $gcfg);
