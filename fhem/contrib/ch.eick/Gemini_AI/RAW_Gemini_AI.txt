@@ -1,4 +1,4 @@
-defmod Gemini_AI HTTPMOD none
+defmod Gemini_AI HTTPMOD none 0
 attr Gemini_AI userattr KI_CMD00 KI_CMD01 KI_CMD02 KI_CMD03 KI_CMD04 KI_CMD05 KI_CMD06 KI_CMD07 KI_CMD08 KI_CMD09 KI_CMD10 KI_Instr00 KI_Instr01 KI_Instr02 KI_Instr03 KI_Instr04 KI_Instr05 KI_Instr06 KI_Instr07 KI_Instr08 KI_Instr09 KI_Instr10
 attr Gemini_AI KI_CMD00 BEISPIELE:
 attr Gemini_AI KI_CMD01 'Es ist dunkel in der Küche' -> set MQTT2_zigbee_Ku_Licht ON  'Licht aus in der Küche' -> set MQTT2_zigbee_Ku_Licht OFF
