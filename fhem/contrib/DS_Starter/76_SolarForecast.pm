@@ -1869,6 +1869,43 @@ semantics_pv => sub {
 },
 
 # --------------------------------------------------------
+# PV-Mittagspeak-Verstärker 
+# --------------------------------------------------------
+pv_mittag_peak_boost => sub {
+    my ($f) = @_;
+    return [
+        2 * sqrt($f->{pv_norm} * $f->{delta1_norm_pos}   * $f->{hour_class_noon}),
+        2 * sqrt($f->{pv_norm} * $f->{volatility_flag}   * $f->{hour_class_noon}),
+        2 * sqrt($f->{pv_norm} * $f->{trend_up_strength} * $f->{hour_class_noon}),
+        2 * ($f->{pv_norm}     + $f->{hour_class_noon}),
+    ];
+},
+
+pv_mittag_peak_boost_special => sub {
+    my ($f) = @_;
+
+    # --- Basis: PV + Mittag ---
+    my $base = $f->{pv_norm} * $f->{hour_class_noon};
+
+    # --- Dynamik: Verbrauchsanstieg + Trend ---
+    my $dyn = sqrt(
+        ($f->{delta1_norm_pos} + 0.1) *
+        ($f->{trend_up_strength} + 0.1)
+    );
+
+    # --- Stabilisierung: Tagesmuster vom Vortag ---
+    my $yday = sqrt($f->{delta24_norm_pos} * $f->{hour_class_noon});
+
+    # --- Kombinierter Verstärker ---
+    my $amp = 1.5 * ($base + 0.7*$dyn + 0.5*$yday);
+
+    # --- Mindestwirkung: verhindert Wegtrainieren ---
+    my $stable = ($amp < 0.05) ? 0.05 : $amp;
+
+    return [$stable];
+},
+
+# --------------------------------------------------------
 # Rückfall Semantik
 # --------------------------------------------------------
 semantics_rueckfall => sub {
@@ -1976,6 +2013,11 @@ semantics_heatpump => sub {
         # --- TEMPERATUR + TREND ---
         sqrt($f->{temp_delta_3h_neg} * $f->{trend_up_strength}),                    # Kälte + steigender Trend
         sqrt($f->{temp_delta_3h_pos} * $f->{trend_down_strength}),                  # Wärme + fallender Trend
+        
+        # --- Verstärker ---
+        $f->{pv_norm}    * $f->{hour_class_noon},                                   # Neu  11.01
+        $f->{ww_morning} * $f->{hour_class_morning},                                # Neu  11.01
+        $f->{frost_load} * $f->{hour_class_morning},                                # Neu  11.01
     ];
 },
 
@@ -1983,11 +2025,12 @@ semantics_heatpump => sub {
 # Sandbox für neue Features
 # --------------------------------------------------------
 sandbox => sub {
-    my ($f) = @_;
     return [
 
     ];
 },
+
+
 );
 
 ###################################################################################
@@ -2047,6 +2090,7 @@ v1_common_pv => sub {
     return [
         @{ $FEATURE_REGISTRY{v1_common}->($f) },
         @{ $FEATURE_BLOCKS{pv}->($f) },
+        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost}->($f) },
     ];
 },
   
@@ -2059,7 +2103,9 @@ v1_common_active_pv => sub {
     return [
         @{ $FEATURE_REGISTRY{v1_common}->($f) },
         @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
+        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
         @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
+        @{ $FEATURE_BLOCKS{sandbox}->($f) },
     ];
 },
   
@@ -2097,19 +2143,11 @@ v1_heatpump_active_pv => sub {
         @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
         @{ $FEATURE_BLOCKS{pv}->($f) },
         @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
+        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
         @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
     ];
 },
 
-# --------------------------------------------------------
-# v1_sandbox: v1 + experimentelle Features
-# --------------------------------------------------------
-v1_sandbox => sub {
-    my ($f) = @_;
-    return [
-
-    ];
-},
 );
 
 # Information zu verwendeten internen Datenhashes
