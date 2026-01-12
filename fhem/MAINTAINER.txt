@@ -407,6 +407,7 @@ FHEM/73_MPD.pm               Wzut/Beta-User       Multimedia
 FHEM/73_NUKIBridge.pm        CoolTux              Sonstige Systeme
 FHEM/73_PRESENCE.pm          JoWiemann            Unterstützende Dienste
 FHEM/73_PRESENCE2.pm         JoWiemann            Unterstützende Dienste cover version
+FHEM/73_Tide.pm              Sailor               Unterstützende Dienste https://forum.fhem.de/index.php?topic=143631.0.html
 FHEM/73_WaterCalculator.pm   Sailor               Unterstützende Dienste https://forum.fhem.de/index.php/topic,58579.0.html
 FHEM/74_AMADDevice.pm        CoolTux              Sonstige Systeme
 FHEM/74_AutomowerConnect.pm  Ellert               Sonstige Systeme https://forum.fhem.de/index.php/topic,131661.0.html
