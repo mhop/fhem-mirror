@@ -3,6 +3,7 @@
  - feature: 72_FRITZBOX: get <name> luaFunction [get|post] <funktion>
                          set <name> checkAPIs <[basic|full]>
             set <name> dectRing <id:DECT_ID> [dur:dauer] [tone:ringtone_id|?]
+ - change: 73_DoorBird: Adapted to changes in changeLog -File
  - bugfix: 72_FRITZBOX: Fehlerkorrekturen
  - new:    73_Tide: German tidal forcast and current water levels
  - change: 59_ECOWITT_GW: remove blank from reading, add maxAge attribute
