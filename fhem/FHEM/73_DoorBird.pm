@@ -4873,15 +4873,18 @@ sub DoorBird_parseChangelog($$) {
 	my $version;
 
 	### Log Entry for debugging purposes
-	# Log3 $name, 5, $name. " : DoorBird_parseChangelog - data                    : " . $data;
+	Log3 $name, 5, $name. " : DoorBird_parseChangelog - data                    : " . $data;
 
 
 	### For all lines do
 	while(my $line = <$lines>) 	{
 
 		### If the line contains the keywords "Firmware version " followed by a number then obtain it
-		if ($line =~ m/^Firmware version /) {
+		if ($line =~ m/^<strong>Firmware version /) {
 			( $version ) = $line =~ /(\d+)/;
+
+			### Log Entry for debugging purposes
+			Log3 $name, 5, $name. " : DoorBird_parseChangelog - version            : " . $version;
 		}
 
 		### If the line contains the keywords "Products affected: " then obtain it
