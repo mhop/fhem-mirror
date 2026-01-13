@@ -142,9 +142,9 @@ package ui_Table;;\
 "Kommando<dd>Auswahl</dd>" |widget([$SELF:ui_command_1],"uzsuDropDown,---,1_$SELF_PriceInfo,2_$SELF_PriceAll,3_$SELF_Diagramm") |"LiveMessurement <br>".widget([$SELF:ui_command_2],"uzsuDropDown,---,connect,disconnect")|""|[$SELF_connect:ws_cmd]\
 \
 "Strompreis<br>".card([$SELF_connect:current_price:bar1day],undef,undef,0,60,90,0,"fc0  ".::ReadingsVal("$SELF_connect","current_currency",""),undef,"1","130,,,,,,220").card([$SELF_connect:current_level:bar1day],undef,undef,0,60,90,0,"fc1  ".::ReadingsVal("$SELF_connect","current_currency",""),undef,"1","130,,,,,,220")|\
-"<span style=font-weight:bold>avg nächste 3h</span><br><br>".Price(1)."<br>".Price(2)."<br>".Price(3)|"<span style=font-weight:bold>Statistik fc0</span><br><br>".::ReadingsVal("$SELF_connect","fc_min",0)." min<br>".::ReadingsVal("$SELF_connect","fc_avg",0)." avg<br>".::ReadingsVal("$SELF_connect","fc_med",0)." med<br>".::ReadingsVal(Device(),"fc_max",0)." max"|\
-"<span style=font-weight:bold>Trigger fc0</span><br>Basis ".widget([$SELF_connect:compensation_grid],"selectnumbers,0,0.1,12,1,lin")."<br>".Format("trigger_0")|\
-"<span style=font-weight:bold>Trigger fc1</span><br><br>".Format("trigger_1")
+"<span style=font-weight:bold>avg nächste 3h</span><br><br>".$SELF_Price(1)."<br>".$SELF_Price(2)."<br>".$SELF_Price(3)|"<span style=font-weight:bold>Statistik fc0</span><br><br>".::ReadingsVal("$SELF_connect","fc_min",0)." min<br>".::ReadingsVal("$SELF_connect","fc_avg",0)." avg<br>".::ReadingsVal("$SELF_connect","fc_med",0)." med<br>".::ReadingsVal("$SELF_connect","fc_max",0)." max"|\
+"<span style=font-weight:bold>Trigger fc0</span><br>Basis ".widget([$SELF_connect:compensation_grid],"selectnumbers,0,0.1,12,1,lin")."<br>".$SELF_Format("trigger_0")|\
+"<span style=font-weight:bold>Trigger fc1</span><br><br>".$SELF_Format("trigger_1")
 attr EVU_Tibber uiTable {\
 package ui_Table;;\
   $TABLE = "style='width:100%;;'";;\
@@ -153,20 +153,20 @@ package ui_Table;;\
   $TD{0..18}{1..5} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:1px;;width:8%;;text-align:center;;'";;\
   $TD{0..18}{6} = "style='border-top-style:solid;;border-bottom-style:solid;;border-right-style:solid;;border-color:darkgreen;;border-top-width:2px;;border-bottom-width:2px;;border-right-width:2px;;width:8%;;text-align:center;;'";;\
 \
-sub FUNC_Status {\
+sub $SELF_FUNC_Status {\
     my($value, $min, $colorMin,  $statusMin,  $colorMiddel, $statusMiddle, $max, $colorMax, $statusMax)=@_;;\
     my $ret = ($value < $min)? '<span style="color:'.$colorMin.'">'.$statusMin.'</span>' : ($value > $max)? '<span style="color:'.$colorMax.'">'.$statusMax.'</span>' : '<span style="color:'.$colorMiddel.'">'.$statusMiddle.'</span>';;\
     return $ret;;\
   }\
 \
-sub Cost {\
+sub $SELF_Cost {\
   my($i)=@_;;\
   my $currency = (::ReadingsVal("$SELF_connect","current_currency","") eq "EUR")? " €" : "";;\
 \
   return ::ReadingsVal("$SELF_connect","total_cost_".$i,0).$currency;;\
 }\
 \
-sub Price {\
+sub $SELF_Price {\
   my($i)=@_;;\
   my $j;;\
   my $value;;\
@@ -199,7 +199,7 @@ sub Price {\
   return  $value;;\
  }\
 \
-sub Format {\
+sub $SELF_Format {\
   my($i)=@_;;\
 \
   my $MonthBefore   = "LogDBRep_Statistic_previous_Month";;\
@@ -246,18 +246,21 @@ sub Format {\
 \
 "Statistiken ".::ReadingsVal("$SELF_connect","current_date",0)." in kWh"|"<span style=font-weight:bold>aktuell</span>"|"<span style=font-weight:bold>heute</span>"|"<span style=font-weight:bold>Monat</span>"|"<span style=font-weight:bold>Jahr</span>"\
 \
-"Strom<dd>Preis / Kosten</dd>"|Price(0)|Cost("day")|Cost("month")|Cost("year")\
+"Strom<dd>Preis / Kosten</dd>"|$SELF_Price(0)|$SELF_Cost("day")|$SELF_Cost("month")|$SELF_Cost("year")\
 \
 ## Wenn man das liveMessurment von Tibber verwendet\
 "Bezug vom Netz"|\
 sprintf("%04d W",([$SELF_connect:payload_data_liveMeasurement_power]  >= 0 ? ::ReadingsVal("$SELF_connect","payload_data_liveMeasurement_power",0) : 0))|\
-Format("day")|Format("month")|Format("year")\
+$SELF_Format("day")|$SELF_Format("month")|$SELF_Format("year")\
 \
 "Einspeisung ins Netz"|\
 sprintf("%04d W",([$SELF_connect:payload_data_liveMeasurement_powerProduction]  >= 0 ? ::ReadingsVal("$SELF_connect","payload_data_liveMeasurement_powerProduction",0) : 0))|\
 ""|""|""\
 \
 ## Wenn man einen eigenes SmartMeter verwendet\
-## "Bezug vom Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] >= 0 ? ::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0) : 0) )|Format("day")|Format("month")|Format("year")\
+## "Bezug vom Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] >= 0 ? ::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0) : 0) )|$SELF_Format("day")|$SELF_Format("month")|$SELF_Format("year")\
 ## "Einspeisung ins Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] <= 0 ? abs(::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0)) :  0) )|""|""|""
 attr EVU_Tibber verbose 3
+
+setstate EVU_Tibber 2026-01-13 08:45:00 ui_command_1 ---
+setstate EVU_Tibber 2025-12-27 15:06:38 ui_command_2 ---
