@@ -28,7 +28,7 @@
 #
 #     fhem.cfg: define <devicename> Tide
 #
-#     Example 1:
+#     Example:
 #     define myTide Tide
 #
 ########################################################################################################################
@@ -63,6 +63,7 @@ use strict;
 use warnings;
 use utf8;
 use Encode;
+use Date::Parse;
 use Time::Local;
 use FHEM::Meta;
 use Data::Dumper;
@@ -901,10 +902,22 @@ sub Tide_UpdateGauge($) {
 	if (!defined($ReadingA13)){
 		
 		### Log Entry for debugging purposes
-		Log3 $name, 1, $name. " : Tide_UpdateGauge - ReadingA13 does not exist.";
+		Log3 $name, 5, $name. " : Tide_UpdateGauge - ReadingA13 does not exist.";
 		
 		return;
 	}
+	
+	### Check whether TideStation has GaugeLevel available and if not abort this subroutine
+	if (!defined($hash->{helper}{GaugeStationList}{$ReadingA13}{uuid})){
+		
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : Tide_UpdateGauge - GaugeStationUuid does not exist.";
+		
+		return;
+	}
+	
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : Tide_UpdateGauge - Progressing with value and timestamp download.";
 	
 	### Get uuid for the selected Tide station
 	my $GaugeStationUuid = $hash->{helper}{GaugeStationList}{$ReadingA13}{uuid};
@@ -921,7 +934,7 @@ sub Tide_UpdateGauge($) {
 	my $GaugeJson = GetFileFromURL($UrlPegelonlineStation);	
 
 	### Log Entry for debugging purposes
-	Log3 $name, 5, $name. " : Tide_UpdateGauge - GaugeJson                 : " . $GaugeJson;
+	Log3 $name, 4, $name. " : Tide_UpdateGauge - GaugeJson                 : " . $GaugeJson;
 
 	my $GaugeHashRef;
 
@@ -999,7 +1012,7 @@ sub Tide_FW_detailFn($$$$) {
 
 	if ($attr{$name}{ShowGaugeChart} eq "on"){
 		### Log Entry for debugging purposes
-		Log3 $name, 1, $name. " : Tide_FW_detailFn - {helper}{PegelChartUrl}   : " . $hash->{helper}{PegelChartUrl};
+		Log3 $name, 5, $name. " : Tide_FW_detailFn - {helper}{PegelChartUrl}   : " . $hash->{helper}{PegelChartUrl};
 		
 		#$htmlCode  .= "<td><img width=\"649\" height=\"auto\" alt=\"tick\" src=" . $hash->{helper}{PegelChartUrl} . "></td>";
 		$htmlCode  .= "<td><iframe src="  . $hash->{helper}{PegelChartUrl} . " width=\"750\" height=\"325\" title=\"Gauge Chart\" loading=\"lazy\" frameBorder=\"0\"></iframe></td>";
