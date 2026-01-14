@@ -565,9 +565,23 @@ sub Tide_Download($) {
 	{
 		return;
 	}
-	### Delete all readings
-	fhem("deletereading " . $name . " .*");
+	
+	### Extract all existing Readings as hash reference
+	my @ReadingsList = $hash->{READINGS};
+	
+	### Log Entry for debugging purposes
+	Log3 $name, 5, $name. " : Tide_Download - ReadingsList                 : " . Dumper(@ReadingsList);
+	
+	### For all 
+	foreach my $ReadingsName (keys %{$ReadingsList[0]}) {
 
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : Tide_Download - Deleting Reading             : " . $ReadingsName;
+	 
+		### Delete Reading
+		readingsDelete($hash, $ReadingsName);
+	}
+	
 	### Create URL for Tide File
 	my $TideFileUrl = "https://filebox.bsh.de/index.php/s/SbJ3z5NBkpOZloY/download?path=/vb_hwnw/deu" . $year . "&files=" . $StationID . $year . ".txt";
 	
