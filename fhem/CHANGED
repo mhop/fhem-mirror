@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - bugfix:  73_Tide: Adding libary, increasing loglevel
  - feature: 72_FRITZBOX: get <name> luaFunction [get|post] <funktion>
                          set <name> checkAPIs <[basic|full]>
             set <name> dectRing <id:DECT_ID> [dur:dauer] [tone:ringtone_id|?]
