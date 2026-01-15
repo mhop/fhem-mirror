@@ -162,13 +162,14 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.0.0"  => "12.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
+  "2.0.0"  => "14.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
                            "new consumer type 'heatpump', new readings Today_CONdeviation, Today_CONforecast, Today_CONreal ".
                            "show Con deviation in UI, new key aiControl->aiConProfile, calculate con_quantile30 ".
                            "__setConsRcmdState: add Current_GridConsumption to function, add windspeed and FF to DWD-Device ".
-                           "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ",
+                           "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ".
+                           "aiConActFunc: *_SYMMETRIC AF added ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
   "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
@@ -1790,19 +1791,18 @@ semantics_human_rhythm => sub {
     my ($f) = @_;
     return [
         # --- MORGEN ---
-        sqrt($f->{delta1_norm_pos} * $f->{hour_class_morning}),             # Aufstehen / Geräte an
+        softplus($f->{delta1_norm_pos} * $f->{hour_class_morning}),             # Aufstehen / Geräte an
 
         # --- MITTAG ---
-        sqrt($f->{delta1_norm_pos} * $f->{hour_class_noon}),                # Kochen / Haushalt
+        softplus($f->{delta1_norm_pos} * $f->{hour_class_noon}),                # Kochen / Haushalt
 
         # --- ABEND ---
-        sqrt($f->{delta1_norm_pos} * $f->{hour_class_evening}),             # Kochen / Abendaktivität
+        softplus($f->{delta1_norm_pos} * $f->{hour_class_evening}),             # Kochen / Abendaktivität
 
         # --- SPÄTER ABEND ---
-        sqrt($f->{delta1_norm_neg} * $f->{hour_class_lateevening}),         # Geräte gehen aus
+        softplus($f->{delta1_norm_neg} * $f->{hour_class_lateevening}),         # Geräte gehen aus
     ];
 },
-
 
 # --------------------------------------------------------
 # Semantik: erweiterter Menschlicher Tagesrhythmus
@@ -1811,27 +1811,27 @@ semantics_human_rhythm_advanced => sub {
     my ($f) = @_;
     return [
         # --- MORGEN ---
-        sqrt($f->{trend_up_strength} * $f->{hour_class_morning}),
-        sqrt($f->{delta24_norm_pos}  * $f->{hour_class_morning}),
-        sqrt($f->{temp_delta_1h_neg} * $f->{hour_class_morning}),
+        softplus($f->{trend_up_strength} * $f->{hour_class_morning}),
+        softplus($f->{delta24_norm_pos}  * $f->{hour_class_morning}),
+        softplus($f->{temp_delta_1h_neg} * $f->{hour_class_morning}),
 
         # --- MITTAG ---
-        sqrt($f->{trend_up_strength} * $f->{hour_class_noon}),
-        sqrt($f->{delta24_norm_pos}  * $f->{hour_class_noon}),
-        sqrt($f->{delta1_norm_pos}   * $f->{volatility_flag} * $f->{hour_class_noon}),          # Peak-Trigger: Verbrauchssprung + Volatilität + Mittag
-        sqrt($f->{trend_up_strength} * $f->{volatility_flag} * $f->{hour_class_noon}),          # Verstärker: Trend + Volatilität mittags
-        0.3 * sqrt($f->{trend_break} * $f->{hour_class_noon}),                                  # Dämpfer: nur wenn Trendbruch mittags erkannt wird
+        softplus($f->{trend_up_strength} * $f->{hour_class_noon}),
+        softplus($f->{delta24_norm_pos}  * $f->{hour_class_noon}),
+        softplus($f->{delta1_norm_pos}   * $f->{volatility_flag} * $f->{hour_class_noon}),          # Peak-Trigger: Verbrauchssprung + Volatilität + Mittag
+        softplus($f->{trend_up_strength} * $f->{volatility_flag} * $f->{hour_class_noon}),          # Verstärker: Trend + Volatilität mittags
+        0.3 * softplus($f->{trend_break} * $f->{hour_class_noon}),                                  # Dämpfer: nur wenn Trendbruch mittags erkannt wird
 
         # --- ABEND ---
-        sqrt($f->{trend_up_strength} * $f->{hour_class_evening}),
-        sqrt($f->{delta24_norm_pos}  * $f->{hour_class_evening}),
+        softplus($f->{trend_up_strength} * $f->{hour_class_evening}),
+        softplus($f->{delta24_norm_pos}  * $f->{hour_class_evening}),
 
         # --- SPÄTER ABEND ---
-        sqrt($f->{trend_down_strength} * $f->{hour_class_lateevening}),
-        sqrt($f->{temp_delta_1h_neg}   * $f->{hour_class_lateevening}),
+        softplus($f->{trend_down_strength} * $f->{hour_class_lateevening}),
+        softplus($f->{temp_delta_1h_neg}   * $f->{hour_class_lateevening}),
 
         # --- NACHT ---
-        sqrt($f->{trend_down_strength} * $f->{hour_class_midnight}),
+        softplus($f->{trend_down_strength} * $f->{hour_class_midnight}),
 
         # --- WOCHENENDE ---
         $f->{hour_class_morning} * $f->{day_class_weekend},                                     # binär
@@ -1839,8 +1839,8 @@ semantics_human_rhythm_advanced => sub {
         $f->{hour_class_evening} * $f->{day_class_weekend},                                     # binär
 
         # --- TAGESMUSTER VOM VORTAG ---
-        sqrt($f->{delta24_norm_pos} * $f->{hour_norm}),
-        sqrt($f->{delta24_norm_neg} * $f->{hour_norm}),
+        softplus($f->{delta24_norm_pos} * $f->{hour_norm}),
+        softplus($f->{delta24_norm_neg} * $f->{hour_norm}),
     ];
 },
 
@@ -1851,21 +1851,21 @@ semantics_pv => sub {
     my ($f) = @_;
     return [
         # --- PV + Tageszeit ---
-        sqrt($f->{pv_norm}) * $f->{hour_class_noon},                                # PV-Lastverschiebung mittags
+        softplus($f->{pv_norm}) * $f->{hour_class_noon},                                # PV-Lastverschiebung mittags
 
         # --- PV + Verbrauchsdynamik ---
-        sqrt($f->{pv_norm} * $f->{trend_up_strength}),                              # PV + steigender Trend
-        sqrt($f->{pv_norm} * $f->{delta1_norm_pos}),                                # PV + Verbrauchsanstieg
+        softplus($f->{pv_norm} * $f->{trend_up_strength}),                              # PV + steigender Trend
+        softplus($f->{pv_norm} * $f->{delta1_norm_pos}),                                # PV + Verbrauchsanstieg
 
         # --- PV-Drop + Verbrauchsdynamik ---
-        sqrt($f->{pv_drop} * $f->{delta1_norm_neg}),                                # Lastabfall durch PV-Wegfall
+        softplus($f->{pv_drop} * $f->{delta1_norm_neg}),                                # Lastabfall durch PV-Wegfall
 
         # --- PV + Temperatur ---
-        sqrt($f->{pv_norm} * $f->{temp_delta_1h_neg}),                              # Kälte + PV -> Heizer + Batterie
-        sqrt($f->{pv_drop} * $f->{temp_delta_1h_neg}),                              # Kälte + PV-Drop -> Lastabfall
+        softplus($f->{pv_norm} * $f->{temp_delta_1h_neg}),                              # Kälte + PV -> Heizer + Batterie
+        softplus($f->{pv_drop} * $f->{temp_delta_1h_neg}),                              # Kälte + PV-Drop -> Lastabfall
 
         # --- PV + Temperatur + Trend ---
-        sqrt($f->{pv_norm} * $f->{temp_delta_1h_neg} * $f->{trend_up_strength}),    # Kälte + PV + steigender Trend -> Peak                                                                                 
+        softplus($f->{pv_norm} * $f->{temp_delta_1h_neg} * $f->{trend_up_strength}),    # Kälte + PV + steigender Trend -> Peak                                                                                 
     ];
 },
 
@@ -1875,10 +1875,10 @@ semantics_pv => sub {
 pv_mittag_peak_boost => sub {
     my ($f) = @_;
     return [
-        2 * sqrt($f->{pv_norm} * $f->{delta1_norm_pos}   * $f->{hour_class_noon}),
-        2 * sqrt($f->{pv_norm} * $f->{volatility_flag}   * $f->{hour_class_noon}),
-        2 * sqrt($f->{pv_norm} * $f->{trend_up_strength} * $f->{hour_class_noon}),
-        2 * ($f->{pv_norm}     + $f->{hour_class_noon}),
+        2 * softplus($f->{pv_norm} * $f->{delta1_norm_pos}   * $f->{hour_class_noon}),
+        2 * softplus($f->{pv_norm} * $f->{volatility_flag}   * $f->{hour_class_noon}),
+        2 * softplus($f->{pv_norm} * $f->{trend_up_strength} * $f->{hour_class_noon}),
+        2 * ($f->{pv_norm}         + $f->{hour_class_noon}),
     ];
 },
 
@@ -1892,13 +1892,12 @@ pv_mittag_peak_boost_special => sub {
     my $base = $f->{pv_norm} * $f->{hour_class_noon};
 
     # --- Dynamik: Verbrauchsanstieg + Trend ---
-    my $dyn = sqrt(
-        ($f->{delta1_norm_pos} + 0.1) *
-        ($f->{trend_up_strength} + 0.1)
+    my $dyn = softplus(
+        ($f->{delta1_norm_pos} + 0.1) * ($f->{trend_up_strength} + 0.1)
     );
 
     # --- Stabilisierung: Tagesmuster vom Vortag ---
-    my $yday = sqrt($f->{delta24_norm_pos} * $f->{hour_class_noon});
+    my $yday = softplus($f->{delta24_norm_pos} * $f->{hour_class_noon});
 
     # --- Kombinierter Verstärker ---
     my $amp = 1.5 * ($base + 0.7*$dyn + 0.5*$yday);
@@ -1915,8 +1914,8 @@ pv_mittag_peak_boost_special => sub {
 semantics_rueckfall => sub {
     my ($f) = @_;
     return [
-        sqrt($f->{trend_break} * $f->{delta1_norm_neg}),                            # Rückfall nach Peak (Trendbruch + Verbrauch sinkt)
-        sqrt($f->{trend_break} * $f->{hour_class_lateevening}),                     # Tagesende-Rückfall (Trendbruch + später Abend)
+        softplus($f->{trend_break} * $f->{delta1_norm_neg}),                            # Rückfall nach Peak (Trendbruch + Verbrauch sinkt)
+        softplus($f->{trend_break} * $f->{hour_class_lateevening}),                     # Tagesende-Rückfall (Trendbruch + später Abend)
     ];
 },
 
@@ -1926,7 +1925,7 @@ semantics_rueckfall => sub {
 semantics_cold => sub {
     my ($f) = @_;
     return [
-        sqrt($f->{temp_delta_1h_neg} * $f->{trend_break}),                          # Kälte + Trendbruch -> abruptes Ende
+        softplus($f->{temp_delta_1h_neg} * $f->{trend_break}),                          # Kälte + Trendbruch -> abruptes Ende
     ];
 },
 
@@ -1977,51 +1976,118 @@ heatpump_base => sub {
     ];
 },
 
-semantics_heatpump => sub {
+semantics_heatpump => sub {                                             
     my ($f) = @_;
     return [
         # --- HEIZEN ---
         # Heizmodus + Kälte = hoher Verbrauch
-        sqrt($f->{hp_heating_mode} * $f->{temp_delta_1h_neg}),
-        sqrt($f->{hp_heating_mode} * $f->{temp_trend_neg}),
-        sqrt($f->{hp_heating_mode} * $f->{frost_load}),                             # Frostlast + Heizmodus
+        softplus($f->{hp_heating_mode} * $f->{temp_delta_1h_neg}),
+        softplus($f->{hp_heating_mode} * $f->{temp_trend_neg}),
+        softplus($f->{hp_heating_mode} * $f->{frost_load}),                             # Frostlast + Heizmodus
 
         # Heizmodus + Tageszeit
-        sqrt($f->{hp_heating_mode} * $f->{hour_class_morning}),                     # morgens heizen
-        sqrt($f->{hp_heating_mode} * $f->{hour_class_evening}),                     # abends heizen
+        softplus($f->{hp_heating_mode} * $f->{hour_class_morning}),                     # morgens heizen
+        softplus($f->{hp_heating_mode} * $f->{hour_class_evening}),                     # abends heizen
 
         # --- KÜHLEN ---
-        sqrt($f->{hp_cooling_mode} * $f->{temp_delta_1h_pos}),
-        sqrt($f->{hp_cooling_mode} * $f->{temp_trend_pos}),
-        sqrt($f->{hp_cooling_mode} * $f->{hour_class_noon}),                        # mittags kühlen
+        softplus($f->{hp_cooling_mode} * $f->{temp_delta_1h_pos}),
+        softplus($f->{hp_cooling_mode} * $f->{temp_trend_pos}),
+        softplus($f->{hp_cooling_mode} * $f->{hour_class_noon}),                        # mittags kühlen
 
         # --- WARM-WASSER ---
-        sqrt($f->{ww_morning}    * $f->{hp_heating_mode}),                          # WW morgens + Heizen
-        sqrt($f->{ww_evening}    * $f->{hp_heating_mode}),                          # WW abends + Heizen
-        sqrt($f->{ww_cycle_flag} * $f->{hp_heating_mode}),                          # WW-Zyklus + Heizen
+        softplus($f->{ww_morning}    * $f->{hp_heating_mode}),                          # WW morgens + Heizen
+        softplus($f->{ww_evening}    * $f->{hp_heating_mode}),                          # WW abends + Heizen
+        softplus($f->{ww_cycle_flag} * $f->{hp_heating_mode}),                          # WW-Zyklus + Heizen
 
         # Kaltstart
-        sqrt($f->{ww_cold_boost} * $f->{temp_delta_1h_neg}),                        # Kaltstart + Temperaturfall
+        softplus($f->{ww_cold_boost} * $f->{temp_delta_1h_neg}),                        # Kaltstart + Temperaturfall
 
         # PV-Boost (nur sinnvoll in PV-Profilen)
-        sqrt($f->{ww_pv_boost} * $f->{pv_norm}),                                    # PV + Warmwasser
+        softplus($f->{ww_pv_boost} * $f->{pv_norm}),                                    # PV + Warmwasser
 
         # --- EFFIZIENZ ---
-        sqrt($f->{cop_inverse} * $f->{trend_up_strength}),                          # ineffizient + steigender Trend
-        sqrt($f->{cop_proxy}   * $f->{trend_down_strength}),                        # effizient + fallender Trend
+        softplus($f->{cop_inverse} * $f->{trend_up_strength}),                          # ineffizient + steigender Trend
+        softplus($f->{cop_proxy}   * $f->{trend_down_strength}),                        # effizient + fallender Trend
 
         # --- FROSTSCHUTZ ---
-        sqrt($f->{frost_protect} * $f->{hour_class_midnight}),                      # Frostschutz nachts
-        sqrt($f->{frost_protect} * $f->{temp_delta_1h_neg}),                        # Frostschutz + Temperaturfall
+        softplus($f->{frost_protect} * $f->{hour_class_midnight}),                      # Frostschutz nachts
+        softplus($f->{frost_protect} * $f->{temp_delta_1h_neg}),                        # Frostschutz + Temperaturfall
 
         # --- TEMPERATUR + TREND ---
-        sqrt($f->{temp_delta_3h_neg} * $f->{trend_up_strength}),                    # Kälte + steigender Trend
-        sqrt($f->{temp_delta_3h_pos} * $f->{trend_down_strength}),                  # Wärme + fallender Trend
+        softplus($f->{temp_delta_3h_neg} * $f->{trend_up_strength}),                    # Kälte + steigender Trend
+        softplus($f->{temp_delta_3h_pos} * $f->{trend_down_strength}),                  # Wärme + fallender Trend
         
         # --- Verstärker ---
-        $f->{pv_norm}    * $f->{hour_class_noon},                                   # Neu  11.01
-        $f->{ww_morning} * $f->{hour_class_morning},                                # Neu  11.01
-        $f->{frost_load} * $f->{hour_class_morning},                                # Neu  11.01
+        $f->{pv_norm}    * $f->{hour_class_noon},                               
+        $f->{ww_morning} * $f->{hour_class_morning},                            
+        $f->{frost_load} * $f->{hour_class_morning},                          
+    ];
+},
+
+semantics_heatpump_boost_special => sub {                                               # NEU 14.01.
+    my ($f) = @_;
+
+    # --- HEIZEN ---
+    my $heat_base = 0.05 * $f->{hp_heating_mode};
+
+    my $heat_dyn = softplus(
+        ($f->{temp_delta_1h_neg} + 0.1) *
+        ($f->{trend_up_strength} + 0.1)
+    );
+
+    my $heat_stab = 0.7 * softplus(
+        $f->{frost_load} + 0.1
+    );
+
+    my $heat_amp = 1.2 * ($heat_base + 0.8*$heat_dyn + 0.6*$heat_stab);
+    my $heat_final = ($heat_amp < 0.05) ? 0.05 : $heat_amp;
+
+
+    # --- KÜHLEN ---
+    my $cool_base = 0.05 * $f->{hp_cooling_mode};
+
+    my $cool_dyn = softplus(
+        ($f->{temp_delta_1h_pos} + 0.1) *
+        ($f->{trend_up_strength} + 0.1)
+    );
+
+    my $cool_stab = 0.5 * softplus($f->{temp_trend_pos} + 0.1);
+
+    my $cool_amp = 1.1 * ($cool_base + 0.7*$cool_dyn + 0.5*$cool_stab);
+    my $cool_final = ($cool_amp < 0.03) ? 0.03 : $cool_amp;
+
+
+    # --- WARM-WASSER ---
+    my $ww_base = 0.05 * ($f->{ww_morning} + $f->{ww_evening});
+
+    my $ww_dyn = softplus(
+        ($f->{ww_cycle_flag} + 0.1) *
+        ($f->{temp_delta_1h_neg} + 0.1)
+    );
+
+    my $ww_stab = 0.6 * softplus($f->{ww_cold_boost} + 0.1);
+
+    my $ww_amp = 1.3 * ($ww_base + 0.7*$ww_dyn + 0.5*$ww_stab);
+    my $ww_final = ($ww_amp < 0.04) ? 0.04 : $ww_amp;
+
+
+    # --- FROSTSCHUTZ ---
+    my $frost_base = 0.03 * $f->{frost_protect};
+
+    my $frost_dyn = softplus(
+        ($f->{temp_delta_1h_neg} + 0.1) *
+        ($f->{trend_down_strength} + 0.1)
+    );
+
+    my $frost_amp = 1.1 * ($frost_base + 0.6*$frost_dyn);
+    my $frost_final = ($frost_amp < 0.02) ? 0.02 : $frost_amp;
+
+
+    return [
+        $heat_final,
+        $cool_final,
+        $ww_final,
+        $frost_final,
     ];
 },
 
@@ -2133,6 +2199,7 @@ v1_heatpump_pv => sub {
         @{ $FEATURE_REGISTRY{v1_common}->($f) },
         @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
         @{ $FEATURE_BLOCKS{pv}->($f) },
+        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost}->($f) },
     ];
 },
 
@@ -2145,6 +2212,19 @@ v1_heatpump_active_pv => sub {
         @{ $FEATURE_REGISTRY{v1_common}->($f) },
         @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
         @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
+        @{ $FEATURE_BLOCKS{pv}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
+        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
+    ];
+},
+
+v1_heatpump_active_pv_test => sub {
+    my ($f) = @_;
+    return [
+        @{ $FEATURE_REGISTRY{v1_common}->($f) },
+        @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_heatpump_boost_special}->($f) },
         @{ $FEATURE_BLOCKS{pv}->($f) },
         @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
         @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
@@ -7746,6 +7826,7 @@ sub _attraiControl {                     ## no critic "not used"
                 v1_heatpump
                 v1_heatpump_pv
                 v1_heatpump_active_pv
+                v1_heatpump_active_pv_test
                 v1_sandbox
               );
               
@@ -22431,7 +22512,7 @@ sub aiFannCreateConTrainData {
       my $row = $training_data[$i];
       for my $j (0 .. $#$row) {
           my $v = $row->[$j];
-          if ($v < 0) {
+          if ($v < 0 && $haf !~ /SYMMETRIC/xs) {
               Log3 ($name, 1, "$name - AI Train data NEGATIV: training_data[$i][$j] = $v");
           }
       }
@@ -23546,11 +23627,11 @@ sub aiFannTrain {
   my $rmse_rel      = sprintf "%0.0f", (($rmse / $target_median) * 100);                    # relative RMSE in %
   
   my $rmse_rating;
-  if    ($rmse_rel < 5)  { $rmse_rating = "excellent"; }
-  elsif ($rmse_rel < 10) { $rmse_rating = "good"; }
-  elsif ($rmse_rel < 20) { $rmse_rating = "acceptable"; }
-  elsif ($rmse_rel < 35) { $rmse_rating = "weak"; }
-  else                   { $rmse_rating = "very bad"; }
+  if    ($rmse_rel < 20)  { $rmse_rating = "excellent"; }                                   # extrem selten
+  elsif ($rmse_rel < 40)  { $rmse_rating = "good"; }                                        # sehr gut
+  elsif ($rmse_rel < 70)  { $rmse_rating = "acceptable"; }                                  # normal
+  elsif ($rmse_rel < 120) { $rmse_rating = "weak"; }                                        # noch ok
+  else                    { $rmse_rating = "very bad"; }                                    # kritisch
   
   # weighted RMSE
   my @weighted_sq;
@@ -23574,11 +23655,12 @@ sub aiFannTrain {
   my $weighted_rmse     = sqrt( (sum(@weighted_sq)) / (sum(@weights) || 1) );
   my $weighted_rmse_rel = sprintf "%.0f", (($weighted_rmse / $target_median) * 100);
 
-  my $weighted_rmse_rating =  $weighted_rmse_rel < 5  ? "excellent"
-                            : $weighted_rmse_rel < 10 ? "good"
-                            : $weighted_rmse_rel < 20 ? "acceptable"
-                            : $weighted_rmse_rel < 35 ? "weak"
-                            :                           "very bad";
+  my $weighted_rmse_rating =
+        $weighted_rmse_rel < 20  ? "excellent"                                              # extrem selten, aber möglich
+      : $weighted_rmse_rel < 40  ? "good"                                                   # sehr gut
+      : $weighted_rmse_rel < 70  ? "acceptable"                                             # normal
+      : $weighted_rmse_rel < 120 ? "weak"                                                   # noch ok
+      :                            "very bad";                                              # kritisch
 
   # Bester Snapshot ->  Modell-Slope und Modell-Bias auf denormalisierten Werten
   #################################################################################
@@ -23907,8 +23989,8 @@ sub _aiFannRetrainIndicator {
   my $lim_bias           = 1.5 * $mae;          # Sehr gut. Bias > 50% des MAE bedeutet systematische Verzerrung
   
   # RMSE/MAE
-  my $lim_rmse_mae_ratio = 1.5;                 # Sehr gut. RMSE sollte nicht viel größer sein als MAE -> sonst Ausreißerproblem
-  my $lim_rmse_rel       = 20;                  # RMSE relativ zum Medianverbrauch >20% -> Retrain
+  my $lim_rmse_mae_ratio = 2.5;                 # vorher 1.5 – Peaks machen RMSE immer größer als MAE
+  my $lim_rmse_rel       = 60;                  # vorher 20 – 60% ist für volatile Haushalte normal
   
   # P95 / P99
   my $lim_p95_error      = 4 * $mae;
@@ -23919,14 +24001,17 @@ sub _aiFannRetrainIndicator {
   my $lim_bitfail_rate   = 0.10;
   
   # --- Forecast Quality Score (0–100) + Ampel ---              
+  my $rmse_rel_capped = $rmse_rel;
+  $rmse_rel_capped    = 60 if $rmse_rel_capped > 60;    # Cap, damit Peaks nicht alles zerstören
+
   my $score = 100
-              - 0.5  * $rmse_rel
-              - 5    * abs($model_bias) / ($mae || 1)    
-              - 10   * abs($model_slope - 1)            
+              - 0.2  * $rmse_rel_capped                 # vorher 0.5 – weicher Faktor
+              - 5    * abs($model_bias) / ($mae || 1)
+              - 10   * abs($model_slope - 1)
               - 10   * $bitfail_rate
               - 5    * (1 - $r2)
-              - 2    * ($p95_error / ($mae || 1))       
-              - 1    * ($p99_error / ($mae || 1));   
+              - 1.5  * ($p95_error / ($mae || 1))       # etwas höher gewichtet
+              - 0.7  * ($p99_error / ($mae || 1));      # etwas höher gewichtet
         
   $score = 0   if $score < 0;
   $score = 100 if $score > 100;
@@ -23952,10 +24037,11 @@ sub _aiFannRetrainIndicator {
                                     || $model_slope     < $lim_slope_min
                                     || $model_slope     > $lim_slope_max
                                     || abs($model_bias) > $lim_bias
-                                    || $rmse_rel        > $lim_rmse_rel
-                                    || $p95_error       > $lim_p95_error
-                                    || $p99_error       > $lim_p99_error
+                                    || ($rmse_rel       > $lim_rmse_rel 
+                                        && ($p95_error  > $lim_p95_error 
+                                        ||  $p99_error  > $lim_p99_error))
                                  );
+
   
   if ($debug =~ /aiProcess/xs) {
       $mse_train      = sprintf "%.6f", $mse_train;
@@ -29748,6 +29834,14 @@ return $bin;
 }
 
 ################################################################
+#    SoftPlus Funktion für symmetrische AI Normierung 
+################################################################  
+sub softplus {
+  my ($x) = @_;
+  return log ( 1 + exp ($x) );
+}
+
+################################################################
 #  Einen Wert auf angegebenen unteren und oberen Wert begrenzen  
 ################################################################    
 sub clampValue {
@@ -34808,85 +34902,88 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          
          <table>
          <colgroup> <col width="26%"> <col width="74%"> </colgroup>            
-            <tr><td> <b>aiConActivate</b>     </td><td>Aktiviert die Verwendung des neuronalen Netzes für die Verbrauchsvorhersage. Es wird eine Standardeinstellung verwendet. Zur Änderung der            </td></tr>
-            <tr><td>                          </td><td>Trainingsparameter sind die weiteren beschriebenen verfügbar.                                                                                        </td></tr>
-            <tr><td>                          </td><td><ul> * 0 - das neuronale Netz ist deaktiviert </ul>                                                                                                  </td></tr>
-            <tr><td>                          </td><td><ul> * 1 - das neuronale Netz ist aktiviert </ul>                                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> * 2 - der Trainingsmodus mit max. 1 Trainingswiederholung ist aktiviert. Die KI-Verbrauchsprognose wird nicht verwendet </ul>                   </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2</b>, default: 0                                                                                                                  </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConProfile</b>      </td><td>Auswahl der Eigenschaften des Haushalts. Die auswählbaren Profile verstärken bzw. betonen bestimmte Spezifika im Haushalt.                           </td></tr>
-            <tr><td>                          </td><td>Die Versionsbezeichnung ist lediglich ein Anhaltspunkt. Man sollte die Version einstellen, mit der die besten Ergebnisse erzielt werden.             </td></tr>
-            <tr><td>                          </td><td>Ist aiConProfile nicht gesetzt, erfolgt durch das System eine automatische Auswahl des wahrscheinlich zutreffendsten Profils.                        </td></tr>
-            <tr><td>                          </td><td><ul> v1_common - Standardhaushalt </ul>                                                                                                              </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit ausgeprägten Tagesrhythmen </ul>                                                                        </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit geringerer Gewichtung der PV-Anlage </ul>                                                                           </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage und starkem Tagesrhythmus </ul>                                           </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump - Standardhaushalt mit Wärmepumpe  </ul>                                                                                            </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit geringerer Gewichtung und Wärmepumpen Charakteristika </ul>                                                       </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage, Wärmepumpe und starkem Tagesrhythmus </ul>                             </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                      </td></tr>
-            <tr><td>                          </td><td><ul> * 0 - die KI-Ergebnisse werden nicht verwendet, nur Legacy Werte </ul>                                                                          </td></tr>
-            <tr><td>                          </td><td><ul> * 0.4 - die KI-Ergebnisse gehen zu 40%, die Legacy Werte zu 60% in die finale Prognose ein </ul>                                                </td></tr>
-            <tr><td>                          </td><td><ul> * 0.7 - die KI-Ergebnisse gehen zu 70%, die Legacy Werte zu 30% in die finale Prognose ein </ul>                                                </td></tr>
-            <tr><td>                          </td><td><ul> * 1 - es werden nur KI-Ergebnisse verwendet, keine Legacy Werte </ul>                                                                           </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0 .. 1</b>, default: 1                                                                                                                     </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConTrainStart</b>   </td><td>Legt die Wiederholungsperiode des Trainings in Tagen und Startstunde des Trainings fest.                                                             </td></tr>
-            <tr><td>                          </td><td>Die Angabe erfolgt in der Form &lt;Periode&gt;:&lt;Stunde&gt;                                                                                        </td></tr>
-            <tr><td>                          </td><td>Wertebereich:<b> &lt;1..90&gt;:&lt;1..23&gt; </b>, default: 7:3  (Start Training alle 7 Tage um 3 Uhr)                                               </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConActFunc</b>      </td><td>Auswahl der Aktivierungsfunktion für die Hidden Layer.                                                                                               </td></tr>
-            <tr><td>                          </td><td><ul> * SIGMOID - glättet stark, gut für einfache Muster </ul>                                                                                        </td></tr>
-            <tr><td>                          </td><td><ul> * GAUSSIAN - betont zentrale Peaks, blendet Ränder aus </ul>                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> * ELLIOT - glatter als Sigmoid, schneller trainierbar </ul>                                                                                     </td></tr>
-            <tr><td>                          </td><td>Werte:<b> SIGMOID | GAUSSIAN | ELLIOT </b>, default: SIGMOID                                                                                         </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConHiddenLayers</b> </td><td>Stellt die Architektur (verborgene Schichten) des neuronalen Netzes ein.                                                                             </td></tr>
-            <tr><td>                          </td><td>Die Architektur bestimmt, wie viele Schichten und Neuronen das Netz hat.                                                                             </td></tr>
-            <tr><td>                          </td><td><ul> * kleine Netze (z.B. 50-25) sind schnell und einfach, aber weniger genau  </ul>                                                                 </td></tr>
-            <tr><td>                          </td><td><ul> * mittlere Netze (64-32) bieten einen guten Kompromiss aus Geschwindigkeit und Genauigkeit  </ul>                                               </td></tr>
-            <tr><td>                          </td><td><ul> * tiefe Netze (64-32-16) erkennen komplexe Muster besser, sind aber empfindlicher gegenüber Ausreißern  </ul>                                   </td></tr>
-            <tr><td>                          </td><td>Wertebereich:<b> XX[X]-XX[X]-XX[X] (X = 1-9) </b>, default: 80-40-20                                                                                 </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConLearnRate</b>    </td><td>Bestimmt, wie stark die Gewichte des neuronalen Netzes bei jedem Traningsschritt angepasst werden.                                                   </td></tr>
-            <tr><td>                          </td><td><ul> * Klein (z.B. 0.001): langsames, stabiles Lernen; geringes Risiko von Überschwingen, aber längere Trainingszeit. </ul>                          </td></tr>
-            <tr><td>                          </td><td><ul> * Mittel (z.B. 0.005): guter Kompromiss zwischen Geschwindigkeit und Stabilität; oft ein sinnvoller Standardwert </ul>                          </td></tr>
-            <tr><td>                          </td><td><ul> * Groß (z.B. 0.05): schnelles Lernen, aber Gefahr von Instabilität oder Divergenz, wenn die Schritte zu groß sind </ul>                         </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0.05 | 0.01 | 0.005 | 0.001 </b>, default: 0.005                                                                                           </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConMomentum</b>     </td><td>Steuert, wie stark frühere Gewichtsanpassungen in die aktuelle Lernrichtung einfließen.                                                              </td></tr>
-            <tr><td>                          </td><td><ul> * Klein (z.B. 0.2): Netz reagiert direkt auf aktuelle Fehler, aber schwankt stärker </ul>                                                       </td></tr>
-            <tr><td>                          </td><td><ul> * Mittel (z.B. 0.5–0.8): glättet die Lernschritte, beschleunigt die Konvergenz und verhindert Zickzack-Bewegungen </ul>                         </td></tr>
-            <tr><td>                          </td><td><ul> * Groß (z.B. 0.9): sehr starke Glättung, kann Training stabilisieren, aber das Netz kann an lokalen Minima 'vorbeischießen' </ul>               </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0.2 - 0.9 </b>, default: 0.5                                                                                                               </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConShuffleMode</b>  </td><td>Einstellung des Shuffle Mode. Er bestimmt, wie die Trainingsdaten gemischt und in Trainings- sowie Testpakete aufgeteilt werden.                     </td></tr>
-            <tr><td>                          </td><td><ul> * 0 = chronologisch, reproduzierbar, aber anfällig für Reihenfolge-Effekte </ul>                                                                </td></tr>
-            <tr><td>                          </td><td><ul> * 1 = chronologischer Split, danach internes Shuffle - gute Balance zwischen zeitlicher Validierung und robustem Training </ul>                 </td></tr>
-            <tr><td>                          </td><td><ul> * 2 = vollständiges Shuffle vor dem Split + internes Shuffle - maximale Durchmischung, aber zeitliche Strukturen gehen verloren</ul>            </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2 </b>, default: 2                                                                                                                 </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td><b>aiConShufflePeriod</b> </td><td>Die Shuffle-Periode bestimmt, nach wie vielen Epochen die Trainingsdaten im Hintergrund neu gemischt werden.                                         </td></tr>
-            <tr><td>                          </td><td>Der Parameter beeinflusst, wie stark das Netz zufällige Reihenfolgen sieht und damit Generalisation vs. Stabilität.                                  </td></tr>
-            <tr><td>                          </td><td><ul> * Klein (5–10): Daten werden sehr häufig neu gemischt, bessere Generalisierung, weniger Gefahr von 'Auswendiglernen' </ul>                      </td></tr>
-            <tr><td>                          </td><td><ul> * Mittel (10–20): guter Kompromiss zwischen Stabilität und Durchmischung, glatte Lernkurven, trotzdem genug Variation </ul>                     </td></tr>
-            <tr><td>                          </td><td><ul> * Groß (>20): länger gleiche Datenreihenfolge, sehr stabiles Lernen weniger Stochastik, Netz kann Muster zu stark übernehmen</ul>               </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 10 | 15 | 20 | 25 | 30 </b>, default: 10                                                                                                   </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConSteepness</b>    </td><td>Steepness steuert die Empfindlichkeit der Neuronen. Niedrigere Werte glätten, höhere Werte schärfen.                                                 </td></tr>
-            <tr><td>                          </td><td><ul> * < 0.4: wenn das Modell zu stark auf Spitzen reagiert und geglättet werden soll </ul>                                                          </td></tr>
-            <tr><td>                          </td><td><ul> * 0.5: Standard, wenn keine besonderen Anforderungen bestehen </ul>                                                                             </td></tr>
-            <tr><td>                          </td><td><ul> * > 0.7: wenn feine Details oder starke Muster (z.B. Lastspitzen) deutlicher erfasst werden sollen </ul>                                        </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0.1 - 1.5 </b>, default: 0.9                                                                                                               </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
-            <tr><td> <b>aiConTrainAlgo</b>    </td><td>Stellt den Trainingsalgorithmus des neuronalen Netzes ein.                                                                                           </td></tr>
-            <tr><td>                          </td><td>Der Trainingsalgorithmus bestimmt, wie die Gewichte im Netz angepasst werden.                                                                        </td></tr>
-            <tr><td>                          </td><td><ul> * RPROP arbeitet stabil und automatisch mit angepassten Schrittweiten, ideal für zuverlässiges Training ohne viele Parameter </ul>              </td></tr>
-            <tr><td>                          </td><td><ul> * INCREMENTAL lernt schneller und reagiert direkt auf jedes Beispiel, ist aber empfindlicher gegenüber Ausreißern </ul>                         </td></tr>
-            <tr><td>                          </td><td>Werte:<b> RPROP | INCREMENTAL </b>, default: INCREMENTAL                                                                                             </td></tr>
-            <tr><td>                          </td><td>                                                                                                                                                     </td></tr>
+            <tr><td> <b>aiConActivate</b>     </td><td>Aktiviert die Verwendung des neuronalen Netzes für die Verbrauchsvorhersage. Es wird eine Standardeinstellung verwendet. Zur Änderung der                    </td></tr>
+            <tr><td>                          </td><td>Trainingsparameter sind die weiteren beschriebenen verfügbar.                                                                                                </td></tr>
+            <tr><td>                          </td><td><ul> * 0 - das neuronale Netz ist deaktiviert </ul>                                                                                                          </td></tr>
+            <tr><td>                          </td><td><ul> * 1 - das neuronale Netz ist aktiviert </ul>                                                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> * 2 - der Trainingsmodus mit max. 1 Trainingswiederholung ist aktiviert. Die KI-Verbrauchsprognose wird nicht verwendet </ul>                           </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2</b>, default: 0                                                                                                                          </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConProfile</b>      </td><td>Auswahl der Eigenschaften des Haushalts. Die auswählbaren Profile verstärken bzw. betonen bestimmte Spezifika im Haushalt.                                   </td></tr>
+            <tr><td>                          </td><td>Die Versionsbezeichnung ist lediglich ein Anhaltspunkt. Man sollte die Version einstellen, mit der die besten Ergebnisse erzielt werden.                     </td></tr>
+            <tr><td>                          </td><td>Ist aiConProfile nicht gesetzt, erfolgt durch das System eine automatische Auswahl des wahrscheinlich zutreffendsten Profils.                                </td></tr>
+            <tr><td>                          </td><td><ul> v1_common - Standardhaushalt </ul>                                                                                                                      </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit ausgeprägten Tagesrhythmen </ul>                                                                                </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit geringerer Gewichtung der PV-Anlage </ul>                                                                                   </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage und starkem Tagesrhythmus </ul>                                                   </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump - Standardhaushalt mit Wärmepumpe  </ul>                                                                                                    </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit geringerer Gewichtung und Wärmepumpen Charakteristika </ul>                                                               </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage, Wärmepumpe und starkem Tagesrhythmus </ul>                                     </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                              </td></tr>
+            <tr><td>                          </td><td><ul> * 0 - die KI-Ergebnisse werden nicht verwendet, nur Legacy Werte </ul>                                                                                  </td></tr>
+            <tr><td>                          </td><td><ul> * 0.4 - die KI-Ergebnisse gehen zu 40%, die Legacy Werte zu 60% in die finale Prognose ein </ul>                                                        </td></tr>
+            <tr><td>                          </td><td><ul> * 0.7 - die KI-Ergebnisse gehen zu 70%, die Legacy Werte zu 30% in die finale Prognose ein </ul>                                                        </td></tr>
+            <tr><td>                          </td><td><ul> * 1 - es werden nur KI-Ergebnisse verwendet, keine Legacy Werte </ul>                                                                                   </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 .. 1</b>, default: 1                                                                                                                             </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConTrainStart</b>   </td><td>Legt die Wiederholungsperiode des Trainings in Tagen und Startstunde des Trainings fest.                                                                     </td></tr>
+            <tr><td>                          </td><td>Die Angabe erfolgt in der Form &lt;Periode&gt;:&lt;Stunde&gt;                                                                                                </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> &lt;1..90&gt;:&lt;1..23&gt; </b>, default: 7:3  (Start Training alle 7 Tage um 3 Uhr)                                                       </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConActFunc</b>      </td><td>Auswahl der Aktivierungsfunktion für die Hidden Layer.                                                                                                       </td></tr>
+            <tr><td>                          </td><td><ul> * SIGMOID - typisch bei Verbrauchsanstiegen, die eine Sättigung erreichen (z.B. mehr Geräte -> mehr Verbrauch) </ul>                                    </td></tr>
+            <tr><td>                          </td><td><ul> * SIGMOID_SYMMETRIC - gut bei Abweichungen um einen Normalzustand (z.B. Temperaturabweichung -> mehr oder weniger Verbrauch) </ul>                      </td></tr>
+            <tr><td>                          </td><td><ul> * GAUSSIAN - gut für Peak-Effekte, die bei einem bestimmten Wert maximal sind (z.B. optimale Außentemperatur → maximaler Verbrauch) </ul>               </td></tr>
+            <tr><td>                          </td><td><ul> * GAUSSIAN_SYMMETRIC - wie GAUSSIAN, aber symmetrisch um einen Mittelpunkt (z.B. Komforttemperatur – zu kalt oder zu warm-> höherer Verbrauch) </ul>    </td></tr>
+            <tr><td>                          </td><td><ul> * ELLIOT - für positive Effekte, die weich ansteigen, aber weniger stark gesättigt werden als bei Sigmoid </ul>                                         </td></tr>
+            <tr><td>                          </td><td><ul> * ELLIOT_SYMMETRIC - wie SIGMOID_SYMMETRIC, Effekte die sanft symmetrisch verlaufen (z.B. Temperaturen die den Verbrauch leicht ohne starke Spitzen erhöhen)</ul> </td></tr>
+            <tr><td>                          </td><td>Werte:<b> SIGMOID | SIGMOID_SYMMETRIC | GAUSSIAN | GAUSSIAN_SYMMETRIC | ELLIOT | ELLIOT_SYMMETRIC </b>, default: SIGMOID                                     </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConHiddenLayers</b> </td><td>Stellt die Architektur (verborgene Schichten) des neuronalen Netzes ein.                                                                                     </td></tr>
+            <tr><td>                          </td><td>Die Architektur bestimmt, wie viele Schichten und Neuronen das Netz hat.                                                                                     </td></tr>
+            <tr><td>                          </td><td><ul> * kleine Netze (z.B. 50-25) sind schnell und einfach, aber weniger genau  </ul>                                                                         </td></tr>
+            <tr><td>                          </td><td><ul> * mittlere Netze (64-32) bieten einen guten Kompromiss aus Geschwindigkeit und Genauigkeit  </ul>                                                       </td></tr>
+            <tr><td>                          </td><td><ul> * tiefe Netze (64-32-16) erkennen komplexe Muster besser, sind aber empfindlicher gegenüber Ausreißern  </ul>                                           </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> XX[X]-XX[X]-XX[X] (X = 1-9) </b>, default: 80-40-20                                                                                         </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConLearnRate</b>    </td><td>Bestimmt, wie stark die Gewichte des neuronalen Netzes bei jedem Traningsschritt angepasst werden.                                                           </td></tr>
+            <tr><td>                          </td><td><ul> * Klein (z.B. 0.001): langsames, stabiles Lernen; geringes Risiko von Überschwingen, aber längere Trainingszeit. </ul>                                  </td></tr>
+            <tr><td>                          </td><td><ul> * Mittel (z.B. 0.005): guter Kompromiss zwischen Geschwindigkeit und Stabilität; oft ein sinnvoller Standardwert </ul>                                  </td></tr>
+            <tr><td>                          </td><td><ul> * Groß (z.B. 0.05): schnelles Lernen, aber Gefahr von Instabilität oder Divergenz, wenn die Schritte zu groß sind </ul>                                 </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.05 | 0.01 | 0.005 | 0.001 </b>, default: 0.005                                                                                                   </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConMomentum</b>     </td><td>Steuert, wie stark frühere Gewichtsanpassungen in die aktuelle Lernrichtung einfließen.                                                                      </td></tr>
+            <tr><td>                          </td><td><ul> * Klein (z.B. 0.2): Netz reagiert direkt auf aktuelle Fehler, aber schwankt stärker </ul>                                                               </td></tr>
+            <tr><td>                          </td><td><ul> * Mittel (z.B. 0.5–0.8): glättet die Lernschritte, beschleunigt die Konvergenz und verhindert Zickzack-Bewegungen </ul>                                 </td></tr>
+            <tr><td>                          </td><td><ul> * Groß (z.B. 0.9): sehr starke Glättung, kann Training stabilisieren, aber das Netz kann an lokalen Minima 'vorbeischießen' </ul>                       </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.2 - 0.9 </b>, default: 0.5                                                                                                                       </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConShuffleMode</b>  </td><td>Einstellung des Shuffle Mode. Er bestimmt, wie die Trainingsdaten gemischt und in Trainings- sowie Testpakete aufgeteilt werden.                             </td></tr>
+            <tr><td>                          </td><td><ul> * 0 = chronologisch, reproduzierbar, aber anfällig für Reihenfolge-Effekte </ul>                                                                        </td></tr>
+            <tr><td>                          </td><td><ul> * 1 = chronologischer Split, danach internes Shuffle - gute Balance zwischen zeitlicher Validierung und robustem Training </ul>                         </td></tr>
+            <tr><td>                          </td><td><ul> * 2 = vollständiges Shuffle vor dem Split + internes Shuffle - maximale Durchmischung, aber zeitliche Strukturen gehen verloren</ul>                    </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2 </b>, default: 2                                                                                                                         </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td><b>aiConShufflePeriod</b> </td><td>Die Shuffle-Periode bestimmt, nach wie vielen Epochen die Trainingsdaten im Hintergrund neu gemischt werden.                                                 </td></tr>
+            <tr><td>                          </td><td>Der Parameter beeinflusst, wie stark das Netz zufällige Reihenfolgen sieht und damit Generalisation vs. Stabilität.                                          </td></tr>
+            <tr><td>                          </td><td><ul> * Klein (5–10): Daten werden sehr häufig neu gemischt, bessere Generalisierung, weniger Gefahr von 'Auswendiglernen' </ul>                              </td></tr>
+            <tr><td>                          </td><td><ul> * Mittel (10–20): guter Kompromiss zwischen Stabilität und Durchmischung, glatte Lernkurven, trotzdem genug Variation </ul>                             </td></tr>
+            <tr><td>                          </td><td><ul> * Groß (>20): länger gleiche Datenreihenfolge, sehr stabiles Lernen weniger Stochastik, Netz kann Muster zu stark übernehmen</ul>                       </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 10 | 15 | 20 | 25 | 30 </b>, default: 10                                                                                                           </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConSteepness</b>    </td><td>Steepness steuert die Empfindlichkeit der Neuronen. Niedrigere Werte glätten, höhere Werte schärfen.                                                         </td></tr>
+            <tr><td>                          </td><td><ul> * < 0.4: wenn das Modell zu stark auf Spitzen reagiert und geglättet werden soll </ul>                                                                  </td></tr>
+            <tr><td>                          </td><td><ul> * 0.5: Standard, wenn keine besonderen Anforderungen bestehen </ul>                                                                                     </td></tr>
+            <tr><td>                          </td><td><ul> * > 0.7: wenn feine Details oder starke Muster (z.B. Lastspitzen) deutlicher erfasst werden sollen </ul>                                                </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.1 - 1.5 </b>, default: 0.9                                                                                                                       </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConTrainAlgo</b>    </td><td>Stellt den Trainingsalgorithmus des neuronalen Netzes ein.                                                                                                   </td></tr>
+            <tr><td>                          </td><td>Der Trainingsalgorithmus bestimmt, wie die Gewichte im Netz angepasst werden.                                                                                </td></tr>
+            <tr><td>                          </td><td><ul> * RPROP arbeitet stabil und automatisch mit angepassten Schrittweiten, ideal für zuverlässiges Training ohne viele Parameter </ul>                      </td></tr>
+            <tr><td>                          </td><td><ul> * INCREMENTAL lernt schneller und reagiert direkt auf jedes Beispiel, ist aber empfindlicher gegenüber Ausreißern </ul>                                 </td></tr>
+            <tr><td>                          </td><td>Werte:<b> RPROP | INCREMENTAL </b>, default: INCREMENTAL                                                                                                     </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
         </table>
         </ul>
 
