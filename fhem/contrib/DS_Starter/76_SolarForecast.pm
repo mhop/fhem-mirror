@@ -169,7 +169,7 @@ my %vNotesIntern = (
                            "show Con deviation in UI, new key aiControl->aiConProfile, calculate con_quantile30 ".
                            "__setConsRcmdState: add Current_GridConsumption to function, add windspeed and FF to DWD-Device ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ".
-                           "aiConActFunc: *_SYMMETRIC AF added ",
+                           "aiConActFunc: *_SYMMETRIC AF added, checkPlantConfig: add AI FANN Configuration check ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
   "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
@@ -2053,7 +2053,7 @@ semantics_heatpump_boost_special => sub {                                       
 
     my $cool_stab = 0.5 * softplus($f->{temp_trend_pos} + 0.1);
 
-    my $cool_amp = 1.1 * ($cool_base + 0.7*$cool_dyn + 0.5*$cool_stab);
+    my $cool_amp   = 1.1 * ($cool_base + 0.7*$cool_dyn + 0.5*$cool_stab);
     my $cool_final = ($cool_amp < 0.03) ? 0.03 : $cool_amp;
 
 
@@ -2100,6 +2100,12 @@ sandbox => sub {
     ];
 },
 
+### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+v1_heatpump_active_pv_test => sub {
+    return [
+
+    ];
+},
 
 );
 
@@ -2198,6 +2204,7 @@ v1_heatpump_pv => sub {
     return [
         @{ $FEATURE_REGISTRY{v1_common}->($f) },
         @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
+        @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
         @{ $FEATURE_BLOCKS{pv}->($f) },
         @{ $FEATURE_BLOCKS{pv_mittag_peak_boost}->($f) },
     ];
@@ -2207,19 +2214,6 @@ v1_heatpump_pv => sub {
 # v1_heatpump_active_pv – WP + PV Semantik
 # --------------------------------------------------------  
 v1_heatpump_active_pv => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },
-        @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
-        @{ $FEATURE_BLOCKS{pv}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
-        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
-    ];
-},
-
-v1_heatpump_active_pv_test => sub {
     my ($f) = @_;
     return [
         @{ $FEATURE_REGISTRY{v1_common}->($f) },
@@ -6718,11 +6712,10 @@ sub __getaiFannConState {            ## no critic "not used"
   my $regv     = AiNeuralVal ($name, 'con', 'RegVersion',     '-');                       # verwendete Feature-Registry Version
   my $talgo    = AiNeuralVal ($name, 'con', 'TrainAlgo',      '-');
   
-  my $drift_score   = AiNeuralVal ($name, 'con', 'DriftScore',       '-'); 
-  my $drift_rmserel = AiNeuralVal ($name, 'con', 'DriftRmseRelLive', '-'); 
-  my $drift_bias    = AiNeuralVal ($name, 'con', 'DriftBias',        '-'); 
-  my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlope',       '-'); 
-  my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',        '-');                                      
+  my $drift_score   = AiNeuralVal ($name, 'con', 'DriftScore',        '-'); 
+  my $drift_rmserel = AiNeuralVal ($name, 'con', 'DriftRmseRelRatio', '-');  
+  my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlopeRel',     '-'); 
+  my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',         '-');                                      
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6769,8 +6762,7 @@ sub __getaiFannConState {            ## no critic "not used"
   
   my $drift  = '<b>=== Drift-Kennzahlen ===</b>'."\n\n";
   $drift    .= "<b>Drift Score:</b> $drift_score"."\n";
-  $drift    .= "<b>Drift RMSE relative:</b> $drift_rmserel"."\n";
-  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";
+  $drift    .= "<b>Drift RMSE ratio:</b> $drift_rmserel"."\n";
   $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
   $drift    .= "<b>Drift Bewertung:</b> $drift_flag"."\n";
   
@@ -7818,7 +7810,7 @@ sub _attraiControl {                     ## no critic "not used"
                 THRESHOLD
                 THRESHOLD_SYMMETRIC
               );
-              
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !! ->  v1_heatpump_active_pv_test           
   my @rv = qw ( v1_common
                 v1_common_active
                 v1_common_pv
@@ -10618,7 +10610,7 @@ sub _specialActivities {
 
   $gcon = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
   storeReading ('LastHourGridconsumptionReal', "$gcon Wh", $ts1);
-
+  
   ## überhängende Daten in Nexthours löschen
   ############################################
   for my $num (0..MAXNEXTHOURS) {
@@ -10835,17 +10827,18 @@ sub _specialActivities {
   
   ## Task 7
   ###########
-  my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
-  my $ltctrfts                 = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 86400);      # letztes erfolgreiches KI Consumption Training...
-  my $tfo                      = timestringsFromOffset ($ltctrfts, 0);
-  my $tfodate                  = $tfo->{date};
-  my $ltctrts                  = timestringToTimestamp ($tfodate.' 00:00:00');                  # ...auf Tag genau
   my ($aiconpd, $aiconhr)      = split ":", CurrentVal ($name, 'aiConTrainStart', '7:3');       # Periode (in Tagen):Stunde f. Start Training KI Consumption 
-  my $newctrstts               = $ltctrts + ($aiconpd * 86400);
   
   if ($chour == $aiconhr && $minute >= 20) {
       if (!defined $hash->{HELPER}{T7RUN}) {
           $hash->{HELPER}{T7RUN} = 1;
+          
+          my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+          my $ltctrfts                 = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 86400);      # letztes erfolgreiches KI Consumption Training...
+          my $tfo                      = timestringsFromOffset ($ltctrfts, 0);
+          my $tfodate                  = $tfo->{date};
+          my $ltctrts                  = timestringToTimestamp ($tfodate.' 00:00:00');                  # ...auf Tag genau
+          my $newctrstts               = $ltctrts + ($aiconpd * 86400);
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 started");
           
@@ -22504,20 +22497,19 @@ sub aiFannCreateConTrainData {
   
   #my $trainpo = join ", \n", @{$training_data[0]};
   #debugLog ($paref, 'aiProcess', "AI FANN - First AI training dataset normalized: \n". $trainpo);
-  #my $trainpo = join ", \n", @$norm_ref;
-  #debugLog ($paref, 'aiProcess', "AI FANN - Targets normalized 0..1: \n". $trainpo);
   
   # Prüfung auf verbotene negative Daten im Trainingsset
   for my $i (0 .. $#training_data) {
       my $row = $training_data[$i];
+      
       for my $j (0 .. $#$row) {
           my $v = $row->[$j];
+          
           if ($v < 0 && $haf !~ /SYMMETRIC/xs) {
-              Log3 ($name, 1, "$name - AI Train data NEGATIV: training_data[$i][$j] = $v");
+              Log3 ($name, 1, "$name - ERROR - AI Train data NEGATIV: training_data[$i][$j] = $v");
           }
       }
   }
-
 
   # Übergabe
   ############
@@ -22914,8 +22906,14 @@ sub _aiSelectRegistryVersion {
                ? 'v1_heatpump_pv'                                           # Haushalt mit Wärmepumpe + PV
                : 'v1_common_pv';                                            # Standardhaushalt + PV
             
-  my $frv = CurrentVal ($name, 'aiConProfile',     $frvdef);                # überschreiben durch aiConProfile
-  $frv    = $frvdef if($frv =~ /heatpump/xs && !defined $c);                # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
+  my $frv = CurrentVal ($name, 'aiConProfile', $frvdef);                    # überschreiben durch aiConProfile
+  
+  if (!grep /^$frv$/, keys %FEATURE_REGISTRY) {
+      Log3 ($name, 1, "$name - ERROR - selected AI FANN profile is invalid, fallback to $frvdef done");
+      $frv = $frvdef;
+  }
+  
+  $frv = $frvdef if($frv =~ /heatpump/xs && !defined $c);                   # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
       
 return $frv;
 }
@@ -23626,12 +23624,12 @@ sub aiFannTrain {
   my $target_median = medianArray (\@targets_wh); 
   my $rmse_rel      = sprintf "%0.0f", (($rmse / $target_median) * 100);                    # relative RMSE in %
   
-  my $rmse_rating;
-  if    ($rmse_rel < 20)  { $rmse_rating = "excellent"; }                                   # extrem selten
-  elsif ($rmse_rel < 40)  { $rmse_rating = "good"; }                                        # sehr gut
-  elsif ($rmse_rel < 70)  { $rmse_rating = "acceptable"; }                                  # normal
-  elsif ($rmse_rel < 120) { $rmse_rating = "weak"; }                                        # noch ok
-  else                    { $rmse_rating = "very bad"; }                                    # kritisch
+  #my $rmse_rating;
+  #if    ($rmse_rel < 20)  { $rmse_rating = "excellent"; }                                   # extrem selten
+  #elsif ($rmse_rel < 40)  { $rmse_rating = "good"; }                                        # sehr gut
+  #elsif ($rmse_rel < 70)  { $rmse_rating = "acceptable"; }                                  # normal
+  #elsif ($rmse_rel < 120) { $rmse_rating = "weak"; }                                        # noch ok
+  #else                    { $rmse_rating = "very bad"; }                                    # kritisch
   
   # weighted RMSE
   my @weighted_sq;
@@ -23652,7 +23650,7 @@ sub aiFannTrain {
       push @weighted_sq, $w * ($err_clipped ** 2);
   }
 
-  my $weighted_rmse     = sqrt( (sum(@weighted_sq)) / (sum(@weights) || 1) );
+  my $weighted_rmse     = sqrt ((sum (@weighted_sq)) / (sum (@weights) || 1));
   my $weighted_rmse_rel = sprintf "%.0f", (($weighted_rmse / $target_median) * 100);
 
   my $weighted_rmse_rating =
@@ -24481,8 +24479,8 @@ sub _aiFannApplyBiasCorrection {
   $clamped_bias    =  $max_bias if($clamped_bias >  $max_bias);
   $clamped_bias    = -$max_bias if($clamped_bias < -$max_bias);
                                                                                           # Nur ein Teil des (geclampeten) Bias wird angewendet
-  my $alpha_green  = 0.5;                                                                 # 50% in grüner Zone
-  my $alpha_yellow = 0.3;                                                                 # 30% in gelber Zone
+  my $alpha_green  = 0.7;                                                                 # 50% in grüner Zone
+  my $alpha_yellow = 0.5;                                                                 # 30% in gelber Zone
 
   # --- Peak-Schutz: nur Grundlast korrigieren ---
   # Wenn kein RefLevel oder val deutlich drüber liegt -> keine Korrektur.
@@ -24498,72 +24496,63 @@ sub _aiFannApplyBiasCorrection {
   if ($is_baseline) {
       if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {      # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
           my $soft_bias = $clamped_bias * $alpha_green;
-          $res  = $val - $soft_bias;                                                      # nur additive Basiskorrektur, kein Slope!
-          $zone = 1;
+          $res          = $val + $soft_bias;                                              # nur additive Basiskorrektur, kein Slope!
+          $zone         = 1;
       }
       elsif ($slope >= 0.7 && $slope < 0.9 && $bias_ratio <= 2.0 && $rmse_rel <= 40) {    # --- Zone 2: Gelbe Zone (noch sanfter, aber gleiche Logik) ---
           my $soft_bias = $clamped_bias * $alpha_yellow;
-          $res  = $val - $soft_bias;
-          $zone = 2;
+          $res          = $val + $soft_bias;
+          $zone         = 2;
       }
   }                                                                                       # Zone 3: keine Korrektur
 
-  $bc = $val - $res;
+  $bc = $res - $val;
 
 return ($res, $bc, $zone);
 }
 
 ###########################################################################
-#        Drift-Analyse-Routine
-#  $windows - die Anzahl der auszuwertenden (letzten) Daten
-#             default: 150 
-#
-# Sie leistet:
-# - Drift basierend auf MAE_live / MAE_model -> die wichtigste Drift-Metrik
-# - RMSE_rel_live (% vom Medianverbrauch) -> erkennt Ausreißer-Drift
-# - Slope/Bias-Drift -> erkennt Skalierungsfehler im Live-Betrieb
-# - Ampel-System: none, mild, moderate, severe 
-###########################################################################      
+#   Drift-Analyse (peak-aware, semantik-adaptiv, modellskaliert)
+###########################################################################
 sub aiFannDetectDrift {
   my $name    = shift;
   my $fanntyp = shift;
   my $window  = shift // 150;                                                           # Anzahl Stunden für Driftanalyse -> default 6.25 Tage
-    
-  my (@abs_errors, @targets, @preds);
-  
-  my $rawref = $data{$name}{aidectree}{airaw};                                          # Zugriff auf die Rohdaten
+
+  my $rawref = $data{$name}{aidectree}{airaw};
   return unless $rawref && ref $rawref eq 'HASH';
-                                                                
-  my $mae_model = AiNeuralVal ($name, $fanntyp, 'Mae', 1);                              # Trainings-MAE aus dem Modell
 
   my @indices = sort { $a <=> $b } keys %$rawref;
-  return unless @indices;
+  return unless @indices >= $window;
 
-  my @tail_idx = @indices[-$window .. -1];                                              # nur die letzten $window Datensätze verwenden
-  return unless (scalar (@tail_idx) >= $window);
-    
+  my @tail_idx = @indices[-$window .. -1];
+
+  my (@targets, @preds, @abs_errors);
+
   for my $idx (@tail_idx) {
-      my $rec = $rawref->{$idx};
-      next unless $rec;
+      my $rec = $rawref->{$idx} or next;
+      my $a   = $rec->{$fanntyp};
+      my $p   = $rec->{$fanntyp.'aifc'};
 
-      my $actual     = $rec->{$fanntyp};
-      my $prediction = $rec->{$fanntyp.'aifc'};
+      next unless (defined $a && defined $p && $a >= 0 && $p >= 0);
 
-      next if(!defined $actual || !defined $prediction || $actual < 0 || $prediction < 0);
-
-      push @targets, $actual;
-      push @preds,   $prediction;
-      push @abs_errors, abs ($prediction - $actual);
+      push @targets,    $a;
+      push @preds,      $p;
+      push @abs_errors, abs($p - $a);
   }
 
-  my $n             = @abs_errors || return;
-  my $mae_live      = sum (@abs_errors) / $n;                                           # MAE_live
-  my $rmse_live     = sqrt ( sum (map { $_**2 } @abs_errors) / $n );                    # RMSE_live
-  my $median        = medianArray (\@targets) || 1;                                     # Medianverbrauch bestimmen
-  my $rmse_rel_live = ($rmse_live / $median) * 100;                                     # RMSE_rel_live (%)
-  my $drift_score   = $mae_live / $mae_model;                                           # DriftScore (MAE-basiert)
+  my $n = @abs_errors || return;
 
-  my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);                                    # Slope/Bias für Drift
+  # --- Basis-Metriken ---
+  my $mae_live      = sum(@abs_errors) / $n;
+  my $rmse_live     = sqrt(sum(map { $_**2 } @abs_errors) / $n);
+  my $median        = medianArray(\@targets) || 1;
+  my $rmse_rel_live = ($rmse_live / $median) * 100;
+  my $mae_model     = AiNeuralVal($name, $fanntyp, 'Mae', 1) || 1;
+  my $drift_score   = $mae_live / $mae_model;
+
+  # --- Slope/Bias ---
+  my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);
     
   for my $i (0 .. $#targets) {
       $sum_x  += $targets[$i];
@@ -24572,82 +24561,82 @@ sub aiFannDetectDrift {
       $sum_xx += $targets[$i] * $targets[$i];
   }
 
-  my $den        = $n * $sum_xx - $sum_x * $sum_x;                                    
-  my $slope_live = $den != 0 ? ($n * $sum_xy - $sum_x * $sum_y) / $den : 0;
-  my $bias_live  = ($sum_y - $slope_live * $sum_x) / $n;
-  
-  my $semantics_active = 0;                                                             # Semantikindikatoren berechnen
+  my $den         = $n * $sum_xx - $sum_x * $sum_x;
+  my $slope_live  = $den != 0 ? ($n * $sum_xy - $sum_x * $sum_y) / $den : 0;
+  my $bias_live   = ($sum_y - $slope_live * $sum_x) / $n;
+  my $slope_model = AiNeuralVal($name, $fanntyp, 'ModelSlope', 1);
+  my $bias_model  = AiNeuralVal($name, $fanntyp, 'ModelBias',  0);
+  my $slope_drift = abs($slope_live - $slope_model);
+  my $bias_drift  = abs($bias_live  - $bias_model);
+
+  my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel', 30);
+  my $rmse_rel_ratio  = $rmse_rel_model > 0 ? ($rmse_rel_live / $rmse_rel_model) : 1;
+  my $slope_drift_rel = $slope_model != 0   ? ($slope_drift / abs($slope_model)) : $slope_drift;
+  my $bias_drift_norm = $mae_model > 0      ? ($bias_drift / $mae_model)         : $bias_drift;
+
+  # --- Semantik-Trigger (modellskaliert) ---
+  my $semantics_active = 0;
   my $peak_active      = 0;
+  my $sem_threshold    = 0.5 * $mae_model;                                      # dynamisch
+  my $peak_threshold   = $median + 2 * $mae_model;                              # dynamisch
 
   for my $i (0 .. $#targets) {
-      my $actual = $targets[$i];
-      my $pred   = $preds[$i];
+      my $a = $targets[$i];
+      my $p = $preds[$i];
 
-      # Semantik aktiv: wenn delta > 300W oder Verbrauch > 1.5 × Median
-      $semantics_active++ if (abs($pred - $actual) > 300);
-      $peak_active++      if ($actual > 1.5 * $median);
+      $semantics_active++ if(abs($p - $a) > $sem_threshold);
+      $peak_active++      if($a > $peak_threshold);
   }
 
-  my $semantics_ratio = $semantics_active / $n;
-  my $peak_ratio      = $peak_active / $n;
+  my $sem_ratio  = $semantics_active / $n;
+  my $peak_ratio = $peak_active / $n;
 
+  # --- Ampel-Logik (modellskaliert) ---
+  my $flag;
 
-  my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);                     # Slope/Bias aus Training
-  my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0); 
-
-  my $slope_drift = abs ($slope_live - $slope_model);                                   # Drift in Slope/Bias
-  my $bias_drift  = abs ($bias_live  - $bias_model);
-
-  my $drift_flag;                                                                       # Drift-Ampel
-
-  # --- SEVERE nur, wenn Metrik + Semantik beide kritisch ---
-  if ($drift_score     > 2.5 &&
-      $rmse_rel_live   > 50  &&
-      $slope_drift     > 0.4 &&
-      $semantics_ratio < 0.2 &&                                                         # Modell reagiert kaum
-      $peak_ratio      < 0.1                                                            # keine Peaks erkannt
+  if (
+      $drift_score      > 2.5 &&
+      $rmse_rel_ratio   > 2.0 &&
+      $slope_drift_rel  > 0.6 &&
+      $bias_drift_norm  > 3.0
   ) {
-      $drift_flag = "severe";
+      $flag = "severe";
   }
-
-  # --- MODERATE, wenn Metrik auffällig, aber Semantik aktiv ---
   elsif (
-      $drift_score     >  2.0 &&
-      $rmse_rel_live   >  35  &&
-      $slope_drift     >  0.3 &&
-      $semantics_ratio >= 0.2 &&
-      $peak_ratio      >= 0.1
+      $drift_score      > 2.0 &&
+      $rmse_rel_ratio   > 1.6 &&
+      $slope_drift_rel  > 0.4 &&
+      $bias_drift_norm  > 2.0
   ) {
-      $drift_flag = "moderate";
+      $flag = "moderate";
   }
-
-  # --- MILD, wenn Metrik leicht abweicht, aber Semantik gut arbeitet ---
   elsif (
-      $drift_score     >  1.5 &&
-      $rmse_rel_live   >  20  &&
-      $slope_drift     >  0.2 &&
-      $semantics_ratio >= 0.3
+      $drift_score      > 1.4  &&
+      $rmse_rel_ratio   > 1.3  &&
+      $slope_drift_rel  > 0.25 &&
+      $bias_drift_norm  > 1.0
   ) {
-      $drift_flag = "mild";
+      $flag = "mild";
   }
-
-  # --- NONE, wenn Modell lebendig und plausibel ---
   else {
-      $drift_flag = "none";
+      $flag = "none";
   }
 
-  # Ergebnisse speichern
-  $data{$name}{neuralnet}{$fanntyp}{DriftScore}       = sprintf "%.2f", $drift_score;
-  $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelLive} = sprintf "%.2f", $rmse_rel_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftBias}        = sprintf "%.2f", $bias_drift;
-  $data{$name}{neuralnet}{$fanntyp}{DriftSlope}       = sprintf "%.3f", $slope_drift;
-  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeLive}   = sprintf "%.3f", $slope_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}    = sprintf "%.2f", $bias_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftMaeLive}     = sprintf "%.2f", $mae_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftRmseLive}    = sprintf "%.2f", $rmse_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftFlag}        = $drift_flag;
+  # --- Ergebnisse speichern ---
+  $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelLive}  = sprintf "%.2f", $rmse_rel_live;
+  $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = sprintf "%.2f", $bias_drift;
+  $data{$name}{neuralnet}{$fanntyp}{DriftSlope}        = sprintf "%.3f", $slope_drift;
+  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeLive}    = sprintf "%.3f", $slope_live;
+  $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = sprintf "%.2f", $bias_live;
+  $data{$name}{neuralnet}{$fanntyp}{DriftMaeLive}      = sprintf "%.2f", $mae_live;
+  $data{$name}{neuralnet}{$fanntyp}{DriftRmseLive}     = sprintf "%.2f", $rmse_live;
+  $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = sprintf "%.2f", $drift_score;
+  $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = sprintf "%.2f", $rmse_rel_ratio;
+  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeRel}     = sprintf "%.3f", $slope_drift_rel;
+  $data{$name}{neuralnet}{$fanntyp}{DriftBiasNorm}     = sprintf "%.2f", $bias_drift_norm;
+  $data{$name}{neuralnet}{$fanntyp}{DriftFlag}         = $flag;
 
-return $drift_flag;
+return $flag;
 }
 
 ###############################################################
@@ -26878,15 +26867,16 @@ sub checkPlantConfig {
   my $nok    = FW_makeImage ('10px-kreis-rot.png',       '');
   my $warn   = FW_makeImage ('message_attention@orange', '');
   my $info   = FW_makeImage ('message_info',             '');
-
+  
   my $result = {                                                                                    # Ergebnishash
-      'String Configuration' => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'Weather Properties'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'Common Settings'      => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'FTUI Widget Files'    => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'Perl Modules'         => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'Data Memory'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
-      'Plant Control'        => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'String Configuration'  => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Weather Properties'    => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Common Settings'       => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'FTUI Widget Files'     => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Perl Modules'          => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Data Memory'           => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'Plant Control'         => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'AI FANN Configuration' => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
   };
 
   my $sub = sub {
@@ -26949,6 +26939,43 @@ sub checkPlantConfig {
   if (!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn}) {
       $result->{'String Configuration'}{result} = $hqtxt{fulfd}{$lang};
   }
+  
+  ## Check FANN AI
+  ##################
+  my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+  my $congrs                   = CurrentVal ($name, 'conNNGetResultState', 'ok');
+  
+  # --- FANN allgemein 
+  if (!$prepared) {
+      $result->{'AI FANN Configuration'}{state}   = $info;
+      $result->{'AI FANN Configuration'}{result} .= qq{AI FANN is not yet ready for use in consumption forecasting:  <br>};
+      $result->{'AI FANN Configuration'}{result} .= qq{cause: $cause <br>};
+      $result->{'AI FANN Configuration'}{note}   .= qq{Currently, AI cannot be used to support consumption forecasts, so only the <br>};
+      $result->{'AI FANN Configuration'}{note}   .= qq{conventional method of consumption forecasting is used. <br>};
+      $result->{'AI FANN Configuration'}{info}    = 1;
+  }
+  elsif (!$rdy) {
+      $result->{'AI FANN Configuration'}{state}   = $warn;
+      $result->{'AI FANN Configuration'}{result} .= qq{AI FANN usage is prepared, but not ready. <br>};
+      $result->{'AI FANN Configuration'}{result} .= qq{cause: $cause <br>};
+      $result->{'AI FANN Configuration'}{warn}    = 1;     
+  }
+  elsif ($congrs ne 'ok') {
+      $result->{'AI FANN Configuration'}{state}   = $nok;
+      $result->{'AI FANN Configuration'}{result} .= qq{There is a problem with the AI consumption forecast: <br>};
+      $result->{'AI FANN Configuration'}{result} .= qq{message: $congrs <br>};
+      $result->{'AI FANN Configuration'}{fault}   = 1;
+  }
+  
+  if (!$result->{'AI FANN Configuration'}{info} && 
+      !$result->{'AI FANN Configuration'}{warn} && 
+      !$result->{'AI FANN Configuration'}{fault}) {
+       
+       $result->{'AI FANN Configuration'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
+       $result->{'AI FANN Configuration'}{note}   .= qq{FANN installation and operational readiness have been checked. <br>};
+  }
+  
+  $result->{'AI FANN Configuration'}{note}   .= qq{For more information please read <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Die_KI%E2%80%91Verbrauchsprognose_mit_AI%3A%3AFANN_aktivieren_und_einstellen' target='_blank'>"Activate and configure AI consumption forecast with AI::FANN"</a> in german Wiki. <br>};
 
   ## Check Attribute DWD Wetterdevice
   #####################################
