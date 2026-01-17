@@ -1,6 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
- - feature:  00_SIGNALduino.pm: WM Bus support
+ - feature: 14_SD_WS.pm:  new sensors:
+                          BRESSER Air Quality Sensor
+                          BRESSER Blitzsensor 
+                          Temperatursensor JOKER TFA 30.3055, 30.3212
+                          added DCF WH31E/DNT000005
+                          Temperatursensor TFA 30.3255.02
+ - feature: 00_SIGNALduino.pm: WM Bus support
                                 User defined Client list via attr
  - feature: SD_ProtocolData.pm: Protocols
                                 22 HAMULiGHT finished
