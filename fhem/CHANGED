@@ -1,5 +1,16 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on it
+ - feature:  00_SIGNALduino.pm: WM Bus support
+                                User defined Client list via attr
+ - feature: SD_ProtocolData.pm: Protocols
+                                22 HAMULiGHT finished
+                                48 TFA JOKER finished
+                                130 CREATE_6601TL finished
+                                131 Bresser lightning added
+                                132 HA-HX2 adderd
+                                v133 WMBus_S added
+                                134 WMBus_T added
+                                134 TFA 30.3255.02 added
  - bugfix:  73_Tide: Adding libary, increasing loglevel
  - feature: 72_FRITZBOX: get <name> luaFunction [get|post] <funktion>
                          set <name> checkAPIs <[basic|full]>

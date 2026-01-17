@@ -3,7 +3,7 @@
 # All protocol definitions are contained in this file.
 #
 # 2016-2019  S.Butzek, Ralf9
-# 2019-2023  S.Butzek, HomeAutoUser, elektron-bbs
+# 2019-2025  S.Butzek, HomeAutoUser, elektron-bbs
 #
 # !!! useful hints !!!
 # --------------------
@@ -70,8 +70,8 @@
 ##### notice #### or #### info ############################################################################################################
 # !!! Between the keys and values no tabs, please use spaces !!!
 # !!! Please use first unused id for new protocols !!!
-# ID´s are currently unused: 130 - 
-# ID´s need to be revised (preamble u): 5|19|21|22|23|25|28|31|36|40|52|59|63
+# ID´s are currently unused: 136 - 
+# ID´s need to be revised (preamble u): 5|19|21|23|25|28|31|36|40|52|59|63
 ###########################################################################################################################################
 # Please provide at least three messages for each new MU/MC/MS/MN protocol and a URL of issue in GitHub or discussion in FHEM Forum
 # https://forum.fhem.de/index.php/topic,58396.975.html | https://github.com/RFD-FHEM/RFFHEM
@@ -85,7 +85,7 @@ package lib::SD_ProtocolData;
   use strict;
   use warnings;
 
-  our $VERSION = '1.53';
+  our $VERSION = '1.59';
   our %protocols = (
     "0" =>  ## various weather sensors (500 | 9100)
             # Mebus | Id:237 Ch:1 T: 1.9 Bat:low           MS;P0=-9298;P1=495;P2=-1980;P3=-4239;D=1012121312131313121313121312121212121212131212131312131212;CP=1;SP=0;R=223;O;m2;
@@ -725,9 +725,21 @@ package lib::SD_ProtocolData;
               # DC_1961_TG_1846 light_on_off   MS;P1=291;P2=-753;P3=762;P4=-249;P5=-8312;D=151212123434121212123412121234341234123412341212121234341212341234;CP=1;SP=5;R=224;O;m2;
               # DC_1961_TG_1846 fan_off        MS;P1=-760;P2=747;P3=-282;P4=253;P5=-8335;D=454141412323414141412341414123234123412341412323234123232323412323;CP=4;SP=5;R=27;O;m2;
               # DC_1961_TG_1846 fan_direction  MS;P0=-8384;P1=255;P2=-766;P3=754;P4=-263;D=101212123434121212123412121234341234123412341212341234341212341212;CP=1;SP=0;R=27;O;m2;
+              ## Remote control with 9 buttons for ceiling fan with lighting (Controller MP 2.5+3UF)
+              # https://forum.fhem.de/index.php?topic=138538.0 @ Butsch 2024-06-17
+              # RCnoName20_09_024F fan_low   MS;P0=249;P1=-744;P3=770;P4=-228;P5=-8026;D=050101010101013401013401013434343401010101010134010101010101010134;CP=0;SP=5;R=35;O;m2;
+              # RCnoName20_09_024F fan_stop  MS;P0=-7940;P1=246;P2=-757;P3=736;P4=-247;D=101212121212123412123412123434343412121212123434121212343412343412;CP=1;SP=0;R=47;O;m2;
+              ## Remote control CREATE 6601L with 14 buttons for ceiling fan with lighting
+              # https://forum.fhem.de/index.php?topic=53282.msg1316246#msg1316246 @ Kent 2024-07-04
+              # CREATE_6601L_1B90 fan_2  MS;P0=-7944;P1=-740;P4=253;P6=732;P7=-256;D=404141416767416767674141674141414141414141674141414141674141416767;CP=4;SP=0;R=67;O;m2;
+              # CREATE_6601L_1B90 fan_5  MS;P0=-264;P2=-743;P3=254;P4=733;P5=-7942;D=353232324040324040403232403232323232323232324032324032323232403240;CP=3;SP=5;R=40;O;m2;
+              ## Remote control RCnoName20_15 with 15 buttons for ceiling fan Forrovenco QX-01-DE1 with lighting
+              # https://forum.fhem.de/index.php?topic=143046.0 @ drhirn  2025-11-14
+              # RCnoName20_15_41267 all_off       MS;P2=-258;P3=229;P4=-780;P5=755;P6=-7847;D=363452343434343452343452343452523434525252343452523434525252523434;CP=3;SP=6;R=222;O;m2;
+              # RCnoName20_15_41267 light_on_off  MS;P2=-243;P3=277;P4=-739;P5=773;P6=-7861;D=363452343434343452343452343452523434525252345234343452525252525252;CP=3;SP=6;R=224;O;m2;
       {
         name            => 'RCnoName20',
-        comment         => 'Remote control with 4, 10 or 12 buttons',
+        comment         => 'Remote control with 4, 9, 10, 12, 14 or 15 buttons',
         id              => '20',
         knownFreqs      => '433.92',
         one             => [3,-1],  # 720,-240
@@ -748,7 +760,7 @@ package lib::SD_ProtocolData;
               # RCnoName20_10_3E00 fan_stop   MU;P0=184;P1=-380;P2=128;P3=-9090;P4=-768;P5=828;P6=-238;P7=298;D=45656565656747474747474747474747474567474560404515124040451040374745656565656747474747474747474747474567474567474565674747456747374745656565656747474747474747474747474567474567474565674747456747374745656565656747474747474747474747474567474567474565674747;CP=7;O;
       {
         name         => 'RCnoName20',
-        comment         => 'Remote control with 4, 10 or 12 buttons',
+        comment      => 'Remote control with 4, 9, 10, 12 or 14 buttons',
         id           => '20.1',
         knownFreqs   => '433.92',
         one          => [3,-1],  # 720,-240
@@ -785,28 +797,30 @@ package lib::SD_ProtocolData;
         length_max      => '32',
         paddingbits     => '1',        # This will disable padding
       },
-    "22"  =>  ## HAMULiGHT LED Trafo
-              # https://forum.fhem.de/index.php?topic=89301.0 | https://forum.fhem.de/index.php/topic,89643.msg822289.html#msg822289 @Michi240281
-              # remote with one button on/off
+    "22"  =>  ## HAMULiGHT remote control for LED transformer (for AB sets)
+              # https://forum.fhem.de/index.php?topic=89301.0 @ Michi240281 10 Juli 2018| https://forum.fhem.de/index.php/topic,89643.msg822289.html#msg822289 @ Michi240281 28 Juli 2018
+              # remote with one button for toggle on/off
               # u22#8F995F34   MU;P0=-196;P1=32001;P3=214;P4=1192;P5=-1200;P6=-595;P7=597;D=0103030453670707036363636367070363670703670367036363636367070363670367070303030304536707070363636363670703636707036703670363636363670703636703670703030303045367070703636363636707036367070367036703636363636707036367036707030303030453670707036363636367070;CP=3;R=15;
-              # u22#8F995F34   MU;P0=-604;P1=188;P2=583;P3=-224;P4=1199;P5=-1197;D=0102323102310231010101010232310102310232313131313451023232310101010102323101023231023102310101010102323101023102323131313134510232323101010101023231010232310231023101010101023231010231023231313131345102323231010101010232310102323102310231010101010232310;CP=1;R=15;
-              # u22#8F995F34   MU;P0=-614;P1=597;P2=-228;P3=171;P4=1184;P5=-1215;D=0123012123232323245301212123030303030121230301212301230123030303030121230301230121232323232453012121230303030301212303012123012301230303030301212303012301212323232324530121212303030303012123030121230123012303030303012123030123012;CP=3;R=7;
-              # u22#8F995F34   MU;P0=604;P1=-197;P2=205;P3=-595;P4=1194;P5=-1197;D=0101012323232323010123230101230123012323232323010123230123010121212121452301010123232323230101232301012301230123232323230101232301230101212121214523010101232323232301012323010123012301232323232301012323012301012121212145230101012323232323010123230101230;CP=2;R=17;
-              # u22#8F995F34   MU;P0=193;P1=-607;P2=605;P3=-209;P4=1204;P5=-1196;D=0123010101010123230101230123230303030345012323230101010101232301012323012301230101010101232301012301232303030303450123232301010101012323010123230123012301010101012323010123012323030303034501232323010101010123230101232301230123010101010123230101230123230;CP=0;R=18;
-              # u22#8F995F34   MU;P0=192;P1=-209;P2=1182;P3=-1214;P4=-606;P5=594;D=0101012304515151040404040451510404515104510451040404040451510404510451510101010123045151510404040404515104045151045104510404040404515104045104515101010101230451515104040404045151040451510451045104040404045151040451045150;CP=0;R=17;
+              # u22#8F995F34 -> P22#8F995F34 Hamulight_AB_8F99 on_off
+              # https://github.com/RFD-FHEM/RFFHEM/issues/1206 @ obduser 2023-12-09
+              # remote control with five buttons and touch control for dim
+              # P22#36055F47 Hamulight_AB_3605 on_off   MU;P0=-16360;P1=144;P2=-191;P3=209;P4=1194;P5=-1203;P6=607;P7=-591;D=01232324562623737623737626262626262376237623762373737373762376262623737373232323245626237376237376262626262623762376237623737373737623762626237373732323232456262373762373762626262626237623762376237373737376237626262373737323232324562623737623737626262626;CP=3;R=5;O;
+              # P22#36055F47 Hamulight_AB_3605 dim_1    MU;P0=-14008;P1=136;P2=-199;P3=210;P4=1200;P5=-1200;P6=596;P7=-591;D=01232324562623737623737626262626262376237623762376237623762623737373762373232323245626237376237376262626262623762376237623762376237626237373737623732323232456262373762373762626262626237623762376237623762376262373737376237323232324562623737623737626262626;CP=3;R=6;O;
+              # P22#36055F47 Hamulight_AB_3605 dim_4    MU;P0=-16204;P1=120;P2=-204;P3=204;P4=1192;P5=-1208;P6=593;P7=-592;D=01232324562623737623737626262626262376237623762373762623762376262626262373232323245626237376237376262626262623762376237623737626237623762626262623732323232456262373762373762626262626237623762376237376262376237626262626237323232324562623737623737626262626;CP=3;R=5;O;
       {
         name            => 'HAMULiGHT',
-        comment         => 'remote control for LED Transformator',
+        comment         => 'Remote control for LED transformer',
         id              => '22',
         knownFreqs      => '433.92',
         one             => [1,-3],
         zero            => [3,-1],
-        start           => [6,-6],
-        clockabs        => 200,        # ca 200us
+        start           => [1,-1,1,-1,6,-6],
+        end             => [1,-1,1,-1],
+        clockabs        => 200,
         format          => 'twostate',
-        preamble        => 'u22#',
-        #clientmodule    => '',
-        #modulematch     => '',
+        preamble        => 'P22#',
+        clientmodule    => 'SD_UT',
+        modulematch     => '^P22#',
         length_min      => '32',
         length_max      => '32',
       },
@@ -1300,7 +1314,7 @@ package lib::SD_ProtocolData;
       {
         name            => 'Somfy RTS',
         id              => '43',
-        knownFreqs      => '',
+        knownFreqs      => '433.42',
         clockrange      => [610,680],                # min , max
         format          => 'manchester',
         preamble        => 'Ys',
@@ -1412,25 +1426,25 @@ package lib::SD_ProtocolData;
         method          => \&lib::SD_Protocols::mcBit2Maverick,    # Call to process this message
         #polarity        => 'invert'
       },
-    "48"  =>  ## Joker Dostmann TFA 30.3055.01
-              # ! some message are decode as protocol 42 and protocol 50 !
+    "48"  =>  ## TFA Temperature transmitter 30.3212 for Wireless thermometer JOKER 30.3055
               # https://github.com/RFD-FHEM/RFFHEM/issues/92 @anphiga
-              # U48#016C7E18004C   MU;P0=591;P1=-1488;P2=-3736;P3=1338;P4=-372;P6=-988;D=23406060606063606363606363606060636363636363606060606363606060606060606060606060636060636360106060606060606063606363606363606060636363636363606060606363606060606060606060606060636060636360106060606060606063606363606363606060636363636363606060606363606060;CP=0;O;
-              # U48#01657EB80034   MU;P0=96;P1=-244;P2=510;P3=-1000;P4=1520;P5=-1506;D=01232323232343234343232343234323434343434343234323434343232323232323232323232323234343234325232323232323232343234343232343234323434343434343234323434343232323232323232323232323234343234325232323232323232343234343232343234323434343434343234323434343232323;CP=2;O;
+              # SD_WS_48_T  T: 24.3  W48#FF49C0F3FFD9  MU;P0=591;P1=-1488;P2=-3736;P3=1338;P4=-372;P6=-988;D=23406060606063606363606363606060636363636363606060606363606060606060606060606060636060636360106060606060606063606363606363606060636363636363606060606363606060606060606060606060636060636360106060606060606063606363606363606060636363636363606060606363606060;CP=0;O;
+              # SD_WS_48_T  T: 16.3  W48#FF4D40A3FFE5  MU;P0=96;P1=-244;P2=510;P3=-1000;P4=1520;P5=-1506;D=01232323232343234343232343234323434343434343234323434343232323232323232323232323234343234325232323232323232343234343232343234323434343434343234323434343232323232323232323232323234343234325232323232323232343234343232343234323434343434343234323434343232323;CP=2;O;
       {
-        name            => 'TFA Dostmann',
-        comment         => 'Funk-Thermometer Joker TFA 30.3055.01',
+        name            => 'TFA JOKER',
+        comment         => 'Temperature transmitter TFA 30.3212',
         id              => '48',
         knownFreqs      => '433.92',
-        clockabs        => 250,             # In real it is 500 but this leads to unprceise demodulation
-        one             => [-4,6],
-        zero            => [-4,2],
-        start           => [-6,2],
+        clockabs        => 250,
+        one             => [2,-4], #   500,-1000
+        zero            => [6,-4], #  1500,-1000
+        start           => [-6],   # -1500
+        reconstructBit  => '1',
         format          => 'twostate',
-        preamble        => 'U48#',
-        #clientmodule    => '',
-        modulematch     => '^U48#.*',
-        length_min      => '47',
+        preamble        => 'W48#',
+        clientmodule    => 'SD_WS',
+        modulematch     => '^W48#.*',
+        length_min      => '47', # lenght without reconstructBit
         length_max      => '48',
       },
     "49"  =>  ## QUIGG GT-9000, EASY HOME RCT DS1 CR-A, uniTEC 48110 and other
@@ -2294,11 +2308,15 @@ package lib::SD_ProtocolData;
         length_max      => '3360',    # 3360 bit (336 x 10bit words to decode 168 bytes data) for full timer message
       },
     "83"  =>  ## Remote control RH787T based on MOSDESIGN SEMICONDUCTOR CORP (CMOS ASIC encoder) M1EN compatible HT12E
-              # for example Westinghouse Deckenventilator Delancey, 6 speed buttons, @zwiebelxxl
+              # Westinghouse Deckenventilator Delancey, 6 speed buttons, @zwiebelxxl
               # https://github.com/RFD-FHEM/RFFHEM/issues/250
               # 1_fan_minimum_speed      MU;P0=388;P1=-112;P2=267;P3=-378;P5=585;P6=-693;P7=-11234;D=0123035353535356262623562626272353535353562626235626262723535353535626262356262627235353535356262623562626272353535353562626235626262723535353535626262356262627235353535356262623562626272353535353562626235626262723535353535626262356262627235353535356262;CP=2;R=43;O;
               # 2_fan_low_speed          MU;P0=-176;P1=262;P2=-11240;P3=112;P5=-367;P6=591;P7=-695;D=0123215656565656717171567156712156565656567171715671567121565656565671717156715671215656565656717171567156712156565656567171715671567121565656565671717156715671215656565656717171567156712156565656567171715671567121565656565671717171717171215656565656717;CP=1;R=19;O;
               # 3_fan_medium_low_speed   MU;P0=564;P1=-392;P2=-713;P3=245;P4=-11247;D=0101010101023231023232323431010101010232310232323234310101010102323102323232343101010101023231023232323431010101010232310232323234310101010102323102323232343101010101023231023232323431010101010232310232323234310101010102323102323232343101010101023231023;CP=3;R=40;O;
+              # SEAV BeEasy TX blind controller (HT12E), remote control with 2 buttons [Protocol 83]
+              # https://github.com/RFD-FHEM/RFFHEM/issues/1276 @ xschmidt2 2024-10-10
+              # BeEasy_TX_4D4 down       MU;P0=-25312;P1=286;P2=-354;P3=626;P4=-677;P5=-11292;D=01234123234141234123412341512341232341412341234123415123412323414123412341234151234123234141234123412341512341232341412341234123415123412323414123412341234151234123234141234123412341512341232341412341234123415123412323414123412341234151234123234141234123;CP=1;R=37;O;
+              # BeEasy_TX_4D4 up         MU;P0=-24160;P1=277;P2=-363;P3=602;P4=-690;P6=-11311;D=01234123234141234123414123612341232341412341234141236123412323414123412341412361234123234141234123414123612341232341412341234141236123412323414123412341412361234123234141234123414123612341232341412341234141236123412323414123412341412361234123234141234123;CP=1;R=38;O;
       {
         name            => 'RH787T',
         comment         => 'remote control for example Westinghouse Delancey 7800140',
@@ -2757,7 +2775,7 @@ package lib::SD_ProtocolData;
         sync            => '2DD4',
         modulation      => '2-FSK',
         regexMatch      => qr/^9/,
-        register        => ['0001','022E','0341','042D','05D4','0605','0780','0800','0D21','0E65','0F6A','1089','115C','1202','1322','14F8','1556','1916','1B43','1C68','2611'],
+        register        => ['0001','022E','0341','042D','05D4','0605','0780','0800','0D21','0E65','0F6A','1089','115C','1202','1322','14F8','1556','1916','1B43','1C68'],
         rfmode          => 'Lacrosse_mode1',
         clientmodule    => 'LaCrosse',
         length_min      => '10',
@@ -2810,11 +2828,11 @@ package lib::SD_ProtocolData;
         comment         => 'example: TX35-IT,TX35DTH-IT,30.3155WD,30.3156WD,EMT7110',
         id              => '103',
         knownFreqs      => '868.3',
-        datarate        => '9579',
+        datarate        => '9596',
         sync            => '2DD4',
         modulation      => '2-FSK',
         regexMatch      => qr/^9/,
-        register        => ['0001','022E','0341','042D','05D4','0605','0780','0800','0D21','0E65','0F6A','10C8','1182','1202','1322','14F8','1542','1916','1B43','1C68','2611'],
+        register        => ['0001','022E','0341','042D','05D4','0605','0780','0800','0D21','0E65','0F6A','10C8','1183','1202','1322','14F8','1542','1916','1B43','1C68'],
         rfmode          => 'Lacrosse_mode2',
         clientmodule    => 'LaCrosse',
         length_min      => '10',
@@ -2906,6 +2924,7 @@ package lib::SD_ProtocolData;
         rfmode          => 'Fine_Offset_WH51_434',
         clientmodule    => 'SD_WS',
         length_min      => '28',
+        length_max      => '38', # WH68 - length_min => '32', length_max => '38',
       },
     "107.1" =>  # Fine Offset WH51, ECOWITT WH51, MISOL/1, Froggit DP100 Soil Moisture Sensor use with FSK 868.35 MHz
       {
@@ -2922,6 +2941,7 @@ package lib::SD_ProtocolData;
         rfmode          => 'Fine_Offset_WH51_868',
         clientmodule    => 'SD_WS',
         length_min      => '28',
+        length_max      => '38', # WH68 - length_min => '32', length_max => '38',
       },
     "108" =>  ## BRESSER 5-in-1 Weather Center, Bresser Professional Rain Gauge, Fody E42, Fody E43 - elektron-bbs 2021-05-02
               # https://github.com/RFD-FHEM/RFFHEM/issues/607
@@ -2940,6 +2960,7 @@ package lib::SD_ProtocolData;
         sync            => '2DD4',
         modulation      => '2-FSK',
         rfmode          => 'Bresser_5in1',
+        regexMatch      => qr/^[a-fA-F0-9]/,
         register        => ['0001','022E','0346','042D','05D4','061A','07C0','0800','0D21','0E65','0F6A','1088','114C','1202','1322','14F8','1551','1916','1B43','1C68'],
         preamble        => 'W108#',
         clientmodule    => 'SD_WS',
@@ -3100,6 +3121,7 @@ package lib::SD_ProtocolData;
         sync            => '2DD4',
         modulation      => '2-FSK',
         rfmode          => 'Bresser_6in1',
+        regexMatch      => qr/^[a-fA-F0-9]/,
         register        => ['0001','022E','0344','042D','05D4','0612','07C0','0800','0D21','0E65','0F6A','1088','114C','1202','1322','14F8','1551','1916','1B43','1C68'],
         preamble        => 'W115#',
         clientmodule    => 'SD_WS',
@@ -3125,6 +3147,7 @@ package lib::SD_ProtocolData;
         rfmode          => 'Fine_Offset_WH57_434',
         clientmodule    => 'SD_WS',
         length_min      => '18',
+        length_max      => '38', # WH68 - length_min => '32', length_max => '38',
       },
     "116.1" =>  ## Thunder and lightning sensor Fine Offset WH57, aka Froggit DP60, aka Ambient Weather WH31L use with FSK 868.35 MHz
       {
@@ -3141,12 +3164,16 @@ package lib::SD_ProtocolData;
         rfmode          => 'Fine_Offset_WH57_868',
         clientmodule    => 'SD_WS',
         length_min      => '18',
+        length_max      => '38', # WH68 - length_min => '32', length_max => '38',
       },
-    "117" =>  ## BRESSER 7-in-1 Weather Center
+    "117" =>  ## BRESSER 7-in-1 Weather Center (outdoor sensor)
               # https://forum.fhem.de/index.php/topic,78809.msg1196941.html#msg1196941 @ JensS 2021-12-30
               # T: 12.7 H: 87 W: 0 R: 8.4 B: 6.676   MN;D=FC28A6F58DCA18AAAAAAAAAA2EAAB8DA2DAACCDCAAAAAAAAAA000000;R=29;
               # T: 13.1 H: 88 W: 0 R: 0   B: 0.36    MN;D=4DC4A6F5B38A10AAAAAAAAAAAAAAB9BA22AAA9CAAAAAAAAAAA000000;R=15;
               # T: 10.1 H: 94 W: 0 R: 0   B: 1.156   MN;D=0CF0A6F5B98A10AAAAAAAAAAAAAABABC3EAABBFCAAAAAAAAAA000000;R=28;
+              ## BRESSER PM2.5/10 air quality meter @ elektron-bbs 2023-11-30
+              # PM2.5: 629  PM10: 636   MN;D=ACF66068BDCA89BD2AF22AC83AC9CA33333333333393CAAAAA00;R=9;
+              # PM2.5:   8  PM10:   9   MN;D=E3626068BDCA89BD2AAADAAA2AAA3AAEEAAF9AAFEA93CAAAAA00;R=10;
       {
         name            => 'Bresser 7in1',
         comment         => 'BRESSER 7-in-1 weather center',
@@ -3156,10 +3183,11 @@ package lib::SD_ProtocolData;
         sync            => '2DD4',
         modulation      => '2-FSK',
         rfmode          => 'Bresser_7in1',
-        register        => ['0001','022E','0345','042D','05D4','0616','07C0','0800','0D21','0E65','0F6A','1088','114C','1202','1322','14F8','1551','1916','1B43','1C68'],
+        regexMatch      => qr/^[a-fA-F0-9]/,
+        register        => ['0001','022E','0345','042D','05D4','0617','07C0','0800','0D21','0E65','0F6A','1088','114C','1202','1322','14F8','1551','1916','1B43','1C68'],
         preamble        => 'W117#',
         clientmodule    => 'SD_WS',
-        length_min      => '44',
+        length_min      => '46',
         method          => \&lib::SD_Protocols::ConvBresser_7in1,
       },
     "118" => ## Remote controls for Meikee LED lights e.g. RGB LED Wallwasher Light and Solar Flood Light
@@ -3299,13 +3327,13 @@ package lib::SD_ProtocolData;
 
     # "124" reserved for => ## Remote control CasaFan FB-FNK Powerboat with 5 buttons for fan
 
-    "125" =>  ## Humidity and Temperaturesensor Ecowitt WH31, froggit DP50 / WH31A
+    "125" =>  ## Humidity and Temperaturesensor Ecowitt WH31/WH31E, froggit DP50 / WH31A, DNT000005
               # Nordamerika: 915MHz; Europa: 868MHz, andere Regionen: 433MHz
               # https://github.com/RFD-FHEM/RFFHEM/pull/1161 @ sidey79 2023-04-01
-              # SD_WS_125_TH_1 T: 21.0 H: 55  Battery: ok channel:1   MN;D=300282623704516C000200;R=56;  
-              # SD_WS_125_TH_1 T: 16.7 H: 60  Battery: ok channel:2   MN;D=300292373CDA116C000200;R=229;  
+              # SD_WS_125_TH_1 T: 21.0 H: 55  Battery: ok channel:1   MN;D=300282623704516C000200;R=56;
+              # SD_WS_125_TH_1 T: 16.7 H: 60  Battery: ok channel:2   MN;D=300292373CDA116C000200;R=229;
               # SD_WS_125_TH_3 T: 5.4 H: 52   Battery: ok channel:3   MN;D=30E0A1C634FEA96C000200;R=197;
-
+              # SD_WS_125_DCF: 97: 2025-01-09 10:49:29                MN;D=52971025010910492909B3;R=33;A=2;
       {
         name            => 'WH31',
         comment         => 'Fine Offset | Ambient Weather WH31E Thermo-Hygrometer Sensor',
@@ -3314,15 +3342,16 @@ package lib::SD_ProtocolData;
         datarate        => '17.257',
         sync            => '2DD4',
         modulation      => '2-FSK',
-        regexMatch      => qr/^(30|37)/, 
+        regexMatch      => qr/^(30|37|52)/,
         preamble        => 'W125#',
-        register        => ['0001','022E','0343','042D','05D4','060b','0780','0800','0D21','0E65','0FE8','10A9','115C','1202','1322','14F8','1543','1916','1B43','1C68'],
+        register        => ['0001','022E','0342','042D','05D4','060b','0780','0800','0D21','0E65','0FE8','10A9','115C','1202','1322','14F8','1543','1916','1B43','1C68'],
         rfmode          => 'Fine_Offset_WH31_868',
         clientmodule    => 'SD_WS',
-        length_min      => '18',
+        length_min      => '22',
+        length_max      => '38', # WH68 - length_min => '32', length_max => '38',
       },
-    "126" =>  ## Humidity and Temperaturesensor Ecowitt WH40,  
-              # https://github.com/RFD-FHEM/RFFHEM/pull/1164
+    "126" =>  ## Rainfall Sensor Ecowitt WH40
+              # https://github.com/RFD-FHEM/RFFHEM/pull/1164 @ sidey79 2023-04-03
               # SD_WS_126 R: 0 MN;D=40011CDF8F0000976220A6802801;R=61;   14 byte  ID 11CDF
               # SD_WS_126 R: 0 MN;D=40013E3C900000105BA02A;R=61;         11 byte  ID 13E3c
               # SD_WS_126 R: 9 MN;D=40013E3C90005AB55AA0A0800408;R=61;   14 Byte  ID 13E3c
@@ -3340,7 +3369,7 @@ package lib::SD_ProtocolData;
         rfmode          => 'Fine_Offset_WH40_868',
         clientmodule    => 'SD_WS',
         length_min      => '22',
-        length_max      => '28',
+        length_max      => '38', # WH68 - length_min => '32', length_max => '38',
       },
     "127" =>  ## Remote control with 14 buttons for ceiling fan
                # https://forum.fhem.de/index.php?topic=134121.0 @ Kai-Alfonso 2023-06-29
@@ -3351,8 +3380,8 @@ package lib::SD_ProtocolData;
         comment          => 'Remote control with 14 buttons for ceiling fan',
         id               => '127',
         knownFreqs       => '433.92',
-        one              => [1,-3],  #  370,-1110
-        zero             => [3,-1],  # 1110, -370
+        one              => [1,-3],  #   370,-1110
+        zero             => [3,-1],  #  1110, -370
         start            => [-15],   # -5550 (MU)
         reconstructBit   => '1',
         clockabs         => '370',
@@ -3448,7 +3477,139 @@ package lib::SD_ProtocolData;
         polarity        => 'invert',
         method          => \&lib::SD_Protocols::mcBit2Sainlogic, # Call to process this message
       },
-
+    "130" =>  ## Remote control CREATE 6601TL for ceiling fan with light
+              # https://forum.fhem.de/index.php?msg=1288203 @ erdnar 2023-09-29
+              # CREATE_6601TL_F53A light_on_off     MS;P1=425;P2=-1142;P3=1187;P4=-395;P5=-12314;D=15121212123412341234341212123412341212121212121234;CP=1;SP=5;R=232;O;m2;
+              # CREATE_6601TL_F53A light_cold_warm  MS;P1=432;P2=-1143;P3=1183;P4=-393;P5=-12300;D=15121212123412341234341212123412341212121212123434;CP=1;SP=5;R=231;O;m2;
+              # CREATE_6601TL_F53A fan_faster       MS;P0=-11884;P1=392;P2=-1179;P3=1180;P4=-391;D=10121212123412341234341212123412341212121212341234;CP=1;SP=0;R=231;O;m2;
+              # https://github.com/RFD-FHEM/RFFHEM/issues/1296 @ projectsun2 2025-02-04
+              # RCnoName130_3115     on_off         MS;P0=-11334;P1=1213;P2=-416;P3=411;P4=-1222;D=30121234341212123412121234123412343434343434343412;CP=3;SP=0;R=59;m2; 
+              # https://github.com/RFD-FHEM/RFFHEM/issues/1312 @  @ zwiebelxxl 2025-07-26
+              # Lumention_RFSETCCT_14DF     on      MS;P1=-414;P2=396;P3=-1216;P4=1200;P5=-12111;D=25414141234123414123234123232323232323232323232341;CP=2;SP=5;R=38;O;m2;
+      {
+        name             => 'CREATE_6601TL',
+        comment          => 'Remote control for ceiling fan with light',
+        id               => '130',
+        knownFreqs       => '433.92',
+        one              => [1,-3],  #
+        zero             => [3,-1],  #
+        sync             => [1,-30], #
+        clockabs         => '400',
+        format           => 'twostate',
+        preamble         => 'P130#',
+        clientmodule     => 'SD_UT',
+        modulematch      => '^P130#',
+        length_min       => '24',
+        length_max       => '24',
+      },
+    "131" =>  ## BRESSER lightning detector @ elektron-bbs 2023-12-26
+              # SD_WS_131 count:   0, distance:  0, batteryState: ok, batteryChanged: 0   MN;D=DA5A2866AAA290AAAAAA;R=23;A=-2;
+              # SD_WS_131 count:   1, distance: 17, batteryState: ok, batteryChanged: 0   MN;D=5B192866AAB290BDAAAA;R=32;A=-3;
+              # SD_WS_131 count: 148, distance:  8, batteryState: ok, batteryChanged: 1   MN;D=AA362866BE2298A2AAAA;R=24;A=-2;
+      {
+        name            => 'Bresser lightning',
+        comment         => 'Bresser lightning detector',
+        id              => '131',
+        knownFreqs      => '868.300',
+        datarate        => '8.232',
+        sync            => '2DD4',
+        modulation      => '2-FSK',
+        rfmode          => 'Bresser_lightning',
+        regexMatch      => qr/^[a-fA-F0-9]/,
+        register        => ['0001','022E','0342','042D','05D4','060A','07C0','0800','0D21','0E65','0F6A','1088','114C','1202','1322','14F8','1551','1916','1B43','1C68'],
+        preamble        => 'W131#',
+        clientmodule    => 'SD_WS',
+        length_min      => '20',
+        method          => \&lib::SD_Protocols::ConvBresser_lightning,
+      },
+    "132"  =>  ## Remote control Halemeier HA-HX2 for Actor HA-RX-M2-1
+               # https://github.com/RFD-FHEM/RFFHEM/issues/1207 @ HomeAuto_User 2023-12-11
+               # https://forum.fhem.de/index.php?topic=38452.0 (probably identical)
+               # remote 1 - off | P132#85EFAC
+               # MU;P0=304;P1=-351;P2=633;P3=-692;P4=-12757;D=01230303030301230123030121240301212121230123030303012303030303012124030121212123012303030301230303030301230123030121240301212121230123030303012303030303012301230301212403012121212301230303030123030303030123012303012124030121212123012303030301230303030301;CP=0;R=241;O;
+               # MU;P0=-12609;P1=305;P2=-696;P3=-344;P4=653;D=01213434343421342121212134212121212134213421213434012134343434213421212121342121212121342134212134340121343434342134212121213421212121213421342121343401213434343421342121212134212121212134213421213434012134343434213421212121342121212121342134212134340121;CP=1;R=239;O;
+               # remote 1 - on  | P132#85EFAA
+               # MU;P0=-696;P1=312;P2=-371;P3=637;P4=-12847;D=01012301230123012341012323232301230101010123010101010123012301230123410123232323012301010101230101010101230123012301234101232323230123010101012301010101012301230123012341012323232301230101010123010101010123012301230123410123232323012301010101230101010101;CP=1;R=236;O;
+               # MU;P0=-701;P1=304;P2=-366;P3=642;P4=-12781;D=01012301230123012341012323232301230101010123010101010123012301230123410123232323012301010101230101010101230123012301234101232323230123010101012301010101012301230123012341012323232301230101010123010101010123012301230123410123232323012301010101230101010101;CP=1;R=238;O;
+               # remote 2 - on  | P132#01EFAA
+               # MU;P0=-340;P1=639;P2=-686;P3=304;P4=-12480;D=01230123014301010101010101232323232301230123012301430101010101010123232323012323232323012301230123014301010101010101232323230123232323230123012301230143010101010101012323232301232323232301230123012301430101010101010123232323012323232323012301230123014301;CP=3;R=226;O;
+               # MU;P0=-120;P1=642;P2=-343;P3=-684;P4=319;P5=-12492;D=01212121343434342134343434342134213421342154212121212121213434343421343434343421342134213421542121212121212134343434213434343434213421342134215421212121212121343434342134343434342134213421342154212121212121213434343421343434343421342134213421542121212121;CP=4;R=227;O;
+               # remote 2 - off  | P132#01EFAC
+               # MU;P0=622;P1=-367;P2=-690;P3=323;P4=-12531;D=01010101010101023232323102323232323102310232310101010102323232310232323232310231023231010431010101010101023232323102323232323102310232310104310101010101010232323231023232323231023102323101043101010101010102323232310232323232310231023231010431010101010101;CP=3;R=235;O;
+               # MU;P0=307;P1=-685;P2=-350;P3=658;P4=-12510;D=01010102310101010102310231010232340232323232323231010101023101010101023102323232323232323101010102310101010102310231010232340232323232323231010101023101010101023102310102323402323232323232310101010231010101010231023101023234023232323232323101010102310101;CP=0;R=232;O;
+      {
+        name            => 'HA-HX2',
+        comment         => 'Remote control for Halemeier LED actor HA-RX-M2-1',
+        id              => '132',
+        knownFreqs      => '433.92',
+        one             => [-2,1],
+        zero            => [-1,2],
+        start           => [-39,1],
+        clockabs        => 330,
+        format          => 'twostate',
+        preamble        => 'P132#',
+        clientmodule    => 'SD_UT',
+        modulematch     => '^P132#.*',
+        length_min      => '24',
+        length_max      => '24',
+      },
+    "133" =>  # WMBus_S
+              # https://wiki.fhem.de/wiki/WMBUS
+      {
+        name            => 'WMBus_S',
+        comment         => 'WMBus mode S',
+        id              => '133',
+        knownFreqs      => '868.300',
+        datarate        => '32.720',
+        preamble        => 'b',
+        modulation      => '2-FSK',
+        sync            => '7696',
+        rfmode          => 'WMBus_S',
+        register        => ['0006','0200','0340','0476','0596','06FF','0704','0802','0B08','0D21','0E65','0F6A','106A','114A','1206','1322','14F8','1547','192E','1A6D','1B04','1C09','1DB2'],
+        length_min      => '56',      # to filter messages | must check
+        clientmodule    => 'WMBUS',
+      },
+    "134" =>  # WMBus_T
+              # https://wiki.fhem.de/wiki/WMBUS
+              # messages with normal identifier
+              # RAWMSG: MN;D=3E44FA1213871122011633057A1C002025417CD28E06770269857D8001EF3B8BBE56BA7E06855CBA0334149F51682F2E6E2960E6900F800C0001090086B41E003A6F140131414D7D88810A;R=10;A=16;
+              # DMSG:       b3E44FA1213871122011633057A1C002025417CD28E06770269857D8001EF3B8BBE56BA7E06855CBA0334149F51682F2E6E2960E6900F800C0001090086B41E003A6F140131414D7D88810A
+              # messages with Y identifier for frame type B
+              # RAWMSG: MN;D=Y304497264202231800087A3E0020A5EE5B2074920E46E4B4A26B99C92C8DD3A55F44FAF6AE0256B354F9C48C717BFAD43400FB;R=251;A=0;
+              # DMSG:       bY304497264202231800087A3E0020A5EE5B2074920E46E4B4A26B99C92C8DD3A55F44FAF6AE0256B354F9C48C717BFAD43400FB
+      {
+        name            => 'WMBus_T',
+        comment         => 'WMBus mode C and T',
+        id              => '134',
+        knownFreqs      => '868.950',
+        datarate        => '100.000',
+        preamble        => 'b',
+        modulation      => '2-FSK',
+        sync            => '543D',
+        rfmode          => 'WMBus_T',
+        register        => ['0006','0200','0340','0454','053D','06FF','0704','0802','0B08','0D21','0E6B','0FD0','105C','1104','1206','1322','14F8','1544','192E','1ABF','1BC7','1C09','1DB2'],
+        length_min      => '56',      # to filter messages | must check
+        clientmodule    => 'WMBUS',
+      },
+    "135" =>  ## Temperatursensor TFA Dostmann 30.3255.02
+              # https://forum.fhem.de/index.php?topic=141436.0 @ Johann.S 2025-04-18
+              # Ch: 2  T: 21.4  batteryState: ok  sendmode: manual   MU;P0=-5132;P1=963;P2=-992;P3=467;P4=-273;P5=230;P6=-499;D=01212121234565656343456343434563456563456343434565634563434565634343456565612121212345656563434563434345634565634563434345656345634345656343434565656121212123456565634345634343456345656345634343456563456343456563434345656561212121234565656343456343434563;CP=5;R=51;O;
+              # Ch: 2  T: 21.4  batteryState: ok  sendmode: auto     MU;P0=-10720;P1=965;P2=-994;P3=470;P4=-265;P5=237;P6=-501;D=01212121234565656343456343456563456563456343434565634563456345634343456565612121212345656563434563434565634565634563434345656345634563456343434565656121212123456565634345634345656345656345634343456563456345634563434345656561212121234565656343456343456563;CP=5;R=60;O;
+      {
+        name            => 'TFA 30.3255.02',
+        comment         => 'Temperature sensor TFA 30.3255.02',
+        id              => '135',
+        knownFreqs      => '433.92',
+        one             => [2,-1],           # 488,-244
+        zero            => [1,-2],           # 244,-488
+        start           => [4,-4,4,-4,4,-4], # 976,-976,976,-976,976,-976,976,-976
+        clockabs        => 244,
+        format          => 'twostate',
+        preamble        => 'W135#',
+        clientmodule    => 'SD_WS',
+        length_min      => '32',
+        length_max      => '33',
+      },
     ########################################################################
     #### ###  register informations from other hardware protocols  #### ####
 
@@ -3509,51 +3670,6 @@ package lib::SD_ProtocolData;
         # modulation      => 'GFSK',
         # rfmode          => 'RIO',
         # register        => ['000D','012E','022D','0347','04D3','0591','063D','0704','0832','0900','0A00','0B06','0C00','0D21','0E65','0F6F','1086','1190','1218','1323','14B9','1540','1607','1700','1818','1914','1A6C','1B07','1C00','1D91','1E87','1F6B','20F8','21B6','2211','23EF','240D','253E','261F','2741'],
-      # },
-    # "997" =>  # WMBus_C
-              # # https://wiki.fhem.de/wiki/WMBUS
-              # # settings from CUL
-      # {
-        # name            => 'WMBus_C',
-        # comment         => '',
-        # id              => '997',
-        # developId       => 'm',
-        # knownFreqs      => '',
-        # datarate        => '',
-        # modulation      => '2-FSK',
-        # rfmode          => 'WMBus_C',
-        # register        => ['0029','012E','023F','0307','04D3','0591','06FF','0704','0845','0900','0A00','0B0F','0C00','0D1E','0EC4','0FEC','108C','1122','1202','1322','14F8','1547','1607','1730','1804','1976','1A6C','1B03','1C40','1D91','1E87','1F6B','20F8','2156','2210','23A9','240A','2520','260D','2741'],
-        # #regexMatch      => qr/^9/,   # ToDo, check! fuer eine regexp Pruefung am Anfang vor dem method Aufruf
-      # },
-    # "998" =>  # WMBus_S
-              # # https://wiki.fhem.de/wiki/WMBUS
-              # # settings from CUL
-      # {
-        # name            => 'WMBus_S',
-        # comment         => '',
-        # id              => '998',
-        # developId       => 'm',
-        # knownFreqs      => '',
-        # datarate        => '',
-        # modulation      => '2-FSK',
-        # rfmode          => 'WMBus_S',
-        # register        => ['0006','012E','0200','0300','0476','0596','06FF','0704','0802','0900','0A00','0B08','0C00','0D21','0E65','0F6A','106A','114A','1206','1322','14F8','1547','1607','1700','1818','192E','1A6D','1B04','1C09','1DB2','1E87','1F6B','20F8','21B6','2210','23EF','242A','2512','261F','2741'],
-        # #regexMatch      => qr/^9/,   # ToDo, check! fuer eine regexp Pruefung am Anfang vor dem method Aufruf
-      # },
-    # "999" =>  # WMBus_T
-              # # https://wiki.fhem.de/wiki/WMBUS
-              # # settings from CUL
-      # {
-        # name            => 'WMBus_T',
-        # comment         => '',
-        # id              => '999',
-        # developId       => 'm',
-        # knownFreqs      => '',
-        # datarate        => '',
-        # modulation      => '2-FSK',
-        # rfmode          => 'WMBus_T',
-        # register        => ['0006','012E','0200','0300','0454','053D','06FF','0704','0802','0900','0A00','0B08','0C00','0D21','0E6B','0FD0','105C','1104','1206','1322','14F8','1544','1607','1700','1818','192E','1ABF','1B43','1C09','1DB5','1E87','1F6B','20F8','21B6','2210','23EF','242A','2513','261F','2741'],
-        # #regexMatch      => qr/^9/,   # ToDo, check! fuer eine regexp Pruefung am Anfang vor dem method Aufruf
       # },
 
     ########################################################################
