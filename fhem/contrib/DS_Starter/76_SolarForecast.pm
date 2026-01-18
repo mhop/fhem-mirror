@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.0.0"  => "14.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
+  "2.0.0"  => "18.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
                            "new consumer type 'heatpump', new readings Today_CONdeviation, Today_CONforecast, Today_CONreal ".
@@ -170,7 +170,7 @@ my %vNotesIntern = (
                            "__setConsRcmdState: add Current_GridConsumption to function, add windspeed and FF to DWD-Device ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ".
                            "aiConActFunc: *_SYMMETRIC AF added, checkPlantConfig: add AI FANN Configuration check ".
-                           "new attr setupEnvironment, new key aiControl->aiConBitFailLimit ",
+                           "new attr setupEnvironment, new key aiControl->aiConBitFailLimit, setupEnvironment: new key presence ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
   "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
@@ -295,7 +295,7 @@ my %vNotesIntern = (
   "1.51.8" => "02.05.2025  _specialActivities: delete overhanging days at the change of month ".
                            "Bugfix: https://forum.fhem.de/index.php?msg=1340666 ",
   "1.51.7" => "01.05.2025  __createAdditionalEvents: optimized for SVG 'steps', new key plantControl->genPVforecastsToEvent ".
-                           "aiAddRawData: add gcons, _listDataPoolCircular: add gcons_a ",
+                           "__aiAddRawData: add gcons, _listDataPoolCircular: add gcons_a ",
   "1.51.6" => "30.04.2025  graphicBeamXContent: change batsocforecast_XX to batsocCombi_XX, new options batsocForecast_XX, batsocReal_XX ".
                            "new Paramaeter socprogwhsum, socwhsum in pvHisory & NextHours ",
   "1.51.5" => "28.04.2025  attr transformed: graphicBeamWidth, graphicHourCount, graphicEnergyUnit, graphicSpaceSize ".
@@ -367,7 +367,7 @@ my %vNotesIntern = (
                            "_transferBatteryValues: change Debug Logging ",
   "1.46.3" => "22.02.2025  new sub getConsumerMintime, consumer key 'mintime' can handle a device/reading combination that deliver minutes ".
                            "reports violation of the continuity specification for battery in/out energy ",
-  "1.46.2" => "19.02.2025  aiAddRawData: save original data and sort to bin in sub aiAddInstance instead, _calcConsForecast_circular: include epiecAVG ".
+  "1.46.2" => "19.02.2025  __aiAddRawData: save original data and sort to bin in sub aiAddInstance instead, _calcConsForecast_circular: include epiecAVG ".
                            "fix NOTIFYDEV for consumers, change MAXINVERTER to 4 ",
   "1.46.1" => "18.02.2025  improve temp2bin, correct Log output to consumptionHistory, set setupStringDeclination can be free integer between 0..90 ",
   "1.46.0" => "17.02.2025  Notification System: print out last/next file pull if no messages are present, improvements and activation of ".
@@ -381,7 +381,7 @@ my %vNotesIntern = (
   "1.45.4" => "08.02.2025  change constant GMFILEREPEAT + new constant GMFILERANDOM ",
   "1.45.3" => "06.02.2025  __readDataWeather: if no values of hour 01 (00:00+) use val of hour 24 of day before ".
                            "new special reading todayConsumption ",
-  "1.45.2" => "05.02.2025  aiAddRawData: temp, con, wcc, rr1c, rad1h = undef if no value in pvhistory, fix isWeatherDevValid ".
+  "1.45.2" => "05.02.2025  __aiAddRawData: temp, con, wcc, rr1c, rad1h = undef if no value in pvhistory, fix isWeatherDevValid ".
                            "__readDataWeather(API): fix no values of hour 01 (00:00+), weather_ids: more weather entries ".
                            "change weather display management (don), some minor bugfixes ",
   "1.45.1" => "02.02.2025  _specialActivities: Task 1 __deleteEveryHourControls changed, all Tasks adapted ".
@@ -3519,7 +3519,7 @@ sub _setaiDecTree {                   ## no critic "not used"
       aiManageInstance ($paref);
   }
   elsif ($prop eq 'addRawData') {
-      aiAddRawData ($paref);
+      __aiAddRawData ($paref);
   }
   elsif ($prop eq 'rawDataGHIreplace') {
       __getopenMeteoGHIreplace ($paref);
@@ -7450,15 +7450,21 @@ sub _attrconsumer {                      ## no critic "not used"
           }
       }
       
-      # Wärmepumpe
-      ##############
+      # Consumer Typ Wärmepumpe
+      ###########################
       if ($h->{type} eq 'heatpump') {
+          my ($hp) = isHeatPumpUsed ($name);                                                       
+          
+          if (defined $hp && $aName ne 'consumer'.$hp) {                                  # andere "heatpump" bereits definiert? -> kann nur eine WP geben
+              return qq{A 'heatpump' type consumer ($hp) has already been defined.};
+          }
+          
           if ($h->{power} == 0) {
               return qq{For the consumer type 'heatpump' the rated power value must be specified as not equal to 0.};
           }
           
-          if (!defined $h->{etotal} || !defined $h->{pcurr}) {
-              return qq{The consumer type 'heatpump' needs both keys 'etotal' and 'pcurr' to be defined.};
+          if (!defined $h->{etotal} || !defined $h->{pcurr} || !defined $h->{swstate}) {
+              return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate' and 'pcurr' to be defined.};
           }
 
            if (!defined $h->{comforttemp}) {
@@ -8004,29 +8010,30 @@ sub _attrEnvironment {                   ## no critic "not used"
 
   my $valid = {
       outsideTemp => '',
+      presence    => '',
   };
   
   my ($a, $h) = parseParams ($aVal);
 
   if ($paref->{cmd} eq 'set') {
       for my $key (keys %{$h}) {
-          return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+          return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);           # Absturzschutz!
 
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
       }
 
-      if ($h->{outsideTemp}) {
-          my @acp = split ":", $h->{outsideTemp};
-          return qq{Incorrect input for key 'conprice'. Please consider the commandref.} if(scalar(@acp) != 2);
+      for my $akey (keys %{$h}) {
+          my @acp = split ":", $h->{$akey};
+          return qq{Incorrect input for key '$akey'. Please consider the commandref.} if(scalar(@acp) != 2);
           
-          my ($dv, $rd) = split ':', $h->{outsideTemp};
+          my ($dv, $rd) = split ':', $h->{$akey};
           my ($err)     = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
           return $err if($err);
 
-          my $outsideTemp = ReadingsVal ($dv, $rd, undef);
-          if (!defined $outsideTemp) {
+          my $val = ReadingsVal ($dv, $rd, undef);
+          if (!defined $val) {
               return "The reading '$rd' of device '$dv' is invalid or doesn't contain a defined value";
           }
       }
@@ -8959,7 +8966,7 @@ sub __attrKeyAction {
       if ($init_done && $akey eq 'aiConProfile') {
           if ($keyval =~ /heatpump/xs) {
               my ($hp, $comftemp) = isHeatPumpUsed ($name);                                  # Consumer Nummer , Solltemp falls WP verwendet
-              if (!$hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
+              if (!defined $hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
           }
       }
 
@@ -12941,11 +12948,14 @@ sub __parseAttrEnvironment {
   my ($pa, $ph) = parseParams ($env);
 
   my ($oustmpdev, $oustmprdg) = split (':', $ph->{outsideTemp}, 2) if(defined $ph->{outsideTemp});
+  my ($presendev, $presenrdg) = split (':', $ph->{presence}, 2)    if(defined $ph->{presence});
 
 
   my $parsed = {
       outsideTempDev  => $oustmpdev,
-      outsideTempRdg  => $oustmprdg,                                                       
+      outsideTempRdg  => $oustmprdg, 
+      presenceDev     => $presendev,
+      presenceRdg     => $presenrdg,      
   };
 
 return $parsed;
@@ -21836,29 +21846,6 @@ sub checkdwdattr {
 return ($err, $warn);
 }
 
-################################################################
-#       AI Daten für die abgeschlossene Stunde hinzufügen
-################################################################
-sub _addHourAiRawdata {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $h      = $paref->{h};
-
-  my $rho = sprintf "%02d", $h;
-
-  debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
-
-  $paref->{ood} = 1;                                                                                  # only one Day
-  $paref->{rho} = $rho;
-
-  aiAddRawData ($paref);                                                                              # Raw Daten für AI hinzufügen und sichern
-
-  delete $paref->{ood};
-  delete $paref->{rho};
-
-return;
-}
-
 ####################################################################################################
 #                       Abruf und Einlesen Messagefile nonBlocking
 #  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
@@ -22181,6 +22168,191 @@ sub outputMessages {
   $out .= $hqtxt{legimp}{$lang};
 
 return $out;
+}
+
+################################################################
+#       AI Daten für die abgeschlossene Stunde hinzufügen
+################################################################
+sub _addHourAiRawdata {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $h      = $paref->{h};
+
+  my $rho = sprintf "%02d", $h;
+
+  debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
+
+  $paref->{ood} = 1;                                                                                  # only one Day
+  $paref->{rho} = $rho;
+
+  __aiAddRawData ($paref);                                                                              # Raw Daten für AI hinzufügen und sichern
+
+  delete $paref->{ood};
+  delete $paref->{rho};
+
+return;
+}
+
+################################################################
+#    Daten der AI Raw Datensammlung hinzufügen
+################################################################
+sub __aiAddRawData {
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $yday     = $paref->{yday};                                                                        # vorheriger Tag (falls gesetzt)
+  my $day      = $paref->{day} // strftime "%d",  localtime(time);                                      # aktueller Tag (range 01 to 31)
+  my $ood      = $paref->{ood} // 0;                                                                    # only one (current) day
+  my $rho      = $paref->{rho};                                                                         # only this hour of day
+  my $dayname  = $paref->{dayname};
+  my $ydayname = $paref->{ydayname};
+
+  my $hash = $defs{$name};
+
+  delete $data{$name}{current}{aitrawstate};
+
+  my ($err, $minutes_on_wp);
+  
+  my $dosave = 0;
+  $day       = $yday     if(defined $yday);                                                             # der vergangene Tag soll verarbeitet werden
+  $dayname   = $ydayname if(defined $ydayname);                                                         # Name des Vortages
+  my ($hp)   = isHeatPumpUsed ($name);                                                                  # WP-Consumer Nummer falls WP verwendet
+
+  for my $pvd (sort keys %{$data{$name}{pvhist}}) {
+      next if(!$pvd);
+
+      if ($ood) {
+          next if($pvd ne $day);
+      }
+
+      last if(int $pvd > int $day);
+
+      if (!$ood) {                                                                                      # V 1.47.2 -> für manuelles Auffüllen mit Setter
+          $dayname = HistoryVal ($name, $pvd, 99, 'dayname', undef);
+      }
+
+      for my $hod (sort keys %{$data{$name}{pvhist}{$pvd}}) {
+          next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
+          
+          my $ridx      = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
+
+          my $temp      = HistoryVal ($name, $pvd, $hod, 'temp',      undef);
+          my $sunalt    = HistoryVal ($name, $pvd, $hod, 'sunalt',        0);
+          my $sunaz     = HistoryVal ($name, $pvd, $hod, 'sunaz',         0);
+          my $con       = HistoryVal ($name, $pvd, $hod, 'con',       undef);
+          my $conaifc   = HistoryVal ($name, $pvd, $hod, 'conaifc',   undef);
+          my $gcons     = HistoryVal ($name, $pvd, $hod, 'gcons',     undef);
+          my $wcc       = HistoryVal ($name, $pvd, $hod, 'wcc',       undef);
+          my $wid       = HistoryVal ($name, $pvd, $hod, 'weatherid', undef);                           # Wetter ID
+          my $rr1c      = HistoryVal ($name, $pvd, $hod, 'rr1c',      undef);
+          my $rad1h     = HistoryVal ($name, $pvd, $hod, 'rad1h',     undef);
+          my $pvrlvd    = HistoryVal ($name, $pvd, $hod, 'pvrlvd',        1);                           # PV Generation valide?
+          my $pvrl      = HistoryVal ($name, $pvd, $hod, 'pvrl',      undef);
+          my $socwhsum  = HistoryVal ($name, $pvd, $hod, 'socwhsum',  undef);                           # erreichter SoC total (Wh)
+          
+          $minutes_on_wp = HistoryVal ($name, $pvd, $hod, 'minutescsm'.$hp, undef) if(defined $hp);     # Aktivminuten der Wärmepumpe falls vorhanden
+          
+          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}     = $sunalt;
+          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}      = $sunaz;
+          $data{$name}{aidectree}{airaw}{$ridx}{dayname}    = $dayname;
+          $data{$name}{aidectree}{airaw}{$ridx}{hod}        = $hod;
+          $data{$name}{aidectree}{airaw}{$ridx}{socwhsum}   = $socwhsum                        if(defined $socwhsum);
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}       = sprintf "%.1f", $temp            if(defined $temp);
+          $data{$name}{aidectree}{airaw}{$ridx}{con}        = $con                             if(defined $con     && $con     >= 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{conaifc}    = $conaifc                         if(defined $conaifc && $conaifc >= 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{gcons}      = $gcons                           if(defined $gcons   && $gcons   >= 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{wcc}        = $wcc                             if(defined $wcc);
+          $data{$name}{aidectree}{airaw}{$ridx}{weatherid}  = $wid >= 100 ? $wid - 100 : $wid  if(defined $wid);
+          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}       = $rr1c                            if(defined $rr1c);
+          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}      = $rad1h                           if(defined $rad1h && $rad1h > 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{pvrl}       = $pvrl                            if(defined $pvrl  && $pvrl  > 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{minutes_wp} = $minutes_on_wp                   if(defined $minutes_on_wp);
+          $data{$name}{aidectree}{airaw}{$ridx}{pvrlvd}     = $pvrlvd;
+
+          for my $c (1..MAXCONSUMER) {
+              $c       = sprintf "%02d", $c;
+              my $csme = HistoryVal ($name, $pvd, $hod, 'csme'.$c, undef);
+              
+              if (defined $csme) { $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c} = sprintf ("%.0f", $csme) }
+          }
+  
+          $dosave++;
+
+          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sunalt, sunaz: $sunaz, rad1h: ".(defined $rad1h ? $rad1h : '-').", pvrl: ".(defined $pvrl ? $pvrl : '-').", con: ".(defined $con ? $con : '-').", wcc: ".(defined $wcc ? $wcc : '-').", rr1c: ".(defined $rr1c ? $rr1c : '-').", temp: ".(defined $temp ? $temp : '-'), 4);
+      }
+  }
+
+  debugLog ($paref, 'aiProcess', "AI raw add - $dosave entities added to raw data pool ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
+
+  if ($dosave) {
+      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+
+      if (!$err) {
+          $data{$name}{current}{aitrawstate} = 'ok';
+          debugLog ($paref, 'aiProcess', "AI raw data saved into file: ".$airaw.$name);
+      }
+  }
+
+return;
+}
+
+################################################################
+#    Daten aus Raw Datensammlung löschen welche die maximale
+#    Haltezeit (Tage) überschritten haben
+################################################################
+sub aiDelRawData {
+  my $paref = shift;
+  my $name  = $paref->{name};
+
+  my $hash = $defs{$name};
+
+  if (!keys %{$data{$name}{aidectree}{airaw}}) {
+      return;
+  }
+
+  my $hd   = CurrentVal ($name, 'aiStorageDuration', AISTDUDEF);                # Haltezeit KI Raw Daten (Tage)
+  my $ht   = time - ($hd * 86400);
+  my $day  = strftime "%d", localtime($ht);
+  my $didx = _aiMakeIdxRaw ($day, '00', $ht);                                   # Daten mit idx <= $didx löschen
+
+  debugLog ($paref, 'aiProcess', qq{AI Raw delete data equal or less than index >$didx<});
+
+  delete $data{$name}{current}{aitrawstate};
+
+  my ($err, $dosave);
+
+  for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
+      next if(!$idx || $idx > $didx);
+      delete $data{$name}{aidectree}{airaw}{$idx};
+
+      $dosave = 1;
+
+      debugLog ($paref, 'aiProcess', qq{AI Raw data deleted - idx: $idx});
+  }
+
+  if ($dosave) {
+      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+
+      if (!$err) {
+          $data{$name}{current}{aitrawstate} = 'ok';
+          debugLog ($paref, 'aiProcess', qq{AI raw data saved into file: }.$airaw.$name);
+      }
+  }
+
+return;
+}
+
+################################################################
+#  den Index für AI raw Daten erzeugen
+################################################################
+sub _aiMakeIdxRaw {
+  my $day = shift;
+  my $hod = shift;
+  my $t   = shift // time;
+
+  my $ridx = strftime "%Y%m", localtime($t);
+  $ridx   .= $day.$hod;
+
+return $ridx;
 }
 
 #####################################################################
@@ -23003,7 +23175,7 @@ sub _aiSelectRegistryVersion {
   my ($c, $ct) = isHeatPumpUsed ($name);
  
  # defaults
-  my $frvdef = $c 
+  my $frvdef = defined $c 
                ? 'v1_heatpump_pv'                                           # Haushalt mit Wärmepumpe + PV
                : 'v1_common_pv';                                            # Standardhaushalt + PV
             
@@ -23423,6 +23595,7 @@ sub aiFannTrain {
                       "mse_error=$mse_error, \n".
                       "learning rate=$lr, \n".
                       "learning momentum=$lm, \n".
+                      "BitFail limit: $bit_fail_limit, \n".
                       "Data sharing=$mode (Train=$split_index, Test=".(scalar($#$trdref)-$split_index)."), \n".
                       "Data shuffle=$shuffle_mode ".($shuffle_mode ? qq{(period=$shuffle_period)} : '') 
                      );
@@ -25562,164 +25735,6 @@ return ('', $dtree);
 }
 
 ################################################################
-#    Daten der Raw Datensammlung hinzufügen
-################################################################
-sub aiAddRawData {
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $yday     = $paref->{yday};                                             # vorheriger Tag (falls gesetzt)
-  my $day      = $paref->{day} // strftime "%d",  localtime(time);           # aktueller Tag (range 01 to 31)
-  my $ood      = $paref->{ood} // 0;                                         # only one (current) day
-  my $rho      = $paref->{rho};                                              # only this hour of day
-  my $dayname  = $paref->{dayname};
-  my $ydayname = $paref->{ydayname};
-
-  my $hash = $defs{$name};
-
-  delete $data{$name}{current}{aitrawstate};
-
-  my $err;
-  my $dosave = 0;
-
-  $day     = $yday     if(defined $yday);                                    # der vergangene Tag soll verarbeitet werden
-  $dayname = $ydayname if(defined $ydayname);                                # Name des Vortages
-
-  for my $pvd (sort keys %{$data{$name}{pvhist}}) {
-      next if(!$pvd);
-
-      if ($ood) {
-          next if($pvd ne $day);
-      }
-
-      last if(int $pvd > int $day);
-
-      if (!$ood) {                                                           # V 1.47.2 -> für manuelles Auffüllen mit Setter
-          $dayname = HistoryVal ($name, $pvd, 99, 'dayname', undef);
-      }
-
-      for my $hod (sort keys %{$data{$name}{pvhist}{$pvd}}) {
-          next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
-
-          my $ridx      = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
-
-          my $temp      = HistoryVal ($name, $pvd, $hod, 'temp',      undef);
-          my $sunalt    = HistoryVal ($name, $pvd, $hod, 'sunalt',        0);
-          my $sunaz     = HistoryVal ($name, $pvd, $hod, 'sunaz',         0);
-          my $con       = HistoryVal ($name, $pvd, $hod, 'con',       undef);
-          my $conaifc   = HistoryVal ($name, $pvd, $hod, 'conaifc',   undef);
-          my $gcons     = HistoryVal ($name, $pvd, $hod, 'gcons',     undef);
-          my $wcc       = HistoryVal ($name, $pvd, $hod, 'wcc',       undef);
-          my $wid       = HistoryVal ($name, $pvd, $hod, 'weatherid', undef);            # Wetter ID
-          my $rr1c      = HistoryVal ($name, $pvd, $hod, 'rr1c',      undef);
-          my $rad1h     = HistoryVal ($name, $pvd, $hod, 'rad1h',     undef);
-          my $pvrlvd    = HistoryVal ($name, $pvd, $hod, 'pvrlvd',        1);            # PV Generation valide?
-          my $pvrl      = HistoryVal ($name, $pvd, $hod, 'pvrl',      undef);
-          my $socwhsum  = HistoryVal ($name, $pvd, $hod, 'socwhsum',  undef);            # erreichter SoC total (Wh)    
-
-          $data{$name}{aidectree}{airaw}{$ridx}{sunalt}    = $sunalt;
-          $data{$name}{aidectree}{airaw}{$ridx}{sunaz}     = $sunaz;
-          $data{$name}{aidectree}{airaw}{$ridx}{dayname}   = $dayname;
-          $data{$name}{aidectree}{airaw}{$ridx}{hod}       = $hod;
-          $data{$name}{aidectree}{airaw}{$ridx}{socwhsum}  = $socwhsum                        if(defined $socwhsum);
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}      = sprintf "%.1f", $temp            if(defined $temp);
-          $data{$name}{aidectree}{airaw}{$ridx}{con}       = $con                             if(defined $con     && $con     >= 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{conaifc}   = $conaifc                         if(defined $conaifc && $conaifc >= 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{gcons}     = $gcons                           if(defined $gcons   && $gcons   >= 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{wcc}       = $wcc                             if(defined $wcc);
-          $data{$name}{aidectree}{airaw}{$ridx}{weatherid} = $wid >= 100 ? $wid - 100 : $wid  if(defined $wid);
-          $data{$name}{aidectree}{airaw}{$ridx}{rr1c}      = $rr1c                            if(defined $rr1c);
-          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}     = $rad1h                           if(defined $rad1h && $rad1h > 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{pvrl}      = $pvrl                            if(defined $pvrl  && $pvrl  > 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{pvrlvd}    = $pvrlvd;
-
-          for my $c (1..MAXCONSUMER) {
-              $c       = sprintf "%02d", $c;
-              my $csme = HistoryVal ($name, $pvd, $hod, 'csme'.$c, undef);
-              
-              if (defined $csme) { $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c} = sprintf ("%.0f", $csme) }
-          }
-  
-          $dosave++;
-
-          debugLog ($paref, 'aiProcess', "AI raw add - idx: $ridx, day: $pvd, hod: $hod, sunalt: $sunalt, sunaz: $sunaz, rad1h: ".(defined $rad1h ? $rad1h : '-').", pvrl: ".(defined $pvrl ? $pvrl : '-').", con: ".(defined $con ? $con : '-').", wcc: ".(defined $wcc ? $wcc : '-').", rr1c: ".(defined $rr1c ? $rr1c : '-').", temp: ".(defined $temp ? $temp : '-'), 4);
-      }
-  }
-
-  debugLog ($paref, 'aiProcess', "AI raw add - $dosave entities added to raw data pool ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
-
-  if ($dosave) {
-      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
-
-      if (!$err) {
-          $data{$name}{current}{aitrawstate} = 'ok';
-          debugLog ($paref, 'aiProcess', "AI raw data saved into file: ".$airaw.$name);
-      }
-  }
-
-return;
-}
-
-################################################################
-#    Daten aus Raw Datensammlung löschen welche die maximale
-#    Haltezeit (Tage) überschritten haben
-################################################################
-sub aiDelRawData {
-  my $paref = shift;
-  my $name  = $paref->{name};
-
-  my $hash = $defs{$name};
-
-  if (!keys %{$data{$name}{aidectree}{airaw}}) {
-      return;
-  }
-
-  my $hd   = CurrentVal ($name, 'aiStorageDuration', AISTDUDEF);                # Haltezeit KI Raw Daten (Tage)
-  my $ht   = time - ($hd * 86400);
-  my $day  = strftime "%d", localtime($ht);
-  my $didx = _aiMakeIdxRaw ($day, '00', $ht);                                   # Daten mit idx <= $didx löschen
-
-  debugLog ($paref, 'aiProcess', qq{AI Raw delete data equal or less than index >$didx<});
-
-  delete $data{$name}{current}{aitrawstate};
-
-  my ($err, $dosave);
-
-  for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
-      next if(!$idx || $idx > $didx);
-      delete $data{$name}{aidectree}{airaw}{$idx};
-
-      $dosave = 1;
-
-      debugLog ($paref, 'aiProcess', qq{AI Raw data deleted - idx: $idx});
-  }
-
-  if ($dosave) {
-      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
-
-      if (!$err) {
-          $data{$name}{current}{aitrawstate} = 'ok';
-          debugLog ($paref, 'aiProcess', qq{AI raw data saved into file: }.$airaw.$name);
-      }
-  }
-
-return;
-}
-
-################################################################
-#  den Index für AI raw Daten erzeugen
-################################################################
-sub _aiMakeIdxRaw {
-  my $day = shift;
-  my $hod = shift;
-  my $t   = shift // time;
-
-  my $ridx = strftime "%Y%m", localtime($t);
-  $ridx   .= $day.$hod;
-
-return $ridx;
-}
-
-################################################################
 #     Hilfsfunktion zum Erstellen einer Stichprobe
 ################################################################
 sub aiSampleData {
@@ -26822,21 +26837,22 @@ sub _listDataPoolAiRawData {
   my $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
 
   for my $idx (sort keys %{$h}) {
-      my $hod      = AiRawdataVal ($name, $idx, 'hod',       '-');
-      my $sunalt   = AiRawdataVal ($name, $idx, 'sunalt',    '-');
-      my $sunaz    = AiRawdataVal ($name, $idx, 'sunaz',     '-');
-      my $rad1h    = AiRawdataVal ($name, $idx, 'rad1h',     '-');
-      my $wcc      = AiRawdataVal ($name, $idx, 'wcc',       '-');
-      my $wid      = AiRawdataVal ($name, $idx, 'weatherid', '-');
-      my $rr1c     = AiRawdataVal ($name, $idx, 'rr1c',      '-');
-      my $pvrl     = AiRawdataVal ($name, $idx, 'pvrl',      '-');
-      my $pvrlvd   = AiRawdataVal ($name, $idx, 'pvrlvd',    '-');
-      my $temp     = AiRawdataVal ($name, $idx, 'temp',      '-');
-      my $nod      = AiRawdataVal ($name, $idx, 'dayname',   '-');
-      my $con      = AiRawdataVal ($name, $idx, 'con',       '-');
-      my $conaifc  = AiRawdataVal ($name, $idx, 'conaifc',   '-');
-      my $gcons    = AiRawdataVal ($name, $idx, 'gcons',     '-');
-      my $socwhsum = AiRawdataVal ($name, $idx, 'socwhsum',  '-');
+      my $hod           = AiRawdataVal ($name, $idx, 'hod',        '-');
+      my $sunalt        = AiRawdataVal ($name, $idx, 'sunalt',     '-');
+      my $sunaz         = AiRawdataVal ($name, $idx, 'sunaz',      '-');
+      my $rad1h         = AiRawdataVal ($name, $idx, 'rad1h',      '-');
+      my $wcc           = AiRawdataVal ($name, $idx, 'wcc',        '-');
+      my $wid           = AiRawdataVal ($name, $idx, 'weatherid',  '-');
+      my $rr1c          = AiRawdataVal ($name, $idx, 'rr1c',       '-');
+      my $pvrl          = AiRawdataVal ($name, $idx, 'pvrl',       '-');
+      my $pvrlvd        = AiRawdataVal ($name, $idx, 'pvrlvd',     '-');
+      my $temp          = AiRawdataVal ($name, $idx, 'temp',       '-');
+      my $nod           = AiRawdataVal ($name, $idx, 'dayname',    '-');
+      my $con           = AiRawdataVal ($name, $idx, 'con',        '-');
+      my $conaifc       = AiRawdataVal ($name, $idx, 'conaifc',    '-');
+      my $gcons         = AiRawdataVal ($name, $idx, 'gcons',      '-');
+      my $socwhsum      = AiRawdataVal ($name, $idx, 'socwhsum',   '-');
+      my $minutes_on_wp = AiRawdataVal ($name, $idx, 'minutes_wp', '-');
       
       my $csm;
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
@@ -26853,7 +26869,7 @@ sub _listDataPoolAiRawData {
       $sq .= "$idx => hod: $hod, dayname: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, weatherid: $wid, ";
       $sq .= "rr1c: $rr1c, temp: $temp, socwhsum: $socwhsum, ";
       $sq .= "\n              ";
-      $sq .= "pvrl: $pvrl, pvrlvd: $pvrlvd, conaifc: $conaifc, con: $con, gcons: $gcons, ";
+      $sq .= "pvrl: $pvrl, pvrlvd: $pvrlvd, minutes_wp: $minutes_on_wp, conaifc: $conaifc, con: $con, gcons: $gcons, ";
        
       if (defined $csm) { $sq .= "\n              "; $sq .= $csm; }
   }
@@ -29192,7 +29208,7 @@ sub isHeatPumpUsed {
   my $ct;
   
   my $c = CurrentVal  ($name, 'heatpumpInstalled', undef);
-  $ct   = ConsumerVal ($name, $c, 'comforttemp',   undef) if($c);
+  $ct   = ConsumerVal ($name, $c, 'comforttemp',   undef) if(defined $c);
   
 return ($c, $ct);
 }
@@ -32506,13 +32522,17 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+            <tr><td> <b>comforttemp</b>    </td><td>Target temperature (comfort temperature) in living spaces in °C. (mandatory field)                                                                 </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>&lt;Reading&gt;:&lt;Unit&gt; (Wh/kWh) of the consumer device that provides the total amount of energy consumed. (mandatory field)                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>&lt;Reading&gt;:&lt;Unit&gt; (W/kW) that provides the current energy consumption. (mandatory field)                                                </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>Maximum power consumption of the heat pump in W. The value must not be 0.                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>Reading: Unit (Wh/kWh) of the consumer device that provides the total amount of energy consumed. This information is mandatory.                    </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Reading: Unit (W/kW) that provides the current energy consumption. This information is mandatory.                                                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>comforttemp</b>    </td><td>Target temperature (comfort temperature) in living spaces in °C. This information is mandatory.                                                    </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Unlike other consumers, this information must be provided even if the default is to be used. By creating a suitable userReadings,                  </td></tr>
+            <tr><td>                       </td><td>you can control whether you want to combine the running times for heating and cooling operation, hot water production, and heating element         </td></tr>
+            <tr><td>                       </td><td>operation, or whether you want to separate the running times for heating and cooling operation exclusively as times for heating.                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
          </table>
          </ul>
@@ -35165,7 +35185,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConBitFailLimit</b> </td><td>Das Bit-Fail-Limit definiert ab welchem Fehler (im Normbereich) ein Trainingsbeispiel als 'Fehler' zählt.                                                    </td></tr>
             <tr><td>                          </td><td>Je kleiner der Wert, desto strenger das Training und desto besser werden Peaks getroffen. Größere Werte sind robuster, aber weniger peak-sensitiv.           </td></tr>
-			<tr><td>                          </td><td><ul> * 0.05 - 0.20: sehr streng -> nur für sehr saubere Daten </ul>                                                                                          </td></tr>
+            <tr><td>                          </td><td><ul> * 0.05 - 0.20: sehr streng -> nur für sehr saubere Daten </ul>                                                                                          </td></tr>
             <tr><td>                          </td><td><ul> * 0.20 - 0.35: ausgewogenener Standardbereich </ul>                                                                                                     </td></tr>
             <tr><td>                          </td><td><ul> * 0.35 - 0.50: tolerant - gut bei verrauschten Haushalten </ul>                                                                                         </td></tr>
             <tr><td>                          </td><td>Werte:<b> 0.05 .. 0.50 </b>, default: 0.35                                                                                                                   </td></tr>
@@ -35467,13 +35487,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+            <tr><td> <b>comforttemp</b>    </td><td>Solltemperatur (Komforttemperatur) in den Wohnräumen in °C. (Pflichtangabe)                                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>etotal</b>         </td><td>&lt;Reading&gt;:&lt;Einheit&gt; (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert. (Pflichtangabe)                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>&lt;Reading&gt;:&lt;Einheit&gt; (W/kW) welches den aktuellen Energieverbrauch liefert. (Pflichtangabe)                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme der Wärmepumpe in W. Der Wert darf nicht! 0 sein.                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>etotal</b>         </td><td>Reading:Einheit (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert. Die Angabe ist verpflichtend.                    </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Reading:Einheit (W/kW) welches den aktuellen Energieverbrauch liefert. Die Angabe ist verpflichtend.                                               </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>comforttemp</b>    </td><td>Solltemperatur (Komforttemperatur) in den Wohnräumen in °C. Die Angabe ist verpflichtend.                                                          </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Abweichend von anderen Consumern ist die Angabe verpflichtend, auch wenn der default verwendet werden soll. Durch Erstellung eines passenden       </td></tr>
+            <tr><td>                       </td><td>userReadings kann gesteuert werden, ob man sowohl Laufzeiten für Heiz- und Kühlbetrieb, Warmwassererzeugung und Heizstabbetrieb zusammenfassen     </td></tr>
+            <tr><td>                       </td><td>will, oder ob man ausschließlich die Laufzeiten des Heiz- und Kühlbetriebs als Zeiten für die Heizung separieren möchte.                           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
          </table>
          </ul>
