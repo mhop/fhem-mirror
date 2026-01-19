@@ -31,6 +31,11 @@
 #     Adresse c | 1100 (off|off|on|on): fan_off              |  get sduino_dummy raw MU;;P0=-720;;P1=235;;P2=-386;;P3=561;;P4=-11254;;D=01230141230101232301010101012301412301012323010101010123014123010123230101010101010141230101232301010101010101412301012323010101010101014123010123230101010101010;;CP=1;;R=242;;
 #}    Adresse c | 1100 (off|off|on|on): fan_off              |  get sduino_dummy raw MU;;P0=-11230;;P1=258;;P2=-390;;P3=571;;P4=-699;;D=0123414123234141414141234101234141232341414141412341012341412323414141414123410123414123234141414141234101234141232341414141412341012341412323414141414123410123414123234141414141234101234141232341414141412341012341412323414141414123410123414123234141414;;CP=1;;R=246;;O;;
 ####################################################################################################################################
+# - SEAV BeEasy TX blind controller (HT12E), remote control with 2 buttons [Protocol 83]
+#{    https://github.com/RFD-FHEM/RFFHEM/issues/1276 @ xschmidt2 2024-10-10
+#     Adresse 4D4 down MU;P0=-25312;P1=286;P2=-354;P3=626;P4=-677;P5=-11292;D=01234123234141234123412341512341232341412341234123415123412323414123412341234151234123234141234123412341512341232341412341234123415123412323414123412341234151234123234141234123412341512341232341412341234123415123412323414123412341234151234123234141234123;CP=1;R=37;O;
+#}    Adresse 4D4 up   MU;P0=-24160;P1=277;P2=-363;P3=602;P4=-690;P6=-11311;D=01234123234141234123414123612341232341412341234141236123412323414123412341412361234123234141234123414123612341232341412341234141236123412323414123412341412361234123234141234123414123612341232341412341234141236123412323414123412341412361234123234141234123;CP=1;R=38;O;
+####################################################################################################################################
 # - Deckenventilator mit Licht Westinghouse Bendan (remote control TR60C-1 with touch screen) [Protocol 104]
 #{    Adresse 0 | DIP 0000 Licht aus/Ventilator aus | get sduino_dummy raw MU;P0=18280;P1=-737;P2=419;P3=-331;P4=799;P5=-9574;P6=-7080;D=012121234343434341212121212121252121212123434343434121212121212125212121212343434343412121212121212521212121234343434341212121212121252121212123434343434121212121212126;CP=2;R=2;
 #     Adresse 8 | DIP 1000 Licht an/Ventilator aus  | get sduino_dummy raw MU;P0=-2496;P1=778;P2=-755;P3=379;P4=-358;P5=-9582;D=0123232341414141412323234141414153412323234141414141232323414141415341232323414141414123232341414141534123232341414141412323234141414153412323234141414141232323414141415341232323414141414123232341414141;CP=3;R=12;
@@ -296,24 +301,34 @@
 #}
 ###############################################################################################################################################################################
 # - Remote control with 4 buttons for diesel heating [Protocol 20]
-#{    https://forum.fhem.de/index.php/topic,58397.msg999475.html#msg999475 @ fhem_user0815 2019-12-04
+#     https://forum.fhem.de/index.php/topic,58397.msg999475.html#msg999475 @ fhem_user0815 2019-12-04
 #     RCnoName20_17E9 on     MS;P0=-740;P2=686;P3=-283;P5=229;P6=-7889;D=5650505023502323232323235023505023505050235050502323502323505050;CP=5;SP=6;R=67;O;m2;
 #     RCnoName20_17E9 off    MS;P1=-754;P2=213;P4=681;P5=-283;P6=-7869;D=2621212145214545454545452145212145212121212145214521212121452121;CP=2;SP=6;R=69;O;m2;
 #     RCnoName20_17E9 plus   MS;P1=-744;P2=221;P3=679;P4=-278;P5=-7860;D=2521212134213434343434342134212134212121213421212134343434212121;CP=2;SP=5;R=66;O;m2;
 #     RCnoName20_17E9 minus  MS;P0=233;P1=-7903;P3=-278;P5=-738;P6=679;D=0105050563056363636363630563050563050505050505630563050505630505;CP=0;SP=1;R=71;O;m1;
-#}
+# - Remote control with 9 buttons for ceiling fan with lighting (Controller MP 2.5+3UF) [Protocol 20]
+#     https://forum.fhem.de/index.php?topic=138538.0 @ Butsch 2024-06-17
+#     RCnoName20_09_024F fan_stop  MS;P0=249;P1=-744;P3=770;P4=-228;P5=-8026;D=050101010101013401013401013434343401010101010134010101010101010134;CP=0;SP=5;R=35;O;m2;
+#     RCnoName20_09_024F fan_low   MS;P0=-7940;P1=246;P2=-757;P3=736;P4=-247;D=101212121212123412123412123434343412121212123434121212343412343412;CP=1;SP=0;R=47;O;m2;
 # - Remote control with 10 buttons for Leroy Deckenventilator [Protocol 20]
-#{    https://forum.fhem.de/index.php/topic,53282.msg1233431.html#msg1233431 @ steffen83 2022-09-01
+#     https://forum.fhem.de/index.php/topic,53282.msg1233431.html#msg1233431 @ steffen83 2022-09-01
 #     RCnoName20_10_3E00 light_on   MU;P0=-8774;P1=282;P2=-775;P3=815;P4=-253;P5=-32001;D=10121234343434341212121212121212121212123434343412121234343412343415;CP=1;
 #     RCnoName20_10_3E00 light_off  MU;P0=-238;P1=831;P3=300;P4=-762;P5=-363;P6=192;P7=-8668;D=01010101010343434343434343434343434103415156464156464641564646734341010101010343434343434343434343434103410103434103434341034343734341010101010343434343434343434343434103410103434103434341034343734341010101010343434343434343434343434103410103434103434341;CP=3;O;
 #     RCnoName20_10_3E00 fan_stop   MU;P0=184;P1=-380;P2=128;P3=-9090;P4=-768;P5=828;P6=-238;P7=298;D=45656565656747474747474747474747474567474560404515124040451040374745656565656747474747474747474747474567474567474565674747456747374745656565656747474747474747474747474567474567474565674747456747374745656565656747474747474747474747474567474567474565674747;CP=7;O;
-#}
 # - Remote control DC-1961-TG with 12 buttons for ceiling fan with lighting [Protocol 20]
-#{    https://forum.fhem.de/index.php/topic,53282.msg1240911.html#msg1240911 @ Skusi  2022-10-23
+#     https://forum.fhem.de/index.php/topic,53282.msg1240911.html#msg1240911 @ Skusi  2022-10-23
 #     DC_1961_TG_1846 light_on_off   MS;P1=291;P2=-753;P3=762;P4=-249;P5=-8312;D=151212123434121212123412121234341234123412341212121234341212341234;CP=1;SP=5;R=224;O;m2;
 #     DC_1961_TG_1846 fan_off        MS;P1=-760;P2=747;P3=-282;P4=253;P5=-8335;D=454141412323414141412341414123234123412341412323234123232323412323;CP=4;SP=5;R=27;O;m2;
 #     DC_1961_TG_1846 fan_direction  MS;P0=-8384;P1=255;P2=-766;P3=754;P4=-263;D=101212123434121212123412121234341234123412341212341234341212341212;CP=1;SP=0;R=27;O;m2;
-#}
+# - Remote control CREATE 6601L with 14 buttons for CREATE Deckenventilator [Protocol 20]
+#     https://forum.fhem.de/index.php?topic=53282.msg1316246#msg1316246 @ Kent 2024-07-04
+#     CREATE_6601L_1B900 fan_2  MS;P0=-7944;P1=-740;P4=253;P6=732;P7=-256;D=404141416767416767674141674141414141414141674141414141674141416767;CP=4;SP=0;R=67;O;m2;
+#     CREATE_6601L_1B900 fan_5  MS;P0=-264;P2=-743;P3=254;P4=733;P5=-7942;D=353232324040324040403232403232323232323232324032324032323232403240;CP=3;SP=5;R=40;O;m2;
+# - Remote control RCnoName20_15 with 15 buttons for ceiling fan Forrovenco QX-01-DE1 with lighting [Protocol 20]
+#     https://forum.fhem.de/index.php?topic=143046.0 @ drhirn  2025-11-14
+#     RCnoName20_15_41267 all_off       MS;P2=-258;P3=229;P4=-780;P5=755;P6=-7847;D=363452343434343452343452343452523434525252343452523434525252523434;CP=3;SP=6;R=222;O;m2;
+#     RCnoName20_15_41267 light_on_off  MS;P2=-243;P3=277;P4=-739;P5=773;P6=-7861;D=363452343434343452343452343452523434525252345234343452525252525252;CP=3;SP=6;R=224;O;m2;
+#     RCnoName20_15_41267 fan_natural   MS;P2=-270;P3=240;P4=-779;P5=746;P6=-8025;D=363452343434343452343452343452523434525252523452345252345252345252;CP=3;SP=6;R=220;O;m2;
 ###############################################################################################################################################################################
 # - Remote control Momento for wireless digital picture frame [Protocol 97]
 #{    elektron-bbs 2020-03-21
@@ -417,6 +432,36 @@
 #     RCnoName128_8A7F fan_direction   MS;P0=-10144;P4=434;P5=-415;P6=1215;P7=-1181;D=40474565656745674565674747474747474747474745656567;CP=4;SP=0;R=37;m2;
 #}
 ###############################################################################################################################################################################
+# - Remote control CREATE 6601TL [Protocol 130]
+#{    elektron-bbs 2023-09-30
+#     https://forum.fhem.de/index.php/topic,126110.0.html @ erdnar 2023-09-29
+#     CREATE_6601TL_F53A light_on_off     MS;P1=425;P2=-1142;P3=1187;P4=-395;P5=-12314;D=15121212123412341234341212123412341212121212121234;CP=1;SP=5;R=232;O;m2;
+#     CREATE_6601TL_F53A light_cold_warm  MS;P1=432;P2=-1143;P3=1183;P4=-393;P5=-12300;D=15121212123412341234341212123412341212121212123434;CP=1;SP=5;R=231;O;m2;
+#     CREATE_6601TL_F53A fan_faster       MS;P0=-11884;P1=392;P2=-1179;P3=1180;P4=-391;D=10121212123412341234341212123412341212121212341234;CP=1;SP=0;R=231;O;m2;
+# - Remote control with 10 buttons - https://github.com/RFD-FHEM/RFFHEM/issues/1296 @ projectsun2 2025-02-04
+#     RCnoName130_3115   on_off           MS;P0=-11334;P1=1213;P2=-416;P3=411;P4=-1222;D=30121234341212123412121234123412343434343434343412;CP=3;SP=0;R=59;m2; 
+# - Remote control Lumention RFSETCCT - https://github.com/RFD-FHEM/RFFHEM/issues/1312 @ zwiebelxxl 2025-07-26
+#     Lumention_RFSETCCT_14DF     on      MS;P1=-414;P2=396;P3=-1216;P4=1200;P5=-12111;D=25414141234123414123234123232323232323232323232341;CP=2;SP=5;R=38;O;m2;
+#}
+###############################################################################################################################################################################
+# - Hamulight remote control with five buttons and touch control for dim [Protocol 22] 
+#{    elektron-bbs 2023-12-10
+#     https://github.com/RFD-FHEM/RFFHEM/issues/1206 @ obduser 2023-12-09
+#     Hamulight_AB_3605 on_off   MU;P0=-16360;P1=144;P2=-191;P3=209;P4=1194;P5=-1203;P6=607;P7=-591;D=01232324562623737623737626262626262376237623762373737373762376262623737373232323245626237376237376262626262623762376237623737373737623762626237373732323232456262373762373762626262626237623762376237373737376237626262373737323232324562623737623737626262626;CP=3;R=5;O;
+#     Hamulight_AB_3605 dim_1    MU;P0=-14008;P1=136;P2=-199;P3=210;P4=1200;P5=-1200;P6=596;P7=-591;D=01232324562623737623737626262626262376237623762376237623762623737373762373232323245626237376237376262626262623762376237623762376237626237373737623732323232456262373762373762626262626237623762376237623762376262373737376237323232324562623737623737626262626;CP=3;R=6;O;
+#     Hamulight_AB_3605 dim_4    MU;P0=-16204;P1=120;P2=-204;P3=204;P4=1192;P5=-1208;P6=593;P7=-592;D=01232324562623737623737626262626262376237623762373762623762376262626262373232323245626237376237376262626262623762376237623737626237623762626262623732323232456262373762373762626262626237623762376237376262376237626262626237323232324562623737623737626262626;CP=3;R=5;O;
+#}
+###############################################################################################################################################################################
+# - Remote control Halemeier HA-HX2 for Actor HA-RX-M2-1 [Protocol 132]
+#{    https://github.com/RFD-FHEM/RFFHEM/issues/1207 @ hightower 2023-12-11
+#     off | P132#85EFAC
+#     MU;P0=304;P1=-351;P2=633;P3=-692;P4=-12757;D=01230303030301230123030121240301212121230123030303012303030303012124030121212123012303030301230303030301230123030121240301212121230123030303012303030303012301230301212403012121212301230303030123030303030123012303012124030121212123012303030301230303030301;CP=0;R=241;O;
+#     MU;P0=-12609;P1=305;P2=-696;P3=-344;P4=653;D=01213434343421342121212134212121212134213421213434012134343434213421212121342121212121342134212134340121343434342134212121213421212121213421342121343401213434343421342121212134212121212134213421213434012134343434213421212121342121212121342134212134340121;CP=1;R=239;O;
+#     on  | P132#85EFAA
+#     MU;P0=-696;P1=312;P2=-371;P3=637;P4=-12847;D=01012301230123012341012323232301230101010123010101010123012301230123410123232323012301010101230101010101230123012301234101232323230123010101012301010101012301230123012341012323232301230101010123010101010123012301230123410123232323012301010101230101010101;CP=1;R=236;O;
+#     MU;P0=-701;P1=304;P2=-366;P3=642;P4=-12781;D=01012301230123012341012323232301230101010123010101010123012301230123410123232323012301010101230101010101230123012301234101232323230123010101012301010101012301230123012341012323232301230101010123010101010123012301230123410123232323012301010101230101010101;CP=1;R=238;O;
+#}
+###############################################################################################################################################################################
 # !!! ToDo´s !!!
 #     - LED lights, counter battery-h reading --> commandref hour_counter module
 #     -
@@ -428,8 +473,6 @@ use strict;
 use warnings;
 use FHEM::Meta;
 no warnings 'portable';  # Support for 64-bit ints required
-
-our $VERSION = '2023-07-19';
 
 sub SD_UT_bin2tristate;
 sub SD_UT_tristate2bin;
@@ -639,6 +682,12 @@ my %models = (
                 Protocol   => 'P83',
                 Typ        => 'remote'
               },
+  'BeEasy_TX' => { '01'       => 'down',
+                   '10'       => 'up',
+                   hex_length => [3],
+                   Protocol   => 'P83',
+                   Typ        => 'remote'
+                 },
   'TR60C1' => { '111110000000' => 'light_off_fan_off',
                 '110110000000' => 'light_off_fan_1',
                 '001110000000' => 'light_off_fan_2',
@@ -793,6 +842,19 @@ my %models = (
                     Protocol          => 'P20',
                     Typ               => 'remote'
                   },
+  'RCnoName20_09' => { '00001000' => 'light_on_off',
+                       '00000010' => 'fan_low',
+                       '00000011' => 'fan_med',
+                       '00001001' => 'fan_high',
+                       '00000110' => 'fan_stop',
+                       '00000001' => 'time_1h',
+                       '00000111' => 'time_2h',
+                       '00000101' => 'time_4h',
+                       '00001010' => 'time_8h',
+                       hex_length => [8],
+                       Protocol   => 'P20',
+                       Typ        => 'remote'
+                     },
   'RCnoName20_10' => { '00011110' => 'light_on',
                        '00010110' => 'light_off',
                        '00010101' => 'fan_low',
@@ -803,6 +865,25 @@ my %models = (
                        '00011101' => 'time_1h',
                        '00010001' => 'time_2h',
                        '00011001' => 'time_4h',
+                       hex_length => [8],
+                       Protocol   => 'P20',
+                       Typ        => 'remote'
+                     },
+  'RCnoName20_15' => { '00110' => 'all_off',
+                       '01000' => 'light_on_off',
+                       '10000' => 'fan_1',
+                       '10010' => 'fan_2',
+                       '11100' => 'fan_3',
+                       '01010' => 'fan_4',
+                       '01111' => 'fan_5',
+                       '01100' => 'fan_6',
+                       '10110' => 'fan_off',
+                       '00100' => 'fan_forward',
+                       '10001' => 'fan_reverse',
+                       '10101' => 'fan_natural',
+                       '00010' => 'time_1h',
+                       '01001' => 'time_2h',
+                       '11001' => 'time_4h',
                        hex_length => [8],
                        Protocol   => 'P20',
                        Typ        => 'remote'
@@ -841,6 +922,54 @@ my %models = (
                      Protocol   => 'P128',
                      Typ        => 'remote'
                    },
+  'CREATE_6601TL' => { '11110111' => 'fan_on_off',
+                       '11110100' => 'fan_slower',
+                       '11111010' => 'fan_faster',
+                       '11111110' => 'light_on_off',
+                       '11111100' => 'light_cold_warm',
+                       '11111000' => 'light_darker',
+                       '11110110' => 'light_brighter',
+                       '11110001' => 'fan_direction',
+                       '11110010' => 'time_1h',
+                       '11110000' => 'time_2h',
+                       '11101111' => 'time_4h',
+                       '11101101' => 'time_8h',
+                       hex_length => [6],
+                       Protocol   => 'P130',
+                       Typ        => 'remote'
+                     },
+  'Lumention_RFSETCCT' => { '11111110' => 'on',
+                            '11111100' => 'off',
+                            '11111010' => 'dim_up',
+                            '11110100' => 'dim_down',
+                            '11111000' => 'cct_down',
+                            '11110110' => 'cct_up',
+                            '11110111' => 'bright_100',
+                            '11110010' => 'bright_step',
+                            '11110000' => 'bright_5',
+                            '11110001' => 'group_a',
+                            '11101111' => 'group_b',
+                            '11101101' => 'group_c',
+                            hex_length => [6],
+                            Protocol   => 'P130',
+                            Typ        => 'remote'
+                          },
+  'CREATE_6601L' => { '0101' => 'fan_on_off',    # count 0-7
+                      '0010' => 'fan_1',         # count 0-7
+                      '1000' => 'fan_2,fan_direction', # same bits, but count 0-7 (fan_2) or 8-15
+                      '0110' => 'fan_3',         # count 0-7
+                      '0011' => 'fan_4',         # count 0-7
+                      '0100' => 'fan_5,beeper_on_off', # same bits, but count 0-7 or 8-15 (fan_5)
+                      '1010' => 'fan_6',         # count 8-15
+                      '1001' => 'light_on_off',  # count 0-7
+                      '1110' => 'light_color',   # count 0-7
+                      '1011' => 'time_1h',       # count 0-7
+                      '0111' => 'time_2h',       # count 8-15
+                      '0001' => 'time_4h',       # count 0-7
+                      hex_length => [8],
+                      Protocol   => 'P20',
+                      Typ        => 'remote'
+                    },
   'DC_1961_TG' => { '10100111' => 'fan_off',
                     '10100001' => 'fan_1',
                     '10100010' => 'fan_2',
@@ -998,6 +1127,36 @@ my %models = (
                    Protocol   => 'P118',
                    Typ        => 'remote'
                  },
+  'RCnoName130' => {
+                     '11111110' => 'on_off',
+                     '11110101' => 'color_plus',
+                     '11110010' => 'color_minus',
+                     '11110000' => 'brightness_minus',
+                     '11110011' => 'brightness_plus',
+                     '11110111' => 'demo',
+                     '11110100' => 'mode_minus',
+                     '11111010' => 'mode_plus',
+                     '11110110' => 'speed_plus',
+                     '11111000' => 'speed_minus',
+                     hex_length => [6],
+                     Protocol => 'P130',
+                     Typ => 'remote'
+                   },
+  'Hamulight_AB' => { '01011111' => 'on_off',
+                      '01010101' => 'dim_1',
+                      '01010110' => 'dim_2',
+                      '01010000' => 'dim_3',
+                      '01011001' => 'dim_4',
+                      hex_length => [8],
+                      Protocol   => 'P22',
+                      Typ        => 'remote'
+                    },
+  'HA_HX2' => { '10101100' => 'off',
+                '10101010' => 'on',
+                Protocol   => 'P132',
+                hex_length => [6],
+                Typ        => 'remote'
+              },
   'unknown' =>  { Protocol   => 'any',
                   hex_length => [],
                   Typ        => 'not_exist'
@@ -1007,7 +1166,7 @@ my %models = (
 #############################
 sub SD_UT_Initialize {
   my ($hash) = @_;
-  $hash->{Match}      = '^P(?:14|20|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91\.1|92|93|95|97|99|104|105|114|118|121|127|128)#.*';
+  $hash->{Match}      = '^P(?:14|20|20.1|22|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91.1|92|93|95|97|99|104|105|114|118|121|127|128|130|132)#.*';
   $hash->{DefFn}      = \&SD_UT_Define;
   $hash->{UndefFn}    = \&SD_UT_Undef;
   $hash->{ParseFn}    = \&SD_UT_Parse;
@@ -1025,13 +1184,12 @@ sub SD_UT_Initialize {
     'MD_210R.*'    => {ATTR => 'model:MD_210R', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'Momento.*'    => {ATTR => 'model:Momento', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'OR28V.*'      => {ATTR => 'model:OR28V', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
-    'RCnoName20.*' => {ATTR => 'model:RCnoName20', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
-    'DC_1961_TG.*' => {ATTR => 'model:DC_1961_TG', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
-    'TC6861.*'     => {ATTR => 'model:TR401', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
+    'TC6861.*'     => {ATTR => 'model:TC6861', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'TR401.*'      => {ATTR => 'model:TR401', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'Techmar.*'    => {ATTR => 'model:Techmar', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'Visivo.*'     => {ATTR => 'model:Visivo', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'xavax.*'      => {ATTR => 'model:xavax', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
+    'Hamulight_AB.*' => {ATTR => 'model:Hamulight_AB', FILTER => '%NAME', autocreateThreshold => '3:180', GPLOT => q{}},
     'unknown_please_select_model' => {ATTR => 'model:unknown', FILTER => '%NAME', autocreateThreshold => '5:180', GPLOT => q{}},
   };
   return FHEM::Meta::InitMod( __FILE__, $hash );
@@ -1044,6 +1202,8 @@ sub SD_UT_Define {
   my $iodevice;
   my $ioname;
 
+  # Anzeigen der Modulversion (Internal FVERSION) über FHEM::Meta, Variable in META.json Abschnitt erforderlich: "version": "v1.0.0", siehe https://wiki.fhem.de/wiki/Meta
+  return $@ unless ( FHEM::Meta::SetInternals($hash) );
   # Argument                    0     1      2       3           4
   return 'wrong syntax: define <name> SD_UT <model> <HEX-Value> <optional IODEV>' if(int(@a) < 3 || int(@a) > 5);
   return "wrong <model> $a[2]\n\n(allowed modelvalues: " . join(' | ', sort keys %models).')' if $a[2] && ( !grep { $_ eq $a[2] } %models );
@@ -1071,47 +1231,50 @@ sub SD_UT_Define {
   }
 
   ### [2] checks CAME_TOP_432EV & Novy_840029 & Novy_840039 & Unitec_47031 ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){2}" if (($a[2] eq 'CAME_TOP_432EV' || $a[2] eq 'Novy_840029' || $a[2] eq 'Novy_840039' || $a[2] eq 'Unitec_47031') && not $a[3] =~ /^[0-9a-fA-F]{2}/xms);
-  ### [3] checks SA_434_1_mini | QUIGG_DMV | TR_502MSV | BeSmart_S4 ###
+  ### [3] checks SA_434_1_mini | QUIGG_DMV | TR_502MSV | BeSmart_S4 | BeEasy_TX ###
+  # uncoverable branch true
+  return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short or long (must be 3 chars) or not HEX (0-9 | a-f | A-F){3}"
+         if (($a[2] eq 'SA_434_1_mini' || $a[2] eq 'QUIGG_DMV' || $a[2] eq 'TR_502MSV' || $a[2] eq 'BeSmart_S4' || $a[2] eq 'BeEasy_TX') && not $a[3] =~ /^[0-9a-fA-F]{3}/xms);    
+  ### [4 nibble] checks Neff SF01_01319004 & BOSCH SF01_01319004_Typ2 & Chilitec_22640 & ESTO KL_RF01 & RCnoName20 & RCnoName20_09 & RCnoName20_10 & RCnoName128 & DC-1961-TG & xavax & BF_301 & Meikee_xx & CREATE_6601TL & Hamulight_AB & Lumention_RFSETCCT ###
+  # uncoverable branch true
+  return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 4 chars) or not hex (0-9 | a-f | A-F) {4}"
+         if (($a[2] eq 'SF01_01319004' || $a[2] eq 'SF01_01319004_Typ2' || $a[2] eq 'Chilitec_22640' || $a[2] eq 'KL_RF01' || $a[2] eq 'RCnoName20' || $a[2] eq 'RCnoName20_09'
+           || $a[2] eq 'RCnoName20_10' || $a[2] eq 'RCnoName128' || $a[2] eq 'DC_1961_TG' || $a[2] eq 'xavax' || $a[2] eq 'BF_301' || $a[2] eq 'Meikee_21' || $a[2] eq 'Meikee_24'
+           || $a[2] eq 'Lumention_RFSETCCT' || $a[2] eq 'RCnoName130' || $a[2] eq 'CREATE_6601TL' || $a[2] eq 'HA_HX2' || $a[2] eq 'Hamulight_AB') && not $a[3] =~ /^[0-9a-fA-F]{4}/xms);
+  ### [5 nibble] checks CREATE_6601L & RCnoName127 & RCnoName20_15
   # uncoverable branch true 
-  return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short or long (must be 3 chars) or not HEX (0-9 | a-f | A-F){3}" if (($a[2] eq 'SA_434_1_mini' || $a[2] eq 'QUIGG_DMV' || $a[2] eq 'TR_502MSV' || $a[2] eq 'BeSmart_S4') && not $a[3] =~ /^[0-9a-fA-F]{3}/xms);    
-  ### [4 nibble] checks Neff SF01_01319004 & BOSCH SF01_01319004_Typ2 & Chilitec_22640 & ESTO KL_RF01 & RCnoName20 & RCnoName20_10 & RCnoName128 & DC-1961-TG & xavax & BF_301 & Meikee_xx ###
-  # uncoverable branch true 
-  return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 4 chars) or not hex (0-9 | a-f | A-F) {4}" if (($a[2] eq 'SF01_01319004' || $a[2] eq 'SF01_01319004_Typ2' || $a[2] eq 'Chilitec_22640' || $a[2] eq 'KL_RF01' || $a[2] eq 'RCnoName20' || $a[2] eq 'RCnoName20_10' || $a[2] eq 'RCnoName128'  || $a[2] eq 'DC_1961_TG' || $a[2] eq 'xavax' || $a[2] eq 'BF_301' || $a[2] eq 'Meikee_21' || $a[2] eq 'Meikee_24') && not $a[3] =~ /^[0-9a-fA-F]{4}/xms);
-  ### [5 nibble] checks RCnoName127
-  # uncoverable branch true 
-  return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 5 chars) or not hex (0-9 | a-f | A-F) {5}" if ($a[2] eq 'RCnoName127' && not $a[3] =~ /^[0-9a-fA-F]{5}/xms);
+  return "Wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 5 chars) or not hex (0-9 | a-f | A-F) {5}" if (($a[2] eq 'CREATE_6601L' || $a[2] eq 'RCnoName127' || $a[2] eq 'RCnoName20_15') && not $a[3] =~ /^[0-9a-fA-F]{5}/xms);
   ### [6] checks Manax | mumbi ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){4}_[ABCD]|[all]" if ($a[2] eq 'RC_10' && not $a[3] =~ /^[0-9a-fA-F]{4}_([ABCD]|all)$/xms) ;
   ### [6] checks MD_2003R | MD_210R | MD_2018R | Navaris | AC114_01B | Visivo ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 6 chars) or not hex (0-9 | a-f | A-F){6}" if (($a[2] eq 'MD_2003R' || $a[2] eq 'MD_210R' || $a[2] eq 'MD_2018R' || $a[2] eq 'Navaris' || $a[2] eq 'AC114_01B' || $a[2] eq 'Visivo') && not $a[3] =~ /^[0-9a-fA-F]{6}/xms);
   ### [7] checks Hoermann HSM4 | Krinner_LUMIX | Momento ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong HEX-Value! ($a[3]) $a[2]  Hex-value to short or long (must be 7 chars) or not hex (0-9 | a-f | A-F){7}" if (($a[2] eq 'HSM4' || $a[2] eq 'Krinner_LUMIX' || $a[2] eq 'Momento') && not $a[3] =~ /^[0-9a-fA-F]{7}/xms);
   ### [7] checks Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx (tristate code)###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong tristate code! ($a[3]) $a[2] code to short or long (must be 7 chars) or values not 0, 1 or F" if (($a[2] eq 'Tedsen_SKX1xx' || $a[2] eq 'Tedsen_SKX2xx' || $a[2] eq 'Tedsen_SKX4xx' || $a[2] eq 'Tedsen_SKX6xx') && not $a[3] =~ /^[01fF]{7}$/xms);
   ### [8 nibble] checks Techmar ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong HEX-Value! ($a[3]) $a[2] Hex-value to short or long (must be 8 chars) or not hex (0-9 | a-f | A-F)" if (($a[2] eq 'Techmar') && not $a[3] =~ /^[0-9a-fA-F]{8}$/xms);
   ### [9] checks Hoermann HS1-868-BS ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){9}" if ($a[2] eq 'HS1_868_BS' && not $a[3] =~ /^[0-9a-fA-F]{9}/xms);
   ### [14] checks LED_XM21_0 ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong HEX-Value! ($a[3]) $a[2] HEX-Value to short | long or not HEX (0-9 | a-f | A-F){14}" if ($a[2] eq 'LED_XM21_0' && not $a[3] =~ /^[0-9a-fA-F]{14}/xms);
   ### [3] checks TR401 (Well-Light) ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "wrong devicecode! ($a[3]) $a[2] must be [0-9]_[1-4]" if ($a[2] eq 'TR401' && not $a[3] =~ /^[0-9]_[1-4]/xms);
   ### [3] checks TC6861 (Busch-Transcontrol HF) [P121] ###
-  # uncoverable branch true 
+  # uncoverable branch true
   return "SD_UT model $a[2] wrong devicecode: ($a[3]) - must be 3 digit house code (hex 0-9 A-F) _ 1 digit channel (dec 1-3) - e.g. 3DC_1" if ($a[2] eq 'TC6861' && not $a[3] =~ /^[0-9A-F]{3}_[1-3]$/xms);  
 
-  $hash->{versionModule} = $VERSION;
-  $hash->{lastMSG} =  'no data';
+  $hash->{lastMSG} = 'no data';
   $hash->{bitMSG} =  'no data';
   $iodevice = $a[4] if($a[4]);
   my $name = $hash->{NAME};
@@ -1157,6 +1320,11 @@ sub SD_UT_Set {
     if ($model eq 'RH787T') {
       my $adr = sprintf( "%04b", hex($definition[1]));  # argument 1 - adress to binary with 4 digits
       $msg = $models{$model}{Protocol} . '#0' . $adr .'1';
+      $msgEnd = '#R' . $repeats;
+    ############ SEAV BeEasy_TX ############
+    } elsif ($model eq 'BeEasy_TX') {
+      my $adr = substr(sprintf( "%012b", hex($definition[1])), 0, 10); # argument 1 - adress to binary with 10 digits
+      $msg = $models{$model}{Protocol} . '#' . $adr;
       $msgEnd = '#R' . $repeats;
     ############ Westinghouse TR60C-1 ############
     } elsif ($model eq 'TR60C1') {
@@ -1332,13 +1500,19 @@ sub SD_UT_Set {
     } elsif ($model eq 'TC6861') {
       $msg = $models{$model}{Protocol} . q{#P};
       $msgEnd = '#R' . $repeats;
-    ############ Meikee_21 | Meikee_24 | RCnoName128 | RCnoName20 | RCnoName20_10 | DC-1961-TG ############
-    } elsif ($model eq 'Meikee_21' || $model eq 'Meikee_24' || $model eq 'RCnoName128' || $model eq 'RCnoName20' || $model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') {
+    ############ Hamulight_AB ############
+    } elsif ($model eq 'Hamulight_AB') {
+      my $adr = sprintf '%016b' , hex $definition[1]; # argument 1 - adress to binary with 16 bits
+      $msg = $models{$model}{Protocol} . q{#} . $adr;
+      $msgEnd = '#R10';
+    ############ Meikee_xx| | RCnoName128 | RCnoName20 | RCnoName20_09 | RCnoName20_10 | DC-1961-TG | CREATE_6601TL | HA_HX2 | Lumention_RFSETCCT ############
+    } elsif ($model eq 'RCnoName130' || $model eq 'Meikee_21' || $model eq 'Meikee_24' || $model eq 'RCnoName128' || $model eq 'RCnoName20' || $model eq 'RCnoName20_09'
+          || $model eq 'Lumention_RFSETCCT' || $model eq 'RCnoName20_10'|| $model eq 'DC_1961_TG' || $model eq 'CREATE_6601TL' || $model eq 'HA_HX2') {
       my $adr = sprintf '%016b' , hex $definition[1]; # argument 1 - adress to binary with 16 bits
       $msg = $models{$model}{Protocol} . q{#} . $adr;
       $msgEnd = '#R' . $repeats;
-    ############ RCnoName127 ############
-    } elsif ($model eq 'RCnoName127') {
+    ############ CREATE_6601L | RCnoName127 | RCnoName20_15 ############
+    } elsif ($model eq 'CREATE_6601L' || $model eq 'RCnoName127' || $model eq 'RCnoName20_15') {
       my $adr = sprintf '%020b' , hex $definition[1]; # argument 1 - adress to binary with 20 bits
       $msg = $models{$model}{Protocol} . q{#} . $adr;
       $msgEnd = '#R' . $repeats;
@@ -1351,18 +1525,43 @@ sub SD_UT_Set {
     ### create setlist ###
     foreach my $keys (keys %{ $models{$model}}) {
       if ( $keys =~ /^[0-1]{1,}/xms ) {
-        $ret.= $models{$model}{$keys}.':noArg ';
+        if ($model eq 'CREATE_6601L' && index($models{$model}{$keys},',') > 0) {
+          my @values = split(',', $models{$model}{$keys});
+          foreach ( @values ) {
+            $ret .= $_ . ':noArg ';
+          }
+        } else {
+          $ret .= $models{$model}{$keys} . ':noArg ';
+        }
       }
     }
+    $ret .= 'dim:slider,5,1,100 ' if ($model eq 'Hamulight_AB');
   } else {
     if (defined $msgEnd) {
       ### if cmd, set bits ###
-      foreach my $keys (keys %{ $models{$model}}) {
+      foreach my $keys (keys %{$models{$model}}) {
         if ( $keys =~ /^[0-1]{1,}/xms ) {
+          if ($model eq 'CREATE_6601L' && index($models{$model}{$keys},',') > 0) {
+            my @values = split(',', $models{$model}{$keys});
+            foreach ( @values ) {
+              $value = $_;
+              Log3 $name, 5, "$ioname: SD_UT_Set model=$model value=$value";
+              last if ($value eq $cmd);
+            }
+          } else {
+            $value = $models{$model}{$keys};
+          }
           $save = $keys;
-          $value = $models{$model}{$keys};
           last if ($value eq $cmd);
         }
+      }
+      if ($model eq 'Hamulight_AB' && $cmd eq 'dim') {
+        return "$name: The value for the dimming command is not in the allowed range of 5 to 100!" if ($a[1] < 5 || $a[1] > 100);
+        $value = 'dim';
+        my $dimVal = FHEM::Core::Utils::Math::round( ($a[1] * 1.17 + 170) , 0);
+        $dimVal -= 127 if ($dimVal > 254);
+        $save = sprintf '%08b' , $dimVal; # dec to bin
+        Log3 $name, 5, "$ioname: SD_UT_Set model=$model dim=$a[1] send=$dimVal bin=$save";
       }
       return "$name Unkown set command!" if ($value ne $cmd);
 
@@ -1436,6 +1635,15 @@ sub SD_UT_Set {
         Log3 $name, 5, "$ioname: SD_UT_Set $name bits=$split[1] sum=$sum";
         $msg .= sprintf '%08b' , $sum;
         $msg .= $msgEnd;
+      ############ Hamulight_AB ############
+      } elsif ($model eq 'Hamulight_AB') {
+        $msg .= $save; # command
+        my @split = split /[#]/xms , $msg;
+        my $sum = oct ('0b'. substr $split[1],0,8) + oct ('0b'. substr $split[1],8,8) + oct ('0b'. substr $split[1],16,8);
+        $sum = ($sum - 83) & 0xFF;
+        Log3 $name, 5, "$ioname: SD_UT_Set $name bits=$split[1] sum=$sum";
+        $msg .= sprintf '%08b' , $sum;
+        $msg .= $msgEnd;
       ########### TR401 (Well-Light) #########
       } elsif ($model eq 'TR401') {
         my ($housecode, $ch) = split('_', $definition[1]);
@@ -1448,23 +1656,31 @@ sub SD_UT_Set {
         $msg .= $save; # on/off
         $msg .= sprintf('%012b', hex $housecode);
         $msg .= $models{$model}{ch}{$ch} . $msgEnd;
-        # $msg .= $models{$model}{ch}{$ch} . 'P' . $msgEnd;
-      ############ RCnoName20_10 or DC-1961-TG [P20] ############
-      } elsif ($model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') {
+      ############ RCnoName20_09 or RCnoName20_10 or DC-1961-TG or CREATE_6601L or RCnoName20_15 [P20] ############
+      } elsif ($model eq 'RCnoName20_09' || $model eq 'RCnoName20_10' || $model eq 'DC_1961_TG' || $model eq 'CREATE_6601L' || $model eq 'RCnoName20_15') {
         $msg .= $save; # button
         my $rollingCode = ReadingsVal($name, 'rollingCode', 0);
         $rollingCode += 1;
-        if ($rollingCode > 7) {
-          $rollingCode = 0;
+        if ($model eq 'CREATE_6601L' && ($cmd eq 'fan_5' || $cmd eq 'fan_6' || $cmd eq 'fan_direction' || $cmd eq 'time_2h')) { # rolling code 8-15
+          $rollingCode += 8 if ($rollingCode < 8);
+          $rollingCode = 8 if ($rollingCode > 15);
+        } else { # rolling code 0-7
+          $rollingCode -= 8 if ($rollingCode > 7);
+          $rollingCode = 0 if ($rollingCode > 7);
         }
         readingsSingleUpdate($hash, 'rollingCode' , $rollingCode, 0);
-        $msg .= sprintf('%04b', $rollingCode); # rolling code
+        if ($model eq 'RCnoName20_15') {
+          $msg .= sprintf('%03b', $rollingCode); # 3 bit rolling code
+        } else {
+          $msg .= sprintf('%04b', $rollingCode); # 4 bit rolling code
+        }
         my $xor = 10;
         for (my $n = 4; $n < 32; $n += 4) { # without P20#
           $xor ^= oct('0b' . substr($msg, $n, 4));
         }
         $msg .= sprintf('%04b', $xor); # check
         $msg .= $msgEnd;
+        Log3 $name, 5, "$ioname: SD_UT_Set model=$model, cmd=$cmd, msg=$msg, save=$save, rollingCode=$rollingCode";
       ############ RCnoName127 [P127] ############
       } elsif ($model eq 'RCnoName127') {
         $msg .= $save; # button
@@ -1538,61 +1754,82 @@ sub SD_UT_Parse {
   my $state = 'unknown';
   my $tristateCode;
   my $unknown_bits;     # unknown bits to a reading
-
+  my $rollingCode;
   my $deletecache = $modules{SD_UT}{defptr}{deletecache};
   Log3 $iohash, 5, "$ioname: SD_UT device in delete cache = $deletecache" if($deletecache && $deletecache ne '-');
 
+  # uncoverable branch true
   if ($deletecache && $deletecache ne '-') {
     CommandDelete( undef, "$deletecache" );           # delete device
     CommandDelete( undef, "FileLog_$deletecache" );   # delete filelog_device
+    # uncoverable branch true
     Log3 $iohash, 3, "SD_UT_Parse device $deletecache deleted" if($deletecache);
     $modules{SD_UT}{defptr}{deletecache} = '-';
     return '';
   }
 
+  # uncoverable branch true
   if ($hlen == 3) {
     ### Westinghouse Buttons_five [P29] ###
+    # uncoverable branch true
     if (!$def && ($protocol == 29 || $protocol == 30)) {
       $deviceCode = substr($rawData,2,1);
       $devicedef = 'Buttons_five ' . $deviceCode;
       $def = $modules{SD_UT}{defptr}{$devicedef};
     }
     ### Westinghouse Buttons_six [P29] ###
+    # uncoverable branch true
     if (!$def && ($protocol == 29 || $protocol == 30)) {
       $deviceCode = substr($rawData,2,1);
       $devicedef = 'Buttons_six ' . $deviceCode;
       $def = $modules{SD_UT}{defptr}{$devicedef};
     }
-    ### Unitec_47031 [P30] ###
-    if (!$def && ($protocol == 30 || $protocol == 83)) {
-      $deviceCode = substr($rawData,0,2);
-      $devicedef = 'Unitec_47031 ' . $deviceCode;
-      $def = $modules{SD_UT}{defptr}{$devicedef};
-    }
     ### Remote control SA_434_1_mini 923301 [P81] ###
+    # uncoverable branch true
     if (!$def && ($protocol == 81 || $protocol == 83 || $protocol == 86)) {
       $deviceCode = $rawData;
       $devicedef = 'SA_434_1_mini ' . $deviceCode;
       $def = $modules{SD_UT}{defptr}{$devicedef};
     }
-    ### Westinghouse_Delancey RH787T [P83] ### no define
-    if (!$def && ($protocol == 83 || $protocol == 30)) {
-      $deviceCode = substr($bitData,1,4);
-      $deviceCode = sprintf("%X", oct( "0b$deviceCode" ) );
-      $devicedef = 'RH787T ' . $deviceCode;
-      $def = $modules{SD_UT}{defptr}{$devicedef};
+    if ($protocol == 30 || $protocol == 83) {
+      ### Unitec_47031 [P30] ###
+      if (!$def) {
+        $deviceCode = substr($rawData,0,2);
+        $devicedef = 'Unitec_47031 ' . $deviceCode;
+        $def = $modules{SD_UT}{defptr}{$devicedef};
+      }
+      ### Westinghouse_Delancey RH787T or BeEasy_TX [P83] ###
+      if (!$def) {
+        my $button = substr($bitData,6,6); # RH787T
+        if (exists $models{'RH787T'}{$button}) {
+          $deviceCode = substr($bitData,1,4);
+          $deviceCode = sprintf("%X", oct( "0b$deviceCode" ) );
+          $devicedef = 'RH787T ' . $deviceCode;
+          $def = $modules{SD_UT}{defptr}{$devicedef};
+        }
+        $button = substr($bitData,10,2); # BeEasy_TX
+        if (exists $models{'BeEasy_TX'}{$button}) {
+          $deviceCode = substr($bitData,0,10) . '00';
+          $deviceCode = sprintf("%03X", oct( "0b$deviceCode" ) );
+          $devicedef = 'BeEasy_TX ' . $deviceCode;
+          $def = $modules{SD_UT}{defptr}{$devicedef};
+        }
+      }
     }
     ### CAME_TOP_432EV [P86] ###  no define
+    # uncoverable branch true
     if (!$def && ($protocol == 86 || $protocol == 81)) {
       $deviceCode = substr($rawData,0,2);
       $devicedef = 'CAME_TOP_432EV ' . $deviceCode;
       $def = $modules{SD_UT}{defptr}{$devicedef};
     }
     ### TR401 (Well-Light) [P114] ###
+    # uncoverable branch true
     if (!$def && $protocol == 114 && substr($bitData,-5) eq '11111') {
       $model = 'TR401';
       my $housecode = substr($rawData,1,1) >> 1;
       my $ch = substr($bitData,1,3);
+      # uncoverable branch true
       if ( exists $models{$model}{ch}{$ch} ) {
         $ch = $models{$model}{ch}{$ch};
         $deviceCode = $housecode .'_'. $ch;
@@ -1716,10 +1953,26 @@ sub SD_UT_Parse {
         return '';
       }
     }
+    ### Remote control RCnoName128 [P128] ###
     if (!$def && $protocol == 128) {
-      ### Remote control RCnoName128 [P128] ###
       $deviceCode = substr($rawData,0,4);
       $devicedef = 'RCnoName128 ' . $deviceCode;
+      $def = $modules{SD_UT}{defptr}{$devicedef};
+    }
+    ### Remote control CREATE_6601TL or RCnoName130 or Lumention_RFSETCCT [P130] ###
+    if (!$def && $protocol == 130) {
+      $deviceCode = substr($rawData,0,4);
+      $devicedef = 'CREATE_6601TL ' . $deviceCode if (!$def);
+      $def = $modules{SD_UT}{defptr}{$devicedef} if (!$def);
+      $devicedef = 'Lumention_RFSETCCT ' . $deviceCode if (!$def);
+      $def = $modules{SD_UT}{defptr}{$devicedef} if (!$def);
+      $devicedef = 'RCnoName130 ' . $deviceCode if (!$def);
+      $def = $modules{SD_UT}{defptr}{$devicedef} if (!$def);
+    }
+    ### Remote control HA-HX2 [P132] ###
+    if (!$def && $protocol == 132) {
+      $deviceCode = substr($rawData,0,4);
+      $devicedef = 'HA_HX2 ' . $deviceCode;
       $def = $modules{SD_UT}{defptr}{$devicedef};
     }
   }
@@ -1739,23 +1992,73 @@ sub SD_UT_Parse {
     if (!$def && $protocol == 20) {
       ### Remote control RCnoName20 [P20] ###
       $deviceCode = substr($rawData,0,4);
-      $devicedef = 'RCnoName20 ' . $deviceCode;
-      $def = $modules{SD_UT}{defptr}{$devicedef};
-      $model = 'RCnoName20';
-      $name = 'RCnoName20_' . $deviceCode;
-      ### Remote control RCnoName20_10 or DC-1961-TG [P20] ###
+      my $button = substr($bitData,16,15);
+      if (exists $models{'RCnoName20'}{$button}) {
+        $model = 'RCnoName20';
+        $devicedef = $model . ' ' . $deviceCode;
+        $def = $modules{SD_UT}{defptr}{$devicedef};
+        $name = $model . '_' . $deviceCode;
+      }
+      ### Remote control RCnoName20_09 or RCnoName20_10 or DC-1961-TG or CREATE_6601L or RCnoName20_15 [P20] ###
       my $xor = 0;
       for (my $n = 0; $n < 8; $n++) {
         $xor ^= hex(substr($rawData,$n,1));
       }
       if ($xor == 10) {
-        my $button = substr($bitData,16,8);
-        $model = 'RCnoName20_10' if exists $models{'RCnoName20_10'}{$button};
-        $model = 'DC_1961_TG' if exists $models{'DC_1961_TG'}{$button};
-        $devicedef = $model . ' ' . $deviceCode if (!$def);
-        $def = $modules{SD_UT}{defptr}{$devicedef} if (!$def);
-        $name = $model . '_' . $deviceCode;
+        $button = substr($bitData,16,8);
+        if (exists $models{'RCnoName20_09'}{$button} && !$def) {
+          $model = 'RCnoName20_09';
+          $devicedef = $model . ' ' . $deviceCode;
+          $def = $modules{SD_UT}{defptr}{$devicedef};
+          $name = $model . '_' . $deviceCode;
+        }
+        if (exists $models{'RCnoName20_10'}{$button} && !$def) {
+          $model = 'RCnoName20_10';
+          $devicedef = $model . ' ' . $deviceCode;
+          $def = $modules{SD_UT}{defptr}{$devicedef};
+          $name = $model . '_' . $deviceCode;
+        }
+        if (exists $models{'DC_1961_TG'}{$button} && !$def) {
+          $model = 'DC_1961_TG';
+          $devicedef = $model . ' ' . $deviceCode;
+          $def = $modules{SD_UT}{defptr}{$devicedef};
+          $name = $model . '_' . $deviceCode;
+        }
+        $button = substr($bitData,20,4) if (!$def);
+        if (exists $models{'CREATE_6601L'}{$button} && !$def) {
+          $deviceCode = substr($rawData,0,5);
+          $model = 'CREATE_6601L';
+          $devicedef = $model . ' ' . $deviceCode;
+          $def = $modules{SD_UT}{defptr}{$devicedef};
+          $name = $model . '_' . $deviceCode;
+        }
+        $button = substr($bitData,20,5) if (!$def);
+        if (exists $models{'RCnoName20_15'}{$button} && !$def) {
+          $deviceCode = substr($rawData,0,5);
+          $model = 'RCnoName20_15';
+          $devicedef = $model . ' ' . $deviceCode;
+          $def = $modules{SD_UT}{defptr}{$devicedef};
+          $name = $model . '_' . $deviceCode;
+        }
       }
+    }
+    if (!$def && $protocol == 22) {
+      ### Remote control Hamulight_AB [P22] ###
+      my $sum = 0;
+      for (my $n = 0; $n < 6; $n += 2) { # sum over 3 bytes
+        $sum += hex(substr($rawData, $n, 2));
+      }
+      $sum = ($sum - 83) & 0xFF;
+      if ($sum != hex(substr($rawData, 6, 2))) { # byte 4
+        Log3 $iohash, 3, "$ioname: SD_UT_Parse device Hamulight_AB - ERROR checksum $sum != " . hex(substr($rawData, 6, 2));
+        return '';
+      }
+      $deviceCode = substr($rawData,0,4);
+      $state = substr($bitData,16,8);
+      $model = 'Hamulight_AB';
+      $devicedef = 'Hamulight_AB ' . $deviceCode;
+      $name = 'Hamulight_AB_' . $deviceCode;
+      $def = $modules{SD_UT}{defptr}{$devicedef};
     }
     if (!$def && $protocol == 92) {
       ### Remote control Krinner_LUMIX [P92] ###
@@ -1826,8 +2129,7 @@ sub SD_UT_Parse {
         } elsif ($state eq '1000') {
           $state = 'off';
         } else {
-          $state = 'unknown';
-          $def = undef;
+          $state = substr($bitData,20,4);
         }
 
         ### if received data from device _all, set channels A | B | C | D to state and trigger event ###
@@ -1992,31 +2294,63 @@ sub SD_UT_Parse {
 
   readingsBeginUpdate($hash);
 
+  if ($protocol == 30 || $protocol == 83) {
   ############ Westinghouse_Delancey RH787T ############ Protocol 83 or 30 ############
-  if ($model eq 'RH787T' && ($protocol == 83 || $protocol == 30)) {
-    $state = substr($bitData,6,6);
-    $deviceCode = substr($bitData,1,4);
-
-    ## Check fixed bits
-    my $unknown1 = substr($bitData,0,1);  # every 0
-    my $unknown2 = substr($bitData,5,1);  # every 1
-    if ($unknown1 ne '0' || $unknown2 ne '1') {
-      Log3 $name, 3, "$ioname: $model fixed bits wrong! always bit0=0 ($unknown1) and bit5=1 ($unknown2)";
-      return '';
+    if ($model eq 'RH787T') {
+      $state = substr($bitData,6,6);
+      $deviceCode = substr($bitData,1,4);
+      ## Check fixed bits
+      my $unknown1 = substr($bitData,0,1);  # every 0
+      my $unknown2 = substr($bitData,5,1);  # every 1
+      if ($unknown1 ne '0' || $unknown2 ne '1') {
+        Log3 $name, 3, "$ioname: $model fixed bits wrong! always bit0=0 ($unknown1) and bit5=1 ($unknown2)";
+        return '';
+      }
+      ## deviceCode conversion for User in ON or OFF ##
+      my $deviceCodeUser = $deviceCode;
+      $deviceCodeUser =~ s/1/off|/g;
+      $deviceCodeUser =~ s/0/on|/g;
+      $deviceCodeUser = substr($deviceCodeUser, 0 , length($deviceCodeUser)-1);
+      $deviceCode = $deviceCode." ($deviceCodeUser)";
+    ############ BeEasy_TX ############ Protocol 30 or 83 ############
+    } elsif ($model eq 'BeEasy_TX') {
+      $state = substr($bitData,10,2);
+      $deviceCode = substr($bitData,0,10) . '00';
+    ############ Unitec_47031 ############ Protocol 30 or 83 ############
+    } elsif ($model eq 'Unitec_47031') {
+      $state = substr($bitData,11,1);   # muss noch 100% verifiziert werden !!!
+      ## deviceCode conversion for User in ON or OFF ##
+      $deviceCode = substr($bitData,0,8);
+      my $deviceCodeUser = $deviceCode;
+      $deviceCodeUser =~ s/1/on|/g;
+      $deviceCodeUser =~ s/0/off|/g;
+      $deviceCodeUser = substr($deviceCodeUser, 0 , length($deviceCodeUser)-1);
+      $deviceCode = $deviceCode." ($deviceCodeUser)";
+      ## zone conversion for User in ON or OFF ##
+      $zone = substr($bitData,8,3);
+      my $zoneUser = $zone;
+      $zoneUser =~ s/1/on|/g;
+      $zoneUser =~ s/0/off|/g;
+      $zoneUser = substr($zoneUser, 0 , length($zoneUser)-1);
+      $zoneRead = $zone." ($zoneUser) - Zone ";
+      # Anmeldung an Profi-Alarmanzentrale 47121
+      if (oct("0b".$zone) < 6 ) {
+        $zoneRead.= (oct("0b".$zone)+1);
+        $usersystem = 'Unitec 47121';
+      # other variants
+      } else {
+        $zoneRead.= (oct("0b".$zone)-5);
+        # Anmeldung an Basis-Alarmanzentrale 47125 | Sirenen-System (z.B. ein System ohne separate Funk-Zentrale)
+        $usersystem = 'Unitec 47125 or Friedland' if (oct("0b".$zone) == 6);
+        # Anmeldung an Basis-Alarmanzentrale 47125
+        $usersystem = 'Unitec 47125' if (oct("0b".$zone) == 7);
+      }
+      Log3 $name, 5, "$ioname: SD_UT_Parse devicedef=$devicedef attr_model=$model protocol=$protocol deviceCode=$deviceCode state=$state Zone=$zone";
     }
-
-    ## deviceCode conversion for User in ON or OFF ##
-    my $deviceCodeUser = $deviceCode;
-    $deviceCodeUser =~ s/1/off|/g;
-    $deviceCodeUser =~ s/0/on|/g;
-    $deviceCodeUser = substr($deviceCodeUser, 0 , length($deviceCodeUser)-1);
-    $deviceCode = $deviceCode." ($deviceCodeUser)";
-
   ############ Westinghouse Buttons_five / Buttons_six############ Protocol 29 or 30 ############
   } elsif (($model eq 'Buttons_five' || $model eq 'Buttons_six') && ($protocol == 29 || $protocol == 30)) {
     $state = substr($bitData,0,6);
     $deviceCode = substr($bitData,8,4);
-
     ## Check fixed bits
     my $unknown1 = substr($bitData,6,1);  # every 1
     my $unknown2 = substr($bitData,7,1);  # every 1
@@ -2024,46 +2358,12 @@ sub SD_UT_Parse {
       Log3 $name, 3, "$ioname: $model fixed bits wrong! always bit6=1 ($unknown1) and bit7=1 ($unknown2)";
       return '';
     }
-
     ## deviceCode conversion for User in ON or OFF ##
     my $deviceCodeUser = $deviceCode;
     $deviceCodeUser =~ s/1/off|/g;
     $deviceCodeUser =~ s/0/on|/g;
     $deviceCodeUser = substr($deviceCodeUser, 0 , length($deviceCodeUser)-1);
     $deviceCode = $deviceCode." ($deviceCodeUser)";
-  ############ Unitec_47031 ############ Protocol 30 or 83 ############
-  } elsif ($model eq 'Unitec_47031' && ($protocol == 30 || $protocol == 83)) {
-    $state = substr($bitData,11,1);   # muss noch 100% verifiziert werden !!!
-
-    ## deviceCode conversion for User in ON or OFF ##
-    $deviceCode = substr($bitData,0,8);
-    my $deviceCodeUser = $deviceCode;
-    $deviceCodeUser =~ s/1/on|/g;
-    $deviceCodeUser =~ s/0/off|/g;
-    $deviceCodeUser = substr($deviceCodeUser, 0 , length($deviceCodeUser)-1);
-    $deviceCode = $deviceCode." ($deviceCodeUser)";
-
-    ## zone conversion for User in ON or OFF ##
-    $zone = substr($bitData,8,3);
-    my $zoneUser = $zone;
-    $zoneUser =~ s/1/on|/g;
-    $zoneUser =~ s/0/off|/g;
-    $zoneUser = substr($zoneUser, 0 , length($zoneUser)-1);
-    $zoneRead = $zone." ($zoneUser) - Zone ";
-
-    # Anmeldung an Profi-Alarmanzentrale 47121
-    if (oct("0b".$zone) < 6 ) {
-      $zoneRead.= (oct("0b".$zone)+1);
-      $usersystem = 'Unitec 47121';
-    # other variants
-    } else {
-      $zoneRead.= (oct("0b".$zone)-5);
-      # Anmeldung an Basis-Alarmanzentrale 47125 | Sirenen-System (z.B. ein System ohne separate Funk-Zentrale)
-      $usersystem = 'Unitec 47125 or Friedland' if (oct("0b".$zone) == 6);
-      # Anmeldung an Basis-Alarmanzentrale 47125
-      $usersystem = 'Unitec 47125' if (oct("0b".$zone) == 7);
-    }
-    Log3 $name, 5, "$ioname: SD_UT_Parse devicedef=$devicedef attr_model=$model protocol=$protocol deviceCode=$deviceCode state=$state Zone=$zone";
   ############ Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx ############ Protocol 46 ############
   } elsif (($model eq 'Tedsen_SKX1xx' || $model eq 'Tedsen_SKX2xx' || $model eq 'Tedsen_SKX4xx' || $model eq 'Tedsen_SKX6xx') && $protocol == 46) {
     $state = substr($bitData,14,4);
@@ -2191,11 +2491,23 @@ sub SD_UT_Parse {
   } elsif ($model eq 'RCnoName20' && $protocol == 20) {
     $state = substr($bitData,16,15);  # last bit is filled
     $deviceCode = substr($rawData,0,4);
-  ### Remote control RCnoName20_10 or DC-1961-TG[P20] ###
-  } elsif (($model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') && $protocol == 20) {
+  ### Remote control RCnoName20_09 or RCnoName20_10 or DC-1961-TG [P20] ###
+  } elsif (($model eq 'RCnoName20_09' || $model eq 'RCnoName20_10' || $model eq 'DC_1961_TG') && $protocol == 20) {
     $state = substr($bitData,16,8);
     $deviceCode = substr($rawData,0,4);
-    my $rollingCode = hex(substr($rawData,6,1));
+    $rollingCode = hex(substr($rawData,6,1));
+    readingsBulkUpdate($hash, 'rollingCode', $rollingCode, 0);
+  ### Remote control CREATE_6601L [P20] ###
+  } elsif ($model eq 'CREATE_6601L' && $protocol == 20) {
+    $state = substr($bitData,20,4);
+    $deviceCode = substr($rawData,0,5);
+    $rollingCode = hex(substr($rawData,6,1));
+    readingsBulkUpdate($hash, 'rollingCode', $rollingCode, 0);
+  ### Remote control RCnoName20_15 [P20] ### 
+  } elsif ($model eq 'RCnoName20_15' && $protocol == 20) {
+    $state = substr($bitData,20,5);
+    $deviceCode = substr($rawData,0,5);
+    $rollingCode = oct('0b' . substr($bitData,25,3));
     readingsBulkUpdate($hash, 'rollingCode', $rollingCode, 0);
   ### Remote control xavax [P26] ###
   } elsif ($model eq 'xavax' && $protocol == 26) {
@@ -2240,19 +2552,14 @@ sub SD_UT_Parse {
   } elsif ($model eq 'TC6861') {
     $state = substr($bitData,0,4);
     $deviceCode = substr($rawData,1,3);
-  ############ Meikee [P118] ############
-  } elsif (($model eq 'Meikee_21' || $model eq 'Meikee_24') && $protocol == 118) {
+  ############ Meikee [P118] or RCnoName128 [P128] or CREATE_6601TL, RCnoName130, Lumention_RFSETCCT [P130] or HA-HX2 [132] or Hamulight_AB [P22] ############
+  } elsif ($model eq 'RCnoName130' || $model eq 'Meikee_21' || $model eq 'Meikee_24' || $model eq 'RCnoName128' || $model eq 'CREATE_6601TL' || $model eq 'HA_HX2' || $model eq 'Hamulight_AB' || $model eq 'Lumention_RFSETCCT') {
     $state = substr $bitData,16,8;
     $deviceCode = substr $rawData,0,4;
   ############ RCnoName127 [P127] ############
   } elsif ($model eq 'RCnoName127') {
     $state = substr($bitData,20,8);
     $deviceCode = substr($rawData,0,5);
-  ############ RCnoName128 [P128] ############
-  } elsif ($model eq 'RCnoName128') {
-    $state = substr($bitData,16,8);
-    $deviceCode = substr($rawData,0,4);
-
   ############ unknown ############
   } else {
     readingsBulkUpdate($hash, 'state', '???');
@@ -2274,9 +2581,30 @@ sub SD_UT_Parse {
         last;
       }
     }
-
+    if ($model eq 'Hamulight_AB' && $state =~ /^[0|1]{8}$/xms ) { # bei dim slider 5-100
+      my $dec = oct("0b".$state);
+      Log3 $name, 4, "$ioname: SD_UT_Parse $devicedef state=$state ($dec)";
+      $state = 'dim';
+    }
     if ($model eq 'Novy_840029' || $model eq 'Novy_840039') {
       $state = $state =~ /^[01]+$/x ? "Please check your model. The code $deviceCode is not supported." : $state;
+    }
+    if ($model eq 'CREATE_6601L') {
+      Log3 $name, 5, "$ioname: SD_UT_Parse $devicedef state=$state, rollingCode=$rollingCode";
+      if ($state eq 'fan_5,beeper_on_off') {
+        if ($rollingCode < 8) { # rollingcode 0-7
+          $state = 'beeper_on_off';
+        } else { # rollingcode 8-15
+          $state = 'fan_5';
+        }
+      }
+      if ($state eq 'fan_2,fan_direction') {
+        if ($rollingCode < 8) { # rollingcode 0-7
+          $state = 'fan_2';
+        } else { # rollingcode 8-15
+          $state = 'fan_direction';
+        }
+      }
     }
   }
 
@@ -2316,6 +2644,7 @@ sub SD_UT_Attr {
     
     return qq[$name: Unallowed value $attrValue for the attribute repetition (must be 1 - 99)!] if ($attrName eq q[repeats] && $attrValue !~ m/^[1-9]{1}[0-9]{0,1}$/xms);
     return qq[$name: Invalid value $attrValue for the UTfrequency attribute. Values ​​such as: 433.92 (300.00-999.99 MHz) are permitted.] if ($attrName eq q[UTfrequency] && ($attrValue !~ m/^[3-9]{1}[\d]{2}$|^[3-9]{1}[\d]{2}\.{1}[\d]*$/xms));
+    return qq[$name: The model $attrValue is not supported!] if ($attrName eq q[model] && not exists $models{$attrValue}); # Can't use an undefined value as an ARRAY reference at ./FHEM/14_SD_UT.pm line 2423.
 
     ############ change device models ############
     if ($attrName eq 'model' && $attrValue ne $oldmodel) {
@@ -2347,6 +2676,11 @@ sub SD_UT_Attr {
         if ($attrValue eq 'RH787T') {
           $deviceCode = substr($bitData,1,4);
           $deviceCode = sprintf("%X", oct( "0b$deviceCode" ) );
+          $devicename = $devicemodel.'_'.$deviceCode;
+        ############ SEAV BeEasy_TX ############
+        } elsif ($attrValue eq 'BeEasy_TX') {
+          $deviceCode = substr($bitData,0,10) . '00';
+          $deviceCode = sprintf("%03X", oct( "0b$deviceCode" ) );
           $devicename = $devicemodel.'_'.$deviceCode;
         ############ Westinghouse TR60C-1 ############
         } elsif ($attrValue eq 'TR60C1') {
@@ -2463,18 +2797,14 @@ sub SD_UT_Attr {
           $deviceCode = substr $bitData,8,24;
           $deviceCode = sprintf("%06X", oct( "0b$bitData" ) );
           $devicename = $devicemodel.'_'.$deviceCode;
-        ############ Meikee ############
-        } elsif ($attrValue eq 'Meikee_21' || $attrValue eq 'Meikee_24') {
+        ############ Meikee_xx or RCnoName20 or RCnoName20_09 or RCnoName20_10 or RCnoName128 or DC_1961_TG or CREATE_6601TL or HA_HX2 or Lumention_RFSETCCT ############
+        } elsif ($attrValue eq 'RCnoName130' || $attrValue eq 'Meikee_21' || $attrValue eq 'Meikee_24' || $attrValue eq 'RCnoName20' || $attrValue eq 'RCnoName20_09' || $attrValue eq 'Lumention_RFSETCCT'
+              || $attrValue eq 'RCnoName20_10' || $attrValue eq 'RCnoName128' || $attrValue eq 'DC_1961_TG' || $attrValue eq 'CREATE_6601TL' || $attrValue eq 'HA_HX2') {
           $deviceCode = substr($bitData,0,16);
           $deviceCode = sprintf("%04X", oct( "0b$deviceCode" ) );
           $devicename = $devicemodel.'_'.$deviceCode;
-        ############ RCnoName20 or RCnoName20_10 or RCnoName128 or DC_1961_TG ############
-        } elsif ($attrValue eq 'RCnoName20' || $attrValue eq 'RCnoName20_10' || $attrValue eq 'RCnoName128' || $attrValue eq 'DC_1961_TG') {
-          $deviceCode = substr($bitData,0,16);
-          $deviceCode = sprintf("%04X", oct( "0b$deviceCode" ) );
-          $devicename = $devicemodel.'_'.$deviceCode;
-        ############ RCnoName127 ############
-        } elsif ($attrValue eq 'RCnoName127') {
+        ############ CREATE_6601L or RCnoName127 or RCnoName20_15 ############
+        } elsif ($attrValue eq 'CREATE_6601L' || $attrValue eq 'RCnoName127' || $attrValue eq 'RCnoName20_15') {
           $deviceCode = substr $bitData,0,20;
           $deviceCode = sprintf("%05X", oct( "0b$deviceCode" ) );
           $devicename = $devicemodel.'_'.$deviceCode;
@@ -2551,6 +2881,8 @@ sub SD_UT_tristate2bin {
 1;
 
 =pod
+
+=encoding utf8
 =item summary    module for some SIGNALduino devices
 =item summary_DE Universalmodul f&uuml;r einige SIGNALduino Devices
 =begin html
@@ -2571,27 +2903,27 @@ sub SD_UT_tristate2bin {
     <li>AC114-01 remote control&nbsp;&nbsp;&nbsp;<small>(module model: AC114_01, protocol 56)</small></li>
     <li>Atlantic Security sensors&nbsp;&nbsp;&nbsp;<small>(module model: MD-2003R, MD-2018R,MD-210R, protocol 91|91.1)</small><br>
     <code>&nbsp;&nbsp;&nbsp;Note: The model MD_230R (water) is recognized as MD-2018R due to the same hardware ID!</code></li>
-    <li>BeSmart S4 remote control&nbsp;&nbsp;&nbsp;<small>(module model: BeSmart_S4, protocol 78)</small></li>
     <li>BF-301 remote control&nbsp;&nbsp;&nbsp;<small>(module model: BF_301, protocol 105)</small></li>
     <li>BOSCH ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: SF01_01319004_Typ2, protocol 86)</small></li>
     <li>Busch-Transcontrol HF - remote control 6861&nbsp;&nbsp;&nbsp;<small>(module model: TC6861, protocol 121)</small></li>
     <li>CAME swing gate drive&nbsp;&nbsp;&nbsp;<small>(module model: CAME_TOP_432EV, protocol 86)</small></li>
     <li>ChiliTec LED X-Mas light&nbsp;&nbsp;&nbsp;<small>(module model: Chilitec_22640, protocol 14)</small></li>
+    <li>CREATE 6601L Remote control for ceiling fan with light&nbsp;&nbsp;&nbsp;<small>(module model: CREATE_6601L, protocol 20)</small></li>
+    <li>CREATE 6601TL Remote control for ceiling fan with light&nbsp;&nbsp;&nbsp;<small>(module model: CREATE_6601TL, protocol 130)</small></li>
     <li>DC-1961-TG - remote control with 12 buttons for ceiling fan with lighting&nbsp;&nbsp;&nbsp;<small>(module model: DC_1961_TG, protocol 20)</small></li>
     <li>ESTO ceiling lamp&nbsp;&nbsp;&nbsp;<small>(module model: KL_RF01, protocol 93)</small></li>
-    <li>Remote control with 4 buttons for diesel heating&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20, protocol 20)</small></li>
-    <li>Remote control with 10 buttons for Leroy ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20_10, protocol 20)</small></li>
-    <li>Remote control with 12 buttons for ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName128, protocol 128)</small></li>
-    <li>Remote control with 14 buttons for ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName127, protocol 127)</small></li>
+    <li>Halemeier HA-HX2&nbsp;&nbsp;&nbsp;<small>(module model: HA-HX2, protocol 132)</small></li>
+    <li>HAMULiGHT remote control with 5 buttons for LED lighting&nbsp;&nbsp;&nbsp;<small>(module model: Hamulight_AB, protocol 22)</small></li>
     <li>Hoermann HS1-868-BS&nbsp;&nbsp;&nbsp;<small>(module model: HS1_868_BS, protocol 69)</small></li>
     <li>Hoermann HSM4&nbsp;&nbsp;&nbsp;<small>(module model: HSM4, protocol 69)</small></li>
     <li>Krinner LUMIX X-Mas light string&nbsp;&nbsp;&nbsp;<small>(module model: Krinner_LUMIX, protocol 92)</small></li>
     <li>LED_XM21_0 X-Mas light string&nbsp;&nbsp;&nbsp;<small>(module model: LED_XM21_0, protocol 76)</small></li>
+    <li>Lumention RFSETCCT Remote control for LED light&nbsp;&nbsp;&nbsp;<small>(module model: Lumention_RFSETCCT, protocol 130)</small></li>
     <li>TR401 (Well-Light, remote control with 4 buttons)&nbsp;&nbsp;&nbsp;<small>(module model: TR401, protocol 114)</small></li>
     <li>TR-502MSV (LIDL, LIBRA, MANDOLYN, QUIGG), compatible GT-7008BS, GT-FSI-04, DMV-7008S, Powerfix RCB-I 3600&nbsp;&nbsp;&nbsp;<small>(module model: TR_502MSV, protocol 34)</small></li>
     <li>Manax RCS250&nbsp;&nbsp;&nbsp;<small>(module model: RC_10, protocol 90)</small></li>
     <li>Medion OR28V&nbsp;&nbsp;&nbsp;<small>(module model: OR28V, protocol 68)</small></li>
-    <li>Meikee remote controls <small>(Protokoll 118)</small>
+    <li>Meikee remote controls <small>(protocol 118)</small>
       <ul><small>
         <li>Meikee, 21 buttons, e.g. for Solar Flood Lights - module model: Meikee_21</li>
         <li>Meikee, 24 buttons, e.g. for RGB LED Wallwasher Light - module model: Meikee_24</li>
@@ -2603,7 +2935,16 @@ sub SD_UT_tristate2bin {
     <li>Novy Cloud 230 kitchen hood&nbsp;&nbsp;&nbsp;<small>(module model: Novy_840039, protocol 86)</small></li>
     <li>Novy Pureline 6830 kitchen hood&nbsp;&nbsp;&nbsp;<small>(module model: Novy_840029, protocol 86)</small></li>
     <li>QUIGG DMV-7000&nbsp;&nbsp;&nbsp;<small>(module model: QUIGG_DMV, protocol 34)</small></li>
+    <li>Remote control with 4 buttons for diesel heating&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20, protocol 20)</small></li>
+    <li>Remote control with 9 buttons for ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20_09, protocol 20)</small></li>
+    <li>Remote control with 10 buttons for Leroy ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20_10, protocol 20)</small></li>
+    <li>Remote control with 10 buttons for LED Stripe Controllers&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName130, protocol 130)</small></li>
+    <li>Remote control with 12 buttons for ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName128, protocol 128)</small></li>
+    <li>Remote control with 14 buttons for ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName127, protocol 127)</small></li>
+    <li>Remote control with 15 buttons for ceiling fan&nbsp;&nbsp;&nbsp;<small>(module model: RCnoName20_15, protocol 20)</small></li>
     <li>SA-434-1 mini 923301&nbsp;&nbsp;&nbsp;<small>(module model: SA_434_1_mini, protocol 81)</small></li>
+    <li>SEAV BeEasy TX &nbsp;&nbsp;&nbsp;<small>(Modulmodel: BeEasy_TX, protocol 83)</small></li>
+    <li>SEAV BeSmart S4 remote control&nbsp;&nbsp;&nbsp;<small>(module model: BeSmart_S4, protocol 78)</small></li>
     <li>Techmar Garden Lights &nbsp;&nbsp;&nbsp;<small>(module model: Techmar, protocol 95)</small></li>
     <li>Tedsen Teletaster <small>(protocol 46)</small>:
     <ul><small>
@@ -2671,15 +3012,15 @@ sub SD_UT_tristate2bin {
       <a name="night_mode"></a><li>night_mode: button moon on the remote</li>
     </ul><br>
 
-    <u>LED_XM21_0 light string</u>
-    <ul>
-      <a name="on"></a><li>on: button I on the remote</li>
-      <a name="off"></a><li>off: button O on the remote</li>
-    </ul><br>
-
     <u>Remote control SA-434-1 mini 923301, Hoermann HS1-868-BS, Tedsen_SKX1xx</u>
     <ul>
       <a name="send"></a><li>send: button <small>(Always send the same, even if the user sends another set command via console.)</small></li>
+    </ul><br>
+
+    <u>Halemeier HA_HX2</u>
+    <ul>
+      <a name="on"></a><li>on: button ON on the remote</li>
+      <a name="off"></a><li>off: button OFF on the remote</li>
     </ul><br>
 
     <u>Hoermann HSM4 (Remote control with 4 button)</u>
@@ -2688,6 +3029,12 @@ sub SD_UT_tristate2bin {
       <a name="button_2"></a><li>button_2: button 2 on the remote</li>
       <a name="button_3"></a><li>button_3: button 3 on the remote</li>
       <a name="button_4"></a><li>button_4: button 4 on the remote</li>
+    </ul><br>
+
+    <u>LED_XM21_0 light string</u>
+    <ul>
+      <a name="on"></a><li>on: button I on the remote</li>
+      <a name="off"></a><li>off: button O on the remote</li>
     </ul><br>
 
     <u>Techmar Garden Lights (Remote control with 10 button)</u>
@@ -2732,7 +3079,7 @@ sub SD_UT_tristate2bin {
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#IODev">IODev</a></li>
     <li><a name="model"></a>model<br>
-      The attribute indicates the model type of your device (AC114_01B, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, DC_1961_TG, HS1-868-BS, HSM4, KL_RF01, LED_XM21_0, Meikee_21, Meikee_24, Momento, Navaris, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, SA_434_1_mini, SF01_01319004, TC6861, TR60C1, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031, unknown).<br>
+      This attribute indicates the model type of your device (AC114_01B, BeEasy_TX, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, CREATE_6601L, CREATE_6601TL, DC_1961_TG, HA_HX2, HS1-868-BS, HSM4, KL_RF01, LED_XM21_0, Lumention_RFSETCCT, Meikee_21, Meikee_24, Momento, Navaris, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, SA_434_1_mini, SF01_01319004, TC6861, TR60C1, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031, unknown).<br>
       If the attribute is changed, a new device is created using <a href="#autocreate">autocreate</a>. Autocreate must be activated for this.
     </li>
     <li><a name="repeats"></a>repeats<br>
@@ -2750,7 +3097,7 @@ sub SD_UT_tristate2bin {
 
   <b>Generated readings of the models</b><br>
   <ul>
-    <u>AC114-01, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, HSM4, KL_RF01, LED_XM21_0, Meikee_xx, Momento, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, SF01_01319004, SF01_01319004_Typ2, TR401, TR_502MSV, Visivo</u>
+    <u>AC114-01, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, HA_HX2, HSM4, KL_RF01, LED_XM21_0, Meikee_xx, Momento, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RCnoNamexxx, RC_10, RH787T, SF01_01319004, SF01_01319004_Typ2, TR401, TR_502MSV, Visivo</u>
     <ul>
       <li>deviceCode: Device code of the system</li>
       <li>LastAction: Last executed action of the device (<code>receive</code> for command received | <code>send</code> for command send).</li>
@@ -2800,22 +3147,29 @@ sub SD_UT_tristate2bin {
     <li>AC114-01 Fernbedienung&nbsp;&nbsp;&nbsp;<small>(Modulmodel: AC114_01, Protokoll 56)</small></li>
     <li>Atlantic Security Sensoren&nbsp;&nbsp;&nbsp;<small>(Modulmodel: MD-2003R, MD-2018R,MD-210R, Protokoll 91|91.1)</small><br>
     <code>&nbsp;&nbsp;&nbsp;Hinweis: Das Model MD_230R (water) wird aufgrund gleicher Hardwarekennung als MD-2018R erkannt!</code></li>
-    <li>BeSmart S4 Fernbedienung&nbsp;&nbsp;&nbsp;<small>(Modulmodel: BeSmart_S4, Protokoll 78)</small></li>
     <li>BF-301 Fernbedienung&nbsp;&nbsp;&nbsp;<small>(Modulmodel: BF_301, Protokoll 105)</small></li>
     <li>BOSCH Deckenl&uuml;fter&nbsp;&nbsp;&nbsp;<small>(Modulmodel: SF01_01319004_Typ2, Protokoll 86)</small></li>
     <li>Busch-Transcontrol HF - Handsender 6861&nbsp;&nbsp;&nbsp;<small>(Modulmodel: TC6861, Protokoll 121)</small></li>
     <li>CAME Drehtor Antrieb&nbsp;&nbsp;&nbsp;<small>(Modulmodel: CAME_TOP_432EV, Protokoll 86)</small></li>
     <li>ChiliTec LED Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Chilitec_22640, Protokoll 14)</small></li>
+    <li>CREATE 6601L Fernbedienung für Ventilator mit Licht&nbsp;&nbsp;&nbsp;<small>(Modulmodel: CREATE_6601L, Protokoll 20)</small></li>
+    <li>CREATE 6601TL Fernbedienung für Ventilator mit Licht&nbsp;&nbsp;&nbsp;<small>(Modulmodel: CREATE_6601TL, Protokoll 130)</small></li>
     <li>DC-1961-TG - Fernbedienung mit 12 Tasten für Deckenventilator mit Beleuchtung&nbsp;&nbsp;&nbsp;<small>(Modulmodel: DC_1961_TG, Protokoll 20)</small></li>
     <li>ESTO Deckenlampe&nbsp;&nbsp;&nbsp;<small>(Modulmodel: KL_RF01, Protokoll 93)</small></li>
     <li>Fernbedienung mit 4 Tasten f&uuml;r Diesel-Heizung &nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20, Protokoll 20)</small></li>
+    <li>Fernbedienung mit 9 Tasten f&uuml;r Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20_09, Protokoll 20)</small></li>
     <li>Fernbedienung mit 10 Tasten f&uuml;r Leroy Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20_10, Protokoll 20)</small></li>
+    <li>Fernbedienung mit 10 Tasten f&uuml;r LED Streifen Controller&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName130, Protokoll 130)</small></li>
     <li>Fernbedienung mit 12 Tasten f&uuml;r Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName128, Protokoll 128)</small></li>
     <li>Fernbedienung mit 14 Tasten f&uuml;r Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName127, Protokoll 127)</small></li>
+    <li>Fernbedienung mit 15 Tasten f&uuml;r Deckenventilator&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RCnoName20_15, Protokoll 20)</small></li>
+    <li>Halemeier HA-HX2&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HA-HX2, Protokoll 132)</small></li>
+    <li>HAMULiGHT Fernbedienung mit 5 Tasten f&uuml;r LED-Beleuchtung&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Hamulight_AB, Protokoll 22)</small></li>
     <li>Hoermann HS1-868-BS&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HS1_868_BS, Protokoll 69)</small></li>
     <li>Hoermann HSM4&nbsp;&nbsp;&nbsp;<small>(Modulmodel: HSM4, Protokoll 69)</small></li>
     <li>Krinner LUMIX Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Krinner_LUMIX, Protokol 92)</small></li>
     <li>LED_XM21_0 Christbaumkerzen&nbsp;&nbsp;&nbsp;<small>(Modulmodel: LED_XM21_0, Protokol 76)</small></li>
+    <li>Lumention RFSETCCT Fernbedienung f&uuml;r LED Beleuchtung&nbsp;&nbsp;&nbsp;<small>(module model: Lumention_RFSETCCT, protocol 130)</small></li>
     <li>TR-502MSV (LIDL, LIBRA, MANDOLYN, QUIGG), kompatibel GT-7008BS, GT-FSI-04, DMV-7008S, Powerfix RCB-I 3600&nbsp;&nbsp;&nbsp;<small>(Modulmodel: TR_502MSV, Protokoll 34)</small></li>
     <li>TR401 (Well-Light, Fernbedienung 4 Tasten)&nbsp;&nbsp;&nbsp;<small>(Modulmodel: TR401, Protokoll 114)</small></li>
     <li>Manax RCS250&nbsp;&nbsp;&nbsp;<small>(Modulmodel: RC_10, Protokoll 90)</small></li>
@@ -2833,6 +3187,8 @@ sub SD_UT_tristate2bin {
     <li>Novy Pureline 6830 Dunstabzugshaube&nbsp;&nbsp;&nbsp;<small>(Modulmodel: Novy_840029, Protokoll 86)</small></li>
     <li>QUIGG DMV-7000&nbsp;&nbsp;&nbsp;<small>(Modulmodel: QUIGG_DMV, Protokoll 34)</small></li>
     <li>SA-434-1 mini 923301&nbsp;&nbsp;&nbsp;<small>(Modulmodel: SA_434_1_mini, Protokoll 81)</small></li>
+    <li>SEAV BeEasy TX Fernbedienung&nbsp;&nbsp;&nbsp;<small>(Modulmodel: BeEasy_TX, Protokoll 83)</small></li>
+    <li>SEAV BeSmart S4 Fernbedienung&nbsp;&nbsp;&nbsp;<small>(Modulmodel: BeSmart_S4, Protokoll 78)</small></li>
     <li>Techmar Garden Lights &nbsp;&nbsp;&nbsp;<small>(Modulmodel: Techmar, Protokoll 95)</small></li>
     <li>Tedsen Teletaster <small>(Protokoll 46)</small>:
     <ul><small>
@@ -2900,15 +3256,15 @@ sub SD_UT_tristate2bin {
       <a name="night_mode"></a><li>night_mode: Taste MOND auf der Fernbedienung</li>
     </ul><br>
 
-    <u>LED_XM21_0 Christbaumkerzen</u>
-    <ul>
-      <a name="on"></a><li>on: Taste I auf der Fernbedienung</li>
-      <a name="off"></a><li>off: Taste O auf der Fernbedienung</li>
-    </ul><br>
-
     <u>Fernbedienungen SA-434-1 mini 923301, Hoermann HS1-868-BS, Tedsen_SKX1xx</u>
     <ul>
       <a name="send"></a><li>send: Tastendruck <small>(Sendet immer den gleichen Befehl, auch wenn der Benutzer einen anderen Set-Befehl via Konsole sendet.)</small></li>
+    </ul><br>
+
+    <u>Halemeier HA_HX2</u>
+    <ul>
+      <a name="on"></a><li>on: Taste ON auf der Fernbedienung</li>
+      <a name="off"></a><li>off: Taste OFF auf der Fernbedienung</li>
     </ul><br>
 
     <u>Hoermann HSM4 (Fernbedienung mit 4 Tasten)</u>
@@ -2917,6 +3273,12 @@ sub SD_UT_tristate2bin {
       <a name="button_2"></a><li>button_2: Taste 2 auf der Fernbedienung</li>
       <a name="button_3"></a><li>button_3: Taste 3 auf der Fernbedienung</li>
       <a name="button_4"></a><li>button_4: Taste 4 auf der Fernbedienung</li>
+    </ul><br>
+
+    <u>LED_XM21_0 Christbaumkerzen</u>
+    <ul>
+      <a name="on"></a><li>on: Taste I auf der Fernbedienung</li>
+      <a name="off"></a><li>off: Taste O auf der Fernbedienung</li>
     </ul><br>
 
     <u>Techmar Garden Lights (Fernbedienung mit 10 Tasten)</u>
@@ -2961,7 +3323,7 @@ sub SD_UT_tristate2bin {
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#IODev">IODev</a></li>
     <li><a name="model"></a>model<br>
-      Diese Attribut bezeichnet den Modelltyp Ihres Ger&auml;tes (AC114_01B, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, DC_1961_TG, HS1-868-BS, HSM4, KL_RF01, LED_XM21_0, Meikee_21, Meikee_24, Momento, Navaris, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, SA_434_1_mini, SF01_01319004, TC6861, TR60C1, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031, unknown).<br>
+      Dieses Attribut bezeichnet den Modelltyp Ihres Ger&auml;tes (AC114_01B, BeEasy_TX, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, CREATE_6601L, CREATE_6601TL, DC_1961_TG, HA_HX2, HS1-868-BS, HSM4, KL_RF01, LED_XM21_0, Lumention_RFSETCCT, Meikee_21, Meikee_24, Momento, Navaris, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, RCnoNamexxx, SA_434_1_mini, SF01_01319004, TC6861, TR60C1, Tedsen_SKX1xx, Tedsen_SKX2xx, Tedsen_SKX4xx, Tedsen_SKX6xx, TR_502MSV, Unitec_47031, unknown).<br>
       Bei &Auml;nderung des Attributes wird ein neues Gerät mittels <a href="#autocreate">autocreate</a> erzeugt. Autocreate muss dazu aktiviert sein.
     </li>
     <li><a name="repeats"></a>repeats<br>
@@ -2979,7 +3341,7 @@ sub SD_UT_tristate2bin {
 
   <b>Generierte Readings der Modelle</b><br>
   <ul>
-    <u>AC114-01, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, HSM4, KL_RF01, LED_XM21_0, Meikee_xx, Momento, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, SF01_01319004, SF01_01319004_Typ2, TR401, TR_502MSV, Visivo</u>
+    <u>AC114-01, BeSmart_S4, Buttons_five, Buttons_six, CAME_TOP_432EV, Chilitec_22640, HA_HX2, HSM4, KL_RF01, LED_XM21_0, Meikee_xx, Momento, Novy_840029, Novy_840039, OR28V, QUIGG_DMV, RC_10, RH787T, SF01_01319004, SF01_01319004_Typ2, TR401, TR_502MSV, Visivo</u>
     <ul>
       <li>deviceCode: Ger&auml;teCode des Systemes</li>
       <li>LastAction: Zuletzt ausgef&uuml;hrte Aktion des Ger&auml;tes (<code>receive</code> f&uuml;r Kommando empfangen, <code>send</code> f&uuml;r Kommando gesendet).</li>
@@ -3011,6 +3373,7 @@ sub SD_UT_tristate2bin {
 </ul>
 
 =end html_DE
+
 =for :application/json;q=META.json 14_SD_UT.pm
 {
   "author": [
@@ -3051,6 +3414,7 @@ sub SD_UT_tristate2bin {
       }
     }
   },
+  "version": "v1.0.11",
   "release_status": "stable",
   "resources": {
     "bugtracker": {
