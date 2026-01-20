@@ -28,7 +28,7 @@
 #  Leerzeichen entfernen: sed -i 's/[[:space:]]*$//' 76_SolarForecast.pm
 #
 #########################################################################################################################
-use strict;
+use strict; 
 use warnings;
 
 main::LoadModule ('Astro');                                                          # Astro Modul für Sonnenkennzahlen laden
