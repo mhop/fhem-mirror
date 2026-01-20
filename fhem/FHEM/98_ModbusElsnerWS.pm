@@ -128,8 +128,12 @@ sub ModbusElsnerWS_Define {
   my ($cmd, $filelogName, $gplot, $ret, $weblinkName, $weblinkHash) =
        (undef, "FileLog_$name", "ElsnerWS:SunIntensity,ElsnerWS_2:Temperature/Brightness,ElsnerWS_3:WindSpeed/Raining,", undef, undef, undef);
   # find autocreate device
-  while (($autocreateName, $autocreateHash) = each(%defs)) {
-    last if ($defs{$autocreateName}{TYPE} eq "autocreate");
+  for my $nameCandidate (keys %defs) {
+    if ($defs{$nameCandidate}{TYPE} eq "autocreate") {
+      $autocreateName = $nameCandidate;
+      $autocreateHash = $defs{$nameCandidate};
+      last;
+    }
   }
   $autocreateDeviceRoom = AttrVal($autocreateName, "device_room", $autocreateDeviceRoom) if (defined $autocreateName);
   $autocreateDeviceRoom = 'ElsnerWS' if ($autocreateDeviceRoom eq '%TYPE');
