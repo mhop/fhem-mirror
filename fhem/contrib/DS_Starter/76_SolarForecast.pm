@@ -170,7 +170,7 @@ my %vNotesIntern = (
                            "__setConsRcmdState: add Current_GridConsumption to function, add windspeed and FF to DWD-Device ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ".
                            "aiConActFunc: *_SYMMETRIC AF added, checkPlantConfig: add AI FANN Configuration check ".
-                           "add NeuralNet to setter operatingMemory backup/restore ",
+                           "add NeuralNet to setter operatingMemory backup/restore ".
                            "new attr setupEnvironment, new key aiControl->aiConBitFailLimit, setupEnvironment: new key presence ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
