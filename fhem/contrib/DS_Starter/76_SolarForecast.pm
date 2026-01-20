@@ -170,7 +170,7 @@ my %vNotesIntern = (
                            "__setConsRcmdState: add Current_GridConsumption to function, add windspeed and FF to DWD-Device ".
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ".
                            "aiConActFunc: *_SYMMETRIC AF added, checkPlantConfig: add AI FANN Configuration check ".
-                           "add NeuralNet to setter operatingMemory backup/restore ".
+                           "add NeuralNet to setter operatingMemory backup/restore, valDecTree->aiRawData can display last x datasets ".
                            "new attr setupEnvironment, new key aiControl->aiConBitFailLimit, setupEnvironment: new key presence ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
@@ -3502,9 +3502,9 @@ return;
 sub Get {
   my ($hash, @a) = @_;
   return "\"get X\" needs at least an argument" if ( @a < 2 );
-  my $name = shift @a;
-  my $opt  = shift @a;
-  my $arg  = join " ", map { my $p = $_; $p =~ s/\s+/ /xg; $p; } @a;     ## no critic 'Map blocks'
+  my $name  = shift @a;
+  my $opt   = shift @a;
+  my $arg   = join " ", map { my $p = $_; $p =~ s/\s+/ /xg; $p; } @a;     ## no critic 'Map blocks'
 
   my $type = $hash->{TYPE};
 
@@ -3555,8 +3555,12 @@ sub Get {
        $vdtopt .= ',';
        $vdtopt .= 'aiRuleStrings';
   }
+  
+  my $vdtoptnum = 1 + scalar (split ',', $vdtopt);
+  
+  $getlist .= "valDecTree:widgetList,$vdtoptnum,select,$vdtopt,2,textField,fill&nbsp;in&nbsp;only&nbsp;if&nbsp;arguments&nbsp;are&nbsp;needed ";
 
-  $getlist .= "valDecTree:$vdtopt ";
+  #$getlist .= "valDecTree:$vdtopt ";
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
@@ -6517,22 +6521,28 @@ sub _getaiDecTree {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $arg   = $paref->{arg} // return;
 
+  if ( $arg =~ /=/ ) { $arg =~ s/,(?=[^=]*=)/ /g; }
+  else               { $arg =~ s/,/ /g; }
+
+  $arg     = trim ($arg);                                                        # trim it
+  my @args = split " ", $arg;
+
   my $ret;
   my $hash = $defs{$name};
 
-  if ($arg eq 'aiRawData') {
+  if ($args[0] eq 'aiRawData') {
       $ret  = "<span style='font-size:90%;'>";
-      $ret .= listDataPool ($hash, 'aiRawData');
+      $ret .= listDataPool ($hash, 'aiRawData', $args[1]);
       $ret .= "</span>";
       $ret .= lineFromSpaces ($ret, 0);
   }
 
-  if ($arg eq 'aiRuleStrings') {
+  if ($args[0] eq 'aiRuleStrings') {
       $ret = __getaiRuleStrings ($paref);
       $ret .= lineFromSpaces ($ret, 5);
   }
   
-  if ($arg =~ /aiNeuralNetConState/xs) {
+  if ($args[0] =~ /aiNeuralNetConState/xs) {
       $ret = __getaiFannConState ($paref);
       $ret .= lineFromSpaces ($ret, 0);
       
@@ -22272,6 +22282,7 @@ sub __aiAddRawData {
           my $ridx      = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
 
           my $temp      = HistoryVal ($name, $pvd, $hod, 'temp',      undef);
+          my $presence  = HistoryVal ($name, $pvd, $hod, 'presence',  undef);
           my $sunalt    = HistoryVal ($name, $pvd, $hod, 'sunalt',        0);
           my $sunaz     = HistoryVal ($name, $pvd, $hod, 'sunaz',         0);
           my $con       = HistoryVal ($name, $pvd, $hod, 'con',       undef);
@@ -22302,6 +22313,7 @@ sub __aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{rad1h}      = $rad1h                           if(defined $rad1h && $rad1h > 0);
           $data{$name}{aidectree}{airaw}{$ridx}{pvrl}       = $pvrl                            if(defined $pvrl  && $pvrl  > 0);
           $data{$name}{aidectree}{airaw}{$ridx}{minutes_wp} = $minutes_on_wp                   if(defined $minutes_on_wp);
+          $data{$name}{aidectree}{airaw}{$ridx}{presence}   = $presence                        if(defined $presence);
           $data{$name}{aidectree}{airaw}{$ridx}{pvrlvd}     = $pvrlvd;
 
           for my $c (1..MAXCONSUMER) {
@@ -26876,7 +26888,7 @@ return $sq;
 ################################################################
 sub _listDataPoolAiRawData {
   my $name = shift;
-  my $par  = shift // q{};
+  my $par  = shift // 0;
 
   my $h      = $data{$name}{aidectree}{airaw};
   my $maxcnt = keys %{$h};
@@ -26884,10 +26896,14 @@ sub _listDataPoolAiRawData {
   if (!$maxcnt) {
       return qq{aiRawData values cache is empty.};
   }
+  
+  my @last;
+  if ($par) { @last = (sort keys %{$h})[-$par .. -1]; }
+  else      { @last = sort keys %{$h};                }
+  
+  my $sq = "<b>Below are</b> ".(scalar @last)." <b>of a total of</b> ".$maxcnt." <b>records are displayed.</b> \n";
 
-  my $sq = "<b>Number of datasets:</b> ".$maxcnt."\n";
-
-  for my $idx (sort keys %{$h}) {
+  for my $idx (@last) {
       my $hod           = AiRawdataVal ($name, $idx, 'hod',        '-');
       my $sunalt        = AiRawdataVal ($name, $idx, 'sunalt',     '-');
       my $sunaz         = AiRawdataVal ($name, $idx, 'sunaz',      '-');
@@ -26904,6 +26920,7 @@ sub _listDataPoolAiRawData {
       my $gcons         = AiRawdataVal ($name, $idx, 'gcons',      '-');
       my $socwhsum      = AiRawdataVal ($name, $idx, 'socwhsum',   '-');
       my $minutes_on_wp = AiRawdataVal ($name, $idx, 'minutes_wp', '-');
+      my $presence      = AiRawdataVal ($name, $idx, 'presence',   '-');
       
       my $csm;
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
@@ -26918,9 +26935,10 @@ sub _listDataPoolAiRawData {
 
       $sq .= "\n";
       $sq .= "$idx => hod: $hod, dayname: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, weatherid: $wid, ";
-      $sq .= "rr1c: $rr1c, temp: $temp, socwhsum: $socwhsum, ";
+      $sq .= "rr1c: $rr1c, temp: $temp, socwhsum: $socwhsum ";
       $sq .= "\n              ";
       $sq .= "pvrl: $pvrl, pvrlvd: $pvrlvd, minutes_wp: $minutes_on_wp, conaifc: $conaifc, con: $con, gcons: $gcons, ";
+      $sq .= "presence: $presence ";
        
       if (defined $csm) { $sq .= "\n              "; $sq .= $csm; }
   }
@@ -32195,7 +32213,7 @@ to ensure that the system configuration is correct.
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
           <tr><td> <b>aiRawData</b>            </td><td>Display of the PV, radiation and environmental data currently saved for an AI evaluation.   </td></tr>
-          <tr><td>                             </td><td>The data is used by solar forecasting AI and consumption forecasting AI.                    </td></tr>
+          <tr><td>                             </td><td>Optionally, only the last saved data records can be displayed (e.g. aiRawData 20).          </td></tr>
           <tr><td>                             </td><td>                                                                                            </td></tr>
           <tr><td> <b>aiRuleStrings</b>        </td><td>Returns a list describing the decision tree of the solar forecast AI in the form of rules.  </td></tr>
           <tr><td>                             </td><td><b>Note:</b> While the order of the rules is not predictable, the                           </td></tr>
@@ -35061,7 +35079,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
        <table>
        <colgroup> <col width="20%"> <col width="80%"> </colgroup>
           <tr><td> <b>aiRawData</b>            </td><td>Anzeige der aktuell für eine KI-Auswertung gespeicherten PV-, Strahlungs- und Umweltdaten.               </td></tr>
-          <tr><td>                             </td><td>Die Daten werden von Solarprognose-KI und Verbrauchsprognose-KI genutzt.                                 </td></tr>
+          <tr><td>                             </td><td>Optional können nur die letzten gespeicherten Datensätze angezeigt werden (z.B. aiRawData 20)            </td></tr>
           <tr><td>                             </td><td>                                                                                                         </td></tr>
           <tr><td> <b>aiRuleStrings</b>        </td><td>Gibt eine Liste zurück, die den Entscheidungsbaum der Solarprognose KI in Form von Regeln beschreibt.    </td></tr>
           <tr><td>                             </td><td><b>Hinweis:</b> Die Reihenfolge der Regeln ist zwar nicht vorhersehbar, die                              </td></tr>
