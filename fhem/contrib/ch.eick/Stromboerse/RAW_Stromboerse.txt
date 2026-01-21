@@ -160,7 +160,7 @@ init\
 }\
 
 attr Stromboerse DbLogExclude .*
-attr Stromboerse comment Version 2026.01.09 15:00 \
+attr Stromboerse comment Version 2025.12.11 15:00 \
 Dieses Device benötigt EPEX_Spot_connect als Verbindung zu EPEX_Spot.
 attr Stromboerse disable 0
 attr Stromboerse group PV Steuerung EVU

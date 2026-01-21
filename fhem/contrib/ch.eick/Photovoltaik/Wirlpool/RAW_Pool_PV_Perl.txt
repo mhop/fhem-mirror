@@ -284,7 +284,7 @@ defmod Pool_PV_Perl DOIF #######################################################
       }\
 \
     } else {\
-      if ([$SELF:Pool_Status] eq "An") {                                 ## nur abschalten, wenn nicht manuell eingeschaltet wurde\
+      if ([$SELF:Pool_Status] eq "Stromboerse") {                        ## nur abschalten, wenn nicht manuell eingeschaltet wurde\
         set_Reading("Pool_TriggerLaden","Aus");;\
         PV_Modus_Aus_Pool();;\
         Log 3, "Pool_PV 11__ : Stromboerse wurde gestoppt";;\
@@ -292,7 +292,7 @@ defmod Pool_PV_Perl DOIF #######################################################
     }\
 \
    if (AttrVal("$SELF","verbose",0) >=3)\
-     {Log 3, "Pool_PV 11__ : Pool ".[Stromboerse_connect:fc0_trigger]." für ".[$SELF:Pool_Stromboerse]};;\
+     {Log 3, "Pool_PV 11__ : Pool ".[$SELF:Pool_Status]." ".[Stromboerse_connect:fc0_trigger]." für ".[$SELF:Pool_Stromboerse]};;\
 \
    set_Reading("ui_command_1","---");;                                    ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
                                                                          ## kann das Kommando nicht sofort wiederholt werden\
@@ -342,22 +342,26 @@ sub $SELF_Device {\
 sub $SELF_Format {\
   my($i)=@_;;\
 \
-  if ($i eq "trigger_0") {\
-      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_price",0)\
-                 or ::ReadingsVal($SELF_Device(),"fc0_trigger_start","") eq "null" ) ?\
+    if ($i eq "trigger_0") {\
+      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_net_price",0)\
+                 or ::ReadingsVal($SELF_Device(),"fc0_trigger_net_start","") eq "null" ) ?\
             "<span style='color:red'>Heute kein Trigger <br>mehr unter ".\
-                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" :\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_net_price","null")." ct</span>" :\
             "<span style='color:green'>Trigger von<br>".\
-                 ::ReadingsVal($SELF_Device(),"fc0_trigger_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc0_trigger_stop","00:00")."<br>unter ".\
-                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" ;;\
+                 ::ReadingsVal($SELF_Device(),"fc0_trigger_net_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc0_trigger_net_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_net_price","null")." ct</span>" ;;\
     } elsif ($i eq "trigger_1") {\
-      return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_price",0)\
-                 or ::ReadingsVal($SELF_Device(),"fc1_trigger_start","") eq "null" ) ?\
+      if (::ReadingsVal($SELF_Device(),"fc1_0000_startsAt","null") ne "null") {\
+        return (    ::ReadingsVal($SELF_Device(),"fc_min",0) > ::ReadingsVal($SELF_Device(),"fc_trigger_net_price",0)\
+                 or ::ReadingsVal($SELF_Device(),"fc1_trigger_net_start","") eq "null" ) ?\
             "<span style='color:red'>Morgen kein Trigger <br>mehr unter ".\
-                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" :\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_net_price","null")." ct</span>" :\
             "<span style='color:green'>Morgen ein Trigger von<br>".\
-                 ::ReadingsVal($SELF_Device(),"fc1_trigger_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc1_trigger_stop","00:00")."<br>unter ".\
-                 ::ReadingsVal($SELF_Device(),"fc_trigger_price","null")." ct</span>" ;;\
+                 ::ReadingsVal($SELF_Device(),"fc1_trigger_net_start","00:00")." bis ".::ReadingsVal($SELF_Device(),"fc1_trigger_net_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal($SELF_Device(),"fc_trigger_net_price","null")." ct</span>" ;;\
+      } else {\
+        return "Morgen noch kein Trigger vorhanden";;\
+      }\
     }\
   return "null";;\
   }\
