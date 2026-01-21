@@ -11,7 +11,7 @@ attr Stromboerse_connect DbLogValueFn {\
 \
   }\
 }
-attr Stromboerse_connect comment Version: 20251223 13:00\
+attr Stromboerse_connect comment Version: 20260121 20:00\
 \
 https://api.energy-charts.info\
 https://api.energy-charts.info/price?bzn=DE-LU&start=2025-06-25&end=2025-06-25\
@@ -1581,59 +1581,317 @@ fc_max:current_price.* {\
   return round($fc_max ,2);;                             ## Max Wert gerundet in Cent ausgeben\
 },\
 \
-fc_trigger_price:fc_avg.* {\
-## fc_trigger_price:[fc_avg|compensation_grid].* {\
+fc_trigger_net_price:fc_avg.* {\
+## fc_trigger_net_price:[fc_avg|compensation_grid].* {\
+  my $hash = $defs{$name};;\
+  readingsBeginUpdate($hash);;\
+\
   my $fc_avg = ReadingsVal("$NAME","fc_avg",0);;\
   my $fc_min = ReadingsVal("$NAME","fc_min",0);;\
 \
   # Berechnung eines Default Schwellwertes als täglicher Niedrigpreis\
-  my $price_level = round( ($fc_avg - $fc_min)/2 + $fc_min , 2);;\
-  \
+  my $fc_trigger_net_price= round( ($fc_avg - $fc_min)/2 + $fc_min , 2);;\
+ \
   # Abschätzung von Wirtschaftlichkeit beim Speicher Laden, falls die Börse zu teuer wird\
-  if ( ReadingsVal("$NAME","compensation_grid",0) != 0 ) {\
-    my $price_level_battery = round( ($fc_avg - ReadingsVal("$NAME","compensation_grid",0)) *0.85 , 2) ;;\
-    if ( $price_level > $price_level_battery ) {\
-      $price_level = $price_level_battery;;\
-    }\
-  }\
+  my $fc_trigger_bat_price = round( ReadingsVal("$NAME","fc_max",0) *0.7, 2);;    # Speicher ab 30% unter Maximum Laden\
+  readingsBulkUpdate($hash, "fc_trigger_bat_price", $fc_trigger_bat_price);;\
+\
+## Hier noch eine andere Berechnungsmöglichkeit\
+##  if ( ReadingsVal("$NAME","compensation_grid",0) != 0 ) {\
+##    my $price_level_battery = round( ($fc_avg - ReadingsVal("$NAME","compensation_grid",0)) *0.85 , 2) ;;\
+##    if ( $price_level > $price_level_battery ) {\
+##      $price_level = $price_level_battery;;\
+##    }\
+##  }\
+\
   if (AttrVal("$NAME","verbose",0) >=3) {\
     Log 3, "$NAME  ur_7  : berechne Triggerpreis";;\
   }\
- return($price_level);;\
+ return($fc_trigger_net_price);;\
 },\
 \
-fc0_trigger_start:fc_trigger_price.* {\
+fc0_trigger_net_start:fc_trigger_net_price.* {\
+  my $hash = $defs{$name};;\
+  readingsBeginUpdate($hash);;\
+\
+  my $fc = 0;;\
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-  my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0);;\
+  my $fc_trigger_net_price = ReadingsVal("$NAME","fc_trigger_net_price",0);;\
+  my $fc_trigger_bat_price = ReadingsVal("$NAME","fc_trigger_bat_price",0);;\
 \
   # Ermitteln des nächsten Trigger Fensters\
   my $fc_total = 0;;\
+  my $fc_total_net_found;;\
+  my $fc_total_bat_found;;\
+  my $fc_total_next;;\
   my $fc_trigger_start_quarter = int($min / 15);;\
 \
+  for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
+    my $start_quarter = ($loop_hour == $hour) ? $fc_trigger_start_quarter : 0;;\
+    for (my $quarter = $start_quarter;; $quarter <= 3;; $quarter++) {\
+      $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour , $quarter*15),0);;\
+      if (AttrVal("$NAME","verbose",0) >=3) {\
+        Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Start %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_net_price." ".$fc_trigger_bat_price;;\
+      }\
+      if ( $fc_total < $fc_trigger_bat_price and !defined($fc_total_bat_found) ) {\
+        $fc_total_bat_found = sprintf("%02d:%02d", $loop_hour, $quarter*15);;\
+        if (AttrVal("$NAME","verbose",0) >=3) {\
+          Log 3, "$NAME  ur_8  : ".sprintf("fc%d_trigger_bat_start %02d:%02d",$fc, $loop_hour, $quarter*15);;\
+        }\
+      }\
 \
-    for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
-# print sprintf("fc0 Start %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
-        if ( $fc_total < $fc_trigger_price ) {\
-          if (AttrVal("$NAME","verbose",0) >=3) {\
-            Log 3, "$NAME  ur_8  : fc0_trigger_start ".sprintf("%02d:%02d",$loop_hour ,$quarter*15);;\
+      if ( $fc_total < $fc_trigger_net_price  and !defined($fc_total_net_found)) {\
+        $fc_total_net_found = sprintf("%02d:%02d", $loop_hour, $quarter*15);;\
+\
+        if ( $quarter+1 <= 3 ) {\
+          $fc_total_next = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, ($quarter+1)*15),0);;\
+              if (AttrVal("$NAME","verbose",0) >=3) {\
+                Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Next  %02d:%02d",$fc, $loop_hour, ($quarter+1)*15)." ".$fc_total_next;;\
+              }\
+        } else {\
+          if ( $loop_hour+1 <= 23 ) {\
+            $fc_total_next = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour+1, 0*15),0);;\
+              if (AttrVal("$NAME","verbose",0) >=3) {\
+                Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Next  %02d:%02d",$fc, $loop_hour+1, 0*15)." ".$fc_total_next;;\
+              }\
+          } else {\
+            $fc_total_next = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, 0, 0*15),0);;\
+              if (AttrVal("$NAME","verbose",0) >=3) {\
+                Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Next  %02d:%02d",$fc, 0, 0*15)." ".$fc_total_next;;\
+              }\
           }\
-          return(sprintf("%02d:%02d",$loop_hour ,$quarter*15)) ;;\
+        }\
+        if ( $fc_total_next > $fc_trigger_net_price ) {\
+          $fc_total_net_found = undef;;\
+          if (AttrVal("$NAME","verbose",0) >=3) {\
+            Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Next  Trigger ist zu kurz",$fc);;\
+          }\
+        }\
+\
+        if (AttrVal("$NAME","verbose",0) >=3) {\
+          Log 3, "$NAME  ur_8  : ".sprintf("fc%d_trigger_net_start     %02d:%02d",$fc, $loop_hour, $quarter*15);;\
+        }\
+      }\
+      if ( defined($fc_total_net_found) and defined($fc_total_bat_found) ) {last;;}\
+    } # end $quarter\
+    if ( defined($fc_total_net_found) and defined($fc_total_bat_found) ) {last;;}\
+  } # end  for loop_hour\
+\
+  if ( defined($fc_total_bat_found) ) {\
+    readingsBulkUpdate($hash, "fc0_trigger_bat_start", $fc_total_bat_found);;\
+  } else {\
+    readingsBulkUpdate($hash, "fc0_trigger_bat_start", "null");;\
+  }\
+  if ( !defined($fc_total_net_found) ) {\
+    $fc_total_net_found = "null";;\
+  }\
+  return($fc_total_net_found);;\
+},\
+\
+fc0_trigger_net_stop:fc0_trigger_net_start.* {\
+  my $hash = $defs{$name};;\
+  readingsBeginUpdate($hash);;\
+\
+  my $fc = 0;;\
+  my $loop_hour = 0;;\
+  my $fc_trigger_net_price = ReadingsVal("$NAME","fc_trigger_net_price",0);;\
+  my $fc_trigger_bat_price = ReadingsVal("$NAME","fc_trigger_bat_price",0);;\
+\
+  # Ermitteln des nächsten Trigger Fensters\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_net_start","null");;\
+  my $fc_trigger_stop  = $fc_trigger_start;;\
+\
+  my ($fc_trigger_start_hour, $fc_trigger_start_quarter, $fc_total_net_found, $fc_total_bat_found);;\
+\
+  if ( $fc_trigger_start ne "null" ) {\
+    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_start_hour = $1;;\
+    $fc_trigger_start_quarter = $2 / 15;;\
+\
+    my $fc_total = 0;;\
+\
+    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      my $start_quarter = ($loop_hour == $fc_trigger_start_hour) ? $fc_trigger_start_quarter : 0;;\
+      for (my $quarter = $start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $quarter*15),0);;\
+        if (AttrVal("$NAME","verbose",0) >=3) {\
+          Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Stop      %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_net_price;;\
+        }\
+\
+      if ( $fc_total > $fc_trigger_net_price  and !defined($fc_total_net_found)) {\
+        $fc_total_net_found = sprintf("%02d:%02d", $loop_hour, $quarter*15);;\
+        if (AttrVal("$NAME","verbose",0) >=3) {\
+          Log 3, "$NAME  ur_8  : ".sprintf("fc0_trigger_net_stop     %02d:%02d", $loop_hour, $quarter*15);;\
+        }\
+      }\
+\
+      # wenn es 23:45 is wechsel zum nächsten Tag\
+       if ($loop_hour == 23 and $fc == 0 and $quarter == 3) {\
+         if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {   # Der nächste Tag ist bereits da\
+           $fc = 1;;\
+           $loop_hour = -1;;                                                                # beginne wieder bei 00:00\
+         } else {\
+           $fc_trigger_stop = "23:59";;                                                 # fc0 stop ist um 00:00\
+         }\
+       }\
+\
+      if ( defined($fc_total_net_found) ) {last;;}\
+      } # end $quarter\
+    if ( defined($fc_total_net_found) ) {last;;}\
+    } # end for loop_hour\
+  }\
+\
+  $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_bat_start","null");;\
+  $fc_trigger_stop  = $fc_trigger_start;;\
+\
+  if ( $fc_trigger_start ne "null" ) {\
+    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
+    $fc_trigger_start_hour = $1;;\
+    $fc_trigger_start_quarter = $2 / 15;;\
+\
+    my $fc_total = 0;;\
+\
+    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
+      my $start_quarter = ($loop_hour == $fc_trigger_start_hour) ? $fc_trigger_start_quarter : 0;;\
+      for (my $quarter = $start_quarter;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $quarter*15),0);;\
+        if (AttrVal("$NAME","verbose",0) >=3) {\
+          Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Stop_bat  %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_bat_price;;\
+        }\
+      if ( $fc_total > $fc_trigger_bat_price and !defined($fc_total_bat_found) ) {\
+        $fc_total_bat_found = sprintf("%02d:%02d", $loop_hour, $quarter*15);;\
+        if (AttrVal("$NAME","verbose",0) >=3) {\
+          Log 3, "$NAME  ur_8  : ".sprintf("fc0_trigger_bat_stop %02d:%02d", $loop_hour, $quarter*15);;\
+        }\
+      }\
+\
+      # wenn es 23:45 is wechsel zum nächsten Tag\
+       if ($loop_hour == 23 and $fc == 0 and $quarter == 3) {\
+         if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {   # Der nächste Tag ist bereits da\
+           $fc = 1;;\
+           $loop_hour = -1;;                                                                # beginne wieder bei 00:00\
+         } else {\
+           $fc_trigger_stop = "23:59";;                                                 # fc0 stop ist um 00:00\
+         }\
+       }\
+\
+      if ( defined($fc_total_bat_found) ) {last;;}\
+      } # end $quarter\
+    if ( defined($fc_total_bat_found) ) {last;;}\
+    } # end for loop_hour\
+  }\
+\
+  if ( defined($fc_total_bat_found) ) {\
+    readingsBulkUpdate($hash, "fc0_trigger_bat_stop", $fc_total_bat_found);;\
+  } else {\
+    readingsBulkUpdate($hash, "fc0_trigger_bat_stop", "null");;\
+  }\
+  if ( !defined($fc_total_net_found) ) {\
+    $fc_total_net_found = "null";;\
+  }\
+  return($fc_total_net_found);;\
+},\
+\
+fc0_trigger_net_dauer:fc0_trigger_net_stop.* {\
+# Berechnung des Trigger Fensters in Minuten\
+  my $hash = $defs{$name};;\
+\
+  my $fc_trigger_dauer = "null";;\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_bat_start","null");;\
+  if ( $fc_trigger_start ne "null" ) {\
+    my $fc_trigger_stop = ReadingsVal("$NAME","fc0_trigger_bat_stop","null");;\
+\
+    if ( $fc_trigger_stop lt "00:00" ) { $fc_trigger_stop = "24:00" };;\
+    my ($h1,$m1) = split(":", $fc_trigger_start);;\
+    my ($h2,$m2) = split(":", $fc_trigger_stop);;\
+\
+    if ( $h2 < $h1 ) { $h2 += 24 };;\
+    $fc_trigger_dauer = ($h2*60 + $m2) - ($h1*60 + $m1);;\
+    if ( $fc_trigger_dauer <= 15 ) {                           # Das Trigger Fenster ist zu klein\
+      readingsBeginUpdate($hash);;\
+      readingsBulkUpdate($hash, "fc0_trigger_bat_start", "null");;\
+      readingsBulkUpdate($hash, "fc0_trigger_bat_stop", "null");;\
+      $fc_trigger_dauer = "null";;\
+      if (AttrVal("$NAME","verbose",0) >=3) {\
+        Log 3, "$NAME  ur_8  : fc0_trigger_bat_dauer ist zu kurz";;\
+      }\
+    }\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_8  : fc0_trigger_bat_dauer $fc_trigger_dauer";;\
+    }\
+  }\
+  readingsBulkUpdate($hash, "fc0_trigger_bat_dauer", $fc_trigger_dauer);;\
+\
+  $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_net_start","null");;\
+  if ( $fc_trigger_start ne "null" ) {\
+    my $fc_trigger_stop     = ReadingsVal("$NAME","fc0_trigger_net_stop","null");;\
+\
+    if ( $fc_trigger_stop lt "00:00" ) { $fc_trigger_stop = "24:00" };;\
+    my ($h1,$m1) = split(":", $fc_trigger_start);;\
+    my ($h2,$m2) = split(":", $fc_trigger_stop);;\
+\
+    if ( $h2 < $h1 ) { $h2 += 24 };;\
+    my $fc_trigger_dauer = ($h2*60 + $m2) - ($h1*60 + $m1);;\
+    if ( $fc_trigger_dauer <= 15 ) {                               # Das Trigger Fenster ist zu klein\
+      readingsBeginUpdate($hash);;\
+      readingsBulkUpdate($hash, "fc0_trigger_net_start", "null");;\
+      readingsBulkUpdate($hash, "fc0_trigger_net_stop", "null");;\
+      $fc_trigger_dauer = "null";;\
+      if (AttrVal("$NAME","verbose",0) >=3) {\
+        Log 3, "$NAME  ur_8  : fc0_trigger_net_dauer     ist zu kurz";;\
+      }\
+    }\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_8  : fc0_trigger_net_dauer     $fc_trigger_dauer";;\
+    }\
+    return $fc_trigger_dauer;;\
+  }\
+  return "null";;\
+},\
+\
+fc0_net_trigger:fc0_trigger_net_dauer.* {\
+  # Setzen des Triggers für die aktuelle viertel Stunde\
+  if (      ReadingsVal("$NAME","fc0_trigger_net_dauer","null") ne "null"\
+      and ReadingsVal("$NAME","current_price",100)  < ReadingsVal("$NAME","fc_trigger_net_price",0) ) {\
+    return("on")\
+  } else {\
+    return("off")\
+  }\
+},\
+\
+fc1_trigger_net_start:fc_trigger_net_price.* {\
+  my $fc = 1;;\
+  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {\
+    my $fc_trigger_net_price = ReadingsVal("$NAME","fc_trigger_net_price",0);;\
+\
+    # Ermitteln des nächsten Trigger Fensters\
+    my $fc_total = 0;;\
+\
+    for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
+      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
+        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour , $quarter*15),0);;\
+          if (AttrVal("$NAME","verbose",0) >=4) {\
+            Log 3, "$NAME  ur_8  :  ".sprintf("fc%d Start %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_net_price;;\
+          }\
+        if ( $fc_total < $fc_trigger_net_price ) {\
+          if (AttrVal("$NAME","verbose",0) >=3) {\
+            Log 3, "$NAME  ur_8  : ".sprintf("fc%d_trigger_net_start     %02d:%02d",$fc, $loop_hour ,$quarter*15);;\
+          }\
+          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
         }\
       } # end $quarter\
     } # end  for loop_hour\
-\
+  }\
   return("null");;\
 },\
 \
-fc0_trigger_stop:fc0_trigger_start.* {\
-  my $fc = 0;;\
-  my $loop_hour = 0;;\
-  my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0);;\
-\
+fc1_trigger_net_stop:fc1_trigger_net_start.* {\
   # Ermitteln des nächsten Trigger Fensters\
-  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_start","null");;\
+  my $fc = 1;;\
+  my $loop_hour;;\
+  my $fc_trigger_net_price = ReadingsVal("$NAME","fc_trigger_net_price",0);;\
+\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_net_start","null");;\
   my $fc_trigger_stop = $fc_trigger_start;;\
 \
   my ($fc_trigger_start_hour, $fc_trigger_start_quarter);;\
@@ -1647,108 +1905,15 @@ fc0_trigger_stop:fc0_trigger_start.* {\
     for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
       for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
         $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $quarter*15),0);;\
-# print sprintf("fc%d Stop  %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
-        if ( $fc_total < $fc_trigger_price ) {\
+        if (AttrVal("$NAME","verbose",0) >=4) {\
+          Log 3, "$NAME  ur_8  : ".sprintf("fc%d Stop  %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_net_price;;\
+        }\
+        if ( $fc_total < $fc_trigger_net_price ) {\
           $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
         } else {\
           if (AttrVal("$NAME","verbose",0) >=3) {\
-            Log 3, "$NAME  ur_8  : fc0_trigger_stop   ".sprintf("%02d:%02d",$loop_hour, $quarter*15);;\
-            }\
-          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
-        }\
-\
-      # wenn es 23:45 is wechsel zum nächsten Tag\
-       if ($loop_hour == 23 and $fc == 0 and $quarter == 3) {\
-         if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {   # Der nächste Tag ist bereits da\
-           $fc = 1;;\
-           $loop_hour = -1;;                                                                # beginne wieder bei 00:00\
-         } else {\
-           $fc_trigger_stop = "23:59";;                                                 # fc0 stop ist um 00:00\
-         }\
-       }\
-\
-       if ( $quarter == 3 ) { $fc_trigger_start_quarter = 0 }\
-\
-      } # end $quarter\
-    } # end for loop_hour\
-  }\
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_8  : fc0_trigger_stop   $fc_trigger_stop";;\
-  }\
-  return($fc_trigger_stop);;\
-},\
-\
-fc0_trigger_dauer:fc0_trigger_stop.* {\
-# Berechnung des Trigger Fensters in Minuten\
-  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_start","null");;\
-  if ( $fc_trigger_start ne "null" ) {\
-    my $fc_trigger_stop = ReadingsVal("$NAME","fc0_trigger_stop","null");;\
-    if ( $fc_trigger_stop lt "00:00" ) { $fc_trigger_stop = "24:00" };;\
-    my ($h1,$m1) = split(":", $fc_trigger_start);;\
-    my ($h2,$m2) = split(":", $fc_trigger_stop);;\
-\
-    if ( $h2 < $h1 ) { $h2 += 24 };;\
-\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_8  : fc0_trigger_dauer  ".(($h2*60 + $m2) - ($h1*60 + $m1));;\
-    }\
-    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
-  }\
-  return "null";;\
-},\
-\
-fc0_trigger:fc0_trigger_stop.* {\
-  # Setzen des Triggers für die aktuelle viertel Stunde\
-  if ( ReadingsVal("$NAME","current_price",100)  < ReadingsVal("$NAME","fc_trigger_price",0) ) {\
-    return("on")\
-  } else {\
-    return("off")\
-  }\
-},\
-\
-fc1_trigger_start:fc_trigger_price.* {\
-  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {\
-    my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0);;\
-\
-    # Ermitteln des nächsten Trigger Fensters\
-    my $fc_total = 0;;\
-\
-    for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total",$loop_hour , $quarter*15),0);;\
-# print sprintf("fc1 Start %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
-        if ( $fc_total < $fc_trigger_price ) {\
-          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
-        }\
-      } # end $quarter\
-    } # end  for loop_hour\
-  }\
-  return("null");;\
-},\
-\
-fc1_trigger_stop:fc0_trigger_start.* {\
-  # Ermitteln des nächsten Trigger Fensters\
-  my $loop_hour;;\
-  my $fc_trigger_price = ReadingsVal("$NAME","fc_trigger_price",0);;\
-\
-  my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_start","null");;\
-  my $fc_trigger_stop = $fc_trigger_start;;\
-\
-  my ($fc_trigger_start_hour, $fc_trigger_start_quarter);;\
-\
-  if ( $fc_trigger_start ne "null" ) {\
-    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
-    $fc_trigger_start_hour = $1;;\
-    $fc_trigger_start_quarter = $2 / 15;;\
-    my $fc_total = 0;;\
-\
-    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total", $loop_hour, $quarter*15),0);;\
-# print sprintf("fc1 Stop  %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_price."\n";;\
-        if ( $fc_total < $fc_trigger_price ) {\
-          $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
-        } else {\
+            Log 3, "$NAME  ur_8  : ".sprintf("fc%d_trigger_net_stop      %02d:%02d",$fc, $loop_hour, $quarter*15);;\
+          }\
           return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
         }\
 \
@@ -1761,15 +1926,32 @@ fc1_trigger_stop:fc0_trigger_start.* {\
   return($fc_trigger_stop);;\
 },\
 \
-fc1_trigger_dauer:fc1_trigger_stop.* {\
+fc1_trigger_net_dauer:fc1_trigger_net_stop.* {\
 # Berechnung des Trigger Fensters in Minuten\
-  my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_start","null");;\
+  my $hash = $defs{$name};;\
+\
+  my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_net_start","null");;\
   if ( $fc_trigger_start ne "null" ) {\
-    my $fc_trigger_stop = ReadingsVal("$NAME","fc1_trigger_stop","null");;\
+    my $fc_trigger_stop = ReadingsVal("$NAME","fc1_trigger_net_stop","null");;\
     if ( $fc_trigger_stop eq "00:00" ) { $fc_trigger_stop = "24:00" };;\
     my ($h1,$m1) = split(":", $fc_trigger_start);;\
     my ($h2,$m2) = split(":", $fc_trigger_stop);;\
-    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
+\
+    my $fc_trigger_dauer = ($h2*60 + $m2) - ($h1*60 + $m1);;\
+\
+    if ( $fc_trigger_dauer <= 15 ) {                               # Das Trigger Fenster ist zu klein\
+      readingsBeginUpdate($hash);;\
+      readingsBulkUpdate($hash, "fc1_trigger_net_start", "null");;\
+      readingsBulkUpdate($hash, "fc1_trigger_net_stop", "null");;\
+      $fc_trigger_dauer = "null";;\
+      if (AttrVal("$NAME","verbose",0) >=3) {\
+        Log 3, "$NAME  ur_8  : fc1_trigger_net_dauer ist zu kurz";;\
+      }\
+    }\
+    if (AttrVal("$NAME","verbose",0) >=3) {\
+      Log 3, "$NAME  ur_8  : fc1_trigger_net_dauer     $fc_trigger_dauer";;\
+    }\
+    return $fc_trigger_dauer;;\
   }\
   return "null";;\
 },\
@@ -2195,3 +2377,5 @@ fc_DbLog:fc0_0000_total.* {\
 }\
 
 attr Stromboerse_connect verbose 3
+attr Stromboerse_connect ws_minInterval 54
+attr Stromboerse_connect ws_websocketURL wss:websocket-api.tibber.com:443/v1-beta/gql/subscriptions
