@@ -612,8 +612,8 @@ sub Tide_UpdateTimer($) {
 
 	### For debugging purpose only
 	Log3 $name, 5, $name. " : Tide_UpdateTimer Begin___________________________________________________________________________________________________________________";
-	Log3 $name, 5, $name. " : Tide_UpdateTimer - GaugeInterval             : " . $hash->{helper}{GaugeInterval};
-	Log3 $name, 5, $name. " : Tide_UpdateTimer - NextTideUpdate            : " . $hash->{helper}{NextTideUpdate};
+	Log3 $name, 5, $name. " : Tide_UpdateTimer - GaugeInterval             : " . $hash->{helper}{GaugeInterval}  if defined $hash->{helper}{GaugeInterval};
+	Log3 $name, 5, $name. " : Tide_UpdateTimer - NextTideUpdate            : " . $hash->{helper}{NextTideUpdate} if defined $hash->{helper}{NextTideUpdate};
 
 	### Stop internal timer
 	RemoveInternalTimer($hash);
