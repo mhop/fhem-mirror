@@ -97,6 +97,8 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.0.5"  => "05.01.2026  Auth and token requests changed to V3 API",
+  "1.0.4"  => "04.01.2026  Log response body in case off access token error",
   "1.0.3"  => "11.12.2025  asSingleValue fixed – this time for real",
   "1.0.2"  => "08.12.2025  Power reading asSingleValue finally fixed",
   "1.0.1"  => "29.11.2025  fix power reading logging",
@@ -158,8 +160,8 @@ my $apiBaseURL    = "https://api.viessmann-climatesolutions.com";
 my $iamBaseURL    = "https://iam.viessmann-climatesolutions.com";
 my $equipmentURL  = "$apiBaseURL/iot/v2/equipment/";
 my $featureURL     = "$apiBaseURL/iot/v2/features/";
-my $authorizeURL  = "$iamBaseURL/idp/v2/authorize";
-my $tokenURL      = "$iamBaseURL/idp/v2/token";
+my $authorizeURL  = "$iamBaseURL/idp/v3/authorize";
+my $tokenURL      = "$iamBaseURL/idp/v3/token";
 my $errorURL_V3   = "$apiBaseURL/service-documents/v3/error-database";
 
 my $RequestListMapping; # Über das Attribut Mapping definierte Readings zum überschreiben der RequestList
@@ -3317,8 +3319,9 @@ sub vitoconnect_getAccessTokenCallback {
             vitoconnect_getGw($hash);   # Abfrage Gateway-Serial
         }
         else                        {
-            Log3($name,1,$name." - Access Token: nicht definiert");
-            Log3($name,5,$name." - Received response: ".$response_body."\n");
+            Log3($name,1,$name." Can not get Access Token - Access Token: not defined in response");
+            Log3($name,2,$name." - Request url: " . $param->{"url"} . " data: " . $param->{"data"});
+            Log3($name,2,$name." - Received response: ".$response_body."\n");
             InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
             return;
         }
@@ -3354,7 +3357,7 @@ sub vitoconnect_getRefresh {
         callback => \&vitoconnect_getRefreshCallback
     };
 
-    #Log3 $name, 1, "$name - " . $param->{"data"};
+    #Log3 $name, 1, "$name - Refresh token request url: " . $param->{"url"} . " data: " . $param->{"data"};
     HttpUtils_NonblockingGet($param);
     return;
 }
@@ -3400,8 +3403,9 @@ sub vitoconnect_getRefreshCallback {
             }
         }
         else {
-            Log3 $name, 1, "$name - Access Token: nicht definiert";
-            Log3 $name, 5, "$name - Received response: $response_body\n";
+            Log3($name,1,$name." Can not refresh Access Token - Access Token: not defined in response");
+            Log3($name,2,$name." - Request url: " . $param->{"url"} . " data: " . $param->{"data"});
+            Log3($name,2,$name." - Received response: ".$response_body."\n");
             # zurück zu getCode?
             if ($caller ne 'action') {
                 InternalTimer(gettimeofday() + $hash->{intervall}, "vitoconnect_GetUpdate", $hash);
@@ -4056,8 +4060,11 @@ sub vitoconnect_getResourceCallback {
         # NEU: jetzt alle relevanten Readings finden und Sub wie früher aufrufen
         foreach my $Reading (keys %{ $hash->{READINGS} }) {
          if ($Reading =~ m/dayValueReadAt$/) {
-           Log(4,$name.", -call setpower $Reading");
-           vitoconnect_getPowerLast($hash,$name,$Reading);
+           my ($featureBase) = $Reading =~ /^(.*)\.dayValueReadAt$/;
+           # passenden Feature-Block im bereits vorhandenen $items suchen
+           my ($feature) = grep { $_->{feature} eq $featureBase } @{ $items->{data} };
+           my $anchor = $feature->{timestamp};
+           vitoconnect_getPowerLast($hash,$name,$Reading,$anchor);
          }
         }
     }
@@ -4076,6 +4083,68 @@ sub vitoconnect_getResourceCallback {
 #####################################################################################################################
 # Implementierung power readings die nur sehr selten kommen in ein logbares reading füllen (asSingleValue)
 #####################################################################################################################
+#sub vitoconnect_getPowerLast {
+#    my ($hash, $name, $Reading, $anchor) = @_;
+#
+#    # Basename ohne letztes Suffix
+#    $Reading =~ s/\.[^.]*$//;
+#
+#    # Werte-Liste (robust gegen Leerzeichen, als Zahl)
+#    my $raw = ReadingsVal($name, $Reading.".day", "");
+#    my @values = map { 0+$_ } split(/\s*,\s*/, $raw);
+#
+#    # Basisdatum = dayValueReadAt (Kalendertag der Ablesung)
+#    #my $timestamp = ReadingsVal($name, $Reading.".dayValueReadAt", "");
+#    #return if (!$timestamp || $timestamp eq "");
+#    #my $baseDate = Time::Piece->strptime(substr($timestamp, 0, 10), '%Y-%m-%d');
+#    #my $one_day  = 24 * 60 * 60;
+#
+#    # Basisdatum = übergebener Snapshot-Timestamp
+#    return if (!$anchor || $anchor eq "");
+#    my $baseDate = Time::Piece->strptime(substr($anchor, 0, 10), '%Y-%m-%d');
+#    my $one_day  = 24 * 60 * 60;
+#
+#    # Zielreading und letzter gespeicherter Zeitstempel
+#    my $targetReading = $Reading.".day.asSingleValue";
+#    my $readingLastTimestamp = ReadingsTimestamp($name, $targetReading, "0000-00-00 00:00:00");
+#    my $lastTS = time_str2num($readingLastTimestamp);
+#
+#    Log3($name, 5, "$name -setpower: target=$targetReading lastTS='$readingLastTimestamp' (num=$lastTS), baseDate=".$baseDate->ymd);
+#
+#    readingsBeginUpdate($hash);
+#    
+#    # Älteste -> Neueste, Index 0 (aktueller Tag) wird implizit übersprungen
+#    for (my $i = $#values; $i >= 1; $i--) {
+#        my $dayDate     = $baseDate - ($one_day * $i);   # i Tage vor baseDate
+#        my $readingDate = $dayDate->ymd . " 23:59:59";
+#        my $readingTS   = time_str2num($readingDate);
+#        my $newVal      = $values[$i];
+#
+#        Log3($name, 4, "$name - candidate i=$i date=$readingDate val=$newVal lastTS=$lastTS");
+#
+#        # Nur schreiben, wenn wirklich neuer Tag
+#        # Nur schreiben, wenn wirklich neuer Tag UND keine gleiches-Datum-Updates
+#        if ($readingTS > $lastTS) {
+#            # Wert mit Tag-Zuordnung
+#            readingsBulkUpdate($hash, $targetReading, $newVal, undef, $readingDate);
+#        
+#            # Snapshot-Zeitpunkt (ISO) – Zeitpunkt der Ablesung
+#            my $snapReading = $targetReading . ".snapshotTimestamp";
+#            readingsBulkUpdate($hash, $snapReading, $anchor);
+#        
+#            # Tag-Zuordnung separat sichtbar
+#            my $tsReading = $targetReading . ".timestamp";
+#            readingsBulkUpdate($hash, $tsReading, $readingDate);
+#        
+#            $lastTS = $readingTS;
+#        } else {
+#            Log3($name, 4, "$name - skip (not newer) dayTS=$readingTS <= lastTS=$lastTS");
+#        }
+#    }
+#    
+#    readingsEndUpdate($hash, 1);
+#    return;
+#}
 sub vitoconnect_getPowerLast {
     my ($hash, $name, $Reading) = @_;
 
@@ -4085,44 +4154,92 @@ sub vitoconnect_getPowerLast {
     # Werte-Liste (robust gegen Leerzeichen, als Zahl)
     my $raw = ReadingsVal($name, $Reading.".day", "");
     my @values = map { 0+$_ } split(/\s*,\s*/, $raw);
+    return if (!@values || $#values < 1);  # brauchen mind. Index 1 (gestern)
 
-    # Basisdatum = dayValueReadAt (Kalendertag der Ablesung)
-    my $timestamp = ReadingsVal($name, $Reading.".dayValueReadAt", "");
-    return if (!$timestamp || $timestamp eq "");
-    my $baseDate = Time::Piece->strptime(substr($timestamp, 0, 10), '%Y-%m-%d');
+    # Zielreading und State-Readings
+    my $targetReading   = $Reading.".day.asSingleValue";
+    my $stateDateRd     = $targetReading.".lastWrittenDate";    # YYYY-MM-DD
+    my $stateValRd      = $targetReading.".lastIndex1Value";    # Zahl (nur Sichtbarkeit)
+
+    # Systembasierte Zeitachse (lokal)
+    my $now      = localtime();           # Time::Piece
     my $one_day  = 24 * 60 * 60;
+    my $yesterday_tp   = $now - $one_day; # Gestern
+    my $yesterday_date = $yesterday_tp->ymd;  # 'YYYY-MM-DD'
+    my $base_tp        = Time::Piece->strptime($yesterday_date, '%Y-%m-%d'); # Basis "gestern"
 
-    # Zielreading und letzter gespeicherter Zeitstempel
-    my $targetReading = $Reading.".day.asSingleValue";
+    # State laden
+    my $lastWrittenDate = ReadingsVal($name, $stateDateRd, "");
+    my $lastIndex1Value = 0 + ReadingsVal($name, $stateValRd, -1);
+
+    # Letzter historischer Zeitstempel für das Zielreading (Event-Timestamp)
     my $readingLastTimestamp = ReadingsTimestamp($name, $targetReading, "0000-00-00 00:00:00");
     my $lastTS = time_str2num($readingLastTimestamp);
 
-    Log3($name, 5, "$name -setpower: target=$targetReading lastTS='$readingLastTimestamp' (num=$lastTS), baseDate=".$baseDate->ymd);
+    # Hilfsfunktion: Tages-Differenz (in vollen Tagen) zwischen zwei YYYY-MM-DD
+    my $days_between = sub {
+        my ($d1, $d2) = @_; # d1 < d2 erwartet
+        my $tp1 = Time::Piece->strptime($d1, '%Y-%m-%d');
+        my $tp2 = Time::Piece->strptime($d2, '%Y-%m-%d');
+        my $diff = ($tp2 - $tp1) / $one_day;
+        return int($diff);
+    };
 
     readingsBeginUpdate($hash);
-    
-    # Älteste -> Neueste, Index 0 (aktueller Tag) wird implizit übersprungen
-    for (my $i = $#values; $i >= 1; $i--) {
-        my $dayDate     = $baseDate - ($one_day * $i);   # i Tage vor baseDate
-        my $readingDate = $dayDate->ymd . " 23:59:59";
-        my $readingTS   = time_str2num($readingDate);
-        my $newVal      = $values[$i];
 
-        Log3($name, 4, "$name - candidate i=$i date=$readingDate val=$newVal lastTS=$lastTS");
+    # Initialisierung: kein State vorhanden -> gestern schreiben und State setzen
+    if (!$lastWrittenDate || $lastWrittenDate eq "") {
+        my $val_yesterday = $values[1];
+        my $ts = $yesterday_date . " 23:59:59";
+        my $rts = time_str2num($ts);
 
-        # Nur schreiben, wenn wirklich neuer Tag
-        if ($readingTS > $lastTS || ($i == 1 && $readingTS == $lastTS && $newVal != ReadingsVal($name,$targetReading,''))) {
-            readingsBulkUpdate($hash, $targetReading, $newVal, undef, $readingDate);
-            Log3($name, 4, "$name -setpower: update $targetReading -> $newVal ($readingDate)");
-            $lastTS = $readingTS;  # Schrittweise nach vorne gehen
-        } else {
-            Log3($name, 4, "$name -setpower: skip (not newer) dayTS=$readingTS <= lastTS=$lastTS");
-        }
+        readingsBulkUpdate($hash, $targetReading, $val_yesterday, undef, $ts);
+        readingsBulkUpdate($hash, $stateDateRd, $yesterday_date);
+        readingsBulkUpdate($hash, $stateValRd, 0+$val_yesterday);
+
+        Log3($name, 4, "$name - init: write yesterday=$val_yesterday at $ts; set lastWrittenDate=$yesterday_date");
+        readingsEndUpdate($hash, 1);
+        return;
     }
-    
+
+    # Bereits aktuell? -> nichts tun
+    if ($lastWrittenDate eq $yesterday_date) {
+        Log3($name, 4, "$name - up-to-date: lastWrittenDate=$lastWrittenDate equals yesterday=$yesterday_date");
+        readingsEndUpdate($hash, 1);
+        return;
+    }
+
+    # Gap-Fill: fehlende Tage bis gestern schreiben, in chronologischer Reihenfolge
+    # Beispiel: lastWrittenDate=11., gestern=13. -> erst 12. (Index 2), dann 13. (Index 1)
+    my $gapDays = $days_between->($lastWrittenDate, $yesterday_date);
+    # Begrenzen auf Array-Länge (Index i muss existieren)
+    my $maxFill = ($#values >= 1) ? ($#values >= $gapDays ? $gapDays : $#values) : 0;
+
+    for (my $i = $maxFill; $i >= 1; $i--) {
+        # Datum für Index i: i=1 -> gestern, i=2 -> vorgestern, usw.
+        my $day_tp = $base_tp - ($one_day * ($i-1));
+        my $rd     = $day_tp->ymd . " 23:59:59";
+        my $rts    = time_str2num($rd);
+        my $val    = $values[$i];
+
+        # Nur anhängen, wenn zeitlich neuer als letzter Eintrag
+        next if ($rts <= $lastTS);
+
+        readingsBulkUpdate($hash, $targetReading, $val, undef, $rd);
+        Log3($name, 4, "$name - write day i=$i val=$val at $rd");
+
+        $lastTS = $rts;
+    }
+
+    # State fortschreiben: jetzt sind wir bis gestern aktuell
+    readingsBulkUpdate($hash, $stateDateRd, $yesterday_date);
+    readingsBulkUpdate($hash, $stateValRd, 0+$values[1]);
+
     readingsEndUpdate($hash, 1);
     return;
 }
+
+
 
 
 #####################################################################################################################
