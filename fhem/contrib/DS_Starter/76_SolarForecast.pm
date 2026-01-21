@@ -22479,6 +22479,7 @@ sub aiFannCreateConTrainData {
   my (@month_sin_values, @temp_norm_values, @pv_norm_values, @pv_norm_prev_values);
   my (@month_cos_values, @sunaz_sin_values, @sunaz_cos_values, @wcc_norm_values, @isday_values);
   my (@day_hour_norm_values, @night_hour_norm_values, @inthod_values);
+  my (@presence_values, @presence_mask_values);
   
   # einstellbare Parameter
   ##########################
@@ -22539,6 +22540,11 @@ sub aiFannCreateConTrainData {
       my $pvrl      = clampValue ($rec->{pvrl} // 0, 0, $pvpeak);
       my $wcc       = clampValue (int $rec->{wcc}, 0, 100);
       my $temp      = clampValue (int $rec->{temp}, -40, 40);
+      
+      # --- zu maskierende Daten
+      my $presence      = defined $rec->{presence} ? $rec->{presence} : 0;          
+      my $presence_mask = defined $rec->{presence} ? 1                : 0;
+
       
       # Ableitungen und Normierungen
       ################################
@@ -22603,6 +22609,8 @@ sub aiFannCreateConTrainData {
       push @day_hour_norm_values,     $day_hour_norm;
       push @night_hour_norm_values,   $night_hour_norm;
       push @inthod_values,            $inthod - 1;
+      push @presence_values,          $presence;
+      push @presence_mask_values,     $presence_mask;
                                 
       # Zielwert
       ############
@@ -22730,6 +22738,8 @@ sub aiFannCreateConTrainData {
                          month_cos              => $month_cos_values[$i],                     # Monat, zyklische Struktur (Dezember <-> Januar)
                          sunaz_sin              => $sunaz_sin_values[$i],                     # Sonnenazimut zyklisch
                          sunaz_cos              => $sunaz_cos_values[$i],                     # Sonnenazimut zyklisch
+                         presence               => $presence_values[$i],                      # Anwesenheit
+                         presence_mask          => $presence_mask_values[$i],                 # Maskierung Anwesenheit
                          lag1_norm              => $lags->{lag1_norm},
                          lag2_norm              => $lags->{lag2_norm},                                                         
                          lag24_norm             => $lags->{lag24_norm},
@@ -24484,7 +24494,7 @@ sub aiFannGetConResult {
   my $debug   = $paref->{debug};
   my $fanntyp = 'con';                                                                   # FANN Verwendungsart 'consumption' Prognose                   
   
-  my ($max_key, $msg, $pv_prev);
+  my $msg;
   
   debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
   $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
@@ -24535,6 +24545,7 @@ sub aiFannGetConResult {
       my $nhstr = 'NextHour'.(sprintf "%02d", $num);
       
       my $starttime    = NexthoursVal ($name, $nhstr, 'starttime',   undef);
+      my $day          = NexthoursVal ($name, $nhstr, 'day',         undef);
       my $legacyconfc  = NexthoursVal ($name, $nhstr, 'conlegfc',    undef);      
       my $weekday      = NexthoursVal ($name, $nhstr, 'weekday',     undef);
       my $hod          = NexthoursVal ($name, $nhstr, 'hourofday',   undef);
@@ -24544,9 +24555,11 @@ sub aiFannGetConResult {
       my $wcc          = NexthoursVal ($name, $nhstr, 'wcc',         undef);  
       my $temp         = NexthoursVal ($name, $nhstr, 'temp',        undef);
       my $isday        = NexthoursVal ($name, $nhstr, 'DoN',         undef);
-      my $pv           = NexthoursVal ($name, $nhstr, 'pvfc',            0);                         # Erstatzwert für pvrl
+      my $pv           = NexthoursVal ($name, $nhstr, 'pvfc',            0);                        # Erstatzwert für pvrl
       
-      if (!$num) {
+      my ($presence, $presence_mask, $pv_prev);
+      
+      if (!$num) {                                                                                  # das ist die aktuelle laufende Stunde                                                             
           my $hits   = timestringToTimestamp ($starttime);
           my $dt     = timestringsFromOffset ($hits, -3600);
           my $hihour = $dt->{hour};
@@ -24554,10 +24567,18 @@ sub aiFannGetConResult {
           my $hihod  = sprintf "%02d", int ($hihour) + 1;
           
           $pv_prev   = HistoryVal ($name, $hiday, $hihod, 'pvrl', 0);                               # num 0 -> reale PV der Vorgängerstunde 
+      
+          # --- zu maskierende Daten
+          $presence      = HistoryVal ($name, $day, $hod, 'presence', undef);         
+          $presence_mask = defined $presence ? 1 : 0;
       }
       else {
           my $lhstr = 'NextHour'.(sprintf "%02d", $num-1);
           $pv_prev  = NexthoursVal ($name, $lhstr, 'pvfc', 0);
+          
+          # --- zu maskierende Daten
+          $presence      = 0;         
+          $presence_mask = 0;
       }
       
       # Vollständigkeitsprüfung
@@ -24668,7 +24689,9 @@ sub aiFannGetConResult {
                          month_sin              => $month_sin,                        # Monat, zyklische Struktur (Dezember <-> Januar)
                          month_cos              => $month_cos,                        # Monat, zyklische Struktur (Dezember <-> Januar)
                          sunaz_sin              => $sunaz_sin,                        # Sonnenazimut zyklisch
-                         sunaz_cos              => $sunaz_cos,                        # Sonnenazimut zyklisch                              
+                         sunaz_cos              => $sunaz_cos,                        # Sonnenazimut zyklisch  
+                         presence               => $presence,                         # Anwesenheit
+                         presence_mask          => $presence_mask,                    # Maskierung Anwesenheit         
                          lag1_norm              => $lags->{lag1_norm},
                          lag2_norm              => $lags->{lag2_norm},                                                         
                          lag24_norm             => $lags->{lag24_norm},
@@ -26897,11 +26920,15 @@ sub _listDataPoolAiRawData {
       return qq{aiRawData values cache is empty.};
   }
   
+  my $count = $maxcnt;
+  $par      = $par > $maxcnt ? $maxcnt : $par;
+  $count    = $par;
+  
   my @last;
   if ($par) { @last = (sort keys %{$h})[-$par .. -1]; }
-  else      { @last = sort keys %{$h};                }
+  else      { @last = sort keys %{$h};                } 
   
-  my $sq = "<b>Below are</b> ".(scalar @last)." <b>of a total of</b> ".$maxcnt." <b>records are displayed.</b> \n";
+  my $sq = "<b>Below are</b> $count <b>of a total of</b> $maxcnt <b>records are displayed.</b> \n";
 
   for my $idx (@last) {
       my $hod           = AiRawdataVal ($name, $idx, 'hod',        '-');
