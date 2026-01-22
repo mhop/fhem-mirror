@@ -1749,41 +1749,18 @@ pv => sub {
 # --------------------------------------------------------
 semantics_presence => sub {
     my ($f) = @_;
-    
-    # Safety: Maskierung anwenden
-    my $p_raw   = $f->{presence}      // 0;
-    my $p_mask  = $f->{presence_mask} // 0;
 
-    # Maskiertes Rohsignal
-    my $p       = $p_raw * $p_mask;
-
-    # Gleitende Fenster (werden ebenfalls maskiert)
-    my $p_s3    = ($f->{presence_smooth3} // 0) * $p_mask;
-
-    # Transitionen (0→1, 1→0)
-    my $p_up    = ($f->{presence_transition_up}   // 0) * $p_mask;
-    my $p_down  = ($f->{presence_transition_down} // 0) * $p_mask;
+    my $p      = $f->{presence} // 1;                                               # Vergangenheit = 1
+    my $p_s2   = $f->{presence_smooth2} // 1;
+    my $p_s3   = $f->{presence_smooth3} // 1;
+    my $p_up   = $f->{presence_transition_up}   // 0;
+    my $p_down = $f->{presence_transition_down} // 0;
 
     return [
-        # --- Rohsignal ---
-        $p_raw,                                                                     # 0/1
-        $p_mask,                                                                    # 0/1 -> Feature existiert?
-
-        # --- Gleitende Anwesenheit ---
-        softplus($p_s3),                                                            # 3h geglättet
-
-        # --- Übergänge ---
-        softplus($p_up),                                                            # Heimkehr
-        softplus($p_down),                                                          # Haus wird verlassen
-
-        # --- Tageszeitliche Kopplung ---
-        softplus($p * $f->{hour_class_morning}),                                    # Morgenaktivität
-        softplus($p * $f->{hour_class_noon}),                                       # Mittag / Haushalt
-        softplus($p * $f->{hour_class_evening}),                                    # Abendaktivität
-        softplus($p * $f->{hour_class_lateevening}),                                # Geräte gehen aus
-
-        # --- Ruheindex (Abwesenheit × Nacht) ---
-        softplus((1 - $p) * $f->{hour_class_night}),
+        $p,
+        $p_s2,
+        softplus($p_up),
+        softplus($p_down),
     ];
 },
 
@@ -22544,7 +22521,7 @@ sub aiFannCreateConTrainData {
   my (@month_sin_values, @temp_norm_values, @pv_norm_values, @pv_norm_prev_values);
   my (@month_cos_values, @sunaz_sin_values, @sunaz_cos_values, @wcc_norm_values, @isday_values);
   my (@day_hour_norm_values, @night_hour_norm_values, @inthod_values);
-  my (@presence_values, @presence_mask_values);
+  my (@presence_values);
   
   # einstellbare Parameter
   ##########################
@@ -22575,7 +22552,6 @@ sub aiFannCreateConTrainData {
       my $rec = $data{$name}{aidectree}{airaw}{$idx};                                     # Datensatz
 
       # Vollständigkeitsprüfung
-      # WICHTIG: ungeprüfte Werte (z.B. später hinzugefügte) müssen maskiert werden!
       unless (defined $rec->{$fanntyp}
               && $rec->{$fanntyp} >= 0
               && defined $rec->{dayname}
@@ -22605,11 +22581,7 @@ sub aiFannCreateConTrainData {
       my $pvrl      = clampValue ($rec->{pvrl} // 0, 0, $pvpeak);
       my $wcc       = clampValue (int $rec->{wcc}, 0, 100);
       my $temp      = clampValue (int $rec->{temp}, -40, 40);
-      
-      # --- zu maskierende Daten
-      my $presence      = defined $rec->{presence} ? $rec->{presence} : 1;              # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend' aber ungültig (masked=0) deklarieren -> Semantik: 'Anwesenheit war wahrscheinlich gegeben'     
-      my $presence_mask = defined $rec->{presence} ? 1                : 0;
-
+      my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                  # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend' aber ungültig (masked=0) deklarieren -> Semantik: 'Anwesenheit war wahrscheinlich gegeben'     
       
       # Ableitungen und Normierungen
       ################################
@@ -22675,7 +22647,6 @@ sub aiFannCreateConTrainData {
       push @night_hour_norm_values,   $night_hour_norm;
       push @inthod_values,            $inthod - 1;
       push @presence_values,          $presence;
-      push @presence_mask_values,     $presence_mask;
                                 
       # Zielwert
       ############
@@ -22740,9 +22711,7 @@ sub aiFannCreateConTrainData {
                                                 range             => $range,
                                               }
                                             );
-      
-      #debugLog ($paref, 'aiProcess', "AI FANN - presence $i - $presence_values[$i] , $presence_mask_values[$i] , $lags->{presence_smooth3}, $lags->{presence_transition_up} , $lags->{presence_transition_down} "); 
-      
+            
       # Feature Event Flag Logging
       ##############################
       if ($debug =~ /aiProcess/xs) {
@@ -22806,8 +22775,8 @@ sub aiFannCreateConTrainData {
                          sunaz_sin                => $sunaz_sin_values[$i],                     # Sonnenazimut zyklisch
                          sunaz_cos                => $sunaz_cos_values[$i],                     # Sonnenazimut zyklisch
                          presence                 => $presence_values[$i],                      # Anwesenheit
-                         presence_mask            => $presence_mask_values[$i],                 # Maskierung Anwesenheit
-                         presence_smooth3         => $lags->{presence_smooth3},  
+                         presence_smooth3         => $lags->{presence_smooth3},
+                         presence_smooth2         => $lags->{presence_smooth2},                         
                          presence_transition_up   => $lags->{presence_transition_up}, 
                          presence_transition_down => $lags->{presence_transition_down}, 
                          lag1_norm                => $lags->{lag1_norm},
@@ -23129,14 +23098,18 @@ sub _aiFannBuildLagFeatures {
   $temp_trend_neg    = clampValue ($temp_trend_neg,    0, 1);
   
   # ---------------------------------------------------------
-  # presence_smooth3          -> gleitender 3h-Mittelwert
+  # presence_smooth3/2        -> gleitender 3h/2h-Mittelwert
   # $presence_transition_up   -> 'Heimkehr'
   # $presence_transition_down -> 'Haus wird verlassen'
   # ---------------------------------------------------------
   my $v0 = $presence_values->[$i];
   my $v1 = $i > 0 ? $presence_values->[$i-1] : $v0;
   my $v2 = $i > 1 ? $presence_values->[$i-2] : $v1;
+  my $v3 = $i > 2 ? $presence_values->[$i-3] : $v2;
+  my $v4 = $i > 3 ? $presence_values->[$i-4] : $v3;
+  my $v5 = $i > 4 ? $presence_values->[$i-5] : $v4;
 
+  my $presence_smooth2 = ($v0 + $v1) / 2;
   my $presence_smooth3 = ($v0 + $v1 + $v2) / 3;
   
   my $prev = $i > 0 ? $presence_values->[$i-1] : $presence_values->[$i];
@@ -23179,6 +23152,7 @@ sub _aiFannBuildLagFeatures {
       temp_trend_neg           => $temp_trend_neg,
       
       presence_smooth3         => $presence_smooth3,
+      presence_smooth2         => $presence_smooth2,
       presence_transition_up   => $presence_transition_up,
       presence_transition_down => $presence_transition_down,
       
@@ -24585,7 +24559,7 @@ sub aiFannGetConResult {
   my $debug   = $paref->{debug};
   my $fanntyp = 'con';                                                                   # FANN Verwendungsart 'consumption' Prognose                   
   
-  my $msg;
+  my ($msg, $presence);
   
   debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
   $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
@@ -24657,7 +24631,7 @@ sub aiFannGetConResult {
       my $isday        = NexthoursVal ($name, $nhstr, 'DoN',         undef);
       my $pv           = NexthoursVal ($name, $nhstr, 'pvfc',            0);                        # Erstatzwert für pvrl
       
-      my ($presence, $presence_mask, $pv_prev);
+      my ($pv_prev);
       
       if (!$num) {                                                                                  # das ist die aktuelle laufende Stunde                                                             
           my $hits   = timestringToTimestamp ($starttime);
@@ -24667,23 +24641,14 @@ sub aiFannGetConResult {
           my $hihod  = sprintf "%02d", int ($hihour) + 1;
           
           $pv_prev   = HistoryVal ($name, $hiday, $hihod, 'pvrl', 0);                               # num 0 -> reale PV der Vorgängerstunde 
-      
-          # --- zu maskierende Daten
-          $presence      = HistoryVal ($name, $day, $hod, 'presence', undef);       
-          $presence_mask = defined $presence ? 1 : 0;
-          $presence     //= 0; 
+          $presence  = HistoryVal ($name, $day, $hod, 'presence', 1);                               # Wenn keine Presence-Erfassung -> Anwesenheit annehmen
       }
       else {
           my $lhstr = 'NextHour'.(sprintf "%02d", $num-1);
           $pv_prev  = NexthoursVal ($name, $lhstr, 'pvfc', 0);
-          
-          # --- zu maskierende Daten
-          $presence      = 0;         
-          $presence_mask = 0;
       }
       
       # Vollständigkeitsprüfung
-      # WICHTIG: ungeprüfte Werte (z.B. später hinzugefügte) müssen maskiert werden!
       unless (defined $starttime
            && defined $legacyconfc
            && $legacyconfc >= 0
@@ -24792,8 +24757,8 @@ sub aiFannGetConResult {
                          sunaz_sin                => $sunaz_sin,                        # Sonnenazimut zyklisch
                          sunaz_cos                => $sunaz_cos,                        # Sonnenazimut zyklisch  
                          presence                 => $presence,                         # Anwesenheit
-                         presence_mask            => $presence_mask,                    # Maskierung Anwesenheit
-                         presence_smooth3         => $lags->{presence_smooth3},  
+                         presence_smooth3         => $lags->{presence_smooth3}, 
+                         presence_smooth2         => $lags->{presence_smooth2},                         
                          presence_transition_up   => $lags->{presence_transition_up}, 
                          presence_transition_down => $lags->{presence_transition_down},                      
                          lag1_norm                => $lags->{lag1_norm},
@@ -24875,13 +24840,13 @@ sub aiFannGetConResult {
       # Prognose + BiasKorrektur abfragen
       #####################################
       my $denorm_val               = _aiFannPredict             ($name, $fanntyp, \@new_input); 
-      my ($prediction, $bc, $zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $denorm_val, $targetref);    # gewichtete Bias-Korrektur anwenden
+      my ($prediction, $bc, $zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
       
       my $nngrst = CurrentVal ($name, $fanntyp.'NNGetResultState', 'ok');
       
       if ($nngrst ne 'ok') {
           Log3 ($name, 2, "$name - WARNING - AI FANN '$fanntyp' forecast ignored and Legacy value is used, cause: $nngrst") 
-                  if(askLogtime ($name, $msg, 300));                                                                          # Log mit Mehrfachverhinderung
+                  if(askLogtime ($name, $msg, 300));                                                                            # Log mit Mehrfachverhinderung
           return;
       }
       
@@ -24893,7 +24858,7 @@ sub aiFannGetConResult {
       ##############################
       push @flat_targets,     $prediction;
       push @temp_norm_values, $temp_norm;                                                    # wichtig: Temperaturreihe auch erweitern
-      push @presence_values,  $presence;                                                     # wichtig: Presence ebenfalls
+      push @presence_values,  $presence;                                                     # wichtig: Presence fortschreiben
       
       # Hybridmodell mit Legacy
       ##########################
@@ -30246,7 +30211,13 @@ return $bin;
 }
 
 ################################################################
-#    SoftPlus Funktion für symmetrische AI Normierung 
+#    SoftPlus Funktion (verschiebt alles in pos. Bereich)
+# Softplus verstärkt kleine Werte stark
+# - Softplus macht aus 0 -> 0.693 (riesiger Effekt!)
+# - Softplus macht aus 1 -> 1.313 (moderater Effekt)
+# - Negative Werte -> werden Richtung 0 gedrückt
+#   –1.0 -> 0.313 -> stark gedämpft
+#   –0.5 -> 0.474 -> gedämpft
 ################################################################  
 sub softplus {
   my ($x) = @_;
