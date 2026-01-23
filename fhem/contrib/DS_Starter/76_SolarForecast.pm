@@ -18173,7 +18173,7 @@ sub _graphicHeader {
       my $tempimg  = FW_makeImage('temp_temperature');
       my $srisetxt = ReadingsVal ($name, 'Today_SunRise', '-');
       my $ssettxt  = ReadingsVal ($name, 'Today_SunSet',  '-');
-      my $temptxt  = CurrentVal  ($name, 'outsideTemp',   '-').encode('utf8', ' °C');
+      my $temptxt  = CurrentVal  ($name, 'outsideTemp',   '-').' &deg;C';
 
       my ($err, $resh) = isWeatherAgeExceeded ($paref);
       $img = FW_makeImage ('10px-kreis-gruen.png', $htitles{dwfcrsu}{$lang}.' '.$resh->{mosmix}.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
@@ -22766,6 +22766,7 @@ sub aiFannCreateConTrainData {
                          hour_norm                => $hour_norm_values[$i],                     # Stunde des Tages normiert 0..1
                          day_hour_norm            => $day_hour_norm_values[$i],                 # Tagstunden normiert, sonst 0
                          night_hour_norm          => $night_hour_norm_values[$i],               # Nachtstunden normiert, sonst 0 
+                         
                          hod_sin                  => $hod_sin_values[$i],                       # Stunde des Tages zyklisch
                          hod_cos                  => $hod_cos_values[$i],                       # Stunde des Tages zyklisch
                          wday_sin                 => $wday_sin_values[$i],                      # Wochentag in zyklischer Struktur (0..6)
@@ -22774,64 +22775,79 @@ sub aiFannCreateConTrainData {
                          month_cos                => $month_cos_values[$i],                     # Monat, zyklische Struktur (Dezember <-> Januar)
                          sunaz_sin                => $sunaz_sin_values[$i],                     # Sonnenazimut zyklisch
                          sunaz_cos                => $sunaz_cos_values[$i],                     # Sonnenazimut zyklisch
+                         
                          presence                 => $presence_values[$i],                      # Anwesenheit
-                         presence_smooth3         => $lags->{presence_smooth3},
-                         presence_smooth2         => $lags->{presence_smooth2},                         
-                         presence_transition_up   => $lags->{presence_transition_up}, 
-                         presence_transition_down => $lags->{presence_transition_down}, 
-                         lag1_norm                => $lags->{lag1_norm},
-                         lag2_norm                => $lags->{lag2_norm},                                                         
-                         lag24_norm               => $lags->{lag24_norm},
-                         delta1_norm              => $lags->{delta1_norm},
-                         delta24_norm             => $lags->{delta24_norm},
-                         delta1_norm_pos          => $lags->{delta1_norm_pos}, 
-                         delta1_norm_neg          => $lags->{delta1_norm_neg},
-                         delta24_norm_pos         => $lags->{delta24_norm_pos},
-                         delta24_norm_neg         => $lags->{delta24_norm_neg},
-                         roll_mean_3_norm         => $lags->{roll_mean_3_norm},
-                         roll_std_6_norm          => $lags->{roll_std_6_norm}, 
-                         temp_norm_lag1h          => $lags->{temp_norm_lag1h},
-                         temp_norm_lag3h          => $lags->{temp_norm_lag3h},
-                         temp_norm_lag24h         => $lags->{temp_norm_lag24h},
-                         temp_delta_1h_pos        => $lags->{temp_delta_1h_pos},
-                         temp_delta_1h_neg        => $lags->{temp_delta_1h_neg},
-                         temp_delta_3h_pos        => $lags->{temp_delta_3h_pos},
-                         temp_delta_3h_neg        => $lags->{temp_delta_3h_neg},
-                         temp_trend_pos           => $lags->{temp_trend_pos},
-                         temp_trend_neg           => $lags->{temp_trend_neg},                         
-                         trend_break              => $sigs->{trend_break},                             # Trendwechsel
-                         trend_up_norm            => $sigs->{trend_up_norm},
-                         trend_down_norm          => $sigs->{trend_down_norm},
-                         trend_up_strength        => $sigs->{trend_up_strength},
-                         trend_down_strength      => $sigs->{trend_down_strength},
-                         pv_jump                  => $sigs->{pv_jump},
-                         cold_trigger             => $sigs->{cold_trigger},
-                         heat_trigger             => $sigs->{heat_trigger},
-                         volatility_flag          => $sigs->{volatility_flag},
-                         pv_consumption_cross     => $sigs->{pv_consumption_cross},
-                         pv_drop                  => $sigs->{pv_drop},
-                         hour_class_morning       => $sigs->{hour_class_morning},                      # Morgens Flag
-                         hour_class_evening       => $sigs->{hour_class_evening},                      # Abend Flag
-                         hour_class_lateevening   => $sigs->{hour_class_lateevening},                  # Spätabend Flag
-                         hour_class_midnight      => $sigs->{hour_class_midnight},                     # Mitternachts Flag
-                         hour_class_night         => $sigs->{hour_class_night},                        # Nacht Flag
-                         hour_class_noon          => $sigs->{hour_class_noon},                         # Mittag Flag
-                         day_class_weekend        => $sigs->{day_class_weekend},                       # Wochenende Flag
-                         day_class_workday        => $sigs->{day_class_workday},                       # Arbeitstag Flag 
-                         heating_degree_norm      => $sigs->{heating_degree_norm},                     # Heizlast  
-                         cooling_degree_norm      => $sigs->{cooling_degree_norm},                     # Kühllast
-                         hp_heating_mode          => $sigs->{hp_heating_mode},                         # WP Heizmodus
-                         hp_cooling_mode          => $sigs->{hp_cooling_mode},                         # WP Kühlmodus
-                         ww_morning               => $sigs->{ww_morning},                              # Warmwasser Morgens
-                         ww_evening               => $sigs->{ww_evening},                              # Warmwasser Abends
-                         ww_cold_boost            => $sigs->{ww_cold_boost},                           # Heizlast verstärkte WW-Semantik
-                         ww_pv_boost              => $sigs->{ww_pv_boost},                             # PV-optimiertes Warmwasser                          
-                         ww_cycle_flag            => $sigs->{ww_cycle_flag},                           # WW-Zyklus
-                         cop_proxy                => $sigs->{cop_proxy},                               # für Luft-Wasser-WP ist COP ungefähr linear mit Außentemperatur            
-                         cop_inverse              => $sigs->{cop_inverse},                             # invertierter COP (Strombedarf)
-                         hp_power_factor          => $sigs->{hp_power_factor},                         # kombinierte Semantik (sehr stark)         
-                         frost_protect            => $sigs->{frost_protect},                           # Frostschutz-Trigger binär
-                         frost_load               => $sigs->{frost_load},                              # kontinuierliches Lastsignal wenn Frostschutz aktiv 
+                         presence_smooth3         => $lags->{presence_smooth3},                 # Anwesenheitsglättung über 3h (0..1)                 
+                         presence_smooth2         => $lags->{presence_smooth2},                 # Anwesenheitsglättung über 2h (0..1)                         
+                         presence_transition_up   => $lags->{presence_transition_up},           # Anwesenheit 0->1 Übergang (Impuls)
+                         presence_transition_down => $lags->{presence_transition_down},         # Anwesenheit 1->0 Übergang (Impuls)
+                         
+                         lag1_norm                => $lags->{lag1_norm},                        # Verbrauch vor 1h (normalisiert)                        
+                         lag2_norm                => $lags->{lag2_norm},                        # Verbrauch vor 2h (normalisiert)                                                         
+                         lag24_norm               => $lags->{lag24_norm},                       # Verbrauch vor 24h (normalisiert)
+                         
+                         delta1_norm              => $lags->{delta1_norm},                      # Änderung ggü. Vorstunde (normalisiert)
+                         delta24_norm             => $lags->{delta24_norm},                     # Änderung ggü. Vortag (normalisiert)
+                         delta1_norm_pos          => $lags->{delta1_norm_pos},                  # Positive 1h-Änderung
+                         delta1_norm_neg          => $lags->{delta1_norm_neg},                  # Negative 1h-Änderung
+                         delta24_norm_pos         => $lags->{delta24_norm_pos},                 # Positive 24h-Änderung
+                         delta24_norm_neg         => $lags->{delta24_norm_neg},                 # Negative 24h-Änderung
+                         
+                         roll_mean_3_norm         => $lags->{roll_mean_3_norm},                 # 3h gleitender Mittelwert (normalisiert)
+                         roll_std_6_norm          => $lags->{roll_std_6_norm},                  # 6h gleitende Standardabweichung (Volatilität)
+                         
+                         temp_norm_lag1h          => $lags->{temp_norm_lag1h},                  # Temperatur vor 1h (normalisiert)
+                         temp_norm_lag3h          => $lags->{temp_norm_lag3h},                  # Temperatur vor 3h (normalisiert)
+                         temp_norm_lag24h         => $lags->{temp_norm_lag24h},                 # Temperatur vor 24h (normalisiert)
+                         
+                         temp_delta_1h_pos        => $lags->{temp_delta_1h_pos},                # Positive Temperaturänderung 1h
+                         temp_delta_1h_neg        => $lags->{temp_delta_1h_neg},                # Negative Temperaturänderung 1h
+                         temp_delta_3h_pos        => $lags->{temp_delta_3h_pos},                # Positive Temperaturänderung 3h
+                         temp_delta_3h_neg        => $lags->{temp_delta_3h_neg},                # Negative Temperaturänderung 3h
+                         temp_trend_pos           => $lags->{temp_trend_pos},                   # Aufwärtstrend Temperatur
+                         temp_trend_neg           => $lags->{temp_trend_neg},                   # Abwärtstrend Temperatur                
+                         
+                         trend_break              => $sigs->{trend_break},                      # Trendwechsel (binär)
+                         trend_up_norm            => $sigs->{trend_up_norm},                    # Aufwärtstrend Stärke (normalisiert)
+                         trend_down_norm          => $sigs->{trend_down_norm},                  # Abwärtstrend Stärke (normalisiert)
+                         trend_up_strength        => $sigs->{trend_up_strength},                # Starker Aufwärtstrend
+                         trend_down_strength      => $sigs->{trend_down_strength},              # Starker Abwärtstrend
+                         
+                         pv_jump                  => $sigs->{pv_jump},                          # Plötzlicher PV-Anstieg
+                         cold_trigger             => $sigs->{cold_trigger},                     # Kälte-Trigger (binär)
+                         heat_trigger             => $sigs->{heat_trigger},                     # Hitze-Trigger (binär)
+                         volatility_flag          => $sigs->{volatility_flag},                  # Hohe Lastvolatilität
+                         pv_consumption_cross     => $sigs->{pv_consumption_cross},             # PV-Erzeugung > Verbrauch
+                         pv_drop                  => $sigs->{pv_drop},                          # PV-Einbruch
+                         
+                         hour_class_morning       => $sigs->{hour_class_morning},               # Morgenstunden (Flag)
+                         hour_class_evening       => $sigs->{hour_class_evening},               # Abendstunden (Flag)
+                         hour_class_lateevening   => $sigs->{hour_class_lateevening},           # Spätabend (Flag)
+                         hour_class_midnight      => $sigs->{hour_class_midnight},              # Mitternacht (Flag)
+                         hour_class_night         => $sigs->{hour_class_night},                 # Nachtstunden (Flag)
+                         hour_class_noon          => $sigs->{hour_class_noon},                  # Mittagsstunden (Flag)
+                         
+                         day_class_weekend        => $sigs->{day_class_weekend},                # Wochenende (Flag)
+                         day_class_workday        => $sigs->{day_class_workday},                # Arbeitstag (Flag)
+                         
+                         heating_degree_norm      => $sigs->{heating_degree_norm},              # Heizgradtage (Heizlast) 
+                         cooling_degree_norm      => $sigs->{cooling_degree_norm},              # Kühlgradtage (Kühllast)
+                         
+                         hp_heating_mode          => $sigs->{hp_heating_mode},                  # Wärmepumpe im Heizmodus
+                         hp_cooling_mode          => $sigs->{hp_cooling_mode},                  # Wärmepumpe im Kühlmodus
+                         
+                         ww_morning               => $sigs->{ww_morning},                       # Warmwasser morgens
+                         ww_evening               => $sigs->{ww_evening},                       # Warmwasser abends
+                         ww_cold_boost            => $sigs->{ww_cold_boost},                    # Kältebedingter WW-Boost
+                         ww_pv_boost              => $sigs->{ww_pv_boost},                      # PV-optimierter WW-Boost                         
+                         ww_cycle_flag            => $sigs->{ww_cycle_flag},                    # WW-Zyklus aktiv
+                         
+                         cop_proxy                => $sigs->{cop_proxy},                        # COP-Schätzwert (linear zur Temperatur)
+                         cop_inverse              => $sigs->{cop_inverse},                      # Inverser COP (Strombedarf)
+                         hp_power_factor          => $sigs->{hp_power_factor},                  # Kombinierte WP-Leistungssemantik     
+                         
+                         frost_protect            => $sigs->{frost_protect},                    # Frostschutz aktiv (binär)
+                         frost_load               => $sigs->{frost_load},                       # Frostschutz-Last (kontinuierlich) 
                        }
                      );
                                                
@@ -24737,84 +24753,100 @@ sub aiFannGetConResult {
       
       # Kombinatorik durch FEATURE_REGISTRY 
       #######################################
-      my $regv     = _aiSelectRegistryVersion ($name);                                  # verwendete Feature-Registry Version
-      my $semantic = _aiFannFeatureBuilder ($regv,                                     
-                       { pv_norm                  => $pv_norm,                          # Erstatzwert für PV Ertrag min-max normalisiert
-                         rr1c_norm                => $rr1c_norm,                        # Niederschlag, numerisch min-max normalisiert
-                         temp_norm                => $temp_norm,                        # Temperatur, numerisch min-max normalisiert
-                         wcc_norm                 => $wcc_norm,                         # Bewölkung, numerisch min-max normalisiert
-                         sunalt_norm              => $sunalt_norm,                      # Sonnenaltitude normalisiert im Bereich 0..+1
-                         isday                    => $isday,                            # Tag / Nacht (0|1)                         
-                         hour_norm                => $hour_norm,                        # Stunde des Tages normiert 0..1
-                         day_hour_norm            => $day_hour_norm,                    # Tagstunden normiert, sonst 0
-                         night_hour_norm          => $night_hour_norm,                  # Nachtstunden normiert, sonst 0
-                         hod_sin                  => $hod_sin,                          # Stunde des Tages zyklisch
-                         hod_cos                  => $hod_cos,                          # Stunde des Tages zyklisch
-                         wday_sin                 => $wday_sin,                         # Wochentag in zyklischer Struktur (0..6)
-                         wday_cos                 => $wday_cos,                         # Wochentag in zyklischer Struktur (0..6)
-                         month_sin                => $month_sin,                        # Monat, zyklische Struktur (Dezember <-> Januar)
-                         month_cos                => $month_cos,                        # Monat, zyklische Struktur (Dezember <-> Januar)
-                         sunaz_sin                => $sunaz_sin,                        # Sonnenazimut zyklisch
-                         sunaz_cos                => $sunaz_cos,                        # Sonnenazimut zyklisch  
-                         presence                 => $presence,                         # Anwesenheit
-                         presence_smooth3         => $lags->{presence_smooth3}, 
-                         presence_smooth2         => $lags->{presence_smooth2},                         
-                         presence_transition_up   => $lags->{presence_transition_up}, 
-                         presence_transition_down => $lags->{presence_transition_down},                      
-                         lag1_norm                => $lags->{lag1_norm},
-                         lag2_norm                => $lags->{lag2_norm},                                                         
-                         lag24_norm               => $lags->{lag24_norm},
-                         delta1_norm              => $lags->{delta1_norm},
-                         delta24_norm             => $lags->{delta24_norm},
-                         delta1_norm_pos          => $lags->{delta1_norm_pos}, 
-                         delta1_norm_neg          => $lags->{delta1_norm_neg},
-                         delta24_norm_pos         => $lags->{delta24_norm_pos},
-                         delta24_norm_neg         => $lags->{delta24_norm_neg},
-                         roll_mean_3_norm         => $lags->{roll_mean_3_norm},
-                         roll_std_6_norm          => $lags->{roll_std_6_norm},
-                         temp_norm_lag1h          => $lags->{temp_norm_lag1h},
-                         temp_norm_lag3h          => $lags->{temp_norm_lag3h},
-                         temp_norm_lag24h         => $lags->{temp_norm_lag24h},
-                         temp_delta_1h_pos        => $lags->{temp_delta_1h_pos},
-                         temp_delta_1h_neg        => $lags->{temp_delta_1h_neg},
-                         temp_delta_3h_pos        => $lags->{temp_delta_3h_pos},
-                         temp_delta_3h_neg        => $lags->{temp_delta_3h_neg},
-                         temp_trend_pos           => $lags->{temp_trend_pos},
-                         temp_trend_neg           => $lags->{temp_trend_neg},
-                         trend_break              => $sigs->{trend_break},                      # Trendwechsel
-                         trend_up_norm            => $sigs->{trend_up_norm},
-                         trend_down_norm          => $sigs->{trend_down_norm},
-                         trend_up_strength        => $sigs->{trend_up_strength},
-                         trend_down_strength      => $sigs->{trend_down_strength},
-                         pv_jump                  => $sigs->{pv_jump},
-                         cold_trigger             => $sigs->{cold_trigger},
-                         heat_trigger             => $sigs->{heat_trigger},  
-                         volatility_flag          => $sigs->{volatility_flag},
-                         pv_consumption_cross     => $sigs->{pv_consumption_cross},
-                         pv_drop                  => $sigs->{pv_drop},
-                         hour_class_morning       => $sigs->{hour_class_morning},               # Morgens Flag
-                         hour_class_evening       => $sigs->{hour_class_evening},               # Abend Flag
-                         hour_class_lateevening   => $sigs->{hour_class_lateevening},           # Spätabends Flag
-                         hour_class_midnight      => $sigs->{hour_class_midnight},              # Mitternachts Flag
-                         hour_class_night         => $sigs->{hour_class_night},                 # Nacht Flag
-                         hour_class_noon          => $sigs->{hour_class_noon},                  # Mittag Flag
-                         day_class_weekend        => $sigs->{day_class_weekend},                # Wochenende Flag
-                         day_class_workday        => $sigs->{day_class_workday},                # Arbeitstag Flag
-                         heating_degree_norm      => $sigs->{heating_degree_norm},              # Heizlast
-                         cooling_degree_norm      => $sigs->{cooling_degree_norm},              # Kühllast
-                         hp_heating_mode          => $sigs->{hp_heating_mode},                  # WP Heizmodus
-                         hp_cooling_mode          => $sigs->{hp_cooling_mode},                  # WP Kühlmodus
-                         ww_morning               => $sigs->{ww_morning},                       # Warmwasser Morgens
-                         ww_evening               => $sigs->{ww_evening},                       # Warmwasser Abends
-                         ww_cold_boost            => $sigs->{ww_cold_boost},                    # Heizlast verstärkte WW-Semantik
-                         ww_pv_boost              => $sigs->{ww_pv_boost},                      # PV-optimiertes Warmwasser 
-                         ww_cycle_flag            => $sigs->{ww_cycle_flag},                    # WW-Zyklus
-                         cop_proxy                => $sigs->{cop_proxy},                        # für Luft-Wasser-WP ist COP ungefähr linear mit Außentemperatur            
-                         cop_inverse              => $sigs->{cop_inverse},                      # invertierter COP (Strombedarf)
-                         hp_power_factor          => $sigs->{hp_power_factor},                  # kombinierte Semantik (sehr stark)         
-                         frost_protect            => $sigs->{frost_protect},                    # Frostschutz-Trigger binär
-                         frost_load               => $sigs->{frost_load},                       # kontinuierliches Lastsignal wenn Frostschutz aktiv 
-                       }       
+      my $regv     = _aiSelectRegistryVersion ($name);                                     # verwendete Feature-Registry Version
+      my $semantic = _aiFannFeatureBuilder ($regv, {                                    
+                            pv_norm                  => $pv_norm,                          # PV-Ertrag (min-max normalisiert)
+                            rr1c_norm                => $rr1c_norm,                        # Niederschlag (min-max normalisiert)
+                            temp_norm                => $temp_norm,                        # Außentemperatur (min-max normalisiert)
+                            wcc_norm                 => $wcc_norm,                         # Bewölkungsgrad (min-max normalisiert)
+                            sunalt_norm              => $sunalt_norm,                      # Sonnenhöhe 0..1 (unterhalb Horizont = 0)
+                            isday                    => $isday,                            # Tag/Nacht-Flag (1 = Tag)
+                            hour_norm                => $hour_norm,                        # Stunde des Tages 0..1
+                            day_hour_norm            => $day_hour_norm,                    # Normierte Tagesstunden (sonst 0)
+                            night_hour_norm          => $night_hour_norm,                  # Normierte Nachtstunden (sonst 0)
+
+                            hod_sin                  => $hod_sin,                          # Stunde des Tages (sinusförmig zyklisch)
+                            hod_cos                  => $hod_cos,                          # Stunde des Tages (cosinusförmig zyklisch)
+                            wday_sin                 => $wday_sin,                         # Wochentag zyklisch (sin)
+                            wday_cos                 => $wday_cos,                         # Wochentag zyklisch (cos)
+                            month_sin                => $month_sin,                        # Monat zyklisch (sin)
+                            month_cos                => $month_cos,                        # Monat zyklisch (cos)
+                            sunaz_sin                => $sunaz_sin,                        # Sonnenazimut zyklisch (sin)
+                            sunaz_cos                => $sunaz_cos,                        # Sonnenazimut zyklisch (cos)
+
+                            presence                 => $presence,                         # Anwesenheit (0/1, Vergangenheit = 1)
+                            presence_smooth3         => $lags->{presence_smooth3},         # Anwesenheitsglättung über 3h (0..1)
+                            presence_smooth2         => $lags->{presence_smooth2},         # Anwesenheitsglättung über 2h (0..1)
+                            presence_transition_up   => $lags->{presence_transition_up},   # Anwesenheit 0->1 Übergang (Impuls)
+                            presence_transition_down => $lags->{presence_transition_down}, # Anwesenheit 1->0 Übergang (Impuls)
+
+                            lag1_norm                => $lags->{lag1_norm},                # Verbrauch vor 1h (normalisiert)
+                            lag2_norm                => $lags->{lag2_norm},                # Verbrauch vor 2h (normalisiert)
+                            lag24_norm               => $lags->{lag24_norm},               # Verbrauch vor 24h (normalisiert)
+
+                            delta1_norm              => $lags->{delta1_norm},              # Änderung ggü. Vorstunde (normalisiert)
+                            delta24_norm             => $lags->{delta24_norm},             # Änderung ggü. Vortag (normalisiert)
+                            delta1_norm_pos          => $lags->{delta1_norm_pos},          # Positive 1h-Änderung
+                            delta1_norm_neg          => $lags->{delta1_norm_neg},          # Negative 1h-Änderung
+                            delta24_norm_pos         => $lags->{delta24_norm_pos},         # Positive 24h-Änderung
+                            delta24_norm_neg         => $lags->{delta24_norm_neg},         # Negative 24h-Änderung
+
+                            roll_mean_3_norm         => $lags->{roll_mean_3_norm},         # 3h gleitender Mittelwert (normalisiert)
+                            roll_std_6_norm          => $lags->{roll_std_6_norm},          # 6h gleitende Standardabweichung (Volatilität)
+
+                            temp_norm_lag1h          => $lags->{temp_norm_lag1h},          # Temperatur vor 1h (normalisiert)
+                            temp_norm_lag3h          => $lags->{temp_norm_lag3h},          # Temperatur vor 3h (normalisiert)
+                            temp_norm_lag24h         => $lags->{temp_norm_lag24h},         # Temperatur vor 24h (normalisiert)
+
+                            temp_delta_1h_pos        => $lags->{temp_delta_1h_pos},        # Positive Temperaturänderung 1h
+                            temp_delta_1h_neg        => $lags->{temp_delta_1h_neg},        # Negative Temperaturänderung 1h
+                            temp_delta_3h_pos        => $lags->{temp_delta_3h_pos},        # Positive Temperaturänderung 3h
+                            temp_delta_3h_neg        => $lags->{temp_delta_3h_neg},        # Negative Temperaturänderung 3h
+                            temp_trend_pos           => $lags->{temp_trend_pos},           # Aufwärtstrend Temperatur
+                            temp_trend_neg           => $lags->{temp_trend_neg},           # Abwärtstrend Temperatur
+
+                            trend_break              => $sigs->{trend_break},              # Trendwechsel (binär)
+                            trend_up_norm            => $sigs->{trend_up_norm},            # Aufwärtstrend Stärke (normalisiert)
+                            trend_down_norm          => $sigs->{trend_down_norm},          # Abwärtstrend Stärke (normalisiert)
+                            trend_up_strength        => $sigs->{trend_up_strength},        # Starker Aufwärtstrend
+                            trend_down_strength      => $sigs->{trend_down_strength},      # Starker Abwärtstrend
+
+                            pv_jump                  => $sigs->{pv_jump},                  # Plötzlicher PV-Anstieg
+                            cold_trigger             => $sigs->{cold_trigger},             # Kälte-Trigger (binär)
+                            heat_trigger             => $sigs->{heat_trigger},             # Hitze-Trigger (binär)
+                            volatility_flag          => $sigs->{volatility_flag},          # Hohe Lastvolatilität
+                            pv_consumption_cross     => $sigs->{pv_consumption_cross},     # PV-Erzeugung > Verbrauch
+                            pv_drop                  => $sigs->{pv_drop},                  # PV-Einbruch
+
+                            hour_class_morning       => $sigs->{hour_class_morning},       # Morgenstunden (Flag)
+                            hour_class_evening       => $sigs->{hour_class_evening},       # Abendstunden (Flag)
+                            hour_class_lateevening   => $sigs->{hour_class_lateevening},   # Spätabend (Flag)
+                            hour_class_midnight      => $sigs->{hour_class_midnight},      # Mitternacht (Flag)
+                            hour_class_night         => $sigs->{hour_class_night},         # Nachtstunden (Flag)
+                            hour_class_noon          => $sigs->{hour_class_noon},          # Mittagsstunden (Flag)
+
+                            day_class_weekend        => $sigs->{day_class_weekend},        # Wochenende (Flag)
+                            day_class_workday        => $sigs->{day_class_workday},        # Arbeitstag (Flag)
+
+                            heating_degree_norm      => $sigs->{heating_degree_norm},      # Heizgradtage (Heizlast)
+                            cooling_degree_norm      => $sigs->{cooling_degree_norm},      # Kühlgradtage (Kühllast)
+
+                            hp_heating_mode          => $sigs->{hp_heating_mode},          # Wärmepumpe im Heizmodus
+                            hp_cooling_mode          => $sigs->{hp_cooling_mode},          # Wärmepumpe im Kühlmodus
+
+                            ww_morning               => $sigs->{ww_morning},               # Warmwasser morgens
+                            ww_evening               => $sigs->{ww_evening},               # Warmwasser abends
+                            ww_cold_boost            => $sigs->{ww_cold_boost},            # Kältebedingter WW-Boost
+                            ww_pv_boost              => $sigs->{ww_pv_boost},              # PV-optimierter WW-Boost
+                            ww_cycle_flag            => $sigs->{ww_cycle_flag},            # WW-Zyklus aktiv
+
+                            cop_proxy                => $sigs->{cop_proxy},                # COP-Schätzwert (linear zur Temperatur)
+                            cop_inverse              => $sigs->{cop_inverse},              # Inverser COP (Strombedarf)
+                            hp_power_factor          => $sigs->{hp_power_factor},          # Kombinierte WP-Leistungssemantik
+
+                            frost_protect            => $sigs->{frost_protect},            # Frostschutz aktiv (binär)
+                            frost_load               => $sigs->{frost_load},               # Frostschutz-Last (kontinuierlich)                       
+                        }       
                     );
       
       unless ($semantic) {
@@ -35357,7 +35389,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>aiConActFunc</b>      </td><td>Auswahl der Aktivierungsfunktion für die Hidden Layer.                                                                                                       </td></tr>
             <tr><td>                          </td><td><ul> * SIGMOID - typisch bei Verbrauchsanstiegen, die eine Sättigung erreichen (z.B. mehr Geräte -> mehr Verbrauch) </ul>                                    </td></tr>
             <tr><td>                          </td><td><ul> * SIGMOID_SYMMETRIC - gut bei Abweichungen um einen Normalzustand (z.B. Temperaturabweichung -> mehr oder weniger Verbrauch) </ul>                      </td></tr>
-            <tr><td>                          </td><td><ul> * GAUSSIAN - gut für Peak-Effekte, die bei einem bestimmten Wert maximal sind (z.B. optimale Außentemperatur → maximaler Verbrauch) </ul>               </td></tr>
+            <tr><td>                          </td><td><ul> * GAUSSIAN - gut für Peak-Effekte, die bei einem bestimmten Wert maximal sind (z.B. optimale Außentemperatur -> maximaler Verbrauch) </ul>               </td></tr>
             <tr><td>                          </td><td><ul> * GAUSSIAN_SYMMETRIC - wie GAUSSIAN, aber symmetrisch um einen Mittelpunkt (z.B. Komforttemperatur – zu kalt oder zu warm-> höherer Verbrauch) </ul>    </td></tr>
             <tr><td>                          </td><td><ul> * ELLIOT - für positive Effekte, die weich ansteigen, aber weniger stark gesättigt werden als bei Sigmoid </ul>                                         </td></tr>
             <tr><td>                          </td><td><ul> * ELLIOT_SYMMETRIC - wie SIGMOID_SYMMETRIC, Effekte die sanft symmetrisch verlaufen (z.B. Temperaturen die den Verbrauch leicht ohne starke Spitzen erhöhen)</ul> </td></tr>
