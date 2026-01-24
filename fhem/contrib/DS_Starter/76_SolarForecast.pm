@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.0.0"  => "20.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
+  "2.0.0"  => "24.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
                            "new consumer type 'heatpump', new readings Today_CONdeviation, Today_CONforecast, Today_CONreal ".
@@ -171,7 +171,8 @@ my %vNotesIntern = (
                            "edit commandRef, remove __batSaveSocKeyFigures, attr ctrlSpecialReadings: new option careCycleViolationDays_XX ".
                            "aiConActFunc: *_SYMMETRIC AF added, checkPlantConfig: add AI FANN Configuration check ".
                            "add NeuralNet to setter operatingMemory backup/restore, valDecTree->aiRawData can display last x datasets ".
-                           "new attr setupEnvironment, new key aiControl->aiConBitFailLimit, setupEnvironment: new key presence ",
+                           "new attr setupEnvironment, new key aiControl->aiConBitFailLimit, setupEnvironment: new key presence ".
+                           "add holiday information ",
   "1.60.7" => "21.11.2025  new special Reading BatRatio, minor code changes ",
   "1.60.6" => "18.11.2025  _createSummaries: fix tdConFcTillSunset, _batSocTarget: apply 75% of tomorrow consumption ",
   "1.60.5" => "16.11.2025  ___csmSpecificEpieces: implement EPIECMAXOPHRS , ___batAdjustPowerByMargin: adjust pow with otpMargin ".
@@ -1542,6 +1543,7 @@ my %hcsr = (                                                                    
 my %hfspvh = (
   radiation         => { fn => \&_storeVal, storname => 'rad1h',        validkey => undef,    fpar => undef    },    # irradiation
   DoN               => { fn => \&_storeVal, storname => 'DoN',          validkey => undef,    fpar => undef    },    # Tag 1 oder Nacht 0
+  holiday           => { fn => \&_storeVal, storname => 'holiday',      validkey => undef,    fpar => undef    },    # Urlaub, Feiertag
   sunaz             => { fn => \&_storeVal, storname => 'sunaz',        validkey => undef,    fpar => undef    },    # Sonnenstand Azimuth
   sunalt            => { fn => \&_storeVal, storname => 'sunalt',       validkey => undef,    fpar => undef    },    # Sonnenstand Altitude
   etotal            => { fn => \&_storeVal, storname => 'etotal',       validkey => undef,    fpar => undef    },    # etotal des Wechselrichters
@@ -1549,6 +1551,7 @@ my %hfspvh = (
   weathercloudcover => { fn => \&_storeVal, storname => 'wcc',          validkey => undef,    fpar => undef    },    # Wolkenbedeckung
   windspeed         => { fn => \&_storeVal, storname => 'windspeed',    validkey => undef,    fpar => undef    },    # Windgeschwindigkeit in m/s
   rr1c              => { fn => \&_storeVal, storname => 'rr1c',         validkey => undef,    fpar => undef    },    # Gesamtniederschlag (1-stündig) letzte 1 Stunde
+  presence          => { fn => \&_storeVal, storname => 'presence',     validkey => undef,    fpar => undef    },    # zeitgewichtete Anwesenheit
   pvcorrfactor      => { fn => \&_storeVal, storname => 'pvcorrf',      validkey => undef,    fpar => undef    },    # pvCorrectionFactor
   temperature       => { fn => \&_storeVal, storname => 'temp',         validkey => undef,    fpar => undef    },    # Außentemperatur
   conprice          => { fn => \&_storeVal, storname => 'conprice',     validkey => undef,    fpar => undef    },    # Bezugspreis pro kWh der Stunde
@@ -1557,7 +1560,6 @@ my %hfspvh = (
   socprogwhsum      => { fn => \&_storeVal, storname => 'socprogwhsum', validkey => undef,    fpar => undef    },    # prognostizierter SoC (Wh) zusammengefasst über alle Batterien
   pvapifcraw        => { fn => \&_storeVal, storname => 'pvapifcraw',   validkey => undef,    fpar => undef    },    # prognostizierter Energieertrag Raw
   pvfc              => { fn => \&_storeVal, storname => 'pvfc',         validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
-  presence          => { fn => \&_storeVal, storname => 'presence',     validkey => undef,    fpar => undef    },    # zeitgewichtete Anwesenheit
   confc             => { fn => \&_storeVal, storname => 'confc',        validkey => undef,    fpar => 'comp99' },    # durch KI oder herkömmlich prognostizierter Hausverbrauch
   conaifc           => { fn => \&_storeVal, storname => 'conaifc',      validkey => undef,    fpar => undef    },    # Hilfswert: durch KI prognostizierter Hausverbrauch
   conlegfc          => { fn => \&_storeVal, storname => 'conlegfc',     validkey => undef,    fpar => undef    },    # Hilfswert: herkömmlich prognostizierter Hausverbrauch
@@ -2075,13 +2077,6 @@ semantics_heatpump_boost_special => sub {                                       
 # Sandbox für neue Features
 # --------------------------------------------------------
 sandbox => sub {
-    return [
-
-    ];
-},
-
-### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-v1_heatpump_active_pv_test => sub {
     return [
 
     ];
@@ -7833,7 +7828,7 @@ sub _attraiControl {                     ## no critic "not used"
                 THRESHOLD
                 THRESHOLD_SYMMETRIC
               );
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !! ->  v1_heatpump_active_pv_test           
+          
   my @rv = qw ( v1_common
                 v1_common_active
                 v1_common_pv
@@ -7841,7 +7836,6 @@ sub _attraiControl {                     ## no critic "not used"
                 v1_heatpump
                 v1_heatpump_pv
                 v1_heatpump_active_pv
-                v1_heatpump_active_pv_test
                 v1_sandbox
               );
               
@@ -10296,7 +10290,8 @@ sub centralTask {
   _transferProducerValues     ($centpars);                                            # Werte anderer Erzeuger übertragen
   _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
-  _transferEnvironmentValues  ($centpars);                                            # Umweltsensorik sammeln
+  _transferEnvironmentValues  ($centpars);                                            # Umweltsensorik einsammeln
+  _transferHolidayValues      ($centpars);                                            # Wochentage, Feiertage und Urlaubstage einsammeln
   
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
   _batChargeMgmt              ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
@@ -11686,7 +11681,6 @@ sub _transferAPIRadiationValues {
   my $lang  = $paref->{lang};
   my $chour = $paref->{chour};
   my $date  = $paref->{date};
-  my $hash  = $defs{$name};
 
   return if(!keys %{$data{$name}{solcastapi}});
 
@@ -11710,7 +11704,7 @@ sub _transferAPIRadiationValues {
       my $nhtstr           = 'NextHour'.(sprintf "%02d", $num);
 
       my $dt               = timestringsFromOffset ($wantts, 0);
-      my $weekday          = $dt->{dayname};
+      #my $weekday          = $dt->{dayname};
       my $wtday            = $dt->{day};
       my $wthour           = $dt->{hour};
       my $hod              = sprintf "%02d", int ($wthour) + 1;                                            # Stunde des Tages
@@ -11726,8 +11720,8 @@ sub _transferAPIRadiationValues {
       $paref->{fd}     = $fd;
 
       $data{$name}{nexthours}{$nhtstr}{starttime} = $wantdt;
-      $data{$name}{nexthours}{$nhtstr}{day}       = $wtday;
-      $data{$name}{nexthours}{$nhtstr}{weekday}   = $weekday;
+      #$data{$name}{nexthours}{$nhtstr}{day}       = $wtday;
+      #$data{$name}{nexthours}{$nhtstr}{weekday}   = $weekday;
       $data{$name}{nexthours}{$nhtstr}{hourofday} = $hod;
       $data{$name}{nexthours}{$nhtstr}{today}     = $fd == 0 ? 1 : 0;
       $data{$name}{nexthours}{$nhtstr}{rad1h}     = $rad1h;
@@ -12767,6 +12761,42 @@ sub _transferEnvironmentValues {
   }
 
 return;
+}
+
+################################################################
+#   Wochentage, Feiertage und Urlaubstage übertragen
+################################################################  starttime
+sub _transferHolidayValues {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  my $date  = $paref->{date};
+  
+  for my $num (0..MAXNEXTHOURS) {
+      my ($fd, $fh) = calcDayHourMove ($chour, $num);
+      last if($fd > MAXNEXTDAYS);
+
+      my $nhtstr  = 'NextHour'.(sprintf "%02d", $num);
+      my $sttime  = NexthoursVal ($name, $nhtstr, 'starttime', undef);
+      my $wantts  = timestringToTimestamp ($sttime);
+
+      my $dt      = timestringsFromOffset ($wantts, 0);
+      my $wtyear  = $dt->{year};
+      my $wtmonth = $dt->{month};
+      my $wtday   = $dt->{day};
+      my $weekday = $dt->{dayname};
+      my $holiday = isHoliday ($wtyear.'-'.$wtmonth.'-'.$wtday);               # Feiertag und Urlaubstage abfragen
+      
+      $data{$name}{nexthours}{$nhtstr}{day}     = $wtday;
+      $data{$name}{nexthours}{$nhtstr}{weekday} = $weekday;
+      $data{$name}{nexthours}{$nhtstr}{holiday} = $holiday;
+
+      if ($fd == 0) {
+          writeToHistory ( { paref => $paref, key => 'holiday', val => $holiday, hour => '99' } );
+      }
+  }
+  
+return;  
 }
 
 ################################################################
@@ -22270,7 +22300,7 @@ sub _addHourAiRawdata {
 
   debugLog ($paref, 'aiProcess', "start add AI raw data for hour: $h");
 
-  $paref->{ood} = 1;                                                                                  # only one Day
+  $paref->{ood} = 1;                                                                                    # only one Day
   $paref->{rho} = $rho;
 
   __aiAddRawData ($paref);                                                                              # Raw Daten für AI hinzufügen und sichern
@@ -22317,6 +22347,8 @@ sub __aiAddRawData {
       if (!$ood) {                                                                                      # V 1.47.2 -> für manuelles Auffüllen mit Setter
           $dayname = HistoryVal ($name, $pvd, 99, 'dayname', undef);
       }
+      
+      my $holiday = HistoryVal ($name, $pvd, 99, 'holiday', undef);                                     # Holiday auslesen
 
       for my $hod (sort keys %{$data{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
@@ -22356,6 +22388,7 @@ sub __aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{pvrl}       = $pvrl                            if(defined $pvrl  && $pvrl  > 0);
           $data{$name}{aidectree}{airaw}{$ridx}{minutes_wp} = $minutes_on_wp                   if(defined $minutes_on_wp);
           $data{$name}{aidectree}{airaw}{$ridx}{presence}   = $presence                        if(defined $presence);
+          $data{$name}{aidectree}{airaw}{$ridx}{holiday}    = $holiday                         if(defined $holiday);
           $data{$name}{aidectree}{airaw}{$ridx}{pvrlvd}     = $pvrlvd;
 
           for my $c (1..MAXCONSUMER) {
@@ -22521,7 +22554,7 @@ sub aiFannCreateConTrainData {
   my (@month_sin_values, @temp_norm_values, @pv_norm_values, @pv_norm_prev_values);
   my (@month_cos_values, @sunaz_sin_values, @sunaz_cos_values, @wcc_norm_values, @isday_values);
   my (@day_hour_norm_values, @night_hour_norm_values, @inthod_values);
-  my (@presence_values);
+  my (@presence_values, @holiday_values);
   
   # einstellbare Parameter
   ##########################
@@ -22581,7 +22614,8 @@ sub aiFannCreateConTrainData {
       my $pvrl      = clampValue ($rec->{pvrl} // 0, 0, $pvpeak);
       my $wcc       = clampValue (int $rec->{wcc}, 0, 100);
       my $temp      = clampValue (int $rec->{temp}, -40, 40);
-      my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                  # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend' aber ungültig (masked=0) deklarieren -> Semantik: 'Anwesenheit war wahrscheinlich gegeben'     
+      my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                  # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend'
+      my $holiday   = defined $rec->{holiday}  ? $rec->{holiday}  : 0;                  # nicht definierte Feiertage/Uerlaub als 0 belegen
       
       # Ableitungen und Normierungen
       ################################
@@ -22647,6 +22681,7 @@ sub aiFannCreateConTrainData {
       push @night_hour_norm_values,   $night_hour_norm;
       push @inthod_values,            $inthod - 1;
       push @presence_values,          $presence;
+      push @holiday_values,           $holiday;
                                 
       # Zielwert
       ############
@@ -22763,6 +22798,7 @@ sub aiFannCreateConTrainData {
                          wcc_norm                 => $wcc_norm_values[$i],
                          sunalt_norm              => $sunalt_norm_values[$i],                   # Sonnenaltitude normalisiert im Bereich 0..+1
                          isday                    => $isday_values[$i],                         # Tag / Nacht (0|1)
+                         holiday                  => $holiday_values[$i],                       # Feiertag / Urlaub
                          hour_norm                => $hour_norm_values[$i],                     # Stunde des Tages normiert 0..1
                          day_hour_norm            => $day_hour_norm_values[$i],                 # Tagstunden normiert, sonst 0
                          night_hour_norm          => $night_hour_norm_values[$i],               # Nachtstunden normiert, sonst 0 
@@ -24646,6 +24682,7 @@ sub aiFannGetConResult {
       my $temp         = NexthoursVal ($name, $nhstr, 'temp',        undef);
       my $isday        = NexthoursVal ($name, $nhstr, 'DoN',         undef);
       my $pv           = NexthoursVal ($name, $nhstr, 'pvfc',            0);                        # Erstatzwert für pvrl
+      my $holiday      = NexthoursVal ($name, $nhstr, 'holiday',         0);                        # holiday undefiniert -> 0 
       
       my ($pv_prev);
       
@@ -24761,6 +24798,7 @@ sub aiFannGetConResult {
                             wcc_norm                 => $wcc_norm,                         # Bewölkungsgrad (min-max normalisiert)
                             sunalt_norm              => $sunalt_norm,                      # Sonnenhöhe 0..1 (unterhalb Horizont = 0)
                             isday                    => $isday,                            # Tag/Nacht-Flag (1 = Tag)
+                            holiday                  => $holiday,                          # Feiertag / Urlaub
                             hour_norm                => $hour_norm,                        # Stunde des Tages 0..1
                             day_hour_norm            => $day_hour_norm,                    # Normierte Tagesstunden (sonst 0)
                             night_hour_norm          => $night_hour_norm,                  # Normierte Nachtstunden (sonst 0)
@@ -26234,7 +26272,8 @@ sub _listDataPoolPvHist {
           my $socprogwhsum = HistoryVal ($name, $day, $key, 'socprogwhsum',   '-');
           my $socwhsum     = HistoryVal ($name, $day, $key, 'socwhsum',       '-');
           my $pd           = HistoryVal ($name, $day, $key, 'plantderated',   '-');
-          my $presence     = HistoryVal ($name, $day, $key, 'presence',       '-');
+          my $presence     = HistoryVal ($name, $day, $key, 'presence',       '-');  
+          my $holiday      = HistoryVal ($name, $day, $key, 'holiday',        '-');
 
           if ($export eq 'csv') {
               $hexp->{$day}{$key}{PVreal}              = $pvrl;
@@ -26265,6 +26304,7 @@ sub _listDataPoolPvHist {
               $hexp->{$day}{$key}{BatteryProgSocWhSum} = $socprogwhsum;
               $hexp->{$day}{$key}{PlantDerated}        = $pd;
               $hexp->{$day}{$key}{Presence}            = $presence;
+              $hexp->{$day}{$key}{Holiday}             = $holiday;
           }
 
           my ($inve, $invl);
@@ -26408,7 +26448,7 @@ sub _listDataPoolPvHist {
           }
           
           if ($key eq '99') {
-              $ret .= "dayname: $dayname ";
+              $ret .= "dayname: $dayname, holiday: $holiday";
           }
 
           my $csm;
@@ -26784,6 +26824,7 @@ sub _listDataPoolNextHours {
       my $nhts       = NexthoursVal ($name, $idx, 'starttime',    '-');
       my $day        = NexthoursVal ($name, $idx, 'day',          '-');
       my $weekday    = NexthoursVal ($name, $idx, 'weekday',      '-');
+      my $holiday    = NexthoursVal ($name, $idx, 'holiday',      '-');                      
       my $hod        = NexthoursVal ($name, $idx, 'hourofday',    '-');
       my $today      = NexthoursVal ($name, $idx, 'today',        '-');
       my $pvfc       = NexthoursVal ($name, $idx, 'pvfc',         '-');
@@ -26829,7 +26870,7 @@ sub _listDataPoolNextHours {
 
       $sq .= "\n" if($sq);
       $sq .= $idx." => ";
-      $sq .= "starttime: $nhts, day: $day, weekday: $weekday, hourofday: $hod, today: $today";
+      $sq .= "starttime: $nhts, day: $day, weekday: $weekday, holiday: $holiday, hourofday: $hod, today: $today";
       $sq .= "\n              ";
       $sq .= "pvapifcraw: $pvapifcraw, pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
       $sq .= "\n              ";
@@ -27049,7 +27090,8 @@ sub _listDataPoolAiRawData {
       my $gcons         = AiRawdataVal ($name, $idx, 'gcons',      '-');
       my $socwhsum      = AiRawdataVal ($name, $idx, 'socwhsum',   '-');
       my $minutes_on_wp = AiRawdataVal ($name, $idx, 'minutes_wp', '-');
-      my $presence      = AiRawdataVal ($name, $idx, 'presence',   '-');
+      my $presence      = AiRawdataVal ($name, $idx, 'presence',   '-');    
+      my $holiday       = AiRawdataVal ($name, $idx, 'holiday',    '-'); 
       
       my $csm;
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
@@ -27067,7 +27109,7 @@ sub _listDataPoolAiRawData {
       $sq .= "rr1c: $rr1c, temp: $temp, socwhsum: $socwhsum ";
       $sq .= "\n              ";
       $sq .= "pvrl: $pvrl, pvrlvd: $pvrlvd, minutes_wp: $minutes_on_wp, conaifc: $conaifc, con: $con, gcons: $gcons, ";
-      $sq .= "presence: $presence ";
+      $sq .= "presence: $presence, holiday: $holiday ";
        
       if (defined $csm) { $sq .= "\n              "; $sq .= $csm; }
   }
@@ -29395,6 +29437,28 @@ sub isNumeric {
   if ($val =~ /^-?(?:\d+(?:\.\d*)?|\.\d+)$/xs) { $ret = 1; }
 
 return $ret;
+}
+
+################################################################
+#   Feiertag, Urlaub aus global holiday2we ermitteln
+#   $when: YYYY-MM-DD
+################################################################
+sub isHoliday {
+  my $when = shift;
+
+  my $holiday = 0;
+  
+  for my $dv (split (",", AttrVal ('global', 'holiday2we', ''))) {
+      next if(!$dv || !$defs{$dv});
+      
+      my $b = CommandGet (undef, "$dv YYYY-MM-DD $when");
+      
+      if ($b && $b ne 'none') {
+         $holiday = 1  if($b !~ /unknown\sargument/xs);
+      }
+  }
+
+return $holiday;
 }
 
 ################################################################
@@ -32073,6 +32137,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>day</b>             </td><td>Date of day                                                                            </td></tr>
             <tr><td> <b>DaysInRange</b>     </td><td>previously recorded days with comparable sun position and clouds at this time          </td></tr>
             <tr><td> <b>DoN</b>             </td><td>sunrise and sunset status (0 - night, 1 - day)                                         </td></tr>
+            <tr><td> <b>holiday</b>         </td><td>Vacation or holiday                                                                    </td></tr>
             <tr><td> <b>hourofday</b>       </td><td>current hour of the day                                                                </td></tr>
             <tr><td> <b>pvapifcraw</b>      </td><td>expected PV generation (Wh) of the used API (raw)                                      </td></tr>
             <tr><td> <b>pvapifc</b>         </td><td>expected PV generation (Wh) of the used API incl. a possible correction                </td></tr>
@@ -32092,6 +32157,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>socXX</b>           </td><td>current (NextHour00) or predicted SoC (%) of battery XX                                </td></tr>
             <tr><td> <b>socprogwhsum</b>    </td><td>current (NextHour00) or forecast SoC (Wh) summarized across all batteries              </td></tr>
             <tr><td> <b>weatherid</b>       </td><td>ID of the predicted weather                                                            </td></tr>
+            <tr><td> <b>weekday</b>         </td><td>Abbreviation for day of the week                                                       </td></tr>
             <tr><td> <b>wcc</b>             </td><td>predicted degree of cloudiness                                                         </td></tr>
             <tr><td> <b>windspeed</b>       </td><td>Wind speed in m/s                                                                      </td></tr>
          </table>
@@ -32139,6 +32205,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>gcons</b>          </td><td>real consumption (Wh) from the electricity grid                                                                          </td></tr>
             <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
             <tr><td> <b>feedprice</b>      </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the setupMeterDev.                      </td></tr>
+            <tr><td> <b>holiday</b>        </td><td>Vacation or holiday                                                                                                      </td></tr>
             <tr><td> <b>hourscsmeXX</b>    </td><td>total active hours of the day from ConsumerXX                                                                            </td></tr>
             <tr><td> <b>lcintimebatXX</b>  </td><td>the charge management for battery XX was activated (1 - Yes, 0 - No)                                                     </td></tr>
             <tr><td> <b>strategybatXX</b>  </td><td>the selected charging strategy                                                                                           </td></tr>
@@ -33525,7 +33592,7 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>If the key 'consForecastIdentWeekdays' is also set, the specified number of past weekdays                                                                       </td></tr>
             <tr><td>                                  </td><td>of the <b>same</b> day (Mon .. Sun) is taken into account.                                                                                                      </td></tr>
             <tr><td>                                  </td><td>For example, if the value is set to '8', the same weekdays of the past 8 weeks are taken into account.                                                          </td></tr>
-            <tr><td>                                  </td><td>Value: <b>Integer 0..180</b>, default: 60                                                                                                                       </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer 1..180</b>, default: 60                                                                                                                       </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>cycleInterval</b>             </td><td>Repetition interval of the data collection in seconds.                                                                                                          </td></tr>
             <tr><td>                                  </td><td>If cycleInterval is explicitly set to '0', there is no regular data collection and must be started externally                                                   </td></tr>
@@ -34939,6 +35006,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>day</b>             </td><td>Tagesdatum                                                                                 </td></tr>
             <tr><td> <b>DaysInRange</b>     </td><td>bisher aufgezeichnete Tage mit vergleichbaren Sonnenstand und Bewölkungen zu dieser Zeit   </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                       </td></tr>
+            <tr><td> <b>holiday</b>         </td><td>Urlaub oder Feiertag                                                                       </td></tr>
             <tr><td> <b>hourofday</b>       </td><td>laufende Stunde des Tages                                                                  </td></tr>
             <tr><td> <b>pvapifcraw</b>      </td><td>erwartete PV Erzeugung (Wh) der verwendeten API (raw)                                      </td></tr>
             <tr><td> <b>pvapifc</b>         </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur          </td></tr>
@@ -34958,6 +35026,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>socXX</b>           </td><td>aktueller (NextHour00) oder prognostizierter SoC (%) der Batterie XX                       </td></tr>
             <tr><td> <b>socprogwhsum</b>    </td><td>aktueller (NextHour00) oder prognostizierter SoC (Wh) zusammengefasst über alle Batterien  </td></tr>
             <tr><td> <b>weatherid</b>       </td><td>ID des vorhergesagten Wetters                                                              </td></tr>
+            <tr><td> <b>weekday</b>         </td><td>Kürzel des Wochentags                                                                      </td></tr>
             <tr><td> <b>wcc</b>             </td><td>vorhergesagter Grad der Bewölkung                                                          </td></tr>
             <tr><td> <b>windspeed</b>       </td><td>Windgeschwindigkeit in m/s                                                                 </td></tr>
          </table>
@@ -35006,6 +35075,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>gfeedin</b>         </td><td>reale Einspeisung (Wh) in das Stromnetz                                                                </td></tr>
             <tr><td> <b>feedprice</b>       </td><td>Vergütung für die Einpeisung einer kWh. Die Währung des Preises ist im setupMeterDev definiert.        </td></tr>
             <tr><td> <b>avgcycmntscsmXX</b> </td><td>durchschnittliche Dauer eines Einschaltzyklus des Tages von ConsumerXX in Minuten                      </td></tr>
+            <tr><td> <b>holiday</b>         </td><td>Urlaub oder Feiertag                                                                                   </td></tr>
             <tr><td> <b>hourscsmeXX</b>     </td><td>Summe Aktivstunden des Tages von ConsumerXX                                                            </td></tr>
             <tr><td> <b>lcintimebatXX</b>   </td><td>das Lademanagement für Batterie XX war aktiviert (1 - Ja, 0 - Nein)                                    </td></tr>
             <tr><td> <b>strategybatXX</b>   </td><td>die gewählte Ladestrategie                                                                             </td></tr>
@@ -36497,7 +36567,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>Bei einem zusätzlich gesetzten Schlüssel 'consForecastIdentWeekdays' wird die angegebene Anzahl vergangener                                       </td></tr>
             <tr><td>                                  </td><td><b>gleicher</b> Wochentage (Mo .. So) berücksichtigt.                                                                                             </td></tr>
             <tr><td>                                  </td><td>Zum Beispiel werden dann bei einem gesetzten Wert von '8' die gleichen Wochentage der vergangenen 8 Wochen berücksichtigt.                        </td></tr>
-            <tr><td>                                  </td><td>Wert: <b>Ganzzahl 0..180</b>, default: 60                                                                                                         </td></tr>
+            <tr><td>                                  </td><td>Wert: <b>Ganzzahl 1..180</b>, default: 60                                                                                                         </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>cycleInterval</b>             </td><td>Wiederholungsintervall der Datensammlung in Sekunden.                                                                                             </td></tr>
             <tr><td>                                  </td><td>Ist cycleInterval explizit auf '0' gesetzt, erfolgt keine regelmäßige Datensammlung und muss mit 'get &lt;name&gt; data'                          </td></tr>
