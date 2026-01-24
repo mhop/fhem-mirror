@@ -2022,7 +2022,7 @@ SVG_render($$$$$$$$$$)
           $lx = int($x2); $ly = int($y2);
           $ret .= sprintf(" %d,%d %d,%d", $x1,$y1, $x2,$y1);
         }
-        $ret .= sprintf(" %d,%d %d,%d", $lx,$ly, $x+$nx,$ly);
+        $ret .= sprintf(" %d,%d %d,%d", $lx,$ly, $x+$nx,$ly) if($lx < $x+$nx);
       }
 
       my $sAttributes = $attributes;
