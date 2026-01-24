@@ -614,7 +614,8 @@ attr DEVICE setStateList on off toggle
 deletereading -q DEVICE (?!associatedWith|IODev).*
 set DEVICE attrTemplate set_associatedWith \CHANNELS=3 \MAKECOPIES=1
 loop:#:2:3
-defmod DEVICE_CH# MQTT2_\DEVICE
+#defmod DEVICE_CH# MQTT2_\DEVICE
+#attr DEVICE_CH# devicetopic BASE_TOPIC/DEV_ID
 attr DEVICE_CH# setList \
   on:noArg $\DEVICETOPIC/set {"state_l#":"ON"}\
   off:noArg $\DEVICETOPIC/set {"state_l#":"OFF"}\
@@ -624,7 +625,7 @@ attr DEVICE_CH2 jsonMap state_l2:state state_l1:0 state_l3:0 state:0 consumption
 attr DEVICE_CH3 jsonMap state_l3:state state_l1:0 state_l2:0 state:0 consumption:0 linkquality:0 power:0 temperature:0
 set DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplate speechcontrol_type_switch
 attr DEVICE,DEVICE_CH2,DEVICE_CH3 model zigbee2mqtt_3channel_split
-setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20220913
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3 attrTemplateVersion 20260124
 
 #provided by laberlaib, https://forum.fhem.de/index.php/topic,94495.msg1238330.html#msg1238330
 # zigbee2mqtt 5 channel device

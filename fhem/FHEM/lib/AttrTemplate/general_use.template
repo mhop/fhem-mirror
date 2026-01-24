@@ -24,13 +24,16 @@ par:CHANNELS;CHANNELS: Nr. of channels to configure, defaults to 2;{ 2 }
 par:MAKECOPIES;MAKECOPIES: boolean, if set, device will be copied to other channel devices , defaults to 0;{ 0 }
 par:IODEVATTR;IODEVATTR: attribute value if set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','IODev',0) }
 par:IODEVREADING;IODEVREADING: reading value if set and no attribute is set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','IODev',0) ? 0 : ReadingsVal('DEVICE','IODev',0)}
+par:DEVTOPIC;DEVTOPIC: attribute value if set, will be copied to other channel devices , defaults to 0;{ AttrVal('DEVICE','devicetopic',0) }
 
 # second channel preparation - all TYPE devices
 option:{return 1 if MAKECOPIES==1;;return 0}
 copy DEVICE DEVICE_CH2
 # 2 channels for MQTT2_DEVICE channels - delete CID info in first channel
-option:{return 1 if InternalVal(DEVICE,'TYPE','unknown') eq 'MQTT2_DEVICE' && MAKECOPIES==1;;return 0}
+option:{return 1 if MAKECOPIES==1 && InternalVal('DEVICE','TYPE','unknown') eq 'MQTT2_\DEVICE';;return 0}
 defmod DEVICE_CH2 MQTT2_\DEVICE
+option:{return 1 if 'DEVTOPIC' ne '0';;return 0}
+attr DEVICE_CH2 devicetopic DEVTOPIC
 
 # 2 channels
 option:{return 1 if CHANNELS==2;;return 0}
