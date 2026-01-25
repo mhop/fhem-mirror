@@ -7,7 +7,12 @@ init\
     if (AttrVal("$SELF","verbose",0) >=3) {\
       Log 3, "$SELF 0   WebSocket  : ▶️  $SELF_connect start Websocket";;\
     }\
-  }\
+  } else {\
+    if (AttrVal("$SELF","verbose",0) >=3) {\
+      Log 3, "$SELF 0   WebSocket  : Es ist kein Tibber_Live konfiguriert";;\
+    }\
+  } \
+\
   Log(0, "$SELF 0   init       : 🏁 $SELF init done for ".[?$SELF_connect:conf_EVU,"null"]);;\
 }\
 \
@@ -15,12 +20,18 @@ init\
 ## EVU_Tibber_connect start/stop WebSocket\
 0_$SELF_connect_Tibber_Live_ws\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
-#    or  [$SELF:ui_command_2]                                             ## Hier wird das uiTable select ausgewertet\
+    and [?$SELF_connect:conf_EVU,"null"] eq "Tibber_Live"\
+    or  [$SELF:ui_command_2]                                             ## Hier wird das uiTable select ausgewertet\
     and [$SELF:ui_command_2] ne "---"\
    ) {\
     if ( [?$SELF_connect:conf_EVU,"null"] eq "Tibber_Live" ) {\
       fhem("setreading $SELF_connect ws_cmd ".[?$SELF:ui_command_2]);; \
+    } else {\
+      if (AttrVal("$SELF","verbose",0) >=3) {\
+        Log 3, "$SELF 1   Kosten     : Es ist kein Tibber_Live konfiguriert";;\
+      }\
     }\
+\
     set_Reading("ui_command_2","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
                                                                          ## kann das Kommando nicht sofort wiederholt werden\
   }\
@@ -32,13 +43,19 @@ init\
 0_$SELF_connect_Tibber_Live_Kosten\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
     and [:03]                                                            ##\
-    and [?$SELF_connect:conf_EVU,"null"] eq "Tibber"\
-#    or  [$SELF:ui_command_2]                                             ## Hier wird das uiTable select ausgewertet\
-#    and [$SELF:ui_command_2] ne "---"\
+    and [?$SELF_connect:conf_EVU,"null"] eq "Tibber_Live"\
+    or  [$SELF:ui_command_2]                                             ## Hier wird das uiTable select ausgewertet\
+    and [$SELF:ui_command_2] ne "---"\
    ) {\
-    ::CommandGet(undef, "$SELF_connect 03_consumption_hour");;\
-    if (AttrVal("$SELF","verbose",0) >=3) {\
-      Log 3, "$SELF 1   Kosten     : Kosten der letzten Stunden für ".[?$SELF_connect:conf_EVU,"null"]." abgeholt";;\
+    if ( [?$SELF_connect:conf_EVU,"null"] eq "Tibber_Live" ) {\
+      ::CommandGet(undef, "$SELF_connect 03_consumption_hour");;\
+      if (AttrVal("$SELF","verbose",0) >=3) {\
+        Log 3, "$SELF 1   Kosten     : Kosten der letzten Stunden für ".[?$SELF_connect:conf_EVU,"null"]." abgeholt";;\
+      }\
+    } else {\
+      if (AttrVal("$SELF","verbose",0) >=3) {\
+        Log 3, "$SELF 1   Kosten     : Es ist kein Tibber_Live konfiguriert";;\
+      }\
     }\
 \
     set_Reading("ui_command_2","---");;                                   ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
@@ -51,10 +68,9 @@ init\
 \
 1_$SELF_PriceInfo\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
-    and\
-    (     [:00] or [:15] or [:30] or [:45]                               ## jede 15 Minuten\
-    )\
-    or [$SELF:ui_command_1] eq "1_Aktueller_Preis"                       ## Hier wird das uiTable select ausgewertet\
+    and  ![00:00]\
+    and ( [:00] or [:15] or [:30] or [:45] )                             ## jede 15 Minuten\
+    or    [$SELF:ui_command_1] eq "1_Aktueller_Preis"                    ## Hier wird das uiTable select ausgewertet\
    ) {\
 \
   fhem("setreading $SELF_connect fc0_0000_total ".[?$SELF_connect:fc0_0000_total]);;  ## Preis für die aktuelle Stunde triggern\
@@ -73,10 +89,14 @@ init\
 2_$SELF_PriceInfo_Schedule\
 {if( !([$SELF:state] eq "off")                                           ## DOIF enabled\
     and\
-    (   [00:01]                 \
+    (    [00:00]                                                         ## Ab 00:00 Uhr gibt es die Preise für den Tag\
+     or ( [00:00-01:00] and [+:10]                                       ## Bei Problemen alle 10 Minuten nochmals abfragen\
+     and  [$SELF_connect:fc0_0000_startsAt,"null"] ne "null"             ##       solange bis das Datum aktuell ist\
+     and  substr(ReadingsVal($name,"fc0_0000_starstAt","0000-00-00"),0,10) lt strftime("%Y-%m-%d", localtime)\
+        )\
      or [13:00-16:00] and [+:20] and [$SELF_connect:fc1_0000_startsAt,"null"] ne ""  ## Ab 14:00 Uhr gibt es die Preise für den nächsten Tag\
     )\
-    or [$SELF:ui_command_1] eq "2_Preis_Info"   ## Hier wird das uiTable select ausgewertet\
+    or [$SELF:ui_command_1] eq "2_Preis_Info"                            ## Hier wird das uiTable select ausgewertet\
    ) {\
 \
   if (AttrVal("$SELF","verbose",0) >=3) {\
@@ -94,6 +114,7 @@ init\
       Log 3, "$SELF 2   PriceInfo  : $rc";;\
     }\
   }\
+\
   set_Reading("ui_command_1","---");;                                     ## Hier wird das uiTable select wieder zurückgesetzt, ansonsten\
                                                                          ## kann das Kommando nicht sofort wiederholt werden\
   }\
@@ -118,7 +139,7 @@ init\
 \
     if (ReadingsVal("$SELF_connect",sprintf("fc%d_0000_startsAt",$j),"null") eq "null") {     ## Der nächste Tag ist noch nicht da\
       if (AttrVal("$SELF","verbose",0) >=3) {\
-        Log 3, "$SELF 3   Diagramm   : Daten für fc".$j." sind noch nicht da";;\
+        Log 3, "$SELF 3   Diagramm   : fc".$j." Daten sind noch nicht da";;\
       }\
 \
       $timestamp = POSIX::strftime("%Y-%m-%d",localtime(time+86400));;    ## Setze das Datum auf morgen\
@@ -137,7 +158,7 @@ init\
           $out[$j] .=$timestamp." ".::round(ReadingsVal("$SELF_connect",sprintf("fc%d_%02d%02d_total",$j, $i, $quarter*15),0),1)."\n";;\
         } # end $quarter\
       } # End $i\
-      Log 3, "$SELF 3   Diagramm   : Daten für fc".$j." wurden im Diagramm gesetzt.";;\
+      Log 3, "$SELF 3   Diagramm   : fc".$j." Daten wurden im Diagramm gesetzt.";;\
     } # End if\
   } # End $j\
   \
@@ -258,20 +279,20 @@ sub $SELF_Format {\
       $evu_ey .= ($YearPrevious ne "null") ? sprintf(" / %04d", ::ReadingsVal("$YearBefore","$SELF_connect_nodes_consumption_month",0) ) : "";;\
       return $evu_ey;;\
     } elsif ($i eq "trigger_0") {\
-      return ((::ReadingsVal("$SELF_connect","fc0_trigger_start","") eq "null" ) ?\
+      return ((::ReadingsVal("$SELF_connect","fc0_trigger_net_start","") eq "null" ) ?\
             "<span style='color:red'>Heute kein Trigger <br>mehr unter ".\
-                 ::ReadingsVal("$SELF_connect","fc_trigger_price","null")." ct</span>" :\
+                 ::ReadingsVal("$SELF_connect","fc_trigger_net_price","null")." ct</span>" :\
             "<span style='color:green'>Trigger von<br>".\
-                 ::ReadingsVal("$SELF_connect","fc0_trigger_start","00:00")." bis ".::ReadingsVal("$SELF_connect","fc0_trigger_stop","00:00")."<br>unter ".\
-                 ::ReadingsVal("$SELF_connect","fc_trigger_price","null")." ct</span>" );;\
+                 ::ReadingsVal("$SELF_connect","fc0_trigger_net_start","00:00")." bis ".::ReadingsVal("$SELF_connect","fc0_trigger_net_stop","00:00")."<br>unter ".\
+                 ::ReadingsVal("$SELF_connect","fc_trigger_net_price","null")." ct</span>" );;\
     } elsif ($i eq "trigger_1") {\
       if (::ReadingsVal("$SELF_connect","fc1_0000_startsAt","null") ne "null") {\
-        return ((::ReadingsVal("$SELF_connect","fc1_trigger_start","null") eq "null" ) ?\
+        return ((::ReadingsVal("$SELF_connect","fc1_trigger_net_start","null") eq "null" ) ?\
               "<span style='color:red'>Morgen kein Trigger <br>mehr unter ".\
-                   ::ReadingsVal("$SELF_connect","fc_trigger_price","null")." ct</span>" :\
+                   ::ReadingsVal("$SELF_connect","fc_trigger_net_price","null")." ct</span>" :\
               "<span style='color:green'>Morgen ein Trigger von<br>".\
-                   ::ReadingsVal("$SELF_connect","fc1_trigger_start","00:00")." bis ".::ReadingsVal("$SELF_connect","fc1_trigger_stop","00:00")."<br>unter ".\
-                   ::ReadingsVal("$SELF_connect","fc_trigger_price","null")." ct</span>" );;\
+                   ::ReadingsVal("$SELF_connect","fc1_trigger_net_start","00:00")." bis ".::ReadingsVal("$SELF_connect","fc1_trigger_net_stop","00:00")."<br>unter ".\
+                   ::ReadingsVal("$SELF_connect","fc_trigger_net_price","null")." ct</span>" );;\
       } else {\
         return "Morgen noch kein Trigger vorhanden";;\
       }\

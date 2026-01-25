@@ -1,5 +1,7 @@
-defmod Stromboerse_connect HTTPMOD none
-attr Stromboerse_connect userattr conf_EVU_Tibber_Grundgebuehr_EUR_Jahr conf_EVU_Tibber_Korrektur conf_EVU_Tibber_Zuschlag_ct_kWh conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr conf_EVU_aWATTar_Zuschlag_ct_kWh conf_Netz_Jahresverbrauch_kWh conf_VAT conf_VNB conf_VNB_Arbeitspreis_ct_kWh conf_VNB_KWKG_ct_kWh conf_VNB_Konzession_ct_kWh conf_VNB_Leistungspreis_EUR_Jahr conf_VNB_MSB_iMSys_EUR_Jahr conf_VNB_MSB_mME_EUR_Jahr conf_VNB_Messstelle conf_VNB_Netzentgelt_ct_kWh conf_VNB_Paragraph_19_Umlage_ct_kWh conf_VNB_Stromsteuer_ct_kWh ws_homeId ws_minInterval ws_myId ws_token ws_websocketURL
+defmod Stromboerse_connect HTTPMOD none 0
+attr Stromboerse_connect userattr conf_Speicher_Ladepreisdifferenz conf_EVU_Tibber_Grundgebuehr_EUR_Jahr conf_EVU_Tibber_Korrektur conf_EVU_Tibber_Zuschlag_ct_kWh conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr conf_EVU_aWATTar_Zuschlag_ct_kWh conf_Netz_Jahresverbrauch_kWh conf_VAT conf_VNB conf_VNB_Arbeitspreis_ct_kWh conf_VNB_KWKG_ct_kWh conf_VNB_Konzession_ct_kWh conf_VNB_Leistungspreis_EUR_Jahr conf_VNB_MSB_iMSys_EUR_Jahr conf_VNB_MSB_mME_EUR_Jahr conf_VNB_Messstelle conf_VNB_Netzentgelt_ct_kWh conf_VNB_Paragraph_19_Umlage_ct_kWh conf_VNB_Stromsteuer_ct_kWh ws_homeId ws_minInterval ws_myId ws_token ws_websocketURL
+attr Stromboerse_connect DbLogExclude .*
+attr Stromboerse_connect DbLogInclude total_cost_.*,fc._trigger.*
 attr Stromboerse_connect DbLogValueFn {\
   if ($READING =~ /fc0_trigger/) {\
     my ($sec, $min, $hour, $mday, $mon, $year) = localtime(time_str2num($TIMESTAMP));;\
@@ -11,7 +13,7 @@ attr Stromboerse_connect DbLogValueFn {\
 \
   }\
 }
-attr Stromboerse_connect comment Version: 20260121 20:00\
+attr Stromboerse_connect comment Version: 20260121 20:00\\
 \
 https://api.energy-charts.info\
 https://api.energy-charts.info/price?bzn=DE-LU&start=2025-06-25&end=2025-06-25\
@@ -61,6 +63,7 @@ attr Stromboerse_connect conf_EVU_Tibber_Zuschlag_ct_kWh 2.15
 attr Stromboerse_connect conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr 46.20
 attr Stromboerse_connect conf_EVU_aWATTar_Zuschlag_ct_kWh 0
 attr Stromboerse_connect conf_Netz_Jahresverbrauch_kWh 5099
+attr Stromboerse_connect conf_Speicher_Ladepreisdifferenz 20
 attr Stromboerse_connect conf_VAT 1.19
 attr Stromboerse_connect conf_VNB Mainzer Netze GmbH (64560)
 attr Stromboerse_connect conf_VNB_Arbeitspreis_ct_kWh 7.54
@@ -1180,207 +1183,230 @@ attr Stromboerse_connect replacement04Regex %%homeID%%
 attr Stromboerse_connect replacement04Value {KeyValue("read","EVU_Tibber_connect_homeID")}
 attr Stromboerse_connect room Strom->Boerse
 attr Stromboerse_connect showBody 0
+attr Stromboerse_connect showError 1
 attr Stromboerse_connect sortby 413
-attr Stromboerse_connect timeout 10
+attr Stromboerse_connect timeout 15
 attr Stromboerse_connect userReadings ws_connect:ws_cmd:.connect {\
-    my $hash = $defs{$name};;\
-    my $devState = DevIo_IsOpen($hash);;\
-    return "Device already open" if (defined($devState));;\
-    \
-    # establish connection to websocket\
-    # format must also include portnumber if a path is to be specified\
-    $hash->{DeviceName} = AttrVal($name, "ws_websocketURL", "wss:echo.websocket.org:443");;\
-    \
-    # special headers needed for Tibber, see also Developer Tools in Browser\
-    $hash->{header}{'Sec-WebSocket-Protocol'} = 'graphql-transport-ws';;\
-    $hash->{header}{'Host'} = 'websocket-api.tibber.com';;\
-    $hash->{header}{'Origin'} = 'https://developer.tibber.com';;\
-    \
-    # callback function when "select()" signals data for us\
-    # websocket Ping/Pongs are treated in DevIo but still call this function\
-    $hash->{directReadFn} = sub () {\
-        my $hash = $defs{$name};;\
-        \
-        # we can read without closing the DevIo, because select() signalled data\
-        my $buf = DevIo_SimpleRead($hash);;\
-        \
-        # if read fails, close device\
-        if(!defined($buf)) {\
-            DevIo_CloseDev($hash);;\
-            $buf = "not_connected";;\
-        }\
-        \
-        #Log(3, "$name:$reading: websocket data: >>>$buf<<<");;\
-        \
-        # only update our reading if buffer is not empty and if last update is older than minInterval\
-        if ($buf ne "") {\
-            my $websocketDataAge = ReadingsAge($name, "ws_websocketData", 3600);;\
-            my $minInterval = AttrVal($name, "ws_minInterval", 0);;\
-            my $isNext = ($buf =~ /.*id.*type.*next.*payload.*data.*liveMeasurement.*/s);;\
-            \
-            readingsBeginUpdate($hash);;\
-            readingsBulkUpdate($hash, "ws_websocketData", "$buf") if ($isNext && $websocketDataAge > $minInterval);;\
-            readingsBulkUpdate($hash, "ws_websocketData", "$buf") if (!$isNext);;\
-            readingsEndUpdate($hash, 1);;\
-            #Log(3, "$name:$reading: websocket data written to reading");;\
-        }\
-    };;\
-    \
-    # open DevIo websocket\
-    DevIo_OpenDev($hash, 0, undef, sub(){\
-        my ($hash, $error) = @_;;\
-        return "$error" if ($error);;\
-        \
-        my $token = AttrVal($name, "ws_token", "???");;\
-           $token = KeyValue("read","EVU_Tibber_connect_token") if ($token eq "???");;\
+  my $hash = $defs{$name};;\
+  my $devState = DevIo_IsOpen($hash);;\
+  return "Device already open" if ($devState);;\
 \
-        DevIo_SimpleWrite($hash, '{"type":"connection_init","payload":{"token":"'.$token.'"}}', 2);;\
-    });;\
-    readingsBulkUpdate($hash, "ws_websocketData", "");;\
-    #Log(3, "$name:$reading: websocket data cleared in reading");;\
-      \
-    return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+  # establish connection to websocket\
+  # format must also include portnumber if a path is to be specified\
+  $hash->{DeviceName} = AttrVal($name, "ws_websocketURL", "wss:echo.websocket.org:443");;\
+\
+  # special headers needed for Tibber, see also Developer Tools in Browser\
+  $hash->{header}{'Sec-WebSocket-Protocol'} = 'graphql-transport-ws';;\
+  $hash->{header}{'Host'}                   = 'websocket-api.tibber.com';;\
+  $hash->{header}{'Origin'}                 = 'https://developer.tibber.com';;\
+\
+  # callback function when "select()" signals data for us\
+  # websocket Ping/Pongs are treated in DevIo but still call this function\
+  $hash->{directReadFn} = sub () {\
+    my $hash = $defs{$name};;\
+\
+    # we can read without closing the DevIo, because select() signalled data\
+    my $buf = DevIo_SimpleRead($hash);;\
+\
+    # if read fails, close device\
+    if(!$buf) {\
+      DevIo_CloseDev($hash);;\
+      $buf = "not_connected";;\
+    }\
+    Log3($name,4,sprintf("%-20s ws_01 : ", $name)."websocket data: >>>$buf<<<");;\
+\
+    # only update our reading if buffer is not empty and if last update is older than minInterval\
+    if ($buf ne "") {\
+      my $websocketDataAge = ReadingsAge($name, "ws_live_Data", 3600);;\
+      my $minInterval      = AttrVal($name, "ws_minInterval", 0);;\
+      my $isNext           = ($buf =~ /.*id.*type.*next.*payload.*data.*liveMeasurement.*/s);;\
+\
+      readingsBeginUpdate($hash);;\
+      readingsBulkUpdate($hash, "ws_live_Data", "$buf") if ($isNext && $websocketDataAge > $minInterval);;\
+      readingsBulkUpdate($hash, "ws_live_Data", "$buf") if (!$isNext);;\
+      readingsEndUpdate($hash, 1);;\
+      Log3($name,4,sprintf("%-20s ws_01 : ", $name)."websocket data written to reading");;\
+    }\
+  };;\
+\
+  # open DevIo websocket\
+  DevIo_OpenDev($hash, 0, undef, sub(){\
+    my ($hash, $error) = @_;;\
+    return "$error" if ($error);;\
+\
+    my $token = AttrVal($name, "ws_token", "???");;\
+       $token = KeyValue("read","EVU_Tibber_connect_token") if ($token eq "???");;\
+\
+    DevIo_SimpleWrite($hash, '{"type":"connection_init","payload":{"token":"'.$token.'"}}', 2);;\
+  });;\
+\
+  readingsSingleUpdate($hash, "ws_live_Data", "", 1);;\
+  Log3($name,4,sprintf("%-20s ws_01 : ", $name)."websocket data cleared in reading");;\
+\
+  readingsBeginUpdate($hash);;\
+  return POSIX::strftime("%H:%M:%S",localtime(time()));;\
 },\
 \
 ws_disconnect:ws_cmd:.disconnect {\
-    Log(3, "$name: disconnect");;\
-    my $hash = $defs{$name};;\
-    RemoveInternalTimer($hash);;\
-    DevIo_SimpleRead($hash);;\
-    DevIo_CloseDev($hash);;\
+  my $hash = $defs{$name};;\
+  RemoveInternalTimer($hash);;\
+  DevIo_SimpleRead($hash);;\
+  DevIo_CloseDev($hash);;\
+  Log3($name,4,sprintf("%-20s ws_02 : ", $name)."websocket disconnect");;\
 \
-    return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+  readingsBeginUpdate($hash);;\
+  return POSIX::strftime("%H:%M:%S",localtime(time()));;\
 },\
 \
 ws_onDisconnect {\
+  my ($myState,$myData);;\
+  my $hash = $defs{$name};;\
+  $myData  = ReadingsVal($name, "ws_live_Data", undef);;\
+\
   if ( ReadingsVal($name, "conf_EVU", "???") eq "Tibber_Live" ) {\
-    my $myState = ReadingsVal($name, "state", "???");;\
-    my $myData = ReadingsVal($name, "ws_websocketData", "???");;\
+    $myState = ReadingsVal($name, "state", undef);;\
+    readingsBeginUpdate($hash);;\
     return if ($myState ne "disconnected" and $myData ne "not_connected");;\
-    \
-	## timer callback function, called after a few seconds to initiate a reconnect\
-	my $timerFunction = sub() {\
-		my ($arg) = @_;;\
-		my $hash = $defs{$name};;\
-		my $devState = DevIo_IsOpen($hash);;\
-		\
-		# only re-connect if device is not connected\
-		readingsSingleUpdate($hash, "ws_cmd", "connect", 1) if (!defined($devState));;\
-	};;\
-	RemoveInternalTimer($name.$reading.'Timer');;\
-	\
-	# wait a random time before reconnect (exponential backoff TBD):\
-	my $rwait = int(rand(200)) + 30;;\
-	InternalTimer(gettimeofday() + $rwait, $timerFunction, $name.$reading.'Timer');;\
-	\
-	#set cmd to a new value, informs user and allows to retrigger when timer expires\
-	my $hash = $defs{$name};;\
-	readingsBulkUpdate($hash, "ws_cmd", "reconnect attempt in $rwait seconds");;\
-	return POSIX::strftime("%H:%M:%S",localtime(time()));;\
-  }\
- else {\
-    return "No Tibber_Live configured";;\
-  }\
-},\
 \
-ws_onTimeout:ws_websocketData:.* {\
-	#re-establish websocket connection if no data received in the past ten minutes\
-	#but only if our reading "ws_cmd" was not set to the value "disconnect"\
+    # timer callback function, called after a few seconds to initiate a reconnect\
+    my $timerFunction = sub() {\
+      my ($arg)    = @_;;\
+      my $hash     = $defs{$name};;\
+      my $devState = DevIo_IsOpen($hash);;\
 \
-        #Log(3, "$name:$reading: websocket data triggert ws_onTimeout");;\
+      # only re-connect if device is not connected\
+      readingsSingleUpdate($hash, "ws_cmd", "connect", 1) if (!$devState);;\
+    };; # end sub\
 \
-	#timeout in seconds when the connection is considered dead\
-	my $timeoutTime = 600;;\
-	\
-	# function to execute when timeout expired\
-	# defining the function here in the userReading, allows us to insert variables directly\
-	my $timerFunction = sub() {\
-		my ($arg) = @_;;\
-		my $hash = $defs{$name};;\
-		my $rCmd = ReadingsVal($name, "ws_cmd", "???");;\
-		my $age  = ReadingsAge($name, "ws_websocketData", 0);;\
-		\
-		Log(3, "$name: onTimeoutTimer triggered >>$arg<<");;\
-		\
-		#do not do anything further if disconnect is on purpose\
-		if ( $rCmd eq "disconnect" ) {\
-			Log(3, "$name: ws_cmd was set to disconnect");;\
-			return;;\
-		}\
-		\
-		# for whatever reason, we triggered to soon (80%)\
-		if ( $age < $timeoutTime*0.8 ) {\
-			Log(3, "$name: ws_websocketData is not outdated");;\
-			return;;\
-		}\
-		\
-		DevIo_CloseDev($hash);;\
-		Log(3, "$name: onTimeoutTimer closed DevIo...");;\
-		\
-		readingsSingleUpdate($hash, "ws_cmd", "connect", 1);;\
-		Log(3, "$name: onTimeoutTimer set ws_cmd to value 'connect'");;\
-	};;\
+    RemoveInternalTimer($name.$reading.'Timer');;\
 \
-        #Log(3, "$name:$reading: onTimeout function defined");;\
+    # wait a random time before reconnect (exponential backoff TBD):\
+    my $rwait = int(rand(200)) + 30;;\
+    InternalTimer(gettimeofday() + $rwait, $timerFunction, $name.$reading.'Timer');;\
 \
-	#remove/cancel previous timers, because we got fresh data and countdown starts again\
-	RemoveInternalTimer($name.$reading.'Timer');;\
-	\
-	#set timer to expire and execute function defined above, give special arg as identifier\
-	InternalTimer(gettimeofday() + $timeoutTime, $timerFunction, $name.$reading.'Timer');;\
-	\
-	return POSIX::strftime("%H:%M:%S",localtime(time()));;\
-},\
-\
-ws_onConnectionAck:ws_websocketData:.*connection_ack.* {\
-    #ws_websocketData contains the string "connection_ack"\
-    Log(3, "$name:$reading: got connection ack");;\
-    \
-    # do not proceed if connection is lost\
-    my $hash = $defs{$name};;\
-    my $devState = DevIo_IsOpen($hash);;\
-    return "Device not open" if (!defined($devState));;\
-\
-    readingsBulkUpdate($hash, "ws_cmd", "got connection ack");;\
-    \
-    my $homeId = AttrVal($name, "ws_homeId", "???");;\
-       $homeId = KeyValue("read","EVU_Tibber_connect_homeID") if ($homeId eq "???");;\
-\
-    my $myId = AttrVal($name, "ws_myId", "???");;\
-       $myId = KeyValue("read","EVU_Tibber_connect_homeID") if ($myId eq "???");;\
-    \
-    # build the query, do it in pieces, the comma at the end caused perl errors\
-    # so we put it together in this not very elegant way\
-    my $json = '{ "id":"'. $myId .'", "type":"subscribe"'.", ";;\
-    $json .= '"payload":{';;\
-    $json .= '"variables":{}'.", ";;\
-    $json .= '"extensions":{}'.", ";;\
-    $json .= '"query":"subscription { liveMeasurement( homeId: \"'.$homeId.'\" ) ';;\
-    #$json .= '{ timestamp power accumulatedConsumption accumulatedCost currency minPower averagePower maxPower signalStrength }}"';;\
-    $json .= '{ timestamp power lastMeterConsumption accumulatedConsumption accumulatedProduction ';;\
-    $json .= 'accumulatedProductionLastHour accumulatedCost accumulatedReward currency minPower averagePower maxPower ';;\
-    $json .= 'powerProduction powerReactive powerProductionReactive minPowerProduction maxPowerProduction lastMeterProduction ';;\
-    $json .= 'powerFactor voltagePhase1 voltagePhase2 voltagePhase3 signalStrength }}"';;\
-    $json .= '}}';;\
-    \
-    #send the string via websocket as ASCII\
-    #Log(3, "$name:$reading: sending JSON: >>>$json<<<");;\
-    DevIo_SimpleWrite($hash, $json, 2);;\
-        \
+    # set cmd to a new value, informs user and allows to retrigger when timer expires\
+    readingsSingleUpdate($hash, "ws_cmd", "reconnect attempt in $rwait seconds", 1);;\
+    Log3($name,4,sprintf("%-20s ws_03 : ", $name)."reconnect attempt in $rwait seconds");;\
+    readingsBeginUpdate($hash);;\
     return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+  } else {\
+    if ($myData) {\
+      Log3($name,3,sprintf("%-20s ws_03 : ", $name)."delete old Tibber_Live readings");;\
+      fhem("deletereading Stromboerse_connect ^ws_.*|^Adresse_.*|^nodes_.*|total_cost_");;\
+      readingsBeginUpdate($hash);;\
+      readingsBulkUpdate($hash, "ws_Tibber_Live","not configured");;\
+      readingsEndUpdate($hash, 0);;                              # 0 = KEIN Event\
+    }\
+  }\
+    return;;\
 },\
 \
-ws_onNextLiveMeasurement:ws_websocketData:.*next.*payload.*data.*liveMeasurement.* {\
-    #websocketData contains next-live-measurement-data\
-    my $val = ReadingsVal($name, "ws_websocketData", "{}");;\
-    my %res = %{json2nameValue($val, undef, undef, "payload_data_liveMeasurement.*")};;\
-    \
-    my $ret = "got values for:\n";;\
-    foreach my $k (sort keys %res) {\
-        $ret .= "$k\n";;\
-        readingsBulkUpdate($hash, makeReadingName($k), $res{$k});;\
+ws_onTimeout:ws_live_Data:.* {\
+  # re-establish websocket connection if no data received in the past ten minutes\
+  # but only if our reading "ws_cmd" was not set to the value "disconnect"\
+\
+  Log3($name,4,sprintf("%-20s ws_04 : ", $name)."websocket data triggert ws_onTimeout");;\
+\
+  # timeout in seconds when the connection is considered dead\
+  my $timeoutTime = 600;;\
+\
+  # function to execute when timeout expired\
+  # defining the function here in the userReading, allows us to insert variables directly\
+  my $timerFunction = sub() {\
+    my ($arg) = @_;;\
+    my $hash  = $defs{$name};;\
+    my $rCmd  = ReadingsVal($name, "ws_cmd", "???");;\
+    my $age   = ReadingsAge($name, "ws_live_Data", 0);;\
+\
+    Log3($name,4,sprintf("%-20s ws_04 : ", $name)."onTimeoutTimer triggered >>$arg<<");;\
+\
+    # do not do anything further if disconnect is on purpose\
+    if ( $rCmd eq "disconnect" ) {\
+      Log3($name,4,sprintf("%-20s ws_04 : ", $name)."ws_cmd was set to disconnect");;\
+      return;;\
     }\
-    return $ret;;\
+\
+    # for whatever reason, we triggered to soon (80%)\
+    if ( $age < $timeoutTime*0.8 ) {\
+      Log3($name,4,sprintf("%-20s ws_04 : ", $name)."ws_live_Data is not outdated");;\
+      return;;\
+    }\
+\
+    DevIo_CloseDev($hash);;\
+    Log3($name,4,sprintf("%-20s ws_04 : ", $name)."onTimeoutTimer closed DevIo...");;\
+\
+    readingsSingleUpdate($hash, "ws_cmd", "connect", 1);;\
+    Log3($name,4,sprintf("%-20s ws_04 : ", $name)."onTimeoutTimer set ws_cmd to value 'connect'");;\
+  };;\
+\
+  Log3($name,4,sprintf("%-20s ws_04 : ", $name)."onTimeout function defined");;\
+\
+  # remove/cancel previous timers, because we got fresh data and countdown starts again\
+  RemoveInternalTimer($name.$reading.'Timer');;\
+\
+  # set timer to expire and execute function defined above, give special arg as identifier\
+  InternalTimer(gettimeofday() + $timeoutTime, $timerFunction, $name.$reading.'Timer');;\
+\
+  return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+},\
+\
+ws_onConnectionAck:ws_live_Data:.*connection_ack.* {\
+  # ws_live_Data contains the string "connection_ack"\
+  Log3($name,4,sprintf("%-20s ws_05 : ", $name)."got connection ack");;\
+\
+  # do not proceed if connection is lost\
+  my $hash = $defs{$name};;\
+  my $devState = DevIo_IsOpen($hash);;\
+  return "Device not open" if (!$devState);;\
+\
+  readingsSingleUpdate($hash, "ws_cmd", "got connection ack", 1);;\
+\
+  my $homeId = AttrVal($name, "ws_homeId", "???");;\
+     $homeId = KeyValue("read","EVU_Tibber_connect_homeID") if ($homeId eq "???");;\
+\
+  my $myId = AttrVal($name, "ws_myId", "???");;\
+     $myId = KeyValue("read","EVU_Tibber_connect_homeID") if ($myId eq "???");;\
+\
+  # build the query, do it in pieces, the comma at the end caused perl errors\
+  # so we put it together in this not very elegant way\
+  my $json = '{ "id":"'. $myId .'", "type":"subscribe"'.", ";;\
+  $json .= '"payload":{';;\
+  $json .= '"variables":{}'.", ";;\
+  $json .= '"extensions":{}'.", ";;\
+  $json .= '"query":"subscription { liveMeasurement( homeId: \"'.$homeId.'\" ) ';;\
+#  $json .= '{ timestamp power accumulatedConsumption accumulatedCost currency minPower averagePower maxPower signalStrength }}"';;\
+  $json .= '{ timestamp power lastMeterConsumption accumulatedConsumption accumulatedProduction ';;\
+  $json .= 'accumulatedProductionLastHour accumulatedCost accumulatedReward currency minPower averagePower maxPower ';;\
+  $json .= 'powerProduction powerReactive powerProductionReactive minPowerProduction maxPowerProduction lastMeterProduction ';;\
+  $json .= 'powerFactor voltagePhase1 voltagePhase2 voltagePhase3 signalStrength }}"';;\
+  $json .= '}}';;\
+\
+  #send the string via websocket as ASCII\
+  Log3($name,4,sprintf("%-20s ws_05 : ", $name)."$reading: sending JSON: >>>$json<<<");;\
+  DevIo_SimpleWrite($hash, $json, 2);;\
+\
+  readingsBeginUpdate($hash);;\
+  return POSIX::strftime("%H:%M:%S",localtime(time()));;\
+},\
+\
+ws_onNextLiveMeasurement:ws_live_Data:.*next.*payload.*data.*liveMeasurement.* {\
+  my $hash = $defs{$name};;\
+  readingsBeginUpdate($hash);;\
+  # ws_live_Data contains next-live-measurement-data\
+  my $val = ReadingsVal($name, "ws_live_Data", "{}");;\
+  my %res = %{json2nameValue($val, undef, undef, "payload_data_liveMeasurement.*")};;\
+\
+  my $ret = "got values for:\n";;\
+  foreach my $k (sort keys %res) {\
+    # Key umbenennen: payload_data_liveMeasurement_ → ws_live_\
+    my $newKey = $k;;\
+    $newKey =~ s/^payload_data_liveMeasurement_/ws_live_/;;\
+\
+    $ret .= "$newKey\n";;\
+    readingsBulkUpdate($hash, makeReadingName($newKey), $res{$k});;\
+  }\
+  Log3($name,4,sprintf("%-20s ws_06 : ", $name)."got values for payload_data_liveMeasurement_ → ws_live_");;\
+  return $ret;;\
 \
 ####################################### Ende Tibber_Live ###################################\
 },\
@@ -1391,7 +1417,7 @@ conf_EVU_Summe_ct_kWh:conf_EVU.* {\
 \
   my $conf_EVU = ReadingsVal("$NAME","conf_EVU","EPEX_Spot") ;;\
   my $Summe_ct_kWh = 0;;\
-  if ( $conf_EVU eq "Tibber" ) {                                     ## Es wurde ein EVU ausgewählt\
+  if ( $conf_EVU eq "Tibber" ) {                                               # Es wurde ein EVU ausgewählt\
     $Summe_ct_kWh =\
           AttrVal("$NAME","conf_EVU_".$conf_EVU."_Zuschlag_ct_kWh",0)\
        + AttrVal("$NAME","conf_EVU_".$conf_EVU."_Grundgebuehr_EUR_Jahr",0) *100 / AttrVal("$NAME","conf_Netz_Jahresverbrauch_kWh",0)\
@@ -1404,14 +1430,12 @@ conf_EVU_Summe_ct_kWh:conf_EVU.* {\
        + AttrVal("$NAME","conf_VNB_Stromsteuer_ct_kWh",0);;\
 \
     $Summe_ct_kWh *= AttrVal("$NAME","conf_EVU_".$conf_EVU."_Korrektur",1);;\
-    $Summe_ct_kWh  = round($Summe_ct_kWh ,4);;              ## Netto Aufschlag pro kWh\
+    $Summe_ct_kWh  = round($Summe_ct_kWh ,4);;                   # Netto Aufschlag pro kWh\
 \
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_1  : Zuschlag von ".$Summe_ct_kWh." ct/kWh für ".$conf_EVU." berechnet";;\
-    }\
-  } ## end if\
+    Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Zuschlag von $Summe_ct_kWh ct/kWh für $conf_EVU berechnet");;\
+  } # end if\
 \
-  if ( $conf_EVU eq "aWATTar" ) {                                    ## Es wurde ein EVU ausgewählt\
+  if ( $conf_EVU eq "aWATTar" ) {                                              # Es wurde ein EVU ausgewählt\
     $Summe_ct_kWh =\
           AttrVal("$NAME","conf_EVU_".$conf_EVU."_Grundgebuehr_EUR_Jahr",0) *100 / AttrVal("$NAME","conf_Netz_Jahresverbrauch_kWh",0)\
        + AttrVal("$NAME","conf_VNB_Arbeitspreis_ct_kWh",0)\
@@ -1423,18 +1447,14 @@ conf_EVU_Summe_ct_kWh:conf_EVU.* {\
        + AttrVal("$NAME","conf_VNB_Stromsteuer_ct_kWh",0);;\
 \
     $Summe_ct_kWh *= AttrVal("$NAME","conf_EVU_".$conf_EVU."_Korrektur",1);;\
-    $Summe_ct_kWh  = round($Summe_ct_kWh ,4);;              ## Netto Aufschlag pro kWh\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_1  : Zuschlag von ".$Summe_ct_kWh." für ".$conf_EVU." berechnet";;\
-      Log 3, "$NAME  ur_1  : Zusätzlich erfolgt bei ".$conf_EVU." ein dynamischer Zuschlag von val+0.03*abs(val) pro kWh";;\
-    }\
-  } ## end if\
+    $Summe_ct_kWh  = round($Summe_ct_kWh ,4);;                    # Netto Aufschlag pro kWh\
+    Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Zuschlag von $Summe_ct_kWh für $conf_EVU berechnet");;\
+    Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Zusätzlich erfolgt bei $conf_EVU ein dynamischer Zuschlag von val+0.03*abs(val) pro kWh");;\
+  } # end if\
 \
   if ( $conf_EVU eq "EPEX_Spot" ) {\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_1  : Zuschlag von 0 für ".$conf_EVU."";;\
-    }\
-  } ## end if\
+    Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Zuschlag von 0 für $conf_EVU");;\
+  } # end if\
 \
   if ( $conf_EVU ne "Tibber_Live" ) {\
    fhem("get $NAME 01_Preis_Info_EPEX_Spot");;\
@@ -1442,940 +1462,18 @@ conf_EVU_Summe_ct_kWh:conf_EVU.* {\
    fhem("get $NAME 02_Preis_Info_Tibber_Live");;\
   }\
 \
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_1  : Daten für ".$conf_EVU." aktualisiert";;\
-  }\
+  Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Daten für $conf_EVU aktualisiert");;\
  \
   return $Summe_ct_kWh;;\
 },\
 \
 current_level:fc._0000_total.* {\
-  ## Aktueller Preis\
+## Aktueller Preis\
   my $hash = $defs{$name};;\
-\
-   # --- Readings setzen ---\
-  readingsBeginUpdate($hash);;\
-  readingsBulkUpdate($hash,"current_price",ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",strftime("%H",localtime),int(strftime("%M",localtime)  / 15) * 15),0) );;\
-  readingsBulkUpdate($hash,"current_date",sprintf("%s:%02d:00",strftime("%Y-%m-%d %H",localtime),int(strftime("%M",localtime)  / 15) * 15) );;\
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_2  : Daten für current Werte gesetzt";;\
-  }\
-  readingsBulkUpdate($hash,"fc0_0000_startsAt",strftime("%Y-%m-%d 00:00:00",localtime) );;\
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_2  : Daten für fc0 Startzeit gesetzt";;\
-  }\
-  if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {       ## Der nächste Tag ist bereits da\
-    readingsBulkUpdate($hash,"fc1_0000_startsAt",strftime("%Y-%m-%d 00:00:00",localtime(time+86400)) );;\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_2  : Daten für fc1 Startzeit gesetzt";;\
-    }\
-  } else {\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_2  : Daten für fc1 sind noch nicht da";;\
-    }\
-    fhem("deletereading ".$NAME." fc1_0000_startsAt");;\
-  } # end if\
-  return "null";;\
-},\
-\
-fc_avg:current_price.* {\
-## Berechnung des durchschnitt Wertes über alle Werte von fc0 und fc1\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
-  my $fc_avg = 0;;\
-\
-  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {      ## Der nächste Tag ist bereits da\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_3  : Daten für fc1 sind bereits da";;\
-    }\
-    $fc  = 1;;\
-  } # end if\
-  \
-  my $start=$hour;;\
-  for (my $j=0;;$j<=$fc ;;$j++){ # heute und eventuell morgen durchlaufen\
-    if ($j==1) {$start=0}                                                                   ## Den nächsten Tag bei Stunde 0 beginnen\
-    for (my $k=$start;;$k<=23;;$k++) {                                                ## Summe  berechnen\
-      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
-        $fc_avg += ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j, $k, $quarter*15),0);;\
-# print sprintf("fc%d %02d:%02d",$j, $k, $quarter*15)." ".$fc_avg."\n";;\
-      } # end $quarter\
-    } # end $k\
-  } # end $j\
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_3  : berechne Durchschnittspreis";;\
-  }\
-  return round($fc_avg / ( (96 - $hour*4) + (96 *$fc) ) ,2);;               ## Durchschnitt berechnen\
-},\
-\
-fc_med:current_price.* {\
-## Berechnung des median Wertes\
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_4  : berechne Medianwert aus der Datenbank";;\
-  }\
-  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-           SELECT\
-             cast( (   (SUBSTRING_INDEX(SUBSTRING_INDEX(group_concat(VALUE order by VALUE), ',', floor(1+((count(VALUE)-1) / 2)))  , ',', -1))\
-                       + (SUBSTRING_INDEX(SUBSTRING_INDEX(group_concat(VALUE order by VALUE), ',', ceiling(1+((count(VALUE)-1) / 2))), ',', -1))\
-                     )/2\
-             AS DECIMAL(4,2))\
-           FROM history\
-           WHERE DEVICE='".$NAME."'\
-             AND (   READING='fc0_total' AND TIMESTAMP >= DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00')\
-                     OR READING='fc1_total' AND TIMESTAMP >= DATE_FORMAT(NOW() + INTERVAL 1 DAY, '%Y-%m-%d 00:00:00') ) ;;") ;;\
-},\
-\
-fc_min:current_price.* {\
-##  Ermittlung des minimal Wertes\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
-  my $fc_min = 0;;\
-  my $fc_tmp = 0;;\
-\
-  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
-    $fc = 1;;\
-  } # end if\
-\
-  for (my $j=0;;$j<=$fc;;$j++){\
-    for (my $k=$hour;;$k<=23;;$k++) {\
-      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
-        $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j,$k, $quarter*15),0);;\
-# print sprintf("fc%d %02d:%02d",$j, $k, $quarter*15)." ".$fc_tmp."\n";;\
-        if (($fc_tmp < $fc_min) or ($j == 0 and $k == $hour and $quarter == 0)) {\
-# print sprintf("fc%d %02d:%02d",$j, $k, $quarter*15)." ".$fc_tmp."\n";;\
-          $fc_min = $fc_tmp;;\
-        }\
-      } # end $quarter\
-    } # end $k\
-  } # end $j\
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_5  : berechne Minimalpreis";;\
-  }\
-  return round($fc_min ,2);;                             ## Min Wert gerundet in Cent ausgeben\
-},\
-\
-fc_max:current_price.* {\
-##  Ermittlung des minimal Wertes\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-  my $fc = 0;; # fc0_ = heute, passt sich an wenn es über Mitternacht geht\
-  my $fc_max = 0;;\
-  my $fc_tmp = 0;;\
-\
-  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {       ## Der nächste Tag ist bereits da\
-    $fc = 1;;\
-  } # end if\
-\
-  for (my $j=0;;$j<=$fc;;$j++){\
-    for (my $k=$hour;;$k<=23;;$k++) {\
-      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
-        $fc_tmp = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$j,$k, $quarter*15),0);;\
-# print sprintf("fc%d %02d:%02d",$j, $k, $quarter*15)." ".$fc_tmp."\n";;\
-        if (($fc_tmp > $fc_max) or ($j == 0 and $k == 0 and $quarter == 0)) {\
-          $fc_max = $fc_tmp;;\
-        }\
-      } # end $quarter\
-    } # end $k\
-  } # end $j\
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_6  : berechne Maximalpreis";;\
-  }\
-  return round($fc_max ,2);;                             ## Max Wert gerundet in Cent ausgeben\
-},\
-\
-fc_trigger_net_price:fc_avg.* {\
-## fc_trigger_net_price:[fc_avg|compensation_grid].* {\
-  my $hash = $defs{$name};;\
-  readingsBeginUpdate($hash);;\
-\
-  my $fc_avg = ReadingsVal("$NAME","fc_avg",0);;\
-  my $fc_min = ReadingsVal("$NAME","fc_min",0);;\
-\
-  # Berechnung eines Default Schwellwertes als täglicher Niedrigpreis\
-  my $fc_trigger_net_price= round( ($fc_avg - $fc_min)/2 + $fc_min , 2);;\
- \
-  # Abschätzung von Wirtschaftlichkeit beim Speicher Laden, falls die Börse zu teuer wird\
-  my $fc_trigger_bat_price = round( ReadingsVal("$NAME","fc_max",0) *0.7, 2);;    # Speicher ab 30% unter Maximum Laden\
-  readingsBulkUpdate($hash, "fc_trigger_bat_price", $fc_trigger_bat_price);;\
-\
-## Hier noch eine andere Berechnungsmöglichkeit\
-##  if ( ReadingsVal("$NAME","compensation_grid",0) != 0 ) {\
-##    my $price_level_battery = round( ($fc_avg - ReadingsVal("$NAME","compensation_grid",0)) *0.85 , 2) ;;\
-##    if ( $price_level > $price_level_battery ) {\
-##      $price_level = $price_level_battery;;\
-##    }\
-##  }\
-\
-  if (AttrVal("$NAME","verbose",0) >=3) {\
-    Log 3, "$NAME  ur_7  : berechne Triggerpreis";;\
-  }\
- return($fc_trigger_net_price);;\
-},\
-\
-fc0_trigger_net_start:fc_trigger_net_price.* {\
-  my $hash = $defs{$name};;\
-  readingsBeginUpdate($hash);;\
-\
-  my $fc = 0;;\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-  my $fc_trigger_net_price = ReadingsVal("$NAME","fc_trigger_net_price",0);;\
-  my $fc_trigger_bat_price = ReadingsVal("$NAME","fc_trigger_bat_price",0);;\
-\
-  # Ermitteln des nächsten Trigger Fensters\
-  my $fc_total = 0;;\
-  my $fc_total_net_found;;\
-  my $fc_total_bat_found;;\
-  my $fc_total_next;;\
-  my $fc_trigger_start_quarter = int($min / 15);;\
-\
-  for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
-    my $start_quarter = ($loop_hour == $hour) ? $fc_trigger_start_quarter : 0;;\
-    for (my $quarter = $start_quarter;; $quarter <= 3;; $quarter++) {\
-      $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour , $quarter*15),0);;\
-      if (AttrVal("$NAME","verbose",0) >=3) {\
-        Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Start %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_net_price." ".$fc_trigger_bat_price;;\
-      }\
-      if ( $fc_total < $fc_trigger_bat_price and !defined($fc_total_bat_found) ) {\
-        $fc_total_bat_found = sprintf("%02d:%02d", $loop_hour, $quarter*15);;\
-        if (AttrVal("$NAME","verbose",0) >=3) {\
-          Log 3, "$NAME  ur_8  : ".sprintf("fc%d_trigger_bat_start %02d:%02d",$fc, $loop_hour, $quarter*15);;\
-        }\
-      }\
-\
-      if ( $fc_total < $fc_trigger_net_price  and !defined($fc_total_net_found)) {\
-        $fc_total_net_found = sprintf("%02d:%02d", $loop_hour, $quarter*15);;\
-\
-        if ( $quarter+1 <= 3 ) {\
-          $fc_total_next = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, ($quarter+1)*15),0);;\
-              if (AttrVal("$NAME","verbose",0) >=3) {\
-                Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Next  %02d:%02d",$fc, $loop_hour, ($quarter+1)*15)." ".$fc_total_next;;\
-              }\
-        } else {\
-          if ( $loop_hour+1 <= 23 ) {\
-            $fc_total_next = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour+1, 0*15),0);;\
-              if (AttrVal("$NAME","verbose",0) >=3) {\
-                Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Next  %02d:%02d",$fc, $loop_hour+1, 0*15)." ".$fc_total_next;;\
-              }\
-          } else {\
-            $fc_total_next = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, 0, 0*15),0);;\
-              if (AttrVal("$NAME","verbose",0) >=3) {\
-                Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Next  %02d:%02d",$fc, 0, 0*15)." ".$fc_total_next;;\
-              }\
-          }\
-        }\
-        if ( $fc_total_next > $fc_trigger_net_price ) {\
-          $fc_total_net_found = undef;;\
-          if (AttrVal("$NAME","verbose",0) >=3) {\
-            Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Next  Trigger ist zu kurz",$fc);;\
-          }\
-        }\
-\
-        if (AttrVal("$NAME","verbose",0) >=3) {\
-          Log 3, "$NAME  ur_8  : ".sprintf("fc%d_trigger_net_start     %02d:%02d",$fc, $loop_hour, $quarter*15);;\
-        }\
-      }\
-      if ( defined($fc_total_net_found) and defined($fc_total_bat_found) ) {last;;}\
-    } # end $quarter\
-    if ( defined($fc_total_net_found) and defined($fc_total_bat_found) ) {last;;}\
-  } # end  for loop_hour\
-\
-  if ( defined($fc_total_bat_found) ) {\
-    readingsBulkUpdate($hash, "fc0_trigger_bat_start", $fc_total_bat_found);;\
-  } else {\
-    readingsBulkUpdate($hash, "fc0_trigger_bat_start", "null");;\
-  }\
-  if ( !defined($fc_total_net_found) ) {\
-    $fc_total_net_found = "null";;\
-  }\
-  return($fc_total_net_found);;\
-},\
-\
-fc0_trigger_net_stop:fc0_trigger_net_start.* {\
-  my $hash = $defs{$name};;\
-  readingsBeginUpdate($hash);;\
-\
-  my $fc = 0;;\
-  my $loop_hour = 0;;\
-  my $fc_trigger_net_price = ReadingsVal("$NAME","fc_trigger_net_price",0);;\
-  my $fc_trigger_bat_price = ReadingsVal("$NAME","fc_trigger_bat_price",0);;\
-\
-  # Ermitteln des nächsten Trigger Fensters\
-  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_net_start","null");;\
-  my $fc_trigger_stop  = $fc_trigger_start;;\
-\
-  my ($fc_trigger_start_hour, $fc_trigger_start_quarter, $fc_total_net_found, $fc_total_bat_found);;\
-\
-  if ( $fc_trigger_start ne "null" ) {\
-    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
-    $fc_trigger_start_hour = $1;;\
-    $fc_trigger_start_quarter = $2 / 15;;\
-\
-    my $fc_total = 0;;\
-\
-    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
-      my $start_quarter = ($loop_hour == $fc_trigger_start_hour) ? $fc_trigger_start_quarter : 0;;\
-      for (my $quarter = $start_quarter;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $quarter*15),0);;\
-        if (AttrVal("$NAME","verbose",0) >=3) {\
-          Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Stop      %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_net_price;;\
-        }\
-\
-      if ( $fc_total > $fc_trigger_net_price  and !defined($fc_total_net_found)) {\
-        $fc_total_net_found = sprintf("%02d:%02d", $loop_hour, $quarter*15);;\
-        if (AttrVal("$NAME","verbose",0) >=3) {\
-          Log 3, "$NAME  ur_8  : ".sprintf("fc0_trigger_net_stop     %02d:%02d", $loop_hour, $quarter*15);;\
-        }\
-      }\
-\
-      # wenn es 23:45 is wechsel zum nächsten Tag\
-       if ($loop_hour == 23 and $fc == 0 and $quarter == 3) {\
-         if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {   # Der nächste Tag ist bereits da\
-           $fc = 1;;\
-           $loop_hour = -1;;                                                                # beginne wieder bei 00:00\
-         } else {\
-           $fc_trigger_stop = "23:59";;                                                 # fc0 stop ist um 00:00\
-         }\
-       }\
-\
-      if ( defined($fc_total_net_found) ) {last;;}\
-      } # end $quarter\
-    if ( defined($fc_total_net_found) ) {last;;}\
-    } # end for loop_hour\
-  }\
-\
-  $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_bat_start","null");;\
-  $fc_trigger_stop  = $fc_trigger_start;;\
-\
-  if ( $fc_trigger_start ne "null" ) {\
-    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
-    $fc_trigger_start_hour = $1;;\
-    $fc_trigger_start_quarter = $2 / 15;;\
-\
-    my $fc_total = 0;;\
-\
-    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
-      my $start_quarter = ($loop_hour == $fc_trigger_start_hour) ? $fc_trigger_start_quarter : 0;;\
-      for (my $quarter = $start_quarter;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $quarter*15),0);;\
-        if (AttrVal("$NAME","verbose",0) >=3) {\
-          Log 3, "$NAME  ur_8  :  ".sprintf("fc%d     Stop_bat  %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_bat_price;;\
-        }\
-      if ( $fc_total > $fc_trigger_bat_price and !defined($fc_total_bat_found) ) {\
-        $fc_total_bat_found = sprintf("%02d:%02d", $loop_hour, $quarter*15);;\
-        if (AttrVal("$NAME","verbose",0) >=3) {\
-          Log 3, "$NAME  ur_8  : ".sprintf("fc0_trigger_bat_stop %02d:%02d", $loop_hour, $quarter*15);;\
-        }\
-      }\
-\
-      # wenn es 23:45 is wechsel zum nächsten Tag\
-       if ($loop_hour == 23 and $fc == 0 and $quarter == 3) {\
-         if (ReadingsVal("$NAME","fc1_0000_total","null") ne "null") {   # Der nächste Tag ist bereits da\
-           $fc = 1;;\
-           $loop_hour = -1;;                                                                # beginne wieder bei 00:00\
-         } else {\
-           $fc_trigger_stop = "23:59";;                                                 # fc0 stop ist um 00:00\
-         }\
-       }\
-\
-      if ( defined($fc_total_bat_found) ) {last;;}\
-      } # end $quarter\
-    if ( defined($fc_total_bat_found) ) {last;;}\
-    } # end for loop_hour\
-  }\
-\
-  if ( defined($fc_total_bat_found) ) {\
-    readingsBulkUpdate($hash, "fc0_trigger_bat_stop", $fc_total_bat_found);;\
-  } else {\
-    readingsBulkUpdate($hash, "fc0_trigger_bat_stop", "null");;\
-  }\
-  if ( !defined($fc_total_net_found) ) {\
-    $fc_total_net_found = "null";;\
-  }\
-  return($fc_total_net_found);;\
-},\
-\
-fc0_trigger_net_dauer:fc0_trigger_net_stop.* {\
-# Berechnung des Trigger Fensters in Minuten\
-  my $hash = $defs{$name};;\
-\
-  my $fc_trigger_dauer = "null";;\
-  my $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_bat_start","null");;\
-  if ( $fc_trigger_start ne "null" ) {\
-    my $fc_trigger_stop = ReadingsVal("$NAME","fc0_trigger_bat_stop","null");;\
-\
-    if ( $fc_trigger_stop lt "00:00" ) { $fc_trigger_stop = "24:00" };;\
-    my ($h1,$m1) = split(":", $fc_trigger_start);;\
-    my ($h2,$m2) = split(":", $fc_trigger_stop);;\
-\
-    if ( $h2 < $h1 ) { $h2 += 24 };;\
-    $fc_trigger_dauer = ($h2*60 + $m2) - ($h1*60 + $m1);;\
-    if ( $fc_trigger_dauer <= 15 ) {                           # Das Trigger Fenster ist zu klein\
-      readingsBeginUpdate($hash);;\
-      readingsBulkUpdate($hash, "fc0_trigger_bat_start", "null");;\
-      readingsBulkUpdate($hash, "fc0_trigger_bat_stop", "null");;\
-      $fc_trigger_dauer = "null";;\
-      if (AttrVal("$NAME","verbose",0) >=3) {\
-        Log 3, "$NAME  ur_8  : fc0_trigger_bat_dauer ist zu kurz";;\
-      }\
-    }\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_8  : fc0_trigger_bat_dauer $fc_trigger_dauer";;\
-    }\
-  }\
-  readingsBulkUpdate($hash, "fc0_trigger_bat_dauer", $fc_trigger_dauer);;\
-\
-  $fc_trigger_start = ReadingsVal("$NAME","fc0_trigger_net_start","null");;\
-  if ( $fc_trigger_start ne "null" ) {\
-    my $fc_trigger_stop     = ReadingsVal("$NAME","fc0_trigger_net_stop","null");;\
-\
-    if ( $fc_trigger_stop lt "00:00" ) { $fc_trigger_stop = "24:00" };;\
-    my ($h1,$m1) = split(":", $fc_trigger_start);;\
-    my ($h2,$m2) = split(":", $fc_trigger_stop);;\
-\
-    if ( $h2 < $h1 ) { $h2 += 24 };;\
-    my $fc_trigger_dauer = ($h2*60 + $m2) - ($h1*60 + $m1);;\
-    if ( $fc_trigger_dauer <= 15 ) {                               # Das Trigger Fenster ist zu klein\
-      readingsBeginUpdate($hash);;\
-      readingsBulkUpdate($hash, "fc0_trigger_net_start", "null");;\
-      readingsBulkUpdate($hash, "fc0_trigger_net_stop", "null");;\
-      $fc_trigger_dauer = "null";;\
-      if (AttrVal("$NAME","verbose",0) >=3) {\
-        Log 3, "$NAME  ur_8  : fc0_trigger_net_dauer     ist zu kurz";;\
-      }\
-    }\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_8  : fc0_trigger_net_dauer     $fc_trigger_dauer";;\
-    }\
-    return $fc_trigger_dauer;;\
-  }\
-  return "null";;\
-},\
-\
-fc0_net_trigger:fc0_trigger_net_dauer.* {\
-  # Setzen des Triggers für die aktuelle viertel Stunde\
-  if (      ReadingsVal("$NAME","fc0_trigger_net_dauer","null") ne "null"\
-      and ReadingsVal("$NAME","current_price",100)  < ReadingsVal("$NAME","fc_trigger_net_price",0) ) {\
-    return("on")\
-  } else {\
-    return("off")\
-  }\
-},\
-\
-fc1_trigger_net_start:fc_trigger_net_price.* {\
-  my $fc = 1;;\
-  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {\
-    my $fc_trigger_net_price = ReadingsVal("$NAME","fc_trigger_net_price",0);;\
-\
-    # Ermitteln des nächsten Trigger Fensters\
-    my $fc_total = 0;;\
-\
-    for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour , $quarter*15),0);;\
-          if (AttrVal("$NAME","verbose",0) >=4) {\
-            Log 3, "$NAME  ur_8  :  ".sprintf("fc%d Start %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_net_price;;\
-          }\
-        if ( $fc_total < $fc_trigger_net_price ) {\
-          if (AttrVal("$NAME","verbose",0) >=3) {\
-            Log 3, "$NAME  ur_8  : ".sprintf("fc%d_trigger_net_start     %02d:%02d",$fc, $loop_hour ,$quarter*15);;\
-          }\
-          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
-        }\
-      } # end $quarter\
-    } # end  for loop_hour\
-  }\
-  return("null");;\
-},\
-\
-fc1_trigger_net_stop:fc1_trigger_net_start.* {\
-  # Ermitteln des nächsten Trigger Fensters\
-  my $fc = 1;;\
-  my $loop_hour;;\
-  my $fc_trigger_net_price = ReadingsVal("$NAME","fc_trigger_net_price",0);;\
-\
-  my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_net_start","null");;\
-  my $fc_trigger_stop = $fc_trigger_start;;\
-\
-  my ($fc_trigger_start_hour, $fc_trigger_start_quarter);;\
-\
-  if ( $fc_trigger_start ne "null" ) {\
-    $fc_trigger_start =~ /(\d\d):(\d\d)/;;\
-    $fc_trigger_start_hour = $1;;\
-    $fc_trigger_start_quarter = $2 / 15;;\
-    my $fc_total = 0;;\
-\
-    for ($loop_hour = $fc_trigger_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = $fc_trigger_start_quarter;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $quarter*15),0);;\
-        if (AttrVal("$NAME","verbose",0) >=4) {\
-          Log 3, "$NAME  ur_8  : ".sprintf("fc%d Stop  %02d:%02d",$fc, $loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_net_price;;\
-        }\
-        if ( $fc_total < $fc_trigger_net_price ) {\
-          $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
-        } else {\
-          if (AttrVal("$NAME","verbose",0) >=3) {\
-            Log 3, "$NAME  ur_8  : ".sprintf("fc%d_trigger_net_stop      %02d:%02d",$fc, $loop_hour, $quarter*15);;\
-          }\
-          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
-        }\
-\
-       if ( $quarter == 3 ) { $fc_trigger_start_quarter = 0 }\
-\
-      } # end $quarter\
-    } # end for loop_hour\
-  }\
- \
-  return($fc_trigger_stop);;\
-},\
-\
-fc1_trigger_net_dauer:fc1_trigger_net_stop.* {\
-# Berechnung des Trigger Fensters in Minuten\
-  my $hash = $defs{$name};;\
-\
-  my $fc_trigger_start = ReadingsVal("$NAME","fc1_trigger_net_start","null");;\
-  if ( $fc_trigger_start ne "null" ) {\
-    my $fc_trigger_stop = ReadingsVal("$NAME","fc1_trigger_net_stop","null");;\
-    if ( $fc_trigger_stop eq "00:00" ) { $fc_trigger_stop = "24:00" };;\
-    my ($h1,$m1) = split(":", $fc_trigger_start);;\
-    my ($h2,$m2) = split(":", $fc_trigger_stop);;\
-\
-    my $fc_trigger_dauer = ($h2*60 + $m2) - ($h1*60 + $m1);;\
-\
-    if ( $fc_trigger_dauer <= 15 ) {                               # Das Trigger Fenster ist zu klein\
-      readingsBeginUpdate($hash);;\
-      readingsBulkUpdate($hash, "fc1_trigger_net_start", "null");;\
-      readingsBulkUpdate($hash, "fc1_trigger_net_stop", "null");;\
-      $fc_trigger_dauer = "null";;\
-      if (AttrVal("$NAME","verbose",0) >=3) {\
-        Log 3, "$NAME  ur_8  : fc1_trigger_net_dauer ist zu kurz";;\
-      }\
-    }\
-    if (AttrVal("$NAME","verbose",0) >=3) {\
-      Log 3, "$NAME  ur_8  : fc1_trigger_net_dauer     $fc_trigger_dauer";;\
-    }\
-    return $fc_trigger_dauer;;\
-  }\
-  return "null";;\
-},\
-\
-fc_trigger_max:fc_avg.* {\
-  my $fc_avg = ReadingsVal("$NAME","fc_avg",0);;\
-  my $fc_max = ReadingsVal("$NAME","fc_max",0);;\
-\
-  # Berechnung eines Schwellwertes als täglichen Maximalpreises\
-  return round( ($fc_max - $fc_avg)/2 + $fc_avg , 2);;\
-},\
-\
-fc0_trigger_max_start:fc_trigger_max.* {\
-  # Ermitteln des nächsten Trigger_max Fensters\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
-  my $fc_total = 0;;\
-\
-    for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc0_%02d%02d_total",$loop_hour , $quarter*15),0);;\
-# print sprintf("fc0 Start max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
-        if ( $fc_total > $fc_trigger_max ) {\
-          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
-        }\
-      } # end $quarter\
-    } # end  for loop_hour\
-\
-  return("null");;\
-},\
-\
-fc0_trigger_max_stop:fc0_trigger_max_start.* {\
-  # Ermitteln des nächsten Trigger Fensters\
-  my $fc = 0;;\
-  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
-\
-  my $fc_trigger_max_start = ReadingsVal("$NAME","fc0_trigger_max_start","null");;\
-  my $fc_trigger_max_stop = $fc_trigger_max_start;;\
-\
-  my ($fc_trigger_max_start_hour, $fc_trigger_max_start_quarter);;\
-\
-  if ( $fc_trigger_max_start ne "null" ) {\
-    $fc_trigger_max_start =~ /(\d\d):(\d\d)/;;\
-    $fc_trigger_max_start_hour = $1;;\
-    $fc_trigger_max_start_quarter = $2 / 15;;\
-    my $fc_total = 0;;\
-\
-    for (my $loop_hour = $fc_trigger_max_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = $fc_trigger_max_start_quarter;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total", $fc, $loop_hour, $quarter*15),0);;\
-# print sprintf("fc0 Stop  max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
-        if ( $fc_total > $fc_trigger_max ) {\
-          $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
-        } else {\
-          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
-        }\
-\
-       if ( $quarter == 3 ) { $fc_trigger_max_start_quarter = 0 }\
-\
-      } # end $quarter\
-\
-     # wechsel zum nächsten Tag\
-     if ( $loop_hour == 23 and $fc == 0 ) {\
-       $fc = 1;;\
-       $loop_hour = -1;;\
-     }\
-\
-    } # end for loop_hour\
-  }\
- \
-  return($fc_trigger_max_stop);;\
-},\
-\
-fc0_trigger_max_dauer:fc0_trigger_max_stop.* {\
-# Berechnung des Trigger Fensters in Minuten\
-  my $fc_trigger_max_start = ReadingsVal("$NAME","fc0_trigger_max_start","null");;\
-  if ( $fc_trigger_max_start ne "null" ) {\
-    my $fc_trigger_max_stop = ReadingsVal("$NAME","fc0_trigger_max_stop","null");;\
-    my ($h1,$m1) = split(":", $fc_trigger_max_start);;\
-    my ($h2,$m2) = split(":", $fc_trigger_max_stop);;\
-    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
-  }\
-  return "null";;\
-},\
-\
-fc0_trigger_max:fc0_trigger_max_stop.* {\
-\
-  # Setzen des maximum Triggers für die aktuelle Stunde\
-  if ( ReadingsVal("$NAME","current_price",0)  > ReadingsVal("$NAME","fc_trigger_max",0) ) {\
-    return("on")\
-  } else {\
-    return("off")\
-  }\
-},\
-\
-fc1_trigger_max_start:fc_trigger_max.* {\
-  if (ReadingsVal("$NAME","fc1_0000_startsAt","null") ne "null") {\
-    my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
-\
-    # Ermitteln des nächsten Trigger Fensters\
-    my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-    my $fc_total = 0;;\
-\
-    for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total",$loop_hour , $quarter*15),0);;\
-# print sprintf("fc1 Start max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
-        if ( $fc_total > $fc_trigger_max ) {\
-          return(sprintf("%02d:%02d",$loop_hour, $quarter*15)) ;;\
-        }\
-      } # end $quarter\
-    } # end  for loop_hour\
-  }\
-  return("null");;\
-},\
-\
-fc1_trigger_max_stop:fc1_trigger_max_start.* {\
-  # Ermitteln des nächsten Trigger Fensters\
-  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
-\
-  my $fc_trigger_max_start = ReadingsVal("$NAME","fc1_trigger_max_start","null");;\
-  my $fc_trigger_max_stop = $fc_trigger_max_start;;\
-\
-  my ($fc_trigger_max_start_hour, $fc_trigger_max_start_quarter);;\
-\
-  if ( $fc_trigger_max_start ne "null" ) {\
-    $fc_trigger_max_start =~ /(\d\d):(\d\d)/;;\
-    $fc_trigger_max_start_hour = $1;;\
-    $fc_trigger_max_start_quarter = $2 / 15;;\
-    my $fc_total = 0;;\
-\
-    for (my $loop_hour = $fc_trigger_max_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
-      for (my $quarter = $fc_trigger_max_start_quarter;; $quarter <= 3;; $quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc1_%02d%02d_total", $loop_hour, $quarter*15),0);;\
-# print sprintf("fc1 Stop  max %02d:%02d",$loop_hour, $quarter*15)." ".$fc_total." ".$fc_trigger_max."\n";;\
-        if ( $fc_total > $fc_trigger_max ) {\
-          $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $quarter*15) ;;\
-        } else {\
-          return(sprintf("%02d:%02d",$loop_hour, $quarter*15));;\
-        }\
-\
-       if ( $quarter == 3 ) { $fc_trigger_max_start_quarter = 0 }\
-\
-      } # end $quarter\
-    } # end for loop_hour\
-  }\
- \
-  return($fc_trigger_max_stop);;\
-},\
-\
-fc1_trigger_max_dauer:fc1_trigger_max_stop.* {\
-# Berechnung des Trigger Fensters in Minuten\
-  my $fc_trigger_max_start = ReadingsVal("$NAME","fc1_trigger_max_start","null");;\
-  if ( $fc_trigger_max_start ne "null" ) {\
-    my $fc_trigger_max_stop = ReadingsVal("$NAME","fc1_trigger_max_stop","null");;\
-    my ($h1,$m1) = split(":", $fc_trigger_max_start);;\
-    my ($h2,$m2) = split(":", $fc_trigger_max_stop);;\
-    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
-  }\
-  return "null";;\
-},\
-\
-next1_quarter:current_price.* {\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-  my $quarter = int($min / 15);; # aktuelle Viertelstunde 0–3\
-  my $next_quarter = ($quarter + 1) % 4;;  # nächste Viertelstunde\
-  my $hour_offset = $hour;; # passen sich an wenn es über Mitternacht geht\
-  my $fc = 0;; # fc0_ = # heute passen sich an wenn es über Mitternacht geht\
-\
-  if ($quarter == 3) {  # wenn wir in 23:45 sind nächste Viertelstunde gehört zur nächsten Stunde \
-        $hour_offset++;;\
-        if ($hour_offset >= 24) { \
-            $hour_offset -= 24;;\
-            $fc = 1;; # fc1_ = morgen\
-        }\
-    }\
-\
-  return round(ReadingsVal($NAME,sprintf("fc%d_%02d%02d_total",$fc, $hour_offset, $next_quarter*15),0),2);;\
- },\
-\
-next1_hour:current_price.* {\
-  my $j;;\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
-  my $quarter = int($min / 15);; # aktuelle Viertelstunde 0–3\
-  my $next_quarter = ($quarter + 1) % 4;;  # nächste Viertelstunde\
-  my $hour_offset = $hour;; # passt sich an wenn es über Mitternacht geht\
-  my $fc = 0;; # fc0_ = # heute, passt sich an wenn es über Mitternacht geht\
-\
-  if ($hour_offset == 23) {  # wenn wir bei 23:00 sind gehört die nächste Stunde zum nächsten Tag\
-     $hour_offset = 0;;\
-     $fc = 1;; # fc1_ = morgen\
-    }\
-    for ($quarter = 0;; $quarter <= 3;; $quarter++) {\
-      $j += ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total",$fc, $hour_offset, $quarter*15),0);;\
-    }\
-\
-  return round($j/4,2);; # Für die nächste Stunde wird der Durchschnitt ausgegeben\
- },\
-\
-nodes_TIMESTAMP:nodes_00_00_cost.* {\
-my ($timestamp,$value) = 2x0;;\
-my $tmp = 0;;\
-\
-for (my $loop_last = 0;; $loop_last <= 2;; $loop_last++) {\
-  $timestamp = ReadingsVal("$NAME","nodes_00_".sprintf("%02d",$loop_last)."_from","null");;\
-  $value = ReadingsVal("$NAME","nodes_00_".sprintf("%02d",$loop_last)."_cost","null");;\
-\
-  if ( $value ne "null" ) {\
-    # Eintragen der Kosten für die Stunde\
-    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                VALUES('".$timestamp."','$NAME','Tibber','nodes_cost','".$value."')\
-              ON DUPLICATE KEY UPDATE\
-                VALUE='".$value."';;") ;;\
-    # Eintragen des Verbrauchs für die Stunde\
-    $value = ReadingsVal("$NAME","nodes_00_".sprintf("%02d",$loop_last)."_consumption","null");;\
-    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                VALUES('".$timestamp."','$NAME','Tibber','nodes_consumption','".$value."')\
-              ON DUPLICATE KEY UPDATE\
-                VALUE='".$value."';;") ;;\
-  } else {\
-    $tmp = "null";;\
-  }\
-} # end for\
-if ($tmp eq "null") {\
-  $timestamp = $tmp\
-}\
-$timestamp;;\
-},\
-\
-nodes_TIMESTAMP:nodes_24_00_cost.* {\
-my ($timestamp,$value) = 2x0;;\
-my $tmp = 0;;\
-\
-for (my $loop_last = 0;; $loop_last <= 23;; $loop_last++) {\
-  $timestamp = ReadingsVal("$NAME","nodes_24_".sprintf("%02d",$loop_last)."_from","null");;\
-  $value = ReadingsVal("$NAME","nodes_24_".sprintf("%02d",$loop_last)."_cost","null");;\
-\
-  if ( $value ne "null" ) {\
-    # Eintragen der Kosten für die Stunde\
-    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                VALUES('".$timestamp."','$NAME','Tibber','nodes_cost','".$value."')\
-              ON DUPLICATE KEY UPDATE\
-                VALUE='".$value."';;") ;;\
-    # Eintragen des Verbrauchs für die Stunde\
-    $value = ReadingsVal("$NAME","nodes_24_".sprintf("%02d",$loop_last)."_consumption","null");;\
-    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                VALUES('".$timestamp."','$NAME','Tibber','nodes_consumption','".$value."')\
-              ON DUPLICATE KEY UPDATE\
-                VALUE='".$value."';;") ;;\
-  } else {\
-    $tmp = "null";;\
-  }\
-} # end for\
-if ($tmp eq "null") {\
-  $timestamp = $tmp\
-}\
-$timestamp;;\
-},\
-\
-nodes_TIMESTAMP:05_consumption_hourly_100-0001.* {\
-  my ($timestamp,$value) = 2x0;;\
-\
-  for (my $loop_last = 1;; $loop_last <= 300;; $loop_last += 3) {\
-\
-    $timestamp =  ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last+2),"null");; # timestamp\
-    $timestamp =~ s/T/ /g ;;\
-    $timestamp =  substr($timestamp,0,19);;\
-\
-    # cost aus tibber-Api ohne MwSt\
-    $value = ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last+1),"null");;\
-\
-    if ( $value ne "" ) {\
-      # Berechnung der Kosten inkl. 19% MwSt für die Stunde\
-      $value = round($value*AttrVal($NAME,"conf_VAT",0),4);;\
-# print $timestamp." ".$value."\n";;\
-\
-      # Schreiben der Kosten für die Stunde in die Datenbank\
-      ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-                INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                  VALUES('".$timestamp."','$NAME','Tibber','nodes_cost','".$value."')\
-                ON DUPLICATE KEY UPDATE\
-                  VALUE='".$value."';;") ;;\
-      # Schreiben des Verbrauchs für die Stunde in die Datenbank\
-      $value = ReadingsVal("$NAME","05_consumption_hourly_100-".sprintf("%04d",$loop_last),"null");;  # consumption\
-      $value = round($value,4);;\
-      ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-                INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                  VALUES('".$timestamp."','$NAME','Tibber','nodes_consumption','".$value."')\
-                ON DUPLICATE KEY UPDATE\
-                  VALUE='".$value."';;") ;;\
-    }\
-  } # end for\
-\
-  $timestamp;;\
-},\
-\
-nodes_cost_avg:nodes_TIMESTAMP.* {\
-## Berechnung des Tages Wertes\
-  if ( ReadingsVal("$NAME","nodes_TIMESTAMP","null") ne "null" ) {\
-    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-           SELECT cast(avg(VALUE) AS DECIMAL(4,2)) FROM history\
-           WHERE DEVICE='".$NAME."'\
-             AND READING='nodes_cost'\
-             AND TIMESTAMP >= curdate() ;;") ;;\
-  } else {\
-    ReadingsVal("$NAME","nodes_cost_avg","null")\
-  }\
-},\
-\
-nodes_cost_min:nodes_TIMESTAMP.* {\
-##  Ermittlung des minimal Wertes\
-  if ( ReadingsVal("$NAME","nodes_TIMESTAMP","null") ne "null" ) {\
-    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-           SELECT cast(min(VALUE) AS DECIMAL(4,2)) FROM history\
-           WHERE DEVICE='".$NAME."'\
-             AND READING='nodes_cost'\
-             AND TIMESTAMP >= curdate() ;;") ;;\
-  } else {\
-    ReadingsVal("$NAME","nodes_cost_min","null")\
-  }\
-},\
-\
-nodes_cost_max:nodes_TIMESTAMP.* {\
-## Ermittlung des maximal Wertes\
-  if ( ReadingsVal("$NAME","nodes_TIMESTAMP","null") ne "null" ) {\
-    ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-           SELECT cast(max(VALUE) AS DECIMAL(4,2)) FROM history\
-           WHERE DEVICE='".$NAME."'\
-             AND READING='nodes_cost'\
-             AND TIMESTAMP >= curdate() ;;") ;;\
-  } else {\
-    ReadingsVal("$NAME","nodes_cost_max","null")\
-  }\
-},\
-\
-nodes_consumption_day:nodes_TIMESTAMP.* {\
-## Berechnung des Tages Verbrauches\
-  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
-             WHERE DEVICE='".$NAME."'\
-               AND READING='nodes_consumption'\
-               AND date(TIMESTAMP) = curdate() ;;") ;;\
-},\
-\
-nodes_consumption_month:nodes_TIMESTAMP.* {\
-## Berechnung des Monats Verbrauches\
-  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
-             WHERE DEVICE='".$NAME."'\
-               AND READING='nodes_consumption'\
-               AND YEAR(TIMESTAMP) = YEAR(curdate())\
-               AND MONTH(TIMESTAMP) = MONTH(curdate()) ;;") ;;\
-},\
-\
-nodes_consumption_year:nodes_TIMESTAMP.* {\
-## Berechnung des Jahres Verbrauches\
-  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
-             WHERE DEVICE='".$NAME."'\
-               AND READING='nodes_consumption'\
-               AND YEAR(TIMESTAMP) = YEAR(curdate()) ;;") ;;\
-},\
-\
-total_cost_day:nodes_TIMESTAMP.* {\
-## Berechnung des Tages Wertes\
-  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-             SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
-             FROM history\
-             WHERE DEVICE='".$NAME."'\
-               AND READING='nodes_cost'\
-               AND date(TIMESTAMP) = curdate() ;;") ;;\
-},\
-\
-total_cost_month:nodes_TIMESTAMP.* {\
-## Berechnung des monats Wertes\
-  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-             SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
-             FROM history\
-             WHERE DEVICE='".$NAME."'\
-               AND READING='nodes_cost'\
-               AND YEAR(TIMESTAMP) = YEAR(curdate())\
-               AND MONTH(TIMESTAMP) = MONTH(curdate()) ;;") ;;\
-},\
-\
-total_cost_year:nodes_TIMESTAMP.* {\
-## Berechnung des Jahres Wertes\
-  ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-             SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
-             FROM history\
-             WHERE DEVICE='".$NAME."'\
-               AND READING='nodes_cost'\
-               AND YEAR(TIMESTAMP) = YEAR(curdate()) ;;") ;;\
-},\
-\
-fc_DbLog:fc0_0000_total.* {\
-# Schreibt die redings fc*_hhmm_total als fc*_total mit passendem TIMESTAMP in die Datenbank\
-  my ($timestamp,$date,$hour,$value,$loop_fc_next) = 5x0;;\
-\
-  for (my $loop_fc = 0;; $loop_fc <= 1;; $loop_fc++) {\
-    $loop_fc_next = $loop_fc +1;;\
-    $date = ReadingsVal("$NAME","fc".$loop_fc."_0000_startsAt","null");;\
-    if ($date ne "null" and $date ne "") {\
-      $date =~ /([\d+-]+)/;; $date = $1 ;;\
-      for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
-        $hour = sprintf("%02d",$loop_hour);;\
-        for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
-          $timestamp = $date." ".$hour.":".($quarter*15).":00";;\
-          $value = ReadingsVal("$NAME","fc".$loop_fc."_".$hour.sprintf("%02d",$quarter*15)."_total","null");;\
-          ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-                            INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                              VALUES('".$timestamp."','$NAME','Tibber','fc".$loop_fc."_total','".$value."')\
-                            ON DUPLICATE KEY UPDATE\
-                              VALUE='".$value."';;") ;;\
-        }\
-      }\
-    }\
-  }\
-  ReadingsTimestamp("$NAME","fc0_0000_startsAt","null");;\
-}\
+  my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);; $year += 1900;; $mon += 1 ;;\
 
 attr Stromboerse_connect verbose 3
 attr Stromboerse_connect ws_minInterval 54
 attr Stromboerse_connect ws_websocketURL wss:websocket-api.tibber.com:443/v1-beta/gql/subscriptions
+
+setstate Stromboerse_connect 2026-01-23 18:08:52 conf_EVU Tibber
