@@ -92,7 +92,7 @@ init\
     (    [00:00]                                                         ## Ab 00:00 Uhr gibt es die Preise für den Tag\
      or ( [00:00-01:00] and [+:10]                                       ## Bei Problemen alle 10 Minuten nochmals abfragen\
      and  [$SELF_connect:fc0_0000_startsAt,"null"] ne "null"             ##       solange bis das Datum aktuell ist\
-     and  substr(ReadingsVal($name,"fc0_0000_starstAt","0000-00-00"),0,10) lt strftime("%Y-%m-%d", localtime)\
+     and  substr(ReadingsVal("$SELF_connect","fc0_0000_startsAt","0000-00-00"),0,10) lt strftime("%Y-%m-%d", localtime)\
         )\
      or [13:00-16:00] and [+:20] and [$SELF_connect:fc1_0000_startsAt,"null"] ne ""  ## Ab 14:00 Uhr gibt es die Preise für den nächsten Tag\
     )\
@@ -181,7 +181,7 @@ init\
 }\
 
 attr Stromboerse DbLogExclude .*
-attr Stromboerse comment Version 2025.12.11 15:00 \
+attr Stromboerse comment Version 2026.01.25 12:00 \
 Dieses Device benötigt EPEX_Spot_connect als Verbindung zu EPEX_Spot.
 attr Stromboerse disable 0
 attr Stromboerse group PV Steuerung EVU
@@ -311,6 +311,7 @@ sub $SELF_Format {\
 ## "Bezug vom Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] >= 0 ? ::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0) : 0) )|Format("day")|Format("month")|Format("year")\
 ## "Einspeisung ins Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] <= 0 ? abs(::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0)) :  0) )|""|""|""
 attr Stromboerse verbose 3
+
 
 setstate Stromboerse 2026-01-09 17:15:02 ui_command_1 ---
 setstate Stromboerse 2026-01-09 17:03:00 ui_command_2 ---
