@@ -1,4 +1,4 @@
-REV 30773
+REV 30778
 DIR unused
 UPD 2026-01-22_07:45:03 453336 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -526,7 +526,7 @@ UPD 2022-04-15_07:45:02 63647 FHEM/98_PHC.pm
 UPD 2025-01-13_07:45:03 39885 FHEM/98_PID20.pm
 UPD 2017-01-24_07:45:02 27747 FHEM/98_QRCode.pm
 UPD 2024-06-20_07:45:03 33013 FHEM/98_RandomTimer.pm
-UPD 2026-01-11_07:45:03 106165 FHEM/98_SVG.pm
+UPD 2026-01-25_07:45:03 106182 FHEM/98_SVG.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
 UPD 2024-09-09_07:45:03 83365 FHEM/98_Text2Speech.pm
@@ -656,13 +656,13 @@ UPD 2020-08-25_07:45:02 414 FHEM/holiday/st.holiday
 UPD 2020-08-25_07:45:02 424 FHEM/holiday/th.holiday
 UPD 2019-10-25_07:45:03 334539 FHEM/lib/74_AMADautomagicFlowset_4.4.3.xml
 UPD 2019-10-25_07:45:03 465967 FHEM/lib/74_AMADtaskerset_4.4.3.prj.xml
-UPD 2025-12-23_07:45:03 9166 FHEM/lib/AttrTemplate/general_use.template
+UPD 2026-01-25_07:45:03 9396 FHEM/lib/AttrTemplate/general_use.template
 UPD 2019-10-28_07:45:02 2333 FHEM/lib/AttrTemplate/hmccu.template
 UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2023-12-30_07:45:03 10369 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2025-12-23_07:45:03 454742 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2026-01-25_07:45:03 454790 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2024-10-26_07:45:03 11260 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -766,12 +766,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2026-01-20_07:45:11 5407739 docs/commandref.html
-UPD 2026-01-20_07:45:15 3409790 docs/commandref_DE.html
+UPD 2026-01-25_07:45:10 5408024 docs/commandref.html
+UPD 2026-01-25_07:45:14 3410099 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-01-24_07:45:16 327976 docs/commandref_modular.html
-UPD 2026-01-24_07:45:17 339830 docs/commandref_modular_DE.html
+UPD 2026-01-25_07:45:15 327976 docs/commandref_modular.html
+UPD 2026-01-25_07:45:17 339830 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2521,7 +2521,7 @@ UPD 2026-01-04_07:45:04 1302 www/pgm2/fbtam.js
 UPD 2023-03-18_07:45:02 8651 www/pgm2/fhemdoc_modular.js
 UPD 2024-08-17_07:45:04 74736 www/pgm2/fhemweb.js
 UPD 2022-03-14_07:45:13 14080 www/pgm2/fhemweb_colorpicker.js
-UPD 2026-01-03_07:45:03 41581 www/pgm2/fhemweb_controlminidash.js
+UPD 2026-01-25_07:45:03 40548 www/pgm2/fhemweb_controlminidash.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
 UPD 2017-11-07_07:45:02 5913 www/pgm2/fhemweb_iconLabel.js
