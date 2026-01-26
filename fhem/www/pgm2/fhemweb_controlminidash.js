@@ -99,7 +99,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     const circumference = 2 * Math.PI * 70;
     const gap = 0.20 * circumference;
     dataCircle.setAttribute("stroke-dasharray", `${circumference - gap} ${gap}`);
-    dataCircle.setAttribute("transform", "rotate(126,177,90)"); // öffnet unten
+    dataCircle.setAttribute("transform", "rotate(126,177,90)"); // Ã¶ffnet unten
 
     svg.appendChild(dataCircle);
 
@@ -132,19 +132,19 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
         text.setAttribute("font-size",t.size);
         text.setAttribute("font-weight","normal");
 
-        // Hier fügst du den Wert-Tspan ein
+        // Hier fÃ¼gst du den Wert-Tspan ein
         const tspanValue = document.createElementNS(svgNS,"tspan");
         tspanValue.setAttribute("class", "value");
         tspanValue.textContent = t.content;
         text.appendChild(tspanValue);
 
-        // Für info1Val zusätzlich Unit-Tspan
+        // FÃ¼r info1Val zusÃ¤tzlich Unit-Tspan
         if(t.id === "info1Val") {
             const tspanUnit = document.createElementNS(svgNS,"tspan");
             tspanUnit.setAttribute("class", "unit");
             tspanUnit.setAttribute("font-size", t.size * 0.6);
             tspanUnit.setAttribute("dx", "2");
-            tspanUnit.textContent = ""; // wird später gesetzt
+            tspanUnit.textContent = ""; // wird spÃ¤ter gesetzt
             text.appendChild(tspanUnit);
         }
 
@@ -161,7 +161,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     const ANGLE_MIN = 138;
     const ANGLE_MAX = 42;
 
-    // --- Compact-Modus prüfen ---
+    // --- Compact-Modus prÃ¼fen ---
     const isCompact = Array.isArray(vArr) && vArr.some(v => typeof v === 'string' && v.toLowerCase() === "compact");
 
     if (isCompact) {
@@ -217,7 +217,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
         });
     }
 
-    // Knob erstellen, Position kommt später aus FHEM
+    // Knob erstellen, Position kommt spÃ¤ter aus FHEM
     if (!knob) {
         var knob = document.createElementNS(svgNS, "circle");
         knob.setAttribute("r", "10");
@@ -237,7 +237,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     let  MIN_TEMP = 7;
     let  MAX_TEMP = 30;
 
-    // Userattr prüfen und ggf. überschreiben
+    // Userattr prÃ¼fen und ggf. Ã¼berschreiben
     FW_queryValue(`{AttrVal("${dev}","knobMinMax","")}`, {
         setValueFn: val => {
             if (val && val.includes(',')) {
@@ -316,11 +316,11 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     }
 
     function roundHalfIfNeeded(val) {
-        // Prüfen, ob val schon auf 0,5er-Stufe liegt
+        // PrÃ¼fen, ob val schon auf 0,5er-Stufe liegt
         if (val * 2 === Math.round(val * 2)) {
             return val; // schon korrekt
         }
-        // sonst runden auf nächste 0,5
+        // sonst runden auf nÃ¤chste 0,5
         return Math.round(val * 2) / 2;
     }
 
@@ -406,12 +406,12 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
         const ring2Entry = vArr[2]; // vArr[2] = "reading" oder "reading@unit"
         if (!ring2Entry) return;
 
-        // Prüfen, ob eine Unit vorhanden ist
+        // PrÃ¼fen, ob eine Unit vorhanden ist
         const parts = ring2Entry.split('@'); // [reading, unit] oder nur [reading]
         const reading = parts[0];
         const unit = parts[1]; // undefined, wenn keine Unit
 
-        // info1Val = vArr[3] … info4Val = vArr[6]
+        // info1Val = vArr[3] â€¦ info4Val = vArr[6]
         for (let i = 3; i <= 6; i++) {
             const slotEntry = vArr[i];
             if (!slotEntry) continue;
@@ -420,11 +420,11 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
             const slotReading = slotEntry.split('@')[0];
             if (slotReading !== reading) continue;
 
-            const slot = "info" + (i - 2) + "Val"; // info1Val … info4Val
+            const slot = "info" + (i - 2) + "Val"; // info1Val â€¦ info4Val
             const tspan = svg.querySelector(`.informId_ringSVG\\:${slot}`);
             if (!tspan) continue;
 
-            // Unit nur anhängen, wenn vorhanden
+            // Unit nur anhÃ¤ngen, wenn vorhanden
             tspan.textContent = unit ? temp.toFixed(1) + unit : temp.toFixed(1);
         }
     }
@@ -701,7 +701,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     }
 
     // ============================================================
-    // Hidden-Divs für FHEMWEB-Live-Updates
+    // Hidden-Divs fÃ¼r FHEMWEB-Live-Updates
     // ============================================================
     Object.entries(readingTargets).forEach(([reading]) => {
         const informId = `${dev}-${reading}`;
@@ -726,7 +726,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     });
 
     // ============================================================
-    // Wrapper-Funktion für sichtbare SVG-Texte (info1Val–info4) mit Units
+    // Wrapper-Funktion fÃ¼r sichtbare SVG-Texte (info1Valâ€“info4) mit Units
     // ============================================================
     wrapper[0].setValueFn = (value, ring, reading) => {
         const tspan = svg.querySelector(`.informId_ringSVG\\:${ring}`);
@@ -764,10 +764,10 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
     window.sendFHEMCmd = (cmd, el) => {
         const baseUrl = typeof FW_root !== 'undefined' ? FW_root : '';
 
-        // Direkt FHEM-Befehl ausführen (kein Toggle)
+        // Direkt FHEM-Befehl ausfÃ¼hren (kein Toggle)
         if (cmd && cmd.includes('@')) {
             const parts = cmd.split('@');
-            const iconName = parts[0];      // optional, bleibt für Logging oder Icons
+            const iconName = parts[0];      // optional, bleibt fÃ¼r Logging oder Icons
             const statePart = parts[1] || '';
 
             let fullCmd = '';
@@ -857,7 +857,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
 
             // --- Hier kommt der bisherige Code zum Rendern des Icons ---
 
-            // --- 1. FHEM-Icon über vArr ---
+            // --- 1. FHEM-Icon Ã¼ber vArr ---
             if (Array.isArray(vArr)) {
                 const fhemIdx = 7 + idx;
                 const fhemIconEntry = vArr[fhemIdx];
@@ -945,7 +945,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
         FW_queryValue(`{AttrVal("${dev}","${k}","")}`, { setValueFn: val => div.setValueFn(val) });
     });
 
-    // 2?? Klick-Handler für die Buttons (vArr zuerst, dann Reading, mit Logging)
+    // 2?? Klick-Handler fÃ¼r die Buttons (vArr zuerst, dann Reading, mit Logging)
     svg.querySelectorAll('.button-area').forEach(btn => {
         btn.addEventListener('click', () => {
             const btnNum = parseInt(btn.id.replace("btn",""));
@@ -969,7 +969,7 @@ function controlMiniDashCreate(elName, devName, vArr, currVal, set, params, cmd)
             requestAnimationFrame(() => { wave.style.transform = 'scale(3)'; wave.style.opacity = '0'; });
             setTimeout(() => wave.remove(), 400);
 
-            // --- Prüfen ob vArr einen FHEM-Befehl enthält ---
+            // --- PrÃ¼fen ob vArr einen FHEM-Befehl enthÃ¤lt ---
             if (Array.isArray(vArr)) {
                 const val = vArr[6 + btnNum]; // Offset im vArr
 
