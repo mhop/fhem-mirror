@@ -11,7 +11,7 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
     $el.empty();
 
     if (!Array.isArray(vArr) || vArr.length < 5) {
-        $el.text("?? Invalid widget parameters – need 4 readings");
+        $el.text("?? Invalid widget parameters â€“ need 4 readings");
         return;
     }
 
@@ -267,7 +267,7 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
   <li>minichart,&lt;label1@reading1@unit1&gt;,&lt;label2@reading2@unit2&gt;,&lt;label3@reading3@unit3&gt;,
       &lt;chart-reading&gt;,&lt;chart-type@color-pos@color-neg&gt;
       - kompaktes Widget mit drei Werten und kleinem Trenddiagramm.<br>
-      Siehe <a href='https://wiki.fhem.de/wiki/FHEMWEB/MiniChart'>FHEMWEB/MiniChart</a> für Dokumentation und Beispiele.</li><br>
+      Siehe <a href='https://wiki.fhem.de/wiki/FHEMWEB/MiniChart'>FHEMWEB/MiniChart</a> fÃ¼r Dokumentation und Beispiele.</li><br>
 =end html_DE
 =cut
 */

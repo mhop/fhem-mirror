@@ -32,9 +32,9 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
     };
 
     // ---------------------------
-    // Icongröße
+    // IcongrÃ¶ÃŸe
     // ---------------------------
-    let iconSizePx = 40; // Standardgröße 40px
+    let iconSizePx = 40; // StandardgrÃ¶ÃŸe 40px
     vArr.forEach(v => {
         if (v.startsWith("size@")) {
             const px = parseInt(v.split("@")[1]);
@@ -197,7 +197,7 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
         const iconClass = 'animatedIcon_' + dev.replace(/[^a-zA-Z0-9_-]/g,'_');
         svgEl.classList.add('icon', iconClass);
 
-        // Style NUR für dieses Icon erzeugen
+        // Style NUR fÃ¼r dieses Icon erzeugen
         const styleId = 'forcedIconSize_' + iconClass;
         if (!document.getElementById(styleId)) {
             const style = document.createElement('style');
