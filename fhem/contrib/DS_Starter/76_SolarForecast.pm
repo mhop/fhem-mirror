@@ -162,7 +162,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.0.0"  => "24.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
+  "2.1.0"  => "26.01.2026  _calcConsForecast_legacy refactored ",
+  "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
                            "new consumer type 'heatpump', new readings Today_CONdeviation, Today_CONforecast, Today_CONreal ".
@@ -274,8 +275,8 @@ my %vNotesIntern = (
   "1.52.11"=> "03.06.2025  _genSpecialReadings: new option todayNotOwnerConsumption ",
   "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
   "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
-  "1.52.8" => "01.06.2025  _calcConsForecast_circular: use avgArray if number included days <= number of days in pvHistory ",
-  "1.52.7" => "30.05.2025  _calcConsForecast_circular: excludes/includes only if number included days <= number of days in pvHistory ",
+  "1.52.8" => "01.06.2025  _calcConsForecast_legacy: use avgArray if number included days <= number of days in pvHistory ",
+  "1.52.7" => "30.05.2025  _calcConsForecast_legacy: excludes/includes only if number included days <= number of days in pvHistory ",
   "1.52.6" => "27.05.2025  verbose 3 for consumer switch log ",
   "1.52.5" => "25.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
                            "check attribute values for prohibited occurrence [...] Forum: https://forum.fhem.de/index.php?msg=1342147 ".
@@ -980,6 +981,49 @@ my %hqtxt = (                                                                # H
               DE => qq{der PV Vorhersagewert f&uuml;r die aktuelle Stunde wird von der KI Unterst&uuml;tzung geliefert}     },
   nncodw => { EN => qq{the neural network for consumption forecasting is ready for use},
               DE => qq{das neuronale Netz f&uuml;r die Verbrauchsprognose ist einsatzbereit}                                },
+  iznncp => { EN => qq{Information about the neural network for consumption forecasting},
+              DE => qq{Informationen zum neuronalen Netz der Verbrauchsvorhersage}                                          },  
+  nmdpar => { EN => qq{Model Parameters},
+              DE => qq{Modellparameter}                                                                                     },  
+  nnmlim => { EN => qq{Standardization Limits},
+              DE => qq{Normierungsgrenzen}                                                                                  },  
+  hodcon => { EN => qq{Household Consumption},
+              DE => qq{Hausverbrauch}                                                                                       },  
+  tradat => { EN => qq{Training Data},
+              DE => qq{Trainingsdaten}                                                                                      }, 
+  dtsets => { EN => qq{Data Records},
+              DE => qq{Datensätze}                                                                                          },  
+  archit => { EN => qq{Architecture},
+              DE => qq{Architektur}                                                                                         },   
+  hyppar => { EN => qq{Hyperparameters},
+              DE => qq{Hyperparameter}                                                                                      },  
+  actvat => { EN => qq{Activations},
+              DE => qq{Aktivierungen}                                                                                       },  
+  tralgo => { EN => qq{Training Algorithm},
+              DE => qq{Trainingsalgorithmus}                                                                                },  
+  rangen => { EN => qq{Random Generator},
+              DE => qq{Zufallsgenerator}                                                                                    },  
+  trmetc => { EN => qq{Training Metrics},
+              DE => qq{Trainingsmetriken}                                                                                   },  
+  bmoaep => { EN => qq{best model at Epoche},
+              DE => qq{bestes Modell bei Epoche}                                                                            }, 
+  treval => { EN => qq{Training evaluation},
+              DE => qq{Trainingsbewertung}                                                                                  }, 
+  noise  => { EN => qq{Noise},
+              DE => qq{Rauschen}                                                                                            },  
+  nserat => { EN => qq{Noise Rating},
+              DE => qq{Rauschen Bewertung}                                                                                  },   
+  rcdfor => { EN => qq{Recommendation for},
+              DE => qq{Empfehlung für}                                                                                      }, 
+  setof  => { EN => qq{Setting of},
+              DE => qq{Einstellung von}                                                                                     },  
+  drftid => { EN => qq{Drift Indicators},
+              DE => qq{Drift-Kennzahlen}                                                                                    },  
+  drfrat => { EN => qq{Drift Rating},
+              DE => qq{Drift Bewertung}                                                                                     },  
+  fcerma => { EN => qq{Forecast Error Measures},
+              DE => qq{Fehlermaße der Prognosen}                                                                            },  
+  
   aifane => { EN => qq{the AI::FANN object loaded from file is empty},
               DE => qq{das aus der Datei geladene AI::FANN-Objekt ist leer}                                                 },
   ailatr => { EN => qq{last AI training:},
@@ -1055,6 +1099,7 @@ my %hqtxt = (                                                                # H
   nnnact => { EN => qq{the neural network for consumption forecasting is not activated \nswitch on with: attr <NAME> aiControl aiConActivate},
               DE => qq{das neuronale Netz zur Verbrauchsprognose ist nicht aktiviert \neinschalten mit: attr <NAME> aiControl aiConActivate}                                                 },
 );
+
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
   iaaf     => { EN => qq{Automatic mode off -> Enable automatic mode},
@@ -6672,9 +6717,6 @@ sub __getaiFannConState {            ## no critic "not used"
       return $rs;
   }
   
-  my $spc3  = '&nbsp;' x 3;
-  my $spc6  = '&nbsp;' x 6;
-  
   my $aspeak   = CurrentVal  ($name, 'allstringspeak',        '-');
   my $hpinst   = CurrentVal  ($name, 'heatpumpInstalled',     '-');               # WP installiert?
   my $tgtmin   = AiNeuralVal ($name, 'con', 'MinVal',         '-');              
@@ -6728,6 +6770,12 @@ sub __getaiFannConState {            ## no critic "not used"
            $ampel eq 'red'    ? FW_makeImage ('10px-kreis-rot.png',   $retran) :
            $retran;
            
+  my $atf  = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 0);
+  my $ars  = CurrentVal  ($name, 'conNNGetResultState',      '-');
+  my $agt  = CurrentVal  ($name, 'conNNLastGetResultTime',    '');
+  my $rtt  = CircularVal ($name, 99, 'conNNRuntimeTrain',    '-');         
+  $rtt     = sprintf "%0.0f", $rtt if(isNumeric($rtt)); 
+           
   $valstd = sprintf "%0.6f", $valstd if($valstd ne '-');
   $valavg = sprintf "%0.6f", $valavg if($valavg ne '-');
   $tramse = sprintf "%0.6f", $tramse if($tramse ne '-');
@@ -6743,20 +6791,32 @@ sub __getaiFannConState {            ## no critic "not used"
   $tgtmax = sprintf "%0.0f", $tgtmax if($tgtmax ne '-');
   
   my $pvpeak = sprintf "%0.0f", ($aspeak * AIASPEAKSFAC);
+  
+  # allgemeine Infos
+  ###################
+  my $head  = '<b><u>'.$hqtxt{iznncp}{$lang}.'</b></u>'."\n\n";                                                                                         # Informationen zum neuronalen Netz der Verbrauchsvorhersage
 
-  my $head  = '<b><u>Informationen zum neuronalen Netz der Verbrauchsvorhersage</b></u>'."\n\n";
+  my $art  = $hqtxt{aitris}{$lang}.' '.$rtt;   
+  $ars     = '<b>'.$hqtxt{airest}{$lang}.'</b> '.$ars;
+  $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
+  $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
+  $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;
+
+  # Modellparameter
+  ###################
+  my $model = '<b>=== '.$hqtxt{nmdpar}{$lang}.' ===</b>'."\n\n";                                                                                        # Modellparameter
+  $model   .= "<b>".$hqtxt{nnmlim}{$lang}.":</b> PV=$pvpeak Wh, ".$hqtxt{hodcon}{$lang}.": Min=$tgtmin Wh / Max=$tgtmax Wh"."\n";                       # Normierungsgrenzen, Hausverbrauch
+  $model   .= (encode("utf8", "<b>".$hqtxt{tradat}{$lang}.":</b> $dsnum ".$hqtxt{dtsets}{$lang}." (Training=$trdnum, Validation=$tednum)"))."\n";       # Trainingsdaten, Datensätze
+  $model   .= "<b>".$hqtxt{archit}{$lang}.":</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";                                          # Architektur
+  $model   .= "<b>".$hqtxt{hyppar}{$lang}.":</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim"."\n";                                   # Hyperparameter
+  $model   .= "<b>".$hqtxt{actvat}{$lang}.":</b> Hidden=$conhaf, Steepness=$hidste, Output=$conoaf"."\n";                                               # Aktivierungen
+  $model   .= "<b>".$hqtxt{tralgo}{$lang}.":</b> $talgo, Registry Version=$regv"."\n";                                                                  # Trainingsalgorithmus
+  $model   .= "<b>".$hqtxt{rangen}{$lang}.":</b> Mode=$shmode, Period=$shperi"."\n";                                                                    # Zufallsgenerator
   
-  my $model = '<b>=== Modellparameter ===</b>'."\n\n";
-  $model   .= "<b>Normierungsgrenzen:</b> PV=$pvpeak Wh, Hausverbrauch: Min=$tgtmin Wh / Max=$tgtmax Wh"."\n";
-  $model   .= (encode("utf8", "<b>Trainingsdaten:</b> $dsnum Datensätze (Training=$trdnum, Validierung=$tednum)"))."\n";
-  $model   .= "<b>Architektur:</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";
-  $model   .= "<b>Hyperparameter:</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim"."\n";
-  $model   .= "<b>Aktivierungen:</b> Hidden=$conhaf, Steilheit=$hidste, Output=$conoaf"."\n";
-  $model   .= "<b>Trainingsalgorithmus:</b> $talgo, Registry Version=$regv"."\n";
-  $model   .= "<b>Zufallsgenerator:</b> Mode=$shmode, Periode=$shperi"."\n";
-  
-  my $keyfig = '<b>=== Trainingsmetriken ===</b>'."\n\n";
-  $keyfig   .= "<b>bestes Modell bei Epoche:</b> $bstmod (von max. 15000)"."\n";
+  # Trainingsmetriken
+  #####################
+  my $keyfig = '<b>=== '.$hqtxt{trmetc}{$lang}.' ===</b>'."\n\n";                                                                                       # Trainingsmetriken
+  $keyfig   .= "<b>".$hqtxt{bmoaep}{$lang}.":</b> $bstmod (max. 15000)"."\n";                                                                           # bestes Modell bei Epoche
   $keyfig   .= "<b>Training MSE:</b> $tramse"."\n";
   $keyfig   .= "<b>Validation MSE:</b> $valmse"."\n";
   $keyfig   .= "<b>Validation MSE Average:</b> $valavg"."\n";
@@ -6764,20 +6824,11 @@ sub __getaiFannConState {            ## no critic "not used"
   $keyfig   .= "<b>Validation Bit_Fail:</b> $bitfai"."\n";
   $keyfig   .= "<b>Model Bias:</b> $bias Wh"."\n";
   $keyfig   .= "<b>Model Slope:</b> $slope"."\n";
-  $keyfig   .= "<b>Trainingsbewertung:</b> $ampel"."\n";
-  
-  my $noise  = '<b>=== Rauschen ===</b>'."\n\n";
-  $noise    .= "<b>Rauschen Bewertung:</b> $nslvl"."\n";
-  $noise    .= "<b>".(encode('utf8', 'Empfehlung für Bit_Fail')).":</b> $bfsug (Einstellung von aiControl->aiConBitFailLimit)"."\n";   
-  
-  my $drift  = '<b>=== Drift-Kennzahlen ===</b>'."\n\n";
-  $drift    .= "<b>Drift Score:</b> $drift_score"."\n";
-  $drift    .= "<b>Drift RMSE ratio:</b> $drift_rmserel"."\n";
-  $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
-  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";
-  $drift    .= "<b>Drift Bewertung:</b> $drift_flag"."\n";
-  
-  my $ermsr  = '<b>=== '.(encode('utf8', 'Fehlermaße der Prognosen')).' ===</b>'."\n\n";
+  $keyfig   .= "<b>".$hqtxt{treval}{$lang}.":</b> $ampel"."\n";                                                                                         # Trainingsbewertung
+ 
+  # Fehlermaße der Prognosen
+  ############################
+  my $ermsr  = '<b>=== '.(encode('utf8', $hqtxt{fcerma}{$lang})).' ===</b>'."\n\n";                                                                     # Fehlermaße der Prognosen
   $ermsr    .= "<b>MAE:</b> $conmae Wh"."\n";
   $ermsr    .= "<b>MedAE:</b> $comdae Wh"."\n";
   $ermsr    .= "<b>RMSE:</b> $cormse Wh"."\n";
@@ -6785,84 +6836,29 @@ sub __getaiFannConState {            ## no critic "not used"
   $ermsr    .= "<b>RMSE Rating:</b> $rmse_rat"."\n";
   $ermsr    .= "<b>MAPE:</b> $comape %"."\n";
   $ermsr    .= "<b>MdAPE:</b> $codape %"."\n";
-  $ermsr    .= "<b>".(encode('utf8', 'R²')).":</b> $conr2"."\n";                
+  $ermsr    .= "<b>".(encode('utf8', 'R²')).":</b> $conr2"."\n";                                   
+ 
+  # Rauschen
+  ############
+  my $noise  = '<b>=== '.$hqtxt{noise}{$lang}.' ===</b>'."\n\n";                                                                                        # Rauschen            
+  $noise    .= "<b>".$hqtxt{nserat}{$lang}.":</b> $nslvl"."\n";                                                                                         # Rauschen Bewertung
+  $noise    .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Bit_Fail')).":</b> $bfsug (".$hqtxt{setof}{$lang}." aiControl->aiConBitFailLimit)"."\n";   # Empfehlung für Bit_Fail, Einstellung von aiControl
   
-  my $atf  = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 0);
-  my $ars  = CurrentVal  ($name, 'conNNGetResultState',      '-');
-  my $agt  = CurrentVal  ($name, 'conNNLastGetResultTime',    '');
-  my $rtt  = CircularVal ($name, 99, 'conNNRuntimeTrain',    '-');         
-          
-  $rtt     = sprintf "%0.0f", $rtt if(isNumeric($rtt));
+  # Drift
+  #########
+  my $drift  = '<b>=== '.$hqtxt{drftid}{$lang}.' ===</b>'."\n\n";                                                                                       # Drift-Kennzahlen                                                                                                   # Drift-Kennzahlen                                
+  $drift    .= "<b>Drift Score:</b> $drift_score"."\n";
+  $drift    .= "<b>Drift RMSE ratio:</b> $drift_rmserel"."\n";
+  $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
+  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";
+  $drift    .= "<b>".$hqtxt{drfrat}{$lang}.":</b> $drift_flag"."\n";                                                                                    # Drift Bewertung
+    
+  # Erläuterungstext
+  ####################
+  my $note = ___aiFannExplainKeyFigures ($paref);
   
-  my $art  = $hqtxt{aitris}{$lang}.' '.$rtt;   
-  $ars     = '<b>'.$hqtxt{airest}{$lang}.'</b> '.$ars;
-  $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
-  $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
-  $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;                    
-  
-  my $note  = (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";;
-  $note    .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
-  $note    .= $spc3.(encode('utf8', 'MSE < 0.01 → sehr gut'))."\n";
-  $note    .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → gut'))."\n";
-  $note    .= $spc3.(encode('utf8', 'MSE > 0.1 → schwach'))."\n";
-  $note    .= $spc3.(encode('utf8', '<b>Interpretation Verhältnis Train MSE zu Validation MSE:</b>'))."\n";
-  $note    .= $spc6.(encode('utf8', 'Validation ≈ Train → gute Generalisierung'))."\n";
-  $note    .= $spc6.(encode('utf8', 'Validation deutlich größer → Überfitting'))."\n";
-  $note    .= $spc6.(encode('utf8', 'Validation kleiner → Validierungsdaten sind einfacher oder Split begünstigt'))."\n";
-  $note    .= "\n";
-  
-  $note    .= (encode('utf8', '<b>Validation Bit_Fail</b> → Anzahl der Ausreißer'))."\n";
-  $note    .= "\n";
-  
-  $note    .= (encode('utf8', '<b>MAE</b> (Mean Absolute Error) → mittlere absolute Abweichung in Wh. Richtwerte bei typischem Verbrauch 500–1500 Wh:'))."\n";
-  $note    .= $spc3.(encode('utf8', '< 100 Wh → sehr gut'))."\n";
-  $note    .= $spc3.(encode('utf8', '100–300 Wh → gut'))."\n";
-  $note    .= $spc3.(encode('utf8', '> 300 Wh → schwach'))."\n";
-  $note    .= "\n";
-  
-  $note    .= (encode('utf8', '<b>MedAE</b> (Median Absolute Error) → Median der absoluten Fehler in Wh (toleriert einzelne Ausreißer besser)'))."\n";
-  $note    .= $spc3.(encode('utf8', '< 100 Wh → sehr gut'))."\n";
-  $note    .= $spc3.(encode('utf8', '100–200 Wh → gut'))."\n";
-  $note    .= $spc3.(encode('utf8', '200–300 Wh → mittelmäßig'))."\n";
-  $note    .= $spc3.(encode('utf8', '> 300 Wh → schwach'))."\n";
-  $note    .= "\n";
-  
-  $note    .= (encode('utf8', '<b>RMSE rel</b> (Root Mean Squared Error) → der gewichtete RMSE misst die quadratische Abweichung von Prognose und Verbrauch in % - mit Gewichtung für hohe Lasten.'))."\n";
-  $note    .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
-  $note    .= $spc3.(encode('utf8', '< 20% → ausgezeichnet, das Modell trifft sowohl Grundlast als auch Peaks sehr präzise'))."\n";
-  $note    .= $spc3.(encode('utf8', '20-40% → gut, das Modell ist zuverlässig und bildet typische Verbrauchsmuster sauber ab'))."\n";
-  $note    .= $spc3.(encode('utf8', '40-70% → akzeptabel, das Modell ist brauchbar, aber Peaks oder spontane Lasten werden nicht immer gut getroffen'))."\n";
-  $note    .= $spc3.(encode('utf8', '70-120% → schwach, das Modell hat deutliche Schwierigkeiten, insbesondere bei Lastspitzen oder unruhigen Haushalten'))."\n";
-  $note    .= $spc3.(encode('utf8', '> 120% → unbrauchbar, die Prognosen weichen stark vom realen Verbrauch ab'))."\n";
-  $note    .= "\n";
-  
-  $note    .= (encode('utf8', '<b>MAPE</b> (Mean Absolute Percentage Error) → relative Abweichung in %'))."\n";
-  $note    .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
-  $note    .= $spc3.(encode('utf8', '< 10 % → sehr gut - Modell liegt fast immer sehr nah an den echten Werten'))."\n";
-  $note    .= $spc3.(encode('utf8', '10–20 % → gut - Prognosen sind solide, kleine Abweichungen sind normal'))."\n";
-  $note    .= $spc3.(encode('utf8', '20–30 % → mittelmäßig / akzeptabel - Modell ist brauchbar, aber nicht präzise – für grobe Trends ok'))."\n";
-  $note    .= $spc3.(encode('utf8', '> 30 % → schwach - Modell verfehlt die Werte deutlich, oft durch Ausreißer oder fehlende Features'))."\n";  
-  $note    .= $spc3.(encode('utf8', '⚠️ Vorsicht: bei kleinen Werten (<200 Wh) kann MAPE stark verzerren → MdAPE heranziehen'))."\n";
-  $note    .= "\n";
-  
-  $note    .= (encode('utf8', '<b>MdAPE</b> (Median Absolute Percentage Error) → Median der prozentualen Fehler in % (robuster gegenüber kleinen Werten)'))."\n";
-  $note    .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
-  $note    .= $spc3.(encode('utf8', '< 10 % → sehr gut'))."\n";
-  $note    .= $spc3.(encode('utf8', '10–20 % → gut'))."\n";
-  $note    .= $spc3.(encode('utf8', '20–30 % → mittelmäßig'))."\n";
-  $note    .= $spc3.(encode('utf8', '> 30 % → schwach'))."\n";  
-  $note    .= "\n";
-  
-  $note    .= (encode('utf8', '<b>R²</b> (Bestimmtheitsmaß) → Maß für die Erklärungskraft des Modells. Je näher R² an 1 liegt, desto besser.'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² = 1.0 → perfekte Vorhersage, alle Punkte liegen exakt auf der Regressionslinie'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² > 0.8 → sehr gut - Modell erfasst den Großteil der Streuung → sehr zuverlässige Prognosen'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² = 0.6 - 0.8 → gut - Modell erklärt einen soliden Teil der Varianz → brauchbar für viele Anwendungen'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² = 0.5-0.6 → mäßig / grenzwertig - Modell liegt knapp über "zufällig" → Muster erkannt, Prognosen nur eingeschränkt nützlich'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² < 0.5 → schwach - Modell erklärt weniger als die Hälfte der Varianz → deutlicher Verbesserungsbedarf'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² = 0.0 → Modell erklärt gar nichts, es ist nicht besser als der Mittelwert der Daten'))."\n";
-  $note    .= $spc3.(encode('utf8', 'R² < 0.0 → Modell ist schlechter als einfach immer den Mittelwert vorherzusagen'))."\n";
-  $note    .= $spc3.(encode('utf8', '⚠️ R² ist sehr empfindlich gegenüber Ausreißern und Varianz in den Daten.'))."\n";
-  
+  # Zusammenstellung
+  ####################
   $rs .= $head;
   $rs .= $atf.' / '.$art."\n";
   $rs .= $ars."\n";
@@ -6878,6 +6874,149 @@ sub __getaiFannConState {            ## no critic "not used"
   $rs .= $note;
 
 return $rs;
+}
+
+################################################################
+#          Erläuterungstext zu Kennzahlen
+################################################################   
+sub ___aiFannExplainKeyFigures {
+  my $paref = shift;
+  my $lang  = $paref->{lang};
+  
+  my $spc3  = '&nbsp;' x 3;
+  my $spc6  = '&nbsp;' x 6;
+  my $note  = '';
+  
+  if ($lang eq 'DE') {
+      $note .= (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";;
+      $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
+      $note .= $spc3.(encode('utf8', 'MSE < 0.01 → sehr gut'))."\n";
+      $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → gut'))."\n";
+      $note .= $spc3.(encode('utf8', 'MSE > 0.1 → schwach'))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Interpretation Verhältnis Train MSE zu Validation MSE:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'Validation ≈ Train → gute Generalisierung'))."\n";
+      $note .= $spc6.(encode('utf8', 'Validation deutlich größer → Überfitting'))."\n";
+      $note .= $spc6.(encode('utf8', 'Validation kleiner → Validierungsdaten sind einfacher oder Split begünstigt'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>Validation Bit_Fail</b> → Anzahl der Ausreißer'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>MAE</b> (Mean Absolute Error) → mittlere absolute Abweichung in Wh. Richtwerte bei typischem Verbrauch 500–1500 Wh:'))."\n";
+      $note .= $spc3.(encode('utf8', '< 100 Wh → sehr gut'))."\n";
+      $note .= $spc3.(encode('utf8', '100–300 Wh → gut'))."\n";
+      $note .= $spc3.(encode('utf8', '> 300 Wh → schwach'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>MedAE</b> (Median Absolute Error) → Median der absoluten Fehler in Wh (toleriert einzelne Ausreißer besser)'))."\n";
+      $note .= $spc3.(encode('utf8', '< 100 Wh → sehr gut'))."\n";
+      $note .= $spc3.(encode('utf8', '100–200 Wh → gut'))."\n";
+      $note .= $spc3.(encode('utf8', '200–300 Wh → mittelmäßig'))."\n";
+      $note .= $spc3.(encode('utf8', '> 300 Wh → schwach'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>RMSE rel</b> (Root Mean Squared Error) → der gewichtete RMSE misst die quadratische Abweichung von Prognose und Verbrauch in % - mit Gewichtung für hohe Lasten.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
+      $note .= $spc3.(encode('utf8', '< 20% → ausgezeichnet, das Modell trifft sowohl Grundlast als auch Peaks sehr präzise'))."\n";
+      $note .= $spc3.(encode('utf8', '20-40% → gut, das Modell ist zuverlässig und bildet typische Verbrauchsmuster sauber ab'))."\n";
+      $note .= $spc3.(encode('utf8', '40-70% → akzeptabel, das Modell ist brauchbar, aber Peaks oder spontane Lasten werden nicht immer gut getroffen'))."\n";
+      $note .= $spc3.(encode('utf8', '70-120% → schwach, das Modell hat deutliche Schwierigkeiten, insbesondere bei Lastspitzen oder unruhigen Haushalten'))."\n";
+      $note .= $spc3.(encode('utf8', '> 120% → unbrauchbar, die Prognosen weichen stark vom realen Verbrauch ab'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>MAPE</b> (Mean Absolute Percentage Error) → relative Abweichung in %'))."\n";
+      $note .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
+      $note .= $spc3.(encode('utf8', '< 10 % → sehr gut - Modell liegt fast immer sehr nah an den echten Werten'))."\n";
+      $note .= $spc3.(encode('utf8', '10–20 % → gut - Prognosen sind solide, kleine Abweichungen sind normal'))."\n";
+      $note .= $spc3.(encode('utf8', '20–30 % → mittelmäßig / akzeptabel - Modell ist brauchbar, aber nicht präzise – für grobe Trends ok'))."\n";
+      $note .= $spc3.(encode('utf8', '> 30 % → schwach - Modell verfehlt die Werte deutlich, oft durch Ausreißer oder fehlende Features'))."\n";  
+      $note .= $spc3.(encode('utf8', '⚠️ Vorsicht: bei kleinen Werten (<200 Wh) kann MAPE stark verzerren → MdAPE heranziehen'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>MdAPE</b> (Median Absolute Percentage Error) → Median der prozentualen Fehler in % (robuster gegenüber kleinen Werten)'))."\n";
+      $note .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
+      $note .= $spc3.(encode('utf8', '< 10 % → sehr gut'))."\n";
+      $note .= $spc3.(encode('utf8', '10–20 % → gut'))."\n";
+      $note .= $spc3.(encode('utf8', '20–30 % → mittelmäßig'))."\n";
+      $note .= $spc3.(encode('utf8', '> 30 % → schwach'))."\n";  
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>R²</b> (Bestimmtheitsmaß) → Maß für die Erklärungskraft des Modells. Je näher R² an 1 liegt, desto besser.'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² = 1.0 → perfekte Vorhersage, alle Punkte liegen exakt auf der Regressionslinie'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² > 0.8 → sehr gut - Modell erfasst den Großteil der Streuung → sehr zuverlässige Prognosen'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² = 0.6 - 0.8 → gut - Modell erklärt einen soliden Teil der Varianz → brauchbar für viele Anwendungen'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² = 0.5-0.6 → mäßig / grenzwertig - Modell liegt knapp über "zufällig" → Muster erkannt, Prognosen nur eingeschränkt nützlich'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² < 0.5 → schwach - Modell erklärt weniger als die Hälfte der Varianz → deutlicher Verbesserungsbedarf'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² = 0.0 → Modell erklärt gar nichts, es ist nicht besser als der Mittelwert der Daten'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² < 0.0 → Modell ist schlechter als einfach immer den Mittelwert vorherzusagen'))."\n";
+      $note .= $spc3.(encode('utf8', '⚠️ R² ist sehr empfindlich gegenüber Ausreißern und Varianz in den Daten.'))."\n";
+  }
+  elsif ($lang eq 'EN') {
+      $note .= (encode('utf8', '<b><u> Explanations of the key figures </b></u>'))."\n\n";
+      $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → how well the network trains and generalizes. Rule of thumb:'))."\n";
+      $note .= $spc3.(encode('utf8', 'MSE < 0.01 → very good'))."\n";
+      $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → good'))."\n";
+      $note .= $spc3.(encode('utf8', 'MSE > 0.1 → weak'))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Interpretation of the ratio of train MSE to validation MSE:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'Validation ≈ Train → good generalization'))."\n";
+      $note .= $spc6.(encode('utf8', 'Validation significantly larger → overfitting'))."\n";
+      $note .= $spc6.(encode('utf8', 'Validation smaller → validation data is easier or split is favorable'))."\n";
+      $note .= "\n";
+
+      $note .= (encode('utf8', '<b>Validation Bit_Fail</b> → Number of outliers'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>MAE</b> (Mean Absolute Error) → mean absolute deviation in Wh. Reference values for typical consumption 500–1500 Wh:'))."\n";
+      $note .= $spc3.(encode('utf8', '< 100 Wh → very good'))."\n";
+      $note .= $spc3.(encode('utf8', '100–300 Wh → good'))."\n";
+      $note .= $spc3.(encode('utf8', '> 300 Wh → poor'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>MedAE</b> (Median Absolute Error) → Median of absolute errors in Wh (better tolerates individual outliers)'))."\n";
+      $note .= $spc3.(encode('utf8', '< 100 Wh → very good'))."\n";
+      $note .= $spc3.(encode('utf8', '100–200 Wh → good'))."\n";
+      $note .= $spc3.(encode('utf8', '200–300 Wh → mediocre'))."\n";
+      $note .= $spc3.(encode('utf8', '> 300 Wh → poor'))."\n";
+      $note .= "\n";    
+
+      $note .= (encode('utf8', '<b>RMSE rel</b> (Root Mean Squared Error) → the weighted RMSE measures the square deviation between forecast and consumption in % - with weighting for high loads.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Reference values:'))."\n";
+      $note .= $spc3.(encode('utf8', '< 20% → excellent, the model accurately predicts both base load and peaks'))."\n";
+      $note .= $spc3. (encode('utf8', '20-40% → good, the model is reliable and accurately reflects typical consumption patterns'))."\n";
+      $note .= $spc3.(encode('utf8', '40-70% → acceptable, the model is usable, but peaks or spontaneous loads are not always accurately predicted'))."\ n";
+      $note .= $spc3.(encode('utf8', '70-120% → weak, the model has significant difficulties, especially with load peaks or unstable households'))."\n";
+      $note .= $spc3.(encode('utf8', '> 120% → unusable, the forecasts deviate significantly from actual consumption'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>MAPE</b> (Mean Absolute Percentage Error) → relative deviation in %'))."\n";
+      $note .= $spc3.(encode('utf8', 'Reference values:'))."\n";
+      $note .= $spc3.(encode('utf8', '< 10% → very good - model is almost always very close to the actual values'))."\n";
+      $note .= $spc3.(encode('utf8', '10–20% → good - forecasts are solid, small deviations are normal'))."\ n";
+      $note .= $spc3.(encode('utf8', '20–30 % → mediocre / acceptable - model is usable but not precise – ok for rough trends'))."\n";
+      $note .= $spc3.(encode('utf8', '> 30% → weak - model significantly misses the values, often due to outliers or missing features'))."\n";  
+      $note .= $spc3.(encode('utf8', '⚠️ Caution: for small values (<200 Wh), MAPE can be highly distorted → use MdAPE'))."\n";
+      $note .= "\n";
+
+      $note .= (encode('utf8', '<b>MdAPE</b> (Median Absolute Percentage Error) → Median of percentage errors in % (more robust against small values)'))."\n";
+      $note .= $spc3.(encode('utf8', 'Reference values:'))."\n";
+      $note .= $spc3.(encode('utf8', '< 10% → very good'))."\n";
+      $note .= $spc3.(encode('utf8', '10–20% → good'))."\n";
+      $note .= $spc3.(encode('utf8', '20–30 % → average'))."\n";
+      $note .= $spc3.(encode('utf8', '> 30 % → poor'))."\n";  
+      $note .= "\n";   
+
+      $note .= (encode('utf8', '<b>R²</b> (coefficient of determination) → Measure of the explanatory power of the model. The closer R² is to 1, the better.'))."\n";
+      $note .= $spc3. (encode('utf8', 'R² = 1.0 → perfect prediction, all points lie exactly on the regression line'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² > 0.8 → very good - model captures most of the variance → very reliable predictions'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² = 0.6 - 0.8 → good - model explains a solid portion of the variance → useful for many applications'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² = 0.5-0.6 → moderate / borderline - model is just above "random" → patterns recognized, forecasts only of limited use'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² < 0.5 → weak - model explains less than half of the variance → significant improvement needed'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² = 0.0 → model explains nothing, it is no better than the mean value of the data'))."\n";
+      $note .= $spc3.(encode('utf8', 'R² < 0.0 → model is worse than simply predicting the mean value'))."\n";
+      $note .= $spc3.(encode('utf8', '⚠️ R² is very sensitive to outliers and variance in the data.'))."\n";      
+  }
+  
+return $note;
 }
 
 ###############################################################
@@ -7928,7 +8067,7 @@ sub _attrplantControl {                  ## no critic "not used"
       backupFilesKeep           => { comp => '\d+',                                               act => 0 },
       batteryPreferredCharge    => { comp => '([0-9]|[1-9][0-9]|100)',                            act => 0 },
       consForecastIdentWeekdays => { comp => '(0|1)',                                             act => 0 },
-      consForecastLastDays      => { comp => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)',                act => 0 },
+      consForecastLastDays      => { comp => '([0-9]|[1-9][0-9]|1[0-7][0-9]|180)',                act => 0 },
       consForecastInPlanning    => { comp => '(0|1)',                                             act => 0 },
       cycleInterval             => { comp => '\d+',                                               act => 1 },
       feedinPowerLimit          => { comp => '\d+',                                               act => 0 },
@@ -16145,9 +16284,9 @@ sub _calcConsForecast {                  ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
 
-  debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");  
+  debugLog ($paref, 'consumption|consumption_long', "################### START Consumption forecast ###################");  
   
-  _calcConsForecast_circular ($paref);                                               # legacy Verbrauchsprognose
+  _calcConsForecast_legacy ($paref);                                                 # legacy Verbrauchsprognose
   
   my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
   
@@ -16164,257 +16303,376 @@ return;
 }
 
 ################################################################
-#     Energieverbrauch Vorhersage kalkulieren (Median)
+#   Legacy Energieverbrauch Vorhersage kalkulieren
 ################################################################
-sub _calcConsForecast_circular {
-  my $paref     = shift;
-  my $name      = $paref->{name};
-  my $chour     = $paref->{chour};
-  my $t         = $paref->{t};
-  my $date      = $paref->{date};                                                                       # aktuelles Datum
-  my $day       = $paref->{day};                                                                        # aktuelles Tagdatum (01...31)
-  my $todayname = $paref->{dayname};                                                                    # aktueller Tagname
+sub _calcConsForecast_legacy {
+  my $paref      = shift;
+  my $name       = $paref->{name};
+  my $chour      = $paref->{chour};
+  my $t          = $paref->{t};
+  my $date       = $paref->{date};                                                                      # aktuelles Datum
+  my $day        = $paref->{day};                                                                       # aktuelles Tagdatum (01...31)
+  my $todayname  = $paref->{dayname};                                                                   # aktueller Tagname
 
-  my $hash    = $defs{$name};
-  my $acref   = $data{$name}{consumers};
-  my $swdfcfc = CurrentVal ($name, 'consForecastIdentWeekdays',         0);                             # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
-  my $acld    = CurrentVal ($name, 'consForecastLastDays',    CONSFCLDAYS);                             # Beachtung Stundenwerte der letzten X Tage falls gesetzt
+  my $cofciwd    = CurrentVal ($name, 'consForecastIdentWeekdays',         0);                          # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
+  my $fcld       = CurrentVal ($name, 'consForecastLastDays',    CONSFCLDAYS);                          # Beachtung Stundenwerte der letzten X Tage falls gesetzt
+  my $ncds       = $cofciwd ? $fcld * 7 : $fcld;                                                        # notwendige Anzahl Vergleichstage die vorhanden sein sollen
 
   my $dt         = timestringsFromOffset ($t, 86400);
-  my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
+  my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname nächster Tag
+  
   my $lct        = LOCALE_TIME =~ /^de_/xs ? 'DE' : 'EN';
   my $st         = timestringToTimestamp ("$date 00:00:00");                                            # Startzeit 00:00 am aktuellen Tag
-  my $ncds       = $swdfcfc ? $acld * 7 : $acld;                                                        # notwendige Anzahl Vergleichstage die vorhanden sein sollen
   my $nhist      = scalar keys %{$data{$name}{pvhist}};
 
-  my (@cona, $exconfc, $csme, %usage);
-  $usage{tom}{con} = 0;
-
-  #debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");
   debugLog ($paref, 'consumption_long', "Basics - installed locale: ".LOCALE_TIME.", used scheme: $lct");
   debugLog ($paref, 'consumption_long', "Need number of stored days: $ncds, Number of days in History: $nhist => can calculate excludes/includes: ".($ncds <= $nhist ? 'yes' : 'no'));
 
+  my $usage;
+  $usage->{tom}{con} = 0;
 
-  ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
-  ###############################################################
-  for my $h (1..24) {                                                                                   # Median für jede Stunde / Tag berechnen
-      $dt         = timestringsFromOffset ($st, $h * 3559);                                             # eine Sek. weniger als 1 Stunde
-      my $dayname = $dt->{dayname};
-      my $hh      = sprintf "%02d", $h;
+  ## Verbrauch der hod-Stunden am aktuellen / nächsten Tag als Median oder Array ermitteln
+  ##########################################################################################                                                                                      
+  for my $num (1..24) {                                                                               # Median für jede Stunde / Tag berechnen
+      my $dth     = timestringsFromOffset ($st, $num * 3559);                                         # eine Sek. weniger als 1 Stunde
+      my $dayname = $dth->{dayname};
+      my $hod     = sprintf "%02d", $num;
 
-      debugLog ($paref, 'consumption_long', "process Today dayname: $dayname, Tomorrow dayname: $tomdayname") if($h == 1);
+      debugLog ($paref, 'consumption_long', "process Today dayname: $dayname, Tomorrow dayname: $tomdayname") if($num == 1);
 
-      my (@conh, @conhtom);
-      my $mix = 0;
+      __readConFromCircular ( { name       => $name,                                                # %usage befüllen
+                                hod        => $hod,
+                                fcld       => $fcld,
+                                lct        => $lct,
+                                dayname    => $dayname,
+                                tomdayname => $tomdayname,
+                                cofciwd    => $cofciwd,
+                                usage      => $usage,
+                                ncds       => $ncds,
+                                nhist      => $nhist,
+                              }
+                            );
+  }
 
-      if ($swdfcfc) {                                                                                   # nur bestimmten Tag (Mo...So) einbeziehen der Stunde
-          push @conh,    @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}    if(defined ${$data{$name}{circular}{$hh}{con_all}{"$dayname"}}[0]);
-          push @conhtom, @{$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}} if(defined ${$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}}[0]);          # für den nächsten Tag
+  ## Excludes / Includes vornehmen
+  ##################################
+  my $tomexnum = 0;                                                                                    # Anzahl Excludes nächster Tag
+  my $tomex    = 0;                                                                                    # Exclude-Summe nächster Tag
+
+  if ($ncds+1 <= $nhist) {                                                                             # Anzahl hist. Tage + aktuellen Tag
+      ($tomexnum, $tomex) = __exincl_from_pvHistory ( { name       => $name,
+                                                        day        => $day,
+                                                        todayname  => $todayname,
+                                                        tomdayname => $tomdayname,
+                                                        st         => $st,
+                                                        cofciwd    => $cofciwd,
+                                                        fcld       => $fcld,
+                                                        usage      => $usage,
+                                                        debug      => $paref->{debug},
+                                                      }
+                                                    );
+  }
+
+  ## nächsten Tageswert Excludes berücksichtigen
+  ################################################
+  my $tomnum = $usage->{tom}{num} // 0;
+
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day ###################");
+
+  if ($tomnum) {
+      if ($tomexnum) {
+          $tomex              = sprintf "%.0f", ($tomex / $tomexnum);                                                  # Ex Tageswert Durchschnitt bilden
+          $usage->{tom}{con} -= $tomex;
       }
-      else {                                                                                            # alle aufgezeichneten Wochentage in der Stunde berücksichtigen
-          for my $dy (keys %{$data{$name}{circular}{$hh}{con_all}}) {                                   # den max Index aller Tagesarrays ermitteln
-              my $ai = $#{$data{$name}{circular}{$hh}{con_all}{$dy}};
-              $mix   = $ai if($ai > $mix);
-          }
 
-          for my $i (0..$mix) {                                                                         # Werte sortiert nach Alter aufsteigend in Array einfügen
-              for my $dy (sort keys %habwdn) {
-                  push @conh,    ${$data{$name}{circular}{$hh}{con_all}{$habwdn{$dy}{$lct}}}[$i] if(defined ${$data{$name}{circular}{$hh}{con_all}{$habwdn{$dy}{$lct}}}[$i]);
-                  push @conhtom, @conh;
-              }
-          }
+      $data{$name}{current}{tomorrowconsumption} = $usage->{tom}{con};
+      debugLog ($paref, 'consumption|consumption_long', "estimated con Tomorrow: $usage->{tom}{con} Wh, Individual hourly elements considered: $tomnum, exclude: $tomex Wh (avg of $tomexnum entities)");
+  }
+  else {
+      my $lang                                   = $paref->{lang};
+      $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
+      
+      debugLog ($paref, 'consumption|consumption_long', "no estimated cons for Tomorrow: ".$hqtxt{wfmdcf}{$lang});
+  }
+  
+  ## StundenForecast nächste 24h berechnen und Ergebnisse speichern
+  ###################################################################
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next 24 Hours ###################");
+        
+  for my $nh (sort keys %{$data{$name}{nexthours}}) {
+      my $isToday = NexthoursVal ($name, $nh, 'today',         0); 
+      my $hod     = NexthoursVal ($name, $nh, 'hourofday', undef);                                                      # Stunde des Tages vom NextHours Key (01,02,...24) 
+      
+      my $num = int ((split 'NextHour', $nh)[1]);
+      next if($num == 0);                                                                                               # aktuelle Stunde 00 nicht berücksichtigen
+      last if($num > 24);
+      
+      my ($msg1, $msg2, $msg3, $msg4) = ('', '', '', '');
+     
+      if (defined $usage->{nxt}{$hod}{histnum}) {                                                                       # historische Stundenverbräuche exkludieren
+          my $exhcon                = $usage->{nxt}{$hod}{histcon} / $usage->{nxt}{$hod}{histnum};                      # durchschnittlichen Verbrauchswert
+          $usage->{nxt}{$hod}{con} -= $exhcon;
+          
+          $exhcon = sprintf "%.0f", $exhcon;
+          $msg1   = "EXCLUDE hist $exhcon Wh (entities=$usage->{nxt}{$hod}{histnum}), ";
       }
 
-      my $hnum    = scalar @conh;
-      my $hnumtom = scalar @conhtom;
+      $usage->{nxt}{$hod}{conex} = $usage->{nxt}{$hod}{con};
+      
 
-      if ($hnum) {
-          if ($hnum > $acld) {
-              @conh = splice (@conh, $acld * -1);
-              $hnum = scalar @conh;
-          }
+      if (defined $usage->{nxt}{$hod}{plannum}) {                                                                       # geplante Stundenverbräuche inkludieren
+          my $inhcon                = $usage->{nxt}{$hod}{plancon} / $usage->{nxt}{$hod}{plannum};
+          $usage->{nxt}{$hod}{con} += $inhcon;
+          
+          $inhcon = sprintf "%.0f", $inhcon;
+          $msg2   = "INCLUDE planned $inhcon Wh (entities=$usage->{nxt}{$hod}{plannum}), "; 
+      }
+      
+      $usage->{nxt}{$hod}{con} = sprintf "%.0f", $usage->{nxt}{$hod}{con} if(defined $usage->{nxt}{$hod}{con});
+           
+      debugLog ($paref, 'consumption_long', "num=$num, isToday=$isToday, hod=$hod, ".$msg1.$msg2."SUMMARY -> estimated CON: ".(defined $usage->{nxt}{$hod}{con} ? $usage->{nxt}{$hod}{con}.' Wh' : 'undef'));
+  
+      
+      ## Ergebnisse speichern
+      #######################
+      next if(!defined $usage->{nxt}{$hod}{con});                                                            
+      
+      $usage->{nxt}{$hod}{conex} = $usage->{nxt}{$hod}{con} if(!defined $usage->{nxt}{$hod}{conex});
+      
+      my $con   = sprintf "%.0f", $usage->{nxt}{$hod}{con};                                                             # prognostizierter Verbrauch
+      my $conex = sprintf "%.0f", $usage->{nxt}{$hod}{conex};  
+      
+      $data{$name}{nexthours}{$nh}{confcEx}  = $conex;
+      $data{$name}{nexthours}{$nh}{confc}    = $con;                                   
+      $data{$name}{nexthours}{$nh}{conlegfc} = $con;
+      
+      $msg3 = "STORE NextHour -> confc=$con Wh, confcEx=$conex Wh";
 
-          my $hcon         = $ncds <= $nhist ? (sprintf "%.0f", avgArray (\@conh, $hnum)) :
-                                               (sprintf "%.0f", medianArray (\@conh));                  # V 1.52.8
-          $usage{$hh}{con} = $hcon;                                                                     # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
-          $usage{$hh}{num} = $hnum;
+      if ($isToday) {                                                                                                   # nur Werte des aktuellen Tags speichern
+          $data{$name}{circular}{$hod}{confc} = $usage->{nxt}{$hod}{con};
+          
+          writeToHistory ( { paref => $paref, key => 'confc',    val => $con, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'conlegfc', val => $con, hour => $hod } );
+
+          $msg4 = " ,STORE pvCircular/pvHistory -> confc=$con Wh";
+      }  
+      
+      debugLog ($paref, 'saveData2Cache|consumption_long', "num=$num, isToday=$isToday, hod=$hod, $msg3".$msg4);
+  }
+  
+  debugLog ($paref, 'saveData2Cache|consumption_long', "################### ENDE Consumption forecast ###################");  
+
+return;
+}
+
+################################################################
+#  historische Verbrauchsdaten aus pvCircular lesen und 
+#  deren Median oder Average berechnen
+################################################################
+sub __readConFromCircular {
+  my $paref      = shift;
+  my $name       = $paref->{name};
+  my $hod        = $paref->{hod};
+  my $fcld       = $paref->{fcld};
+  my $lct        = $paref->{lct};
+  my $dayname    = $paref->{dayname};
+  my $tomdayname = $paref->{tomdayname};
+  my $cofciwd    = $paref->{cofciwd};
+  my $usage      = $paref->{usage};                       # Referenz von %usage
+  my $ncds       = $paref->{ncds};
+  my $nhist      = $paref->{nhist};
+      
+  my (@conh, @conhtom);
+  my $mix = 0;
+
+  if ($cofciwd) {                                                                                                                                       
+      # --- nur Stunde eines bestimmten Wochentags (Mo...So) einbeziehen
+      push @conh,    @{$data{$name}{circular}{$hod}{con_all}{"$dayname"}}    if(defined ${$data{$name}{circular}{$hod}{con_all}{"$dayname"}}[0]);
+      push @conhtom, @{$data{$name}{circular}{$hod}{con_all}{"$tomdayname"}} if(defined ${$data{$name}{circular}{$hod}{con_all}{"$tomdayname"}}[0]);      # für den nächsten Tag
+  }
+  else {                                                                                                                                                
+      # --- alle aufgezeichneten Wochentage in der Stunde berücksichtigen
+      for my $dy (keys %{$data{$name}{circular}{$hod}{con_all}}) {                                                                                       # den max Index aller Tagesarrays ermitteln
+          my $ai = $#{$data{$name}{circular}{$hod}{con_all}{$dy}};
+          $mix   = $ai if($ai > $mix);
       }
 
-      if ($hnumtom) {
-          if ($hnumtom > $acld) {
-              @conhtom = splice (@conhtom, $acld * -1);
-              $hnumtom = scalar @conhtom;
+      for my $i (0..$mix) {                                                                                                                             # Werte sortiert nach Alter aufsteigend in Array einfügen
+          for my $dy (sort keys %habwdn) {
+              my $dayshortname = $habwdn{$dy}{$lct};
+              
+              push @conh,    ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]  if(defined ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]);
+              push @conhtom, @conh;
           }
-
-          my $hcontom       = $ncds <= $nhist ? (sprintf "%.0f", avgArray (\@conhtom, $hnumtom)) :
-                                                (sprintf "%.0f", medianArray (\@conhtom));              # V 1.52.8
-          $usage{tom}{con} += $hcontom;                                                                 # Summe prognostizierter Verbrauch (Median) des Tages
-          $usage{tom}{num} += $hnumtom;
       }
   }
 
-  ## Excludes / Includes vorbereiten
-  ####################################
-  my $exnum = 0;
-  my $ex    = 0;
-  my $lap   = 1;
+  my $hnum    = scalar @conh;
+  my $hnumtom = scalar @conhtom;
 
-  if ($ncds <= $nhist) {                                                                               # V 1.52.7
-      for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
-          next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
-          my $do = 1;
+  if ($hnum) {
+      # --- die nächsten 1..24 Stunden
+      if ($hnum > $fcld) {
+          @conh = splice (@conh, $fcld * -1);
+          $hnum = scalar @conh;
+      }
 
-          for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
-              $exconfc = ConsumerVal ($hash, $c, 'exconfc', 0);
+      my $hcon = $ncds <= $nhist ? (sprintf "%.0f", avgArray    (\@conh, $hnum)) :
+                                   (sprintf "%.0f", medianArray (\@conh));                  
+      
+      $usage->{nxt}{$hod}{con} = $hcon;                                                                                 # prognostizierter Verbrauch der Stunde hh (Hour of Day)
+      $usage->{nxt}{$hod}{num} = $hnum;
+      
+      # --- mit consForecastLastDays = 0
+      if ($fcld == 0) {                                                                                                 # Prognose aus hist. Tagen für Stunde löschen wenn keine Integration historischer Tage gewünscht                                                                                                 
+          $usage->{nxt}{$hod}{con} = 0;
+          $usage->{nxt}{$hod}{num} = 1;
+      }    
+  }
 
-              if ($exconfc) {
-                  ## Tageswert Excludes finden und summieren
-                  ############################################
-                  if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-                      if ($swdfcfc) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
-                          my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
-                          $do     = 0 if(!$hdn || $hdn ne $tomdayname);
-                      }
+  if ($hnumtom) {
+      # --- Stunden des nächsten Tages
+      if ($hnumtom > $fcld) {
+          @conhtom = splice (@conhtom, $fcld * -1);
+          $hnumtom = scalar @conhtom;
+      }
 
-                      if ($do) {
-                          $csme = HistoryVal ($hash, $n, 99, "csme${c}", 0);
+      my $hcontom = $ncds <= $nhist ? (sprintf "%.0f", avgArray    (\@conhtom, $hnumtom)) :
+                                      (sprintf "%.0f", medianArray (\@conhtom));             
+      
+      $usage->{tom}{con} += $hcontom;                                                                                                                   # Summe prognostizierter Verbrauch des Tages
+      $usage->{tom}{num} += $hnumtom;
+  }
 
-                          if ($csme > 0) {
-                              $ex   += $csme;
-                              $exnum++;
+return;
+}
 
-                              debugLog ($paref, 'consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
-                          }
-                      }
-                  }
+################################################################
+#  historische Consumerverbräuche exkludieren sofern nicht 
+#  zu berücksichtigen und geplante Verbräuche inkludieren
+################################################################
+sub __exincl_from_pvHistory {
+  my $paref      = shift;
+  my $name       = $paref->{name};
+  my $day        = $paref->{day};                         # aktuelles Tagdatum (01...31)
+  my $todayname  = $paref->{todayname};                   # aktueller Tagname
+  my $tomdayname = $paref->{tomdayname};
+  my $st         = $paref->{st};
+  my $cofciwd    = $paref->{cofciwd};
+  my $fcld       = $paref->{fcld};
+  my $usage      = $paref->{usage};                       # Referenz von %usage
+  my $debug      = $paref->{debug};
 
-                  ## Stundenweise exkludes und inkludes aufnehmen
-                  #################################################
-                  $do = 1;
-                  if ($swdfcfc) {                                                                           # nur gleiche Tage (Mo...So) einbeziehen
-                      my $hdn = HistoryVal ($hash, $n, 99, 'dayname', undef);
-                      $do     = 0 if(!$hdn || $hdn ne $todayname);
+  my $tomexnum = 0;
+  my $tomex    = 0;
+  #my $lap      = 1;
+
+  my $mday = int($day);
+  my $ph   = $data{$name}{pvhist};
+  my @days;
+
+  if ($fcld == 0) {
+      push @days, $day;
+  }
+  else {
+      my @days_after = sort { $a <=> $b } grep { $_ > $mday } keys %$ph;                           # Tage sortieren (Vormonat + aktueller Monat) ohne aktuellen Tag
+      my @days_upto  = sort { $a <=> $b } grep { $_ < $mday } keys %$ph;
+      @days          = (@days_after, @days_upto);
+      @days          = @days[-$fcld .. -1];    
+  }
+   
+  for my $dhist (@days) {
+      my $do  = 1;
+      my $lap = 1;
+
+      for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {                                  # historischer Verbrauch aller registrierten Verbraucher aufaddieren
+          my $exconfc = ConsumerVal ($name, $c, 'exconfc', 0);
+
+          if ($exconfc || $fcld == 0) {                                                            # --- mit consForecastLastDays = 0
+              ## Tageswert f. kommenden Tag Excludes finden und summieren
+              #############################################################
+              if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstellung der Verbrauchsprognose ausschließen
+                  if ($cofciwd) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                      my $hdn = HistoryVal ($name, $dhist, 99, 'dayname', undef);
+                      $do     = 0 if(!$hdn || $hdn ne $tomdayname);
                   }
 
                   if ($do) {
-                      my $epiecelem = 1;
+                      my $cegy = HistoryVal ($name, $dhist, 99, "csme${c}", 0);
 
-                      for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
-                          my $hh = sprintf "%02d", $h;
-                          $csme  = HistoryVal ($hash, $n, $hh, "csme${c}", 0);
-
-                          if ($csme) {
-                              $csme                 = sprintf "%.2f", $csme;
-                              $usage{$hh}{histcon} += $csme;
-                              $usage{$hh}{histnum}++;
-
-                              debugLog ($paref, 'consumption_long', "consumer '$c' register for exclude day $n, hod: $hh - ".$csme." Wh");
+                      if ($cegy > 0) {
+                          $tomex   += $cegy;
+                          $tomexnum++;
+                      
+                          if ($debug =~ /consumption_long/xs) {
+                              Log3 ($name, 1, "$name DEBUG> Consumer '$c' hist cons registered by 'exconfc' for exclude - day: $dhist -> $cegy Wh");
                           }
+                      }
+                  }
+              }
 
-                          if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren
-                              my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
-                              my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
-                              my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
+              ## stundenweise Exkludes / Inkludes für aktuellen Tag aufnehmen
+              #################################################################
+              $do = 1;
+              
+              if ($cofciwd) {                                                                           # nur gleiche Tage (Mo...So) einbeziehen
+                  my $hdn = HistoryVal ($name, $dhist, 99, 'dayname', undef);
+                  $do     = 0 if(!$hdn || $hdn ne $todayname);
+              }
 
-                              if ($rt >= $plson && $rt <= $plsoff) {
-                                  if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
-                                      $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
-                                      $usage{$hh}{plannum}++;
+              if ($do) {
+                  my $epiecelem = 1;
 
-                                      debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
+                  for my $num (1..24) {                                                                   
+                      my $hod  = sprintf "%02d", $num;
+                      
+                      if ($exconfc == 1) {
+                          my $cegy = HistoryVal ($name, $dhist, $hod, "csme${c}", undef);
 
-                                      $epiecelem++;
+                          if (defined $cegy) {                                                              # historische Con und Anzahl für späteres Exclude zusammenfassen
+                              $cegy                        = sprintf "%.2f", $cegy;
+                              $usage->{nxt}{$hod}{histcon} += $cegy;
+                              $usage->{nxt}{$hod}{histnum}++;
+                          
+                              if ($debug =~ /consumption_long/xs) {
+                                  Log3 ($name, 1, "$name DEBUG> day=$dhist, hod=$hod, consumer '$c' register exclude -> $cegy Wh");
+                              }
+                          }
+                      }
+
+                      if ((!$exconfc || $exconfc == 2) && $lap == 1) {                                  # AVG-Daten des Consumers inkludieren
+                          my $rt     = $st + (3600 * ($num - 1));                                       # Schleifenlaufzeit
+                          my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
+                          my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
+                                  
+                          if ($rt >= $plson && $rt <= $plsoff) {
+                              my $plancon = defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem} 
+                                            ? $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}
+                                            : defined $data{$name}{consumers}{$c}{epieces}{$lap}
+                                            ? $data{$name}{consumers}{$c}{epieces}{$lap}
+                                            : 0;
+                              
+                              if (defined $plancon) {
+                                  $usage->{nxt}{$hod}{plancon} += $plancon;
+                                  $usage->{nxt}{$hod}{plannum}++;
+                                
+                                  if ($debug =~ /consumption_long/xs) {
+                                      Log3 ($name, 1, "$name DEBUG> day=$dhist, hod=$hod, consumer '$c' register include -> planned $plancon Wh");
                                   }
+                                  
+                                  $epiecelem++;
                               }
                           }
                       }
                   }
               }
           }
-
-          $lap++;
       }
+
+      $lap++;
   }
 
-  ## effektiven StundenForecast berechnen
-  #########################################
-  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next Hours (new median) ###################");
-
-  for my $h (1..24) {
-      my $hh = sprintf "%02d", $h;
-
-      if (defined $usage{$hh}{histnum}) {                                                             # historische Stundenverbräuche exkludieren
-          my $exhcon        = sprintf "%.0f", ($usage{$hh}{histcon} / $usage{$hh}{histnum});          # durchschnittlichen Verbrauchswert
-          $usage{$hh}{con} -= $exhcon if($usage{$hh}{con} > $exhcon);
-
-          debugLog ($paref, 'consumption_long', "excl. hist $exhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{histnum});
-      }
-
-      $usage{$hh}{conex} = $usage{$hh}{con};
-
-      if (defined $usage{$hh}{plannum}) {                                                             # geplante Stundenverbräuche inkludieren
-          my $inhcon        = sprintf "%.0f", ($usage{$hh}{plancon} / $usage{$hh}{plannum});
-          $usage{$hh}{con} += $inhcon;
-
-          debugLog ($paref, 'consumption_long', "incl. planned $inhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{plannum});
-      }
-
-      if (defined $usage{$hh}{num}) {                                                                 # V 1.47.0
-          debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
-      }
-  }
-
-  ## nächsten Tageswert Excludes berücksichtigen
-  ################################################
-  my $tomnum = $usage{tom}{num} // 0;
-
-  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day (new median) ###################");
-
-  if ($tomnum) {
-      if ($exnum) {
-          $ex               = sprintf "%.0f", ($ex / $exnum);                                        # Ex Tageswert Durchschnitt bilden
-          $usage{tom}{con} -= $ex;
-      }
-
-      $data{$name}{current}{tomorrowconsumption} = $usage{tom}{con};
-      debugLog ($paref, 'consumption|consumption_long', "estimated cons Tomorrow: ".$usage{tom}{con}." Wh, Individual hourly values considered: $tomnum, exclude: $ex Wh (avg of $exnum entities)");
-  }
-  else {
-      my $lang                                   = $paref->{lang};
-      $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
-      debugLog ($paref, 'consumption|consumption_long', "no estimated cons for Tomorrow: ".$hqtxt{wfmdcf}{$lang});
-  }
-
-  ## Ergebnisse speichern
-  ########################
-  debugLog ($paref, 'saveData2Cache|consumption_long', "################### Store Consumption forecast values (new median) ###################");
-
-  for my $k (sort keys %{$data{$name}{nexthours}}) {
-      my $nhst = NexthoursVal ($hash, $k, "starttime", undef);                                         # Startzeit
-      next if(!$nhst);
-
-      my $utime = timestringToTimestamp ($nhst);
-      my $nhday = strftime "%a", localtime($utime);                                                    # Wochentagsname des NextHours Key
-      my $nhhr  = sprintf "%02d", int (strftime "%H", localtime($utime)) + 1;                          # Stunde des Tages vom NextHours Key (01,02,...24)
-
-      next if(!defined $usage{$nhhr}{con});                                                            # V 1.47.0
-
-      $data{$name}{nexthours}{$k}{confcEx}  = $usage{$nhhr}{conex};
-      $data{$name}{nexthours}{$k}{confc}    = $usage{$nhhr}{con};                                      # prognostizierter Verbrauch (Median)
-      $data{$name}{nexthours}{$k}{conlegfc} = $usage{$nhhr}{con};
-      
-      debugLog ($paref, 'saveData2Cache|consumption_long', "store '$k' hod '$nhhr' confc: $usage{$nhhr}{con}, confcEx: $usage{$nhhr}{conex}");
-
-      if (NexthoursVal ($name, $k, 'today', 0)) {                                                      # nur Werte des aktuellen Tags speichern
-          $data{$name}{circular}{$nhhr}{confc} = $usage{$nhhr}{con};
-          writeToHistory ( { paref => $paref, key => 'confc',    val => $usage{$nhhr}{con}, hour => $nhhr } );
-          writeToHistory ( { paref => $paref, key => 'conlegfc', val => $usage{$nhhr}{con}, hour => $nhhr } );
-
-          debugLog ($paref, 'saveData2Cache|consumption_long', "store circular/history hod '$nhhr' confc: $usage{$nhhr}{con}");
-      }
-  }
-
-return;
+return ($tomexnum, $tomex);
 }
 
 ################################################################
@@ -16563,7 +16821,7 @@ sub _calcTodayDeviation {
       }
       else {
           my $pvfcd   = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;              # PV Prognose bis jetzt
-          $dpv        = sprintf "%.2f", (100 - (100 * $pvre / (abs $pvfcd || 1) ) );        # V 2.0.0
+          $dpv        = sprintf "%.2f", ( 100 - (100 * abs ($pvre / $pvfcd || 1)) );        # V 2.0.0
           $dosave_dpv = 1;
       }
 
@@ -16580,7 +16838,7 @@ sub _calcTodayDeviation {
   my $confc  = ReadingsNum ($name, 'Today_CONforecast', 0);
   my $conre  = ReadingsNum ($name, 'Today_CONreal',     0);
   my $confcd = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0) - $confc;             # Con Prognose bis jetzt
-  $dcon      = sprintf "%.2f", (100 - (100 * $conre / (abs $confcd || 1) ) );               # V 2.0.0
+  $dcon      = sprintf "%.2f", ( 100 - (100 * abs ($conre / $confcd || 1 )) );              # V 2.0.0
   
   $dcon *= -1 if($perspective eq 'reverse');                                                # Perspektivänderung
   
@@ -24948,7 +25206,7 @@ sub aiFannGetConResult {
           writeToHistory ( { paref => $paref, key => 'conaifc', val => $prediction,  hour => $hod } );
           writeToHistory ( { paref => $paref, key => 'confc',   val => $confc_final, hour => $hod } );    
                     
-          debugLog ($paref, 'saveData2Cache|consumption_long', "store circular/history hod '$hod' confc: $prediction");
+          debugLog ($paref, 'saveData2Cache|consumption_long', "store AI legacy alpha value to circular/history -> hod=$hod confc=$confc_final Wh");
       }
   }
   
@@ -32526,15 +32784,23 @@ to ensure that the system configuration is correct.
 
          <ul>
          <table>
-         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
+         <colgroup> <col width="19%"> <col width="81%"> </colgroup>
+            <tr><td> <b>aiStorageDuration</b> </td><td>The module collects and stores training data for PV prediction AI and consumption prediction AI.                              </td></tr>
+            <tr><td>                          </td><td>This data is deleted when it has exceeded the specified holding period (days).                                                </td></tr>
+            <tr><td>                          </td><td>Value: <b>Integer</b>, default: 1825                                                                                          </td></tr>
+            <tr><td>                          </td><td>                                                                                                                              </td></tr>
+         </table>
+         
+         <br><br>         
+         The following parameters refer to the <b>AI PV forecast:</b> 
+         <br><br>
+         
+         <table>
+         <colgroup> <col width="19%"> <col width="81%"> </colgroup>
             <tr><td> <b>aiTrainStart</b>      </td><td>When using the internal PV forecast AI, daily training takes place.                                                           </td></tr>
             <tr><td>                          </td><td>Training starts approx. 15 minutes after the hour specified in this key.                                                      </td></tr>
             <tr><td>                          </td><td>For example, with a set value of '3', training would start at around 03:15.                                                   </td></tr>
             <tr><td>                          </td><td>Value: <b>1 ... 23</b>, default: 2                                                                                            </td></tr>
-            <tr><td>                          </td><td>                                                                                                                              </td></tr>
-            <tr><td> <b>aiStorageDuration</b> </td><td>The module collects and stores training data for PV prediction AI and consumption prediction AI.                              </td></tr>
-            <tr><td>                          </td><td>This data is deleted when it has exceeded the specified holding period (days).                                                </td></tr>
-            <tr><td>                          </td><td>Value: <b>Integer</b>, default: 1825                                                                                          </td></tr>
             <tr><td>                          </td><td>                                                                                                                              </td></tr>
             <tr><td> <b>aiTreesPV</b>         </td><td>PV forecast AI: Defines the number of AI decision trees (random forests). A higher number increases the                       </td></tr>
             <tr><td>                          </td><td>accuracy and robustness of AI prediction, but requires more CPU and RAM resources.                                            </td></tr>
@@ -32542,7 +32808,106 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td>                                                                                                                              </td></tr>
             <tr><td>                          </td><td>Value: <b>1 ... 50</b>, default: 10                                                                                           </td></tr>
         </table>
-         </ul>
+
+        <br><br>
+        The following parameters refer to the <b>AI consumption forecast</b>. <br>
+        Except for aiConActivate, aiConAlpha, and aiConTrainStart, changes will only be applied during the next training run. 
+        <br><br>
+         
+         
+        <table>
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>            
+            <tr><td> <b>aiConActivate</b>     </td><td>Enables the use of the neural network for consumption prediction. A default setting is used. To change the                                                   </td></tr>
+            <tr><td>                          </td><td>training parameters, the following options are available.                                                                                                    </td></tr>
+            <tr><td>                          </td><td><ul> * 0 - the neural network is deactivated </ul>                                                                                                           </td></tr>
+            <tr><td>                          </td><td><ul> * 1 - the neural network is activated </ul>                                                                                                             </td></tr>
+            <tr><td>                          </td><td><ul> * 2 - Training mode with a maximum of 1 training repetition is activated. The AI consumption forecast is not used. </ul>                                </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0 | 1 | 2</b>, default: 0                                                                                                                         </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConProfile</b>      </td><td>Selection of household characteristics. The selectable profiles reinforce or emphasize certain specific characteristics in the household.                    </td></tr>
+            <tr><td>                          </td><td>The version designation is merely a guideline. You should set the version that achieves the best results.                                                    </td></tr>
+            <tr><td>                          </td><td>If aiConProfile is not set, the system automatically selects the profile that is most likely to be accurate.                                                 </td></tr>
+            <tr><td>                          </td><td><ul> v1_common - Standard household </ul>                                                                                                                    </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active - Standard household with distinct daily rhythms </ul>                                                                                 </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_pv - Household with lower weighting of the PV system </ul>                                                                                    </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active_pv - Household with greater emphasis on the PV system and strong daily rhythm </ul>                                                    </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump - Standard household with heat pump  </ul>                                                                                                  </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_pv - Household with lower weighting of the PV system and heat pump characteristics </ul>                                                    </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Household with greater emphasis on PV system, heat pump, and strong daily rhythm </ul>                                          </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConAlpha</b>        </td><td>Weighting of AI results with conventional (legacy) consumption forecast values.                                                                              </td></tr>
+            <tr><td>                          </td><td><ul> * 0 - the AI results are not used, only legacy values. </ul>                                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> * 0.4 - the AI results account for 40% of the final forecast, while the legacy values account for 60%. </ul>                                            </td></tr>
+            <tr><td>                          </td><td><ul> * 0.7 - the AI results account for 70% of the final forecast, while legacy values account for 30%. </ul>                                                </td></tr>
+            <tr><td>                          </td><td><ul> * 1 - only AI results are used, no legacy values. </ul>                                                                                                 </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0 .. 1</b>, default: 1                                                                                                                            </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConTrainStart</b>   </td><td>Set the repetition period of the training in days and the start time of the training.                                                                        </td></tr>
+            <tr><td>                          </td><td>The information is provided in the format &lt;period&gt;:&lt;hour&gt;.                                                                                       </td></tr>
+            <tr><td>                          </td><td>value range:<b> &lt;1..90&gt;:&lt;1..23&gt; </b>, default: 7:3  (Training starts every 7 days at 3 a.m.)                                                     </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConActFunc</b>      </td><td>Selection of the activation function for the hidden layers.                                                                                                  </td></tr>
+            <tr><td>                          </td><td><ul> * SIGMOID - typical for increases in consumption that reach saturation point (e.g., more devices -> more consumption) </ul>                             </td></tr>
+            <tr><td>                          </td><td><ul> * SIGMOID_SYMMETRIC - good for deviations from a normal state (e.g., temperature deviation -> more or less consumption) </ul>                           </td></tr>
+            <tr><td>                          </td><td><ul> * GAUSSIAN - good for peak effects that are maximum at a certain value (e.g., optimal outside temperature -> maximum consumption) </ul>                 </td></tr>
+            <tr><td>                          </td><td><ul> * GAUSSIAN_SYMMETRIC - like GAUSSIAN, but symmetrical around a center point (e.g., comfort temperature – too cold or too warm -> higher consumption) </ul>           </td></tr>
+            <tr><td>                          </td><td><ul> * ELLIOT - for positive effects that rise gently but are less saturated than with sigmoid </ul>                                                                      </td></tr>
+            <tr><td>                          </td><td><ul> * ELLIOT_SYMMETRIC - such as SIGMOID_SYMMETRIC, effects that are gently symmetrical (e.g., temperatures that slightly increase consumption without sharp peaks)</ul> </td></tr>
+            <tr><td>                          </td><td>Values:<b> SIGMOID | SIGMOID_SYMMETRIC | GAUSSIAN | GAUSSIAN_SYMMETRIC | ELLIOT | ELLIOT_SYMMETRIC </b>, default: SIGMOID                                    </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConHiddenLayers</b> </td><td>Sets the architecture (hidden layers) of the neural network.                                                                                                 </td></tr>
+            <tr><td>                          </td><td>The architecture determines how many layers and neurons the network has.                                                                                     </td></tr>
+            <tr><td>                          </td><td><ul> * small nets (e.g., 50-25) are quick and easy, but less accurate.  </ul>                                                                                </td></tr>
+            <tr><td>                          </td><td><ul> * medium nets (64-32) offer a good compromise between speed and accuracy.  </ul>                                                                        </td></tr>
+            <tr><td>                          </td><td><ul> * deep networks (64-32-16) recognize complex patterns better, but are more sensitive to outliers.  </ul>                                                </td></tr>
+            <tr><td>                          </td><td>value range:<b> XX[X]-XX[X]-XX[X] (X = 1-9) </b>, default: 80-40-20                                                                                          </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConLearnRate</b>    </td><td>Determines how strongly the weights of the neural network are adjusted at each training step.                                                                </td></tr>
+            <tr><td>                          </td><td><ul> * small (e.g., 0.001): slow, stable learning; low risk of overshoot, but longer training time. </ul>                                                    </td></tr>
+            <tr><td>                          </td><td><ul> * medium (e.g., 0.005): good compromise between speed and stability; often a sensible default value </ul>                                               </td></tr>
+            <tr><td>                          </td><td><ul> * large (e.g., 0.05): fast learning, but risk of instability or divergence if the steps are too large </ul>                                             </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0.05 | 0.01 | 0.005 | 0.001 </b>, default: 0.005                                                                                                  </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConBitFailLimit</b> </td><td>The bit-fail limit defines the error (within the normal range) at which a training example counts as an 'error'.                                             </td></tr>
+            <tr><td>                          </td><td>The smaller the value, the more intense the training and the better the peaks are achieved. Larger values are more robust but less peak-sensitive.           </td></tr>
+            <tr><td>                          </td><td><ul> * 0.05 - 0.20: very strict -> only for very clean data </ul>                                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> * 0.20 - 0.35: balanced standard range </ul>                                                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> * 0.35 - 0.50: tolerant - good for noisy households </ul>                                                                                               </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0.05 .. 0.50 </b>, default: 0.35                                                                                                                  </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConMomentum</b>     </td><td>Controls how strongly previous weight adjustments are incorporated into the current learning direction.                                                      </td></tr>
+            <tr><td>                          </td><td><ul> * small (e.g., 0.2): Network reacts directly to current errors, but fluctuates more strongly </ul>                                                      </td></tr>
+            <tr><td>                          </td><td><ul> * medium (e.g., 0.5–0.8): smooths the learning steps, accelerates convergence, and prevents zigzag movements </ul>                                      </td></tr>
+            <tr><td>                          </td><td><ul> * large (e.g., 0.9): very strong smoothing, can stabilize training, but the network may 'overshoot' local minima </ul>                                  </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0.2 - 0.9 </b>, default: 0.5                                                                                                                      </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConShuffleMode</b>  </td><td>Setting the shuffle mode. It determines how the training data is mixed and divided into training and test packages.                                          </td></tr>
+            <tr><td>                          </td><td><ul> * 0 = chronological, reproducible, but susceptible to sequence effects </ul>                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> * 1 = chronological split, followed by internal shuffle—good balance between temporal validation and robust training </ul>                              </td></tr>
+            <tr><td>                          </td><td><ul> * 2 = complete shuffle before split + internal shuffle - maximum mixing, but temporal structures are lost </ul>                                         </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0 | 1 | 2 </b>, default: 2                                                                                                                        </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td><b>aiConShufflePeriod</b> </td><td>The shuffle period determines after how many epochs the training data is reshuffled in the background.                                                       </td></tr>
+            <tr><td>                          </td><td>The parameter influences how strongly the network sees random sequences and thus generalization vs. stability.                                               </td></tr>
+            <tr><td>                          </td><td><ul> * small (5–10): Data is reshuffled very frequently, better generalization, less risk of 'memorization' </ul>                                            </td></tr>
+            <tr><td>                          </td><td><ul> * medium (10–20): good compromise between stability and mixing, smooth learning curves, yet enough variation </ul>                                      </td></tr>
+            <tr><td>                          </td><td><ul> * large (>20): longer identical data sequence, very stable learning, less stochasticity, network may adopt patterns too strongly </ul>                  </td></tr>
+            <tr><td>                          </td><td>Values:<b> 10 | 15 | 20 | 25 | 30 </b>, default: 10                                                                                                          </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConSteepness</b>    </td><td>Steepness controls the sensitivity of the neurons. Lower values smooth, higher values sharpen.                                                               </td></tr>
+            <tr><td>                          </td><td><ul> * < 0.4: if the model reacts too strongly to peaks and needs to be smoothed </ul>                                                                       </td></tr>
+            <tr><td>                          </td><td><ul> * 0.5: Standard, if there are no special requirements </ul>                                                                                             </td></tr>
+            <tr><td>                          </td><td><ul> * > 0.7: if fine details or strong patterns (e.g., load peaks) need to be captured more clearly </ul>                                                   </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0.1 - 1.5 </b>, default: 0.9                                                                                                                      </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConTrainAlgo</b>    </td><td>Sets the training algorithm of the neural network.                                                                                                           </td></tr>
+            <tr><td>                          </td><td>The training algorithm determines how the weights in the network are adjusted.                                                                               </td></tr>
+            <tr><td>                          </td><td><ul> * RPROP works stably and automatically with customized step sizes, ideal for reliable training without many parameters </ul>                            </td></tr>
+            <tr><td>                          </td><td><ul> * INCREMENTAL learns faster and reacts directly to each example, but is more sensitive to outliers. </ul>                                               </td></tr>
+            <tr><td>                          </td><td>Values:<b> RPROP | INCREMENTAL </b>, default: INCREMENTAL                                                                                                    </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+       </table>
+       </ul>
 
        <ul>
          <b>Example: </b> <br>
@@ -33588,11 +33953,12 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>consForecastLastDays</b>      </td><td>The specified number of historical days is included in the calculation of the consumption forecast.                                                             </td></tr>
             <tr><td>                                  </td><td>For example, with the attribute value '1' only the previous day is taken into account, with the value '14' the previous 14 days.                                </td></tr>
+            <tr><td>                                  </td><td>Special case 0: No historical consumption is included, only the planning data from consumers for the current day.                                               </td></tr>
             <tr><td>                                  </td><td>The days taken into account may be fewer if there are not enough values in the internal memory.                                                                 </td></tr>
             <tr><td>                                  </td><td>If the key 'consForecastIdentWeekdays' is also set, the specified number of past weekdays                                                                       </td></tr>
             <tr><td>                                  </td><td>of the <b>same</b> day (Mon .. Sun) is taken into account.                                                                                                      </td></tr>
             <tr><td>                                  </td><td>For example, if the value is set to '8', the same weekdays of the past 8 weeks are taken into account.                                                          </td></tr>
-            <tr><td>                                  </td><td>Value: <b>Integer 1..180</b>, default: 60                                                                                                                       </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer 0..180</b>, default: 60                                                                                                                       </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>cycleInterval</b>             </td><td>Repetition interval of the data collection in seconds.                                                                                                          </td></tr>
             <tr><td>                                  </td><td>If cycleInterval is explicitly set to '0', there is no regular data collection and must be started externally                                                   </td></tr>
@@ -35394,7 +35760,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
          <ul>
          <table>
-         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
+         <colgroup> <col width="19%"> <col width="81%"> </colgroup>
             <tr><td> <b>aiStorageDuration</b> </td><td>Im Modul werden Trainingsdaten für die PV-Vorhersage KI und Verbrauchsvorhersage KI gesammelt und gespeichert.                           </td></tr>
             <tr><td>                          </td><td>Diese Daten werden gelöscht, wenn sie die angegebene Haltedauer (Tage) überschritten haben.                                              </td></tr>
             <tr><td>                          </td><td>Wert: <b>Ganzzahl</b>, default: 1825                                                                                                     </td></tr>
@@ -35406,7 +35772,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <br><br>
          
          <table>
-         <colgroup> <col width="26%"> <col width="74%"> </colgroup>
+         <colgroup> <col width="19%"> <col width="81%"> </colgroup>
             <tr><td> <b>aiTrainStart</b>      </td><td>Bei Nutzung der internen PV-Vorhersage KI erfolgt ein tägliches Training.                                                                </td></tr>
             <tr><td>                          </td><td>Der Start des Trainings erfolgt ca. 15 Minuten nach der in diesem Schlüssel festgelegten vollen Stunde.                                  </td></tr>
             <tr><td>                          </td><td>Zum Beispiel würde bei einem eingestellten Wert von '3' das Traning ca. 03:15 Uhr starten.                                               </td></tr>
@@ -35421,12 +35787,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </table>
 
          <br><br>
-         Nachfolgende Parameter beziehen sich auf die <b>KI Verbrauchsvorhersage</b>. Außer bei aiConActivate, aiConAlpha und 
-         aiConTrainStart werden Änderungen erst beim nächsten Trainingslauf angewendet. 
+         Nachfolgende Parameter beziehen sich auf die <b>KI Verbrauchsvorhersage</b>. <br>
+         Außer bei aiConActivate, aiConAlpha und aiConTrainStart werden Änderungen erst beim nächsten Trainingslauf angewendet. 
          <br><br>
          
          <table>
-         <colgroup> <col width="26%"> <col width="74%"> </colgroup>            
+         <colgroup> <col width="15%"> <col width="85%"> </colgroup>            
             <tr><td> <b>aiConActivate</b>     </td><td>Aktiviert die Verwendung des neuronalen Netzes für die Verbrauchsvorhersage. Es wird eine Standardeinstellung verwendet. Zur Änderung der                    </td></tr>
             <tr><td>                          </td><td>Trainingsparameter sind die weiteren beschriebenen verfügbar.                                                                                                </td></tr>
             <tr><td>                          </td><td><ul> * 0 - das neuronale Netz ist deaktiviert </ul>                                                                                                          </td></tr>
@@ -35442,7 +35808,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit geringerer Gewichtung der PV-Anlage </ul>                                                                                   </td></tr>
             <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage und starkem Tagesrhythmus </ul>                                                   </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump - Standardhaushalt mit Wärmepumpe  </ul>                                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit geringerer Gewichtung und Wärmepumpen Charakteristika </ul>                                                               </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit geringerer Gewichtung der PV-Anlage und Wärmepumpen Charakteristika </ul>                                                 </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage, Wärmepumpe und starkem Tagesrhythmus </ul>                                     </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                              </td></tr>
@@ -36563,11 +36929,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>consForecastLastDays</b>      </td><td>Es wird die angegebene Anzahl historischer Tage bei der Berechnung der Verbrauchsprognose einbezogen.                                             </td></tr>
             <tr><td>                                  </td><td>So wird z.B. mit dem Attributwert "1" nur der vorangegangene Tag berücksichtigt, mit dem Wert '14' die vergangenen 14 Tage.                       </td></tr>
+            <tr><td>                                  </td><td>Sonderfall 0: Es wird kein historischer Verbrauch einbezogen, lediglich die Planungsdaten von Verbrauchern für den aktuellen Tag.                 </td></tr>            
             <tr><td>                                  </td><td>Die berücksichtigten Tage können geringer ausfallen, wenn noch nicht genügend Werte im internen Speicher vorhanden sind.                          </td></tr>
             <tr><td>                                  </td><td>Bei einem zusätzlich gesetzten Schlüssel 'consForecastIdentWeekdays' wird die angegebene Anzahl vergangener                                       </td></tr>
             <tr><td>                                  </td><td><b>gleicher</b> Wochentage (Mo .. So) berücksichtigt.                                                                                             </td></tr>
             <tr><td>                                  </td><td>Zum Beispiel werden dann bei einem gesetzten Wert von '8' die gleichen Wochentage der vergangenen 8 Wochen berücksichtigt.                        </td></tr>
-            <tr><td>                                  </td><td>Wert: <b>Ganzzahl 1..180</b>, default: 60                                                                                                         </td></tr>
+            <tr><td>                                  </td><td>Wert: <b>Ganzzahl 0..180</b>, default: 60                                                                                                         </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>cycleInterval</b>             </td><td>Wiederholungsintervall der Datensammlung in Sekunden.                                                                                             </td></tr>
             <tr><td>                                  </td><td>Ist cycleInterval explizit auf '0' gesetzt, erfolgt keine regelmäßige Datensammlung und muss mit 'get &lt;name&gt; data'                          </td></tr>
