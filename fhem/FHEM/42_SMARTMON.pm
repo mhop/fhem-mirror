@@ -477,9 +477,11 @@ sub SMARTMON_getSmartDataReadings($$) {
   foreach my $id (sort keys %{$dmap}) {
     if($id eq "RC") {next}
     # warnings zaehlen
-    if($dmap->{$id}->{failed} ne "-") {
-      if($dmap->{$id}->{type} eq "Pre-fail") {$cnt_prefail++;}
-      if($dmap->{$id}->{type} eq "Old_age") {$cnt_oldage++;}
+    if (defined $dmap->{$id}->{failed}) {
+      if(defined($dmap->{$id}->{failed}) && $dmap->{$id}->{failed} ne "-") {
+        if(defined($dmap->{$id}->{type}) && $dmap->{$id}->{type} eq "Pre-fail") {$cnt_prefail++;}
+        if(defined($dmap->{$id}->{type}) && $dmap->{$id}->{type} eq "Old_age") {$cnt_oldage++;}
+      }           
     }
     # restlichen RAW-Werte ggf. einspielen, per Attribut (show_raw) abschaltbar   
     if( $sr eq "1" || $sr eq "2" ) {
@@ -522,6 +524,8 @@ sub SMARTMON_readDeviceData($%) {
     while(scalar(@dev_data)>0) {
       my $line = $dev_data[0];
       shift @dev_data;
+      next unless defined $line;
+      next unless length($line);
       my($k,$v) = split(/:\s*/,$line);
       if(defined $v) {
 		  $v = trim($v);
@@ -869,11 +873,15 @@ sub SMARTMON_readSmartData($;$) {
       if(scalar(@dev_data)>0 && $dev_data[0]=~m/ID#.*/) {
         shift @dev_data;
         while(scalar(@dev_data)>0) {
-          my ($d_id, $d_attr_name, $d_flag, $d_value, $d_worst, $d_thresh, 
-              $d_type, $d_updated, $d_when_failed, $d_raw_value) 
-              = split(/\s+/, trim($dev_data[0]));
+          my $raw = $dev_data[0];
           shift @dev_data;
-          
+          # leere oder undef-Zeilen ignorieren
+          next unless defined $raw;
+          next unless length($raw);
+          $raw = trim($raw);
+          my ($d_id, $d_attr_name, $d_flag, $d_value, $d_worst, $d_thresh,
+              $d_type, $d_updated, $d_when_failed, $d_raw_value)
+              = split(/\s+/, $raw);
           if(!defined($include) || defined($include->{$d_id})) {
             if(defined($d_attr_name)) {
               #$map->{$d_attr_name} = "Value: $d_value, Worst: $d_worst, Type: $d_type, Raw: $d_raw_value";
@@ -893,11 +901,14 @@ sub SMARTMON_readSmartData($;$) {
       } elsif (scalar(@dev_data)>0 && $dev_data[0]=~m/NVMe/) {
         shift @dev_data;
         while(scalar(@dev_data)>0) {
-          my ($d_attr_name, $d_value) = split(/:/, trim($dev_data[0]));
+          my $raw = $dev_data[0];
           shift @dev_data;
-          $d_attr_name = trim($d_attr_name);
-          $d_value = trim($d_value);
-          
+          # leere oder undef-Zeilen ignorieren
+          next unless defined $raw;
+          next unless length($raw);
+          my ($d_attr_name, $d_value) = split(/:/, $raw, 2);
+          $d_attr_name = trim($d_attr_name // "");
+          $d_value = trim($d_value // "");
           if(!defined($include) || defined($include->{$d_attr_name})) {
             if(defined($d_attr_name)) {
               $map->{$d_attr_name}->{name}    = $d_attr_name;
