@@ -151,7 +151,6 @@ init\
       $j = 2;;                                                            ## Aus der Schleife springen\
 \
     } else {\
-\
       for (my $i=0;;$i<=23;;$i++){\
         for (my $quarter = 0;; $quarter <= 3;; $quarter++) {\
           $timestamp = sprintf("%s_%02d:%02d:00", POSIX::strftime("%Y-%m-%d",localtime(time+86400*$j)), $i, $quarter*15);;\
@@ -199,8 +198,8 @@ package ui_Table;;\
 \
 "Kommando<dd>Auswahl</dd>" |widget([$SELF:ui_command_1],"uzsuDropDown,---,1_Aktueller_Preis,2_Preis_Info,3_Diagramm") |"Börse <br>".widget([$SELF_connect:conf_EVU],"uzsuDropDown,EPEX_Spot,Tibber,Tibber_Live,aWATTar")| "Tibber_Live<br>".widget([$SELF:ui_command_2],"uzsuDropDown,---,connect,disconnect") |[$SELF_connect:ws_cmd] \
 \
-"Strompreis<br>".card([$SELF_connect:current_price:bar1day],undef,undef,0,60,90,0,"fc0  ".::ReadingsVal("$SELF_connect","current_currency",""),undef,"1","130,,,,,,220").card([$SELF_connect:current_level:bar1day],undef,undef,0,60,90,0,"fc1  ".::ReadingsVal("$SELF_connect","current_currency",""),undef,"1","130,,,,,,220")|\
-"<span style=font-weight:bold>avg nächste 3h</span><br><br>".$SELF_Price(1)."<br>".$SELF_Price(2)."<br>".$SELF_Price(3)|"<span style=font-weight:bold>Statistik fc0</span><br><br>".::ReadingsVal("$SELF_connect","fc_min",0)." min<br>".::ReadingsVal("$SELF_connect","fc_avg",0)." avg<br>".::ReadingsVal("$SELF_connect","fc_med",0)." med<br>".::ReadingsVal("$SELF_connect","fc_max",0)." max"|\
+"Strompreis<br>".card([$SELF_connect:current_price:bar1day],undef,undef,0,60,90,0,"fc0 ".[$SELF_connect:current_currency],undef,"1","130,,,,,,220").card([$SELF_connect:current_level:bar1day],undef,undef,0,60,90,0,"fc1 ".[$SELF_connect:current_currency],undef,"1","130,,,,,,220")|\
+"<span style=font-weight:bold>avg nächste 3h</span><br><br>".$SELF_Price(1)."<br>".$SELF_Price(2)."<br>".$SELF_Price(3)|"<span style=font-weight:bold>Statistik fc0</span><br><br>".[$SELF_connect:fc_min]." min<br>".[$SELF_connect:fc_avg]." avg<br>".[$SELF_connect:fc_med]." med<br>".[$SELF_connect:fc_max]." max"|\
 "<span style=font-weight:bold>Trigger fc0</span><br>Basis ".widget([$SELF_connect:compensation_grid],"selectnumbers,0,0.1,12,1,lin")."<br>".$SELF_Format("trigger_0")|\
 "<span style=font-weight:bold>Trigger fc1</span><br><br>".$SELF_Format("trigger_1")
 attr Stromboerse uiTable {\
@@ -311,6 +310,7 @@ sub $SELF_Format {\
 ## "Bezug vom Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] >= 0 ? ::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0) : 0) )|Format("day")|Format("month")|Format("year")\
 ## "Einspeisung ins Netz"|sprintf("%04d W",([WR_0_KSEM:M_AC_Power] <= 0 ? abs(::round(::ReadingsVal("WR_0_KSEM","M_AC_Power",0),0)) :  0) )|""|""|""
 attr Stromboerse verbose 3
+
 
 
 setstate Stromboerse 2026-01-09 17:15:02 ui_command_1 ---
