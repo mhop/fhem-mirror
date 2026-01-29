@@ -271,7 +271,7 @@ my %dbconfig;
 my $configs  = join("",@config);
 my @configs  = split(/;;/,$configs);
 my $count    = @configs;
-my $fhemhost = hostname;
+my $fhemhost = hostname();
 
 ## no critic
 if ($count > 1) {
