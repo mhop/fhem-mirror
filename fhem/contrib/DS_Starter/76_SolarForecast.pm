@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.1.0"  => "26.01.2026  _calcConsForecast_legacy refactored ",
+  "2.1.0"  => "29.01.2026  _calcConsForecast_legacy refactored, fix restOfDaySum->{PV} vs. todaySumFc->{PV} ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
@@ -14349,6 +14349,7 @@ sub _createSummaries {
   $next3HoursSum->{PV}          = $hour00pvfc;
   $next4HoursSum->{PV}          = $hour00pvfc;
   $restOfDaySum->{PV}           = $hour00pvfc;
+  $todaySumFc->{PV}             = $hour00pvfc;
 
   $next1HoursSum->{Consumption} = $hour00confcremain;
   $next2HoursSum->{Consumption} = $hour00confcremain;
