@@ -14348,6 +14348,7 @@ sub _createSummaries {
   $next2HoursSum->{PV}          = $hour00pvfc;
   $next3HoursSum->{PV}          = $hour00pvfc;
   $next4HoursSum->{PV}          = $hour00pvfc;
+  
   $restOfDaySum->{PV}           = $hour00pvfc;
   $todaySumFc->{PV}             = $hour00pvfc;
 
@@ -16822,7 +16823,7 @@ sub _calcTodayDeviation {
       }
       else {
           my $pvfcd   = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;              # PV Prognose bis jetzt
-          $dpv        = sprintf "%.2f", ( 100 - (100 * abs ($pvre / $pvfcd || 1)) );        # V 2.0.0
+          $dpv        = sprintf "%.2f", ( 100 - (100 * abs ($pvre / ($pvfcd || 1))) );      # V 2.0.0
           $dosave_dpv = 1;
       }
 
@@ -16839,7 +16840,7 @@ sub _calcTodayDeviation {
   my $confc  = ReadingsNum ($name, 'Today_CONforecast', 0);
   my $conre  = ReadingsNum ($name, 'Today_CONreal',     0);
   my $confcd = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0) - $confc;             # Con Prognose bis jetzt
-  $dcon      = sprintf "%.2f", ( 100 - (100 * abs ($conre / $confcd || 1 )) );              # V 2.0.0
+  $dcon      = sprintf "%.2f", ( 100 - (100 * abs ($conre / ($confcd || 1) )) );            # V 2.0.0
   
   $dcon *= -1 if($perspective eq 'reverse');                                                # Perspektivänderung
   
