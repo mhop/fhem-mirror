@@ -14350,7 +14350,6 @@ sub _createSummaries {
   $next4HoursSum->{PV}          = $hour00pvfc;
   
   $restOfDaySum->{PV}           = $hour00pvfc;
-  $todaySumFc->{PV}             = $hour00pvfc;
 
   $next1HoursSum->{Consumption} = $hour00confcremain;
   $next2HoursSum->{Consumption} = $hour00confcremain;
