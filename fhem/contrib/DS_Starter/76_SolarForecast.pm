@@ -16821,8 +16821,9 @@ sub _calcTodayDeviation {
           }
       }
       else {
-          my $pvfcd   = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;              # PV Prognose bis jetzt
-          $dpv        = sprintf "%.2f", ( 100 - (100 * abs ($pvre / ($pvfcd || 1))) );      # V 2.0.0
+          my $pvfcrod = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;              # PV Prognose bis jetzt
+          $pvfcrod    = min ($pvfc, $pvfcrod);                                              # Anzeigefix https://forum.fhem.de/index.php?msg=1356915
+          $dpv        = sprintf "%.2f", ( 100 - (100 * abs ($pvre / ($pvfcrod || 1))) );    # V 2.0.0
           $dosave_dpv = 1;
       }
 
