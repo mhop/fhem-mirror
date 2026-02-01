@@ -179,6 +179,7 @@
 #           fix: use EM1 for shellyemmini
 # 6.05      fix: handling of timers, general optimization of ShellySet
 #           add: shelly plug pm gen3, Shelly Dimmer Gen4, shelly plug us gen4 wo/illuminance sensor
+# 6.05.1    add: Shelly Plug M Gen3, add: reading restart_required
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -199,7 +200,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05 26.01.2026";
+my $version = "6.05.1 02.02.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -350,6 +351,7 @@ my %shelly_vendor_ids = (
     "S3EM-003CXCEU63" => ["shelly3emG3",    "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
     "S3PL-10112EU"    => ["shellyplusplug", "Shelly AZ Plug",          0x1850,   "PLUGS_UI"],   # added 01/2025  amazon compatible
     "S3PL-20112EU"    => ["shellyplusplug", "Shelly Outdoor Plug S Gen3",0x1853, "PLUGS_UI"],   # added 02/2025
+    "S3PL-30110EU"    => ["shellyplusplug", "Shelly Plug M Gen3",      0x1865,   "PLUGS_UI"],   # added 02/2026 
     "S3PL-30116EU"    => ["shellyplugpm",   "Shelly Plug PM Gen3",     0x1854,   "PLUGPM_UI"],   # added 01/2026    
     "S3SH-0A2P4EU"    => ["shellyshutter",  "Shelly Shutter",          0x1039],   # added 09/2025
     ## Mini Gen3 Devices
@@ -2385,7 +2387,7 @@ sub Shelly_Set ($@) {
   if( $cmd eq "pct" ){
       if( $hash->{props}{namespace} eq 'roller' ){
           $cmd='pctR';    # set percentage for rollers
-      }else{
+      }elsif( $hash->{props}{namespace} ne 'relay' ){
           $cmd='pctD';    # set percentage for 
       }
   }
@@ -2427,29 +2429,22 @@ sub Shelly_Set ($@) {
       $newkeys .= $shelly_dropdowns{Scripts}
                                     if( $shelly_models{$model}[4]>=1 ); ## Gen2+
       $newkeys .= $shelly_dropdowns{PlugsUI} #{colors}
-                                    if( ReadingsVal($name,"model_function","unknown") eq "plug" );
-                              ###      if( $model eq "shellyplusplug" && ReadingsVal( $name, "model_ID", "" ) =~ /EU$/); ## Shelly Plug-S Gen2+  EU-Type                                  
+                                    if( ReadingsVal($name,"model_function","unknown") eq "plug" );                                  
       # most of devices, except roller, metering
       $newkeys .= $shelly_dropdowns{Onoff}
                                     if( ($mode ne "thermostat" && $mode ne "roller" && $shelly_models{$model}[0]>0) || 
                                                              $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 );
       $newkeys .= $shelly_dropdowns{Therm}
                                     if( $model =~ /walldisplay/ );
-      # multichannel devices
-   ##   $newkeys .= $shelly_dropdowns{Multi} if( ($mode ne "roller" && $shelly_models{$model}[0]>1) ||
-                                        #    ($shelly_models{$model}[2]>1 && ($mode=~/white/ || $shelly_models{$model}[8]==0)) );  # multimode
-   ##                                     ($shelly_models{$model}[2]>1 && $mode!~/white|light/ ) );  # multimode device?
-                                        
+      # multichannel devices / relay and light only
       $newkeys .= $shelly_dropdowns{Multi} if( $hash->{props}{relay}>1 || $hash->{props}{light}>1 );
       
       if( $mode eq "roller" || ($shelly_models{$model}[0]==0 && $shelly_models{$model}[1]>0)){
           $newkeys .= $shelly_dropdowns{Rol};
- #    }elsif( $model =~ /shelly(rgbw|bulb).*/ && $mode eq "color" ){
       }elsif( $shelly_models{$model}[7] > 0 && $mode =~ /color|rgbw/ ){
           $newkeys .= $shelly_dropdowns{RgbwC};
           $newkeys .= $shelly_dropdowns{RgbwEff}  if($shelly_models{$model}[4] == 0);   # first gen devices only (ShellyRGBW,ShellyBulb)
       }elsif( $shelly_models{$model}[2] > 0 && $mode ne 'color' ){
-               #$model =~ /shellydimmer/ || ($model =~ /shellyrgbw.*/ && $mode eq "white") || $model eq "shellyplus010v" ){
           $newkeys .= $shelly_dropdowns{RgbwW};
           $newkeys =~ s/pct:slider,1,1,100/pct/  if( $shelly_models{$model}[2] > 1 ); # no slider at multichannel device
 
@@ -2556,6 +2551,9 @@ sub Shelly_Set ($@) {
          ($subs,$err) = SUBS($name,$value,$shelly_models{$model}[5]);
          if($err){Shelly_error_handling($hash,"Shelly_Set:input",$err,1);return $err;}
          readingsBulkUpdateMonitored($hash, "input$subs", $isWhat, 1 );
+               ##    # experimental 
+               ##    my $OnOffCnt = ReadingsVal( $name,"input$subs\_cnt", 0 );
+               ##    readingsBulkUpdateMonitored($hash, "input$subs\_cnt", $OnOffCnt++, 1 );
      }elsif( $cmd =~ /^(single|double|triple|short|long)_push$/ ){
          ($subs,$err) = SUBS($name,$value,$shelly_models{$model}[5]);
          if($err){Shelly_error_handling($hash,"Shelly_Set:input",$err,1);return $err;}
@@ -2704,37 +2702,6 @@ sub Shelly_Set ($@) {
           return undef;
   #---------------------------
   }
-
-
-  #-- real commands
-#  my $ff=-1;  # Function-Family, correspondends to row in %shelly_models{model}[]
-
-  #-- we have a switch type device
-#  if( $shelly_models{$model}[0]>0 && $mode ne 'roller' ){
-#      $ff = 0;
-  #-- we have a Shelly 2 / 2.5 or a Shelly(Plus/Pro)2pm roller type device
-#  }elsif( $shelly_models{$model}[1]>0 && $mode ne 'relay' ){
-#      $ff = 1;
-  #-- we have a dimable device:  Shelly dimmer or Shelly RGBW or bulb in white mode
-#  }elsif( $shelly_models{$model}[2]>0 && $mode !~ /color|rgb/ ){
-#      $ff = 2;
-  #-- we have a color type device (Bulb or Shelly RGBW, and color/rgb(w) mode) 
-#  }elsif( $shelly_models{$model}[7]>0 && $mode !~ /white|light/ ){
-#      $ff = 7;
-  #-- we have a ShellyBulbDuo  #+#
-#  }elsif( $model =~ /shellybulb.*/ && $mode eq 'white' ){
-#      $ff = 2;
-#  }elsif( $model =~ /(rgb|bulb)/ ){
-#      if( $mode =~ /(white|light)/ ){
-#          $ff = 2;
-#      }elsif( $mode =~ /(color|rgb)/ ){    #-- we have a color type device (Bulb or Shelly RGBW, and color mode) 
-#          $ff = 7;
-#      }else{
-#          Debug "Error".$model."-".$mode;
-#      }
-#  }else{
-#      $ff = -1;
-#  }
 #save command
 my $cmd_orig=$cmd;
   #-- get channel parameter
@@ -2823,7 +2790,6 @@ my $cmd_orig=$cmd;
         }
         $time = shift @a  if( $cmd =~ /dim-for-timer/ );
         $channel = shift @a;
-#  }elsif( ($cmd eq "pctD" && $ff!=1 ) || $cmd =~ /dim/ || $cmd eq "brightness" || $cmd eq "ct" ){
   }elsif( $cmd =~ /pctD|dim|brightness|ct/ ){
       #  $pct = $value;
         $channel = shift @a;
@@ -2839,8 +2805,7 @@ my $cmd_orig=$cmd;
   #******
   #-- check command and channel
   $subs="";   # my $subs
-  if( $cmd =~ /^(toggle|on|off|pctD|dim|brightness)/ && $cmd!~/(till)/ ){   # not for rollers  ## && $ff != 1
-#     if( $ff != 0 && $ff !=2 && $ff !=7 ){
+  if( $cmd =~ /^(toggle|on|off|pctD|dim|brightness)/ && $cmd!~/(till)/ ){   # not for rollers  
      if( $hash->{props}{namespace} !~ /relay|light|color/ ){
           $msg = "Error: forbidden command  \'$cmd\' for device $name";  ## ($ff)
           Log3 $name,1,"[Shelly_Set] $msg";
@@ -2853,7 +2818,6 @@ my $cmd_orig=$cmd;
         Log3 $name,1,"[Shelly_Set] $msg";
         return $msg;
      }
-#     my $channels = $shelly_models{$model}[$ff]; Debug $channels;
      my $channels = $hash->{props}{$hash->{props}{namespace}};
      if( !defined($channel) ){
            if( $channels > 1 ){
@@ -2946,43 +2910,17 @@ my $cmd_orig=$cmd;
     Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd";##, FF=$ff";#4
     my $comp = $URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen} ];
     if( $hash->{props}{gen}>=1 ){ #Gen2+
-#    if( $shelly_models{$model}[4]>=1 ){ #Gen2
             # translate Gen1-commands to Gen2
             $cmd =~ s/\?/\&/g;
             $cmd =~ s/turn=on/on=true/;
             $cmd =~ s/turn=off/on=false/;
             $cmd =~ s/timer/toggle_after/;
             $cmd =~ s/transition/transition_duration/;
-#        if( $ff==0 ){
-#            $comp = "Switch";
-#        }elsif( $ff==2 ){
-#            $comp = "Light";
-#        }elsif( $ff==7 ){
-#            $comp = "RGB";
-#            $comp .= "W"  if( $cmd_orig eq "rgbw" );  #returned data #
-#            $comp = uc($mode); 
-#        }
       #  $cmd .="&transition_duration=$transit" if( $transit );
       #  $comp=$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen} ];
         $comp .= "W"  if( $mode eq "rgbw" );   # url keyword
- #   Debug $comp." vs ".$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen} ];  #getProp
         Shelly_HttpRequest($hash,"/rpc/$comp.Set", "?id=$channel$cmd","Shelly_response","onoff"); #RONOFF
     }else{    #Gen1
-#        if( $ff==0 ){
-#                $comp = "relay";
-#        }elsif( $ff==2 || $ff==7 ){
-#            if( $model =~ /shellydimmer/ ){
-#                $comp = "light";
-#            }elsif( $model =~ /shellybulb/ && $mode eq "white" ){
-#                $comp = "light";
-#            }elsif( $model =~ /shellyrgbw/ && $mode eq "white" ){
-#                $comp = "light";  ### white
-#            }else{ # ff==7: RGBW or Bulb in color mode
-#                $comp = "color";
-#            }
-#        }
-#    Debug $comp." vs ".$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen} ];  #getProp
-      #  $comp=$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen} ];
         Shelly_HttpRequest($hash,"/$comp","/$channel$cmd","Shelly_response","onoff"); # dim=onoff and more
     }
     return;
@@ -3257,9 +3195,7 @@ my $cmd_orig=$cmd;
   ################################################################################################################
   #-- we have a Shelly rgbw type device in color mode; $ff==7
   #-- commands: hsv, rgb, rgbw, white, gain, effect
-##  }elsif( $ff==7 && $cmd =~ /hsv|rgb|white|gain|effect/ ){ # colors
   }elsif( $cmd =~ /hsv|rgb|white|gain|effect/ && $hash->{props}{color}>0 ){ # colors
-    #$ff = 7;
     #my $channel = $value;
     my ($red,$green,$blue,$white);
     my $cmd0;
@@ -3822,7 +3758,7 @@ my $cmd_orig=$cmd;
       return $msg;
   }
   return undef;
-} #end Shelly_Set()
+} #end sub Shelly_Set()
 
 
 ########################################################################################
@@ -4803,6 +4739,8 @@ sub Shelly_status2G {
   }else{
       readingsBulkUpdateIfChanged($hash,"/_device_not_found",time() );
   }
+
+  readingsBulkUpdateIfChanged($hash,"restart_required",$jhash->{sys}{restart_required}==0?"true":"false");
 
   ############ checking if connected to LAN. Is similiar given as answer to /rpc/Eth.GetStatus
   my $eth_ip = "-";
