@@ -4740,7 +4740,7 @@ sub Shelly_status2G {
       readingsBulkUpdateIfChanged($hash,"/_device_not_found",time() );
   }
 
-  readingsBulkUpdateIfChanged($hash,"restart_required",$jhash->{sys}{restart_required}==0?"true":"false");
+  readingsBulkUpdateIfChanged($hash,"restart_required",$jhash->{sys}{restart_required}==1?"true":"false");
 
   ############ checking if connected to LAN. Is similiar given as answer to /rpc/Eth.GetStatus
   my $eth_ip = "-";
