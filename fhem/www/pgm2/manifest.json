@@ -1,0 +1,14 @@
+{
+  "id": "/",
+  "name": "Home, Sweet Home",
+  "short_name": "FHEM",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/fhem/icons/fhemicon_ios",
+      "sizes": "144x144",
+      "type": "image/png"
+    }
+  ]
+}

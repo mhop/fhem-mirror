@@ -51,7 +51,8 @@ $(document).ready(function(){
     '<meta name="viewport" content="initial-scale=1.0,user-scalable=1">'+
     '<meta name=      "mobile-web-app-capable" content="yes">'+
     '<meta name="apple-mobile-web-app-capable" content="yes">'+
-    '<link rel="apple-touch-icon" href="'+icon+'">');
+    '<link rel="apple-touch-icon" href="'+icon+'">'+
+    '<link rel="manifest" href="manifest.json">');
   if('ontouchstart' in window)
     $("body").addClass('touch');
   if(f18_small) {

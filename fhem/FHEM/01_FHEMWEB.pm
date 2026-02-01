@@ -916,6 +916,9 @@ FW_answerCall($)
   } elsif($arg =~ m/^$FW_ME(.*)/s) {
     $arg = $1; # The stuff behind FW_ME, continue to check for commands/FWEXT
 
+  } elsif($arg =~ m,^/manifest.json$,) {
+    return FW_serveSpecial("manifest", "json", "$FW_cssdir", 1);
+
   } elsif($arg =~ m,^/favicon.ico$,) {
     return FW_serveSpecial("favicon", "ico", "$FW_icondir/default", 1);
 
