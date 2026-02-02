@@ -215,6 +215,8 @@ FW_jqueryReadyFn()
         //return true;
         FW_cmd(FW_root+"?cmd="+encodeURIComponent(val)+"&XHR=1", function(data){
           if( !data.match( /^<html>[\s\S]*<\/html>/ ) ) {
+            if(data.match(/unknown.*choose one of/i)) // #143796
+              data = data.replace(/:\S+/g,'');
             data = data.replace( '<', '&lt;' );
             data = '<pre>'+data+'</pre>';
           }
