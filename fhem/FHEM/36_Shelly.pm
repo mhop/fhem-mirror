@@ -180,6 +180,7 @@
 # 6.05      fix: handling of timers, general optimization of ShellySet
 #           add: shelly plug pm gen3, Shelly Dimmer Gen4, shelly plug us gen4 wo/illuminance sensor
 # 6.05.1    add: Shelly Plug M Gen3, add: reading restart_required
+# 6.05.2    fix: firmwarecheck, modes @ shellyplusrgbw
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -200,7 +201,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.1 02.02.2026";
+my $version = "6.05.2 03.02.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -209,7 +210,7 @@ my %shelly_firmware = (  # latest known versions  # as of 29.08.2024
     # used by sub Shelly_firmwarecheck
     "gen1"        => "1.14.0",   # v1.14.1-rc1
     "shelly4"     => "1.6.6",
-    "gen2"        => "1.7.1",  
+    "gen2"        => "1.7.4",    # some have 1.7.1 as latest fw
     "walldisplay" => "2.3.6"
     );
 
@@ -1495,6 +1496,8 @@ sub Shelly_Attr(@) {
     }elsif( $attrVal =~ /shelly(rgbw|bulb)/){
           $hash->{'.AttrList'} =~ s/relay,roller,//;
     #      $hash->{'.AttrList'} =~ s/ maxtime//;
+    }elsif( $attrVal =~ /shellyplusrgbw/){
+          $hash->{'.AttrList'} =~ s/relay,roller,white,color/light,rgb,rgbw/;
     }elsif( $attrVal =~ /shelly.*/){
           $hash->{'.AttrList'} =~ s/mode:relay,roller,white,color //;
     #      $hash->{'.AttrList'} =~ s/ maxtime//;
@@ -1629,12 +1632,10 @@ sub Shelly_Attr(@) {
   # model/
   #---------------------------------------
   }elsif( $cmd eq "set" && $attrName eq "mode" && $init_done == 0 ){
-          if( $attrVal eq "roller" || $attrVal eq "relay" ){
-              $hash->{'.AttrList'} =~ s/,white,color//;
-          }elsif( $attrVal eq "white" || $attrVal eq "color" ){
-              $hash->{'.AttrList'} =~ s/relay,roller,//;
+          if(     $attrVal =~ /roller|relay/ ){    $hash->{'.AttrList'} =~ s/,white,color//;
+          }elsif( $attrVal =~ /white|color/ ){     $hash->{'.AttrList'} =~ s/relay,roller,//;
+          }elsif( $attrVal =~ /light|rgb/ ){       $hash->{'.AttrList'} =~ s/relay,roller,white,color/light,rgb,rgbw/;
           }
-
   #---------------------------------------
   }elsif( $cmd eq "set" && $attrName eq "mode" && $init_done == 1 ){    # after init, we know the model !
     Log3 $name,3,"[Shelly_Attr:mode] $name: setting mode to $attrVal (model is $model)";
@@ -1643,7 +1644,7 @@ sub Shelly_Attr(@) {
       Log3 $name,1,"[Shelly_Attr] $name\: $error ".($init_done?"init is done":"init not done");
       return $error;
     }
-    if( $model !~ /shelly(2|plus2|pro2|(rgb|bulb)).*/ ){
+    if( $model !~ /shelly(2|plus2|pro2|(rgb|bulb)|plusrgbw).*/ ){
       $error="Setting the mode attribute for this device is not possible";
       Log3 $name,1,"[Shelly_Attr] $name\: $error  only works for model=shelly2|shelly2.5|shellyplus2pm|shellypro2|shellyrgbw|shellybulb";
       return $error;
@@ -1700,7 +1701,7 @@ sub Shelly_Attr(@) {
     if( $shelly_models{$model}[4]==0 ){ #1st Gen
         Shelly_HttpRequest($hash,"/settings","?mode=$attrVal","Shelly_response","config" );
     }else{ #2ndGen  %26 =    %22  "
-        Shelly_HttpRequest($hash,"/rpc/Sys.SetConfig","?config={%22device%22:{%22profile%22:$attrVal}}","Shelly_response","config" );
+        Shelly_HttpRequest($hash,"/rpc/Sys.SetConfig","?config={%22device%22:{%22profile%22:%22$attrVal%22}}","Shelly_response","config" );
     }
     delete $hash->{MOVING}      if( $attrVal ne "roller" ); # ?necessary?
   # mode/
@@ -7396,10 +7397,11 @@ sub Shelly_firmwarecheck {
   my (@num_fw,@num_upd,$firmwareV,$updateV);
   my $txt ="-";
   my $icon="/";
+  my $gen=($hash->{props}{gen}==0?"gen1":"gen2");
 
   #-- we don't have info about an update (really no update,  no internet)
   if( !defined($update) ){  #gen2 only
-      $update = $model =~ /walldisplay/ ? $shelly_firmware{walldisplay} : $shelly_firmware{gen2};
+      $update = $model =~ /walldisplay/ ? $shelly_firmware{walldisplay} : $shelly_firmware{$gen};
       ($firmware,$update,$txt,$icon) = cmpVersions( $firmware,$update );  
       if( $icon ne "OK" ){  
           $txt = "check internet for update min. $update";
@@ -7418,7 +7420,7 @@ sub Shelly_firmwarecheck {
       
   #-- we have a non-beta existing fw and no update / gen1
   }elsif( $update eq "none" ){
-      $update = $model =~ /shelly4/ ? $shelly_firmware{shelly4} : $shelly_firmware{gen1};
+      $update = $model =~ /shelly4/ ? $shelly_firmware{shelly4} : $shelly_firmware{$gen};
       ($firmware,$update,$txt,$icon) = cmpVersions( $firmware,$update ); ## "0.0.0"
       if( defined($beta) && $beta ne "none" ){
           $txt = "check for beta-version ";  
@@ -7776,7 +7778,7 @@ sub Shelly_HttpResponse($){
         return;
     }elsif($data ne ""){
         my $call = $param->{url};
-        $msg = AttrVal($name,"verbose",1) == 5 ? $data : (substr($data,0,16)."....");   # make Logging more readable
+        $msg = AttrVal($name,"verbose",1) == 5 ? $data : (substr($data,0,24)."....");   # make Logging more readable
         Log3 $name,4,"[Shelly_HttpResponse] $name $call returned data: $msg";
 
         # Reset the increasing INTERVAL to default value (attr)
