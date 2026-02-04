@@ -16873,7 +16873,7 @@ sub _calcTodayDeviation {
           }
       }
       else {
-          $dpv        = sprintf "%.2f", abs (($pvfc - $pvre) / $pvfc * 100);                # V 2.0.0
+          $dpv        = sprintf "%.2f", (($pvfc - $pvre) / $pvfc * 100);                    # V 2.0.0
           $dosave_dpv = 1;
       }
 
