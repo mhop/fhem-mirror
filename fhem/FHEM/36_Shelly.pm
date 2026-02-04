@@ -180,7 +180,8 @@
 # 6.05      fix: handling of timers, general optimization of ShellySet
 #           add: shelly plug pm gen3, Shelly Dimmer Gen4, shelly plug us gen4 wo/illuminance sensor
 # 6.05.1    add: Shelly Plug M Gen3, add: reading restart_required
-# 6.05.2    fix: firmwarecheck, modes @ shellyplusrgbw
+# 6.05.2    fix: firmwarecheck, modes @ shellyplusrgb
+# 6.05.3    fix: button|input_on|off commands, check on zigbee
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -201,7 +202,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.2 03.02.2026";
+my $version = "6.05.3 05.02.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -490,8 +491,8 @@ my %shelly_models = (
     "shellyemG3"    => [1,0,0, 0,3,0,  2,0,0],    # similar to 'shellyproem50'
     "shelly3emG3"   => [0,0,0, 0,3,0,  3,0,2],    # similar to 'shellypro3em'
     #-- 4nd generation devices (Gen4)
-    "shellyplugus"  => [1,0,0, 1,4,0,  0,0,0],    # illuminance sensor not support yet
-    "shellypstrip4" => [4,0,0, 4,4,0,  0,0,0],    # buttons?
+    "shellyplugus"  => [1,0,0, 1,4,-1, 0,0,0],    # illuminance sensor not support yet
+    "shellypstrip4" => [4,0,0, 4,4,-4, 0,0,0],    # buttons?
     "shellydimmerg4"=> [0,0,1, 1,4,2,  0,0,0],
     "shellyemmini"  => [0,0,0, 1,1,0,  1,0,0],    # similar to 'shellypmmini'    changed 11.1.26
     #-- Android devices
@@ -2544,14 +2545,14 @@ sub Shelly_Set ($@) {
          # write state-reading unless we have a multichannel relay device
          readingsBulkUpdateMonitored($hash,"state$subs",$isWhat)  unless( $shelly_models{$model}[0] > 1 );
        
-     }elsif( $cmd =~ /^(button)_(on|off)$/ ){   # Plugs have a button, but not an input terminal;  button_on
-         ($subs,$err) = SUBS($name,$value,-$shelly_models{$model}[5]);  ## valid channel no is negative!
-         if($err){Shelly_error_handling($hash,"Shelly_Set:button",$err,1);return $err;}
-         readingsBulkUpdateMonitored($hash, "button$subs", $isWhat, 1 );
-     }elsif( $cmd =~ /^(input)_(on|off)$/ ){    # devices with an input-terminal
-         ($subs,$err) = SUBS($name,$value,$shelly_models{$model}[5]);
+##     }elsif( $cmd =~ /^(button)_(on|off)$/ ){   # Plugs have a button, but not an input terminal;  button_on
+##         ($subs,$err) = SUBS($name,$value,-$shelly_models{$model}[5]);  ## valid channel no is negative!
+##         if($err){Shelly_error_handling($hash,"Shelly_Set:button",$err,1);return $err;}
+##         readingsBulkUpdateMonitored($hash, "button$subs", $isWhat, 1 );
+     }elsif( $cmd =~ /^(button|input)_(on|off)$/ ){    # devices with an input-terminal
+         ($subs,$err) = SUBS($name,$value,abs($shelly_models{$model}[5]));
          if($err){Shelly_error_handling($hash,"Shelly_Set:input",$err,1);return $err;}
-         readingsBulkUpdateMonitored($hash, "input$subs", $isWhat, 1 );
+         readingsBulkUpdateMonitored($hash, "$1$subs", $isWhat, 1 );
                ##    # experimental 
                ##    my $OnOffCnt = ReadingsVal( $name,"input$subs\_cnt", 0 );
                ##    readingsBulkUpdateMonitored($hash, "input$subs\_cnt", $OnOffCnt++, 1 );
@@ -5525,6 +5526,11 @@ sub Shelly_settings2G {
         if( $shelly_models{$model}[6]>0 && ReadingsVal($name,"model_function","unknown") eq "energy meter" ){
             readingsBulkUpdateMonitored($hash,"ct_type",  ($jhash->{'em:0'}{ct_type} // ($jhash->{'em1:0'}{ct_type} // "unknown")) );
         }
+        # check communication mode (gen4+): matter or zigbeey 
+        my $commmode=0;
+         $commmode = "matter" if( $jhash->{matter}{enable}//0 != 0 );
+         $commmode = "zigbee" if( $jhash->{zigbee}{enable}//0 != 0 );
+        readingsBulkUpdateMonitored($hash,"comm_mode", $commmode ) if( $commmode!=0 );
             
         Shelly_HttpRequest($hash,"/rpc/Shelly.GetDeviceInfo",undef,"Shelly_settings2G","info" );
 
@@ -5560,7 +5566,7 @@ sub Shelly_settings2G {
        $range_extender_enable = $hash->{helper}{range_extender};
        if( defined($range_extender_enable) && $range_extender_enable ne "disabled" ){
            Shelly_HttpRequest($hash,"/rpc/Wifi.ListAPClients",undef,"Shelly_settings2G","clients" );
-       }elsif( $model !~ /display/ ){
+       }elsif( $model !~ /display/ && ReadingsVal($name,"comm_mode",0)!="zigbee" ){
           Shelly_HttpRequest($hash,"/rpc/BLE.CloudRelay.List",undef,"Shelly_settings2G","BLEclients" );
        }
        
