@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.1.0"  => "29.01.2026  _calcConsForecast_legacy refactored, fix restOfDaySum->{PV} vs. todaySumFc->{PV} ",
+  "2.1.0"  => "04.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
@@ -6888,7 +6888,28 @@ sub ___aiFannExplainKeyFigures {
   my $note  = '';
   
   if ($lang eq 'DE') {
-      $note .= (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";;
+      $note .= (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";
+      
+      $note .= (encode('utf8', '<b>Model Bias</b> → zeigt, ob das Modell den Verbrauch im Durchschnitt zu niedrig oder zu hoch vorhersagt:'))."\n";
+      $note .= $spc3.(encode('utf8', 'Positiver Bias → das Modell unterschätzt den Verbrauch im Mittel'))."\n";
+      $note .= $spc3.(encode('utf8', 'Negativer Bias → das Modell überschätzt den Verbrauch im Mittel'))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'Der Wert wird in Wh angegeben und beschreibt die durchschnittliche Abweichung pro Stunde.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Die Bias‑Korrektur hebt oder senkt die Vorhersage entsprechend an, jedoch nur'))."\n";
+      $note .= $spc6.(encode('utf8', 'im Bereich der Grundlast, um Peaks nicht zu verfälschen.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>Model Slope</b> → zeigt, ob das Modell zu flach oder zu steil reagiert.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Der Wert beschreibt das Verhältnis zwischen:'))."\n";
+      $note .= $spc6.(encode('utf8', '- Änderung im echten Verbrauch'))."\n";
+      $note .= $spc6.(encode('utf8', '- Änderung in der Modellvorhersage'))."\n";
+      $note .= $spc3.(encode('utf8', 'und wird als dimensionsloser Faktor angegeben.'))."\n";
+      $note .= $spc3.'<b>Interpretation:</b>'."\n";
+      $note .= $spc6.(encode('utf8', 'Slope = 1.0 → Das Modell bildet die Verbrauchshöhen korrekt ab. Steigt der echte Verbrauch um X, steigt die Vorhersage ebenfalls um X'))."\n";
+      $note .= $spc6.(encode('utf8', 'Slope < 1.0 → Das Modell reagiert zu flach. Peaks werden abgeschwächt. Beispiel: Slope = 0.9 → Das Modell bildet nur 90 % der realen Dynamik ab.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Slope > 1.0 → Das Modell reagiert zu stark. Peaks werden überbetont, Schwankungen überzeichnet.'))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE < 0.01 → sehr gut'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → gut'))."\n";
@@ -6953,6 +6974,27 @@ sub ___aiFannExplainKeyFigures {
   }
   elsif ($lang eq 'EN') {
       $note .= (encode('utf8', '<b><u> Explanations of the key figures </b></u>'))."\n\n";
+      
+      $note .= (encode('utf8', '<b>Model Bias</b> → shows whether the model predicts average consumption to be too low or too high:'))."\n";
+      $note .= $spc3.(encode('utf8', 'Positive Bias → the model underestimates average consumption'))."\n";
+      $note .= $spc3.(encode('utf8', 'Negative bias → the model overestimates average consumption'))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'The value is given in Wh and describes the average deviation per hour.'))."\n";
+      $note .= $spc6.(encode('utf8', 'The bias correction raises or lowers the prediction accordingly, but only'))."\n";
+      $note .= $spc6.(encode('utf8', 'in the base load range so as not to distort peaks.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>Model Slope</b> → indicates whether the model responds too flatly or too steeply.'))."\n";
+      $note .= $spc3.(encode('utf8', 'The value describes the ratio between:'))."\n";
+      $note .= $spc6.(encode('utf8', '- Change in actual consumption'))."\n";
+      $note .= $spc6.(encode('utf8', '- Change in model prediction'))."\n";
+      $note .= $spc3. (encode('utf8', 'and is specified as a dimensionless factor.'))."\n";
+      $note .= $spc3.'<b>Interpretation:</b>'."\n";
+      $note .= $spc6.(encode('utf8', 'Slope = 1.0 → The model correctly reflects consumption levels. If actual consumption increases by X, the prediction also increases by X'))."\n";
+      $note .= $spc6.(encode('utf8', 'Slope < 1.0 → The model responds too flatly. Peaks are attenuated. Example: Slope = 0.9 → The model only depicts 90% of the actual dynamics.')) ."\n";
+      $note .= $spc6.(encode('utf8', 'Slope > 1.0 → The model reacts too strongly. Peaks are overemphasised, fluctuations are exaggerated.'))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → how well the network trains and generalizes. Rule of thumb:'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE < 0.01 → very good'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → good'))."\n";
@@ -14306,15 +14348,16 @@ sub _createSummaries {
 
   ## Initialisierung
   ####################
-  my $next1HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next2HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next3HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next4HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $restOfDaySum  = { "PV" => 0, "Consumption" => 0 };
-  my $tomorrowSum   = { "PV" => 0, "Consumption" => 0 };
-  my $daftertomSum  = { "PV" => 0, "Consumption" => 0 };                                               # Werte für Übermorgen
-  my $todaySumFc    = { "PV" => 0, "Consumption" => 0 };
-  my $todaySumRe    = { "PV" => 0, "Consumption" => 0 };
+  my $next1HoursSum    = { "PV" => 0, "Consumption" => 0 };
+  my $next2HoursSum    = { "PV" => 0, "Consumption" => 0 };
+  my $next3HoursSum    = { "PV" => 0, "Consumption" => 0 };
+  my $next4HoursSum    = { "PV" => 0, "Consumption" => 0 };
+  my $restOfDaySum     = { "PV" => 0, "Consumption" => 0 };
+  my $tomorrowSum      = { "PV" => 0, "Consumption" => 0 };
+  my $daftertomSum     = { "PV" => 0, "Consumption" => 0 };                                           # Werte für Übermorgen
+  my $todaySumFc       = { "PV" => 0, "Consumption" => 0 };
+  my $todayUp2lastHour = { "PV" => 0, "Consumption" => 0 };
+  my $todaySumRe       = { "PV" => 0, "Consumption" => 0 };
 
   my $tmorsset = CurrentVal ($name, 'sunsetTomorrowTs', 0);                                            # Timestamp Sonneuntergang kommenden Tag
   my $htmsset  = timestringsFromOffset ($tmorsset,      0);
@@ -14326,9 +14369,10 @@ sub _createSummaries {
   my $tmConInHrWithPVGen = 0;
   my $remainminutes      = 60 - $minute;                                                               # verbleibende Minuten der aktuellen Stunde
 
-  my $hour00pvfc  = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;
-  my $hour00confc = NexthoursVal ($name, "NextHour00", 'confc', 0);
-  my $hod00       = NexthoursVal ($name, "NextHour00", 'hourofday', 0);
+  my $hour00pvfc       = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;         # PV Fc für Rest der Stunde
+  my $hour00pvfcup2now = NexthoursVal ($name, "NextHour00", 'pvfc',  0) - $hour00pvfc;                 # PV Fc aktuelle Stunde bis jetzt
+  my $hour00confc      = NexthoursVal ($name, "NextHour00", 'confc', 0);
+  my $hod00            = NexthoursVal ($name, "NextHour00", 'hourofday', 0);
 
   $hour00pvfc     = max (0, $hour00pvfc);                                                              # PV Prognose darf nicht negativ sein
   $hour00confc    = max (0, $hour00confc);                                                             # Verbrauchsprognose darf nicht negativ sein
@@ -14422,15 +14466,22 @@ sub _createSummaries {
       }
   }
 
+  # --- Werte aus pvHistory
+  ###########################
   for my $th (1..24) {
       $th = sprintf "%02d", $th;
       $todaySumFc->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
       $todaySumRe->{PV}          += HistoryVal ($name, $day, $th, 'pvrl',  0);
       $todaySumFc->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
       $todaySumRe->{Consumption} += HistoryVal ($name, $day, $th, 'con',   0);
+      
+      if ($th <= $chour) {
+          $todayUp2lastHour->{PV} += HistoryVal ($name, $day, $th, 'pvfc', 0);
+      }
   }
-
-  my $pvre = sprintf "%.0f", $todaySumRe->{PV};
+  
+  my $todayUp2NowPvFc = sprintf "%.0f", ($hour00pvfcup2now + $todayUp2lastHour->{PV});
+  my $pvre            = sprintf "%.0f", $todaySumRe->{PV};
 
   push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                                # Schieberegister 4h Summe Forecast
   limitArray ($data{$name}{current}{h4fcslidereg}, SLIDENUMMAX);
@@ -14520,6 +14571,7 @@ sub _createSummaries {
   $data{$name}{current}{tmConInHrWithPVGen}    = $tmConInHrWithPVGen;
   $data{$name}{current}{surplus}               = $surplus;
   $data{$name}{current}{dayAfterTomorrowPVfc}  = $daftertomSum->{PV};
+  $data{$name}{current}{tdPvFcUp2Now}          = $todayUp2NowPvFc;
   $data{$name}{current}{dayAfterTomorrowConfc} = $daftertomSum->{Consumption};
 
   push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
@@ -16808,8 +16860,8 @@ sub _calcTodayDeviation {
   
   # PV Prognose/Ist Abweichung
   ##############################
-  my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
-  my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
+  my $pvfc = CurrentVal  ($name, 'tdPvFcUp2Now', 0);
+  my $pvre = ReadingsNum ($name, 'Today_PVreal', 0);
   
   if ($pvre && $pvfc) {                                                                     # Schutz Illegal division by zero
       if ($manner eq 'daily') {
@@ -16821,9 +16873,7 @@ sub _calcTodayDeviation {
           }
       }
       else {
-          my $pvfcrod = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;              # PV Prognose bis jetzt
-          $pvfcrod    = min ($pvfc, $pvfcrod);                                              # Anzeigefix https://forum.fhem.de/index.php?msg=1356915
-          $dpv        = sprintf "%.2f", ( 100 - (100 * abs ($pvre / ($pvfcrod || 1))) );    # V 2.0.0
+          $dpv        = sprintf "%.2f", abs (($pvfc - $pvre) / $pvfc * 100);                # V 2.0.0
           $dosave_dpv = 1;
       }
 
