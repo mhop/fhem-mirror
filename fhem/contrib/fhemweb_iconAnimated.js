@@ -143,6 +143,7 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
         svgEl.querySelectorAll('*').forEach(el => {
             if (el.tagName.match(/path|circle|rect|polygon|ellipse|line|polyline/i)) {
                 el.setAttribute('fill', color);
+                el.setAttribute('stroke', 'none');
             }
         });
 
@@ -189,9 +190,9 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
         // transformOrigin auf Mittelpunkt setzen
         gEl.style.transformOrigin = '50% 50%';
         // optional: in die Mitte verschieben falls ViewBox nicht 0 0
-        const translateX = w/2 - (x + w/2);
-        const translateY = h/2 - (y + h/2);
-        gEl.setAttribute('transform', `translate(${translateX},${translateY})`);
+        //const translateX = w/2 - (x + w/2);
+        //const translateY = h/2 - (y + h/2);
+        //gEl.setAttribute('transform', `translate(${translateX},${translateY})`);
 
         // Eindeutige Klasse pro Device erzeugen
         const iconClass = 'animatedIcon_' + dev.replace(/[^a-zA-Z0-9_-]/g,'_');
