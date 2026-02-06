@@ -493,7 +493,9 @@ SVG_PEdit($$$$)
     my $sel = ($v && $v eq "x1y1") ? "left" : "right";
     $o .= SVG_sel("axes_${idx}", "left,right,left log,right log", $sel );
     $o .= SVG_sel("type_${idx}",
-                "lines,points,steps,fsteps,histeps,bars,ibars,needles,".
+                "lines,steps,fsteps,histeps,bars,ibars,needles,".
+                "points:diamond,points:circle,points:square,points:triangleup,".
+                "points:triangledown,points:plus,points:cross,points:minus,".
                 "horizontalLineFrom,horizontalLineTo,".
                 "cubic,quadratic,quadraticSmooth",
                 $conf{lType}[$idx]);
@@ -508,7 +510,7 @@ SVG_PEdit($$$$)
       $lw =~ s/.*stroke-width://g;
       $lw =~ s/"//g; 
     }
-    $o .= SVG_sel("width_$idx", "0.2,0.5,1,1.5,2,2.5,3,4,8,12,16,24",
+    $o .= SVG_sel("width_$idx", "0.2,0.5,1,1.5,2,2.5,3,4,5,6,7,8,9,10,12,16,24",
                         ($lw ? $lw:1));
     $o .= "</td></tr>";
     $output[$idx] = $o;
@@ -1340,13 +1342,12 @@ SVG_digestConf($$)
 
   # Digest axes/title/etc from $plot (gnuplot) and draw the line-titles
   my (@lAxis,@lTitle,@lType,@lStyle,@lWidth);
-  my ($i, $pTemp);
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ axes (\w+)/$lAxis[$i++]=$1/gse;
-  $pTemp = $plot; $i = 0;
-        $pTemp =~ s/title( '([^']*)')?/$lTitle[$i++]=(defined($2)?$2:"")/gse;
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ with (\w+)/$lType[$i++]=$1/gse;
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ ls (\w+)/$lStyle[$i++]=$1/gse;
-  $pTemp = $plot; $i = 0; $pTemp =~ s/ lw ([\w.]+)/$lWidth[$i++]=$1/gse;
+  my $i;
+  $i = 0; $plot =~ s/ axes (\w+)/$lAxis[$i++]=$1;" axes $1"/gse;
+  $i = 0; $plot =~ s/ title '([^']*)'/$lTitle[$i++]=$1;" title '$1'"/gse;
+  $i = 0; $plot =~ s/ with ([\w+:.]+)/$lType[$i++]=$1;" with $1"/gse;
+  $i = 0; $plot =~ s/ ls (\w+)/$lStyle[$i++]=$1;" ls $1"/gse;
+  $i = 0; $plot =~ s/ lw ([\w.]+)/$lWidth[$i++]=$1;" lw $1"/gse;
 
   for my $i (0..int(@lType)-1) {         # lAxis is optional
     $lAxis[$i] = "x1y2" if(!$lAxis[$i]);
@@ -1999,15 +2000,70 @@ SVG_render($$$$$$$$$$)
     my ($lx, $ly) = (-1,-1);
 
     my $lType = $conf{lType}[$idx];
-    if($lType eq "points" ) {
+
+    if ($lType =~ /^points(:([a-z]+))?(:([\d.]+))?/) {
+
+      my $pShape = $2 ? $2 : "di";
+      my $pSize  = $4;
+
+      if(!$pSize) { # if not defined, use the line-width as size
+        $attributes =~ s/stroke-width:(\d+)/stroke-width:1/;
+        $pSize = $1;
+      }
+
       foreach my $i (0..int(@{$dxp})-1) {
         my ($x1, $y1) = (int($x+$dxp->[$i]),
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
         next if($x1 == $lx && $y1 == $ly);
         $lx = $x1; $ly = $y1;
-        $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
-              $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
-        SVG_pO "<polyline $attributes $lStyle points=\"$ret\"/>";
+        my $attr = "$attributes $lStyle".($isFill ? "" : ' fill="none"');
+
+        if ($pShape eq "circle") {
+          SVG_pO "<circle cx='$x1' cy='$y1' r='$pSize' $attr/>";
+
+        } elsif ($pShape eq "square") {
+          my $d = $pSize * 2;
+          SVG_pO sprintf("<rect x='%d'' y='%d' width='%d' height='%d' $attr/>",
+                        $x1-$pSize, $y1-$pSize, $d, $d);
+
+        } elsif ($pShape eq "triangleup") {
+          SVG_pO sprintf("<polygon points='%d,%d %d,%d %d,%d' $attr/>",
+                $x1,           $y1-$pSize,
+                $x1-$pSize,    $y1+$pSize,
+                $x1+$pSize,    $y1+$pSize);
+
+        } elsif ($pShape eq "triangledown") {
+          SVG_pO sprintf("<polygon points='%d,%d %d,%d %d,%d' $attr/>",
+                $x1-$pSize,    $y1-$pSize,
+                $x1+$pSize,    $y1-$pSize,
+                $x1,           $y1+$pSize);
+
+        } elsif ($pShape eq "plus") {
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
+                        $x1-$pSize, $y1, $x1+$pSize, $y1);
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
+                        $x1, $y1-$pSize, $x1, $y1+$pSize);
+
+        } elsif ($pShape eq "cross") {
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
+                        $x1-$pSize, $y1-$pSize, $x1+$pSize, $y1+$pSize);
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
+                        $x1+$pSize, $y1-$pSize, $x1-$pSize, $y1+$pSize);
+
+        } elsif ($pShape eq "minus") {
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
+                        $x1-$pSize, $y1, $x1+$pSize, $y1);
+
+        } else { # diamond
+          SVG_pO
+              sprintf("<polygon points='%d,%d %d,%d %d,%d %d,%d %d,%d' $attr/>",
+                $x1-$pSize,$y1,
+                $x1,$y1-$pSize,
+                $x1+$pSize,$y1,
+                $x1,$y1+$pSize,
+                $x1-$pSize,$y1);
+        }
+
       }
 
     } elsif($lType eq "steps") {
