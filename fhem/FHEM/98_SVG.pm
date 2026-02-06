@@ -493,7 +493,7 @@ SVG_PEdit($$$$)
     my $sel = ($v && $v eq "x1y1") ? "left" : "right";
     $o .= SVG_sel("axes_${idx}", "left,right,left log,right log", $sel );
     $o .= SVG_sel("type_${idx}",
-                "lines,steps,fsteps,histeps,bars,ibars,needles,".
+                "lines,steps,fsteps,histeps,bars,ibars,needles,points,".
                 "points:diamond,points:circle,points:square,points:triangleup,".
                 "points:triangledown,points:plus,points:cross,points:minus,".
                 "horizontalLineFrom,horizontalLineTo,".
@@ -2008,7 +2008,7 @@ SVG_render($$$$$$$$$$)
 
       if(!$pSize) { # if not defined, use the line-width as size
         $attributes =~ s/stroke-width:(\d+)/stroke-width:1/;
-        $pSize = $1;
+        $pSize = $1 && $1 >= 2 ? $1 : 3;
       }
 
       foreach my $i (0..int(@{$dxp})-1) {
