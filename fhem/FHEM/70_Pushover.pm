@@ -19,7 +19,7 @@ sub Pushover_Initialize($$) {
     $hash->{SetFn}   = "Pushover_Set";
 
     $hash->{AttrList} =
-"disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,2,-1,-2 callbackUrl retry expire storagePath "
+"disable:0,1 disabledForIntervals do_not_notify:0,1 timestamp:0,1 timeout title sound:pushover,bike,bugle,cashregister,classical,cosmic,falling,gamelan,incoming,intermission,magic,mechanical,pianobar,siren,spacealarm,tugboat,alien,climb,persistent,echo,updown,none device priority:0,1,2,-1,-2 callbackUrl retry expire storagePath "
       . $readingFnAttributes;
 
     #$hash->{parseParams} = 1; # not possible due to legacy msg command schema
@@ -42,7 +42,7 @@ sub Pushover_Define($$) {
 
     my ( $token, $user, $infix ) = @a;
 
-    return "$user does not seem to be a valid user or group token"
+    return "$name: $user does not seem to be a valid user or group token"
       if ( $user !~ /^([a-zA-Z0-9]{30})$/ );
 
     if ( defined($token) && defined($user) ) {
@@ -1146,6 +1146,10 @@ sub Pushover_SetMessage2 ($$$$) {
           if ( defined( $h->{cancel_id} )
             && $values{priority}
             && $values{priority} == 2 );
+
+        $values{ttl} = $h->{ttl} // undef;
+        return "parameter ttl is out of scope"
+          unless (!defined($values{ttl}) || $values{ttl} =~ m/^[1-9]\d*$/);
 
         $values{attachment} = $h->{attachment} ? $h->{attachment} : undef;
     }
