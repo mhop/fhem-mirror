@@ -6895,7 +6895,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', 'Negativer Bias → das Modell überschätzt den Verbrauch im Mittel'))."\n";
       $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
       $note .= $spc6.(encode('utf8', 'Der Wert wird in Wh angegeben und beschreibt die durchschnittliche Abweichung pro Stunde.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Die Bias‑Korrektur hebt oder senkt die Vorhersage entsprechend an, jedoch nur'))."\n";
+      $note .= $spc6.(encode('utf8', 'Die interne Bias‑Korrektur hebt oder senkt die Vorhersage entsprechend, jedoch nur'))."\n";
       $note .= $spc6.(encode('utf8', 'im Bereich der Grundlast, um Peaks nicht zu verfälschen.'))."\n";
       $note .= "\n";
       
@@ -6980,7 +6980,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', 'Negative bias → the model overestimates average consumption'))."\n";
       $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
       $note .= $spc6.(encode('utf8', 'The value is given in Wh and describes the average deviation per hour.'))."\n";
-      $note .= $spc6.(encode('utf8', 'The bias correction raises or lowers the prediction accordingly, but only'))."\n";
+      $note .= $spc6.(encode('utf8', 'The internal bias correction raises or lowers the prediction accordingly, but only'))."\n";
       $note .= $spc6.(encode('utf8', 'in the base load range so as not to distort peaks.'))."\n";
       $note .= "\n";
       
@@ -14369,15 +14369,16 @@ sub _createSummaries {
   my $tmConInHrWithPVGen = 0;
   my $remainminutes      = 60 - $minute;                                                               # verbleibende Minuten der aktuellen Stunde
 
-  my $hour00pvfc       = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;         # PV Fc für Rest der Stunde
-  my $hour00pvfcup2now = NexthoursVal ($name, "NextHour00", 'pvfc',  0) - $hour00pvfc;                 # PV Fc aktuelle Stunde bis jetzt
+  my $hour00pvfcremain = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;         # PV Fc für Rest der Stunde
   my $hour00confc      = NexthoursVal ($name, "NextHour00", 'confc', 0);
-  my $hod00            = NexthoursVal ($name, "NextHour00", 'hourofday', 0);
+  
+  $hour00pvfcremain = max (0, $hour00pvfcremain);                                                      # PV Prognose darf nicht negativ sein
+  $hour00confc      = max (0, $hour00confc);                                                           # Verbrauchsprognose darf nicht negativ sein
 
-  $hour00pvfc     = max (0, $hour00pvfc);                                                              # PV Prognose darf nicht negativ sein
-  $hour00confc    = max (0, $hour00confc);                                                             # Verbrauchsprognose darf nicht negativ sein
-
+  my $hour00pvfcup2now = NexthoursVal ($name, "NextHour00", 'pvfc',  0) - $hour00pvfcremain;           # PV Fc aktuelle Stunde bis jetzt
   my $hour00confcremain = $hour00confc / 60 * $remainminutes;
+  my $hour00confcup2now = $hour00confc - $hour00confcremain;
+  my $hod00             = NexthoursVal ($name, "NextHour00", 'hourofday', 0);
 
   if ($paref->{t} < $tdaysset) {
       if (int ($hod00) != int ($dtsset->{hour}) + 1) {
@@ -14388,12 +14389,12 @@ sub _createSummaries {
       }
   }
 
-  $next1HoursSum->{PV}          = $hour00pvfc;
-  $next2HoursSum->{PV}          = $hour00pvfc;
-  $next3HoursSum->{PV}          = $hour00pvfc;
-  $next4HoursSum->{PV}          = $hour00pvfc;
+  $next1HoursSum->{PV}          = $hour00pvfcremain;
+  $next2HoursSum->{PV}          = $hour00pvfcremain;
+  $next3HoursSum->{PV}          = $hour00pvfcremain;
+  $next4HoursSum->{PV}          = $hour00pvfcremain;
   
-  $restOfDaySum->{PV}           = $hour00pvfc;
+  $restOfDaySum->{PV}           = $hour00pvfcremain;
 
   $next1HoursSum->{Consumption} = $hour00confcremain;
   $next2HoursSum->{Consumption} = $hour00confcremain;
@@ -14476,12 +14477,14 @@ sub _createSummaries {
       $todaySumRe->{Consumption} += HistoryVal ($name, $day, $th, 'con',   0);
       
       if ($th <= $chour) {
-          $todayUp2lastHour->{PV} += HistoryVal ($name, $day, $th, 'pvfc', 0);
+          $todayUp2lastHour->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
+          $todayUp2lastHour->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
       }
   }
   
-  my $todayUp2NowPvFc = sprintf "%.0f", ($hour00pvfcup2now + $todayUp2lastHour->{PV});
-  my $pvre            = sprintf "%.0f", $todaySumRe->{PV};
+  my $todayUp2NowPvFc  = sprintf "%.0f", ($hour00pvfcup2now  + $todayUp2lastHour->{PV});
+  my $todayUp2NowConFc = sprintf "%.0f", ($hour00confcup2now + $todayUp2lastHour->{Consumption});
+  my $pvre             = sprintf "%.0f", $todaySumRe->{PV};
 
   push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                                # Schieberegister 4h Summe Forecast
   limitArray ($data{$name}{current}{h4fcslidereg}, SLIDENUMMAX);
@@ -14572,6 +14575,7 @@ sub _createSummaries {
   $data{$name}{current}{surplus}               = $surplus;
   $data{$name}{current}{dayAfterTomorrowPVfc}  = $daftertomSum->{PV};
   $data{$name}{current}{tdPvFcUp2Now}          = $todayUp2NowPvFc;
+  $data{$name}{current}{tdConFcUp2Now}         = $todayUp2NowConFc;
   $data{$name}{current}{dayAfterTomorrowConfc} = $daftertomSum->{Consumption};
 
   push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
@@ -16868,7 +16872,7 @@ sub _calcTodayDeviation {
           my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
 
           if ($t >= $sstime) {
-              $dpv        = sprintf "%.2f", (100 - (100 * $pvre / $pvfc));                 
+              $dpv        = sprintf "%.2f", (($pvfc - $pvre) / $pvfc * 100);                # V 2.0.0
               $dosave_dpv = 1;
           }
       }
@@ -16887,16 +16891,20 @@ sub _calcTodayDeviation {
   
   # Consumption Prognose/Ist Abweichung
   #######################################
-  my $confc  = ReadingsNum ($name, 'Today_CONforecast', 0);
-  my $conre  = ReadingsNum ($name, 'Today_CONreal',     0);
-  my $confcd = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0) - $confc;             # Con Prognose bis jetzt
-  $dcon      = sprintf "%.2f", ( 100 - (100 * abs ($conre / ($confcd || 1) )) );            # V 2.0.0
+  #my $confc  = ReadingsNum ($name, 'Today_CONforecast', 0);
+  my $confc  = CurrentVal  ($name, 'tdConFcUp2Now', 0);
+  my $conre  = ReadingsNum ($name, 'Today_CONreal', 0);
   
-  $dcon *= -1 if($perspective eq 'reverse');                                                # Perspektivänderung
-  
-  $data{$name}{circular}{99}{tdayConDvtn} = $dcon;
-  
-  storeReading ('Today_CONdeviation', $dcon.' %');
+  if ($conre && $confc) {
+      #my $confcd = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0) - $confc;             # Con Prognose bis jetzt
+      #$dcon      = sprintf "%.2f", ( 100 - (100 * abs ($conre / ($confcd || 1) )) );            # V 2.0.0
+      $dcon  = sprintf "%.2f", (($confc - $conre) / $confc * 100);                         # V 2.0.0
+      $dcon *= -1 if($perspective eq 'reverse');                                           # Perspektivänderung
+      
+      $data{$name}{circular}{99}{tdayConDvtn} = $dcon;
+      
+      storeReading ('Today_CONdeviation', $dcon.' %');
+  }
 
 return;
 }
