@@ -182,6 +182,7 @@
 # 6.05.1    add: Shelly Plug M Gen3, add: reading restart_required
 # 6.05.2    fix: firmwarecheck, modes @ shellyplusrgb
 # 6.05.3    fix: button|input_on|off commands, check on zigbee
+# 6.05.4    fix: Status call on web commands
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -202,7 +203,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.3 05.02.2026";
+my $version = "6.05.4 07.02.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -2488,6 +2489,7 @@ sub Shelly_Set ($@) {
   #-- following commands do not occur in command list, eg. out_on, input_on, single_push
   #-- command received via web to register local changes of the device 
   my ($signal,$isWhat,$channels,$subs,$err,$verb);
+  my $update_delay = 0.25; # delay for Shelly_status call
   #-- Part 1: web commands without a value, but a conditon. Channel only on multichannel devices.
   if( $cmd =~ /^(out|button|input|single|double|triple|short|long|touch|voltage|temperature|humidity)_(on|off|push|up|down|multi|over|under|changed)$/ ){
             #  ||  $cmd =~ /^(Active_Power|Voltage|Current)_(a|b|c)$/ 
@@ -2544,11 +2546,7 @@ sub Shelly_Set ($@) {
          readingsBulkUpdateMonitored($hash,"relay$subs",$isWhat) if( $shelly_models{$model}[0] > 0 );
          # write state-reading unless we have a multichannel relay device
          readingsBulkUpdateMonitored($hash,"state$subs",$isWhat)  unless( $shelly_models{$model}[0] > 1 );
-       
-##     }elsif( $cmd =~ /^(button)_(on|off)$/ ){   # Plugs have a button, but not an input terminal;  button_on
-##         ($subs,$err) = SUBS($name,$value,-$shelly_models{$model}[5]);  ## valid channel no is negative!
-##         if($err){Shelly_error_handling($hash,"Shelly_Set:button",$err,1);return $err;}
-##         readingsBulkUpdateMonitored($hash, "button$subs", $isWhat, 1 );
+
      }elsif( $cmd =~ /^(button|input)_(on|off)$/ ){    # devices with an input-terminal
          ($subs,$err) = SUBS($name,$value,abs($shelly_models{$model}[5]));
          if($err){Shelly_error_handling($hash,"Shelly_Set:input",$err,1);return $err;}
@@ -2562,9 +2560,8 @@ sub Shelly_Set ($@) {
          readingsBulkUpdateMonitored($hash, "input$subs", "ON", 1 );
          readingsBulkUpdateMonitored($hash, "input$subs\_action", $cmd, 1 );
          readingsBulkUpdateMonitored($hash, "input$subs\_actionS",$fhem_events{$cmd}, 1 );
-         # Note: after a second, the pushbuttons state is back to OFF resp. 'unknown', call status of inputs
-         #-- scheduling next status update
-         Shelly_status($hash,"Shelly_Set inp",1.4);
+         # Note: after a second, the pushbuttons state is back to OFF resp. 'unknown', call status of inputs with increased delay
+         $update_delay=1.4;
      }elsif( $signal eq "touch" ){    # devices with an touch-display
           #$subs = ($shelly_models{$model}[5] == 1) ? "" : "_".$value;
           readingsBulkUpdateMonitored($hash, "touch", $isWhat, 1 );
@@ -2573,6 +2570,8 @@ sub Shelly_Set ($@) {
           readingsBulkUpdateMonitored($hash,$signal.$subs."_range", $isWhat );
      }
      readingsEndUpdate($hash,1);
+     #-- scheduling next status update
+     Shelly_status($hash,"Shelly_Set $cmd",$update_delay);
      return undef;
   #-- Part 2: web commands with a value. Channel only on multichannel devices.
   }elsif( $cmd =~ /^(Active_Power|Voltage|Current)_(a|b|c)$/ 
@@ -3800,7 +3799,7 @@ sub Shelly_status(@){
   my $name = $hash->{NAME};
   ##$hash->{callFn}=$callFn;  # to be used by Shelly_status2G
   
-  Log3 $name,5,"[Shelly_status:1] $name: callFn=".($callFn//"undefiniert")." sched=".($scheduled//"no").", helper=".$hash->{helper}{timer}; #4
+  Log3 $name,4,"[Shelly_status:1] $name: callFn=".($callFn//"loop_back")." sched=".($scheduled//"no").", helper=".$hash->{helper}{timer}; #4
   if( $scheduled//0 ){  
       Log3 $name,6,"[Shelly_status:1a] $name: set internal Timer  ---and------BYE------";
       readingsSingleUpdate($hash,"/_nextUpdateTimer","$scheduled sec $callFn",1)
@@ -5566,7 +5565,7 @@ sub Shelly_settings2G {
        $range_extender_enable = $hash->{helper}{range_extender};
        if( defined($range_extender_enable) && $range_extender_enable ne "disabled" ){
            Shelly_HttpRequest($hash,"/rpc/Wifi.ListAPClients",undef,"Shelly_settings2G","clients" );
-       }elsif( $model !~ /display/ && ReadingsVal($name,"comm_mode",0)!="zigbee" ){
+       }elsif( $model !~ /display/ && ReadingsVal($name,"comm_mode",0) ne "zigbee" ){
           Shelly_HttpRequest($hash,"/rpc/BLE.CloudRelay.List",undef,"Shelly_settings2G","BLEclients" );
        }
        
