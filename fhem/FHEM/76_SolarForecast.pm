@@ -162,6 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.1.0"  => "08.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation, show module version in header ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
@@ -274,8 +275,8 @@ my %vNotesIntern = (
   "1.52.11"=> "03.06.2025  _genSpecialReadings: new option todayNotOwnerConsumption ",
   "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
   "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
-  "1.52.8" => "01.06.2025  _calcConsForecast_circular: use avgArray if number included days <= number of days in pvHistory ",
-  "1.52.7" => "30.05.2025  _calcConsForecast_circular: excludes/includes only if number included days <= number of days in pvHistory ",
+  "1.52.8" => "01.06.2025  _calcConsForecast_legacy: use avgArray if number included days <= number of days in pvHistory ",
+  "1.52.7" => "30.05.2025  _calcConsForecast_legacy: excludes/includes only if number included days <= number of days in pvHistory ",
   "1.52.6" => "27.05.2025  verbose 3 for consumer switch log ",
   "1.52.5" => "25.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
                            "check attribute values for prohibited occurrence [...] Forum: https://forum.fhem.de/index.php?msg=1342147 ".
@@ -6887,7 +6888,28 @@ sub ___aiFannExplainKeyFigures {
   my $note  = '';
   
   if ($lang eq 'DE') {
-      $note .= (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";;
+      $note .= (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";
+      
+      $note .= (encode('utf8', '<b>Model Bias</b> → zeigt, ob das Modell den Verbrauch im Durchschnitt zu niedrig oder zu hoch vorhersagt:'))."\n";
+      $note .= $spc3.(encode('utf8', 'Positiver Bias → das Modell unterschätzt den Verbrauch im Mittel'))."\n";
+      $note .= $spc3.(encode('utf8', 'Negativer Bias → das Modell überschätzt den Verbrauch im Mittel'))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'Der Wert wird in Wh angegeben und beschreibt die durchschnittliche Abweichung pro Stunde.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Die interne Bias‑Korrektur hebt oder senkt die Vorhersage entsprechend, jedoch nur'))."\n";
+      $note .= $spc6.(encode('utf8', 'im Bereich der Grundlast, um Peaks nicht zu verfälschen.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>Model Slope</b> → zeigt, ob das Modell zu flach oder zu steil reagiert.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Der Wert beschreibt das Verhältnis zwischen:'))."\n";
+      $note .= $spc6.(encode('utf8', '- Änderung im echten Verbrauch'))."\n";
+      $note .= $spc6.(encode('utf8', '- Änderung in der Modellvorhersage'))."\n";
+      $note .= $spc3.(encode('utf8', 'und wird als dimensionsloser Faktor angegeben.'))."\n";
+      $note .= $spc3.'<b>Interpretation:</b>'."\n";
+      $note .= $spc6.(encode('utf8', 'Slope = 1.0 → Das Modell bildet die Verbrauchshöhen korrekt ab. Steigt der echte Verbrauch um X, steigt die Vorhersage ebenfalls um X'))."\n";
+      $note .= $spc6.(encode('utf8', 'Slope < 1.0 → Das Modell reagiert zu flach. Peaks werden abgeschwächt. Beispiel: Slope = 0.9 → Das Modell bildet nur 90 % der realen Dynamik ab.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Slope > 1.0 → Das Modell reagiert zu stark. Peaks werden überbetont, Schwankungen überzeichnet.'))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE < 0.01 → sehr gut'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → gut'))."\n";
@@ -6952,6 +6974,27 @@ sub ___aiFannExplainKeyFigures {
   }
   elsif ($lang eq 'EN') {
       $note .= (encode('utf8', '<b><u> Explanations of the key figures </b></u>'))."\n\n";
+      
+      $note .= (encode('utf8', '<b>Model Bias</b> → shows whether the model predicts average consumption to be too low or too high:'))."\n";
+      $note .= $spc3.(encode('utf8', 'Positive Bias → the model underestimates average consumption'))."\n";
+      $note .= $spc3.(encode('utf8', 'Negative bias → the model overestimates average consumption'))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'The value is given in Wh and describes the average deviation per hour.'))."\n";
+      $note .= $spc6.(encode('utf8', 'The internal bias correction raises or lowers the prediction accordingly, but only'))."\n";
+      $note .= $spc6.(encode('utf8', 'in the base load range so as not to distort peaks.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', '<b>Model Slope</b> → indicates whether the model responds too flatly or too steeply.'))."\n";
+      $note .= $spc3.(encode('utf8', 'The value describes the ratio between:'))."\n";
+      $note .= $spc6.(encode('utf8', '- Change in actual consumption'))."\n";
+      $note .= $spc6.(encode('utf8', '- Change in model prediction'))."\n";
+      $note .= $spc3. (encode('utf8', 'and is specified as a dimensionless factor.'))."\n";
+      $note .= $spc3.'<b>Interpretation:</b>'."\n";
+      $note .= $spc6.(encode('utf8', 'Slope = 1.0 → The model correctly reflects consumption levels. If actual consumption increases by X, the prediction also increases by X'))."\n";
+      $note .= $spc6.(encode('utf8', 'Slope < 1.0 → The model responds too flatly. Peaks are attenuated. Example: Slope = 0.9 → The model only depicts 90% of the actual dynamics.')) ."\n";
+      $note .= $spc6.(encode('utf8', 'Slope > 1.0 → The model reacts too strongly. Peaks are overemphasised, fluctuations are exaggerated.'))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → how well the network trains and generalizes. Rule of thumb:'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE < 0.01 → very good'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → good'))."\n";
@@ -8066,7 +8109,7 @@ sub _attrplantControl {                  ## no critic "not used"
       backupFilesKeep           => { comp => '\d+',                                               act => 0 },
       batteryPreferredCharge    => { comp => '([0-9]|[1-9][0-9]|100)',                            act => 0 },
       consForecastIdentWeekdays => { comp => '(0|1)',                                             act => 0 },
-      consForecastLastDays      => { comp => '([1-9]|[1-9][0-9]|1[0-7][0-9]|180)',                act => 0 },
+      consForecastLastDays      => { comp => '([0-9]|[1-9][0-9]|1[0-7][0-9]|180)',                act => 0 },
       consForecastInPlanning    => { comp => '(0|1)',                                             act => 0 },
       cycleInterval             => { comp => '\d+',                                               act => 1 },
       feedinPowerLimit          => { comp => '\d+',                                               act => 0 },
@@ -10352,10 +10395,10 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
 
-  for my $bn (1..MAXBATTERIES) {                                        # 02.10.
-      $bn = sprintf "%02d", $bn;
-      readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
-  }
+  #for my $bn (1..MAXBATTERIES) {                                        # 02.10.
+  #    $bn = sprintf "%02d", $bn;
+  #    readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
+  #}
   
   #Log3 ($name, 1, "$name - Circular: \n".Dumper $data{$name}{circular}) if($name eq 'openMeteo');
   ##########################################################################################################################
@@ -11842,7 +11885,6 @@ sub _transferAPIRadiationValues {
       my $nhtstr           = 'NextHour'.(sprintf "%02d", $num);
 
       my $dt               = timestringsFromOffset ($wantts, 0);
-      #my $weekday          = $dt->{dayname};
       my $wtday            = $dt->{day};
       my $wthour           = $dt->{hour};
       my $hod              = sprintf "%02d", int ($wthour) + 1;                                            # Stunde des Tages
@@ -11858,8 +11900,6 @@ sub _transferAPIRadiationValues {
       $paref->{fd}     = $fd;
 
       $data{$name}{nexthours}{$nhtstr}{starttime} = $wantdt;
-      #$data{$name}{nexthours}{$nhtstr}{day}       = $wtday;
-      #$data{$name}{nexthours}{$nhtstr}{weekday}   = $weekday;
       $data{$name}{nexthours}{$nhtstr}{hourofday} = $hod;
       $data{$name}{nexthours}{$nhtstr}{today}     = $fd == 0 ? 1 : 0;
       $data{$name}{nexthours}{$nhtstr}{rad1h}     = $rad1h;
@@ -11932,7 +11972,7 @@ sub _transferAPIRadiationValues {
 
       }
       else {
-          debugLog ($paref, 'aiData', $msg);
+          debugLog ($paref, 'aiData', $msg) if(askLogtime ($name, $msg, 5));
       }
 
       if ($useai) {
@@ -14305,15 +14345,16 @@ sub _createSummaries {
 
   ## Initialisierung
   ####################
-  my $next1HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next2HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next3HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $next4HoursSum = { "PV" => 0, "Consumption" => 0 };
-  my $restOfDaySum  = { "PV" => 0, "Consumption" => 0 };
-  my $tomorrowSum   = { "PV" => 0, "Consumption" => 0 };
-  my $daftertomSum  = { "PV" => 0, "Consumption" => 0 };                                               # Werte für Übermorgen
-  my $todaySumFc    = { "PV" => 0, "Consumption" => 0 };
-  my $todaySumRe    = { "PV" => 0, "Consumption" => 0 };
+  my $next1HoursSum    = { "PV" => 0, "Consumption" => 0 };
+  my $next2HoursSum    = { "PV" => 0, "Consumption" => 0 };
+  my $next3HoursSum    = { "PV" => 0, "Consumption" => 0 };
+  my $next4HoursSum    = { "PV" => 0, "Consumption" => 0 };
+  my $restOfDaySum     = { "PV" => 0, "Consumption" => 0 };
+  my $tomorrowSum      = { "PV" => 0, "Consumption" => 0 };
+  my $daftertomSum     = { "PV" => 0, "Consumption" => 0 };                                           # Werte für Übermorgen
+  my $todaySumFc       = { "PV" => 0, "Consumption" => 0 };
+  my $todayUp2lastHour = { "PV" => 0, "Consumption" => 0 };
+  my $todaySumRe       = { "PV" => 0, "Consumption" => 0 };
 
   my $tmorsset = CurrentVal ($name, 'sunsetTomorrowTs', 0);                                            # Timestamp Sonneuntergang kommenden Tag
   my $htmsset  = timestringsFromOffset ($tmorsset,      0);
@@ -14325,14 +14366,16 @@ sub _createSummaries {
   my $tmConInHrWithPVGen = 0;
   my $remainminutes      = 60 - $minute;                                                               # verbleibende Minuten der aktuellen Stunde
 
-  my $hour00pvfc  = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;
-  my $hour00confc = NexthoursVal ($name, "NextHour00", 'confc', 0);
-  my $hod00       = NexthoursVal ($name, "NextHour00", 'hourofday', 0);
+  my $hour00pvfcremain = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;         # PV Fc für Rest der Stunde
+  my $hour00confc      = NexthoursVal ($name, "NextHour00", 'confc', 0);
+  
+  $hour00pvfcremain = max (0, $hour00pvfcremain);                                                      # PV Prognose darf nicht negativ sein
+  $hour00confc      = max (0, $hour00confc);                                                           # Verbrauchsprognose darf nicht negativ sein
 
-  $hour00pvfc     = max (0, $hour00pvfc);                                                              # PV Prognose darf nicht negativ sein
-  $hour00confc    = max (0, $hour00confc);                                                             # Verbrauchsprognose darf nicht negativ sein
-
+  my $hour00pvfcup2now = NexthoursVal ($name, "NextHour00", 'pvfc',  0) - $hour00pvfcremain;           # PV Fc aktuelle Stunde bis jetzt
   my $hour00confcremain = $hour00confc / 60 * $remainminutes;
+  my $hour00confcup2now = $hour00confc - $hour00confcremain;
+  my $hod00             = NexthoursVal ($name, "NextHour00", 'hourofday', 0);
 
   if ($paref->{t} < $tdaysset) {
       if (int ($hod00) != int ($dtsset->{hour}) + 1) {
@@ -14343,11 +14386,12 @@ sub _createSummaries {
       }
   }
 
-  $next1HoursSum->{PV}          = $hour00pvfc;
-  $next2HoursSum->{PV}          = $hour00pvfc;
-  $next3HoursSum->{PV}          = $hour00pvfc;
-  $next4HoursSum->{PV}          = $hour00pvfc;
-  $restOfDaySum->{PV}           = $hour00pvfc;
+  $next1HoursSum->{PV}          = $hour00pvfcremain;
+  $next2HoursSum->{PV}          = $hour00pvfcremain;
+  $next3HoursSum->{PV}          = $hour00pvfcremain;
+  $next4HoursSum->{PV}          = $hour00pvfcremain;
+  
+  $restOfDaySum->{PV}           = $hour00pvfcremain;
 
   $next1HoursSum->{Consumption} = $hour00confcremain;
   $next2HoursSum->{Consumption} = $hour00confcremain;
@@ -14420,15 +14464,24 @@ sub _createSummaries {
       }
   }
 
+  # --- Werte aus pvHistory
+  ###########################
   for my $th (1..24) {
       $th = sprintf "%02d", $th;
       $todaySumFc->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
       $todaySumRe->{PV}          += HistoryVal ($name, $day, $th, 'pvrl',  0);
       $todaySumFc->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
       $todaySumRe->{Consumption} += HistoryVal ($name, $day, $th, 'con',   0);
+      
+      if ($th <= $chour) {
+          $todayUp2lastHour->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
+          $todayUp2lastHour->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
+      }
   }
-
-  my $pvre = sprintf "%.0f", $todaySumRe->{PV};
+  
+  my $todayUp2NowPvFc  = sprintf "%.0f", ($hour00pvfcup2now  + $todayUp2lastHour->{PV});
+  my $todayUp2NowConFc = sprintf "%.0f", ($hour00confcup2now + $todayUp2lastHour->{Consumption});
+  my $pvre             = sprintf "%.0f", $todaySumRe->{PV};
 
   push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                                # Schieberegister 4h Summe Forecast
   limitArray ($data{$name}{current}{h4fcslidereg}, SLIDENUMMAX);
@@ -14518,6 +14571,8 @@ sub _createSummaries {
   $data{$name}{current}{tmConInHrWithPVGen}    = $tmConInHrWithPVGen;
   $data{$name}{current}{surplus}               = $surplus;
   $data{$name}{current}{dayAfterTomorrowPVfc}  = $daftertomSum->{PV};
+  $data{$name}{current}{tdPvFcUp2Now}          = $todayUp2NowPvFc;
+  $data{$name}{current}{tdConFcUp2Now}         = $todayUp2NowConFc;
   $data{$name}{current}{dayAfterTomorrowConfc} = $daftertomSum->{Consumption};
 
   push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
@@ -16283,9 +16338,9 @@ sub _calcConsForecast {                  ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
 
-  debugLog ($paref, 'consumption|consumption_long', "################### Start Consumption forecast ###################");  
+  debugLog ($paref, 'consumption|consumption_long', "################### START Consumption forecast ###################");  
   
-  _calcConsForecast_circular ($paref);                                               # legacy Verbrauchsprognose
+  _calcConsForecast_legacy ($paref);                                                 # legacy Verbrauchsprognose
   
   my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
   
@@ -16302,9 +16357,9 @@ return;
 }
 
 ################################################################
-#     Energieverbrauch Vorhersage kalkulieren (Median)
+#   Legacy Energieverbrauch Vorhersage kalkulieren
 ################################################################
-sub _calcConsForecast_circular {
+sub _calcConsForecast_legacy {
   my $paref      = shift;
   my $name       = $paref->{name};
   my $chour      = $paref->{chour};
@@ -16313,207 +16368,153 @@ sub _calcConsForecast_circular {
   my $day        = $paref->{day};                                                                       # aktuelles Tagdatum (01...31)
   my $todayname  = $paref->{dayname};                                                                   # aktueller Tagname
 
-  my $acref      = $data{$name}{consumers};
   my $cofciwd    = CurrentVal ($name, 'consForecastIdentWeekdays',         0);                          # nutze nur gleiche Wochentage (Mo...So) für Verbrauchsvorhersage
-  my $acld       = CurrentVal ($name, 'consForecastLastDays',    CONSFCLDAYS);                          # Beachtung Stundenwerte der letzten X Tage falls gesetzt
+  my $fcld       = CurrentVal ($name, 'consForecastLastDays',    CONSFCLDAYS);                          # Beachtung Stundenwerte der letzten X Tage falls gesetzt
+  my $ncds       = $cofciwd ? $fcld * 7 : $fcld;                                                        # notwendige Anzahl Vergleichstage die vorhanden sein sollen
 
   my $dt         = timestringsFromOffset ($t, 86400);
-  my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname kommender Tag
+  my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname nächster Tag
+  
   my $lct        = LOCALE_TIME =~ /^de_/xs ? 'DE' : 'EN';
   my $st         = timestringToTimestamp ("$date 00:00:00");                                            # Startzeit 00:00 am aktuellen Tag
-  my $ncds       = $cofciwd ? $acld * 7 : $acld;                                                        # notwendige Anzahl Vergleichstage die vorhanden sein sollen
   my $nhist      = scalar keys %{$data{$name}{pvhist}};
 
   debugLog ($paref, 'consumption_long', "Basics - installed locale: ".LOCALE_TIME.", used scheme: $lct");
   debugLog ($paref, 'consumption_long', "Need number of stored days: $ncds, Number of days in History: $nhist => can calculate excludes/includes: ".($ncds <= $nhist ? 'yes' : 'no'));
 
-  my (@cona, $exconfc, $csme, %usage);
+  my $usage;
+  $usage->{tom}{con} = 0;
 
-  ## Verbrauch der hod-Stunden 01..24 u. gesamten Tag ermitteln
-  ###############################################################
-  $usage{tom}{con} = 0;
-  
-  for my $h (1..24) {                                                                                   # Median für jede Stunde / Tag berechnen
-      $dt         = timestringsFromOffset ($st, $h * 3559);                                             # eine Sek. weniger als 1 Stunde
-      my $dayname = $dt->{dayname};
-      my $hh      = sprintf "%02d", $h;
+  ## Verbrauch der hod-Stunden am aktuellen / nächsten Tag als Median oder Array ermitteln
+  ##########################################################################################                                                                                      
+  for my $num (1..24) {                                                                               # Median für jede Stunde / Tag berechnen
+      my $dth     = timestringsFromOffset ($st, $num * 3559);                                         # eine Sek. weniger als 1 Stunde
+      my $dayname = $dth->{dayname};
+      my $hod     = sprintf "%02d", $num;
 
-      debugLog ($paref, 'consumption_long', "process Today dayname: $dayname, Tomorrow dayname: $tomdayname") if($h == 1);
+      debugLog ($paref, 'consumption_long', "process Today dayname: $dayname, Tomorrow dayname: $tomdayname") if($num == 1);
 
-      __readConFromCircular ( { name       => $name,                                                    # %usage befüllen
-                                hh         => $hh,
-                                acld       => $acld,
+      __readConFromCircular ( { name       => $name,                                                  # %usage befüllen
+                                hod        => $hod,
+                                fcld       => $fcld,
                                 lct        => $lct,
                                 dayname    => $dayname,
                                 tomdayname => $tomdayname,
                                 cofciwd    => $cofciwd,
-                                usage      => \%usage,
+                                usage      => $usage,
                                 ncds       => $ncds,
                                 nhist      => $nhist,
                               }
                             );
   }
 
-  ## Excludes / Includes vorbereiten
-  ####################################
-  my $exnum = 0;
-  my $ex    = 0;
-  my $lap   = 1;
+  ## Excludes / Includes vornehmen
+  ##################################
+  my $tomexnum = 0;                                                                                    # Anzahl Excludes nächster Tag
+  my $tomex    = 0;                                                                                    # Exclude-Summe nächster Tag
 
-  if ($ncds <= $nhist) {                                                                               # V 1.52.7
-      for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
-          next if ($n eq $day);                                                                        # aktuellen (unvollständigen) Tag nicht berücksichtigen
-          my $do = 1;
-
-          for my $c (sort{$a<=>$b} keys %{$acref}) {                                                   # historischer Verbrauch aller registrierten Verbraucher aufaddieren
-              $exconfc = ConsumerVal ($name, $c, 'exconfc', 0);
-
-              if ($exconfc) {
-                  ## Tageswert Excludes finden und summieren
-                  ############################################
-                  if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
-                      if ($cofciwd) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
-                          my $hdn = HistoryVal ($name, $n, 99, 'dayname', undef);
-                          $do     = 0 if(!$hdn || $hdn ne $tomdayname);
-                      }
-
-                      if ($do) {
-                          $csme = HistoryVal ($name, $n, 99, "csme${c}", 0);
-
-                          if ($csme > 0) {
-                              $ex   += $csme;
-                              $exnum++;
-
-                              debugLog ($paref, 'consumption_long', "Consumer '$c' hist cons registered by 'exconfc' for excl. - day: $n, csme: $csme");
-                          }
-                      }
-                  }
-
-                  ## Stundenweise exkludes und inkludes aufnehmen
-                  #################################################
-                  $do = 1;
-                  if ($cofciwd) {                                                                           # nur gleiche Tage (Mo...So) einbeziehen
-                      my $hdn = HistoryVal ($name, $n, 99, 'dayname', undef);
-                      $do     = 0 if(!$hdn || $hdn ne $todayname);
-                  }
-
-                  if ($do) {
-                      my $epiecelem = 1;
-
-                      for my $h (1..24) {                                                                   # excludieren ob exconfc 1 oder 2
-                          my $hh = sprintf "%02d", $h;
-                          $csme  = HistoryVal ($name, $n, $hh, "csme${c}", 0);
-
-                          if ($csme) {
-                              $csme                 = sprintf "%.2f", $csme;
-                              $usage{$hh}{histcon} += $csme;
-                              $usage{$hh}{histnum}++;
-
-                              debugLog ($paref, 'consumption_long', "consumer '$c' register for exclude day $n, hod: $hh - ".$csme." Wh");
-                          }
-
-                          if ($exconfc == 2 && $lap == 1) {                                                 # AVG-Daten des Consumers inkludieren
-                              my $rt     = $st + (3600 * ($h - 1));                                         # Schleifenlaufzeit
-                              my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
-                              my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
-
-                              if ($rt >= $plson && $rt <= $plsoff) {
-                                  if (defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}) {
-                                      $usage{$hh}{plancon} += $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem};
-                                      $usage{$hh}{plannum}++;
-
-                                      debugLog ($paref, 'consumption_long', "consumer '$c' register epiecAVG: ".$data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}." Wh for include in Hour $hh");
-
-                                      $epiecelem++;
-                                  }
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-
-          $lap++;
-      }
-  }
-
-  ## effektiven StundenForecast berechnen
-  #########################################
-  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next Hours (new median) ###################");
-
-  for my $h (1..24) {
-      my $hh = sprintf "%02d", $h;
-
-      if (defined $usage{$hh}{histnum}) {                                                             # historische Stundenverbräuche exkludieren
-          my $exhcon        = sprintf "%.0f", ($usage{$hh}{histcon} / $usage{$hh}{histnum});          # durchschnittlichen Verbrauchswert
-          $usage{$hh}{con} -= $exhcon if($usage{$hh}{con} > $exhcon);
-
-          debugLog ($paref, 'consumption_long', "excl. hist $exhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{histnum});
-      }
-
-      $usage{$hh}{conex} = $usage{$hh}{con};
-
-      if (defined $usage{$hh}{plannum}) {                                                             # geplante Stundenverbräuche inkludieren
-          my $inhcon        = sprintf "%.0f", ($usage{$hh}{plancon} / $usage{$hh}{plannum});
-          $usage{$hh}{con} += $inhcon;
-
-          debugLog ($paref, 'consumption_long', "incl. planned $inhcon Wh for Hour $hh, Considered value numbers: ".$usage{$hh}{plannum});
-      }
-
-      if (defined $usage{$hh}{num}) {                                                                 # V 1.47.0
-          debugLog ($paref, 'consumption|consumption_long', "estimated cons of Hour $hh: ".$usage{$hh}{con}." Wh, Considered value numbers: ".$usage{$hh}{num});
-      }
+  if ($ncds+1 <= $nhist) {                                                                             # Anzahl hist. Tage + aktuellen Tag
+      ($tomexnum, $tomex) = __exincl_from_pvHistory ( { name       => $name,
+                                                        day        => $day,
+                                                        todayname  => $todayname,
+                                                        tomdayname => $tomdayname,
+                                                        st         => $st,
+                                                        cofciwd    => $cofciwd,
+                                                        fcld       => $fcld,
+                                                        usage      => $usage,
+                                                        debug      => $paref->{debug},
+                                                      }
+                                                    );
   }
 
   ## nächsten Tageswert Excludes berücksichtigen
   ################################################
-  my $tomnum = $usage{tom}{num} // 0;
+  my $tomnum = $usage->{tom}{num} // 0;
 
-  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day (new median) ###################");
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day ###################");
 
   if ($tomnum) {
-      if ($exnum) {
-          $ex               = sprintf "%.0f", ($ex / $exnum);                                        # Ex Tageswert Durchschnitt bilden
-          $usage{tom}{con} -= $ex;
+      if ($tomexnum) {
+          $tomex              = sprintf "%.0f", ($tomex / $tomexnum);                                                  # Ex Tageswert Durchschnitt bilden
+          $usage->{tom}{con} -= $tomex;
       }
 
-      $data{$name}{current}{tomorrowconsumption} = $usage{tom}{con};
-      debugLog ($paref, 'consumption|consumption_long', "estimated cons Tomorrow: ".$usage{tom}{con}." Wh, Individual hourly values considered: $tomnum, exclude: $ex Wh (avg of $exnum entities)");
+      $data{$name}{current}{tomorrowconsumption} = $usage->{tom}{con};
+      debugLog ($paref, 'consumption|consumption_long', "estimated con Tomorrow: $usage->{tom}{con} Wh, Individual hourly elements considered: $tomnum, exclude: $tomex Wh (avg of $tomexnum entities)");
   }
   else {
       my $lang                                   = $paref->{lang};
       $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
+      
       debugLog ($paref, 'consumption|consumption_long', "no estimated cons for Tomorrow: ".$hqtxt{wfmdcf}{$lang});
   }
-
-  ## Ergebnisse speichern
-  ########################
-  debugLog ($paref, 'saveData2Cache|consumption_long', "################### Store Consumption forecast values (new median) ###################");
-
-  for my $k (sort keys %{$data{$name}{nexthours}}) {
-      my $nhst = NexthoursVal ($name, $k, "starttime", undef);                                         # Startzeit
-      next if(!$nhst);
-
-      my $utime = timestringToTimestamp ($nhst);
-      my $nhday = strftime "%a", localtime($utime);                                                    # Wochentagsname des NextHours Key
-      my $nhhr  = sprintf "%02d", int (strftime "%H", localtime($utime)) + 1;                          # Stunde des Tages vom NextHours Key (01,02,...24)
-
-      next if(!defined $usage{$nhhr}{con});                                                            # V 1.47.0
-
-      $data{$name}{nexthours}{$k}{confcEx}  = $usage{$nhhr}{conex};
-      $data{$name}{nexthours}{$k}{confc}    = $usage{$nhhr}{con};                                      # prognostizierter Verbrauch (Median)
-      $data{$name}{nexthours}{$k}{conlegfc} = $usage{$nhhr}{con};
+  
+  ## StundenForecast nächste 24h berechnen und Ergebnisse speichern
+  ###################################################################
+  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next 24 Hours ###################");
+        
+  for my $nh (sort keys %{$data{$name}{nexthours}}) {
+      my $isToday = NexthoursVal ($name, $nh, 'today',         0); 
+      my $hod     = NexthoursVal ($name, $nh, 'hourofday', undef);                                                      # Stunde des Tages vom NextHours Key (01,02,...24) 
       
-      debugLog ($paref, 'saveData2Cache|consumption_long', "store '$k' hod '$nhhr' confc: $usage{$nhhr}{con}, confcEx: $usage{$nhhr}{conex}");
-
-      if (NexthoursVal ($name, $k, 'today', 0)) {                                                      # nur Werte des aktuellen Tags speichern
-          $data{$name}{circular}{$nhhr}{confc} = $usage{$nhhr}{con};
-          writeToHistory ( { paref => $paref, key => 'confc',    val => $usage{$nhhr}{con}, hour => $nhhr } );
-          writeToHistory ( { paref => $paref, key => 'conlegfc', val => $usage{$nhhr}{con}, hour => $nhhr } );
-
-          debugLog ($paref, 'saveData2Cache|consumption_long', "store circular/history hod '$nhhr' confc: $usage{$nhhr}{con}");
+      my $num = int ((split 'NextHour', $nh)[1]);
+      #next if($num == 0);                                                                                               # V 2.1.0 ->comment aktuelle Stunde 00 nicht berücksichtigen -> Problem Stunde 00 bei Tageswechsel erhält kein Ergebnis und dadurch kein AI
+      #last if($num > 24);                                                                                               # V 2.1.0 ->comment
+      
+      my ($msg1, $msg2, $msg3, $msg4) = ('', '', '', '');
+     
+      if (defined $usage->{nxt}{$hod}{histnum}) {                                                                       # historische Stundenverbräuche exkludieren
+          my $exhcon                = $usage->{nxt}{$hod}{histcon} / $usage->{nxt}{$hod}{histnum};                      # durchschnittlichen Verbrauchswert
+          $usage->{nxt}{$hod}{con} -= $exhcon;
+          
+          $exhcon = sprintf "%.0f", $exhcon;
+          $msg1   = "EXCLUDE hist $exhcon Wh (entities=$usage->{nxt}{$hod}{histnum}), ";
       }
+
+      $usage->{nxt}{$hod}{conex} = $usage->{nxt}{$hod}{con};
+      
+
+      if (defined $usage->{nxt}{$hod}{plannum}) {                                                                       # geplante Stundenverbräuche inkludieren
+          my $inhcon                = $usage->{nxt}{$hod}{plancon} / $usage->{nxt}{$hod}{plannum};
+          $usage->{nxt}{$hod}{con} += $inhcon;
+          
+          $inhcon = sprintf "%.0f", $inhcon;
+          $msg2   = "INCLUDE planned $inhcon Wh (entities=$usage->{nxt}{$hod}{plannum}), "; 
+      }
+      
+      $usage->{nxt}{$hod}{con} = sprintf "%.0f", $usage->{nxt}{$hod}{con} if(defined $usage->{nxt}{$hod}{con});
+           
+      debugLog ($paref, 'consumption_long', "num=$num, isToday=$isToday, hod=$hod, ".$msg1.$msg2."SUMMARY -> estimated CON: ".(defined $usage->{nxt}{$hod}{con} ? $usage->{nxt}{$hod}{con}.' Wh' : 'undef'));
+  
+      
+      ## Ergebnisse speichern
+      #######################
+      next if(!defined $usage->{nxt}{$hod}{con});                                                            
+      
+      $usage->{nxt}{$hod}{conex} = $usage->{nxt}{$hod}{con} if(!defined $usage->{nxt}{$hod}{conex});
+      
+      my $con   = sprintf "%.0f", $usage->{nxt}{$hod}{con};                                                             # prognostizierter Verbrauch
+      my $conex = sprintf "%.0f", $usage->{nxt}{$hod}{conex};  
+      
+      $data{$name}{nexthours}{$nh}{confcEx}  = $conex;
+      $data{$name}{nexthours}{$nh}{confc}    = $con;                                   
+      $data{$name}{nexthours}{$nh}{conlegfc} = $con;
+      
+      $msg3 = "STORE NextHour -> confc=$con Wh, confcEx=$conex Wh";
+
+      if ($isToday) {                                                                                                   # nur Werte des aktuellen Tags speichern
+          $data{$name}{circular}{$hod}{confc} = $usage->{nxt}{$hod}{con};
+          
+          writeToHistory ( { paref => $paref, key => 'confc',    val => $con, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'conlegfc', val => $con, hour => $hod } );
+
+          $msg4 = " ,STORE pvCircular/pvHistory -> confc=$con Wh";
+      }  
+      
+      debugLog ($paref, 'saveData2Cache|consumption_long', "num=$num, isToday=$isToday, hod=$hod, $msg3".$msg4);
   }
+  
+  debugLog ($paref, 'saveData2Cache|consumption_long', "################### ENDE Consumption forecast ###################");  
 
 return;
 }
@@ -16525,8 +16526,8 @@ return;
 sub __readConFromCircular {
   my $paref      = shift;
   my $name       = $paref->{name};
-  my $hh         = $paref->{hh};
-  my $acld       = $paref->{acld};
+  my $hod        = $paref->{hod};
+  my $fcld       = $paref->{fcld};
   my $lct        = $paref->{lct};
   my $dayname    = $paref->{dayname};
   my $tomdayname = $paref->{tomdayname};
@@ -16538,19 +16539,23 @@ sub __readConFromCircular {
   my (@conh, @conhtom);
   my $mix = 0;
 
-  if ($cofciwd) {                                                                                                                                       # nur bestimmten Tag (Mo...So) einbeziehen der Stunde
-      push @conh,    @{$data{$name}{circular}{$hh}{con_all}{"$dayname"}}    if(defined ${$data{$name}{circular}{$hh}{con_all}{"$dayname"}}[0]);
-      push @conhtom, @{$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}} if(defined ${$data{$name}{circular}{$hh}{con_all}{"$tomdayname"}}[0]);      # für den nächsten Tag
+  if ($cofciwd) {                                                                                                                                       
+      # --- nur Stunde eines bestimmten Wochentags (Mo...So) einbeziehen
+      push @conh,    @{$data{$name}{circular}{$hod}{con_all}{"$dayname"}}    if(defined ${$data{$name}{circular}{$hod}{con_all}{"$dayname"}}[0]);
+      push @conhtom, @{$data{$name}{circular}{$hod}{con_all}{"$tomdayname"}} if(defined ${$data{$name}{circular}{$hod}{con_all}{"$tomdayname"}}[0]);      # für den nächsten Tag
   }
-  else {                                                                                                                                                # alle aufgezeichneten Wochentage in der Stunde berücksichtigen
-      for my $dy (keys %{$data{$name}{circular}{$hh}{con_all}}) {                                                                                       # den max Index aller Tagesarrays ermitteln
-          my $ai = $#{$data{$name}{circular}{$hh}{con_all}{$dy}};
+  else {                                                                                                                                                
+      # --- alle aufgezeichneten Wochentage in der Stunde berücksichtigen
+      for my $dy (keys %{$data{$name}{circular}{$hod}{con_all}}) {                                                                                       # den max Index aller Tagesarrays ermitteln
+          my $ai = $#{$data{$name}{circular}{$hod}{con_all}{$dy}};
           $mix   = $ai if($ai > $mix);
       }
 
       for my $i (0..$mix) {                                                                                                                             # Werte sortiert nach Alter aufsteigend in Array einfügen
           for my $dy (sort keys %habwdn) {
-              push @conh,    ${$data{$name}{circular}{$hh}{con_all}{$habwdn{$dy}{$lct}}}[$i] if(defined ${$data{$name}{circular}{$hh}{con_all}{$habwdn{$dy}{$lct}}}[$i]);
+              my $dayshortname = $habwdn{$dy}{$lct};
+              
+              push @conh,    ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]  if(defined ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]);
               push @conhtom, @conh;
           }
       }
@@ -16560,30 +16565,166 @@ sub __readConFromCircular {
   my $hnumtom = scalar @conhtom;
 
   if ($hnum) {
-      if ($hnum > $acld) {
-          @conh = splice (@conh, $acld * -1);
+      # --- die nächsten 1..24 Stunden
+      if ($hnum > $fcld) {
+          @conh = splice (@conh, $fcld * -1);
           $hnum = scalar @conh;
       }
 
-      my $hcon         = $ncds <= $nhist ? (sprintf "%.0f", avgArray    (\@conh, $hnum)) :
-                                           (sprintf "%.0f", medianArray (\@conh));                  
-      $usage->{$hh}{con} = $hcon;                                                                                                                       # prognostizierter Verbrauch (Median) der Stunde hh (Hour of Day)
-      $usage->{$hh}{num} = $hnum;
+      my $hcon = $ncds <= $nhist ? (sprintf "%.0f", avgArray    (\@conh, $hnum)) :
+                                   (sprintf "%.0f", medianArray (\@conh));                  
+      
+      $usage->{nxt}{$hod}{con} = $hcon;                                                                                 # prognostizierter Verbrauch der Stunde hh (Hour of Day)
+      $usage->{nxt}{$hod}{num} = $hnum;
+      
+      # --- mit consForecastLastDays = 0
+      if ($fcld == 0) {                                                                                                 # Prognose aus hist. Tagen für Stunde löschen wenn keine Integration historischer Tage gewünscht                                                                                                 
+          $usage->{nxt}{$hod}{con} = 0;
+          $usage->{nxt}{$hod}{num} = 1;
+      }    
   }
 
   if ($hnumtom) {
-      if ($hnumtom > $acld) {
-          @conhtom = splice (@conhtom, $acld * -1);
+      # --- Stunden des nächsten Tages
+      if ($hnumtom > $fcld) {
+          @conhtom = splice (@conhtom, $fcld * -1);
           $hnumtom = scalar @conhtom;
       }
 
-      my $hcontom       = $ncds <= $nhist ? (sprintf "%.0f", avgArray    (\@conhtom, $hnumtom)) :
-                                            (sprintf "%.0f", medianArray (\@conhtom));             
-      $usage->{tom}{con} += $hcontom;                                                                                                                   # Summe prognostizierter Verbrauch (Median) des Tages
+      my $hcontom = $ncds <= $nhist ? (sprintf "%.0f", avgArray    (\@conhtom, $hnumtom)) :
+                                      (sprintf "%.0f", medianArray (\@conhtom));             
+      
+      $usage->{tom}{con} += $hcontom;                                                                                                                   # Summe prognostizierter Verbrauch des Tages
       $usage->{tom}{num} += $hnumtom;
   }
 
 return;
+}
+
+################################################################
+#  historische Consumerverbräuche exkludieren sofern nicht 
+#  zu berücksichtigen und geplante Verbräuche inkludieren
+################################################################
+sub __exincl_from_pvHistory {
+  my $paref      = shift;
+  my $name       = $paref->{name};
+  my $day        = $paref->{day};                         # aktuelles Tagdatum (01...31)
+  my $todayname  = $paref->{todayname};                   # aktueller Tagname
+  my $tomdayname = $paref->{tomdayname};
+  my $st         = $paref->{st};
+  my $cofciwd    = $paref->{cofciwd};
+  my $fcld       = $paref->{fcld};
+  my $usage      = $paref->{usage};                       # Referenz von %usage
+  my $debug      = $paref->{debug};
+
+  my $tomexnum = 0;
+  my $tomex    = 0;
+  my $mday     = int($day);
+  my $ph       = $data{$name}{pvhist};
+  my @days;
+
+  if ($fcld == 0) {
+      push @days, $day;
+  }
+  else {
+      my @days_after = sort { $a <=> $b } grep { $_ > $mday } keys %$ph;                           # Tage sortieren (Vormonat + aktueller Monat) ohne aktuellen Tag
+      my @days_upto  = sort { $a <=> $b } grep { $_ < $mday } keys %$ph;
+      @days          = (@days_after, @days_upto);
+      @days          = @days[-$fcld .. -1];    
+  }
+   
+  for my $dhist (@days) {                                                                          # Tagesdatum (01..31)
+      my $do  = 1;
+      my $lap = 1;
+
+      for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {                                  # historischer Verbrauch aller registrierten Verbraucher aufaddieren
+          my $exconfc = ConsumerVal ($name, $c, 'exconfc', 0);
+
+          if ($exconfc || $fcld == 0) {                                                            # --- mit consForecastLastDays = 0
+              ## Tageswert f. kommenden Tag Excludes finden und summieren
+              #############################################################
+              if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstellung der Verbrauchsprognose ausschließen
+                  if ($cofciwd) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+                      my $hdn = HistoryVal ($name, $dhist, 99, 'dayname', undef);
+                      $do     = 0 if(!$hdn || $hdn ne $tomdayname);
+                  }
+
+                  if ($do) {
+                      my $cegy = HistoryVal ($name, $dhist, 99, "csme${c}", 0);
+
+                      if ($cegy > 0) {
+                          $tomex   += $cegy;
+                          $tomexnum++;
+                      
+                          if ($debug =~ /consumption_long/xs) {
+                              Log3 ($name, 1, "$name DEBUG> Consumer '$c' hist cons registered by 'exconfc' for exclude - day: $dhist -> $cegy Wh");
+                          }
+                      }
+                  }
+              }
+
+              ## stundenweise Exkludes / Inkludes für aktuellen Tag aufnehmen
+              #################################################################
+              $do = 1;
+              
+              if ($cofciwd) {                                                                           # nur gleiche Tage (Mo...So) einbeziehen
+                  my $hdn = HistoryVal ($name, $dhist, 99, 'dayname', undef);
+                  $do     = 0 if(!$hdn || $hdn ne $todayname);
+              }
+
+              if ($do) {
+                  my $epiecelem = 1;
+
+                  for my $num (1..24) {                                                                   
+                      my $hod  = sprintf "%02d", $num;
+                      
+                      if ($exconfc == 1) {
+                          my $cegy = HistoryVal ($name, $dhist, $hod, "csme${c}", undef);
+
+                          if (defined $cegy) {                                                              # historische Con und Anzahl für späteres Exclude zusammenfassen
+                              $cegy                        = sprintf "%.2f", $cegy;
+                              $usage->{nxt}{$hod}{histcon} += $cegy;
+                              $usage->{nxt}{$hod}{histnum}++;
+                          
+                              if ($debug =~ /consumption_long/xs) {
+                                  Log3 ($name, 1, "$name DEBUG> day=$dhist, hod=$hod, consumer '$c' register exclude -> $cegy Wh");
+                              }
+                          }
+                      }
+
+                      if ((!$exconfc || $exconfc == 2) && $lap == 1) {                                  # AVG-Daten des Consumers inkludieren
+                          my $rt     = $st + (3600 * ($num - 1));                                       # Schleifenlaufzeit
+                          my $plson  = ConsumerVal ($name, $c, 'planswitchon',  $st + 86400);           # geplante Switch-on Zeit des Consumers
+                          my $plsoff = ConsumerVal ($name, $c, 'planswitchoff',           0);           # geplante Switch-off Zeit des Consumers
+                                  
+                          if ($rt >= $plson && $rt <= $plsoff) {
+                              my $plancon = defined $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem} 
+                                            ? $data{$name}{consumers}{$c}{epiecAVG}{$epiecelem}
+                                            : defined $data{$name}{consumers}{$c}{epieces}{$lap}
+                                            ? $data{$name}{consumers}{$c}{epieces}{$lap}
+                                            : 0;
+                              
+                              if (defined $plancon) {
+                                  $usage->{nxt}{$hod}{plancon} += $plancon;
+                                  $usage->{nxt}{$hod}{plannum}++;
+                                
+                                  if ($debug =~ /consumption_long/xs) {
+                                      Log3 ($name, 1, "$name DEBUG> day=$dhist, hod=$hod, consumer '$c' register include -> planned $plancon Wh");
+                                  }
+                                  
+                                  $epiecelem++;
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+
+      $lap++;
+  }
+
+return ($tomexnum, $tomex);
 }
 
 ################################################################
@@ -16718,21 +16859,20 @@ sub _calcTodayDeviation {
   
   # PV Prognose/Ist Abweichung
   ##############################
-  my $pvfc = ReadingsNum ($name, 'Today_PVforecast', 0);
-  my $pvre = ReadingsNum ($name, 'Today_PVreal',     0);
+  my $pvfc = CurrentVal  ($name, 'tdPvFcUp2Now', 0);
+  my $pvre = ReadingsNum ($name, 'Today_PVreal', 0);
   
   if ($pvre && $pvfc) {                                                                     # Schutz Illegal division by zero
       if ($manner eq 'daily') {
           my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
 
           if ($t >= $sstime) {
-              $dpv        = sprintf "%.2f", (100 - (100 * $pvre / $pvfc));                 
+              $dpv        = sprintf "%.2f", (($pvfc - $pvre) / $pvfc * 100);                # V 2.0.0
               $dosave_dpv = 1;
           }
       }
       else {
-          my $pvfcd   = ReadingsNum ($name, 'RestOfDayPVforecast', 0) - $pvfc;              # PV Prognose bis jetzt
-          $dpv        = sprintf "%.2f", (100 - (100 * $pvre / (abs $pvfcd || 1) ) );        # V 2.0.0
+          $dpv        = sprintf "%.2f", (($pvfc - $pvre) / $pvfc * 100);                    # V 2.0.0
           $dosave_dpv = 1;
       }
 
@@ -16746,16 +16886,17 @@ sub _calcTodayDeviation {
   
   # Consumption Prognose/Ist Abweichung
   #######################################
-  my $confc  = ReadingsNum ($name, 'Today_CONforecast', 0);
-  my $conre  = ReadingsNum ($name, 'Today_CONreal',     0);
-  my $confcd = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0) - $confc;             # Con Prognose bis jetzt
-  $dcon      = sprintf "%.2f", (100 - (100 * $conre / (abs $confcd || 1) ) );               # V 2.0.0
+  my $confc = CurrentVal  ($name, 'tdConFcUp2Now', 0);
+  my $conre = ReadingsNum ($name, 'Today_CONreal', 0);
   
-  $dcon *= -1 if($perspective eq 'reverse');                                                # Perspektivänderung
-  
-  $data{$name}{circular}{99}{tdayConDvtn} = $dcon;
-  
-  storeReading ('Today_CONdeviation', $dcon.' %');
+  if ($conre && $confc) {
+      $dcon  = sprintf "%.2f", (($confc - $conre) / $confc * 100);                         # V 2.0.0
+      $dcon *= -1 if($perspective eq 'reverse');                                           # Perspektivänderung
+      
+      $data{$name}{circular}{99}{tdayConDvtn} = $dcon;
+      
+      storeReading ('Today_CONdeviation', $dcon.' %');
+  }
 
 return;
 }
@@ -18607,13 +18748,14 @@ sub _graphicHeader {
       $text_tdayConDvtn = encode ('utf8', $text_tdayConDvtn);
       $text_ydayConDvtn = encode ('utf8', $text_ydayConDvtn);
 
-      ## erste Header-Zeilen
+
+      ## Aufbau Header
       #######################
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
       my $dlink = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
       my $space = '&nbsp;&nbsp;&nbsp;';
       my $disti = qq{<span title="$chktitle"> $chkicon </span> $space <span title="$fthtitle"> $fthicon </span> $space <span title="$wiktitle"> $wikicon </span> $space <span title="$msgtitle"> $msgicon </span>};
-
+      
       my @parts1 = (
           [ $tempimg,  0 ],
           [ $temptxt,  3 ],
@@ -18637,14 +18779,19 @@ sub _graphicHeader {
 
       my $cont1 = join '', map { $_->[0] . ('&nbsp;' x $_->[1]) } @parts1;
       my $cont2 = join '', map { $_->[0] . ('&nbsp;' x $_->[1]) } @parts2;
+      
+      my $version = $hash->{HELPER}{VERSION} // '-';
 
+      # --- erste Headerzeile
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="1" align="left"   $dstyle> <b>$dlink</b>              </td>};
       $header  .= qq{<td colspan="2" align="center" $dstyle> $disti                     </td>};
-      $header  .= qq{<td colspan="3" align="left"   $dstyle> $lupt $lup &nbsp; $upicon  </td>};
+      $header  .= qq{<td colspan="1" align="left"   $dstyle> Version: $version          </td>};
+      $header  .= qq{<td colspan="2" align="left"   $dstyle> $lupt $lup &nbsp; $upicon  </td>};
       $header  .= qq{<td colspan="3" align="right"  $dstyle> $api                       </td>};
       $header  .= qq{</tr>};
       
+      # --- zweite Headerzeile
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont1 </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont2 </td>};
@@ -18659,6 +18806,7 @@ sub _graphicHeader {
       $header  .= qq{</td>};
       $header  .= qq{</tr>};
       
+      # --- dritte Headerzeile
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
@@ -24883,7 +25031,7 @@ sub aiFannGetConResult {
            && defined $temp 
            && defined $isday) {
 
-             debugLog ($paref, 'aiData', "AI FANN - Record $nhstr skipped: incomplete or legacyconfc < 0"); 
+             debugLog ($paref, 'aiData', "AI FANN - Record $nhstr skipped: data needed are incomplete or legacyconfc < 0"); 
              next; 
       }
 
@@ -25117,7 +25265,7 @@ sub aiFannGetConResult {
           writeToHistory ( { paref => $paref, key => 'conaifc', val => $prediction,  hour => $hod } );
           writeToHistory ( { paref => $paref, key => 'confc',   val => $confc_final, hour => $hod } );    
                     
-          debugLog ($paref, 'saveData2Cache|consumption_long', "store circular/history hod '$hod' confc: $prediction");
+          debugLog ($paref, 'saveData2Cache|consumption_long', "store AI legacy alpha value to circular/history -> hod=$hod confc=$confc_final Wh");
       }
   }
   
@@ -26051,7 +26199,6 @@ sub aiGetResult {
       wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sabin,
-      # sunaz  => $sunaz,
       hod    => $hod
   };
 
@@ -26068,7 +26215,8 @@ sub aiGetResult {
              push @total_prediction, $res if(defined $res);
              1;
            }
-           or do { Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
+           or do { 
+                   Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
                    return $@;
                  };
 
@@ -33864,11 +34012,12 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>consForecastLastDays</b>      </td><td>The specified number of historical days is included in the calculation of the consumption forecast.                                                             </td></tr>
             <tr><td>                                  </td><td>For example, with the attribute value '1' only the previous day is taken into account, with the value '14' the previous 14 days.                                </td></tr>
+            <tr><td>                                  </td><td>Special case 0: No historical consumption is included, only the planning data from consumers for the current day.                                               </td></tr>
             <tr><td>                                  </td><td>The days taken into account may be fewer if there are not enough values in the internal memory.                                                                 </td></tr>
             <tr><td>                                  </td><td>If the key 'consForecastIdentWeekdays' is also set, the specified number of past weekdays                                                                       </td></tr>
             <tr><td>                                  </td><td>of the <b>same</b> day (Mon .. Sun) is taken into account.                                                                                                      </td></tr>
             <tr><td>                                  </td><td>For example, if the value is set to '8', the same weekdays of the past 8 weeks are taken into account.                                                          </td></tr>
-            <tr><td>                                  </td><td>Value: <b>Integer 1..180</b>, default: 60                                                                                                                       </td></tr>
+            <tr><td>                                  </td><td>Value: <b>Integer 0..180</b>, default: 60                                                                                                                       </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>cycleInterval</b>             </td><td>Repetition interval of the data collection in seconds.                                                                                                          </td></tr>
             <tr><td>                                  </td><td>If cycleInterval is explicitly set to '0', there is no regular data collection and must be started externally                                                   </td></tr>
@@ -36839,11 +36988,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>consForecastLastDays</b>      </td><td>Es wird die angegebene Anzahl historischer Tage bei der Berechnung der Verbrauchsprognose einbezogen.                                             </td></tr>
             <tr><td>                                  </td><td>So wird z.B. mit dem Attributwert "1" nur der vorangegangene Tag berücksichtigt, mit dem Wert '14' die vergangenen 14 Tage.                       </td></tr>
+            <tr><td>                                  </td><td>Sonderfall 0: Es wird kein historischer Verbrauch einbezogen, lediglich die Planungsdaten von Verbrauchern für den aktuellen Tag.                 </td></tr>            
             <tr><td>                                  </td><td>Die berücksichtigten Tage können geringer ausfallen, wenn noch nicht genügend Werte im internen Speicher vorhanden sind.                          </td></tr>
             <tr><td>                                  </td><td>Bei einem zusätzlich gesetzten Schlüssel 'consForecastIdentWeekdays' wird die angegebene Anzahl vergangener                                       </td></tr>
             <tr><td>                                  </td><td><b>gleicher</b> Wochentage (Mo .. So) berücksichtigt.                                                                                             </td></tr>
             <tr><td>                                  </td><td>Zum Beispiel werden dann bei einem gesetzten Wert von '8' die gleichen Wochentage der vergangenen 8 Wochen berücksichtigt.                        </td></tr>
-            <tr><td>                                  </td><td>Wert: <b>Ganzzahl 1..180</b>, default: 60                                                                                                         </td></tr>
+            <tr><td>                                  </td><td>Wert: <b>Ganzzahl 0..180</b>, default: 60                                                                                                         </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>cycleInterval</b>             </td><td>Wiederholungsintervall der Datensammlung in Sekunden.                                                                                             </td></tr>
             <tr><td>                                  </td><td>Ist cycleInterval explizit auf '0' gesetzt, erfolgt keine regelmäßige Datensammlung und muss mit 'get &lt;name&gt; data'                          </td></tr>
