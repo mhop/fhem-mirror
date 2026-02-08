@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.1.0"  => "04.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation ",
+  "2.1.0"  => "08.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
@@ -10395,10 +10395,10 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
 
-  for my $bn (1..MAXBATTERIES) {                                        # 02.10.
-      $bn = sprintf "%02d", $bn;
-      readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
-  }
+  #for my $bn (1..MAXBATTERIES) {                                        # 02.10.
+  #    $bn = sprintf "%02d", $bn;
+  #    readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
+  #}
   
   #Log3 ($name, 1, "$name - Circular: \n".Dumper $data{$name}{circular}) if($name eq 'openMeteo');
   ##########################################################################################################################
@@ -11885,7 +11885,6 @@ sub _transferAPIRadiationValues {
       my $nhtstr           = 'NextHour'.(sprintf "%02d", $num);
 
       my $dt               = timestringsFromOffset ($wantts, 0);
-      #my $weekday          = $dt->{dayname};
       my $wtday            = $dt->{day};
       my $wthour           = $dt->{hour};
       my $hod              = sprintf "%02d", int ($wthour) + 1;                                            # Stunde des Tages
@@ -11901,8 +11900,6 @@ sub _transferAPIRadiationValues {
       $paref->{fd}     = $fd;
 
       $data{$name}{nexthours}{$nhtstr}{starttime} = $wantdt;
-      #$data{$name}{nexthours}{$nhtstr}{day}       = $wtday;
-      #$data{$name}{nexthours}{$nhtstr}{weekday}   = $weekday;
       $data{$name}{nexthours}{$nhtstr}{hourofday} = $hod;
       $data{$name}{nexthours}{$nhtstr}{today}     = $fd == 0 ? 1 : 0;
       $data{$name}{nexthours}{$nhtstr}{rad1h}     = $rad1h;
@@ -11975,7 +11972,7 @@ sub _transferAPIRadiationValues {
 
       }
       else {
-          debugLog ($paref, 'aiData', $msg);
+          debugLog ($paref, 'aiData', $msg) if(askLogtime ($name, $msg, 5));
       }
 
       if ($useai) {
@@ -16397,7 +16394,7 @@ sub _calcConsForecast_legacy {
 
       debugLog ($paref, 'consumption_long', "process Today dayname: $dayname, Tomorrow dayname: $tomdayname") if($num == 1);
 
-      __readConFromCircular ( { name       => $name,                                                # %usage befüllen
+      __readConFromCircular ( { name       => $name,                                                  # %usage befüllen
                                 hod        => $hod,
                                 fcld       => $fcld,
                                 lct        => $lct,
@@ -16461,8 +16458,8 @@ sub _calcConsForecast_legacy {
       my $hod     = NexthoursVal ($name, $nh, 'hourofday', undef);                                                      # Stunde des Tages vom NextHours Key (01,02,...24) 
       
       my $num = int ((split 'NextHour', $nh)[1]);
-      next if($num == 0);                                                                                               # aktuelle Stunde 00 nicht berücksichtigen
-      last if($num > 24);
+      #next if($num == 0);                                                                                               # V 2.1.0 ->comment aktuelle Stunde 00 nicht berücksichtigen -> Problem Stunde 00 bei Tageswechsel erhält kein Ergebnis und dadurch kein AI
+      #last if($num > 24);                                                                                               # V 2.1.0 ->comment
       
       my ($msg1, $msg2, $msg3, $msg4) = ('', '', '', '');
      
@@ -16622,10 +16619,8 @@ sub __exincl_from_pvHistory {
 
   my $tomexnum = 0;
   my $tomex    = 0;
-  #my $lap      = 1;
-
-  my $mday = int($day);
-  my $ph   = $data{$name}{pvhist};
+  my $mday     = int($day);
+  my $ph       = $data{$name}{pvhist};
   my @days;
 
   if ($fcld == 0) {
@@ -16638,7 +16633,7 @@ sub __exincl_from_pvHistory {
       @days          = @days[-$fcld .. -1];    
   }
    
-  for my $dhist (@days) {
+  for my $dhist (@days) {                                                                          # Tagesdatum (01..31)
       my $do  = 1;
       my $lap = 1;
 
@@ -16891,13 +16886,10 @@ sub _calcTodayDeviation {
   
   # Consumption Prognose/Ist Abweichung
   #######################################
-  #my $confc  = ReadingsNum ($name, 'Today_CONforecast', 0);
-  my $confc  = CurrentVal  ($name, 'tdConFcUp2Now', 0);
-  my $conre  = ReadingsNum ($name, 'Today_CONreal', 0);
+  my $confc = CurrentVal  ($name, 'tdConFcUp2Now', 0);
+  my $conre = ReadingsNum ($name, 'Today_CONreal', 0);
   
   if ($conre && $confc) {
-      #my $confcd = ReadingsNum ($name, 'RestOfDayConsumptionForecast', 0) - $confc;             # Con Prognose bis jetzt
-      #$dcon      = sprintf "%.2f", ( 100 - (100 * abs ($conre / ($confcd || 1) )) );            # V 2.0.0
       $dcon  = sprintf "%.2f", (($confc - $conre) / $confc * 100);                         # V 2.0.0
       $dcon *= -1 if($perspective eq 'reverse');                                           # Perspektivänderung
       
@@ -25032,7 +25024,7 @@ sub aiFannGetConResult {
            && defined $temp 
            && defined $isday) {
 
-             debugLog ($paref, 'aiData', "AI FANN - Record $nhstr skipped: incomplete or legacyconfc < 0"); 
+             debugLog ($paref, 'aiData', "AI FANN - Record $nhstr skipped: data needed are incomplete or legacyconfc < 0"); 
              next; 
       }
 
@@ -26200,7 +26192,6 @@ sub aiGetResult {
       wid    => $wid,
       rr1c   => $rr1c,
       sunalt => $sabin,
-      # sunaz  => $sunaz,
       hod    => $hod
   };
 
@@ -26217,7 +26208,8 @@ sub aiGetResult {
              push @total_prediction, $res if(defined $res);
              1;
            }
-           or do { Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
+           or do { 
+                   Log3 ($name, 1, "$name - aiGetResult ERROR: $@");
                    return $@;
                  };
 
