@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.1.0"  => "08.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation ",
+  "2.1.0"  => "08.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation, show module version in header ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
                            "aiDecTree: new option stopConTrain, _saveEnergyConsumption: change logging ".
@@ -18748,13 +18748,14 @@ sub _graphicHeader {
       $text_tdayConDvtn = encode ('utf8', $text_tdayConDvtn);
       $text_ydayConDvtn = encode ('utf8', $text_ydayConDvtn);
 
-      ## erste Header-Zeilen
+
+      ## Aufbau Header
       #######################
       my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
       my $dlink = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
       my $space = '&nbsp;&nbsp;&nbsp;';
       my $disti = qq{<span title="$chktitle"> $chkicon </span> $space <span title="$fthtitle"> $fthicon </span> $space <span title="$wiktitle"> $wikicon </span> $space <span title="$msgtitle"> $msgicon </span>};
-
+      
       my @parts1 = (
           [ $tempimg,  0 ],
           [ $temptxt,  3 ],
@@ -18778,14 +18779,19 @@ sub _graphicHeader {
 
       my $cont1 = join '', map { $_->[0] . ('&nbsp;' x $_->[1]) } @parts1;
       my $cont2 = join '', map { $_->[0] . ('&nbsp;' x $_->[1]) } @parts2;
+      
+      my $version = $hash->{HELPER}{VERSION} // '-';
 
+      # --- erste Headerzeile
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="1" align="left"   $dstyle> <b>$dlink</b>              </td>};
       $header  .= qq{<td colspan="2" align="center" $dstyle> $disti                     </td>};
-      $header  .= qq{<td colspan="3" align="left"   $dstyle> $lupt $lup &nbsp; $upicon  </td>};
+      $header  .= qq{<td colspan="1" align="left"   $dstyle> Version: $version          </td>};
+      $header  .= qq{<td colspan="2" align="left"   $dstyle> $lupt $lup &nbsp; $upicon  </td>};
       $header  .= qq{<td colspan="3" align="right"  $dstyle> $api                       </td>};
       $header  .= qq{</tr>};
       
+      # --- zweite Headerzeile
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont1 </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont2 </td>};
@@ -18800,6 +18806,7 @@ sub _graphicHeader {
       $header  .= qq{</td>};
       $header  .= qq{</tr>};
       
+      # --- dritte Headerzeile
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
