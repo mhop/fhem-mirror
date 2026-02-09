@@ -162,6 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.1.1"  => "09.02.2026  sub _createSummaries refactored ",
   "2.1.0"  => "08.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation, show module version in header ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
@@ -14341,8 +14342,6 @@ sub _createSummaries {
   my $minute = $paref->{minute};                                                                      # aktuelle Minute
   my $debug  = $paref->{debug};
 
-  $minute = int ($minute) + 1;                                                                        # Minute Range umsetzen auf 1 bis 60
-
   ## Initialisierung
   ####################
   my $next1HoursSum    = { "PV" => 0, "Consumption" => 0 };
@@ -14351,113 +14350,151 @@ sub _createSummaries {
   my $next4HoursSum    = { "PV" => 0, "Consumption" => 0 };
   my $restOfDaySum     = { "PV" => 0, "Consumption" => 0 };
   my $tomorrowSum      = { "PV" => 0, "Consumption" => 0 };
-  my $daftertomSum     = { "PV" => 0, "Consumption" => 0 };                                           # Werte für Übermorgen
+  my $daftertomSum     = { "PV" => 0, "Consumption" => 0 };                                            # Werte für Übermorgen
   my $todaySumFc       = { "PV" => 0, "Consumption" => 0 };
-  my $todayUp2lastHour = { "PV" => 0, "Consumption" => 0 };
-  my $todaySumRe       = { "PV" => 0, "Consumption" => 0 };
-
+  my $todayUp2lastHour = { "PV" => 0, "Consumption" => 0 };                                            
+  my $todaySumRe       = { "PV" => 0, "Consumption" => 0 };                                            # Summe heute real
+  my $tdTillSunsetFc   = { "PV" => 0, "Consumption" => 0 };                                            # bis heutigen Sonnenuntergang
+  my $tmTillSunsetFc   = { "PV" => 0, "Consumption" => 0 };                                            # bis morgigen Sonnenuntergang
+  my $hour00up2nowFc   = { "PV" => 0, "Consumption" => 0 };                                            # Werte bis aktuelle Zeit (NextHour00)
+  
+  $minute           = 1  + int ($minute);                                                              # Minute Range umsetzen auf 1..60
+  my $remainminutes = 60 - $minute;                                                                    # verbleibende Minuten der aktuellen Stunde
+  
   my $tmorsset = CurrentVal ($name, 'sunsetTomorrowTs', 0);                                            # Timestamp Sonneuntergang kommenden Tag
   my $htmsset  = timestringsFromOffset ($tmorsset,      0);
   my $tdaysset = CurrentVal ($name, 'sunsetTodayTs',    0);                                            # Timestamp Sonneuntergang am aktuellen Tag
-  my $dtsset   = timestringsFromOffset ($tdaysset,      0);
-
-  my $tdConFcTillSunset  = 0;
-  my $tmConFcTillSunset  = 0;
+  my $htdsset  = timestringsFromOffset ($tdaysset,      0);
+  
+  my $tdhosset = 1 + int $htdsset->{hour};                                                             # heute Stunde des SunSet (wie hod)
+  my $tdmtsset = 1 + int $htdsset->{minute};                                                           # heute Minute des SunSet
+  my $tmhosset = 1 + int $htmsset->{hour};                                                             # morgen Stunde des SunSet (wie hod)
+  
+  my $tdmints2sunset = $tdmtsset - $minute;                                                            # Restminuten bis heute Sunset
+  
   my $tmConInHrWithPVGen = 0;
-  my $remainminutes      = 60 - $minute;                                                               # verbleibende Minuten der aktuellen Stunde
 
-  my $hour00pvfcremain = NexthoursVal ($name, "NextHour00", 'pvfc',  0) / 60 * $remainminutes;         # PV Fc für Rest der Stunde
-  my $hour00confc      = NexthoursVal ($name, "NextHour00", 'confc', 0);
+  #my $hour00pvfcremain = NexthoursVal ($name, "NextHour00", 'pvfc',      0) / 60 * $remainminutes;     # PV Fc für Rest der Stunde
+  #my $hour00confc      = NexthoursVal ($name, "NextHour00", 'confc',     0);
   
-  $hour00pvfcremain = max (0, $hour00pvfcremain);                                                      # PV Prognose darf nicht negativ sein
-  $hour00confc      = max (0, $hour00confc);                                                           # Verbrauchsprognose darf nicht negativ sein
+  #$hour00pvfcremain = max (0, $hour00pvfcremain);                                                      # PV Prognose darf nicht negativ sein
+  #$hour00confc      = max (0, $hour00confc);                                                           # Verbrauchsprognose darf nicht negativ sein
 
-  my $hour00pvfcup2now = NexthoursVal ($name, "NextHour00", 'pvfc',  0) - $hour00pvfcremain;           # PV Fc aktuelle Stunde bis jetzt
-  my $hour00confcremain = $hour00confc / 60 * $remainminutes;
-  my $hour00confcup2now = $hour00confc - $hour00confcremain;
-  my $hod00             = NexthoursVal ($name, "NextHour00", 'hourofday', 0);
+  #my $hour00pvfcup2now  = NexthoursVal ($name, "NextHour00", 'pvfc',  0) - $hour00pvfcremain;          # PV Fc aktuelle Stunde bis jetzt
+  #my $hour00confcremain = $hour00confc / 60 * $remainminutes;
+  #my $hour00confcup2now = $hour00confc - $hour00confcremain;
 
-  if ($paref->{t} < $tdaysset) {
-      if (int ($hod00) != int ($dtsset->{hour}) + 1) {
-          $tdConFcTillSunset += $hour00confcremain;                                                    # aktuelle Minute bis volle Stunde
-      }
-      else {
-          $tdConFcTillSunset += $hour00confc / 60 * (int ($dtsset->{minute}) + 1 - $minute);           # aktuelle Minute bis Sunset
-      }
-  }
-
-  $next1HoursSum->{PV}          = $hour00pvfcremain;
-  $next2HoursSum->{PV}          = $hour00pvfcremain;
-  $next3HoursSum->{PV}          = $hour00pvfcremain;
-  $next4HoursSum->{PV}          = $hour00pvfcremain;
-  
-  $restOfDaySum->{PV}           = $hour00pvfcremain;
-
-  $next1HoursSum->{Consumption} = $hour00confcremain;
-  $next2HoursSum->{Consumption} = $hour00confcremain;
-  $next3HoursSum->{Consumption} = $hour00confcremain;
-  $next4HoursSum->{Consumption} = $hour00confcremain;
-  $restOfDaySum->{Consumption}  = $hour00confcremain;
-
-  for my $h (1..MAXNEXTHOURS) {
+  # --- Werte aus NextHours
+  ###########################
+  for my $h (0..MAXNEXTHOURS) {
       my ($fd, $fh) = calcDayHourMove ($chour, $h);
       next if($fd > MAXNEXTDAYS);
 
-      my $idx   = sprintf "%02d", $h-1;
+      my $idx   = sprintf "%02d", $h;                                                       # Start bei Nexthour00
       my $pvfc  = NexthoursVal ($name, "NextHour".$idx, 'pvfc',      0);
       my $confc = NexthoursVal ($name, "NextHour".$idx, 'confc',     0);
       my $istdy = NexthoursVal ($name, "NextHour".$idx, 'today',     0);
       my $don   = NexthoursVal ($name, "NextHour".$idx, 'DoN',       0);
       my $hod   = NexthoursVal ($name, "NextHour".$idx, 'hourofday', 0);
       my $nhday = NexthoursVal ($name, "NextHour".$idx, 'day',       0);
+      
+      $hod   = int ($hod);
+      $pvfc  = max (0, $pvfc);                                                              # PV Prognose darf nicht negativ sein
+      $confc = max (0, $confc);                                                             # Verbrauchsprognose darf nicht negativ sein
 
-      $pvfc     = max (0, $pvfc);                                                           # PV Prognose darf nicht negativ sein
-      $confc    = max (0, $confc);                                                          # Verbrauchsprognose darf nicht negativ sein
+      if ($h == 0) {                                                                        # Nexthour00
+          $next1HoursSum->{PV}          += $pvfc  / 60 * $remainminutes;                    # Rest-Wert in den Minuten bis zu vollen Stunde
+          $next1HoursSum->{Consumption} += $confc / 60 * $remainminutes;
+          
+          $hour00up2nowFc->{PV}          = $pvfc  / 60 * $minute;                            # Werte laufende Stunde bis jetzt
+          $hour00up2nowFc->{Consumption} = $confc / 60 * $minute;
 
-      if ($h == 1) {
-          $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;
-          $next1HoursSum->{Consumption} += $confc / 60 * $minute;
-      }
-
-      if ($h <= 2) {
-          $next2HoursSum->{PV}          += $pvfc                 if($h <  2);
-          $next2HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 2);
-          $next2HoursSum->{Consumption} += $confc                if($h <  2);
-          $next2HoursSum->{Consumption} += $confc / 60 * $minute if($h == 2);
-      }
-
-      if ($h <= 3) {
-          $next3HoursSum->{PV}          += $pvfc                 if($h <  3);
-          $next3HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 3);
-          $next3HoursSum->{Consumption} += $confc                if($h <  3);
-          $next3HoursSum->{Consumption} += $confc / 60 * $minute if($h == 3);
-      }
-
-      if ($h <= 4) {
-          $next4HoursSum->{PV}          += $pvfc                 if($h <  4);
-          $next4HoursSum->{PV}          += $pvfc  / 60 * $minute if($h == 4);
-          $next4HoursSum->{Consumption} += $confc                if($h <  4);
-          $next4HoursSum->{Consumption} += $confc / 60 * $minute if($h == 4);
-      }
-
-      if ($fd == 0) {
-          $restOfDaySum->{PV}          += $pvfc;
-          $restOfDaySum->{Consumption} += $confc;
-          $tdConFcTillSunset           += $confc if(int ($hod) < int ($dtsset->{hour}) + 1);
-
-          if (int ($hod) == int ($dtsset->{hour}) + 1) {                                     # wenn die berücksichtigte Stunde die Stunde des Sonnenuntergangs ist
-              my $diflasth        = 60 - int ($dtsset->{minute}) + 1;                        # fehlende Minuten zur vollen Stunde in der Stunde des Sunset
-              $tdConFcTillSunset -= ($confc / 60) * $diflasth;
+          if ($fd == 0) {                                                                   # Restwert von Nexthour00 am aktuellen Tag
+              $restOfDaySum->{PV}          += $next1HoursSum->{PV};
+              $restOfDaySum->{Consumption} += $next1HoursSum->{Consumption};
+              
+              if ($hod <= $tdhosset) {                                                      # wenn Zeit vor SunSet ...
+                  if ($hod != $tdhosset) {                                                  # ... akt. hod (NextHour00) ungleich ho-Sunset
+                      $tdTillSunsetFc->{Consumption} += $next1HoursSum->{Consumption};  
+                  }
+                  else {
+                      if ($tdmints2sunset >= 0) {
+                          $tdTillSunsetFc->{Consumption} += $confc / 60 * $tdmints2sunset;  # verbleibende CON bis Sunset
+                      }
+                  }
+              }              
           }
       }
+
+      if ($h == 1) {                                                                        # Nexthour01
+          $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;                           # next1HoursSum ist nun vollständig
+          $next1HoursSum->{Consumption} += $confc / 60 * $minute;
+          
+          $next2HoursSum->{PV}          += $next1HoursSum->{PV};                
+          $next2HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                     # jetzt ist die Stunde 1 in next2HoursSum ergänzt
+          
+          $next2HoursSum->{Consumption} += $next1HoursSum->{Consumption};
+          $next2HoursSum->{Consumption} += $confc / 60 * $remainminutes;
+      }
+
+      if ($h == 2) {                                                                        # Nexthour02
+          $next2HoursSum->{PV}          += $pvfc  / 60 * $minute;                           # next2HoursSum ist nun vollständig       
+          $next2HoursSum->{Consumption} += $confc / 60 * $minute;  
+          
+          $next3HoursSum->{PV}          += $next2HoursSum->{PV};                            
+          $next3HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                     # next3HoursSum ist next2HoursSum zzgl. Stundenrest 
+          
+          $next3HoursSum->{Consumption} += $next2HoursSum->{Consumption};
+          $next3HoursSum->{Consumption} += $confc / 60 * $remainminutes;
+      }
+
+      if ($h == 3) {                                                                        # Nexthour03
+          $next3HoursSum->{PV}          += $pvfc  / 60 * $minute;                           # next3HoursSum ist nun vollständig                           
+          $next3HoursSum->{Consumption} += $confc / 60 * $minute;         
+          
+          $next4HoursSum->{PV}          += $next3HoursSum->{PV};
+          $next4HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                     # next4HoursSum ist next3HoursSum zzgl. Stundenrest 
+          
+          $next4HoursSum->{Consumption} += $next3HoursSum->{Consumption};
+          $next4HoursSum->{Consumption} += $confc / 60 * $remainminutes;
+      }
+      
+      if ($h == 4) {                                                                        # Nexthour03
+          $next4HoursSum->{PV}          += $pvfc  / 60 * $minute;                           # next4HoursSum ist nun vollständig                           
+          $next4HoursSum->{Consumption} += $confc / 60 * $minute;  
+      }          
+ 
+      # --- aktueller Tag
+      if ($fd == 0) {          
+          if ($h != 0) {                                                                    # Stunden außer NextHour00
+              $restOfDaySum->{PV}          += $pvfc;                                        # Tagesrestwerte außer Stunde 00                                      
+              $restOfDaySum->{Consumption} += $confc;
+          
+              if ($hod <= $tdhosset) {                                                      # wenn Zeit vor SunSet ...
+                  if ($hod != $tdhosset) {                                                  # ... akt. hod ungleich hour of Sunset                                 # wenn die berücksichtigte Stunde die Stunde des Sonnenuntergangs ist
+                      $tdTillSunsetFc->{Consumption} += $confc;
+                  }
+                  else {
+                      if ($tdmints2sunset >= 0) {
+                          $tdTillSunsetFc->{Consumption} += $confc / 60 * $tdmints2sunset;  # verbleibende CON bis Sunset
+                      }
+                  }
+              }
+          }
+      }
+      # --- Morgen
       elsif ($fd == 1) {
           $tomorrowSum->{PV} += $pvfc;
-          $tmConFcTillSunset += $confc if(int ($hod) <= int ($htmsset->{hour}) + 1);         # Verbrauch kommender Tag bis inkl. Stunde des Sonnenuntergangs
+          
+          if ($hod <= $tmhosset) {
+              $tmTillSunsetFc->{Consumption} += $confc;                                      # Verbrauch kommender Tag bis inkl. Stunde des Sonnenuntergangs
+          }
           
           if ($pvfc) {                                                                       # Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag
                $tmConInHrWithPVGen += $confc;  
           }
       }
+      # --- Übermorgen
       elsif ($fd == 2) {
           $daftertomSum->{PV}          += $pvfc;
           $daftertomSum->{Consumption} += $confc;
@@ -14467,25 +14504,27 @@ sub _createSummaries {
   # --- Werte aus pvHistory
   ###########################
   for my $th (1..24) {
-      $th = sprintf "%02d", $th;
+      $th                         = sprintf "%02d", $th;
       $todaySumFc->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
       $todaySumRe->{PV}          += HistoryVal ($name, $day, $th, 'pvrl',  0);
       $todaySumFc->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
       $todaySumRe->{Consumption} += HistoryVal ($name, $day, $th, 'con',   0);
       
-      if ($th <= $chour) {
+      if ($th <= $chour) {                                                                              # Werte bis 1 Stunde vor aktueller Stunde (pvHistory nutzt hod)
           $todayUp2lastHour->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
           $todayUp2lastHour->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
       }
   }
   
-  my $todayUp2NowPvFc  = sprintf "%.0f", ($hour00pvfcup2now  + $todayUp2lastHour->{PV});
-  my $todayUp2NowConFc = sprintf "%.0f", ($hour00confcup2now + $todayUp2lastHour->{Consumption});
-  my $pvre             = sprintf "%.0f", $todaySumRe->{PV};
+  my $todayUp2NowPvFc  = $todayUp2lastHour->{PV}          + $hour00up2nowFc->{PV};                      # PV Prognose heute bis jetzt 
+  my $todayUp2NowConFc = $todayUp2lastHour->{Consumption} + $hour00up2nowFc->{Consumption};             # CO Prognose heute bis jetzt 
 
   push @{$data{$name}{current}{h4fcslidereg}}, int $next4HoursSum->{PV};                                # Schieberegister 4h Summe Forecast
   limitArray ($data{$name}{current}{h4fcslidereg}, SLIDENUMMAX);
 
+
+  ## aktuelle Consumption, Autarkie, Selbstverbrauch
+  ####################################################
   my $gcon    = CurrentVal ($name, 'gridconsumption',         0);                                       # aktueller Netzbezug
   my $tconsum = CurrentVal ($name, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
   my $gfeedin = CurrentVal ($name, 'gridfeedin',              0);
@@ -14550,6 +14589,9 @@ sub _createSummaries {
   my $surplus         = sprintf "%.0f", ($pv2node + $pv2bat + $ppall - $pv2grid - $consumption);        # aktueller Überschuß - fix V1.57.3
   $surplus            = 0 if($surplus < 0);                                                             # wegen Vergleich nompower vs. surplus
 
+  push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
+  limitArray ($data{$name}{current}{surplusslidereg}, SPLSLIDEMAX);
+
   if ($debug =~ /collectData/xs) {
       Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Bat: $pv2bat, PV2Grid: $pv2grid W, Other: $ppall W, GridIn: $gfeedin W, GridCon: $gcon W");
       Log3 ($name, 1, "$name DEBUG> current Power Battery -> BatIn: $batin W (Node2Inv2DC: $node2inv2dc W), BatOut: $batout W (DC2Inv2Node: $dc2inv2node W)");
@@ -14562,21 +14604,20 @@ sub _createSummaries {
   $selfconsumptionrate    = sprintf "%.0f", ($selfconsumption / $pv2node * 100)        if($pv2node * 1 > 0);
   $autarkyrate            = sprintf "%.0f", ($selfconsumption + $batout) / $divi * 100 if($divi);       # vermeide Illegal division by zero
 
+  ## Speicherung
+  ################
   $data{$name}{current}{consumption}           = $consumption;
   $data{$name}{current}{selfconsumption}       = $selfconsumption;
   $data{$name}{current}{selfconsumptionrate}   = $selfconsumptionrate;
   $data{$name}{current}{autarkyrate}           = $autarkyrate;
-  $data{$name}{current}{tdConFcTillSunset}     = sprintf "%.0f", $tdConFcTillSunset;
-  $data{$name}{current}{tmConFcTillSunset}     = $tmConFcTillSunset;
+  $data{$name}{current}{tdConFcTillSunset}     = sprintf "%.0f", $tdTillSunsetFc->{Consumption};
+  $data{$name}{current}{tmConFcTillSunset}     = $tmTillSunsetFc->{Consumption};
   $data{$name}{current}{tmConInHrWithPVGen}    = $tmConInHrWithPVGen;
   $data{$name}{current}{surplus}               = $surplus;
   $data{$name}{current}{dayAfterTomorrowPVfc}  = $daftertomSum->{PV};
-  $data{$name}{current}{tdPvFcUp2Now}          = $todayUp2NowPvFc;
-  $data{$name}{current}{tdConFcUp2Now}         = $todayUp2NowConFc;
+  $data{$name}{current}{tdPvFcUp2Now}          = sprintf "%.0f", $todayUp2NowPvFc;
+  $data{$name}{current}{tdConFcUp2Now}         = sprintf "%.0f", $todayUp2NowConFc;
   $data{$name}{current}{dayAfterTomorrowConfc} = $daftertomSum->{Consumption};
-
-  push @{$data{$name}{current}{surplusslidereg}}, $surplus;                                             # Schieberegister PV Überschuß
-  limitArray ($data{$name}{current}{surplusslidereg}, SPLSLIDEMAX);
 
   storeReading ('Current_GridFeedIn',           (sprintf "%.0f", $gfeedin). ' W');
   storeReading ('Current_GridConsumption',      (sprintf "%.0f", $gcon).    ' W');
@@ -14585,7 +14626,6 @@ sub _createSummaries {
   storeReading ('Current_SelfConsumptionRate',  $selfconsumptionrate. ' %');
   storeReading ('Current_Surplus',              $surplus.             ' W');
   storeReading ('Current_AutarkyRate',          $autarkyrate.         ' %');
-  storeReading ('Today_PVreal',                 $pvre.               ' Wh');
   storeReading ('Tomorrow_ConsumptionForecast', $tconsum.            ' Wh') if(defined $tconsum);
 
   storeReading ('NextHours_Sum01_PVforecast',          (sprintf "%.0f", $next1HoursSum->{PV}).         ' Wh');
@@ -14597,6 +14637,7 @@ sub _createSummaries {
   storeReading ('Today_PVforecast',                    (sprintf "%.0f", $todaySumFc->{PV}).            ' Wh');
   storeReading ('Today_CONforecast',                   (sprintf "%.0f", $todaySumFc->{Consumption}).   ' Wh');
   storeReading ('Today_CONreal',                       (sprintf "%.0f", $todaySumRe->{Consumption}).   ' Wh');
+  storeReading ('Today_PVreal',                        (sprintf "%.0f", $todaySumRe->{PV}).            ' Wh');
   storeReading ('NextHours_Sum04_ConsumptionForecast', (sprintf "%.0f", $next4HoursSum->{Consumption}).' Wh');
   storeReading ('RestOfDayConsumptionForecast',        (sprintf "%.0f", $restOfDaySum->{Consumption}). ' Wh');
 
