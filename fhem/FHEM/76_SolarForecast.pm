@@ -29220,7 +29220,7 @@ sub isPrepared4AI {
   my $err;
 
   if (!isDWDUsed($hash) && !isOpenMeteoUsed($hash)) {
-      $err = qq(Unfortunately, AI support is not possible with the selected radiation API MODEL.);
+      $err = qq(Unfortunately, AI support for PV forecast is not possible with the selected radiation API MODEL);
   }
   elsif ($aidtabs) {
       $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "cpan install AI::DecisionTree" for AI support);
