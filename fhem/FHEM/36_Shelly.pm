@@ -182,7 +182,7 @@
 # 6.05.1    add: Shelly Plug M Gen3, add: reading restart_required
 # 6.05.2    fix: firmwarecheck, modes @ shellyplusrgb
 # 6.05.3    fix: button|input_on|off commands, check on zigbee
-# 6.05.4    fix: Status call on web commands
+# 6.05.4    fix: Status call on web commands, misc.
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -203,7 +203,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.4 07.02.2026";
+my $version = "6.05.4 10.02.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -250,7 +250,7 @@ my %shelly_dropdowns = (
     "Gets"    => "status:noArg settings:noArg registers:noArg config version:noArg model:noArg actions:noArg properties:noArg  readingsGroup:Device,Firmware,Network,Status",
     "Colors"  => " colors:noArg",
 #-- these we may set
-    "Shelly"  => "config interval password reboot:noArg update:noArg name clear:disconnects,error,energy,responsetimes",
+    "Shelly"  => "config interval password reboot:noArg update:noArg name clear:disconnects,error,energy,responsetimes,extSensors",
     "Actions" => " actions",  # create,delete,disable,enable,update
     "Scripts" => " script_start script_stop",
     "Onoff"   => " on off toggle on-for-timer off-for-timer",## on-till off-till on-till-overnight off-till-overnight blink intervals",
@@ -1351,7 +1351,7 @@ sub Shelly_getProperties {
        }elsif( $mode eq "roller" ){ 
            $hash->{props}{relay}=0; # no relay channel
            $hash->{props}{meters}=$chnls[1]; # no of energy metering channels is number of rollers 
-       }elsif( $mode =~ /white|light/ ){ #Debug $name.$hash->{props}{light};
+       }elsif( $mode =~ /white|light/ ){ 
            $hash->{props}{color}=0; # no color channel
        }elsif( $mode =~ /color|rgb/ ){ 
            $hash->{props}{light}=0; # no dimmer/white channel
@@ -1359,7 +1359,7 @@ sub Shelly_getProperties {
        }
     }
     # get key for URLnamespaces  (component)
-    foreach my $unsKey ( 'relay','roller','light','cct','color','input' ){ #Debug $unsKey;
+    foreach my $unsKey ( 'relay','roller','light','cct','color','input' ){ 
         if( $hash->{props}{$unsKey}>0 ){
             $hash->{props}{namespace} = $unsKey;
             last;
@@ -2932,7 +2932,7 @@ my $cmd_orig=$cmd;
     foreach my $c ( 'relay','roller','light' ){
   #  for(my $i=0;$i<$shelly_models{$model}[$ff];$i++){
       for(my $i=0;$i<$hash->{props}{$c};$i++){
-        Shelly_Set($hash,$name,$cmd,$i); #Debug $name.$c.$i;
+        Shelly_Set($hash,$name,$cmd,$i); 
       }
     }
     return;
@@ -3401,7 +3401,6 @@ my $cmd_orig=$cmd;
   }elsif( $cmd eq "calibrate" ){  # shelly-dimmer
       Log3 $name,1,"[Shelly_Set] call for Calibrating $name";
       if( $shelly_models{$model}[4]==0 ){
-          #$cmd="settings?calibrate=1";
           Shelly_HttpRequest($hash,"/settings","?calibrate=1","Shelly_response","config");
       }else{
           # Gen2; returns 'null' on success
@@ -3446,6 +3445,9 @@ my $cmd_orig=$cmd;
              }
          }
          Log3 $name,2,"[Shelly_Set:Clear] Clearing $ptrclrcnt process time readings at device $name";
+      }elsif( $doreset eq "extSensors" ){
+         fhem("deletereading $name temperature_.*",1);
+         Shelly_status($hash,"Shelly_Set",0.1);
       }elsif( $doreset eq "energy" ){    # command:  set <name> clear energy
          if( ReadingsVal($name,"firmware_current","") =~ /(v0|v1.0)/ ){
               my $err = "firmware must be at least v1.1.0";
@@ -3665,93 +3667,91 @@ my $cmd_orig=$cmd;
   
   #---------------------------
   #### ** manage Shelly Actions **
-  }elsif( $cmd =~ /^actions$/ && $shelly_models{$model}[4]==0 ){  # Gen1
+  }elsif( $cmd =~ /^actions$/ ){  
+    my $actioncmd = $value;      
+    if( $actioncmd !~ /^(create|info|delete|deleteAll|disable|enable|update)$/ ){
+          return "Command \'$actioncmd\' is not valid";
+    }
+    my $action_id = (shift @a)//""; # we shifted somewhere else
+    $action_id = $args[1]//"";      # we use this instead
+    Log3 $name,4,"[Shelly_Set:actions] $name: \'set $cmd $actioncmd $action_id\' called"; #4
+          
+    if( $actioncmd =~ /^(create|info)$/ ){   
+          return "$name: Please define attr webhook first"    if( !defined(AttrVal($name,"webhook",undef)) );
+    }else{
+          # check if actions already on Shelly
+          ReadingsVal($name,"webhook_cnt",'0 / 0 / 0')=~ /(\d+) \/ (\d+) \/ (\d+)/ ;
+          Log3 $name,5,"[Shelly_Set:actions] $name: found $3 actions: $1 enabled";
+          return "No actions on device $name" if( $3 == 0 );
+          # check if identifier is given 
+          if( $action_id eq "" ){
+              return "$name: None or wrong identifier of action given"  unless( $actioncmd eq "update" && $hash->{props}{gen}==0 );
+          }elsif( $action_id !~ /^[a-z_]+url$/ && $hash->{props}{gen}==0 ){  # matching name of action
+                               #/(btn_|out_|long|short|push_|report_|ext_|temp_|hum_|over_|under_|on_|off_|url)*/ ){ 
+              return "$name: Parameter \'$action_id\' is not valid, shall be of type \'out_on_url\'";
+          }elsif( $action_id =~ /^(info|own|all)$/ ){
+              return "$name: Parameter \'$action_id\' not supported anymore";
+          }elsif( $action_id =~ /\D/ && $hash->{props}{gen}>=1 ){ # has non-digits, or minus-sign
+              return "$name: Parameter is negative or not numerical";
+        #  }else{  
+        #      return "$name: Parameter \'$action_id\' is not valid";
+          }
+    }
+
+    if( $shelly_models{$model}[4]==0 ){  # Gen1
       # set actions delete  <id>
       # set actions disable <id>
       # set actions enable  <id>
-      # set actions update   
-      if( !defined(AttrVal($name,"webhook",undef)) ){
-          return "$name: Please define attr webhook first";
-      }elsif( ReadingsNum($name,"webhook_cnt",0)==0 ){
-       #   return "No enabled actions on device $name";
-      }
-      my $actioncmd = $value;
+      # set actions update 
+      
       #-- perform commands
       if( $actioncmd eq "update"){
               Shelly_HttpRequest($hash,"/settings/actions",undef,"Shelly_webhook_update");
-      }elsif( $actioncmd =~ /delete|disable|enable/ ){ 
-         my $actionname = (shift @a)//"";
-         if( $actionname !~ /^[a-z_]+url$/ ){  # matching name of action
-                               #/(btn_|out_|long|short|push_|report_|ext_|temp_|hum_|over_|under_|on_|off_|url)*/ ){ 
-              return "Parameter \'$actionname\' is not valid, shall be of type \'out_on_url\'";
-         }
-         my $actionindex = (shift @a)//0; 
+      }elsif( $actioncmd =~ /delete|disable|enable/ ){         
+         my $actionindex = $args[2]//0;# (shift @a)//0; 
          if( $actionindex =~ /\D/ ){ # has non-digits, or minus-sign
               return "Parameter is negative or not numerical";
          }         # when using a not existing id: is not checked here
-         Log3 $name,4,"[Shelly_Set:actions] G1 $name: \'set $cmd $actioncmd $actionname $actionindex\' called";
-         my $url_ = "?index=$actionindex&name=$actionname&enabled=false";
+         Log3 $name,4,"[Shelly_Set:actions] G1 $name: \'set $cmd $actioncmd $action_id $actionindex\' called";
+         my $url_ = "?index=$actionindex&name=$action_id&enabled=false";
          if( $actioncmd eq "enable" ){
               $url_ =~ s/false/true/;
          }elsif( $actioncmd eq "delete" ){
               $url_ .= "&urls[]=\"\"";
          }
          Shelly_HttpRequest($hash,"/settings/actions",$url_,"Shelly_settings1G","webhook_update" );
-      }else{
+      }else{ # probably 'create'
          return "Command \'$actioncmd\' is not valid";
       }
-      return;
-  #---------------------------
-  }elsif( $cmd =~ /^actions$/ && $shelly_models{$model}[4]>=1 ){    # Gen2+
+    }else{    # Gen2+
       # set actions create  info|<number>|all  
-      # set actions delete  <id>|own|all  
+      # set actions delete  <id> 
+      # set actions deleteAll
       # set actions disable <id>
       # set actions enable  <id>
-      # set actions update   
-      my $actioncmd = $value;
-      my $action_id = (shift @a)//"";
-      Log3 $name,4,"[Shelly_Set:actions] G2 $name: \'set $cmd $actioncmd $action_id\' called";
-      my $gen=$shelly_models{$model}[4];
-      if( $actioncmd !~ /^(create|delete|disable|enable|update)$/ ){
-          return "Command \'$actioncmd\' is not valid";
-      }elsif( $actioncmd !~ /create|enable/ && ReadingsNum($name,"webhook_cnt",0)==0 ){  # commands:  delete, disable, update
-          return "No enabled actions on device $name";
-      }elsif( $actioncmd =~ /update/ && !defined(AttrVal($name,"webhook",undef)) ){
-          return "$name: Please define attr webhook first";
-      }
-          if( $action_id =~ /^(own|all|info)$/ ){ #ok
-          }elsif( $action_id =~ /\D/ ){ # has non-digits, or minus-sign
-              return "Parameter is negative or not numerical";
-          }elsif( $action_id eq "" && $actioncmd !~ /create|update/ ){
-              return "No id given";
-          }elsif( $action_id ne "" && $action_id < 0 ){  # some case 0 not valid
-              return "Id \'$action_id\' is not valid";
-          }
-      # when using a not existing id, shelly will return 'Not Found', reading error will be set to '-105...hook_id...not found!'
+      # set actions update 
+
+          
+      # when using a non existing id, shelly will return 'Not Found', reading error will be set to '-105...hook_id...not found!'
       #-- perform commands
       if( $actioncmd eq "enable" ){
               Shelly_HttpRequest($hash,"/rpc/Webhook.Update","?id=$action_id&enable=true","Shelly_settings2G","webhook_update" );
       }elsif( $actioncmd eq "disable"){
               Shelly_HttpRequest($hash,"/rpc/Webhook.Update","?id=$action_id&enable=false","Shelly_settings2G","webhook_update" );
-      }elsif( $actioncmd eq "delete" ){
-          if( $action_id eq "all" ){
+      }elsif( $actioncmd eq "deleteAll" ){
               Shelly_HttpRequest($hash,"/rpc/Webhook.DeleteAll","","Shelly_settings2G","webhook_update" );
-          }elsif( $action_id eq "own" ){
-              return "Command not implemented yet";
-          }else{
+      }elsif( $actioncmd eq "delete" ){
               Shelly_HttpRequest($hash,"/rpc/Webhook.Delete","?id=$action_id","Shelly_settings2G","webhook_update" );
-          }
       }elsif( $actioncmd eq "create" ){
-         if( !AttrVal($name,"webhook",undef) && $action_id ne "info" ){
-            return "please define attribute webhook first";
-         }else{
             return Shelly_webhook_create($hash,$action_id);
-         }
+      }elsif( $actioncmd eq "info" ){
+            return Shelly_webhook_create($hash,"info");
       }elsif( $actioncmd eq "update"){
                Shelly_HttpRequest($hash,"/rpc/Webhook.List",undef,"Shelly_webhook_update",$action_id );
       }
-      return;
-  #---------------------------      
+    }
+    return;
+  ## finally, command not found
   }else{
       $parameters=( scalar(@args)?" and ".scalar(@args)." parameters: ".join(" ",@args) : ", no parameters" );
       $msg="commands parsed, outstanding call for device $name with command \'$cmd\'$parameters";  #    if($cmd ne "?")
@@ -4313,8 +4313,16 @@ sub Shelly_status1G {
   #-- look for external sensors
   if( $jhash->{'ext_temperature'} ){
     my %sensors = %{$jhash->{'ext_temperature'}};
+    my $hwID;
     foreach my $temp (keys %sensors){
-      Shelly_readingsBulkUpdate($hash,"temperature_".$temp,$sensors{$temp}->{'tC'},"tempC");
+      if( $sensors{$temp}->{'tC'}!=999 ){ # Shellies value if connection is broken
+          Shelly_readingsBulkUpdate($hash,"temperature_".$temp,$sensors{$temp}->{'tC'},"tempC");
+      }else{
+          Shelly_readingsBulkUpdate($hash,"temperature_".$temp,'-',"");
+      }
+      $hwID = $sensors{$temp}->{hwID};
+      $hwID = substr($hwID,0,2).".".substr($hwID,2,12).".".substr($hwID,14,2);
+      Shelly_readingsBulkUpdate($hash,"temperature_$temp\_ID",uc($hwID),""); # One-Wire ID
     }
   }
   if( $jhash->{'ext_humidity'} ){
@@ -4582,8 +4590,8 @@ sub Shelly_settings1G {
       my $controlled=0;  # count quantity of URLs controlled by this fhem-instance
       my $msg = "check & update actions on device $name:";
       if( $shelly_events{$model}[0] ne "" ){
-        $msg ="<thead><tr><th>Name</th><th>Channel&nbsp;</th>";
-        $msg.="<th>Index&nbsp;</th><th>URL</th><th>EN/DIS</th>"   unless( $info );
+        $msg ="<thead><tr><th>Id/Name</th><th>Index&nbsp;</th>";
+        $msg.="<th>Sub&nbsp;</th><th>URL</th><th>EN/DIS</th>"   unless( $info );
         $msg.="</tr></thead><tbody>";
         my $url;
         my $host_ip = AttrVal($name,"host_ip",undef)//qx("\"hostname --all-ip-addresses\"");   # local   same as option -I
@@ -4993,7 +5001,7 @@ sub Shelly_status2G {
   $channels = $hash->{props}{color};
   if( $channels>0 ){
     $comp="rgbw";
-    Log3 $name,3,"[Shelly_status2G:rgbw] Processing $channels RGBW states for device $name ($model)";
+    Log3 $name,4,"[Shelly_status2G:rgbw] Processing $channels RGBW states for device $name ($model)";
 
     for($channel=0; $channel<$channels; $channel++){
         Log3 $name,5,"[Shelly_status2G:rgbw] Processing state of rgbw $channel for device $name ";#5
@@ -5085,7 +5093,7 @@ sub Shelly_status2G {
 
     for( $channel=0; $channel<$channels; $channel++){
       my $CC = "$comp:$channel";
-      my $id = $jhash->{$CC}{id};
+      my $id = $jhash->{$CC}{id}//0;  # in some cases not available
       #$subs = ( $mode eq "roller" ? $shelly_models{$model}[1] : $shelly_models{$model}[3])==1?"":"_$id";
       $subs = $channels==1 ? "" : "_$id";
       Log3 $name,5,"[Shelly_status2G:emeter] $name: Processing metering channel$subs";
@@ -5525,17 +5533,17 @@ sub Shelly_settings2G {
         if( $shelly_models{$model}[6]>0 && ReadingsVal($name,"model_function","unknown") eq "energy meter" ){
             readingsBulkUpdateMonitored($hash,"ct_type",  ($jhash->{'em:0'}{ct_type} // ($jhash->{'em1:0'}{ct_type} // "unknown")) );
         }
-        # check communication mode (gen4+): matter or zigbeey 
-        my $commmode=0;
-         $commmode = "matter" if( $jhash->{matter}{enable}//0 != 0 );
-         $commmode = "zigbee" if( $jhash->{zigbee}{enable}//0 != 0 );
-        readingsBulkUpdateMonitored($hash,"comm_mode", $commmode ) if( $commmode!=0 );
+##        # check communication mode (gen4+): matter or zigbeey 
+##        my $commmode=0;
+##         $commmode = "matter" if( $jhash->{matter}{enable}//0 != 0 );
+##         $commmode = "zigbee" if( $jhash->{zigbee}{enable}//0 != 0 );
+##        readingsBulkUpdateMonitored($hash,"comm_mode", $commmode ) if( $commmode!=0 );
             
         Shelly_HttpRequest($hash,"/rpc/Shelly.GetDeviceInfo",undef,"Shelly_settings2G","info" );
 
   ################ Shelly.GetDeviceInfo
   }elsif($comp eq "info"){
-      Log3 $name,4,"[Shelly_settings2G:info] $name: processing the answer from the \"/rpc/Shelly.GetDeviceInfo\"  call";
+      Log3 $name,4,"[Shelly_settings2G:info] $name: processing the answer from the \"/rpc/Shelly.GetDeviceInfo\" call";#4
 
        $hash->{SHELLYID}=$jhash->{id};
        my $model_id = $jhash->{model};  # vendor id
@@ -5565,8 +5573,10 @@ sub Shelly_settings2G {
        $range_extender_enable = $hash->{helper}{range_extender};
        if( defined($range_extender_enable) && $range_extender_enable ne "disabled" ){
            Shelly_HttpRequest($hash,"/rpc/Wifi.ListAPClients",undef,"Shelly_settings2G","clients" );
-       }elsif( $model !~ /display/ && ReadingsVal($name,"comm_mode",0) ne "zigbee" ){
-          Shelly_HttpRequest($hash,"/rpc/BLE.CloudRelay.List",undef,"Shelly_settings2G","BLEclients" );
+       }elsif( $model =~ /display/ ){ # do nothing
+       }elsif( $jhash->{gen} == 4 && !defined($jhash->{matter}) ){ # it's zigbee mode, do nothing
+       }else{  #Log3 $name,0,"calling for BLE List";
+           Shelly_HttpRequest($hash,"/rpc/BLE.CloudRelay.List",undef,"Shelly_settings2G","BLEclients" );
        }
        
        ### look if device is walldisplay with thermostat
@@ -8556,6 +8566,7 @@ sub Shelly_HttpResponse($){
               <li> disconnects: Reading <code>network_disconnects</code></li> 
               <li> error: Reading <code>error</code></li> 
               <li> energy: Reading <code>energy</code>  (nur bei PMmini Leistungsmessgeräten)</li> 
+              <li> extSensors: Reading <code>temperature</code></li> 
               <li> responsetimes: Readings <code>/....</code>  (nur sichtbar, wenn Attribut <code>timeout</code> gesetzt ist)</li>
             </ul> 
             </li> 
@@ -8767,7 +8778,7 @@ sub Shelly_HttpResponse($){
                 <br/>setzt die Farbtemperatur auf einen Wert 3000...6500 K</li>
             </ul>
             
-            <br/> Für Shellies Gen2:
+            <br/> Actions:
             <ul>
                 <li>
                 <a id="Shelly-set-actions"></a>
@@ -8775,8 +8786,10 @@ sub Shelly_HttpResponse($){
                 <br/>
                 <br/><code>set &lt;name&gt; actions create info|&lt;index&gt;|all &nbsp;</code>
                                             Erstellen von Actions auf dem Shelly (nur Gen2+)
-                <br/><code>set &lt;name&gt; actions delete  &lt;id&gt;|own|all   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code>
-                                            Löschen von Actions auf dem Shelly  (own,all: nur Gen2+)
+                <br/><code>set &lt;name&gt; actions delete  &lt;id&gt;   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code>
+                                            Löschen von Actions auf dem Shelly
+                <br/><code>set &lt;name&gt; actions deleteAll            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code>
+                                            Löschen aller Actions auf dem Shelly  (nur Gen2+)
                 <br/><code>set &lt;name&gt; actions disable &lt;id&gt;  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  </code>
                                             Deaktivieren einer Action auf dem Shelly
                 <br/><code>set &lt;name&gt; actions enable  &lt;id&gt;  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </code>
