@@ -1825,8 +1825,9 @@ sub Calendar_Define($$) {
   my @a = split("[ \t][ \t]*", $def);
 
   return "syntax: define <name> Calendar ical url <URL> [interval]\n".\
-         "        define <name> Calendar ical file <FILENAME> [interval]"
-    if(($#a < 4 && $#a > 5) || ($a[2] ne 'ical') || (($a[3] ne 'url') && ($a[3] ne 'file')));
+         "        define <name> Calendar ical file <FILENAME> [interval]\n".\
+         "        define <name> Calendar ical configdb <FILENAME> [interval]"
+    if(($#a < 4 && $#a > 5) || ($a[2] ne 'ical') || !contains_string($a[3],('url','file','configdb')));
 
   $hash->{NOTIFYDEV} = "global";
   readingsSingleUpdate($hash, "state", "initialized", 1);
@@ -2715,15 +2716,18 @@ sub Calendar_GetUpdate($$$;$) {
     });
     Log3 $hash, 4, "Calendar $name: Getting data from URL <hidden>"; # $url
 
-  } elsif($type eq "file") {
+  } elsif($type eq "file" || $type eq "configdb") {
 
-    Log3 $hash, 4, "Calendar $name: Getting data from file $url";
-    if(open(ICSFILE, $url)) {
-      while(<ICSFILE>) {
-        $ics .= $_;
-      }
-      close(ICSFILE);
+    Log3 $hash, 4, "Calendar $name: Getting data from $type $url";
+    my %f = ('FileName' => $url,'ForceType' => ($type eq 'file')?'file':'configdb');
+    my ($err,@content) = FileRead({%f});
 
+    if ($err) {
+      Log3 $hash, 1, "Calendar $name: $err";
+      readingsSingleUpdate($hash, "state", "error ($err)", 1);
+      return 0;
+    } else {
+      $ics = join("\n",@content);
       my $paramhash;
       $paramhash->{hash} = $hash;
       $paramhash->{removeall} = $removeall;
@@ -2731,11 +2735,6 @@ sub Calendar_GetUpdate($$$;$) {
       $paramhash->{type} = 'caldata';
       Calendar_ProcessUpdate($paramhash, '', $ics);
       return undef;
-
-    } else {
-      Log3 $hash, 1, "Calendar $name: Could not open file $url";
-      readingsSingleUpdate($hash, "state", "error (could not open file)", 1);
-      return 0;
     }
   } else {
     # this case never happens by virtue of _Define, so just
@@ -2787,7 +2786,7 @@ sub Calendar_ProcessUpdate($$$) {
         readingsBulkUpdate($hash, "state", "retrieved");
 		readingsBulkUpdate($hash, 'lastResponse', 'OK');
       }
-    } elsif($type eq "file") {
+    } elsif($type eq "file" || $type eq "configdb") {
       Log3 $name, 5, "Calendar $name: file retrieval successful";
       readingsBulkUpdate($hash, "state", "retrieved");
       readingsBulkUpdate($hash, 'lastResponse', 'OK');
@@ -3462,6 +3461,7 @@ sub CalendarEventsAsHtml($;$) {
   <ul>
     <code>define &lt;name&gt; Calendar ical url &lt;URL&gt; [&lt;interval&gt;]</code><br>
     <code>define &lt;name&gt; Calendar ical file &lt;FILENAME&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; Calendar ical configdb &lt;FILENAME&gt; [&lt;interval&gt;]</code><br>
     <br>
     Defines a calendar device.<br><br>
 
@@ -4200,6 +4200,7 @@ sub CalendarEventsAsHtml($;$) {
   <ul>
     <code>define &lt;name&gt; Calendar ical url &lt;URL&gt; [&lt;interval&gt;]</code><br>
     <code>define &lt;name&gt; Calendar ical file &lt;FILENAME&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; Calendar ical configdb &lt;FILENAME&gt; [&lt;interval&gt;]</code><br>
     <br>
     Definiert ein Kalender-Device.<br><br>
 

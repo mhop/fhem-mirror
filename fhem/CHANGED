@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on 
+ - change:  57_Calender: use FileRead() and support 
+              calendars in configDB (forum #143580)
  - change:  76_SolarForecast: Version 2.1.1
  - feature: 76_SolarForecast: Version 2.0.0 with AI::FANN integration
  - bugfix:  73_Tide: Perl warning fixed
