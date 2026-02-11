@@ -100,7 +100,7 @@
 # 6.00 Beta_4  add: client without definition --> reading 'no definition'
 #           new: attr timeout controls write out readings with response times
 # 6.00      fix some details in commandref (german only)
-# 6.00.1    fix: selection of readings for command 'set clear responsetimes' improved; Debug commands removed
+# 6.00.1    fix: selection of readings for command 'set clear responsetimes' improved; 
 # 6.00.2    fix: reading ble (bluetooth) may be set to disabled
 # 6.00.3    fix: use Sub::Util added
 # 6.00.4    fix: removed the use of Sub::Util
@@ -183,6 +183,7 @@
 # 6.05.2    fix: firmwarecheck, modes @ shellyplusrgb
 # 6.05.3    fix: button|input_on|off commands, check on zigbee
 # 6.05.4    fix: Status call on web commands, misc.
+# 6.05.5    fix: "not enough parameter" on pct-command
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -203,7 +204,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.4 10.02.2026";
+my $version = "6.05.5 11.02.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -2394,6 +2395,7 @@ sub Shelly_Set ($@) {
           $cmd='pctD';    # set percentage for 
       }
   }
+
   my $value = shift @a;  # 1st parameter
 
   #-- when Shelly_Set is called by 'Shelly_Set($hash)' arguments are not handed over, look for a temporarely stored command in internals
@@ -2680,7 +2682,7 @@ sub Shelly_Set ($@) {
      return undef;
   #---------------------------
   #-- commands from shelly roller actions: opening, closing, stopped, is_closed, is_open
-  }elsif( $cmd =~ /opening|closing|stopped|is_/ ){
+  }elsif( $cmd =~ /^(opening|closing|stopped|is_)/ ){
           if( $hash->{helper}{StatusCall}==1 ){  # is pending
               Log3 $name,4,"[Shelly_Set:roller actions] $name: skipping roller action \'$cmd\' because Status-Call is pending";
               return;
@@ -2703,11 +2705,13 @@ sub Shelly_Set ($@) {
           return undef;
   #---------------------------
   }
+
 #save command
 my $cmd_orig=$cmd;
   #-- get channel parameter
   $msg = "";
-  if( $cmd eq "toggle" || $cmd eq "on" || $cmd eq "off" ){
+
+  if( $cmd =~ /^(on|off|toggle)$/ ){
         $channel = $value;
   }elsif( $cmd =~ /(dimup)|(dimdown)/ ){
         # commands for single channel devices or if attr defchannel is set
@@ -2791,14 +2795,14 @@ my $cmd_orig=$cmd;
         }
         $time = shift @a  if( $cmd =~ /dim-for-timer/ );
         $channel = shift @a;
-  }elsif( $cmd =~ /pctD|dim|brightness|ct/ ){
+  }elsif( $cmd =~ /^(pctD|dim|brightness|ct)$/ ){
       #  $pct = $value;
         $channel = shift @a;
         $channel = shift @a if( defined($channel) && $channel eq "%" ); # skip %-sign coming from dropdown (units=1)
   }
 
   #******  map on and off commands to ON, OFF
-  if( $cmd =~ /^((on)|(off))/  &&  !defined($channel)  &&  AttrVal($name,"defchannel","undefined") eq "all" ){
+  if( $cmd =~ /^(on|off)/  &&  !defined($channel)  &&  AttrVal($name,"defchannel","undefined") eq "all" ){
         $cmd = uc($1);
         Log3 $name,4,"[Shelly_Set] command \'$1\' mapped to switch all channels";
   }
@@ -2868,7 +2872,7 @@ my $cmd_orig=$cmd;
   }
 
   #- - on and off, on-for-timer and off-for-timer
-  if( $cmd =~ /^((on)|(off)|(dim))/ && $cmd!~/(till)/ ){  # on-till, on-till-overnight
+  if( $cmd =~ /^(on|off|dim)/ && $cmd!~/(till)/ ){  # on-till, on-till-overnight
     if( $cmd eq "dim" ){
            #
            if( $brightness == 0 ){
@@ -2951,7 +2955,7 @@ my $cmd_orig=$cmd;
             $msg = "Error: no $cmd value \'$value\' given for device $name";
      }elsif( $value =~ /\D+/ ){    #anything else than a digit
             $msg = "Error: wrong $cmd value \'$value\' for device $name, must be <integer>";
-     }elsif( $value == 0 && $cmd =~ /(dimup)|(dimdown)/ ){
+     }elsif( $value == 0 && $cmd =~ /^dim(up|down)/ ){
             $msg = "$name Error: wrong $cmd value \'$value\' given, must be 1 ... 100 ";
      }elsif( $value<0  || $value>100 ){
             $msg = "$name Error: wrong $cmd value \'$value\' given, must be 0 ... 100 ";
@@ -2969,7 +2973,7 @@ my $cmd_orig=$cmd;
                   $cmd="&on=false" ;
             }elsif($cmd eq "pctD" ){
                   $cmd="&brightness=$value";
-            }elsif($cmd =~ /dim(up|down)/ ){
+            }elsif($cmd =~ /^dim(up|down)/ ){
                   $cmd="&dim=$1"."\&step=$value";
             }else{
                   $cmd="&brightness=$value\&on=true";
@@ -2987,7 +2991,7 @@ my $cmd_orig=$cmd;
                   $cmd="?turn=off" ;
             }elsif($cmd eq "pctD" ){
                   $cmd="?brightness=$value";
-            }elsif($cmd =~ /dim(up|down)/ ){
+            }elsif($cmd =~ /^dim(up|down)/ ){
                   $cmd="?dim=$1"."\&step=$value";
             }else{
                   $cmd="?brightness=$value\&turn=on";
@@ -2999,14 +3003,15 @@ my $cmd_orig=$cmd;
   ################################################################################################################
   #-- we have a roller type device / roller mode
   }elsif( $cmd =~ /^(stop|closed|open|pctR|pos|delta|zero)/ && $hash->{props}{roller}>0 ){ #rollers  $ff==1 &&
-    Log3 $name,4,"[Shelly_Set:Roller] $name: we have a $model ($mode mode) and command is $cmd";
-    Log3 $name,7,"[Shelly_Set:Roller] $name: 1st parameter=$value " if( defined($value) );
+    Log3 $name,4,"[Shelly_Set:Roller] $name: we have a $model ($mode mode) and command is $cmd"; #4
+    Log3 $name,3,"[Shelly_Set:Roller] $name: 1st parameter=$value " if( defined($value) ); #7
+#    Log3 $name,1,"[SR] ".scalar(@args)." vs ".scalar(@a)." $name ".($a[0]//"null ").($a[1]//"eins ").($a[2]//"zwei ");
     $channel = 0;   # default, and used for devices with one roller only
     if( $shelly_models{$model}[1]>1 ){   # >1
         if( scalar(@a) == 1 ){  # one more parameter
             $channel = shift @a;
             return "channel not given as parameter" if( !defined($channel) );
-        }elsif( $cmd =~ /pctR|pos|delta/ ){
+        }elsif( $cmd =~ /^(pctR|pos|delta)/ ){
             return "not enough parameter";
         }else{
             $channel = $value;
@@ -3018,7 +3023,7 @@ my $cmd_orig=$cmd;
         Log3 $name,4,"[Shelly_Set] $name: channel is selected: $channel";
     }
     Log3 $name,4,"[Shelly_Set:Roller] $name: value parameter=$value " if( defined($value) );
-    
+  
     my $max=AttrVal($name,"maxtime",30);
     my $maxopen =AttrVal($name,"maxtime_open",30);
     my $maxclose=AttrVal($name,"maxtime_close",30);
