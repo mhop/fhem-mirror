@@ -397,7 +397,7 @@ FHEM/72_UBUS_CALL.pm         xenos1984            Sonstige Systeme
 FHEM/72_UBUS_CLIENT.pm       xenos1984            Sonstige Systeme
 FHEM/72_XiaomiDevice.pm      markus-m             Sonstige Systeme
 FHEM/73_AMADCommBridge.pm    CoolTux              Sonstige Systeme
-FHEM/73_DepartureBnT         Sailor               Unterstützende https://forum.fhem.de/index.php?topic=143906
+FHEM/73_DepartureBnT.pm      Sailor               Unterstützende https://forum.fhem.de/index.php?topic=143906
 FHEM/73_AutoShuttersControl.pm CoolTux            Automatisierung
 FHEM/73_DoorBird.pm          Sailor               Sonstige Systeme https://forum.fhem.de/index.php/topic,100758
 FHEM/73_ElectricityCalculator.pm Sailor           Unterstützende Dienste https://forum.fhem.de/index.php/topic,57106.0.html
