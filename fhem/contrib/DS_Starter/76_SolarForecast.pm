@@ -162,7 +162,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.1.1"  => "09.02.2026  sub _createSummaries refactored ",
+  "2.2.0"  => "14.02.2026  new Consumer mode 'mustNot' ",
+  "2.1.1"  => "10.02.2026  sub _createSummaries refactored ",
   "2.1.0"  => "08.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation, show module version in header ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
                            "aiControl: more keys for aiCon..., change set/get structure, aiData: new option searchValue delValue ".
@@ -2605,11 +2606,14 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $hash  = $defs{$name};
 
   return qq{no consumer number specified} if(!$c);
-  return qq{no valid consumer id "$c"}    if(!ConsumerVal ($hash, $c, "name", ""));
+  return qq{no valid consumer id "$c"}    if(!ConsumerVal ($name, $c, "name", ""));
   
-  my $ctype = ConsumerVal ($hash, $c, 'type', DEFCTYPE);
+  my $ctype   = ConsumerVal ($name, $c, 'type', DEFCTYPE);
+  my $cplmode = getConsumerPlanningMode ($hash, $c);                                         # Planungsmode 'can', 'must' oder 'mustNot'
 
-  if ($ctype eq 'noSchedule' || $ctype eq 'heatpump') {
+  if ($ctype   eq 'noSchedule' || 
+      $ctype   eq 'heatpump'   ||
+      $cplmode eq 'mostNot') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps}       = 'noSchedule';
@@ -2619,6 +2623,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
       delete $paref->{ps};
       delete $paref->{consumer};
+      
       return;
   }
 
@@ -2646,8 +2651,8 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   ___saveEhodpieces           ($paref);
   ___setPlanningDeleteMeth    ($paref);
 
-  my $planstate = ConsumerVal ($hash, $c, 'planstate', '');
-  my $calias    = ConsumerVal ($hash, $c, 'alias',     '');
+  my $planstate = ConsumerVal ($name, $c, 'planstate', '');
+  my $calias    = ConsumerVal ($name, $c, 'alias',     '');
 
   writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                      # Cache File Consumer schreiben
 
@@ -7457,14 +7462,14 @@ sub _attrconsumer {                      ## no critic "not used"
           }
       }
 
-      if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must)$/xs) {
+      if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must|mustNot)$/xs) {
           if ($h->{mode} =~ /.*:.*/xs) {
               my ($dv, $rd) = split ':', $h->{mode};
               ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
               return $err if($err);
 
               my $mode = ReadingsVal ($dv, $rd, '');
-              if ($mode !~ /^(?:can|must)$/xs) {
+              if ($mode !~ /^(?:can|must|mustNot)$/xs) {
                   return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode";
               }
           }
@@ -10437,9 +10442,9 @@ sub centralTask {
       t       => $t,
       date    => $dt->{date},                                                                  # aktuelles Datum
       month   => $dt->{month},                                                                 # Monat 01..12
-      minute  => $dt->{minute},                                                                # aktuelle Minute (00-59)
-      chour   => $chour,                                                                       # aktuelle Stunde in 24h format (00-23)
-      day     => $dt->{day},                                                                   # aktueller Tag (range 01 .. 31)
+      minute  => $dt->{minute},                                                                # aktuelle Minute (00..59)
+      chour   => $chour,                                                                       # aktuelle Stunde in 24h format (00..23)
+      day     => $dt->{day},                                                                   # aktueller Tag (01..31)
       dayname => $dt->{dayname},                                                               # aktueller Wochentagsname (locale-dependent!!)
       debug   => $debug,
       lang    => getLang ($hash),
@@ -14337,9 +14342,9 @@ sub _createSummaries {
   my $paref  = shift;
   my $name   = $paref->{name};
   my $t      = $paref->{t};
-  my $day    = $paref->{day};                                                                         # aktueller Tag
-  my $chour  = $paref->{chour};                                                                       # aktuelle Stunde
-  my $minute = $paref->{minute};                                                                      # aktuelle Minute
+  my $day    = $paref->{day};                                                                           # aktueller Tag (01..31)
+  my $chour  = $paref->{chour};                                                                         # aktuelle Stunde in 24h format (00..23)
+  my $minute = $paref->{minute};                                                                        # aktuelle Minute (00..59)
   my $debug  = $paref->{debug};
 
   ## Initialisierung
@@ -14350,39 +14355,29 @@ sub _createSummaries {
   my $next4HoursSum    = { "PV" => 0, "Consumption" => 0 };
   my $restOfDaySum     = { "PV" => 0, "Consumption" => 0 };
   my $tomorrowSum      = { "PV" => 0, "Consumption" => 0 };
-  my $daftertomSum     = { "PV" => 0, "Consumption" => 0 };                                            # Werte für Übermorgen
+  my $daftertomSum     = { "PV" => 0, "Consumption" => 0 };                                             # Werte für Übermorgen
   my $todaySumFc       = { "PV" => 0, "Consumption" => 0 };
-  my $todayUp2lastHour = { "PV" => 0, "Consumption" => 0 };                                            
-  my $todaySumRe       = { "PV" => 0, "Consumption" => 0 };                                            # Summe heute real
-  my $tdTillSunsetFc   = { "PV" => 0, "Consumption" => 0 };                                            # bis heutigen Sonnenuntergang
-  my $tmTillSunsetFc   = { "PV" => 0, "Consumption" => 0 };                                            # bis morgigen Sonnenuntergang
-  my $hour00up2nowFc   = { "PV" => 0, "Consumption" => 0 };                                            # Werte bis aktuelle Zeit (NextHour00)
+  my $todayUp2lastHour = { "PV" => 0, "Consumption" => 0 };                                             # historische Werte bis Stunde vor aktueller Stunde                           
+  my $todaySumRe       = { "PV" => 0, "Consumption" => 0 };                                             # Summe heute real
+  my $tdTillSunsetFc   = { "PV" => 0, "Consumption" => 0 };                                             # bis heutigen Sonnenuntergang
+  my $tmTillSunsetFc   = { "PV" => 0, "Consumption" => 0 };                                             # bis morgigen Sonnenuntergang
+  my $hour00up2nowFc   = { "PV" => 0, "Consumption" => 0 };                                             # Werte bis aktuelle Zeit (NextHour00)
   
-  $minute           = 1  + int ($minute);                                                              # Minute Range umsetzen auf 1..60
-  my $remainminutes = 60 - $minute;                                                                    # verbleibende Minuten der aktuellen Stunde
+  $minute           = int $minute;                                                               
+  my $remainminutes = 60 - $minute;                                                                     # verbleibende Minuten der aktuellen Stunde
   
-  my $tmorsset = CurrentVal ($name, 'sunsetTomorrowTs', 0);                                            # Timestamp Sonneuntergang kommenden Tag
-  my $htmsset  = timestringsFromOffset ($tmorsset,      0);
-  my $tdaysset = CurrentVal ($name, 'sunsetTodayTs',    0);                                            # Timestamp Sonneuntergang am aktuellen Tag
+  my $tdaysset = CurrentVal ($name, 'sunsetTodayTs',    0);                                             # Timestamp Sonneuntergang am aktuellen Tag
+  my $tmorsset = CurrentVal ($name, 'sunsetTomorrowTs', 0);                                             # Timestamp Sonneuntergang kommenden Tag
   my $htdsset  = timestringsFromOffset ($tdaysset,      0);
+  my $htmsset  = timestringsFromOffset ($tmorsset,      0);
   
-  my $tdhosset = 1 + int $htdsset->{hour};                                                             # heute Stunde des SunSet (wie hod)
-  my $tdmtsset = 1 + int $htdsset->{minute};                                                           # heute Minute des SunSet
-  my $tmhosset = 1 + int $htmsset->{hour};                                                             # morgen Stunde des SunSet (wie hod)
+  my $tdhosset = 1 + int $htdsset->{hour};                                                              # heute Stunde des SunSet (wie hod)
+  my $tmhosset = 1 + int $htmsset->{hour};                                                              # morgen Stunde des SunSet (wie hod)
+  my $tdmtsset = int $htdsset->{minute};                                                                # heute Minute des SunSet
   
-  my $tdmints2sunset = $tdmtsset - $minute;                                                            # Restminuten bis heute Sunset
+  my $tdmints2sunset = $tdmtsset - $minute;                                                             # Restminuten bis heute Sunset
   
   my $tmConInHrWithPVGen = 0;
-
-  #my $hour00pvfcremain = NexthoursVal ($name, "NextHour00", 'pvfc',      0) / 60 * $remainminutes;     # PV Fc für Rest der Stunde
-  #my $hour00confc      = NexthoursVal ($name, "NextHour00", 'confc',     0);
-  
-  #$hour00pvfcremain = max (0, $hour00pvfcremain);                                                      # PV Prognose darf nicht negativ sein
-  #$hour00confc      = max (0, $hour00confc);                                                           # Verbrauchsprognose darf nicht negativ sein
-
-  #my $hour00pvfcup2now  = NexthoursVal ($name, "NextHour00", 'pvfc',  0) - $hour00pvfcremain;          # PV Fc aktuelle Stunde bis jetzt
-  #my $hour00confcremain = $hour00confc / 60 * $remainminutes;
-  #my $hour00confcup2now = $hour00confc - $hour00confcremain;
 
   # --- Werte aus NextHours
   ###########################
@@ -14390,7 +14385,7 @@ sub _createSummaries {
       my ($fd, $fh) = calcDayHourMove ($chour, $h);
       next if($fd > MAXNEXTDAYS);
 
-      my $idx   = sprintf "%02d", $h;                                                       # Start bei Nexthour00
+      my $idx   = sprintf "%02d", $h;                                                                   # Start bei Nexthour00
       my $pvfc  = NexthoursVal ($name, "NextHour".$idx, 'pvfc',      0);
       my $confc = NexthoursVal ($name, "NextHour".$idx, 'confc',     0);
       my $istdy = NexthoursVal ($name, "NextHour".$idx, 'today',     0);
@@ -14399,84 +14394,84 @@ sub _createSummaries {
       my $nhday = NexthoursVal ($name, "NextHour".$idx, 'day',       0);
       
       $hod   = int ($hod);
-      $pvfc  = max (0, $pvfc);                                                              # PV Prognose darf nicht negativ sein
-      $confc = max (0, $confc);                                                             # Verbrauchsprognose darf nicht negativ sein
+      $pvfc  = max (0, $pvfc);                                                                          # PV Prognose darf nicht negativ sein
+      $confc = max (0, $confc);                                                                         # Verbrauchsprognose darf nicht negativ sein
 
-      if ($h == 0) {                                                                        # Nexthour00
-          $next1HoursSum->{PV}          += $pvfc  / 60 * $remainminutes;                    # Rest-Wert in den Minuten bis zu vollen Stunde
+      if ($h == 0) {                                                                                    # Nexthour00
+          $next1HoursSum->{PV}          += $pvfc  / 60 * $remainminutes;                                # Rest-Wert in den Minuten bis zu vollen Stunde
           $next1HoursSum->{Consumption} += $confc / 60 * $remainminutes;
           
-          $hour00up2nowFc->{PV}          = $pvfc  / 60 * $minute;                            # Werte laufende Stunde bis jetzt
+          $hour00up2nowFc->{PV}          = $pvfc  / 60 * $minute;                                       # Werte laufende Stunde bis jetzt
           $hour00up2nowFc->{Consumption} = $confc / 60 * $minute;
 
-          if ($fd == 0) {                                                                   # Restwert von Nexthour00 am aktuellen Tag
+          if ($fd == 0) {                                                                               # Restwert von Nexthour00 am aktuellen Tag
               $restOfDaySum->{PV}          += $next1HoursSum->{PV};
               $restOfDaySum->{Consumption} += $next1HoursSum->{Consumption};
               
-              if ($hod <= $tdhosset) {                                                      # wenn Zeit vor SunSet ...
-                  if ($hod != $tdhosset) {                                                  # ... akt. hod (NextHour00) ungleich ho-Sunset
+              if ($hod <= $tdhosset) {                                                                  # wenn Zeit vor SunSet ...
+                  if ($hod != $tdhosset) {                                                              # ... akt. hod (NextHour00) ungleich ho-Sunset
                       $tdTillSunsetFc->{Consumption} += $next1HoursSum->{Consumption};  
                   }
                   else {
                       if ($tdmints2sunset >= 0) {
-                          $tdTillSunsetFc->{Consumption} += $confc / 60 * $tdmints2sunset;  # verbleibende CON bis Sunset
+                          $tdTillSunsetFc->{Consumption} += $confc / 60 * $tdmints2sunset;              # verbleibende CON bis Sunset
                       }
                   }
               }              
           }
       }
 
-      if ($h == 1) {                                                                        # Nexthour01
-          $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;                           # next1HoursSum ist nun vollständig
+      if ($h == 1) {                                                                                    # Nexthour01
+          $next1HoursSum->{PV}          += $pvfc  / 60 * $minute;                                       # next1HoursSum ist nun vollständig
           $next1HoursSum->{Consumption} += $confc / 60 * $minute;
           
           $next2HoursSum->{PV}          += $next1HoursSum->{PV};                
-          $next2HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                     # jetzt ist die Stunde 1 in next2HoursSum ergänzt
+          $next2HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                                 # jetzt ist die Stunde 1 in next2HoursSum ergänzt
           
           $next2HoursSum->{Consumption} += $next1HoursSum->{Consumption};
           $next2HoursSum->{Consumption} += $confc / 60 * $remainminutes;
       }
 
-      if ($h == 2) {                                                                        # Nexthour02
-          $next2HoursSum->{PV}          += $pvfc  / 60 * $minute;                           # next2HoursSum ist nun vollständig       
+      if ($h == 2) {                                                                                    # Nexthour02
+          $next2HoursSum->{PV}          += $pvfc  / 60 * $minute;                                       # next2HoursSum ist nun vollständig       
           $next2HoursSum->{Consumption} += $confc / 60 * $minute;  
           
           $next3HoursSum->{PV}          += $next2HoursSum->{PV};                            
-          $next3HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                     # next3HoursSum ist next2HoursSum zzgl. Stundenrest 
+          $next3HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                                 # next3HoursSum ist next2HoursSum zzgl. Stundenrest 
           
           $next3HoursSum->{Consumption} += $next2HoursSum->{Consumption};
           $next3HoursSum->{Consumption} += $confc / 60 * $remainminutes;
       }
 
-      if ($h == 3) {                                                                        # Nexthour03
-          $next3HoursSum->{PV}          += $pvfc  / 60 * $minute;                           # next3HoursSum ist nun vollständig                           
+      if ($h == 3) {                                                                                    # Nexthour03
+          $next3HoursSum->{PV}          += $pvfc  / 60 * $minute;                                       # next3HoursSum ist nun vollständig                           
           $next3HoursSum->{Consumption} += $confc / 60 * $minute;         
           
           $next4HoursSum->{PV}          += $next3HoursSum->{PV};
-          $next4HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                     # next4HoursSum ist next3HoursSum zzgl. Stundenrest 
+          $next4HoursSum->{PV}          += $pvfc / 60 * $remainminutes;                                 # next4HoursSum ist next3HoursSum zzgl. Stundenrest 
           
           $next4HoursSum->{Consumption} += $next3HoursSum->{Consumption};
           $next4HoursSum->{Consumption} += $confc / 60 * $remainminutes;
       }
       
-      if ($h == 4) {                                                                        # Nexthour03
-          $next4HoursSum->{PV}          += $pvfc  / 60 * $minute;                           # next4HoursSum ist nun vollständig                           
+      if ($h == 4) {                                                                                    # Nexthour03
+          $next4HoursSum->{PV}          += $pvfc  / 60 * $minute;                                       # next4HoursSum ist nun vollständig                           
           $next4HoursSum->{Consumption} += $confc / 60 * $minute;  
       }          
  
       # --- aktueller Tag
       if ($fd == 0) {          
-          if ($h != 0) {                                                                    # Stunden außer NextHour00
-              $restOfDaySum->{PV}          += $pvfc;                                        # Tagesrestwerte außer Stunde 00                                      
+          if ($h != 0) {                                                                                # Stunden außer NextHour00
+              $restOfDaySum->{PV}          += $pvfc;                                                    # Tagesrestwerte außer Stunde 00                                      
               $restOfDaySum->{Consumption} += $confc;
           
-              if ($hod <= $tdhosset) {                                                      # wenn Zeit vor SunSet ...
-                  if ($hod != $tdhosset) {                                                  # ... akt. hod ungleich hour of Sunset                                 # wenn die berücksichtigte Stunde die Stunde des Sonnenuntergangs ist
+              if ($hod <= $tdhosset) {                                                                  # wenn Zeit vor SunSet ...
+                  if ($hod != $tdhosset) {                                                              # ... akt. hod ungleich hour of Sunset                                 
                       $tdTillSunsetFc->{Consumption} += $confc;
                   }
                   else {
                       if ($tdmints2sunset >= 0) {
-                          $tdTillSunsetFc->{Consumption} += $confc / 60 * $tdmints2sunset;  # verbleibende CON bis Sunset
+                          $tdTillSunsetFc->{Consumption} += $confc / 60 * $tdmints2sunset;              # verbleibende CON bis Sunset
                       }
                   }
               }
@@ -14487,10 +14482,10 @@ sub _createSummaries {
           $tomorrowSum->{PV} += $pvfc;
           
           if ($hod <= $tmhosset) {
-              $tmTillSunsetFc->{Consumption} += $confc;                                      # Verbrauch kommender Tag bis inkl. Stunde des Sonnenuntergangs
+              $tmTillSunsetFc->{Consumption} += $confc;                                                 # Verbrauch kommender Tag bis inkl. Stunde des Sonnenuntergangs
           }
           
-          if ($pvfc) {                                                                       # Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag
+          if ($pvfc) {                                                                                  # Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag
                $tmConInHrWithPVGen += $confc;  
           }
       }
@@ -14858,15 +14853,15 @@ sub _manageConsumerData {
       $data{$name}{consumers}{$c}{state}   = $costate;
       my ($pstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
       my ($iilt,$rlt) = isInLocktime ($paref);                                                                    # Sperrzeit Status ermitteln
-      my $mode        = getConsumerPlanningMode ($hash, $c);                                                      # Planungsmode 'can' oder 'must'
+      my $cplmode     = getConsumerPlanningMode ($hash, $c);                                                      # Planungsmode 'can' oder 'must'
       my $constate    = "name='$alias' state='$costate'";
-      $constate      .= " mode='$mode' planningstate='$pstate'";
+      $constate      .= " mode='$cplmode' planningstate='$pstate'";
       $constate      .= " remainLockTime='$rlt'" if($rlt);
       $constate      .= " info='$supplmnt'"      if($supplmnt);
 
-      storeReading ("consumer${c}",                $constate);                                                    # Consumer Infos
+      storeReading ("consumer${c}",               $constate);                                                     # Consumer Infos
       storeReading ("consumer${c}_planned_start", $starttime) if($starttime);                                     # Consumer Start geplant
-      storeReading ("consumer${c}_planned_stop",   $stoptime) if($stoptime);                                      # Consumer Stop geplant
+      storeReading ("consumer${c}_planned_stop",  $stoptime)  if($stoptime);                                      # Consumer Stop geplant
   }
 
   $data{$name}{current}{dummyConsumption} = CurrentVal ($name, 'consumption', 0) - $pcurrsum;                     # aktueller Verbrauch - Summe aller ConsumerPower
@@ -15136,14 +15131,16 @@ sub __planInitialSwitchTime {
   my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
 
-  my $hash = $defs{$name};
-  my $dnp  = ___noPlanRelease ($paref);
+  my $hash    = $defs{$name};
+  my $dnp     = ___noPlanRelease ($paref);
+  my $cplmode = getConsumerPlanningMode ($hash, $c);                                            # Planungsmode 'can', 'must' oder 'mustNot'
 
-  if ($dnp) {
+  if ($dnp) {                                                                                   # do not plan? -> generell keine Planungsfreigabe
       if ($debug =~ /consumerPlanning/x) {
-          Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
-                          qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
-          Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" - $dnp});
+          my $cname  = ConsumerVal ($name, $c, 'name',      '');
+          my $calias = ConsumerVal ($name, $c, 'alias', $cname);
+          
+          Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" not permitted - $dnp (name=$calias)});
       }
 
       return;
@@ -15151,22 +15148,25 @@ sub __planInitialSwitchTime {
 
   if ($debug =~ /consumerPlanning/x) {
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
-      Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($hash, $c, 'name', '').
-                      qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
+      Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name: }.ConsumerVal ($name, $c, 'name', '').
+                      qq{ alias: }.ConsumerVal ($name, $c, 'alias', ''));
   }
 
-  my $ctype = ConsumerVal ($hash, $c, 'type', DEFCTYPE);
+  my $ctype = ConsumerVal ($name, $c, 'type', DEFCTYPE);
   
-  if ($ctype eq 'noSchedule' || $ctype eq 'heatpump') {
+  if ($ctype   eq 'noSchedule' ||
+      $ctype   eq 'heatpump'   ||
+      $cplmode eq 'mustNot') {                                                                  # vom Consumertyp und Mode abhängige Planungsfreigabe
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps} = 'noSchedule';
-
       ___setConsumerPlanningState ($paref);
-
       delete $paref->{ps};
+      
       return;
   }
+  
+  ## --- Planung durchführen
 
   ___doPlanning ($paref);
 
@@ -15180,25 +15180,26 @@ return;
 sub ___noPlanRelease {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $t     = $paref->{t};                                                                 # aktuelle Zeit
+  my $t     = $paref->{t};                                                                  # aktuelle Zeit
   my $c     = $paref->{consumer};
 
-  my $hash = $defs{$name};
-  my $dnp  = 0;                                                                            # 0 -> Planung, 1 -> keine Planung
-
-  if (ConsumerVal ($hash, $c, 'planstate', undef)) {                                       # Verbraucher ist schon geplant/gestartet/fertig
-      $dnp = qq{consumer is already planned};
+  my $hash   = $defs{$name};
+  my $dnp    = '';                                                                          # false -> Planung, true -> keine Planung
+  my $pstate = ConsumerVal ($name, $c, 'planstate', '');
+  
+  if ($pstate) {                                                                            # Verbraucher ist schon geplant/gestartet/fertig
+      $dnp = simplifyCstate ($pstate);
   }
   elsif (isSolCastUsed ($hash) || isForecastSolarUsed ($hash)) {
       my ($rapi, $wapi) = getStatusApiName ($hash);
-      my $tdc           = StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIcalls', 0);
+      my $tdc           = StatusAPIVal ($name, $rapi, '?All', 'todayDoneAPIcalls', 0);
 
-      if ($tdc < 1) {                                                                      # Planung erst nach dem zweiten API Abruf freigeben
+      if ($tdc < 1) {                                                                       # Planung erst nach dem zweiten API Abruf freigeben
            $dnp = qq{do not plan because off "todayDoneAPIcalls" is not set};
       }
   }
-  else {                                                                                   # Planung erst ab "LEADTIME" vor Sonnenaufgang freigeben
-      my $sunrise = CurrentVal ($hash, 'sunriseTodayTs', 32529945600);
+  else {                                                                                    # Planung erst ab "LEADTIME" vor Sonnenaufgang freigeben
+      my $sunrise = CurrentVal ($name, 'sunriseTodayTs', 32529945600);
 
       if ($t < $sunrise - LEADTIME) {
           $dnp = "do not plan because off current time is less than sunrise minus ".(LEADTIME / 3600)." hour";
@@ -15215,12 +15216,12 @@ return $dnp;
 ###################################################################
 sub __reviewSwitchTime {
   my $paref = shift;
-  my $name      = $paref->{name};
-  my $c         = $paref->{consumer};
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
 
   my $hash      = $defs{$name};
-  my $pstate    = ConsumerVal    ($hash, $c, 'planstate',   '');
-  my $plswon    = ConsumerVal    ($hash, $c, 'planswitchon', 0);                      # bisher geplante Switch on Zeit
+  my $pstate    = ConsumerVal    ($name, $c, 'planstate',   '');
+  my $plswon    = ConsumerVal    ($name, $c, 'planswitchon', 0);                      # bisher geplante Switch on Zeit
   my $simpCstat = simplifyCstate ($pstate);
   my $t         = $paref->{t};
 
@@ -15234,10 +15235,10 @@ sub __reviewSwitchTime {
                       my $name                          = $paref->{name};
                       $hash->{HELPER}{$c.'M'.$m.'DONE'} = 1;
 
-                      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name: }.ConsumerVal ($hash, $c, 'name', '').
-                                                            qq{ alias: }.ConsumerVal ($hash, $c, 'alias', ''));
+                      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name: }.ConsumerVal ($name, $c, 'name', '').
+                                                            qq{ alias: }.ConsumerVal ($name, $c, 'alias', ''));
 
-                      $paref->{replan} = 1;                                           # V 1.35.0
+                      $paref->{replan} = 1;                                           
                       ___doPlanning ($paref);
                       delete $paref->{replan};
                   }
@@ -15320,7 +15321,7 @@ sub ___doPlanning {
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
 
-  my $mode            = getConsumerPlanningMode ($hash, $c);                                           # Planungsmode 'can' oder 'must'
+  my $cplmode         = getConsumerPlanningMode ($hash, $c);                                           # Planungsmode 'can', 'must' oder 'mustNot'
   my $calias          = ConsumerVal ($name, $c, 'alias',     '');
   my $oldplanstate    = ConsumerVal ($name, $c, 'planstate', '');                                      # V. 1.35.0
 
@@ -15336,14 +15337,14 @@ sub ___doPlanning {
       return;
   }
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $mode, mintime: $mintime, relevant method: surplus});
+  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $cplmode, mintime: $mintime, relevant method: surplus});
 
   my $stopdiff       = $mintime * 60;
   $paref->{maxref}   = \%max;
   $paref->{mintime}  = $mintime;
   $paref->{stopdiff} = $stopdiff;
 
-  if ($mode eq 'can') {                                                                                # Verbraucher kann geplant werden
+  if ($cplmode eq 'can') {                                                                                # Verbraucher _kann_ geplant werden
       if ($debug =~ /consumerPlanning/x) {
           for my $m (sort{$a<=>$b} keys %mtimes) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, }.
@@ -15375,7 +15376,7 @@ sub ___doPlanning {
               last;
           }
           else {
-              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang});                          # 'erwarteter max Überschuss weniger als'
+              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang});                             # 'erwarteter max Überschuss weniger als'
               $paref->{ps}         = 'suspended:';
 
               ___setConsumerPlanningState ($paref);
@@ -15385,7 +15386,7 @@ sub ___doPlanning {
           }
       }
   }
-  else {                                                                                               # Verbraucher _muß_ geplant werden
+  elsif ($cplmode eq 'must') {                                                                          # Verbraucher _muß_ geplant werden
       if ($debug =~ /consumerPlanning/x) {
           for my $o (sort{$a<=>$b} keys %max) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus: $max{$o}{spexp}, }.
@@ -15397,7 +15398,7 @@ sub ___doPlanning {
       my $done;
 
       for my $o (sort{$a<=>$b} keys %max) {
-          next if(!$max{$o}{today});                                                                   # der max-Wert von heute ist auszuwählen
+          next if(!$max{$o}{today});                                                                    # der max-Wert von heute ist auszuwählen
 
           $paref->{elem} = $o;
           ___planMust ($paref);
@@ -15409,7 +15410,7 @@ sub ___doPlanning {
       }
 
       if (!$done) {
-          $paref->{supplement} = encode('utf8', $hqtxt{nmspld}{$lang});                              # 'kein max Überschuss für den aktuellen Tag gefunden'
+          $paref->{supplement} = encode('utf8', $hqtxt{nmspld}{$lang});                                 # 'kein max Überschuss für den aktuellen Tag gefunden'
           $paref->{ps}         = 'suspended:';
 
           ___setConsumerPlanningState ($paref);
@@ -15417,6 +15418,11 @@ sub ___doPlanning {
           delete $paref->{ps};
           delete $paref->{supplement};
       }
+  }                                                                                                     # Verbraucher _darf nicht_ geplant werden
+  elsif ($cplmode eq 'mustNot') {                                                                      
+      if ($debug =~ /consumerPlanning/x) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer “$c” – has the “mustNot” mode and must not be scheduled});
+      }     
   }
 
   delete $paref->{maxref};
@@ -15426,11 +15432,11 @@ sub ___doPlanning {
   my $planstate = ConsumerVal ($name, $c, 'planstate',      '');
   my $planspmlt = ConsumerVal ($name, $c, 'planSupplement', '');
 
-  if ($planstate && ($planstate ne $oldplanstate)) {                                                   # V 1.35.0
-      Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate $planspmlt});
+  if ($planstate && ($planstate ne $oldplanstate)) {                                                  
+      Log3 ($name, 3, qq{$name - consumer "$calias" $planstate $planspmlt});
   }
 
-  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                              # Cache File Consumer schreiben
+  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                               # Cache File Consumer schreiben
 
   ___setPlanningDeleteMeth ($paref);
 
@@ -15502,12 +15508,12 @@ sub ___setConsumerPlanningState {
   }
 
   if ($startts) {
-      $starttime                                       = (timestampToTimestring ($startts, $lang))[3];
+      $starttime                                = (timestampToTimestring ($startts, $lang))[3];
       $data{$name}{consumers}{$c}{planswitchon} = $startts;
   }
 
   if ($stopts) {
-      $stoptime                                         = (timestampToTimestring ($stopts, $lang))[3];
+      $stoptime                                  = (timestampToTimestring ($stopts, $lang))[3];
       $data{$name}{consumers}{$c}{planswitchoff} = $stopts;
   }
 
@@ -15844,13 +15850,14 @@ sub ___switchConsumerOn {
 
   my ($swoncond, $swoffcond, $infon, $infoff);
 
-  ($swoncond, $infon, $err) = isAddSwitchOnCond ($name, $c);                                      # zusätzliche Switch on Bedingung
+  ($swoncond, $infon, $err) = isAddSwitchOnCond ($name, $c);                                      # zusätzliche Switch-on Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
-  ($swoffcond, $infoff, $err) = isAddSwitchOffCond ($hash, $c);                                   # zusätzliche Switch off Bedingung
+  ($swoffcond, $infoff, $err) = isAddSwitchOffCond ($hash, $c);                                   # zusätzliche Switch-off Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
+  my $cplmode     = getConsumerPlanningMode ($hash, $c);                                          # Planungsmode 'can', 'must' oder 'mustNot'
 
   if ($debug =~ /consumerSwitching${c}/x) {                                                       # nur für Debugging
       my $cons   = CurrentVal  ($hash, 'consumption',  0);
@@ -15895,23 +15902,29 @@ sub ___switchConsumerOn {
   if ($auto
       && $oncom
       && $swoncond
-      && !$swoffcond                                                                              # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
+      && !$swoffcond                                                                                # kein Einschalten wenn zusätzliche Switch off Bedingung oder Sperrzeit zutrifft
       && !$iilt
       && $simpCstat =~ /planned|priority|starting/xs
-      && $isInTime) {                                                                             # Verbraucher Start ist geplant && Startzeit überschritten
-      my $mode   = getConsumerPlanningMode        ($hash, $c);                                    # Planungsmode 'can' oder 'must'
-      my $enable = ___enableSwitchByBatPrioCharge ($paref);                                       # Vorrangladung Batterie ?
+      && $isInTime) {                                                                               # Verbraucher Start ist geplant && Startzeit überschritten
+      my $enabybatprio = ___enableSwitchByBatPrioCharge ($paref);                                   # Vorrangladung Batterie ?
 
-      debugLog ($paref, "consumerSwitching${c}", qq{Consumer switch enable by battery state: $enable});
+      debugLog ($paref, "consumerSwitching${c}", qq{Consumer switch enable by battery state: $enabybatprio});
 
-      if ($mode eq 'can' && !$enable) {                                                           # Batterieladung - keine Verbraucher "Einschalten" Freigabe
+      if ($cplmode eq 'can' && !$enabybatprio) {                                                    # Batterieladung - keine Verbraucher "Einschalten" Freigabe
           $paref->{ps} = "priority charging battery";
 
           ___setConsumerPlanningState ($paref);
 
           delete $paref->{ps};
       }
-      elsif ($mode eq "must" || $isConsRcmd) {                                                    # "Muss"-Planung oder Überschuß > Ratio (can)
+      elsif ($cplmode eq 'mustNot') {                                                               # darf nicht eingeschaltet werden
+          $state = qq{switching-on consumer '$calias' is NOT permitted (mode: mustNot)};
+          
+          if ($debug =~ /consumerSwitching${c}/x) {
+              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching-on consumer '$calias' is NOT permitted (mode: mustNot)});
+          }          
+      }
+      elsif ($cplmode eq 'must' || $isConsRcmd) {                                                   # "Muss"-Planung oder Überschuß > Ratio (can)
           $state = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom"};
 
           if ($debug =~ /consumerSwitching${c}/x) {
@@ -15927,11 +15940,12 @@ sub ___switchConsumerOn {
           ___setConsumerPlanningState ($paref);
           delete $paref->{ps};
 
-          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                  # Cache File Consumer schreiben
+          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                   # Cache File Consumer schreiben
       }
   }
-  elsif ($isConsRcmd                                                                               # unterbrochenen Consumer fortsetzen
-         && ($isintable == 0 || $isintable == 1 || $isintable == 3)                                # $isintable == 0 -> Consumer auch einschalten wenn sie nicht unterbrechbar sind
+  elsif ($isConsRcmd                                                                                # unterbrochenen Consumer fortsetzen
+         && $cplmode ne 'mustNot'                                                                   # Einschalten ist nicht verboten
+         && ($isintable == 0 || $isintable == 1 || $isintable == 3)                                 # $isintable == 0 -> Consumer auch einschalten wenn sie nicht unterbrechbar sind
          && $isInTime
          && $auto
          && $oncom
@@ -15949,7 +15963,7 @@ sub ___switchConsumerOn {
 
       CommandSet (undef, "$dswname $oncom");
 
-      $paref->{ps} = "continuing:";
+      $paref->{ps} = 'continuing:';
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
@@ -15966,31 +15980,31 @@ sub ___switchConsumerOff {
   my $paref = shift;
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
-  my $t     = $paref->{t};                                                                        # aktueller Unixtimestamp
+  my $t     = $paref->{t};                                                                          # aktueller Unixtimestamp
   my $state = $paref->{state};
   my $debug = $paref->{debug};
 
   my $hash  = $defs{$name};
 
-  my $pstate  = ConsumerVal ($hash, $c, "planstate",        "");
-  my $stopts  = ConsumerVal ($hash, $c, "planswitchoff", undef);                                  # geplante Unix Stopzeit
-  my $auto    = ConsumerVal ($hash, $c, "auto",              1);
-  my $calias  = ConsumerVal ($hash, $c, "alias",            "");                                  # Consumer Device Alias
-  my $hyst    = ConsumerVal ($hash, $c, "hysteresis",  DEFHYST);                                  # Hysterese
+  my $pstate  = ConsumerVal ($name, $c, "planstate",        "");
+  my $stopts  = ConsumerVal ($name, $c, "planswitchoff", undef);                                    # geplante Unix Stopzeit
+  my $auto    = ConsumerVal ($name, $c, "auto",              1);
+  my $calias  = ConsumerVal ($name, $c, "alias",            "");                                    # Consumer Device Alias
+  my $hyst    = ConsumerVal ($name, $c, "hysteresis",  DEFHYST);                                    # Hysterese
 
-  my $mode                     = getConsumerPlanningMode ($hash, $c);                             # Planungsmode 'can' oder 'must'
-  my $offcom                   = ConsumerVal             ($hash, $c, 'offcom', '');               # Set Command für "off"
-  my ($swoffcond,$infoff,$err) = isAddSwitchOffCond      ($hash, $c);                             # zusätzliche Switch off Bedingung
+  my $offcom                   = ConsumerVal             ($name, $c, 'offcom', '');                 # Set Command für "off"
+  my ($swoffcond,$infoff,$err) = isAddSwitchOffCond      ($hash, $c);                               # zusätzliche Switch off Bedingung
   my $simpCstat                = simplifyCstate          ($pstate);
-  my (undef, $cname, $dswname) = getCDnames              ($hash, $c);                             # Consumer und Switch Device Name
-  my $isConsRcmd               = isConsRcmd              ($hash, $c);                             # Consumptionempfehlung
+  my (undef, $cname, $dswname) = getCDnames              ($hash, $c);                               # Consumer und Switch Device Name
+  my $isConsRcmd               = isConsRcmd              ($hash, $c);                               # Consumptionempfehlung
+  my $cplmode                  = getConsumerPlanningMode ($hash, $c);                               # Planungsmode 'can', 'must' oder 'mustNot'
   my $cause;
 
   Log3 ($name, 1, "$name - $err") if($err);
 
-  my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
+  my ($iilt,$rlt) = isInLocktime ($paref);                                                          # Sperrzeit Status ermitteln
 
-  if ($debug =~ /consumerSwitching${c}/x) {                                                       # nur für Debugging
+  if ($debug =~ /consumerSwitching${c}/x) {                                                         # nur für Debugging
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch off' => }.
                       qq{swoffcond: $swoffcond, off-command: $offcom}
            );
@@ -16002,11 +16016,17 @@ sub ___switchConsumerOff {
       }
   }
 
-  my $isintable = isInterruptable ($hash, $c, $hyst, 1);                                          # mit Ausgabe Interruptable Info im Debug
+  my $isintable = isInterruptable ($hash, $c, $hyst, 1);                                            # mit Ausgabe Interruptable Info im Debug
 
-  if (($swoffcond || ($stopts && $t >= $stopts)) && !$iilt &&
-     ($auto && $offcom && $simpCstat =~ /started|starting|stopping|interrupt|continu/xs)) {
-      $cause = $swoffcond ? "switch-off condition (key swoffcond) is true" : "planned switch-off time reached/exceeded";
+  if (($swoffcond || ($stopts && $t >= $stopts) || $cplmode eq 'mustNot') 
+       && ($auto && $offcom && $simpCstat =~ /started|starting|stopping|interrupt|continu/xs)
+       && !$iilt) {                                                                                 # Consumer beenden
+      $cause = $swoffcond 
+               ? "switch-off condition (key swoffcond) is true"
+               : $cplmode eq 'mustNot'
+               ? "must be stopped due to 'mustNot' mode"               
+               : "planned switch-off time reached/exceeded";
+      
       $state = qq{switching Consumer '$calias' to '$offcom', command: "set $dswname $offcom", cause: $cause};
 
       if ($debug =~ /consumerSwitching${c}/x) {
@@ -16022,11 +16042,14 @@ sub ___switchConsumerOff {
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                     # Cache File Consumer schreiben
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                       # Cache File Consumer schreiben
   }
-  elsif ((($isintable && !$isConsRcmd) || $isintable == 2)       &&                               # Consumer unterbrechen
-         isInTimeframe ($hash, $c) && $auto && $offcom && !$iilt &&
-         $simpCstat =~ /started|continued|interrupting/xs) {
+  elsif ((($isintable && !$isConsRcmd) || $isintable == 2)                                          # Consumer unterbrechen
+         && isInTimeframe ($hash, $c) 
+         && $auto 
+         && $offcom 
+         && !$iilt 
+         && $simpCstat =~ /started|continued|interrupting/xs) {
       $cause = $isintable == 2 ? 'interrupt condition' : 'surplus shortage';
       $state = qq{switching Consumer '$calias' to '$offcom', command: "set $dswname $offcom", cause: $cause};
 
@@ -19683,7 +19706,7 @@ sub _graphicConsumerLegend {
       my ($planstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
       $supplmnt                                      = '-' if(!$supplmnt);
       my ($iilt,$rlt)                                = isInLocktime ($paref);                         # Sperrzeit Status ermitteln
-      my $mode                                       = getConsumerPlanningMode ($hash, $c);           # Planungsmode 'can' oder 'must'
+      my $cplmode                                    = getConsumerPlanningMode ($hash, $c);           # Planungsmode 'can', 'must' oder 'mustNot'
 
       my $sm          = ConsumerVal ($name, $c, 'surpmeth', 'default');
       $sm             = $sm eq 'default' || $sm =~ /_/ ? $sm : $sm.'_all';
@@ -19692,7 +19715,7 @@ sub _graphicConsumerLegend {
       my $surplusinfo = isConsRcmd($hash, $c) ? $htitles{splus}{$lang} : $htitles{nosplus}{$lang};
       $surplusinfo   .= " (${sm}: $smr W)";
 
-      $pstate =~ s/<mode>/$mode/xs;
+      $pstate =~ s/<mode>/$cplmode/xs;
       $pstate =~ s/<pstate>/$planstate/xs;
       $pstate =~ s/<supplmnt>/$supplmnt/xs;
       $pstate =~ s/<start>/$starttime/xs;
@@ -29037,21 +29060,22 @@ return;
 #  mode kann sein:
 #       can
 #       must
+#       mustNot
 ################################################################
 sub getConsumerPlanningMode {
   my $hash = shift;
   my $c    = shift;
 
-  my $name = $hash->{NAME};
-  my $mode = ConsumerVal ($hash, $c, 'mode', DEFCMODE);                                    # Consumer Planungsmode
+  my $name    = $hash->{NAME};
+  my $cplmode = ConsumerVal ($name, $c, 'mode', DEFCMODE);                                    # Consumer Planungsmode
 
-  if ($mode =~ /^(?:can|must)$/xs) {
-      return $mode;
+  if ($cplmode =~ /^(?:can|must|mustNot)$/xs) {
+      return $cplmode;
   }
 
   ## Mode kann über Device:Reading gesteuert sein
   #################################################
-  my ($dv, $rd) = split ':', $mode;
+  my ($dv, $rd) = split ':', $cplmode;
   my ($err)     = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );
 
   if ($err) {
@@ -29059,15 +29083,15 @@ sub getConsumerPlanningMode {
       return DEFCMODE;
   }
 
-  $err  = q{};
-  $mode = ReadingsVal ($dv, $rd, '');
+  $err     = q{};
+  $cplmode = ReadingsVal ($dv, $rd, '');
 
-  if ($mode !~ /^(?:can|must)$/xs) {
+  if ($cplmode !~ /^(?:can|must|mustNot)$/xs) {
       Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to 'DEFCMODE' mode.});
       return DEFCMODE;
   }
 
-return $mode;
+return $cplmode;
 }
 
 ################################################################
@@ -29142,9 +29166,8 @@ sub deleteConsumerPlanning {
   my $hash = shift;
   my $c    = shift;
 
-  my $type   = $hash->{TYPE};
   my $name   = $hash->{NAME};
-  my $calias = ConsumerVal ($hash, $c, "alias", "");
+  my $calias = ConsumerVal ($name, $c, "alias", "");
 
   delete $data{$name}{consumers}{$c}{planstate};
   delete $data{$name}{consumers}{$c}{planSupplement};
@@ -29155,7 +29178,7 @@ sub deleteConsumerPlanning {
 
   deleteReadingspec ($hash, "consumer${c}.*");
 
-  Log3($name, 3, qq{$name - Consumer planning of "$calias" deleted});
+  Log3 ($name, 3, qq{$name - Consumer planning of "$calias" deleted});
 
 return;
 }
@@ -29230,7 +29253,7 @@ sub isPrepared4AI {
   my $err;
 
   if (!isDWDUsed($hash) && !isOpenMeteoUsed($hash)) {
-      $err = qq(Unfortunately, AI support is not possible with the selected radiation API MODEL.);
+      $err = qq(Unfortunately, AI support for PV forecast is not possible with the selected radiation API MODEL);
   }
   elsif ($aidtabs) {
       $err = qq(The Perl module AI::DecisionTree is missing. Please install it with e.g. "cpan install AI::DecisionTree" for AI support);
@@ -32237,14 +32260,14 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>The following arguments can be used to selectively or completely remove AI data:                                                                                </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>The following arguments can be used to selectively or completely remove AI raw data:                                                                            </td></tr>
             <tr><td>                           </td><td><b>delDataAll</b> - deletes the AI instance, including all training and raw data as well as data at the file level, and reinitializes it.                       </td></tr>
             <tr><td>                           </td><td><b>delIndex=&lt;Index&gt;,&lt;Index&gt;,...</b> - deletes one or more records with the index. The index can be specified as a regex.                            </td></tr>
             <tr><td>                           </td><td>Examples: <b>1.)</b> delIndex=2025013023  <b>2.)</b> delIndex=2025013023,2025013024 <b>3.)</b> delIndex=202501.* <b>4.)</b> delIndex=20250130[0-9]              </td></tr>
             <tr><td>                           </td><td><b>searchValue</b> - searches for the numeric value in the specified key. Possible comparison operators are: > | >= | == | <= | < (Findings are in the log file)</td></tr>
-            <tr><td>                           </td><td>Examples: <b>1.)</b> searchValue=con==9786  <b>2.)</b> searchValue=con>=14578  <b>2.)</b> searchValue=temp<=-5                                                  </td></tr>
+            <tr><td>                           </td><td>Examples: <b>1.)</b> searchValue=con==9786  <b>2.)</b> searchValue=con>=14578  <b>3.)</b> searchValue=temp<=-5                                                  </td></tr>
             <tr><td>                           </td><td><b>delValue</b> - deletes the numerical value in the specified key. Possible comparison operators are: > | >= | == | <= | < (Deletion confirmation in log file) </td></tr>
-            <tr><td>                           </td><td>Examples: <b>1.)</b> delValue=con==9786  <b>2.)</b> delValue=con>=14578  <b>2.)</b> delValue=temp<=-5                                                           </td></tr>
+            <tr><td>                           </td><td>Examples: <b>1.)</b> delValue=con==9786  <b>2.)</b> delValue=con>=14578  <b>3.)</b> delValue=temp<=-5                                                           </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                                                               </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
@@ -33125,7 +33148,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>power</b>          </td><td>Power consumption of the consumer in W. This can be the nominal power according to the data sheet or a dynamically specified reference value.     </td></tr>
             <tr><td>                       </td><td>(can be set to "0")                                                                                                                               </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>pvshare</b>        </td><td>The key can be used to specify the desired percentage of PV power to cover the power consumption 'power'. (optional)                                   </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>The key can be used to specify the desired percentage of PV power to cover the power consumption 'power'. (optional)                              </td></tr>
             <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least 'power'. With 0%, the consumer does not require any PV surplus.                        </td></tr>
             <tr><td>                       </td><td>Value: <b>0..100</b>, default: 100 (%)                                                                                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
@@ -33133,12 +33156,14 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>The key is useful for consumers where energy measurement and switching is carried out with different devices                                      </td></tr>
             <tr><td>                       </td><td>e.g. Homematic or readingsProxy. If switchdev is specified, the keys on, off, swstate, auto, asynchronous refer to this device.                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Allowed are:                                                                                                   </td></tr>
+            <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Possible options are:                                                                                          </td></tr>
             <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                    </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The consumer is not started at the time of planning if the PV surplus is insufficient.           </td></tr>
             <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                            </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; The load is started even if there is insufficient PV surplus, provided that
                                                     a set "swoncond" condition is met and "swoffcond" is not met.                                                                                     </td></tr>
+            <tr><td>                       </td><td><b>mustNot</b> - The consumer must not be planned or started. Started consumers are stopped                                                       </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; when 'mode' is changed dynamically.        </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination to be able to change the planning mode dynamically.
                                                     The reading must return 'can' or 'must'.                                                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
@@ -33168,7 +33193,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>on-Regex</b> - regular expression for the state 'on' (default: 'on')                                                                           </td></tr>
             <tr><td>                       </td><td><b>off-Regex</b> - regular expression for the state 'off' (default: 'off')                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                  </td></tr>
-            <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command        </td></tr>.
+            <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command        </td></tr>
             <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                    </td></tr>
             <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                              </td></tr>
             <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                        </td></tr>
@@ -35215,14 +35240,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>Mit den nachfolgenden Argumenten können die KI-Daten selektiv oder komplett entfernt werden:                                                                    </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>Mit den nachfolgenden Argumenten können KI-Rohdaten selektiv oder komplett entfernt werden:                                                                     </td></tr>
             <tr><td>                           </td><td><b>delDataAll</b> - löscht die KI Instanz inklusive aller Trainings- und Rohdaten sowie Daten auf Fileebene und initialisiert sie neu                           </td></tr>
             <tr><td>                           </td><td><b>delIndex=&lt;Index&gt;,&lt;Index&gt;,...</b> - löscht einen oder mehrere Datensätze mit dem Index. Der Index kann als Regex angegeben sein.                  </td></tr>
             <tr><td>                           </td><td>Beispiele: <b>1.)</b> delIndex=2025013023  <b>2.)</b> delIndex=2025013023,2025013024 <b>3.)</b> delIndex=202501.* <b>4.)</b> delIndex=20250130[0-9]             </td></tr>
             <tr><td>                           </td><td><b>searchValue</b> - sucht den Zahlenwert im angegebenen Schlüssel. Mögliche Vergleichsoperatoren sind: > | >= | == | <= | <  (Findings sind im Logfile)        </td></tr>
-            <tr><td>                           </td><td>Beispiele: <b>1.)</b> searchValue=con==9786  <b>2.)</b> searchValue=con>=14578  <b>2.)</b> searchValue=temp<=-5                                                 </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> searchValue=con==9786  <b>2.)</b> searchValue=con>=14578  <b>3.)</b> searchValue=temp<=-5                                                 </td></tr>
             <tr><td>                           </td><td><b>delValue</b> - löscht den Zahlenwert im angegebenen Schlüssel. Mögliche Vergleichsoperatoren sind: > | >= | == | <= | <  (Löschbestätigung im Logfile)       </td></tr>
-            <tr><td>                           </td><td>Beispiele: <b>1.)</b> delValue=con==9786  <b>2.)</b> delValue=con>=14578  <b>2.)</b> delValue=temp<=-5                                                          </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> delValue=con==9786  <b>2.)</b> delValue=con>=14578  <b>3.)</b> delValue=temp<=-5                                                          </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                                                  </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
@@ -36110,12 +36135,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>ausgeführt. Der Schlüssel ist für Verbraucher nützlich bei denen Energiemessung und Schaltung mit verschiedenen Geräten vorgenommen                </td></tr>
             <tr><td>                       </td><td>wird, z.B. Homematic oder readingsProxy. Ist switchdev angegeben, beziehen sich die Schlüssel on, off, swstate, auto, asynchron auf dieses Gerät.  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Erlaubt sind:                                                                                           </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - Die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                                  </td></tr>
+            <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Mögliche Optionen sind:                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                                  </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers zum Planungszeitpunkt unterbleibt bei ungenügendem PV-Überschuß.       </td></tr>
             <tr><td>                       </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                   </td></tr>
             <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß sofern eine
                                                     gesetzte "swoncond" Bedingung erfüllt und "swoffcond" nicht erfüllt ist.                                                                           </td></tr>
+            <tr><td>                       </td><td><b>mustNot</b> - Der Verbraucher darf nicht geplant bzw. gestartet werden. Gestartete Verbraucher werden gestoppt                                  </td></tr>
+            <tr><td>                       </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; wenn 'mode' dynamisch geändert wird.        </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading Kombination um den Planungsmodus dynamisch ändern zu können.
                                                     Das Reading muß 'can' oder 'must' zurückgeben.                                                                                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
@@ -36125,7 +36152,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>&lt;Zahl&gt;</b> - die Einplanungsdauer in Minuten als numerische Angabe                                                                        </td></tr>
             <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - die Einplanung erfolgt von Sonnenaufgang bis Sonnenuntergang.                      </td></tr>
             <tr><td>                       </td><td> Optional kann eine positive und negative Verschiebung (Minuten) der Planungszeit bzgl. Sonnenaufgang bzw. Sonnenuntergang angegeben werden.       </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination, die eine variabel definierbare Einplanungsdauer in Minuten liefert.             </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination, die eine variabel definierbare Einplanungsdauer in Minuten liefert.            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td>                       </td><td>Ist mintime nicht angegeben, wird eine Standard Einplanungsdauer gemäß nachfolgender Tabelle verwendet.                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
