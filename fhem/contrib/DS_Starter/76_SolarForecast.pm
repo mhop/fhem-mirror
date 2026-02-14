@@ -15136,6 +15136,14 @@ sub __planInitialSwitchTime {
   my $cplmode = getConsumerPlanningMode ($hash, $c);                                            # Planungsmode 'can', 'must' oder 'mustNot'
 
   if ($dnp) {                                                                                   # do not plan? -> generell keine Planungsfreigabe
+      if ($dnp eq 'planned' && $cplmode eq 'mustNot') {                                         # anpassen falls schon geplant bei dynamischer Änderung
+          deleteConsumerPlanning ($hash, $c);
+          
+          $paref->{ps} = 'noSchedule';
+          ___setConsumerPlanningState ($paref);
+          delete $paref->{ps};
+      }
+      
       if ($debug =~ /consumerPlanning/x) {
           my $cname  = ConsumerVal ($name, $c, 'name',      '');
           my $calias = ConsumerVal ($name, $c, 'alias', $cname);
