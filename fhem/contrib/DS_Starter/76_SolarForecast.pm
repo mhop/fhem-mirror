@@ -162,7 +162,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.2.0"  => "14.02.2026  new Consumer mode 'mustNot' ",
+  "2.2.0"  => "14.02.2026  new Consumer mode 'mustNot', _aiCreateAdditionalSignals: fix problem devision by zero in special case 40 degrees ",
   "2.1.1"  => "10.02.2026  sub _createSummaries refactored ",
   "2.1.0"  => "08.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation, show module version in header ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
@@ -7651,9 +7651,13 @@ sub _attrconsumer {                      ## no critic "not used"
               return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate' and 'pcurr' to be defined.};
           }
 
-           if (!defined $h->{comforttemp}) {
+          if (!defined $h->{comforttemp}) {
               return qq{The consumer type 'heatpump' needs the key 'comforttemp' to be defined.};
-          }                   
+          } 
+
+          if ($h->{comforttemp} !~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
+              return qq{The value of key 'comforttemp' must be in range -40..40};
+          }          
       }
   }
   else {
@@ -23655,25 +23659,32 @@ sub _aiCreateAdditionalSignals {
   # ---------------------------------------------------------
   # Heizlast + Kühllast (dynamische Komforttemp)
   # ---------------------------------------------------------
-  my $t_comfort_norm      = $p->{temp_comfort_norm};                                      # normierte Komforttemp
-  my $temp_norm_min       = ($range eq '-11') ? -1.0 : 0.0;                               # Normraum-Minimum bestimmen
+  my $t_comfort_norm = $p->{temp_comfort_norm};                                             # normierte Komforttemp
 
-  my $heating_raw         = $t_comfort_norm - $temp_norm;                                 # Roh-Heizlast
-  $heating_raw            = 0 if($heating_raw < 0);
+  my $temp_norm_min  = ($range eq '-11') ? -1.0 : 0.0;                                      # Normbereich bestimmen (symmetrisch oder 0..1)
+  my $temp_norm_max  = 1.0;                                                                 # immer 1.0, aber semantisch sauber
 
-  my $heating_span        = $t_comfort_norm - $temp_norm_min;                             # Spannweite für Normierung
-  $heating_span           = 1 if($heating_span <= 0);
+  # --- Heizlast
+  my $heating_raw         = $t_comfort_norm - $temp_norm;
+  $heating_raw            = 0 if $heating_raw < 0;
 
-  my $heating_degree_norm = $heating_raw / $heating_span;                                 # Normierte Heizlast
-  $heating_degree_norm    = 0 if($heating_degree_norm < 0);
-  $heating_degree_norm    = 1 if($heating_degree_norm > 1);
-  
+  my $heating_span        = $t_comfort_norm - $temp_norm_min;
+  $heating_span           = 1 if $heating_span <= 0;                                        # Fallback bei Grenzfall
+
+  my $heating_degree_norm = $heating_raw / $heating_span;
+  $heating_degree_norm    = 0 if $heating_degree_norm < 0;
+  $heating_degree_norm    = 1 if $heating_degree_norm > 1;
+
+  # --- Kühllast
   my $cooling_raw         = $temp_norm - $t_comfort_norm;
-  $cooling_raw            = 0 if($cooling_raw < 0);
+  $cooling_raw            = 0 if $cooling_raw < 0;
 
-  my $cooling_degree_norm = $cooling_raw / (1 - $t_comfort_norm);
-  $cooling_degree_norm    = 0 if($cooling_degree_norm < 0);
-  $cooling_degree_norm    = 1 if($cooling_degree_norm > 1);
+  my $cooling_span        = $temp_norm_max - $t_comfort_norm;
+  $cooling_span           = 1 if $cooling_span <= 0;                                        # Fallback bei Grenzfall
+
+  my $cooling_degree_norm = $cooling_raw / $cooling_span;
+  $cooling_degree_norm    = 0 if $cooling_degree_norm < 0;
+  $cooling_degree_norm    = 1 if $cooling_degree_norm > 1;
 
   $sigs->{heating_degree_norm} = $heating_degree_norm;
   $sigs->{cooling_degree_norm} = $cooling_degree_norm;
@@ -25728,10 +25739,10 @@ sub _aiFannEncodeCyclic {
   my $sin   = sin ($angle);
   my $cos   = cos ($angle);
   
-  if ($range eq '-11') {                                # Direkt im Bereich [-1,1] zurückgeben für *_SYMMETRIC
+  if ($range eq '-11') {                                                        # Direkt im Bereich [-1,1] zurückgeben für *_SYMMETRIC
       return ($sin, $cos);
   } 
-  else {                                                # Verschieben von [-1,1] auf [0,1] für unsymmetrische Aktivierung
+  else {                                                                        # Verschieben von [-1,1] auf [0,1] für unsymmetrische Aktivierung
       my $sin01 = ($sin + 1) / 2;
       my $cos01 = ($cos + 1) / 2;
       return ($sin01, $cos01);
@@ -25746,8 +25757,8 @@ sub _aiFannNormSunalt {
   my $sunalt = shift;
   my $range  = shift // '01';
   
-  if ($range eq '-11') { return $sunalt / 90; }                         # [-90 .. 90] -> [-1 ..1] für SIGMOID_SYMMETRIC
-  else                 { return ($sunalt + 90) / 180; }                 # [-90 .. 90] -> [0 .. 1] für SIGMOID
+  if ($range eq '-11') { return $sunalt / 90; }                                 # [-90 .. 90] -> [-1 ..1] für SYMMETRIC
+  else                 { return ($sunalt + 90) / 180; }                         # [-90 .. 90] -> [0 .. 1] für ASYMMETRIC
 }
 
 ###############################################################
@@ -25758,8 +25769,8 @@ sub _aiFannNormWcc {
   my $wcc   = shift;
   my $range = shift // '01';
   
-  if ($range eq '-11') { return ($wcc - 50) / 50; }                     # [-1 .. 1] für SIGMOID_SYMMETRIC
-  else                 { return $wcc / 100;       }                     # [0 .. 1] für SIGMOID
+  if ($range eq '-11') { return ($wcc - 50) / 50; }                             # [-1 .. 1] für SYMMETRIC
+  else                 { return $wcc / 100;       }                             # [0 .. 1] für ASYMMETRIC
 }
 
 ###############################################################
@@ -25770,8 +25781,8 @@ sub _aiFannNormTemp {
   my $temp  = shift;
   my $range = shift // '01';
   
-  if ($range eq '-11') { return $temp / 40         }                   # [-1 .. 1] für SIGMOID_SYMMETRIC
-  else                 { return ($temp + 40) / 80; }                   # [0 .. 1] für SIGMOID
+  if ($range eq '-11') { return $temp / 40         }                            # [-1 .. 1] für SYMMETRIC
+  else                 { return ($temp + 40) / 80; }                            # [0 .. 1] für ASYMMETRIC
 }
 
 ###############################################################
@@ -25783,8 +25794,8 @@ sub _aiFannNormPv {
   my $pvpeak = shift;
   my $range  = shift // '01';
   
-  if ($range eq '-11') { return ($pv / $pvpeak) * 2 - 1 }                   # [-1 .. 1] für SIGMOID_SYMMETRIC
-  else                 { return $pv / $pvpeak; }                            # [0 .. 1] für SIGMOID
+  if ($range eq '-11') { return ($pv / $pvpeak) * 2 - 1 }                       # [-1 .. 1] für SYMMETRIC
+  else                 { return $pv / $pvpeak; }                                # [0 .. 1] für ASYMMETRIC
 }
 
 ###############################################################
@@ -33304,7 +33315,8 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-            <tr><td> <b>comforttemp</b>    </td><td>Target temperature (comfort temperature) in living spaces in °C. (mandatory field)                                                                 </td></tr>
+            <tr><td> <b>comforttemp</b>    </td><td>Target temperature (comfort temperature) in the interior spaces in °C. (mandatory field)                                                           </td></tr>
+            <tr><td>                       </td><td>Value range: <b>-40..40</b>                                                                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>&lt;Reading&gt;:&lt;Unit&gt; (Wh/kWh) of the consumer device that provides the total amount of energy consumed. (mandatory field)                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
@@ -36283,7 +36295,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-            <tr><td> <b>comforttemp</b>    </td><td>Solltemperatur (Komforttemperatur) in den Wohnräumen in °C. (Pflichtangabe)                                                                        </td></tr>
+            <tr><td> <b>comforttemp</b>    </td><td>Solltemperatur (Komforttemperatur) in den Innenräumen in °C. (Pflichtangabe)                                                                       </td></tr>
+            <tr><td>                       </td><td>Wertebereich: <b>-40..40</b>                                                                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>&lt;Reading&gt;:&lt;Einheit&gt; (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert. (Pflichtangabe)                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
