@@ -25,15 +25,15 @@ polyline.SVGplot { stroke:black; fill:none; }
 .SVGplot.l7     { stroke:gray;    }
 .SVGplot.l8     { stroke:yellow;  }
 
-.SVGplot.l0fill { stroke:red;         fill:url(#gr_0); }
-.SVGplot.l1fill { stroke:forestgreen; fill:url(#gr_1); }
-.SVGplot.l2fill { stroke:blue;        fill:url(#gr_2); }
-.SVGplot.l3fill { stroke:magenta;     fill:url(#gr_3); }
-.SVGplot.l4fill { stroke:yellow;      fill:url(#gr_4); }
-.SVGplot.l5fill { stroke:cyan;        fill:url(#gr_5); }
-.SVGplot.l6fill { stroke:black;       fill:url(#gr_6); }
-.SVGplot.l7fill { stroke:brown;       fill:url(#gr_7); }
-.SVGplot.l8fill { stroke:olive;       fill:url(#gr_8); }
+.SVGplot.l0fill { stroke:red;     fill:url(#gr_0); }
+.SVGplot.l1fill { stroke:green;   fill:url(#gr_1); }
+.SVGplot.l2fill { stroke:blue;    fill:url(#gr_2); }
+.SVGplot.l3fill { stroke:magenta; fill:url(#gr_3); }
+.SVGplot.l4fill { stroke:brown;   fill:url(#gr_4); }
+.SVGplot.l5fill { stroke:black;   fill:url(#gr_5); }
+.SVGplot.l6fill { stroke:olive;   fill:url(#gr_6); }
+.SVGplot.l7fill { stroke:gray;    fill:url(#gr_7); }
+.SVGplot.l8fill { stroke:yellow;  fill:url(#gr_8); }
 
 .SVGplot.l0dot  { stroke:red;     stroke-dasharray:2,4; }
 .SVGplot.l1dot  { stroke:green;   stroke-dasharray:2,4; }
@@ -75,15 +75,15 @@ text.SVGplot.l6     { stroke:none; fill:olive;   }
 text.SVGplot.l7     { stroke:none; fill:gray;    }
 text.SVGplot.l8     { stroke:none; fill:yellow;  }
 
-text.SVGplot.l0fill { stroke:none; fill:red;         }
-text.SVGplot.l1fill { stroke:none; fill:forestgreen; }
-text.SVGplot.l2fill { stroke:none; fill:blue;        }
-text.SVGplot.l3fill { stroke:none; fill:magenta;     }
-text.SVGplot.l4fill { stroke:none; fill:yellow;      }
-text.SVGplot.l5fill { stroke:none; fill:cyan;        }
-text.SVGplot.l6fill { stroke:none; fill:black;       }
-text.SVGplot.l7fill { stroke:none; fill:brown;       }
-text.SVGplot.l8fill { stroke:none; fill:olive;       }
+text.SVGplot.l0fill { stroke:none; fill:red;     }
+text.SVGplot.l1fill { stroke:none; fill:green;   }
+text.SVGplot.l2fill { stroke:none; fill:blue;    }
+text.SVGplot.l3fill { stroke:none; fill:magenta; }
+text.SVGplot.l4fill { stroke:none; fill:brown;   }
+text.SVGplot.l5fill { stroke:none; fill:black;   }
+text.SVGplot.l6fill { stroke:none; fill:olive;   }
+text.SVGplot.l7fill { stroke:none; fill:gray;    }
+text.SVGplot.l8fill { stroke:none; fill:yellow;  }
 
 text.SVGplot.l0dot  { stroke:none; fill:red;     }
 text.SVGplot.l1dot  { stroke:none; fill:green;   }

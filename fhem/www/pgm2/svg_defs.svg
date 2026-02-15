@@ -11,7 +11,7 @@
   </linearGradient>
 
   <linearGradient id="gr_1" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"   style="stop-color:forestgreen; stop-opacity:.6"/>
+    <stop offset="0%"   style="stop-color:green; stop-opacity:.6"/>
     <stop offset="100%" style="stop-color:#98e698; stop-opacity:.4"/>
   </linearGradient>
 
@@ -26,27 +26,27 @@
   </linearGradient>
 
   <linearGradient id="gr_4" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"   style="stop-color:yellow; stop-opacity:.6"/>
-    <stop offset="100%" style="stop-color:#ffff80; stop-opacity:.4"/>
-  </linearGradient>
-
-  <linearGradient id="gr_5" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"   style="stop-color:cyan; stop-opacity:.6"/>
-    <stop offset="100%" style="stop-color:#80ffff; stop-opacity:.4"/>
-  </linearGradient>
-
-  <linearGradient id="gr_6" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"   style="stop-color:black; stop-opacity:.6"/>
-    <stop offset="100%" style="stop-color:#bfbfbf; stop-opacity:.4"/>
-  </linearGradient>
-  
-  <linearGradient id="gr_7" x1="0%" y1="0%" x2="0%" y2="100%">
     <stop offset="0%"   style="stop-color:brown; stop-opacity:.6"/>
     <stop offset="100%" style="stop-color:#e59a9a; stop-opacity:.4"/>
   </linearGradient>
+
+  <linearGradient id="gr_5" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"   style="stop-color:black; stop-opacity:.6"/>
+    <stop offset="100%" style="stop-color:#bfbfbf; stop-opacity:.4"/>
+  </linearGradient>
+
+  <linearGradient id="gr_6" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"   style="stop-color:olive; stop-opacity:.6"/>
+    <stop offset="100%" style="stop-color:#ffff80; stop-opacity:.4"/>
+  </linearGradient>
+  
+  <linearGradient id="gr_7" x1="0%" y1="0%" x2="0%" y2="100%">
+    <stop offset="0%"   style="stop-color:gray; stop-opacity:.6"/>
+    <stop offset="100%" style="stop-color:#aaaaaa; stop-opacity:.4"/>
+  </linearGradient>
   
   <linearGradient id="gr_8" x1="0%" y1="0%" x2="0%" y2="100%">
-    <stop offset="0%"   style="stop-color:olive; stop-opacity:.6"/>
+    <stop offset="0%"   style="stop-color:yellow; stop-opacity:.6"/>
     <stop offset="100%" style="stop-color:#ffff80; stop-opacity:.4"/>
   </linearGradient>
 
