@@ -7367,7 +7367,6 @@ return;
 sub _attrconsumer {                      ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $aName = $paref->{aName};
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
@@ -7426,7 +7425,7 @@ sub _attrconsumer {                      ## no critic "not used"
           return qq{The type "$h->{type}" isn't allowed!};
       }
 
-      if (exists $h->{switchdev}) {                                                       # alternatives Schaltdevice
+      if (exists $h->{switchdev}) {                                                                                     # alternatives Schaltdevice
           ($err) = isDeviceValid ( { name => $name, obj => $h->{switchdev}, method => 'string' } );
           return $err if($err);
       }
@@ -8389,8 +8388,9 @@ return;
 sub _attrInverterDev {                   ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
+  my $aVal  = $paref->{aVal};
+  my $cmd   = $paref->{cmd};
 
   return if(!$init_done);
 
@@ -8411,7 +8411,7 @@ sub _attrInverterDev {                   ## no critic "not used"
       asynchron => { comp => '(0|1)',         act => 0 },
   };
 
-  if ($paref->{cmd} eq 'set') {
+  if ($cmd eq 'set') {
       if ($aVal =~ /strings=/xs && $aVal !~ /strings=(?!.*(\s,|,\s)).*$/xs) {
           return "The key 'string' is not specified correctly. Please refer to the command reference.";
       }
@@ -8506,7 +8506,7 @@ sub _attrInverterDev {                   ## no critic "not used"
 
       $data{$name}{circular}{99}{attrInvChangedTs} = int time;
   }
-  elsif ($paref->{cmd} eq 'del') {
+  elsif ($cmd eq 'del') {
       readingsDelete ($hash, 'Current_PV');
       undef @{$data{$name}{current}{genslidereg}};
 
@@ -9161,7 +9161,7 @@ sub __attrKeyAction {
       
       if ($init_done && $akey eq 'aiConProfile') {
           if ($keyval =~ /heatpump/xs) {
-              my ($hp, $comftemp) = isHeatPumpUsed ($name);                                  # Consumer Nummer , Solltemp falls WP verwendet
+              my ($hp, $comftemp) = isHeatPumpUsed ($name);                                                         # Consumer Nummer , Solltemp falls WP verwendet
               if (!defined $hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
           }
       }
