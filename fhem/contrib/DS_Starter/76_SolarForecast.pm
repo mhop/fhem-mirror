@@ -163,7 +163,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "2.2.0"  => "15.02.2026  new Consumer mode 'mustNot', _aiCreateAdditionalSignals: fix problem devision by zero in special case 40 degrees ".
-                           "edit comref, _attrconsumer partially refactored ",
+                           "edit comref, _attrconsumer refactored ",
   "2.1.1"  => "10.02.2026  sub _createSummaries refactored ",
   "2.1.0"  => "08.02.2026  _calcConsForecast_legacy refactored, fix _calcTodayDeviation, show module version in header ",
   "2.0.0"  => "25.01.2026  initial implementation of neural network for consumption forecasting with AI::FANN ".
@@ -7274,7 +7274,6 @@ sub Attr {
   my $aVal  = shift;
 
   my $hash  = $defs{$name};
-  my $type  = $hash->{TYPE};
 
   my ($do,$val, $err);
 
@@ -7345,7 +7344,6 @@ sub Attr {
 
   my $params = {
       name  => $name,
-      type  => $type,
       cmd   => $cmd,
       aName => $aName,
       aVal  => $aVal
@@ -7377,28 +7375,28 @@ sub _attrconsumer {                      ## no critic "not used"
   my $hash = $defs{$name};
 
   my $valid = {
-      aliasshort    => { comp => '',                                must => 0, act => 0 },
+      aliasshort    => { comp => '.*',                              must => 0, act => 1 },
       type          => { comp => '.*',                              must => 1, act => 1 },
       power         => { comp => '[0-9]+',                          must => 1, act => 0 },
-      switchdev     => { comp => '',                                must => 0, act => 0 },
-      mode          => { comp => '',                                must => 0, act => 0 },
+      switchdev     => { comp => '.*',                              must => 0, act => 1 },
+      mode          => { comp => '.*',                              must => 0, act => 1 },
       icon          => { comp => '',                                must => 0, act => 0 },
-      mintime       => { comp => '',                                must => 0, act => 0 },
+      mintime       => { comp => '.*',                              must => 0, act => 1 },
       on            => { comp => '',                                must => 0, act => 0 },
       off           => { comp => '',                                must => 0, act => 0 },
-      swstate       => { comp => '',                                must => 0, act => 0 },
-      asynchron     => { comp => '',                                must => 0, act => 0 },
-      notbefore     => { comp => '',                                must => 0, act => 0 },
-      notafter      => { comp => '',                                must => 0, act => 0 },
+      swstate       => { comp => '.*',                              must => 0, act => 1 },
+      asynchron     => { comp => '[01]',                            must => 0, act => 0 },
+      notbefore     => { comp => '.*',                              must => 0, act => 1 },
+      notafter      => { comp => '.*',                              must => 0, act => 1 },
       auto          => { comp => '',                                must => 0, act => 0 },
       pcurr         => { comp => '',                                must => 0, act => 0 },
-      etotal        => { comp => '',                                must => 0, act => 0 },
-      swoncond      => { comp => '',                                must => 0, act => 0 },
-      swoffcond     => { comp => '',                                must => 0, act => 0 },
-      surpmeth      => { comp => '',                                must => 0, act => 0 },
-      spignorecond  => { comp => '',                                must => 0, act => 0 },
-      interruptable => { comp => '',                                must => 0, act => 0 },
-      locktime      => { comp => '',                                must => 0, act => 0 },
+      etotal        => { comp => '.*',                              must => 0, act => 1 },
+      swoncond      => { comp => '.*',                              must => 0, act => 1 },
+      swoffcond     => { comp => '.*',                              must => 0, act => 1 },
+      surpmeth      => { comp => '.*',                              must => 0, act => 1 },
+      spignorecond  => { comp => '.*',                              must => 0, act => 1 },
+      interruptable => { comp => '.*',                              must => 0, act => 1 },
+      locktime      => { comp => '[1-9]\d*(?::[1-9]\d*)?',          must => 0, act => 0 },
       noshow        => { comp => '',                                must => 0, act => 0 },
       exconfc       => { comp => '[012]',                           must => 0, act => 0 },
       pvshare       => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
@@ -7415,8 +7413,6 @@ sub _attrconsumer {                      ## no critic "not used"
           }
       }
 
-      # New Style Prüfungen
-      #######################
       for my $key (keys %{$h}) {
           return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);             # Absturzschutz!
 
@@ -7429,12 +7425,12 @@ sub _attrconsumer {                      ## no critic "not used"
 
           if ($h->{$key} =~ /^$comp$/xs) {
               if ($valid->{$key}{act}) {
-                  my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                                aName  => $aName,
-                                                pphash => $h,                                                   # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                                akey   => $key,
-                                                keyval => $h->{$key},
-                                                cmd    => $cmd,
+                  my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                                aName   => $aName,
+                                                pphash  => $h,                                                  # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                akey    => $key,
+                                                akeyval => $h->{$key},
+                                                cmd     => $cmd,
                                               } );
 
                   return $err if($err);
@@ -7442,208 +7438,6 @@ sub _attrconsumer {                      ## no critic "not used"
           }
           else {
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
-          }
-      }
-      
-      # herkömmliche Prüfungen
-      ##########################
-
-      my $alowt = grep (/^$h->{type}$/, @ctypes) ? 1 : 0;
-      if (!$alowt) {
-          return qq{The type "$h->{type}" isn't allowed!};
-      }
-
-      if (exists $h->{switchdev}) {                                                                                     # alternatives Schaltdevice
-          ($err) = isDeviceValid ( { name => $name, obj => $h->{switchdev}, method => 'string' } );
-          return $err if($err);
-      }
-
-      if (exists $h->{etotal}) {
-          my ($rtot, $utot, $ethreshold) = split ":", $h->{etotal};
-
-          if (!$utot || $utot !~ /^(Wh|kWh)$/xs) {
-              return qq{The Unit of key 'etotal' must be 'Wh' or 'kWh'};
-          }
-
-          if (defined $ethreshold && !isNumeric ($ethreshold)) {
-              return qq{The optional 'Threshold' of key 'etotal' must be numeric if specified};
-          }
-      }
-
-      if (exists $h->{aliasshort}) {                                                       # Kurzalias
-          return qq{The short alias "$h->{aliasshort}" longer than allowed. See command reference.}
-                 if(strlength ($h->{aliasshort})> 10);
-      }
-
-      if (exists $h->{mode} && $h->{mode} !~ /^(?:can|must|mustNot)$/xs) {
-          if ($h->{mode} =~ /.*:.*/xs) {
-              my ($dv, $rd) = split ':', $h->{mode};
-              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
-              return $err if($err);
-
-              my $mode = ReadingsVal ($dv, $rd, '');
-              if ($mode !~ /^(?:can|must|mustNot)$/xs) {
-                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode";
-              }
-          }
-          else {
-              return qq{The mode "$h->{mode}" isn't allowed!};
-          }
-      }
-
-      if (exists $h->{surpmeth}) {
-          if ($h->{surpmeth} =~ /.*:.*/xs) {
-              my ($dv, $rd) = split ':', $h->{surpmeth};
-              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
-              return $err if($err);
-
-              if (!isNumeric( ReadingsVal ($dv, $rd, '') )) {
-                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid numeric value";
-              }
-          }
-          elsif ($h->{surpmeth} !~ /^(?:median|average)(?:_(?:[2-9]|1[0-9]|20))?$|^default$/xs) {
-              return qq{The surpmeth "$h->{surpmeth}" is wrong. It must contain a '<device>:<reading>', 'median[_2..20]', 'average[_2..20]' or 'default'.};
-          }
-      }
-      
-      my $valid;
-
-      if (exists $h->{notbefore}) {
-          if ($h->{notbefore} =~ m/^\s*\{.*\}\s*$/xs) {
-              ($err) = checkCode ($name, $h->{notbefore}, 'cc1');
-              return $err if($err);
-          }
-          else {
-              $valid = checkhhmm ($h->{notbefore});
-              return qq{The syntax "notbefore=$h->{notbefore}" is wrong!} if(!$valid);
-          }
-      }
-
-      if (exists $h->{notafter}) {
-          if ($h->{notafter} =~ m/^\s*\{.*\}\s*$/xs) {
-              ($err) = checkCode ($name, $h->{notafter}, 'cc1');
-              return $err if($err);
-          }
-          else {
-              $valid = checkhhmm ($h->{notafter});
-              return qq{The syntax "notafter=$h->{notafter}" is wrong!} if(!$valid);
-          }
-      }
-
-      if (exists $h->{interruptable}) {
-          if ($h->{interruptable} !~ /^[01]$/xs) {
-              my ($dev, $rd, $code, $hyst);
-
-              if ($h->{interruptable} =~ m/\{.*\}/xs) {                                            # interruptable prüft Perl-Code
-                  if ($h->{interruptable} =~ m/:\{.*\}:/xs) {
-                      return qq{The Code specified for the 'interruptable' key must not end with a hysteresis value};
-                  }
-
-                  ($dev, $rd, $code) = split ":", $h->{interruptable}, 3;
-              }
-              else {
-                  ($dev, $rd, $code, $hyst) = split ":", $h->{interruptable};
-              }
-
-              if (!$dev || !$rd || !defined $code) {
-                  return qq{A Device, Reading and Regex/Code must be specified for the 'interruptable' key};
-              }
-
-              if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                  # interruptable prüft Perl-Code
-                  $code  =~ s/\s//xg;
-                  ($err) = checkCode ($name, $code);
-                  return "interruptable: $err" if($err);
-              }
-              else {                                                                               # interruptable prüft Regex
-                  $err = checkRegex ($code);
-                  return "interruptable: $err" if($err);
-              }
-
-              if ($hyst && !isNumeric ($hyst)) {
-                  return qq{The hysteresis of key "interruptable" must be a numeric value};
-              }
-          }
-      }
-
-      if (exists $h->{swoncond}) {
-          my ($dev, $rd, $code) = split ":", $h->{swoncond}, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'swoncond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoncond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "swoncond: $err" if($err);
-          }
-          else {                                                                                   # swoncond prüft Regex
-              $err = checkRegex ($code);
-              return "swoncond: $err" if($err);
-          }
-      }
-
-      if (exists $h->{swoffcond}) {
-          my ($dev, $rd, $code) = split ":", $h->{swoffcond}, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'swoffcond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoffcond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "swoffcond: $err" if($err);
-          }
-          else {                                                                                   # swoffcond prüft Regex
-              $err = checkRegex ($code);
-              return "swoffcond: $err" if($err);
-          }
-      }
-
-      if (exists $h->{spignorecond}) {
-          my ($dev, $rd, $code) = split ":", $h->{spignorecond}, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'spignorecond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # spignorecond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "spignorecond: $err" if($err);
-          }
-          else {                                                                                   # spignorecond prüft Regex
-              $err = checkRegex ($code);
-              return "spignorecond: $err" if($err);
-          }
-      }
-
-      if (exists $h->{swstate}) {                                                                  # Check Regex
-          my (undef,$onregex,$offregex) = split ":", $h->{swstate};
-
-          $err = checkRegex ($onregex);
-          return "swstate on-Regex: $err" if($err);
-
-          $err = checkRegex ($offregex);
-          return "swstate off-Regex: $err" if($err);
-      }
-
-      if (exists $h->{mintime}) {
-          my $mintime = $h->{mintime};
-
-          if ($mintime !~ /^SunPath/xsi && $mintime =~ /.*:.*/xs) {
-              my ($dv, $rd) = split ':', $mintime;
-              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
-              return $err if($err);
-
-              my $val = ReadingsVal ($dv, $rd, '');
-              if (!isNumeric ($val)) {
-                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a numeric value";
-              }
-          }
-          elsif (!isNumeric ($mintime) && $mintime !~ /^SunPath/xsi) {
-              return qq(The key "mintime" must be an integer or a string starting with "SunPath.");
           }
       }
   }
@@ -7723,12 +7517,12 @@ sub _attrconsumerControl {               ## no critic "not used"
 
   for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
       if ($valid->{$akey}{act}) {
-          my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                        aName  => $aName,
-                                        pphash => $h,                     # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                        akey   => $akey,
-                                        keyval => $h->{$akey},
-                                        cmd    => $cmd,
+          my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                        aName   => $aName,
+                                        pphash  => $h,                    # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                        akey    => $akey,
+                                        akeyval => $h->{$akey},
+                                        cmd     => $cmd,
                                       } );
 
           return $err if($err);
@@ -7859,12 +7653,12 @@ sub _attrgraphicControl {                ## no critic "not used"
 
           if ($h->{$key} =~ /^$comp$/xs) {
               if ($valid->{$key}{act}) {
-                  my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                                aName  => $aName,
-                                                pphash => $h,                                                           # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                                akey   => $key,
-                                                keyval => $h->{$key},
-                                                cmd    => $cmd,
+                  my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                                aName   => $aName,
+                                                pphash  => $h,                                                          # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                akey    => $key,
+                                                akeyval => $h->{$key},
+                                                cmd     => $cmd,
                                               } );
 
                   return $err if($err);
@@ -7966,12 +7760,12 @@ sub _attrflowGraphicControl {            ## no critic "not used"
 
   for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
       if ($valid->{$akey}{act}) {
-          my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                        aName  => $aName,
-                                        pphash => $h,                     # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                        akey   => $akey,
-                                        keyval => $h->{$akey},
-                                        cmd    => $cmd,
+          my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                        aName   => $aName,
+                                        pphash  => $h,                    # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                        akey    => $akey,
+                                        akeyval => $h->{$akey},
+                                        cmd     => $cmd,
                                       } );
 
           return $err if($err);
@@ -8077,12 +7871,12 @@ sub _attraiControl {                     ## no critic "not used"
 
   for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
       if ($valid->{$akey}{act}) {
-          my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                        aName  => $aName,
-                                        pphash => $h,                     # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                        akey   => $akey,
-                                        keyval => $h->{$akey},
-                                        cmd    => $cmd,
+          my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                        aName   => $aName,
+                                        pphash  => $h,                    # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                        akey    => $akey,
+                                        akeyval => $h->{$akey},
+                                        cmd     => $cmd,
                                       } );
 
           return $err if($err);
@@ -8154,12 +7948,12 @@ sub _attrplantControl {                  ## no critic "not used"
 
   for my $akey (keys %{$h}) {                                             # von bestimmten Schlüsseln abhängige Aktionen ausführen
       if ($valid->{$akey}{act}) {
-          my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                        aName  => $aName,
-                                        pphash => $h,                     # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                        akey   => $akey,
-                                        keyval => $h->{$akey},
-                                        cmd    => $cmd,
+          my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                        aName   => $aName,
+                                        pphash  => $h,                    # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                        akey    => $akey,
+                                        akeyval => $h->{$akey},
+                                        cmd     => $cmd,
                                       } );
 
           return $err if($err);
@@ -8239,7 +8033,6 @@ sub _attrMeterDev {                    ## no critic "not used"
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
-  my $type  = $paref->{type};
 
   return if(!$init_done);
 
@@ -8319,7 +8112,6 @@ sub _attrProducerDev {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
-  my $type  = $paref->{type};
 
   return if(!$init_done);
 
@@ -8423,12 +8215,12 @@ sub _attrInverterDev {                   ## no critic "not used"
 
           if ($h->{$key} =~ /^$comp$/xs) {
               if ($valid->{$key}{act}) {
-                  my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                                aName  => $aName,
-                                                pphash => $h,                                                           # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                                akey   => $key,
-                                                keyval => $h->{$key},
-                                                cmd    => $cmd,
+                  my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                                aName   => $aName,
+                                                pphash  => $h,                                                          # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                akey    => $key,
+                                                akeyval => $h->{$key},
+                                                cmd     => $cmd,
                                               } );
 
                   return $err if($err);
@@ -8521,7 +8313,6 @@ sub _attrInverterStrings {               ## no critic "not used"
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
-  my $type  = $paref->{type};
 
   return if(!$init_done);
 
@@ -8800,12 +8591,12 @@ sub _attrBatteryDev {                    ## no critic "not used"
 
           if ($h->{$key} =~ /^$comp$/xs) {
               if ($valid->{$key}{act}) {
-                  my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                                aName  => $aName,
-                                                pphash => $h,                                                           # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                                akey   => $key,
-                                                keyval => $h->{$key},
-                                                cmd    => $cmd,
+                  my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                                aName   => $aName,
+                                                pphash  => $h,                                                          # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                akey    => $key,
+                                                akeyval => $h->{$key},
+                                                cmd     => $cmd,
                                               } );
 
                   return $err if($err);
@@ -8929,12 +8720,12 @@ sub _attrBatSocManagement {              ## no critic "not used"
 
           if ($h->{$key} =~ /^$comp$/xs) {
               if ($valid->{$key}{act}) {
-                  my $err = __attrKeyAction ( { name   => $name,                                                                               
-                                                aName  => $aName,
-                                                pphash => $h,                                                           # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
-                                                akey   => $key,
-                                                keyval => $h->{$key},
-                                                cmd    => $cmd,
+                  my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                                aName   => $aName,
+                                                pphash  => $h,                                                          # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                akey    => $key,
+                                                akeyval => $h->{$key},
+                                                cmd     => $cmd,
                                               } );
 
                   return $err if($err);
@@ -9034,7 +8825,6 @@ sub _attrRadiationAPI {                  ## no critic "not used"
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
-  my $type  = $paref->{type};
 
   return if(!$init_done);
 
@@ -9109,38 +8899,38 @@ return;
 #  von bestimmten Schlüsseln abhängige Aktionen ausführen
 ################################################################
 sub __attrKeyAction {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $aName  = $paref->{aName};
-  my $pphash = $paref->{pphash};                                                                                    # parsed Param Hash: wichtig für Abhängigkeitsprüfungen
-  my $akey   = $paref->{akey};
-  my $keyval = $paref->{keyval};
-  my $cmd    = $paref->{cmd};
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $aName   = $paref->{aName};
+  my $pphash  = $paref->{pphash};                                                                                   # parsed Param Hash: wichtig für Abhängigkeitsprüfungen
+  my $akey    = $paref->{akey};
+  my $akeyval = $paref->{akeyval};
+  my $cmd     = $paref->{cmd};
 
   my $hash = $defs{$name};
   my $err  = q{};
 
   if ($cmd eq 'set') {
       if ($init_done && $akey eq 'cycleInterval') {
-          _newCycTime ($hash, time, $keyval);
-          my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                         # gespeicherte nächste CyleTime
+          _newCycTime ($hash, time, $akeyval);
+          my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                        # gespeicherte nächste CyleTime
           readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
       }
 
       if ($akey eq 'capacity') {
-          if (!isNumeric ($keyval)) {
+          if (!isNumeric ($akeyval)) {
               return qq{The value of key '$akey' must be numeric. Please consider the commandref.};
           }
       }
 
       if ($akey eq 'limit') {
-          if (!isNumeric ($keyval) || $keyval < 0 || $keyval > 100) {
+          if (!isNumeric ($akeyval) || $akeyval < 0 || $akeyval > 100) {
               return qq{The value of key '$akey' is not valid. Please consider the commandref.};
           }
       }
 
       if ($init_done && $akey eq 'headerDetail') {
-          my @hda = split ",", $keyval;
+          my @hda = split ",", $akeyval;
 
           for my $val (@hda) {
               if (!grep /^$val$/, qw (all co pv own status)) {
@@ -9150,7 +8940,7 @@ sub __attrKeyAction {
       }
       
       if ($init_done && $akey eq 'aiConProfile') {
-          if ($keyval =~ /heatpump/xs) {
+          if ($akeyval =~ /heatpump/xs) {
               my ($hp, $comftemp) = isHeatPumpUsed ($name);                                                         # Consumer Nummer , Solltemp falls WP verwendet
               if (!defined $hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
           }
@@ -9185,34 +8975,232 @@ sub __attrKeyAction {
           }
       }
       
-      # --- Checks Consumer Typ Wärmepumpe
-      if ($pphash->{type} eq 'heatpump') {
-          my ($hp) = isHeatPumpUsed ($name);                                                       
-          
-          if (defined $hp && $aName ne 'consumer'.$hp) {                                           # andere "heatpump" bereits definiert? -> kann nur eine WP geben
-              return qq{A 'heatpump' type consumer ($hp) has already been defined.};
+      if ($akey eq 'interruptable') {
+          if ($akeyval !~ /^[01]$/xs) {
+              my ($dev, $rd, $code, $hyst);
+
+              if ($akeyval =~ m/\{.*\}/xs) {                                                       # interruptable prüft Perl-Code
+                  if ($akeyval =~ m/:\{.*\}:/xs) {
+                      return qq{The Code specified for the 'interruptable' key must not end with a hysteresis value};
+                  }
+
+                  ($dev, $rd, $code) = split ":", $akeyval, 3;
+              }
+              else {
+                  ($dev, $rd, $code, $hyst) = split ":", $akeyval;
+              }
+
+              if (!$dev || !$rd || !defined $code) {
+                  return qq{Figures 0/1 or a Device:Reading combination with a Regex or Perl code can be specified for the 'interruptable' key};
+              }
+
+              if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                  # interruptable prüft Perl-Code
+                  $code  =~ s/\s//xg;
+                  ($err) = checkCode ($name, $code);
+                  return "interruptable: $err" if($err);
+              }
+              else {                                                                               # interruptable prüft Regex
+                  $err = checkRegex ($code);
+                  return "interruptable: $err" if($err);
+              }
+
+              if ($hyst && !isNumeric ($hyst)) {
+                  return qq{The hysteresis of key "interruptable" must be a numeric value};
+              }
           }
-          
-          if ($pphash->{power} == 0) {
-              return qq{For the consumer type 'heatpump' the rated power value must be specified as not equal to 0.};
+      }
+
+      if ($akey eq 'type') {
+          my $alowt = grep (/^$akeyval$/, @ctypes) ? 1 : 0;
+          if (!$alowt) {
+              return "The consumer type '$akeyval' isn't allowed!";
           }
-          
-          if (!defined $pphash->{etotal} || !defined $pphash->{pcurr} || !defined $pphash->{swstate}) {
-              return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate' and 'pcurr' to be defined.};
+      
+          # --- Checks Consumer Typ Wärmepumpe
+          if ($akeyval eq 'heatpump') {
+              my ($hp) = isHeatPumpUsed ($name);                                                       
+              
+              if (defined $hp && $aName ne 'consumer'.$hp) {                                           # andere "heatpump" bereits definiert? -> kann nur eine WP geben
+                  return qq{A 'heatpump' type consumer ($hp) has already been defined.};
+              }
+              
+              if ($pphash->{power} == 0) {
+                  return qq{For the consumer type 'heatpump' the rated power value must be specified as not equal to 0.};
+              }
+              
+              if (!defined $pphash->{etotal} || !defined $pphash->{pcurr} || !defined $pphash->{swstate}) {
+                  return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate' and 'pcurr' to be defined.};
+              }
+
+              if (!defined $pphash->{comforttemp}) {
+                  return qq{The consumer type 'heatpump' needs the key 'comforttemp' to be defined.};
+              }        
+          }
+      }
+      
+      if ($akey eq 'aliasshort') {                                                                  # Kurzalias
+          if (strlength ($akeyval) > 10) {
+              return "The short alias '$akeyval' longer than allowed. See command reference.";
+          }
+      }
+      
+      if ($akey eq 'mode' && $akeyval !~ /^(?:can|must|mustNot)$/xs) {
+          if ($akeyval =~ /.*:.*/xs) {
+              my ($dv, $rd) = split ':', $akeyval;
+              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+              return $err if($err);
+
+              my $mode = ReadingsVal ($dv, $rd, '');
+              if ($mode !~ /^(?:can|must|mustNot)$/xs) {
+                  return "The reading '$rd' of device '$dv' is invalid or does not contain a valid mode";
+              }
+          }
+          else {
+              return "The mode '$akeyval' is not allowed!";
+          }
+      }
+      
+      if ($akey eq 'surpmeth') {
+          if ($akeyval =~ /.*:.*/xs) {
+              my ($dv, $rd) = split ':', $akeyval;
+              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+              return $err if($err);
+
+              if (!isNumeric( ReadingsVal ($dv, $rd, '') )) {
+                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a valid numeric value";
+              }
+          }
+          elsif ($akeyval !~ /^(?:median|average)(?:_(?:[2-9]|1[0-9]|20))?$|^default$/xs) {
+              return qq{The surpmeth '$akeyval' is wrong. It must contain a '<device>:<reading>', 'median[_2..20]', 'average[_2..20]' or 'default'.};
+          }
+      }
+      
+      if ($akey eq 'etotal') {
+          my ($rtot, $utot, $ethreshold) = split ":", $akeyval;
+
+          if (!$utot || $utot !~ /^(Wh|kWh)$/xs) {
+              return qq{The unit of key 'etotal' must be 'Wh' or 'kWh'};
           }
 
-          if (!defined $pphash->{comforttemp}) {
-              return qq{The consumer type 'heatpump' needs the key 'comforttemp' to be defined.};
-          }        
+          if (defined $ethreshold && !isNumeric ($ethreshold)) {
+              return qq{The optional 'Threshold' of key 'etotal' must be numeric if specified};
+          }
+      }
+      
+      if ($akey eq 'swstate') {                                                                   
+          my (undef, $onregex, $offregex) = split ":", $akeyval;
+
+          $err = checkRegex ($onregex);
+          return "swstate on-Regex: $err" if($err);
+
+          $err = checkRegex ($offregex);
+          return "swstate off-Regex: $err" if($err);
+      }
+      
+      if ($akey eq 'switchdev') {                                                                   # alternatives Schaltdevice
+          ($err) = isDeviceValid ( { name => $name, obj => $akeyval, method => 'string' } );
+          return $err if($err);
+      }
+      
+      if ($akey eq 'mintime') {
+          if ($akeyval !~ /^SunPath/xsi && $akeyval =~ /.*:.*/xs) {
+              my ($dv, $rd) = split ':', $akeyval;
+              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+              return $err if($err);
+
+              my $val = ReadingsVal ($dv, $rd, '');
+              if (!isNumeric ($val)) {
+                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a numeric value";
+              }
+          }
+          elsif (!isNumeric ($akeyval) && $akeyval !~ /^SunPath(?::(?:(?::|-?\d+))*)?$/xs) {
+              return "The used 'SunPath' syntax of key 'mintime' is entered wrong. Please check the command reference for syntax.";
+          }
+      }
+      
+      if ($akey eq 'notbefore') {
+          if ($akeyval =~ m/^\s*\{.*\}\s*$/xs) {
+              ($err) = checkCode ($name, $akeyval, 'cc1');
+              return $err if($err);
+          }
+          else {
+              my $valid = checkhhmm ($akeyval);
+              return qq{The syntax "notbefore=$akeyval" is wrong!} if(!$valid);
+          }
+      }
+      
+      if ($akey eq 'notafter') {
+          if ($akeyval =~ m/^\s*\{.*\}\s*$/xs) {
+              ($err) = checkCode ($name, $akeyval, 'cc1');
+              return $err if($err);
+          }
+          else {
+              my $valid = checkhhmm ($akeyval);
+              return qq{The syntax "notafter=$akeyval" is wrong!} if(!$valid);
+          }
+      }
+      
+      if ($akey eq 'swoncond') {
+          my ($dev, $rd, $code) = split ":", $akeyval, 3;
+
+          if (!$dev || !$rd || !defined $code) {
+              return qq{A Device, Reading and Regex/Code must be specified for the 'swoncond' key};
+          }
+
+          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoncond prüft Perl-Code
+              $code  =~ s/\s//xg;
+              ($err) = checkCode ($name, $code);
+              return "swoncond: $err" if($err);
+          }
+          else {                                                                                   # swoncond prüft Regex
+              $err = checkRegex ($code);
+              return "swoncond: $err" if($err);
+          }
+      }
+
+      if ($akey eq 'swoffcond') {
+          my ($dev, $rd, $code) = split ":", $akeyval, 3;
+
+          if (!$dev || !$rd || !defined $code) {
+              return qq{A Device, Reading and Regex/Code must be specified for the 'swoffcond' key};
+          }
+
+          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoffcond prüft Perl-Code
+              $code  =~ s/\s//xg;
+              ($err) = checkCode ($name, $code);
+              return "swoffcond: $err" if($err);
+          }
+          else {                                                                                   # swoffcond prüft Regex
+              $err = checkRegex ($code);
+              return "swoffcond: $err" if($err);
+          }
+      }
+      
+      if ($akey eq 'spignorecond') {
+          my ($dev, $rd, $code) = split ":", $akeyval, 3;
+
+          if (!$dev || !$rd || !defined $code) {
+              return qq{A Device, Reading and Regex/Code must be specified for the 'spignorecond' key};
+          }
+
+          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # spignorecond prüft Perl-Code
+              $code  =~ s/\s//xg;
+              ($err) = checkCode ($name, $code);
+              return "spignorecond: $err" if($err);
+          }
+          else {                                                                                   # spignorecond prüft Regex
+              $err = checkRegex ($code);
+              return "spignorecond: $err" if($err);
+          }
       }
   }
 
   if ($akey eq 'lcSlot') {
       my $dt                = timestringsFromOffset (time, 0);
-      my ($lcstart, $lcend) = split "-", $keyval;
+      my ($lcstart, $lcend) = split "-", $akeyval;
       my $lcstartts         = timestringToTimestamp ("$dt->{date} ${lcstart}:00");
       my $lcendts           = timestringToTimestamp ("$dt->{date} ${lcend}:59");
-      return qq{The value '$keyval' is not valid for key '$akey'. The slot start must be earlier than the slot end.} if($lcstartts > $lcendts);
+      return qq{The value '$akeyval' is not valid for key '$akey'. The slot start must be earlier than the slot end.} if($lcstartts > $lcendts);
   }
   elsif ($init_done && $akey eq 'genPVdeviation') {
       readingsDelete ($hash, 'Today_PVdeviation');
@@ -33290,8 +33278,8 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>The consumer is continued if both the original and the subtracted readings value do not (or no longer) match.                                           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>locktime</b>       </td><td>Blocking times in seconds for switching the consumer (optional).                                                                                        </td></tr>
-            <tr><td>                       </td><td><b>offlt</b> - Blocking time in seconds after the consumer has been switched off or interrupted                                                         </td></tr>
-            <tr><td>                       </td><td><b>onlt</b> - Blocking time in seconds after the consumer has been switched on or continued                                                             </td></tr>
+            <tr><td>                       </td><td><b>offlt</b> - Blocking time in seconds after the consumer has been switched off or interrupted (default: 0)                                            </td></tr>
+            <tr><td>                       </td><td><b>onlt</b> - Blocking time in seconds after the consumer has been switched on or continued (default: 0)                                                </td></tr>
             <tr><td>                       </td><td>The consumer is only switched again when the corresponding blocking time has elapsed.                                                                   </td></tr>
             <tr><td>                       </td><td><b>Note:</b> The 'locktime' switch is only effective in automatic mode.                                                                                 </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
@@ -36269,8 +36257,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Der Verbraucher wird fortgesetzt, wenn sowohl der originale als auch der substrahierte Readingswert nicht (mehr) matchen.                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>locktime</b>       </td><td>Sperrzeiten in Sekunden für die Schaltung des Verbrauchers (optional).                                                                             </td></tr>
-            <tr><td>                       </td><td><b>offlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher ausgeschaltet oder unterbrochen wurde                                                 </td></tr>
-            <tr><td>                       </td><td><b>onlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher eingeschaltet oder fortgesetzt wurde                                                   </td></tr>
+            <tr><td>                       </td><td><b>offlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher ausgeschaltet oder unterbrochen wurde (default: 0)                                    </td></tr>
+            <tr><td>                       </td><td><b>onlt</b> - Sperrzeit in Sekunden nachdem der Verbraucher eingeschaltet oder fortgesetzt wurde (default: 0)                                      </td></tr>
             <tr><td>                       </td><td>Der Verbraucher wird erst wieder geschaltet wenn die entsprechende Sperrzeit abgelaufen ist.                                                       </td></tr>
             <tr><td>                       </td><td><b>Hinweis:</b> Der Schalter 'locktime' ist nur im Automatik-Modus wirksam.                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
