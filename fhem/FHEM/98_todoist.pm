@@ -17,8 +17,8 @@ eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
 
 #######################
 # Global variables
-my $version = "1.3.28";
-my $apiUrl = "https://api.todoist.com/sync/v9/";
+my $version = "1.4.3";
+my $apiUrl = "https://api.todoist.com/api/v1/";
 
 my $srandUsed;
 
@@ -306,7 +306,7 @@ sub todoist_ReorderTasks ($$) {
       foreach my $taskId (@taskIds) { 
         $i++;
         $args .= "," if ($i>1);
-        $args .= "{\"id\":".$taskId.",\"child_order\":".$i."}";
+        $args .= "{\"id\":\"".$taskId."\",\"child_order\":".$i."}";
       }
       
       $args = $argsStart.$args.$argsEnd;
@@ -381,7 +381,7 @@ sub todoist_UpdateTask($$$) {
   my %commands=();
   
   my $method;
-  my $taskId=0;
+  my $taskId = "";
   my $title;
   my $tid;
   
@@ -395,24 +395,24 @@ sub todoist_UpdateTask($$$) {
   
   ## use the todoist ID
   if (@temp && $temp[0] =~ /id/i) {
-    $taskId = int($temp[1]);
+    $taskId = $temp[1];
     $title = $hash->{helper}{"TITLE"}{$temp[1]};
   }
   ## use task content
   elsif (@temp && $temp[0] =~ /title/i) {
     $title = encode_utf8($temp[1]);
-	my $nTitle = $title;
-	$nTitle =~ s/ /_/g;
+    my $nTitle = $title;
+	  $nTitle =~ s/ /_/g;
     $taskId = $hash->{helper}{"TITLES"}{$nTitle} if ($hash->{helper}{"TITLES"});
   }
   elsif (defined($h->{"title"}) || defined($h->{"TITLE"}) || defined($h->{"Title"})) {
-	Log3 $name, 5, "todoist ($name): Debug: ".Dumper($h);
-	$title = $h->{"title"} if ($h->{"title"});
+	  Log3 $name, 5, "todoist ($name): Debug: ".Dumper($h);
+	  $title = $h->{"title"} if ($h->{"title"});
     $title = $h->{"TITLE"} if ($h->{"TITLE"});
     $title = $h->{"Title"} if ($h->{"Title"});
-	my $nTitle = $title;
-	$nTitle =~ s/ /_/g;
-	Log3 $name, 5, "todoist ($name): Debug: ".$nTitle;
+	  my $nTitle = $title;
+	  $nTitle =~ s/ /_/g;
+	  Log3 $name, 5, "todoist ($name): Debug: ".$nTitle;
     $taskId = $hash->{helper}{"TITLES"}{$nTitle} if ($hash->{helper}{"TITLES"});
   }
   ## use Task-Number 
@@ -423,7 +423,7 @@ sub todoist_UpdateTask($$$) {
   }
   
   # error if we did not get a task id
-  if ($taskId == 0) {
+  if ($taskId eq "") {
     map {FW_directNotify("#FHEMWEB:$_", "if (typeof todoist_ErrorDialog === \"function\") todoist_ErrorDialog('$name','$title ".$todoist_tt->{"idnotfound"}."','".$todoist_tt->{"error"}."')", "")} devspec2array("TYPE=FHEMWEB");
     todoist_ErrorReadings($hash,"Task $title could not be found for $type","task $title not found");
     return undef;
@@ -438,7 +438,11 @@ sub todoist_UpdateTask($$$) {
   my $commandsEnd="}]";
   
   my $tType;
-  my %args=();
+  my %args;
+
+  my $urlSec = "";
+
+  my $contentType = "json";
   
 
   ## if no token is needed and device is not disabled, check token and get list vom todoist
@@ -455,9 +459,7 @@ sub todoist_UpdateTask($$$) {
 
         # variables for the commands parameter
         $tType = "item_complete";
-        %args = (
-          id => $taskId,
-        );
+        $urlSec = "tasks/".$taskId."/close";
         Log3 $name,5, "$name: Args: ".Dumper(%args);
         $method="POST";
       }
@@ -465,28 +467,22 @@ sub todoist_UpdateTask($$$) {
       elsif ($type eq "close") {
 
         # variables for the commands parameter
-        $tType = "item_close";
-        %args = (
-          id => $taskId,
-        );
+        $urlSec = "tasks/".$taskId."/close";
         Log3 $name,5, "$name: Args: ".Dumper(%args);
         $method="POST";
       }
       ## uncomplete a task
-      elsif ($type eq "uncomplete") {
+      elsif ($type eq "uncomplete" || $type eq "reopen") {
 
         # variables for the commands parameter
         $tType = "item_uncomplete";
-        %args = (
-          id => $taskId,
-        );
+        $urlSec = "tasks/".$taskId."/reopen";
         Log3 $name,5, "$name: Args: ".Dumper(%args);
         $method="POST";
       }
       ## move a task
       elsif ($type eq "move") {
-        
-        
+          
         # we can avoid duplicates in FHEM. There may still come duplicates coming from another app
         if ($h->{"parent_id"}) {
           #if (AttrVal($name,"avoidDuplicates",0) == 1 && todoist_inArray(\@{$hash->{helper}{"TITS"}},$title)) {
@@ -495,6 +491,9 @@ sub todoist_UpdateTask($$$) {
           #  return undef;
           #}
         }
+
+        $urlSec = "sync";
+        $contentType = "x-www-form-urlencoded";
         
         $tType = "item_move";
         %args = (
@@ -522,30 +521,19 @@ sub todoist_UpdateTask($$$) {
       ## update a task 
       elsif ($type eq "update") {
         $tType = "item_update";
-        %args = (
-          id => $taskId,
-        );
-        
+        $urlSec = "tasks/".$taskId;
+      
         ## change title
         $args{'content'} = $h->{"title"} if($h->{'title'});
         ## change dueDate
-        $args{'due'}{'string'} = $h->{"dueDate"} if($h->{'dueDate'});
-        $args{'due'}{'string'} = "" if ($h->{'dueDate'} && $h->{'dueDate'} =~ /(null|none|nix|leer|del)/);
+        $args{'due_string'} = $h->{"dueDate"} if($h->{'dueDate'});
+        $args{'due_string'} = "" if ($h->{'dueDate'} && $h->{'dueDate'} =~ /(null|none|nix|leer|del)/);
         ## change dueDate (if someone uses due_date in stead of dueDate)
-        $args{'due'}{'string'} = $h->{"due_date"} if ($h->{'due_date'});
-        $args{'due'}{'string'} = "" if ($h->{'due_date'} && $h->{'due_date'} =~ /(null|none|nix|leer|del)/);
+        $args{'due_string'} = $h->{"due_date"} if ($h->{'due_date'});
+        $args{'due_string'} = "" if ($h->{'due_date'} && $h->{'due_date'} =~ /(null|none|nix|leer|del)/);
         ## change priority
         $args{'priority'} = int($h->{"priority"}) if ($h->{"priority"});
-        ## Who is responsible for the task
-        $args{'responsible_uid'} = $h->{"responsibleUid"} if ($h->{"responsibleUid"});
-        $args{'responsible_uid'} = $h->{"responsible"} if ($h->{"responsible"});
-        ## who assigned the task? 
-        $args{'assigned_by_uid'} = $h->{"assignedByUid"} if ($h->{"assignedByUid"});
-        $args{'assigned_by_uid'} = $h->{"assignedBy"} if ($h->{"assignedByUid"});
-        ## order of the task
-        $args{'child_order'} = $h->{"order"} if ($h->{"order"});
-        ## child order of the task
-        $args{'child_order'} = $h->{"child_order"} if ($h->{"child_order"});
+
         
         
         ## remove attribute
@@ -573,38 +561,40 @@ sub todoist_UpdateTask($$$) {
       ## delete a task
       elsif ($type eq "delete") {
         $tType = "item_delete";
-        %args = (
-          id => $taskId,
-        );
-        $method="POST";
+        $urlSec = "tasks/".$taskId;
+        $method="DELETE";
       }
       else {
         return undef;
       }
+
+      my $dataArr;
       
       Log3 $name,5, "todoist ($name): Data Array sent to todoist API: ".Dumper(%args);
       
-      my $dataArr=$commandsStart.'"type":"'.$tType.'","temp_id":"'.$taskId.'","uuid":"'.$uuid.'","args":'.encode_json(\%args).$commandsEnd;
-      
-      Log3 $name,4, "todoist ($name): Data Array sent to todoist API: ".$dataArr;
+      if ($type eq "move") {
+        $dataArr=$commandsStart.'"type":"'.$tType.'","temp_id":"'.$taskId.'","uuid":"'.$uuid.'","args":'.encode_json(\%args).$commandsEnd;
+      }
+      else {
+        $dataArr=encode_json(\%args);
+      }
+      #Log3 $name,4, "todoist ($name): Data Array sent to todoist API: ".$dataArr;
     
-      my $data= {
-        token     =>    $pwd,
-        commands  =>    $dataArr
-      };
+      my $data = $dataArr;
       
-      Log3 $name,4, "todoist ($name): JSON sent to todoist API: ".Dumper($data);
+      #Log3 $name,4, "todoist ($name): JSON sent to todoist API: ".Dumper($data);
       
       $param = {
-        url        => $apiUrl."sync",
-        data       => $data,
+        url        => $apiUrl.$urlSec,
+        data       => $dataArr,
         tTitle     => $title,
         method     => $method,
         wType      => $type,
         taskId     => $taskId,
         timeout    => 7,
-        header     => "Content-Type: application/x-www-form-urlencoded\r\n".
-					  "Authorization: Bearer ".$pwd,
+        header     => "Content-Type: application/".$contentType."\r\n".
+                      "Accept: application/json\r\n".
+					            "Authorization: Bearer ".$pwd,
         hash       => $hash,
         callback   => \&todoist_HandleTaskCallback,  ## call callback sub to work with the data we get
       };
@@ -1046,12 +1036,11 @@ sub todoist_GetTasks($;$) {
       Log3 $name,5, "$name: hash: ".Dumper($hash);
       
       my $data= {
-        token           => $pwd,
-        project_id      => $hash->{PID}
+        #project_id      => $hash->{PID}
       };
       
       # set url for API access
-      my $url = $apiUrl."projects/get_data";
+      my $url = $apiUrl."tasks?project_id=".$hash->{PID};
       ## check if we get also the completed Tasks
       if ($completed == 1) {
         $url = $apiUrl."completed/get_all";
@@ -1063,10 +1052,9 @@ sub todoist_GetTasks($;$) {
       ## get the tasks
       $param = {
         url        => $url,
-        method     => "POST",
+        method     => "GET",
         data       => $data,
-		header     => "Content-Type: application/x-www-form-urlencoded\r\n".
-					  "Authorization: Bearer ".$pwd,
+		    header     => "Authorization: Bearer ".$pwd,
         timeout    => 7,
         completed  => $completed,
         hash       => $hash,
@@ -1144,7 +1132,7 @@ sub todoist_GetTasksCallback($$$){
     }
     
     # mostly HTML response / todoist is down or locked
-    if ((ref($decoded_json) eq "HASH" && !$decoded_json->{items}) || $decoded_json eq "") {
+    if ((ref($decoded_json) eq "HASH" && !$decoded_json->{results}) || $decoded_json eq "") {
       $hash->{helper}{errorData} = Dumper($data);
       $hash->{helper}{errorMessage} = "GetTasks: Response was damaged or empty. See log for details.";
 
@@ -1155,7 +1143,7 @@ sub todoist_GetTasksCallback($$$){
       Log3 $name,4, "todoist ($name):  getTasks was successful";
       Log3 $name,5, "todoist ($name):  Task item data: ".Dumper(@{$decoded_json->{items}});
       ## items data
-      my @taskseries = @{$decoded_json->{items}};
+      my @taskseries = @{$decoded_json->{results}};
       
       ## project data
       my $project = $decoded_json->{project};
@@ -1454,7 +1442,7 @@ sub todoist_GetUsersCallback($$$){
         foreach my $user (@users) {
           my $do=0;
           foreach my $state (@states) {
-            $do=1 if ($user->{id} == $state->{user_id} && $state->{project_id} == $hash->{PID});
+            $do=1 if ($user->{id} eq $state->{user_id} && $state->{project_id} eq $hash->{PID});
           }
           
           if ($do==1) {
