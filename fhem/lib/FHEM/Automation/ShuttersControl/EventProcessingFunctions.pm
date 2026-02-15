@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2025 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2026 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -935,7 +935,7 @@ sub EventProcessingRoommate {
                     $FHEM::Automation::ShuttersControl::shutters->getShadingPos
                 );
             }
-            elsif (( !$getIsDay || $getDown eq 'roommate' )
+            elsif ( ( !$getIsDay || $getDown eq 'roommate' )
                 && $getModeDown eq 'absent'
                 && $getRoommatesStatus eq 'absent' )
             {
@@ -2356,7 +2356,7 @@ sub EventProcessingShutters {
     FHEM::Automation::ShuttersControl::ASC_Debug( 'EventProcessingShutters: '
           . ' Fn wurde durch Notify aufgerufen da ASC_Pos_Reading Event erkannt wurde '
           . ' - RECEIVED EVENT: '
-          . Dumper $events);
+          . Dumper $events );
 
     if ( $events =~ m{.*:\s(\d+)}xms ) {
         $FHEM::Automation::ShuttersControl::shutters->setShuttersDev(
@@ -2456,7 +2456,7 @@ sub EventProcessingExternalTriggerDevice {
             'EventProcessingExternalTriggerDevice: '
           . ' Fn wurde durch Notify '
           . ' - RECEIVED EVENT: '
-          . Dumper $events);
+          . Dumper $events );
 
     my $reading =
       $FHEM::Automation::ShuttersControl::shutters->getExternalTriggerReading;

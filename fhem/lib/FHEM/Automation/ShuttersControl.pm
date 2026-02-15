@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2018-2025 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2018-2026 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -186,7 +186,7 @@ our %userAttrList = (
 'ASC_AutoAstroModeEveningHorizon:-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9'
       => '-',
     'ASC_Open_Pos:0,10,20,30,40,50,60,70,80,90,100'   => [ '', 0,   100 ],
-    'ASC_Closed_Pos:0,10,20,30,40,50,60,70,80,90,100' => [ '', 100, 0 ],
+    'ASC_Closed_Pos:0,10,20,30,40,50,60,70,80,90,100' => [ '', 100,  0 ],
     'ASC_Sleep_Pos:0,10,20,30,40,50,60,70,80,90,100'  => [ '', -1,  -1 ],
     'ASC_Pos_Reading'                       => [ '', 'position', 'pct' ],
     'ASC_Time_Up_Early'                     => '-',
@@ -401,7 +401,7 @@ sub Notify {
           . " Name: "
           . $name
           . " Notify: "
-          . Dumper $events);    # mit Dumper
+          . Dumper $events );    # mit Dumper
 
     if (
         (
@@ -508,7 +508,7 @@ sub Notify {
               . $devname
               . ' wurde erkannt '
               . ' - RECEIVED EVENT: '
-              . Dumper $events);
+              . Dumper $events );
         EventProcessingShutters( $hash, $devname, join( ' ', @{$events} ) );
     }
     else {
@@ -1763,7 +1763,8 @@ sub SetCmdFn {
     my $idleDetection      = $shutters->getIdleDetection;
 
     return
-      if ( $shutters->getASCenable eq 'off'
+      if (
+           $shutters->getASCenable eq 'off'
         || $ascDev->getASCenable eq 'off'
         || $idleDetection !~ m{^$idleDetectionValue$}xms
         || $FHEM::Automation::ShuttersControl::shutters
@@ -1773,7 +1774,8 @@ sub SetCmdFn {
         || (   CheckIfShuttersWindowRecOpen($shuttersDev) == 2
             && $shutters->getStatus == $shutters->getOpenPos
             && $shutters->getShuttersPlace eq 'terrace'
-            && $shutters->getSelfDefenseMode eq 'off') );
+            && $shutters->getSelfDefenseMode eq 'off' )
+      );
 
     if ( $shutters->getStatus != $posValue ) {
         $shutters->setLastPos( $shutters->getStatus );
