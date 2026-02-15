@@ -559,12 +559,10 @@ FHEM/98_PID20.pm             betateilchen         Sonstiges
 FHEM/98_pilight.pm           andreas-fey          Unterstützende Dienste
 FHEM/98_ping.pm              mattwire             Sonstiges
 FHEM/98_powerMap             rudolfkoenig/orphan  Unterstützende Dienste
-FHEM/98_QRCode.pm            Benni                Unterstützende Dienste
 FHEM/98_rain.pm              baumrasen            Sonstiges
 FHEM/98_RandomTimer.pm       Beta-User            Unterstützende Dienste/Kalendermodule
 FHEM/98_readingsWatcher	     Wzut                 Sonstiges
 FHEM/98_restore.pm           rudolfkoenig         Sonstiges
-FHEM/98_rssFeed.pm           Benni                Unterstützende Dienste
 FHEM/98_serviced.pm          DeeSPe               Unterstützende Dienste
 FHEM/98_statistics.pm        tupol                Unterstützende Dienste (Link als PM an tupol)
 FHEM/98_structure.pm         rudolfkoenig         Automatisierung
@@ -655,6 +653,8 @@ contrib/DS_Starter/*         DS_Starter           Sonstiges
 contrib/98_EDIPLUG.pm        Wzut                 Sonstige Systeme
 contrib/98_exportdevice.pm   rudolfkoenig/orphan  (deprecated)
 contrib/98_FileLogConvert.pm DeeSPe               Automatisierung
+contrib/98_QRCode.pm         Benni                (deprecated)
+contrib/98_rssFeed.pm        Benni                (deprecated)
 contrib/97_SprinkleControl.pm Tobias              Unterstützende Dienste
 contrib/98_Sprinkle.pm       Tobias               Unterstützende Dienste
 contrib/betateilchen/*       betateilchen         No support!
