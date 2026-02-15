@@ -1032,7 +1032,7 @@ sub IsAdv {
         && $FHEM::Automation::ShuttersControl::ascDev->getAdvEndDate eq
         'CandlemasDay' )
     {
-        $adv = $month = 1 || ( $month = 2 && $monthday < 3 ) ? 1 : 0;
+        $adv = $month = 0 || ( $month = 2 && $monthday < 3 ) ? 1 : 0;
     }
     else {
         my $time = str2time( $year . '-12-25' );

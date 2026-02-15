@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on 
+ - bugfix:  73_AutoShuttersControl: Helpers fix Candlemas Day condition
+                                    in IsAdv function
  - change:  57_Calender: use FileRead() and support 
               calendars in configDB (forum #143580)
  - change:  76_SolarForecast: Version 2.1.1
