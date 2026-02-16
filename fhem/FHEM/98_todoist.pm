@@ -18,7 +18,7 @@ eval "use URI::Escape qw(uri_escape);1" or $missingModule .= "URI::Escape ";
 
 #######################
 # Global variables
-my $version = "1.4.8";
+my $version = "1.4.9";
 my $apiUrl = "https://api.todoist.com/api/v1/";
 
 my $srandUsed;
@@ -493,13 +493,13 @@ sub todoist_UpdateTask($$$) {
           #}
         }
 
-        $urlSec = "sync";
-        $contentType = "x-www-form-urlencoded";
+        $urlSec = "tasks/".$taskId."/move";
+        $contentType = "json";
         
-        $tType = "item_move";
-        %args = (
-          id => $taskId,
-        );
+        #$tType = "item_move";
+        #%args = (
+        #  id => $taskId,
+        #);
         ## parent_id
         $args{'parent_id'} = $h->{"parent_id"} if ($h->{"parent_id"});
         $args{'parent_id'} = $h->{"parentID"} if ($h->{"parentID"});
@@ -573,12 +573,12 @@ sub todoist_UpdateTask($$$) {
       
       Log3 $name,5, "todoist ($name): Data Array sent to todoist API: ".Dumper(%args);
       
-      if ($type eq "move") {
-        $dataArr=$commandsStart.'"type":"'.$tType.'","temp_id":"'.$taskId.'","uuid":"'.$uuid.'","args":'.encode_json(\%args).$commandsEnd;
-      }
-      else {
+      #if ($type eq "move") {
+      #  $dataArr=$commandsStart.'"type":"'.$tType.'","temp_id":"'.$taskId.'","uuid":"'.$uuid.'","args":'.encode_json(\%args).$commandsEnd;
+      #}
+      #else {
         $dataArr=encode_json(\%args);
-      }
+      #}
       #Log3 $name,4, "todoist ($name): Data Array sent to todoist API: ".$dataArr;
     
       my $data = $dataArr;
