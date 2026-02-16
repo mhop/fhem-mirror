@@ -13,11 +13,12 @@ eval "use Data::Dumper;1" or $missingModule .= "Data::Dumper ";
 eval "use JSON;1" or $missingModule .= "JSON ";
 eval "use Encode;1" or $missingModule .= "Encode ";
 eval "use Date::Parse;1" or $missingModule .= "Date::Parse ";
+eval "use URI::Escape qw(uri_escape);1" or $missingModule .= "URI::Escape ";
 
 
 #######################
 # Global variables
-my $version = "1.4.3";
+my $version = "1.4.8";
 my $apiUrl = "https://api.todoist.com/api/v1/";
 
 my $srandUsed;
@@ -1043,8 +1044,16 @@ sub todoist_GetTasks($;$) {
       my $url = $apiUrl."tasks?project_id=".$hash->{PID};
       ## check if we get also the completed Tasks
       if ($completed == 1) {
-        $url = $apiUrl."completed/get_all";
-        $data->{'limit'}=50;
+        # until = jetzt (UTC), since = days zurück
+        my $until_ts = time();
+        my $since_ts = $until_ts - (92 * 86400);
+
+        my $since = strftime("%Y-%m-%dT00:00:00Z", gmtime($since_ts));
+        my $until = strftime("%Y-%m-%dT23:59:59Z", gmtime($until_ts));
+        $url = $apiUrl."tasks/completed/by_completion_date"
+          . "?since=" . uri_escape($since)
+          . "&until=" . uri_escape($until)
+          . "&limit=200";
       }
       
       Log3 $name,4, "todoist ($name): Curl Data: ".Dumper($data);
@@ -1132,7 +1141,8 @@ sub todoist_GetTasksCallback($$$){
     }
     
     # mostly HTML response / todoist is down or locked
-    if ((ref($decoded_json) eq "HASH" && !$decoded_json->{results}) || $decoded_json eq "") {
+    if ((ref($decoded_json) eq "HASH" && !$decoded_json->{results} && !$decoded_json->{items})
+       || $decoded_json eq "") {
       $hash->{helper}{errorData} = Dumper($data);
       $hash->{helper}{errorMessage} = "GetTasks: Response was damaged or empty. See log for details.";
 
@@ -1143,7 +1153,11 @@ sub todoist_GetTasksCallback($$$){
       Log3 $name,4, "todoist ($name):  getTasks was successful";
       Log3 $name,5, "todoist ($name):  Task item data: ".Dumper(@{$decoded_json->{items}});
       ## items data
-      my @taskseries = @{$decoded_json->{results}};
+      my @taskseries;
+      
+      @taskseries = @{$decoded_json->{results}} if ($param->{completed} != 1);
+      @taskseries = @{$decoded_json->{items}} if ($param->{completed} == 1);
+      
       
       ## project data
       my $project = $decoded_json->{project};
@@ -1210,9 +1224,9 @@ sub todoist_GetTasksCallback($$$){
           readingsBulkUpdate($hash, $prefix.$t,$title);
           readingsBulkUpdate($hash, $prefix.$t."_ID",$taskID) if (AttrVal($name,"hideId",0)!=1);
 		  
-		  # convert title
-		  my $nTitle = $title;
-		  $nTitle=~s/ /_/g;
+          # convert title
+          my $nTitle = $title;
+          $nTitle=~s/ /_/g;
 
           ## a few helper for ID and revision
           $hash->{helper}{"IDS"}{"Task_".$i}=$taskID; # todoist Task-ID
