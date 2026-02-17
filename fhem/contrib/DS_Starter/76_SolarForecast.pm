@@ -7389,7 +7389,7 @@ sub _attrconsumer {                      ## no critic "not used"
       notbefore     => { comp => '.*',                              must => 0, act => 1 },
       notafter      => { comp => '.*',                              must => 0, act => 1 },
       auto          => { comp => '',                                must => 0, act => 0 },
-      pcurr         => { comp => '',                                must => 0, act => 0 },
+      pcurr         => { comp => '.*',                              must => 0, act => 1 },
       etotal        => { comp => '.*',                              must => 0, act => 1 },
       swoncond      => { comp => '.*',                              must => 0, act => 1 },
       swoffcond     => { comp => '.*',                              must => 0, act => 1 },
@@ -7454,7 +7454,7 @@ sub _attrconsumer {                      ## no critic "not used"
 
   writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                          # Cache File Consumer schreiben
 
-  $data{$name}{current}{consumerCollected} = 0;                                                    # Consumer neu sammeln
+  $data{$name}{current}{consumerCollected} = 0;                                                    # Consumerdefinitionen neu sammeln
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
@@ -9075,15 +9075,18 @@ sub __attrKeyAction {
           }
       }
       
-      if ($akey eq 'etotal') {
+      if ($akey eq 'etotal' || $akey eq 'pcurr') {
           my ($rtot, $utot, $ethreshold) = split ":", $akeyval;
 
-          if (!$utot || $utot !~ /^(Wh|kWh)$/xs) {
-              return qq{The unit of key 'etotal' must be 'Wh' or 'kWh'};
+          if ($akey eq 'etotal' && (!$utot || $utot !~ /^(Wh|kWh)$/xs)) {
+              return qq{The unit of key '$akey' must be 'Wh' or 'kWh'};
+          }
+          elsif ($akey eq 'pcurr' && (!$utot || $utot !~ /^(W|kW)$/xs)) {
+              return qq{The unit of key '$akey' must be 'W' or 'kW'};
           }
 
           if (defined $ethreshold && !isNumeric ($ethreshold)) {
-              return qq{The optional 'Threshold' of key 'etotal' must be numeric if specified};
+              return qq{The optional 'Threshold' of key '$akey' must be numeric if specified};
           }
       }
       
