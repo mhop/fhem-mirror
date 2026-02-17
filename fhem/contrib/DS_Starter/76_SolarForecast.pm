@@ -7400,7 +7400,7 @@ sub _attrconsumer {                      ## no critic "not used"
       noshow        => { comp => '',                                must => 0, act => 0 },
       exconfc       => { comp => '[012]',                           must => 0, act => 0 },
       pvshare       => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
-      comforttemp   => { comp => '-?(40(\.0+)?|[0-3]?\d(\.\d+)?)',  must => 0, act => 1 },
+      comforttemp   => { comp => '.*',                              must => 0, act => 1 },
   };
 
   if ($cmd eq 'set') {
@@ -9196,6 +9196,22 @@ sub __attrKeyAction {
               return "spignorecond: $err" if($err);
           }
       }
+      
+      if ($akey eq 'comforttemp') {          
+          if (isNumeric ($akeyval) && $akeyval =~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
+              return $err;
+          }
+          else {
+              my ($dv, $rd) = split ':', $akeyval;
+              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+              return $err if($err);
+
+              my $val = ReadingsVal ($dv, $rd, '');
+              if (!isNumeric ($val) || $val !~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
+                  return "The reading '$rd' of device '$dv' is invalid or doesn't contain a numerical value within a valid range.";
+              }             
+          }          
+      }
   }
 
   if ($akey eq 'lcSlot') {
@@ -10739,7 +10755,7 @@ sub _collectAllRegConsumers {
       }
 
       my ($rswstate, $onreg, $offreg);
-      if(exists $hc->{swstate}) {
+      if (exists $hc->{swstate}) {
           ($rswstate, $onreg, $offreg) = split ":", $hc->{swstate}, 3;
       }
 
@@ -10790,6 +10806,16 @@ sub _collectAllRegConsumers {
               $setshift  *= 60 if(defined $setshift  && isNumeric($setshift));
           }
       }
+      
+      my ($comforttemp, $comforttempdev, $comforttemprdg);
+      if (exists $hc->{comforttemp}) {
+          if (isNumeric ($hc->{comforttemp}) && $hc->{comforttemp} =~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
+              $comforttemp = $hc->{comforttemp};
+          }
+          else {
+              ($comforttempdev, $comforttemprdg) = split ':', $hc->{comforttemp};           
+          }        
+      }
 
       my $clt;
       if (exists $hc->{locktime}) {
@@ -10799,6 +10825,10 @@ sub _collectAllRegConsumers {
       delete $data{$name}{consumers}{$c}{sunriseshift};
       delete $data{$name}{consumers}{$c}{sunsetshift};
       delete $data{$name}{consumers}{$c}{icon};
+      delete $data{$name}{consumers}{$c}{comforttempdev}; 
+      delete $data{$name}{consumers}{$c}{comforttemprdg}; 
+      delete $data{$name}{consumers}{$c}{comforttemp};      
+
 
       my $rauto = $hc->{auto} // q{};
       my $ctype = $hc->{type} // DEFCTYPE;
@@ -10848,11 +10878,12 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{spignorecondition} = $spignorecondition  // q{};                          # Code/Regex der Ignore Bedingung
       $data{$name}{consumers}{$c}{interruptable}     = $interruptable;                                      # Ein-Zustand des Verbrauchers ist unterbrechbar
       $data{$name}{consumers}{$c}{hysteresis}        = $hyst;                                               # Hysterese
-      $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift         if(defined $riseshift);           # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
-      $data{$name}{consumers}{$c}{sunsetshift}       = $setshift          if(defined $setshift);            # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
-      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}        if(defined $hc->{icon});          # Icon für den Verbraucher
-      $data{$name}{consumers}{$c}{comforttemp}       = $hc->{comforttemp} if(defined $hc->{comforttemp});   # Solltemperatur für Wärmepumpen-Consumer
-      
+      $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift          if(defined $riseshift);          # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
+      $data{$name}{consumers}{$c}{sunsetshift}       = $setshift           if(defined $setshift);           # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
+      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}         if(defined $hc->{icon});         # Icon für den Verbraucher
+      $data{$name}{consumers}{$c}{comforttempdev}    = $comforttempdev     if(defined $comforttempdev);     # Device für HP-Solltemperatur
+      $data{$name}{consumers}{$c}{comforttemprdg}    = $comforttemprdg     if(defined $comforttemprdg);     # Reading für HP-Solltemperatur
+      $data{$name}{consumers}{$c}{comforttemp}       = $comforttemp        if(defined $comforttemp);        # Solltemperatur für Wärmepumpen-Consumer  
   }
 
   $data{$name}{current}{consumerCollected} = 1;
@@ -14708,9 +14739,7 @@ return $vector;
 }
 
 ################################################################
-#     Consumer - Energieverbrauch aufnehmen
-#              - Masterdata ergänzen
-#              - Schaltzeiten planen
+#                  Management Consumer
 ################################################################
 sub _manageConsumerData {
   my $paref   = shift;
@@ -14727,13 +14756,30 @@ sub _manageConsumerData {
 
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
       $paref->{consumer} = $c;
-      my $consumer       = ConsumerVal ($hash, $c, 'name',  '');
-      my $alias          = ConsumerVal ($hash, $c, 'alias', '');
+      my $consumer       = ConsumerVal ($name, $c, 'name',  '');
+      my $alias          = ConsumerVal ($name, $c, 'alias', '');
+      
+      ## Comforttemperatur bei HP-Consumer auslesen
+      my $cftdev = ConsumerVal ($name, $c, "comforttempdev", '');
+      my $cftrdg = ConsumerVal ($name, $c, "comforttemprdg", '');
+      
+      if ($cftdev && $cftrdg) {
+          my $comforttemp = ReadingsNum ($cftdev, $cftrdg,            ''); 
+
+          if (isNumeric ($comforttemp) && $comforttemp =~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
+              $data{$name}{consumers}{$c}{comforttemp} = $comforttemp;
+          }
+          else {
+              delete $data{$name}{consumers}{$c}{comforttemp};
+              my $msg = "consumer $c -> got invalid value=$comforttemp from device=$cftdev, reading=$cftrdg. Check key 'comforttemp'.";          
+              Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));          
+          }
+      }      
 
       ## aktuelle Leistung auslesen
       ##############################
-      my $paread = ConsumerVal ($hash, $c, "rpcurr", "");
-      my $up     = ConsumerVal ($hash, $c, "upcurr", "");
+      my $paread = ConsumerVal ($name, $c, "rpcurr", '');
+      my $up     = ConsumerVal ($name, $c, "upcurr", '');
       my $pcurr  = 0;
 
       if ($paread) {
@@ -14744,20 +14790,20 @@ sub _manageConsumerData {
       ## Verbrauch auslesen + speichern
       ###################################
       my $ethreshold = 0;
-      my $etotread   = ConsumerVal ($hash, $c, "retotal", "");
-      my $u          = ConsumerVal ($hash, $c, "uetotal", "");
+      my $etotread   = ConsumerVal ($name, $c, "retotal", "");
+      my $u          = ConsumerVal ($name, $c, "uetotal", "");
 
       if ($etotread) {
           my $eu      = $u =~ /^kWh$/xi ? 1000 : 1;
           my $etot    = ReadingsNum ($consumer, $etotread, 0) * $eu;                               # Summe Energieverbrauch des Verbrauchers
-          my $ehist   = HistoryVal  ($hash, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
-          $ethreshold = ConsumerVal ($hash, $c, "energythreshold", 0);                             # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
+          my $ehist   = HistoryVal  ($name, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
+          $ethreshold = ConsumerVal ($name, $c, "energythreshold", 0);                             # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
 
           ## aktuelle Leistung ermitteln wenn kein Reading d. aktuellen Leistung verfügbar
           ##################################################################################
           if (!$paread){
-              my $timespan = $t    - ConsumerVal ($hash, $c, "old_etottime",  $t);
-              my $delta    = $etot - ConsumerVal ($hash, $c, "old_etotal", $etot);
+              my $timespan = $t    - ConsumerVal ($name, $c, "old_etottime",  $t);
+              my $delta    = $etot - ConsumerVal ($name, $c, "old_etotal", $etot);
               $pcurr       = sprintf "%.6f", ($delta / 3600 * $timespan) if($delta);               # Einheitenformel beachten !!: W = Wh / (3600 * s)
 
               $data{$name}{consumers}{$c}{old_etotal}   = $etot;
@@ -14766,7 +14812,7 @@ sub _manageConsumerData {
 
           if (defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
               my $consumerco  = $etot - $ehist;
-              $consumerco    += HistoryVal ($hash, $day, sprintf("%02d",$nhour), "csme${c}", 0);
+              $consumerco    += HistoryVal ($name, $day, sprintf("%02d",$nhour), "csme${c}", 0);
 
               if ($consumerco < 0) {                                                              # V1.32.0
                   $consumerco = 0;
@@ -14830,8 +14876,8 @@ sub _manageConsumerData {
       my $dnum       = 0;
 
       for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {                                                 # Betriebszeit und gemessenen Verbrauch ermitteln
-          my $csme  = HistoryVal ($hash, $n, 99, "csme${c}", 0);
-          my $hours = HistoryVal ($hash, $n, 99, "hourscsme${c}", 0);
+          my $csme  = HistoryVal ($name, $n, 99, "csme${c}", 0);
+          my $hours = HistoryVal ($name, $n, 99, "hourscsme${c}", 0);
           next if(!$hours);
 
           $consumerco += $csme;
@@ -33316,6 +33362,8 @@ to ensure that the system configuration is correct.
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
             <tr><td> <b>comforttemp</b>    </td><td>Target temperature (comfort temperature) in the interior spaces in °C. (mandatory field)                                                           </td></tr>
+            <tr><td>                       </td><td>The value can be set permanently or supplied by a &lt;Device&gt;:&lt;Reading&gt; combination:                                                      </td></tr>                
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - The device/reading combination provides the temperature.                                                   </td></tr>
             <tr><td>                       </td><td>Value range: <b>-40..40</b>                                                                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>&lt;Reading&gt;:&lt;Unit&gt; (Wh/kWh) of the consumer device that provides the total amount of energy consumed. (mandatory field)                  </td></tr>
@@ -36236,7 +36284,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                      </td></tr>
             <tr><td>                       </td><td>der Planung eingeschaltet auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                                   </td></tr>
             <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!         </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE ('undef' wird ignoriert)                                        </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE ('undef' wird ignoriert)                        </td></tr>
             <tr><td>                       </td><td>Die Prüfung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                               </td></tr>
             <tr><td>                       </td><td><b>Regex</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                                     </td></tr>
             <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
@@ -36246,13 +36294,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär ausgeschaltet auch wenn der PV Überschuß die benötigte Energie unterschreitet (default)                 </td></tr>
             <tr><td>                       </td><td><b>1</b> - Verbraucher wird temporär ausgeschaltet falls der PV Überschuß die benötigte Energie unterschreitet                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading:{Perl-Code}</b> - Verbraucher wird temporär unterbrochen, wenn der Perl-Code 'wahr' zurückgibt <b>oder</b> unzureichender        </td></tr>
-            <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt und wird wieder eingeschaltet, wenn der Perl-Code 'falsch' zurückgibt <b>und</b> PV Überschuß        </td></tr>
-            <tr><td>                       </td><td>(wenn power ungleich 0) vorliegt. Der Wert von  Device:Reading wird dem Code mit der Variable $VALUE übergeben.                                    </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:{Perl-Code}</b> - Verbraucher wird temporär unterbrochen, wenn der Perl-Code 'wahr' zurückgibt <b>oder</b>       </td></tr>
+            <tr><td>                       </td><td>unzureichender PV Überschuß (wenn power ungleich 0) vorliegt und wird wieder eingeschaltet, wenn der Perl-Code 'falsch' zurückgibt <b>und</b>      </td></tr>
+            <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt. Der Wert von  &lt;Device&gt;:&lt;Reading&gt; wird dem Code mit der Variable $VALUE übergeben.       </td></tr>
             <tr><td>                       </td><td>Der Code ist in {..} einzuschließen und darf <b>keine Leerzeichen</b> enthalten.                                                                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td>                       </td><td><b>Device:Reading:Regex[:Hysterese]</b> - Verbraucher wird temporär unterbrochen, wenn der Wert des angegebenen                                    </td></tr>
-            <tr><td>                       </td><td>Device:Readings auf den Regex matched <b>oder</b> unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                                    </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:Regex[:Hysterese]</b> - Verbraucher wird temporär unterbrochen, wenn der Wert des angegebenen                    </td></tr>
+            <tr><td>                       </td><td>&lt;Device&gt;:&lt;Reading&gt; auf den Regex matched <b>oder</b> unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                     </td></tr>
             <tr><td>                       </td><td>Der unterbrochene Verbraucher wird wieder eingeschaltet, wenn der Wert nicht mehr matched <b>und</b> ausreichender PV Überschuß                    </td></tr>
             <tr><td>                       </td><td>(wenn power ungleich 0) vorliegt.                                                                                                                  </td></tr>
             <tr><td>                       </td><td>Ist die optionale <b>Hysterese</b> angegeben, wird der Hysteresewert vom Readingswert subtrahiert und danach der Regex angewendet.                 </td></tr>
@@ -36294,7 +36342,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-            <tr><td> <b>comforttemp</b>    </td><td>Solltemperatur (Komforttemperatur) in den Innenräumen in °C. (Pflichtangabe)                                                                       </td></tr>
+            <tr><td> <b>comforttemp</b>    </td><td>Solltemperatur (Komforttemperatur) in den Innenräumen in °C (Pflichtangabe).                                                                       </td></tr>
+            <tr><td>                       </td><td>Der Wert kann fest gesetzt oder durch eine &lt;Device&gt;:&lt;Reading&gt;-Kombination geliefert werden:                                            </td></tr>                
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert die Temperatur                                                      </td></tr>
             <tr><td>                       </td><td>Wertebereich: <b>-40..40</b>                                                                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>&lt;Reading&gt;:&lt;Einheit&gt; (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert. (Pflichtangabe)                  </td></tr>
