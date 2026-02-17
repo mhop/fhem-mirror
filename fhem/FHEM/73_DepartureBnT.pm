@@ -720,7 +720,8 @@ sub DepartureBnT_UpdateResponse($) {
 
 	### Create Reading name and Update Reading
 	$ReadingName = "departure_Entries";
-	readingsBulkUpdate($hash, $ReadingName, $ReadingOrderNo++ , 1);
+	$ReadingOrderNo++;
+	readingsBulkUpdate($hash, $ReadingName, $ReadingOrderNo , 1);
 
 	### Execute Readings Bulk Update
 	readingsEndUpdate($hash, 1);
@@ -859,111 +860,123 @@ sub DepartureBnT_FW_detailFn($$$$) {
 	my $MapHeight         = $TableLines * 40;
 	my $TableHeader       = "<h1>" . ReadingsVal($name, "Station_place", "") . " - " . ReadingsVal($name, "Station_name", "") . "</h1><h3>last Update: " . ReadingsTimestamp($name,"departure_00_departureTimeInMinutes",'') . "</h3>";
 
+	### Definition of Icons
+	my $IconBus           = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 122.88 120.96"   ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Bus            </title><path class="cls-1" d="M105.5,104.64H99.44v9.53A6.81,6.81,0,0,1,92.65,121h-4a6.82,6.82,0,0,1-6.79-6.79v-9.53H40.82v9.53A6.82,6.82,0,0,1,34,121H30a6.81,6.81,0,0,1-6.78-6.79v-9.53H18.1c-3.54-.06-5.24-2-5.5-5.29V21.52c-2,.2-2.95.66-3.43,1.68V45.45H4.87A4.88,4.88,0,0,1,0,40.58V27.44a4.89,4.89,0,0,1,4.73-4.87c.41-3.82,2.06-4.93,8-5.21Q14,7.36,26.36,2.57C44.09-.68,77.73-1,96.52,2.57c8.28,3.19,12.8,8.12,13.62,14.79,6,.3,7.61,1.42,8,5.21a4.89,4.89,0,0,1,4.73,4.87V40.58A4.88,4.88,0,0,1,118,45.45h-4.3V23.14c-.48-1-1.47-1.44-3.43-1.63V98.59c0,4.46-1.44,6-4.78,6ZM16.13,84.87l.28-6.69c.16-1.17.78-1.69,1.89-1.5A129.9,129.9,0,0,1,34.39,86.85c1.09.72.66,2.11-.78,1.85L18.48,87.6a2.74,2.74,0,0,1-2.35-2.73ZM52,93.45H71.3a.94.94,0,0,1,.94.94v3.24a.94.94,0,0,1-.94.94H52a.94.94,0,0,1-.94-.94V94.39a.94.94,0,0,1,.94-.94Zm50.35,0A2.51,2.51,0,1,1,99.82,96a2.51,2.51,0,0,1,2.5-2.51Zm-82.65,0A2.51,2.51,0,1,1,17.16,96a2.51,2.51,0,0,1,2.51-2.51Zm87.08-8.63-.28-6.69c-.16-1.17-.78-1.69-1.88-1.5a129.28,129.28,0,0,0-16.1,10.17c-1.09.72-.66,2.11.78,1.85l15.13-1.1a2.73,2.73,0,0,0,2.35-2.73ZM48.19,6.11h26.5a1.63,1.63,0,0,1,1.62,1.62V12a1.63,1.63,0,0,1-1.62,1.62H48.19A1.63,1.63,0,0,1,46.57,12V7.73a1.63,1.63,0,0,1,1.62-1.62ZM20.32,18.91H102.2a2,2,0,0,1,2,2V64.09c0,1.08-.89,1.69-2,2-28.09,8.53-53.8,8.18-81.88,0-1.11-.3-2-.9-2-2V20.89a2,2,0,0,1,2-2Z"/></svg>';
+	my $IconTram          = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80.33 122.88"    ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Tram           </title><path class="cls-1" d="M23.63,15h1.31L22.73,7.67l-.07-.24H18A3.72,3.72,0,0,1,18,0H62.33a3.72,3.72,0,0,1,0,7.43H57.67l-.06.24L55.39,15h.5c5.29,0,11.71,6.85,12.79,12L80.21,81.93c1.09,5.17-5.65,12.64-10.94,12.64H17.48C5,94.57-2.35,92,.69,76.93l10-49.39c1-5.2,7.7-12.52,13-12.52ZM30.4,7.43,32.69,15h15l2.29-7.59ZM8.56,122.88l8.93-20.72h11l-2.95,6.65H55.14l-3-6.84H62.93l8.84,20.53H61.12L58,115.66H22.34l-2.95,7.22Zm17.33-49A7.14,7.14,0,1,1,18.75,81a7.13,7.13,0,0,1,7.14-7.13Zm7.58-52.14H46.33a.6.6,0,0,1,.6.6v6a.6.6,0,0,1-.6.6H33.47a.6.6,0,0,1-.6-.6v-6a.6.6,0,0,1,.6-.6ZM9.35,67.23l7-31.43H63.87l6.58,31.43Zm44.56,6.65A7.14,7.14,0,1,1,46.78,81a7.13,7.13,0,0,1,7.13-7.13Z"/></svg>';
+	my $IconTrainRegional = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50"           ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Regional Train </title><path class="cls-1" d="M34.641 37.807l-.113-.216.057-.081.057-.081c1.051-.434 2.006-.971 2.861-1.604.854-.64 1.426-1.574 1.721-2.809l.215-.988v-25.521c0-.616-.184-1.255-.547-1.905-.363-.661-.816-1.252-1.365-1.777-.543-.52-1.148-.961-1.824-1.311-.676-.344-1.32-.514-1.939-.514h-18.265c-.583 0-1.212.16-1.885.487-.675.328-1.294.747-1.854 1.257-.562.505-1.027 1.08-1.39 1.713-.364.645-.547 1.267-.547 1.89v25.901c0 .436.115.891.327 1.363.22.474.492.917.818 1.331.326.426.685.807 1.067 1.15s.753.627 1.118.844c.176.074.499.188.957.333.448.144.658.251.624.321l-7.476 11.346h4.361l5.457-7.909h15.055l5.451 7.909h4.418l-7.359-11.129zm-14.347-34.628c0-.183.087-.37.273-.575.179-.199.36-.295.545-.295h6.982c.07 0 .221.07.438.213.215.146.324.291.324.436v2.672c0 .183-.092.351-.271.49-.184.15-.35.226-.49.226h-7.035l-.222-.173c-.105-.07-.227-.166-.353-.301-.128-.122-.191-.256-.191-.401v-2.292zm-7.037 7.472c0-.363.086-.719.247-1.066.162-.345.373-.66.627-.955.256-.292.556-.521.898-.704.348-.184.705-.274 1.068-.274h16.963c.322 0 .65.076.977.214.328.146.627.35.902.602.274.252.489.532.655.822.162.284.242.596.242.923v5.783c0 .328-.088.638-.27.95-.182.317-.418.591-.709.827-.295.232-.598.424-.928.564-.326.155-.654.22-.979.22h-16.744l-.276-.049c-.144-.038-.256-.074-.329-.113-.615-.106-1.159-.435-1.633-.982-.474-.546-.711-1.144-.711-1.797v-4.965zm5.049 22.526c-.563.581-1.268.871-2.1.871-.837 0-1.52-.29-2.05-.871-.526-.58-.789-1.294-.789-2.131 0-.763.274-1.424.821-1.986.544-.565 1.217-.851 2.018-.851.832 0 1.536.27 2.1.789.564.533.845 1.226.845 2.105 0 .801-.281 1.494-.845 2.074zm12.489 0c-.562-.58-.848-1.294-.848-2.131 0-.838.299-1.515.9-2.048.602-.52 1.301-.789 2.104-.789.83 0 1.516.285 2.043.851.525.562.793 1.224.793 1.986 0 .837-.275 1.551-.82 2.131-.549.581-1.236.871-2.076.871-.834 0-1.534-.29-2.096-.871z"/></svg>';
+	my $IconTrainIce      = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 538.043 538.043" ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>ICE            </title><path class="cls-1" d="M399.495,480.568c-8.728,3.336-17.827,6.038-27.321,7.963l61.959,47.144c2.056,1.59,4.484,2.344,6.911,2.344 c3.443,0,6.863-1.554,9.111-4.508c3.826-5.046,2.87-12.208-2.188-16.057L399.495,480.568z"/> <path d="M90.084,517.478c-5.046,3.838-6.014,11.012-2.188,16.057c2.248,2.953,5.667,4.508,9.111,4.508 c2.427,0,4.854-0.765,6.923-2.332l61.947-47.144c-9.494-1.937-18.592-4.651-27.321-7.987L90.084,517.478z"/> <path d="M473.948,353.602c-7.82-62.162-11.048-163.948-7.186-226.887c1.805-29.006-8.836-57.391-30.023-79.953 C408.809,17.062,365.981,0,319.207,0H218.82c-46.774,0-89.614,17.062-117.532,46.774C80.125,69.336,69.472,97.72,71.277,126.715 c3.862,62.951,0.645,164.725-7.174,226.923c-3.635,29.198,5.464,57.87,25.587,80.623c26.257,29.724,68.128,46.774,114.842,46.774 h128.951c46.714,0,88.586-17.05,114.842-46.774C468.484,411.496,477.559,382.848,473.948,353.602z M117.991,62.449 c23.626-25.145,60.38-39.564,100.853-39.564h100.375c40.473,0,77.227,14.419,100.853,39.564 c16.93,18.054,25.168,39.636,23.841,62.437c-13.284,86.075-51.222,113.384-51.545,113.587c-5.225,3.491-6.66,10.498-3.24,15.735 c2.2,3.384,29.305,29.999,56.219,35.69c0.55,9.123,1.184,18.042,1.853,26.651c-6.72,11.514-45.985,66.765-178.164,66.765 c-132.131,0-171.421-55.203-178.176-66.765c0.682-8.453,1.291-17.265,1.841-26.233c26.926-5.572,54.151-32.761,56.315-36.192 c3.288-5.189,1.817-12.1-3.216-15.591c-0.394-0.251-38.345-27.56-51.64-113.635C92.81,102.097,101.06,80.504,117.991,62.449z M333.507,458.126H204.544c-40.174,0-75.768-14.204-97.685-39.038c-15.95-18.042-22.885-39.708-20.027-62.616 c0.645-5.237,1.244-10.797,1.841-16.512c16.297,24.164,61.385,66.251,180.34,66.251s164.043-42.087,180.34-66.275 c0.598,5.727,1.22,11.287,1.841,16.512c2.846,22.933-4.089,44.598-20.039,62.64C409.263,443.922,373.681,458.126,333.507,458.126z" /> <path d="M131.896,165.395c7.198,36.037,42.948,65.342,79.678,65.342h114.902c36.718,0,72.48-29.305,79.666-65.342l6.229-31.099 c3.683-18.365-0.299-35.798-11.227-49.141c-10.952-13.331-27.273-20.673-45.997-20.673H182.915 c-18.712,0-35.045,7.341-45.997,20.673c-10.928,13.343-14.91,30.776-11.239,49.141L131.896,165.395z"/> <path d="M207.88,268.029c-1.805-4.173-5.918-6.851-10.486-6.851h-31.876c-3.874,0-7.473,1.937-9.589,5.189 c-2.116,3.24-2.451,7.329-0.897,10.856l28.66,65.402c1.83,4.173,5.943,6.851,10.486,6.851h31.9c0.096,0,0.167,0,0.215,0 c6.325,0,11.466-5.129,11.466-11.442c0-2.451-0.753-4.675-2.044-6.54L207.88,268.029z"/> <path d="M372.533,261.178h-31.876c-4.567,0-8.68,2.69-10.498,6.851l-28.672,65.378c-1.554,3.551-1.196,7.64,0.909,10.868 c2.104,3.228,5.727,5.201,9.577,5.201h31.9c4.555,0,8.669-2.702,10.486-6.851l28.66-65.402c1.554-3.527,1.231-7.628-0.897-10.856 C380.006,263.116,376.395,261.178,372.533,261.178z"/> <path d="M269.025,413.289c-11.036,0-20.015,9.039-20.015,20.123c0,11.036,8.979,20.015,20.015,20.015 c11.036,0,20.015-8.979,20.015-20.015C289.041,422.328,280.061,413.289,269.025,413.289z"/> </svg>';
+	my $IconTaxi          = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"         ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Taxi           </title><path class="cls-1" d="M34.313,250.891c2.297-5.016,6.688-13.281,14.438-27.813c3.531-6.672,7.5-14.047,11.563-21.625H24.719 C11.063,201.453,0,212.516,0,226.188c0,13.641,11.063,24.703,24.719,24.703H34.313z"/> <path class="st0" d="M487.281,201.453h-35.594c4.078,7.578,8.031,14.953,11.563,21.625c7.75,14.531,12.125,22.797,14.438,27.813 h9.594c13.656,0,24.719-11.063,24.719-24.703C512,212.516,500.938,201.453,487.281,201.453z"/> <path class="st0" d="M39.391,465.188c0,18.406,14.938,33.328,33.328,33.328c18.406,0,33.313-14.922,33.313-33.328v-31.516H39.391 V465.188z"/> <path class="st0" d="M405.938,465.188c0,18.406,14.938,33.328,33.344,33.328s33.328-14.922,33.328-33.328v-31.516h-66.672V465.188z "/> <path class="st0" d="M467.875,257.109c1.688,0.484-61.688-115.828-64.719-122.109c-8-16.672-27.781-26.703-47.063-26.703 c-22.281,0-84.344,0-84.344,0s-93.563,0-115.859,0c-19.297,0-39.031,10.031-47.047,26.703 c-3.031,6.281-66.391,122.594-64.719,122.109c0,0-20.5,20.438-22.063,22.063c-8.625,9.281-8,17.297-8,25.313c0,0,0,75.297,0,92.563 c0,17.281,3.063,26.734,23.438,26.734h437c20.375,0,23.469-9.453,23.469-26.734c0-17.266,0-92.563,0-92.563 c0-8.016,0.594-16.031-8.063-25.313C488.406,277.547,467.875,257.109,467.875,257.109z M96.563,221.422 c0,0,40.703-73.313,43.094-78.109c4.125-8.203,15.844-14.141,27.828-14.141h177.031c12,0,23.703,5.938,27.828,14.141 c2.406,4.797,43.109,78.109,43.109,78.109c3.75,6.75,0.438,19.313-10.672,19.313H107.219 C96.109,240.734,92.813,228.172,96.563,221.422z M91.125,384.469c-20.656,0-37.406-16.734-37.406-37.391 c0-20.672,16.75-37.406,37.406-37.406s37.391,16.734,37.391,37.406C128.516,367.734,111.781,384.469,91.125,384.469z M312.781,394.578c0,2.734-2.219,4.953-4.938,4.953H204.172c-2.734,0-4.953-2.219-4.953-4.953v-45.672 c0-2.703,2.219-4.906,4.953-4.906h103.672c2.719,0,4.938,2.203,4.938,4.906V394.578z M420.875,384.469 c-20.656,0-37.422-16.734-37.422-37.391c0-20.672,16.766-37.406,37.422-37.406s37.406,16.75,37.406,37.406 S441.531,384.469,420.875,384.469z"/> <path class="st0" d="M152.906,49.25c0.016-10.047,8.172-18.203,18.219-18.219h169.75c10.031,0.016,18.188,8.172,18.203,18.219 v49.172h17.547V49.25c0-19.75-16-35.75-35.75-35.766h-169.75c-19.75,0.016-35.75,16.016-35.766,35.766v49.172h17.547V49.25z"/> <path class="st0" d="M195.141,92.938h8.891c0.438,0,0.719-0.266,0.719-0.672V56.328c0-0.281,0.156-0.422,0.406-0.422h12.063 c0.406,0,0.719-0.266,0.719-0.672v-7.469c0-0.406-0.313-0.688-0.719-0.688h-35.25c-0.438,0-0.719,0.281-0.719,0.688v7.469 c0,0.406,0.281,0.672,0.719,0.672h12.047c0.281,0,0.422,0.141,0.422,0.422v35.938C194.438,92.672,194.719,92.938,195.141,92.938z" /> <path class="st0" d="M237.438,47.078c-0.5,0-0.781,0.281-0.922,0.688l-16.391,44.5c-0.156,0.406,0,0.672,0.469,0.672h9.203 c0.484,0,0.766-0.203,0.906-0.672l2.672-8.031h16.688l2.719,8.031c0.156,0.469,0.438,0.672,0.938,0.672h9.094 c0.5,0,0.625-0.266,0.5-0.672l-16.125-44.5c-0.156-0.406-0.406-0.688-0.922-0.688H237.438z M247.25,75.813h-11l5.406-16.047h0.203 L247.25,75.813z"/> <path class="st0" d="M269.844,92.938h9.688c0.625,0,0.906-0.203,1.188-0.672l8.531-13.969h0.219l8.5,13.969 c0.281,0.469,0.531,0.672,1.188,0.672h9.734c0.516,0,0.641-0.406,0.453-0.813l-14.313-22.859l13.297-21.375 c0.234-0.406,0.078-0.813-0.406-0.813h-9.734c-0.563,0-0.844,0.203-1.141,0.688l-7.578,12.391h-0.219l-7.563-12.391 c-0.266-0.484-0.547-0.688-1.125-0.688h-9.75c-0.469,0-0.625,0.406-0.406,0.813l13.266,21.375l-14.234,22.859 C269.156,92.531,269.359,92.938,269.844,92.938z"/> <path class="st0" d="M320.422,47.766v44.5c0,0.406,0.281,0.672,0.688,0.672h8.922c0.406,0,0.688-0.266,0.688-0.672v-44.5 c0-0.406-0.281-0.688-0.688-0.688h-8.922C320.703,47.078,320.422,47.359,320.422,47.766z"/></svg>';
+	my $IconUnknown       = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 469 469"         ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Unknown        </title><path class="cls-1" d="M 809,1820 C 205,1745 -161,1123 70,567 224,197 616,-37 1005,9 c 456,54 790,406 812,858 17,335 -134,630 -415,814 -165,108 -400,163 -593,139 z m 306,-155 c 203,-55 385,-203 484,-395 63,-120 85,-213 85,-355 0,-141 -16,-211 -74,-333 C 1503,357 1310,205 1067,153 978,135 792,140 705,164 561,204 410,302 314,418 249,496 179,636 155,735 c -23,94 -23,267 0,360 39,160 153,336 276,430 82,61 224,129 314,149 87,19 283,15 370,-9 z" id="path8" /> </g> <g id="text2989" fill="#000000" stroke="none"> <path d="m 216.47819,309.81169 c -0.12157,-4.37349 -0.18232,-7.65367 -0.18223,-9.84052 -9e-5,-12.87764 1.82223,-23.99378 5.46696,-33.34846 2.67264,-7.04619 6.98546,-14.15323 12.93847,-21.32114 4.37346,-5.22385 12.2398,-12.84721 23.59904,-22.87012 11.35899,-10.02259 18.73938,-18.01042 22.14119,-23.9635 3.40151,-5.95273 5.10234,-12.45233 5.1025,-19.49883 -1.6e-4,-12.75603 -4.98116,-23.96328 -14.94303,-33.6218 -9.96214,-9.65806 -22.17167,-14.4872 -36.62863,-14.48744 -13.97121,2.4e-4 -25.63404,4.3738 -34.98854,13.1207 -9.35463,8.74736 -15.48977,22.41474 -18.40543,41.0022 l -33.71292,-4.00911 c 3.03718,-24.90481 12.05766,-43.97841 27.06145,-57.22084 15.00371,-13.24193 34.83661,-19.86302 59.49875,-19.86329 26.11979,2.7e-4 46.95496,7.10731 62.50557,21.32114 15.55028,14.21434 23.32551,31.40487 23.3257,51.57166 -1.9e-4,11.66303 -2.73367,22.41471 -8.20044,32.25506 -5.46714,9.84069 -16.15807,21.80724 -32.07283,35.8997 -10.69109,9.47619 -17.67664,16.46174 -20.95668,20.95668 -3.2803,4.49516 -5.71006,9.6584 -7.28928,15.48972 -1.57947,5.83151 -2.49063,15.30757 -2.73348,28.42819 z m -2.00455,65.78575 0,-37.35756 37.35756,0 0,37.35756 z" id="path2994" /> </svg>';
+
+
 	my$htmlCode = '
 	<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-<html>
-	<head>
-		<title>Busstation</title>
-		<style type="text/css">
-			<!-- Flashlights -->
-			.container {
-				display: flex;
-				gap: 10px;
-			}
+	<html>
+		<head>
+			<title>Busstation</title>
+			<style type="text/css">
+				<!-- Flashlights -->
+				.container {
+					display: flex;
+					gap: 10px;
+				}
 
-			.light {
-				width: 20px;
-				height: 20px;
-				border-radius: 50%;
-				background-color: grey;
-				opacity: 0.3;
-			}
+				.light {
+					width: 20px;
+					height: 20px;
+					border-radius: 50%;
+					background-color: grey;
+					opacity: 0.3;
+				}
 
-			.off {
-				<!-- Do nothing -->
-			}
+				.off {
+					<!-- Do nothing -->
+				}
 
-			.AlertLeft {
-				animation: AlertLeft 1.0s infinite;
-			}
-			
-			.AlertRight {
-				animation: AlertRight 1.0s infinite;
-			}
+				.AlertLeft {
+					animation: AlertLeft 1.0s infinite;
+				}
+				
+				.AlertRight {
+					animation: AlertRight 1.0s infinite;
+				}
 
-			.WarningLeft {
-				animation: WarningLeft 1.0s infinite;
-			}
-			
-			.WarningRight {
-				animation: WarningRight 1.0s infinite;
-			}
+				.WarningLeft {
+					animation: WarningLeft 1.0s infinite;
+				}
+				
+				.WarningRight {
+					animation: WarningRight 1.0s infinite;
+				}
 
-			.OkLeft {
-				animation: OkLeft 1.0s infinite;
-			}
-			
-			.OkRight {
-				animation: OkRight 1.0s infinite;
-			}
+				.OkLeft {
+					animation: OkLeft 1.0s infinite;
+				}
+				
+				.OkRight {
+					animation: OkRight 1.0s infinite;
+				}
 
-			@keyframes OkLeft {
-				0%, 49% { opacity: 1; background-color: lawngreen;  }
-				50%, 100% { opacity: 0.3; background-color: grey;   }
-			}
-			
-			@keyframes OkRight {
-				0%, 49% { opacity: 0.3; background-color: grey;     }
-				50%, 100% { opacity: 1; background-color: lawngreen;}
-			}
+				@keyframes OkLeft {
+					0%, 49% { opacity: 1; background-color: lawngreen;  }
+					50%, 100% { opacity: 0.3; background-color: grey;   }
+				}
+				
+				@keyframes OkRight {
+					0%, 49% { opacity: 0.3; background-color: grey;     }
+					50%, 100% { opacity: 1; background-color: lawngreen;}
+				}
 
-			@keyframes WarningLeft {
-				0%, 49% { opacity: 1; background-color: gold;       }
-				50%, 100% { opacity: 0.3; background-color: grey;   }
-			}
-			
-			@keyframes WarningRight {
-				0%, 49% { opacity: 0.3; background-color: grey;     }
-				50%, 100% { opacity: 1; background-color: gold;     }
-			}
+				@keyframes WarningLeft {
+					0%, 49% { opacity: 1; background-color: gold;       }
+					50%, 100% { opacity: 0.3; background-color: grey;   }
+				}
+				
+				@keyframes WarningRight {
+					0%, 49% { opacity: 0.3; background-color: grey;     }
+					50%, 100% { opacity: 1; background-color: gold;     }
+				}
 
-			@keyframes AlertLeft {
-				0%, 49% { opacity: 1; background-color: red;        }
-				50%, 100% { opacity: 0.3; background-color: grey;   }
-			}
-			
-			@keyframes AlertRight {
-				0%, 49% { opacity: 0.3; background-color: grey;     }
-				50%, 100% { opacity: 1; background-color: red;      }
-			}
+				@keyframes AlertLeft {
+					0%, 49% { opacity: 1; background-color: red;        }
+					50%, 100% { opacity: 0.3; background-color: grey;   }
+				}
+				
+				@keyframes AlertRight {
+					0%, 49% { opacity: 0.3; background-color: grey;     }
+					50%, 100% { opacity: 1; background-color: red;      }
+				}
 
-		</style>
-	</head>
-	<body>
-	
-		<table border=8 cellspacing=1 cellpadding=6>
-			<tr>
-				<td align ="center" colspan="5">
-					' . $TableHeader . '
-				</td>				
-			</tr>
-			<tr>
-				<td align ="center">
-					<!-- Lights -->
-				</td>
-				<td align ="center">
-					Bus<BR>Train
-				</td>
-				<td align ="center">
-					Destination
-				</td>
-				<td align ="center">
-					Departure<BR>in min
-				</td>
-				<td rowspan="' . $TableLines . '">
-					<iframe width="100%" height="' . $MapHeight . '" src="https://www.openstreetmap.org/export/embed.html?bbox=' . $longitude . '%2C' . $latitude . '%2C' . $longitude . '%2C' . $latitude . '&amp;layer=transportmap&amp;marker=' . $latitude . '%2C' . $longitude . '" style="border: 1px solid black"></iframe><br/><small><a href="https://www.openstreetmap.org/?mlat=' . $latitude . '&amp;mlon=' . $longitude . '#map=18/' . $latitude . '/' . $longitude. '&amp;layers=T">Large Map</a></small>
-				</td>
-			</tr>
+			</style>
+		</head>
+		<body>
+		
+			<table border=8 cellspacing=1 cellpadding=6>
+				<tr>
+					<td align ="center" colspan="7">
+						' . $TableHeader . '
+					</td>				
+				</tr>
+				<tr>
+					<td align ="center">
+						<!-- Lights -->
+					</td>				
+					<td align ="center" colspan="2">
+						Vehicle
+					</td>
+					<td align ="center">
+						Destination
+					</td>
+					<td align ="center">
+						Departure<BR>in min
+					</td>
+					<td align ="center">
+						Delayed<BR>in min
+					</td>
+					<td rowspan="' . $TableLines . '">
+						<iframe width="100%" height="' . $MapHeight . '" src="https://www.openstreetmap.org/export/embed.html?bbox=' . $longitude . '%2C' . $latitude . '%2C' . $longitude . '%2C' . $latitude . '&amp;layer=transportmap&amp;marker=' . $latitude . '%2C' . $longitude . '" style="border: 1px solid black"></iframe><br/><small><a href="https://www.openstreetmap.org/?mlat=' . $latitude . '&amp;mlon=' . $longitude . '#map=18/' . $latitude . '/' . $longitude. '&amp;layers=T">Large Map</a></small>
+					</td>
+				</tr>
 	';
 
 	### For all entries do
@@ -977,9 +990,11 @@ sub DepartureBnT_FW_detailFn($$$$) {
 		my $Destination = ReadingsVal($name, $ReadingNamePrefix . "Destination-long"      , "0");
 		my $DepartTime  = ReadingsVal($name, $ReadingNamePrefix . "departureTime-Local"   , "0");
 		my $CountDown   = ReadingsVal($name, $ReadingNamePrefix . "departureTimeInMinutes", "0");
+		my $Delayed     = ReadingsVal($name, $ReadingNamePrefix . "departureDelay"        , "0");
 		my $Threshold   = $CountDown + $WalkTimeToStation;
 		my $LightLeft;
 		my $LightRight;
+		my $VehicleIcon;
 	
 		if ($CountDown >=0 && $CountDown < $WalkTimeToStation){
 			$LightLeft  = '<div class="light AlertLeft"></div>';
@@ -997,7 +1012,29 @@ sub DepartureBnT_FW_detailFn($$$$) {
 			$LightLeft  = '<div class="light Off"></div>';
 			$LightRight = '<div class="light Off"></div>';
 		}
-	
+
+		my $ProductName = ReadingsVal($name, $ReadingNamePrefix . "product", "0");
+
+		if($ProductName eq "BUS"){
+			$VehicleIcon = $IconBus;
+		}
+		elsif ($ProductName eq "SUBURBAN_TRAIN"){
+			$VehicleIcon = $IconTram ;
+		}
+		elsif ($ProductName eq "HIGH_SPEED_TRAIN"){
+			$VehicleIcon = $IconTrainIce;
+		}
+		elsif ($ProductName eq "REGIONAL_TRAIN"){
+			$VehicleIcon = $IconTrainRegional;
+		}
+		elsif ($ProductName eq "ON_DEMAND"){
+			$VehicleIcon = $IconTaxi;
+		}
+		else {
+			$VehicleIcon = $IconUnknown;			
+		}
+
+
 		$htmlCode  .= '
 			<tr>
 				<td>
@@ -1010,6 +1047,9 @@ sub DepartureBnT_FW_detailFn($$$$) {
 						</td>
 					</table>
 				</td>
+				<td>
+					' . $VehicleIcon . '
+				</td>
 				<td align ="center">
 					' . $LineNumber  . '
 				</td>
@@ -1019,13 +1059,17 @@ sub DepartureBnT_FW_detailFn($$$$) {
 				<td align ="center">
 					' . $CountDown   . '
 				</td>
+				<td align ="center">
+					' . $Delayed     . '
+				</td>
+				
 			</tr>';
 	}
 
 	$htmlCode  .= '
-		</table>	
-	</body>
-</html>';
+			</table>	
+		</body>
+	</html>';
 
 	
 	return($htmlCode);		
@@ -1076,7 +1120,7 @@ sub DepartureBnT_FW_detailFn($$$$) {
 		<tr><td><ul><ul><a id="DepartureBnT-attr-PollingTimeout"    > </a><li><b><u><code>PollingTimeout      </code></u></b> : Number of seconds, the module shall wait fore a website reaction until it gives up.The Default value is 5s.                   <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-UpdateInterval"    > </a><li><b><u><code>UpdateInterval      </code></u></b> : Number of seconds, the module poll the latest departure data. The Default value is 60s.                                       <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-MaxLength"         > </a><li><b><u><code>MaxLength           </code></u></b> : If value not 0, the module introduces a new reading "Destination-short" which limits the length by the number provided.       <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a id="DepartureBnT-attr-WalkTimeToStation" > </a><li><b><u><code>WalkTimeToStation   </code></u></b> : Time in minutes for how long it takes from your home to the station. The Default value is 0min = Right in front of the house. <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DepartureBnT-attr-WalkTimeToStation" > </a><li><b><u><code>WalkTimeToStation   </code></u></b> : Time in minutes for how long it takes from your home to the station. The Default value is 0min = Right in front of the house.<BR>This attribute is influencing the visualisation for the departure.<BR></li></ul></ul></td></tr>
 	</table>
 </ul>
 =end html
@@ -1117,7 +1161,7 @@ sub DepartureBnT_FW_detailFn($$$$) {
 		<tr><td><ul><ul><a id="DepartureBnT-attr-PollingTimeout"    > </a><li><b><u><code>PollingTimeout      </code></u></b> : Anzahl der Sekunden wie lange das Modul auf eine Antwort seitens der Webseite warten soll.<BR>Der Default value is 5s.          <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-UpdateInterval"    > </a><li><b><u><code>UpdateInterval      </code></u></b> : Interval in  Sekunden mit der die Abfahrtszeiten erneut heruntergeladen werden sollen.<BR>Der Default Wert ist 60s.             <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-MaxLength"         > </a><li><b><u><code>MaxLength           </code></u></b> : Wenn der Wert nicht 0 ist, wird das Modul ein weiteres Reading "Destination-short" einf&uuml;hren und die L&auml;nge begrenzen. <BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a id="DepartureBnT-attr-WalkTimeToStation" > </a><li><b><u><code>WalkTimeToStation   </code></u></b> : Anzahl der Minuten die es ben&ouml;tigt um vom eigenen Haus zur Station zu kommen.                                              <BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DepartureBnT-attr-WalkTimeToStation" > </a><li><b><u><code>WalkTimeToStation   </code></u></b> : Anzahl der Minuten die es ben&ouml;tigt um vom eigenen Haus zur Station zu kommen.<BR>Dieses Attribut beeinflu&szlig;t die Visualisierung.<BR></li></ul></ul></td></tr>
 
 	</table>
 </ul>
