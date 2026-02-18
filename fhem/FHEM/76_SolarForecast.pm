@@ -13116,6 +13116,7 @@ sub _batSocTarget {
       if ($debug =~ /batteryManagement/xs) {
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> setup values: lowSoc=$lowSoc %, upSoc=$upSoc %, maxSoc=$maxSoc %, stepSoc=$stepSoc %, careCycle=$careCycle");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> pvHistory values: yesterday=$yday, batymaxsoc=$batymaxsoc %, batysetsoc=$batysetsoc %");
+          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> current values: SoC=$soc %");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> today -> PV fc: $pvfctd Wh, con till sunset: $tdconsset Wh, Surp: $surptd Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> tomorrow -> PV fc: $pvfctm Wh, con till sunset: $constm Wh, Surp: $surptm Wh (".(PERCCONINSOC * 100)."% con)");
