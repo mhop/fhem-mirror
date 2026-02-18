@@ -13096,7 +13096,7 @@ sub _batSocTarget {
 
       $target = $batymaxsoc <  $maxSoc ? $batysetsoc + $stepSoc :
                 $batymaxsoc >= $maxSoc ? $batysetsoc - $stepSoc :
-                $batysetsoc;                                                                    # neuer Min SOC für den laufenden Tag
+                $batysetsoc;                                                                    # neuer vorläufiger Min SOC für den laufenden Tag
       
       $target = min (100, $target);
       
@@ -13114,12 +13114,13 @@ sub _batSocTarget {
       my $pvexpect = $sf * $pvexpraw;
 
       if ($debug =~ /batteryManagement/xs) {
+          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> setup values: lowSoc=$lowSoc %, upSoc=$upSoc %, maxSoc=$maxSoc %, stepSoc=$stepSoc %, careCycle=$careCycle");
+          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> pvHistory values: yesterday=$yday, batymaxsoc=$batymaxsoc %, batysetsoc=$batysetsoc %");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> Battery share factor of total required load: $sf");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> today -> PV fc: $pvfctd Wh, con till sunset: $tdconsset Wh, Surp: $surptd Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> tomorrow -> PV fc: $pvfctm Wh, con till sunset: $constm Wh, Surp: $surptm Wh (".(PERCCONINSOC * 100)."% con)");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> selected energy for charging (the higher positive Surp value from above): $pvexpraw Wh");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> expected energy for charging after application Share factor: $pvexpect Wh");
-          Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - basics -> specified maxSoC: $maxSoc %");
           Log3 ($name, 1, "$name DEBUG> SoC Step1 Bat $bn - compare with SoC history -> preliminary new Target: $target %");
       }
 

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
-# Do not insert empty lines here, update check depends on 
+# Do not insert empty lines here, update check depends on
+ - feature: 76_SolarForecast: Version 2.2.0
  - new:     73_DepartureBnT: New Departure Module
  - change:  98_todoist: adjustments for new todoist API
  - change:  73_AutoShuttersControl: Update copyright year to 2026
