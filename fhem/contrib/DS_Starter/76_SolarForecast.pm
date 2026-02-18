@@ -12400,7 +12400,7 @@ sub _transferProducerValues {
       my $etotal = ReadingsNum ($prdev, $edread, 0) * $etu;                                                   # Erzeugung total (Wh)
 
       my $nhour    = $chour + 1;
-      my $histetot = HistoryVal ($hash, $day, sprintf("%02d",$nhour), 'etotalp'.$pn, 0);                      # etotal zu Beginn einer Stunde
+      my $histetot = HistoryVal ($name, $day, sprintf("%02d",$nhour), 'etotalp'.$pn, 0);                      # etotal zu Beginn einer Stunde
       my $warn     = '';
 
       my ($ethishour, $etotsvd);
@@ -18532,7 +18532,7 @@ sub _graphicHeader {
   my $co4h      = ReadingsNum ($name, "NextHours_Sum04_ConsumptionForecast", 0);
   my $coRe      = ReadingsNum ($name, "RestOfDayConsumptionForecast",        0);
   my $coTo      = ReadingsNum ($name, "Tomorrow_ConsumptionForecast",        0);
-  my $coCu      = CurrentVal  ($hash, 'consumption',                         0);
+  my $coCu      = CurrentVal  ($name, 'consumption',                         0);
   my $pv4h      = ReadingsNum ($name, "NextHours_Sum04_PVforecast",          0);
   my $pvRe      = ReadingsNum ($name, "RestOfDayPVforecast",                 0);
   my $pvTo      = ReadingsNum ($name, "Tomorrow_PVforecast",                 0);
@@ -19938,34 +19938,34 @@ sub _beamGraphicFirstHour {
 
   $hfcg->{0}{time_str} = sprintf '%02d', $hfcg->{0}{time};
 
-  $hfcg->{0}{weather} = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
-  $hfcg->{0}{wcc}     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
-  $hfcg->{0}{sunalt}  = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
-  $hfcg->{0}{sunaz}   = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
+  $hfcg->{0}{weather} = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
+  $hfcg->{0}{wcc}     = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
+  $hfcg->{0}{sunalt}  = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
+  $hfcg->{0}{sunaz}   = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
   $hfcg->{0}{don}     = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'DoN',         0);
 
-  $val1 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
-  $val2 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
-  $val3 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
-  $val4 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
-  $val5 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
-  $val6 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
-  $val7 = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gfeedin', 0);
-  $val8 = sprintf "%.2f", (HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
+  $val1 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
+  $val2 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
+  $val3 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
+  $val4 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
+  $val5 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
+  $val6 = sprintf "%.2f", (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
+  $val7 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gfeedin', 0);
+  $val8 = sprintf "%.2f", (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
 
   ## Batterien Selektionshash erstellen
   #######################################
   for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
 
-      $hbsocs->{0}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                     $beam1cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
-                                     $beam1cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+      $hbsocs->{0}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                     $beam1cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
+                                     $beam1cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
                                      0;
 
-      $hbsocs->{0}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                     $beam2cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
-                                     $beam2cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+      $hbsocs->{0}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                     $beam2cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
+                                     $beam2cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
                                      0;
 
       $hbsocs->{0}{$bn}{beam1cont} = 100 if($hbsocs->{0}{$bn}{beam1cont} >= 100);
@@ -19977,8 +19977,8 @@ sub _beamGraphicFirstHour {
   my $bcapsum = CurrentVal ($name, 'batcapsum', 0);                                                        # Summe installierte Batterie Kapazität in Wh
 
   if ($bcapsum) {
-      my $socprogwhsum = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socprogwhsum', 0);
-      my $socwhsum     = HistoryVal ($hash, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socwhsum', 0);
+      my $socprogwhsum = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socprogwhsum', 0);
+      my $socwhsum     = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socwhsum', 0);
       $val9            = sprintf "%.1f", (100 * $socprogwhsum / $bcapsum);                                 # Summe Prognose SoC in % über alle Batterien
       $val10           = sprintf "%.1f", (100 * $socwhsum / $bcapsum);                                     # Summe real erreichter SoC in % über alle Batterien
   }
@@ -20301,9 +20301,9 @@ sub _beamFillupBatValues {
           ## Auffüllen mit History Werten (Achtung: Stundenverschieber relativ zu Nexthours)
           ####################################################################################
           if (!defined $hh->{$ds}{$ts}{'rcdchargebat'.$bn}) {
-              my $histsoc  = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'batsoc'.$bn,      undef);
-              my $lcintime = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'lcintimebat'.$bn, undef);
-              my $strategy = HistoryVal ($hash, $ds, (sprintf "%02d", $ts+1), 'strategybat'.$bn, undef);
+              my $histsoc  = HistoryVal ($name, $ds, (sprintf "%02d", $ts+1), 'batsoc'.$bn,      undef);
+              my $lcintime = HistoryVal ($name, $ds, (sprintf "%02d", $ts+1), 'lcintimebat'.$bn, undef);
+              my $strategy = HistoryVal ($name, $ds, (sprintf "%02d", $ts+1), 'strategybat'.$bn, undef);
 
               if (defined $histsoc) {
                   $hfcg->{$kdx}{'rcdchargebat'.$bn} = 'hist';
@@ -26443,7 +26443,6 @@ return;
 sub setPVhistory {
   my $paref     = shift;
   my $name      = $paref->{name};
-  my $type      = $paref->{type};
   my $day       = $paref->{day};
   my $dayname   = $paref->{dayname};                                       # aktueller Wochentagsname
   my $nhour     = $paref->{nhour};                                         # Stunde des Tages
@@ -26469,7 +26468,7 @@ sub setPVhistory {
 
           for my $k (keys %{$data{$name}{pvhist}{$day}}) {
               next if($k eq "99");
-              my $csme = HistoryVal ($hash, $day, $k, "$histname", 0);
+              my $csme = HistoryVal ($name, $day, $k, "$histname", 0);
               next if(!$csme);
 
               $sum += $csme;
@@ -26486,13 +26485,13 @@ sub setPVhistory {
 
       for my $k (keys %{$data{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          my $csmm = HistoryVal ($hash, $day, $k, "$histname", 0);
+          my $csmm = HistoryVal ($name, $day, $k, "$histname", 0);
           next if(!$csmm);
 
           $minutes += $csmm;
       }
 
-      my $cycles = HistoryVal ($hash, $day, 99, "cyclescsm${num}", 0);
+      my $cycles = HistoryVal ($name, $day, 99, "cyclescsm${num}", 0);
 
       if ($cycles) {
           $data{$name}{pvhist}{$day}{99}{"hourscsme${num}"}     = sprintf "%.2f", ($minutes / 60 );
@@ -26519,18 +26518,18 @@ sub setPVhistory {
       for my $k (keys %{$data{$name}{pvhist}{$reorgday}}) {
           next if($k eq "99");
 
-          $r3 += HistoryVal ($hash, $reorgday, $k, 'pvrl',    0);
-          $r4 += HistoryVal ($hash, $reorgday, $k, 'pvfc',    0);
-          $r5 += HistoryVal ($hash, $reorgday, $k, 'confc',   0);
-          $r6 += HistoryVal ($hash, $reorgday, $k, 'gcons',   0);
-          $r7 += HistoryVal ($hash, $reorgday, $k, 'gfeedin', 0);
-          $r8 += HistoryVal ($hash, $reorgday, $k, 'con',     0);
+          $r3 += HistoryVal ($name, $reorgday, $k, 'pvrl',    0);
+          $r4 += HistoryVal ($name, $reorgday, $k, 'pvfc',    0);
+          $r5 += HistoryVal ($name, $reorgday, $k, 'confc',   0);
+          $r6 += HistoryVal ($name, $reorgday, $k, 'gcons',   0);
+          $r7 += HistoryVal ($name, $reorgday, $k, 'gfeedin', 0);
+          $r8 += HistoryVal ($name, $reorgday, $k, 'con',     0);
 
           ## Reorg Inverter
           ##################
           for my $in (1..MAXINVERTER) {
               $in   = sprintf "%02d", $in;
-              my $e = HistoryVal ($hash, $reorgday, $k, 'pvrl'.$in, undef);
+              my $e = HistoryVal ($name, $reorgday, $k, 'pvrl'.$in, undef);
               $ien->{$in} += $e if(defined $e);
           }
 
@@ -26538,7 +26537,7 @@ sub setPVhistory {
           ##################
           for my $pn (1..MAXPRODUCER) {
               $pn   = sprintf "%02d", $pn;
-              my $e = HistoryVal ($hash, $reorgday, $k, 'pprl'.$pn, undef);
+              my $e = HistoryVal ($name, $reorgday, $k, 'pprl'.$pn, undef);
               $pen->{$pn} += $e if(defined $e);
           }
 
@@ -26546,8 +26545,8 @@ sub setPVhistory {
           ##################
           for my $bn (1..MAXBATTERIES) {
               $bn   = sprintf "%02d", $bn;
-              my $bi = HistoryVal ($hash, $reorgday, $k, 'batin'.$bn,  undef);
-              my $bo = HistoryVal ($hash, $reorgday, $k, 'batout'.$bn, undef);
+              my $bi = HistoryVal ($name, $reorgday, $k, 'batin'.$bn,  undef);
+              my $bo = HistoryVal ($name, $reorgday, $k, 'batout'.$bn, undef);
               $bin->{$bn} += $bi if(defined $bi);
               $bot->{$bn} += $bo if(defined $bo);
           }
@@ -26614,7 +26613,7 @@ sub _storeVal {                    ## no critic "not used"
       my $sum = 0;
       for my $k (keys %{$data{$name}{pvhist}{$day}}) {
           next if($k eq '99');
-          $sum += HistoryVal ($hash, $day, $k, $store, 0);
+          $sum += HistoryVal ($name, $day, $k, $store, 0);
       }
 
        $data{$name}{pvhist}{$day}{99}{$store} = $sum;
@@ -28266,7 +28265,7 @@ sub checkPlantConfig {
 
   for my $dy (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
       for my $hh (sort{$a<=>$b} keys %{$data{$name}{pvhist}{$dy}}) {
-          my $hcon = HistoryVal ($hash, $dy, $hh, 'con', 0);                                        # historische Verbrauchswerte
+          my $hcon = HistoryVal ($name, $dy, $hh, 'con', 0);                                        # historische Verbrauchswerte
 
           if ($hcon < 0) {                                                                          # V1.45.7
               $confault++;
