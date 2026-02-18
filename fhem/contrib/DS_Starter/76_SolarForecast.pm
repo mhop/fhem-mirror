@@ -10431,11 +10431,11 @@ sub centralTask {
   #Log3 ($name, 1, "$name - Circular: \n".Dumper $data{$name}{circular}) if($name eq 'openMeteo');
   ##########################################################################################################################
 
-  if (!CurrentVal ($hash, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
+  if (!CurrentVal ($name, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
       my $ret = _createStringConfig ($hash);
 
       if ($ret) {
-          if (!CurrentVal ($hash, 'setupcomplete', 0)) {
+          if (!CurrentVal ($name, 'setupcomplete', 0)) {
               $ret = 'The setup routine is still incomplete';
           }
           singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );                      # Central Task running Statusbit
@@ -10444,7 +10444,7 @@ sub centralTask {
       }
   }
 
-  if (CurrentVal ($hash, 'ctrunning', 0)) {
+  if (CurrentVal ($name, 'ctrunning', 0)) {
       Log3 ($name, 4, "$name - INFO - central task was called when it was already running ... end this call");
       return;
   }
@@ -10702,7 +10702,7 @@ sub _collectAllRegConsumers {
   my $name  = $paref->{name};
   my $hash  = $defs{$name};
 
-  return if(CurrentVal ($hash, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
+  return if(CurrentVal ($name, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
 
   delete $data{$name}{current}{consumerdevs};
 
@@ -15646,15 +15646,15 @@ sub ___switchonTimelimits {
 
   if (isSunPath ($hash, $c)) {                                                          # SunPath ist in mintime gesetzt
       my ($riseshift, $setshift) = sunShift   ($hash, $c);
-      $startts                   = CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift;
+      $startts                   = CurrentVal ($name, 'sunriseTodayTs', 0) + $riseshift;
       $starttime                 = (timestampToTimestring ($startts, $lang))[3];
 
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
   }
 
   my $origtime  = $starttime;
-  my $notbefore = ConsumerVal ($hash, $c, 'notbefore', 0);
-  my $notafter  = ConsumerVal ($hash, $c, 'notafter',  0);
+  my $notbefore = ConsumerVal ($name, $c, 'notbefore', 0);
+  my $notafter  = ConsumerVal ($name, $c, 'notafter',  0);
 
   my ($err, $vala, $valb);
 
@@ -20018,8 +20018,8 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{diff}     = sprintf "%.1f", ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
   $hfcg->{0}{diff}     = sprintf "%.0f", $hfcg->{0}{diff} if($kw eq 'Wh' && grep { $roundable{$_} } @beams);
 
-  my $epc = CurrentVal ($hash, 'ePurchasePriceCcy', 0);
-  my $efc = CurrentVal ($hash, 'eFeedInTariffCcy',  0);
+  my $epc = CurrentVal ($name, 'ePurchasePriceCcy', 0);
+  my $efc = CurrentVal ($name, 'eFeedInTariffCcy',  0);
 
   $hfcg->{0}{beam1txt} = $beam1cont eq 'pvForecast'          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
                          $beam1cont eq 'pvReal'              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
@@ -26002,7 +26002,7 @@ sub aiAddInstance {
   my $serial;
 
   if (!isPrepared4AI ($hash)) {
-      my $err = CurrentVal ($hash, 'aicanuse', '');
+      my $err = CurrentVal ($name, 'aicanuse', '');
       $serial = encode_base64 (Serialize ( { name         => $name,
                                              aitrainstate => "aiAddInstance not performed: $err",
                                              aiaddistate  => "aiAddInstance not performed: $err",
@@ -26213,7 +26213,7 @@ sub aiTrain {
 
   $serial = encode_base64 (Serialize ( {name                => $name,
                                         aitrainstate        => 'ok',
-                                        runTimeTrainAI      => CurrentVal ($hash, 'runTimeTrainAI', ''),
+                                        runTimeTrainAI      => CurrentVal ($name, 'runTimeTrainAI', ''),
                                         aitrainLastFinishTs => int time,
                                         aiRulesNumber       => $rn,                                    # Returns a list of strings that describe the tree in rule-form
                                         aicanuse            => 'ok',
@@ -26381,7 +26381,7 @@ sub aiInit {                   ## no critic "not used"
       delete $data{$name}{circular}{99}{runTimeTrainAI};
       delete $data{$name}{circular}{99}{aitrainLastFinishTs};
 
-      my $err = CurrentVal ($hash, 'aicanuse', '');
+      my $err = CurrentVal ($name, 'aicanuse', '');
 
       debugLog ($paref, 'aiProcess', $err);
 
@@ -29174,15 +29174,15 @@ sub getConsumerMintime {
   my $hash    = $defs{$name};
   my $err     = '';
 
-  my $mintime = ConsumerVal ($hash, $c, 'mintime', DEFMINTIME);
+  my $mintime = ConsumerVal ($name, $c, 'mintime', DEFMINTIME);
 
   if (isSunPath ($hash, $c)) {                                                                 # SunPath ist in mintime gesetzt
       my $t                      = time;
       my ($riseshift, $setshift) = sunShift   ($hash, $c);
-      my $sunrisestartts         = CurrentVal ($hash, 'sunriseTodayTs', 0) + $riseshift;
+      my $sunrisestartts         = CurrentVal ($name, 'sunriseTodayTs', 0) + $riseshift;
       my $startts                = $t if($t > $sunrisestartts);
 
-      my $tdiff                  = (CurrentVal ($hash, 'sunsetTodayTs',  0) + $setshift) -
+      my $tdiff                  = (CurrentVal ($name, 'sunsetTodayTs',  0) + $setshift) -
                                    (defined $startts ? $startts : $sunrisestartts);
 
       $mintime                   = sprintf '%.1f', ($tdiff / 60);
@@ -30254,7 +30254,7 @@ sub isRad1hAgeExceeded {
 
   my $hash   = $defs{$name};
   my $currts = int time;
-  my $fcname = CurrentVal ($hash, 'dwdRad1hDev', '');
+  my $fcname = CurrentVal ($name, 'dwdRad1hDev', '');
 
   my $resh->{agedv} = '-';
   $resh->{mosmix}   = '-';
