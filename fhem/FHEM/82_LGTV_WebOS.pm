@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin.
 #
-#  (c) 2017-2025 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2017-2026 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -88,22 +88,22 @@ __END__
 <h3>LGTV_WebOS</h3>
 
 <ul>
-    This module controls SmartTVs from LG based on WebOS as operation system via network. It offers to swtich the TV channel, start and switch applications, send remote control commands, as well as to query the actual status.<p><br /><br />
+    This module controls SmartTVs from LG based on WebOS as operation system via network. It offers to swtich the TV channel, start and switch applications, send remote control commands, as well as to query the actual status.<br /><br /><p></p>
     
     <strong>Definition </strong><code>define &lt;name&gt; LGTV_WebOS &lt;IP-Address&gt;</code>
-    </p>
+    <p></p>
     <ul>
         <ul>
             When an LGTV_WebOS-Module is defined, an internal routine is triggered which queries the TV's status every 15s and triggers respective Notify / FileLog Event definitions.
         </ul>
     </ul>
-    </p>
+    <p></p>
     <ul>
         <ul>
             Example:
         </ul>
         <ul>
-            <code>define TV LGTV_WebOS 192.168.0.10 <br /></code><br /><br /></p>
+            <code>define TV LGTV_WebOS 192.168.0.10 <br /></code><br /><br /><p></p>
         </ul>
     </ul>
         <p><code><strong>Set-Commands </strong><code>set &lt;Name&gt; &lt;Command&gt; [&lt;Parameter&gt;]</code></code></p>
@@ -138,7 +138,7 @@ __END__
                 <li><strong>input&nbsp;</strong> - Selects the input connection (depending on the actual TV type and connected devices) <br />e.g.: extInput_AV-1, extInput_HDMI-1, extInput_HDMI-2, extInput_HDMI-3)</li>
             </ul>
         </ul>
-    </ul><br /><br /></p>
+    </ul><br /><br /><p></p>
         <p><strong>Get-Command</strong> <code>get &lt;Name&gt; &lt;Readingname&gt;</code><br /></p>
     <ul>
         <ul>
@@ -150,7 +150,7 @@ __END__
         <ul>
             <li>disable</li>
             Optional attribute to deactivate the recurring status updates. Manual trigger of update is alsways possible.</br>
-            Valid Values: 0 =&gt; recurring status updates, 1 =&gt; no recurring status updates.</p>
+            Valid Values: 0 =&gt; recurring status updates, 1 =&gt; no recurring status updates.<p></p>
         </ul>
     </ul>
     <ul>
@@ -368,8 +368,8 @@ __END__
     "LG"
   ],
   "release_status": "stable",
-  "license": "GPL_2",
-  "version": "v3.7.1",
+  "license": "GPL_3",
+  "version": "v3.7.2",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
@@ -377,7 +377,7 @@ __END__
     "CoolTux"
   ],
   "x_fhem_maintainer_github": [
-    "LeonGaultier"
+    "CoolTuxNet"
   ],
   "prereqs": {
     "runtime": {

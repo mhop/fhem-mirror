@@ -2,7 +2,7 @@
 #
 # Developed with VSCodium and richterger perl plugin.
 #
-#  (c) 2017-2023 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2017-2026 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to comitters:
@@ -200,6 +200,7 @@ my %openApps = (
     'SkyQ'               => 'com.skygo.app.de.q',
     'WaipuTv'            => 'tv.waipu.app.waipu-lg',
     'JellyFin'           => 'org.jellyfin.webos',
+    'ZDF'                => 'de.zdf.app.zdfm3',
 );
 
 my %openAppsPackageName = reverse %openApps;
@@ -1774,7 +1775,7 @@ sub PresenceRun {
     my $tmp;
     my $response;
 
-    $tmp = qx(ping -c 3 -w 2 $host 2>&1);  ## no critic (Backtick operator used)
+    $tmp = qx(ping -c 3 -w 2 $host 2>&1);    ## no critic (Backtick operator used)
 
     if ( defined($tmp) && $tmp ne '' ) {
 
@@ -1782,8 +1783,7 @@ sub PresenceRun {
         ::Log3( $name, 4,
             "LGTV_WebOS ($name) - ping command returned with output:\n$tmp" );
         $response = $name . '|' . (
-            $tmp =~
-              /\d+ [Bb]ytes (from|von)/ ## no critic (Regular expression without "/x")
+            $tmp =~ /\d+ [Bb]ytes (from|von)/         ## no critic (Regular expression without "/x")
               && $tmp !~ /[Uu]nreachable/x
             ? 'present'
             : 'absent'
