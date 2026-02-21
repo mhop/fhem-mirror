@@ -1206,4 +1206,34 @@ GetHttpFile($$)
   return GetFileFromURL("http://$host$file");
 }
 
+# Forum #143975
+sub
+HttpUtils_AddMultipartData($$$)
+{
+  my ($hash, $data, $mpheader) = @_;
+
+  $hash->{data} = "" if(!$hash->{data});
+  $hash->{header} = {} if(!$hash->{header});
+  my $ct = $hash->{header}{"Content-Type"};
+  my ($sep, $first);
+  if(!$ct) {
+    my @s = ('0'..'9','a'..'z','A'..'Z'); 
+    $sep = join("", map($s[rand @s], 1..32));
+    $ct = "multipart/form-data; boundary=$sep";
+    $hash->{header}{"Content-Type"} = $ct;
+    $first = 1;
+  } else {
+    $sep = $1 if($ct =~ m/boundary=(.*)/);
+  }
+
+  $hash->{data} =~ s/--\r\n$/\r\n/m if($hash->{data});
+  $hash->{data} .= "--$sep\r\n" if($first);
+  foreach my $key (sort keys %{$mpheader}) {
+    $hash->{data} .= "$key: $mpheader->{$key}\r\n";
+  }
+  $hash->{data} .= "\r\n";
+  $hash->{data} .= $data;
+  $hash->{data} .= "\r\n--$sep--\r\n";
+}
+
 1;
