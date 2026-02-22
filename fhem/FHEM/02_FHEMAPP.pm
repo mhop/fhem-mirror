@@ -1,5 +1,7 @@
 ##############################################
 # $Id$
+
+# seit 22.02.2026 ist jemu75 als Maintainer des Moduls eingetragen.
 package FHEM::FHEMAPP;
 
 use strict;
