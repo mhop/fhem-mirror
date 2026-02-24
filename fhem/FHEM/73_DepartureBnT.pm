@@ -69,10 +69,12 @@ sub DepartureBnT_Initialize($) {
 	$hash->{AttrList}       	= "disable:0,1 " .
 								  "NoOfEntries:slider,1,1,20 " .
 								  "UpdateInterval:slider,60,60,3600 " .
+								  "ShowDetails:Fhem,Departure " .
 								  "StationId " .
 								  "PollingTimeout " .
 								  "MaxLength " .
 								  "WalkTimeToStation " .
+								  "ConcatReading:0,1 " .
 								  $readingFnAttributes;
 	
 	return FHEM::Meta::InitMod( __FILE__, $hash );
@@ -156,7 +158,7 @@ sub DepartureBnT_Attr(@) {
 	}
 
 	### Check whether "StationId" attribute has been provided
-	if ($a[2] eq "StationId") 
+	elsif ($a[2] eq "StationId") 
 	{
 		### Log Entry for debugging purposes
 		Log3 $name, 5, $name. " : DepartureBnT_Attr - StationId                : " . $a[3];
@@ -174,8 +176,34 @@ sub DepartureBnT_Attr(@) {
 		DepartureBnT_Update($hash);
 	}
 	
+	### Check whether "ConcatReading" attribute has been provided
+	elsif ($a[2] eq "ConcatReading") 
+	{
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DepartureBnT_Attr - ConcatReading            : " . $a[3];
+		
+		### Delete all Readings
+		DepartureBnT_DeleteAllReadings($hash);
+
+		### Update Header
+		DepartureBnT_UpdateStationDetails($hash);
+		
+		### Update all Departures
+		DepartureBnT_Update($hash);
+	}
+	
+	### Check whether "ShowDetails" attribute has been provided
+	elsif ($a[2] eq "ShowDetails") 
+	{
+		### Log Entry for debugging purposes
+		Log3 $name, 5, $name. " : DepartureBnT_Attr - ShowDetails              : " . $a[3];
+		
+		### Update all Departures
+		DepartureBnT_Update($hash);
+	}
+	
 	### Check whether "UpdateInterval" attribute has been provided
-	if ($a[2] eq "UpdateInterval") 
+	elsif ($a[2] eq "UpdateInterval") 
 	{
 	
 		### Log Entry for debugging purposes
@@ -369,7 +397,7 @@ sub DepartureBnT_CheckAttributes($) {
 		$attr{$name}{MaxLength} = 0;
 
 		### Writing log entry
-		Log3 $name, 4, $name. " : DepartureBnT - The attribute PollingTimeout was missing and has been set to 0 = deactivated";
+		Log3 $name, 4, $name. " : DepartureBnT - The attribute MaxLength was missing and has been set to 0s = deactivated";
 	}
 
 	if(!defined($attr{$name}{WalkTimeToStation})) {
@@ -379,6 +407,22 @@ sub DepartureBnT_CheckAttributes($) {
 		### Writing log entry
 		Log3 $name, 4, $name. " : DepartureBnT - The attribute WalkTimeToStation was missing and has been set to 1 = Right in front the house";
 	}
+
+	if(!defined($attr{$name}{ConcatReading})) {
+		### Set attribute with standard value since it is not available
+		$attr{$name}{ConcatReading} = 0;
+
+		### Writing log entry
+		Log3 $name, 4, $name. " : DepartureBnT - The attribute ConcatReading was missing and has been set to 0 = Disabled";
+	}
+	
+	if(!defined($attr{$name}{ShowDetails})) {
+		### Set attribute with standard value since it is not available
+		$attr{$name}{ShowDetails} = "Departure";
+
+		### Writing log entry
+		Log3 $name, 4, $name. " : DepartureBnT - The attribute ShowDetails was missing and has been set to Departure = Extended View";
+	}	
 }
 ####END####### Check Attributes ################################################################################END#####
 
@@ -557,9 +601,12 @@ sub DepartureBnT_UpdateResponse($) {
 	my $name                 = $hash->{NAME};
 	my $StationID            = $hash->{helper}{StationId};
 	my $NoOfEntries          = AttrVal($name, "NoOfEntries", 5);
+	my $ConcatReadingValue;
+	my @ConcatList;
 	my $DepartureEntries;
 	my $ReadingName;
 	my $ReadingValue;
+
 	
 	### For debugging purpose only
 	Log3 $name, 5, $name. " : DepartureBnT_UpdateResponse Begin___________________________________________________________________________________________________________";
@@ -636,7 +683,7 @@ sub DepartureBnT_UpdateResponse($) {
 				if (($MaxLength eq "") || ($MaxLength eq "0")){
 
 					### Delete Reading "Destination-short"
-					readingsDelete($hash, "Destination-Short");
+					readingsDelete($hash, "departure_" . sprintf("%02d", $ReadingOrderNo) . "_Destination-short");
 				}
 				else {
 					### Log entries for debugging purposes
@@ -716,12 +763,20 @@ sub DepartureBnT_UpdateResponse($) {
 		Log3 $name, 5, $name. " : DepartureBnT_UpdateResponseResponse - departureTimestamp       : " . $TimeStamp;
 		Log3 $name, 5, $name. " : DepartureBnT_UpdateResponseResponse - DepartureTimeLocal       : " . $DepartureTimeLocal;
 		Log3 $name, 5, $name. " : DepartureBnT_UpdateResponseResponse - DepartureTimeUtc         : " . $DepartureTimeUtc;
+
+		####### Create ConcatList for compatibility to FTUI Widget Departure https://wiki.fhem.de/wiki/FTUI_Widget_Departure #######
+		$ConcatList[$ReadingOrderNo]= '["' . $DepartureEntry->{number} . '","' . $DepartureEntry->{to} . '","' . $DepartureEntry->{departureTimeInMinutes} . '"]';
+	}
+
+	### Create ReadingValue for compatibility to FTUI Widget Departure if attribute is enabled
+	if (AttrVal($name, "ConcatReading", "") == 1){
+		$ConcatReadingValue ='[' . join(',' , @ConcatList) . ']';
+		readingsBulkUpdate($hash, "departure_concat", $ConcatReadingValue , 1);
 	}
 
 	### Create Reading name and Update Reading
-	$ReadingName = "departure_Entries";
 	$ReadingOrderNo++;
-	readingsBulkUpdate($hash, $ReadingName, $ReadingOrderNo , 1);
+	readingsBulkUpdate($hash, "departure_Entries", $ReadingOrderNo , 1);
 
 	### Execute Readings Bulk Update
 	readingsEndUpdate($hash, 1);
@@ -859,6 +914,7 @@ sub DepartureBnT_FW_detailFn($$$$) {
 	my $TableLines        = $departure_Entries +2;
 	my $MapHeight         = $TableLines * 40;
 	my $TableHeader       = "<h1>" . ReadingsVal($name, "Station_place", "") . " - " . ReadingsVal($name, "Station_name", "") . "</h1><h3>last Update: " . ReadingsTimestamp($name,"departure_00_departureTimeInMinutes",'') . "</h3>";
+	my $htmlCode;
 
 	### Definition of Icons
 	my $IconBus           = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 122.88 120.96"   ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Bus            </title><path class="cls-1" d="M105.5,104.64H99.44v9.53A6.81,6.81,0,0,1,92.65,121h-4a6.82,6.82,0,0,1-6.79-6.79v-9.53H40.82v9.53A6.82,6.82,0,0,1,34,121H30a6.81,6.81,0,0,1-6.78-6.79v-9.53H18.1c-3.54-.06-5.24-2-5.5-5.29V21.52c-2,.2-2.95.66-3.43,1.68V45.45H4.87A4.88,4.88,0,0,1,0,40.58V27.44a4.89,4.89,0,0,1,4.73-4.87c.41-3.82,2.06-4.93,8-5.21Q14,7.36,26.36,2.57C44.09-.68,77.73-1,96.52,2.57c8.28,3.19,12.8,8.12,13.62,14.79,6,.3,7.61,1.42,8,5.21a4.89,4.89,0,0,1,4.73,4.87V40.58A4.88,4.88,0,0,1,118,45.45h-4.3V23.14c-.48-1-1.47-1.44-3.43-1.63V98.59c0,4.46-1.44,6-4.78,6ZM16.13,84.87l.28-6.69c.16-1.17.78-1.69,1.89-1.5A129.9,129.9,0,0,1,34.39,86.85c1.09.72.66,2.11-.78,1.85L18.48,87.6a2.74,2.74,0,0,1-2.35-2.73ZM52,93.45H71.3a.94.94,0,0,1,.94.94v3.24a.94.94,0,0,1-.94.94H52a.94.94,0,0,1-.94-.94V94.39a.94.94,0,0,1,.94-.94Zm50.35,0A2.51,2.51,0,1,1,99.82,96a2.51,2.51,0,0,1,2.5-2.51Zm-82.65,0A2.51,2.51,0,1,1,17.16,96a2.51,2.51,0,0,1,2.51-2.51Zm87.08-8.63-.28-6.69c-.16-1.17-.78-1.69-1.88-1.5a129.28,129.28,0,0,0-16.1,10.17c-1.09.72-.66,2.11.78,1.85l15.13-1.1a2.73,2.73,0,0,0,2.35-2.73ZM48.19,6.11h26.5a1.63,1.63,0,0,1,1.62,1.62V12a1.63,1.63,0,0,1-1.62,1.62H48.19A1.63,1.63,0,0,1,46.57,12V7.73a1.63,1.63,0,0,1,1.62-1.62ZM20.32,18.91H102.2a2,2,0,0,1,2,2V64.09c0,1.08-.89,1.69-2,2-28.09,8.53-53.8,8.18-81.88,0-1.11-.3-2-.9-2-2V20.89a2,2,0,0,1,2-2Z"/></svg>';
@@ -868,210 +924,216 @@ sub DepartureBnT_FW_detailFn($$$$) {
 	my $IconTaxi          = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"         ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Taxi           </title><path class="cls-1" d="M34.313,250.891c2.297-5.016,6.688-13.281,14.438-27.813c3.531-6.672,7.5-14.047,11.563-21.625H24.719 C11.063,201.453,0,212.516,0,226.188c0,13.641,11.063,24.703,24.719,24.703H34.313z"/> <path class="st0" d="M487.281,201.453h-35.594c4.078,7.578,8.031,14.953,11.563,21.625c7.75,14.531,12.125,22.797,14.438,27.813 h9.594c13.656,0,24.719-11.063,24.719-24.703C512,212.516,500.938,201.453,487.281,201.453z"/> <path class="st0" d="M39.391,465.188c0,18.406,14.938,33.328,33.328,33.328c18.406,0,33.313-14.922,33.313-33.328v-31.516H39.391 V465.188z"/> <path class="st0" d="M405.938,465.188c0,18.406,14.938,33.328,33.344,33.328s33.328-14.922,33.328-33.328v-31.516h-66.672V465.188z "/> <path class="st0" d="M467.875,257.109c1.688,0.484-61.688-115.828-64.719-122.109c-8-16.672-27.781-26.703-47.063-26.703 c-22.281,0-84.344,0-84.344,0s-93.563,0-115.859,0c-19.297,0-39.031,10.031-47.047,26.703 c-3.031,6.281-66.391,122.594-64.719,122.109c0,0-20.5,20.438-22.063,22.063c-8.625,9.281-8,17.297-8,25.313c0,0,0,75.297,0,92.563 c0,17.281,3.063,26.734,23.438,26.734h437c20.375,0,23.469-9.453,23.469-26.734c0-17.266,0-92.563,0-92.563 c0-8.016,0.594-16.031-8.063-25.313C488.406,277.547,467.875,257.109,467.875,257.109z M96.563,221.422 c0,0,40.703-73.313,43.094-78.109c4.125-8.203,15.844-14.141,27.828-14.141h177.031c12,0,23.703,5.938,27.828,14.141 c2.406,4.797,43.109,78.109,43.109,78.109c3.75,6.75,0.438,19.313-10.672,19.313H107.219 C96.109,240.734,92.813,228.172,96.563,221.422z M91.125,384.469c-20.656,0-37.406-16.734-37.406-37.391 c0-20.672,16.75-37.406,37.406-37.406s37.391,16.734,37.391,37.406C128.516,367.734,111.781,384.469,91.125,384.469z M312.781,394.578c0,2.734-2.219,4.953-4.938,4.953H204.172c-2.734,0-4.953-2.219-4.953-4.953v-45.672 c0-2.703,2.219-4.906,4.953-4.906h103.672c2.719,0,4.938,2.203,4.938,4.906V394.578z M420.875,384.469 c-20.656,0-37.422-16.734-37.422-37.391c0-20.672,16.766-37.406,37.422-37.406s37.406,16.75,37.406,37.406 S441.531,384.469,420.875,384.469z"/> <path class="st0" d="M152.906,49.25c0.016-10.047,8.172-18.203,18.219-18.219h169.75c10.031,0.016,18.188,8.172,18.203,18.219 v49.172h17.547V49.25c0-19.75-16-35.75-35.75-35.766h-169.75c-19.75,0.016-35.75,16.016-35.766,35.766v49.172h17.547V49.25z"/> <path class="st0" d="M195.141,92.938h8.891c0.438,0,0.719-0.266,0.719-0.672V56.328c0-0.281,0.156-0.422,0.406-0.422h12.063 c0.406,0,0.719-0.266,0.719-0.672v-7.469c0-0.406-0.313-0.688-0.719-0.688h-35.25c-0.438,0-0.719,0.281-0.719,0.688v7.469 c0,0.406,0.281,0.672,0.719,0.672h12.047c0.281,0,0.422,0.141,0.422,0.422v35.938C194.438,92.672,194.719,92.938,195.141,92.938z" /> <path class="st0" d="M237.438,47.078c-0.5,0-0.781,0.281-0.922,0.688l-16.391,44.5c-0.156,0.406,0,0.672,0.469,0.672h9.203 c0.484,0,0.766-0.203,0.906-0.672l2.672-8.031h16.688l2.719,8.031c0.156,0.469,0.438,0.672,0.938,0.672h9.094 c0.5,0,0.625-0.266,0.5-0.672l-16.125-44.5c-0.156-0.406-0.406-0.688-0.922-0.688H237.438z M247.25,75.813h-11l5.406-16.047h0.203 L247.25,75.813z"/> <path class="st0" d="M269.844,92.938h9.688c0.625,0,0.906-0.203,1.188-0.672l8.531-13.969h0.219l8.5,13.969 c0.281,0.469,0.531,0.672,1.188,0.672h9.734c0.516,0,0.641-0.406,0.453-0.813l-14.313-22.859l13.297-21.375 c0.234-0.406,0.078-0.813-0.406-0.813h-9.734c-0.563,0-0.844,0.203-1.141,0.688l-7.578,12.391h-0.219l-7.563-12.391 c-0.266-0.484-0.547-0.688-1.125-0.688h-9.75c-0.469,0-0.625,0.406-0.406,0.813l13.266,21.375l-14.234,22.859 C269.156,92.531,269.359,92.938,269.844,92.938z"/> <path class="st0" d="M320.422,47.766v44.5c0,0.406,0.281,0.672,0.688,0.672h8.922c0.406,0,0.688-0.266,0.688-0.672v-44.5 c0-0.406-0.281-0.688-0.688-0.688h-8.922C320.703,47.078,320.422,47.359,320.422,47.766z"/></svg>';
 	my $IconUnknown       = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 469 469"         ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Unknown        </title><path class="cls-1" d="M 809,1820 C 205,1745 -161,1123 70,567 224,197 616,-37 1005,9 c 456,54 790,406 812,858 17,335 -134,630 -415,814 -165,108 -400,163 -593,139 z m 306,-155 c 203,-55 385,-203 484,-395 63,-120 85,-213 85,-355 0,-141 -16,-211 -74,-333 C 1503,357 1310,205 1067,153 978,135 792,140 705,164 561,204 410,302 314,418 249,496 179,636 155,735 c -23,94 -23,267 0,360 39,160 153,336 276,430 82,61 224,129 314,149 87,19 283,15 370,-9 z" id="path8" /> </g> <g id="text2989" fill="#000000" stroke="none"> <path d="m 216.47819,309.81169 c -0.12157,-4.37349 -0.18232,-7.65367 -0.18223,-9.84052 -9e-5,-12.87764 1.82223,-23.99378 5.46696,-33.34846 2.67264,-7.04619 6.98546,-14.15323 12.93847,-21.32114 4.37346,-5.22385 12.2398,-12.84721 23.59904,-22.87012 11.35899,-10.02259 18.73938,-18.01042 22.14119,-23.9635 3.40151,-5.95273 5.10234,-12.45233 5.1025,-19.49883 -1.6e-4,-12.75603 -4.98116,-23.96328 -14.94303,-33.6218 -9.96214,-9.65806 -22.17167,-14.4872 -36.62863,-14.48744 -13.97121,2.4e-4 -25.63404,4.3738 -34.98854,13.1207 -9.35463,8.74736 -15.48977,22.41474 -18.40543,41.0022 l -33.71292,-4.00911 c 3.03718,-24.90481 12.05766,-43.97841 27.06145,-57.22084 15.00371,-13.24193 34.83661,-19.86302 59.49875,-19.86329 26.11979,2.7e-4 46.95496,7.10731 62.50557,21.32114 15.55028,14.21434 23.32551,31.40487 23.3257,51.57166 -1.9e-4,11.66303 -2.73367,22.41471 -8.20044,32.25506 -5.46714,9.84069 -16.15807,21.80724 -32.07283,35.8997 -10.69109,9.47619 -17.67664,16.46174 -20.95668,20.95668 -3.2803,4.49516 -5.71006,9.6584 -7.28928,15.48972 -1.57947,5.83151 -2.49063,15.30757 -2.73348,28.42819 z m -2.00455,65.78575 0,-37.35756 37.35756,0 0,37.35756 z" id="path2994" /> </svg>';
 
+	### If the Details shall be the Departure Board with Map
+	if (AttrVal($name, "ShowDetails","Fhem") eq "Departure"){
 
-	my$htmlCode = '
-	<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-	<html>
-		<head>
-			<title>Busstation</title>
-			<style type="text/css">
-				<!-- Flashlights -->
-				.container {
-					display: flex;
-					gap: 10px;
-				}
+		$htmlCode = '
+		<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+		<html>
+			<head>
+				<title>Busstation</title>
+				<style type="text/css">
+					<!-- Flashlights -->
+					.container {
+						display: flex;
+						gap: 10px;
+					}
 
-				.light {
-					width: 20px;
-					height: 20px;
-					border-radius: 50%;
-					background-color: grey;
-					opacity: 0.3;
-				}
+					.light {
+						width: 20px;
+						height: 20px;
+						border-radius: 50%;
+						background-color: grey;
+						opacity: 0.3;
+					}
 
-				.off {
-					<!-- Do nothing -->
-				}
+					.off {
+						<!-- Do nothing -->
+					}
 
-				.AlertLeft {
-					animation: AlertLeft 1.0s infinite;
-				}
-				
-				.AlertRight {
-					animation: AlertRight 1.0s infinite;
-				}
+					.AlertLeft {
+						animation: AlertLeft 1.0s infinite;
+					}
+					
+					.AlertRight {
+						animation: AlertRight 1.0s infinite;
+					}
 
-				.WarningLeft {
-					animation: WarningLeft 1.0s infinite;
-				}
-				
-				.WarningRight {
-					animation: WarningRight 1.0s infinite;
-				}
+					.WarningLeft {
+						animation: WarningLeft 1.0s infinite;
+					}
+					
+					.WarningRight {
+						animation: WarningRight 1.0s infinite;
+					}
 
-				.OkLeft {
-					animation: OkLeft 1.0s infinite;
-				}
-				
-				.OkRight {
-					animation: OkRight 1.0s infinite;
-				}
+					.OkLeft {
+						animation: OkLeft 1.0s infinite;
+					}
+					
+					.OkRight {
+						animation: OkRight 1.0s infinite;
+					}
 
-				@keyframes OkLeft {
-					0%, 49% { opacity: 1; background-color: lawngreen;  }
-					50%, 100% { opacity: 0.3; background-color: grey;   }
-				}
-				
-				@keyframes OkRight {
-					0%, 49% { opacity: 0.3; background-color: grey;     }
-					50%, 100% { opacity: 1; background-color: lawngreen;}
-				}
+					@keyframes OkLeft {
+						0%, 49% { opacity: 1; background-color: lawngreen;  }
+						50%, 100% { opacity: 0.3; background-color: grey;   }
+					}
+					
+					@keyframes OkRight {
+						0%, 49% { opacity: 0.3; background-color: grey;     }
+						50%, 100% { opacity: 1; background-color: lawngreen;}
+					}
 
-				@keyframes WarningLeft {
-					0%, 49% { opacity: 1; background-color: gold;       }
-					50%, 100% { opacity: 0.3; background-color: grey;   }
-				}
-				
-				@keyframes WarningRight {
-					0%, 49% { opacity: 0.3; background-color: grey;     }
-					50%, 100% { opacity: 1; background-color: gold;     }
-				}
+					@keyframes WarningLeft {
+						0%, 49% { opacity: 1; background-color: gold;       }
+						50%, 100% { opacity: 0.3; background-color: grey;   }
+					}
+					
+					@keyframes WarningRight {
+						0%, 49% { opacity: 0.3; background-color: grey;     }
+						50%, 100% { opacity: 1; background-color: gold;     }
+					}
 
-				@keyframes AlertLeft {
-					0%, 49% { opacity: 1; background-color: red;        }
-					50%, 100% { opacity: 0.3; background-color: grey;   }
-				}
-				
-				@keyframes AlertRight {
-					0%, 49% { opacity: 0.3; background-color: grey;     }
-					50%, 100% { opacity: 1; background-color: red;      }
-				}
+					@keyframes AlertLeft {
+						0%, 49% { opacity: 1; background-color: red;        }
+						50%, 100% { opacity: 0.3; background-color: grey;   }
+					}
+					
+					@keyframes AlertRight {
+						0%, 49% { opacity: 0.3; background-color: grey;     }
+						50%, 100% { opacity: 1; background-color: red;      }
+					}
 
-			</style>
-		</head>
-		<body>
+				</style>
+			</head>
+			<body>
+			
+				<table border=8 cellspacing=1 cellpadding=6>
+					<tr>
+						<td align ="center" colspan="7">
+							' . $TableHeader . '
+						</td>				
+					</tr>
+					<tr>
+						<td align ="center">
+							<!-- Lights -->
+						</td>				
+						<td align ="center" colspan="2">
+							Vehicle
+						</td>
+						<td align ="center">
+							Destination
+						</td>
+						<td align ="center">
+							Departure<BR>in min
+						</td>
+						<td align ="center">
+							Delayed<BR>in min
+						</td>
+						<td rowspan="' . $TableLines . '">
+							<iframe width="100%" height="' . $MapHeight . '" src="https://www.openstreetmap.org/export/embed.html?bbox=' . $longitude . '%2C' . $latitude . '%2C' . $longitude . '%2C' . $latitude . '&amp;layer=transportmap&amp;marker=' . $latitude . '%2C' . $longitude . '" style="border: 1px solid black"></iframe><br/><small><a href="https://www.openstreetmap.org/?mlat=' . $latitude . '&amp;mlon=' . $longitude . '#map=18/' . $latitude . '/' . $longitude. '&amp;layers=T">Large Map</a></small>
+						</td>
+					</tr>
+		';
+
+		### For all entries do
+		for (my $i = 0; $i < $departure_Entries; $i++) {
+
+			### Create Prefix for Reading Name
+			my $ReadingNamePrefix = "departure_" . sprintf("%02d", $i)  . "_";
+
+			### Get Reading values
+			my $LineNumber  = ReadingsVal($name, $ReadingNamePrefix . "number"                , "0");
+			my $Destination = ReadingsVal($name, $ReadingNamePrefix . "Destination-long"      , "0");
+			my $DepartTime  = ReadingsVal($name, $ReadingNamePrefix . "departureTime-Local"   , "0");
+			my $CountDown   = ReadingsVal($name, $ReadingNamePrefix . "departureTimeInMinutes", "0");
+			my $Delayed     = ReadingsVal($name, $ReadingNamePrefix . "departureDelay"        , "0");
+			my $Threshold   = $CountDown + $WalkTimeToStation;
+			my $LightLeft;
+			my $LightRight;
+			my $VehicleIcon;
 		
-			<table border=8 cellspacing=1 cellpadding=6>
+			if ($CountDown >=0 && $CountDown < $WalkTimeToStation){
+				$LightLeft  = '<div class="light AlertLeft"></div>';
+				$LightRight = '<div class="light AlertRight"></div>';
+			}
+			elsif($CountDown >=$WalkTimeToStation && $CountDown < ($WalkTimeToStation +5)){
+				$LightLeft  = '<div class="light WarningLeft"></div>';
+				$LightRight = '<div class="light WarningRight"></div>';
+			}
+			elsif($CountDown >=($WalkTimeToStation +5) && $CountDown < ($WalkTimeToStation +10)){
+				$LightLeft  = '<div class="light OkLeft"></div>';
+				$LightRight = '<div class="light OkRight"></div>';			
+			}
+			else{
+				$LightLeft  = '<div class="light Off"></div>';
+				$LightRight = '<div class="light Off"></div>';
+			}
+
+			my $ProductName = ReadingsVal($name, $ReadingNamePrefix . "product", "0");
+
+			if($ProductName eq "BUS"){
+				$VehicleIcon = $IconBus;
+			}
+			elsif ($ProductName eq "SUBURBAN_TRAIN"){
+				$VehicleIcon = $IconTram ;
+			}
+			elsif ($ProductName eq "HIGH_SPEED_TRAIN"){
+				$VehicleIcon = $IconTrainIce;
+			}
+			elsif ($ProductName eq "REGIONAL_TRAIN"){
+				$VehicleIcon = $IconTrainRegional;
+			}
+			elsif ($ProductName eq "ON_DEMAND"){
+				$VehicleIcon = $IconTaxi;
+			}
+			else {
+				$VehicleIcon = $IconUnknown;			
+			}
+
+
+			$htmlCode  .= '
 				<tr>
-					<td align ="center" colspan="7">
-						' . $TableHeader . '
-					</td>				
-				</tr>
-				<tr>
-					<td align ="center">
-						<!-- Lights -->
-					</td>				
-					<td align ="center" colspan="2">
-						Vehicle
+					<td>
+						<table border=0>
+							<td align ="center">
+								' . $LightLeft . '
+							</td>
+							<td align ="center">
+								' . $LightRight . '
+							</td>
+						</table>
+					</td>
+					<td>
+						' . $VehicleIcon . '
 					</td>
 					<td align ="center">
-						Destination
+						' . $LineNumber  . '
 					</td>
 					<td align ="center">
-						Departure<BR>in min
+						' . $Destination . '
 					</td>
 					<td align ="center">
-						Delayed<BR>in min
+						' . $CountDown   . '
 					</td>
-					<td rowspan="' . $TableLines . '">
-						<iframe width="100%" height="' . $MapHeight . '" src="https://www.openstreetmap.org/export/embed.html?bbox=' . $longitude . '%2C' . $latitude . '%2C' . $longitude . '%2C' . $latitude . '&amp;layer=transportmap&amp;marker=' . $latitude . '%2C' . $longitude . '" style="border: 1px solid black"></iframe><br/><small><a href="https://www.openstreetmap.org/?mlat=' . $latitude . '&amp;mlon=' . $longitude . '#map=18/' . $latitude . '/' . $longitude. '&amp;layers=T">Large Map</a></small>
+					<td align ="center">
+						' . $Delayed     . '
 					</td>
-				</tr>
-	';
-
-	### For all entries do
-	for (my $i = 0; $i < $departure_Entries; $i++) {
-
-		### Create Prefix for Reading Name
-		my $ReadingNamePrefix = "departure_" . sprintf("%02d", $i)  . "_";
-
-		### Get Reading values
-		my $LineNumber  = ReadingsVal($name, $ReadingNamePrefix . "number"                , "0");
-		my $Destination = ReadingsVal($name, $ReadingNamePrefix . "Destination-long"      , "0");
-		my $DepartTime  = ReadingsVal($name, $ReadingNamePrefix . "departureTime-Local"   , "0");
-		my $CountDown   = ReadingsVal($name, $ReadingNamePrefix . "departureTimeInMinutes", "0");
-		my $Delayed     = ReadingsVal($name, $ReadingNamePrefix . "departureDelay"        , "0");
-		my $Threshold   = $CountDown + $WalkTimeToStation;
-		my $LightLeft;
-		my $LightRight;
-		my $VehicleIcon;
-	
-		if ($CountDown >=0 && $CountDown < $WalkTimeToStation){
-			$LightLeft  = '<div class="light AlertLeft"></div>';
-			$LightRight = '<div class="light AlertRight"></div>';
+					
+				</tr>';
 		}
-		elsif($CountDown >=$WalkTimeToStation && $CountDown < ($WalkTimeToStation +5)){
-			$LightLeft  = '<div class="light WarningLeft"></div>';
-			$LightRight = '<div class="light WarningRight"></div>';
-		}
-		elsif($CountDown >=($WalkTimeToStation +5) && $CountDown < ($WalkTimeToStation +10)){
-			$LightLeft  = '<div class="light OkLeft"></div>';
-			$LightRight = '<div class="light OkRight"></div>';			
-		}
-		else{
-			$LightLeft  = '<div class="light Off"></div>';
-			$LightRight = '<div class="light Off"></div>';
-		}
-
-		my $ProductName = ReadingsVal($name, $ReadingNamePrefix . "product", "0");
-
-		if($ProductName eq "BUS"){
-			$VehicleIcon = $IconBus;
-		}
-		elsif ($ProductName eq "SUBURBAN_TRAIN"){
-			$VehicleIcon = $IconTram ;
-		}
-		elsif ($ProductName eq "HIGH_SPEED_TRAIN"){
-			$VehicleIcon = $IconTrainIce;
-		}
-		elsif ($ProductName eq "REGIONAL_TRAIN"){
-			$VehicleIcon = $IconTrainRegional;
-		}
-		elsif ($ProductName eq "ON_DEMAND"){
-			$VehicleIcon = $IconTaxi;
-		}
-		else {
-			$VehicleIcon = $IconUnknown;			
-		}
-
 
 		$htmlCode  .= '
-			<tr>
-				<td>
-					<table border=0>
-						<td align ="center">
-							' . $LightLeft . '
-						</td>
-						<td align ="center">
-							' . $LightRight . '
-						</td>
-					</table>
-				</td>
-				<td>
-					' . $VehicleIcon . '
-				</td>
-				<td align ="center">
-					' . $LineNumber  . '
-				</td>
-				<td align ="center">
-					' . $Destination . '
-				</td>
-				<td align ="center">
-					' . $CountDown   . '
-				</td>
-				<td align ="center">
-					' . $Delayed     . '
-				</td>
-				
-			</tr>';
+				</table>	
+			</body>
+		</html>';
+	}
+	### If the Details shall be the fhem Standard
+	else{
+		
 	}
 
-	$htmlCode  .= '
-			</table>	
-		</body>
-	</html>';
-
-	
 	return($htmlCode);		
 }
 1;
@@ -1121,6 +1183,8 @@ sub DepartureBnT_FW_detailFn($$$$) {
 		<tr><td><ul><ul><a id="DepartureBnT-attr-UpdateInterval"    > </a><li><b><u><code>UpdateInterval      </code></u></b> : Number of seconds, the module poll the latest departure data. The Default value is 60s.                                       <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-MaxLength"         > </a><li><b><u><code>MaxLength           </code></u></b> : If value not 0, the module introduces a new reading "Destination-short" which limits the length by the number provided.       <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-WalkTimeToStation" > </a><li><b><u><code>WalkTimeToStation   </code></u></b> : Time in minutes for how long it takes from your home to the station. The Default value is 0min = Right in front of the house.<BR>This attribute is influencing the visualisation for the departure.<BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DepartureBnT-attr-ConcatReading"     > </a><li><b><u><code>ConcatReading       </code></u></b> : Whether the Reading "departure_concat" for the <a href="https://wiki.fhem.de/wiki/FTUI_Widget_Departure">FTUI Widget Departure</a>  shall be generated.<BR>The Default value is 0 = Disabled<BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DepartureBnT-attr-ShowDetails"       > </a><li><b><u><code>ShowDetails         </code></u></b> : Which kind of Details Page shall be presented within FHEMEB - The fhem or Departure Version.<BR>The Default value is Departure = Departure Board with Map<BR></li></ul></ul></td></tr>
 	</table>
 </ul>
 =end html
@@ -1162,13 +1226,12 @@ sub DepartureBnT_FW_detailFn($$$$) {
 		<tr><td><ul><ul><a id="DepartureBnT-attr-UpdateInterval"    > </a><li><b><u><code>UpdateInterval      </code></u></b> : Interval in  Sekunden mit der die Abfahrtszeiten erneut heruntergeladen werden sollen.<BR>Der Default Wert ist 60s.             <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-MaxLength"         > </a><li><b><u><code>MaxLength           </code></u></b> : Wenn der Wert nicht 0 ist, wird das Modul ein weiteres Reading "Destination-short" einf&uuml;hren und die L&auml;nge begrenzen. <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-WalkTimeToStation" > </a><li><b><u><code>WalkTimeToStation   </code></u></b> : Anzahl der Minuten die es ben&ouml;tigt um vom eigenen Haus zur Station zu kommen.<BR>Dieses Attribut beeinflu&szlig;t die Visualisierung.<BR></li></ul></ul></td></tr>
-
+		<tr><td><ul><ul><a id="DepartureBnT-attr-ConcatReading"     > </a><li><b><u><code>ConcatReading       </code></u></b> : Erzeuge das Reading "departure_concat" f&uuml;r die Kompatibilit&auml;t zu <a href="https://wiki.fhem.de/wiki/FTUI_Widget_Departure">FTUI Widget Departure</a>  shall be generated.<BR>Der Default Wert is 0 = Deaktiviert<BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DepartureBnT-attr-ShowDetails"       > </a><li><b><u><code>ShowDetails         </code></u></b> : Welche Details Seite soll in FHEMEB angezeigt werden - Die fhem oder Departure Version.<BR>Der Default Wert ist Departure = Abfahrtstafel mit Karte<BR></li></ul></ul></td></tr>
 	</table>
 </ul>
-
-
-
 =end html_DE
+
 =for :application/json;q=META.json 73_DepartureBnT.pm
 {
 	"abstract"                       : "Provides Departure Data for provided stations by transport.stefan-biermann.de",
