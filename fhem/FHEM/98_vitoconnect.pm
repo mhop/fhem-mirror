@@ -29,7 +29,7 @@
 sub vitoconnect_Initialize;             # Modul initialisieren und Namen zusätzlicher Funktionen bekannt geben
 sub vitoconnect_Define;                 # wird beim 'define' eines Gerätes aufgerufen
 sub vitoconnect_Undef;                  # wird beim Löschen einer Geräteinstanz aufgerufen
-sub vitoconnect_Get;                    # bisher kein 'get' implementiert
+sub vitoconnect_Get;                    # Implementierung get-Befehle
 sub vitoconnect_Set;                    # Implementierung set-Befehle
 sub vitoconnect_Set_New;                # Implementierung set-Befehle New dynamisch auf raw readings
 sub vitoconnect_Set_SVN;                # Implementierung set-Befehle SVN
@@ -67,6 +67,10 @@ sub vitoconnect_getPowerLast;           # Write the power reading of the full la
 sub vitoconnect_actionTimerWrapper;     # Send call to API with timer
 sub vitoconnect_action;                 # Send call to API
 
+sub vitoconnect_FW_detailFn;            # Paint SVG
+sub vitoconnect_fmt_fallback;           # Get numbers for SVG
+sub vitoconnect_GetHtml;                # Return html for ftui
+
 sub vitoconnect_mapCodeText;            # Resolve Message/Error code for OneBase not in API
 sub vitoconnect_mapSeverityPrefix;      # Resolve Severity for OneBase not in API
 sub vitoconnect_getErrorCode;           # Resolve Error code 
@@ -97,6 +101,12 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.1.1"  => "25.02.2026  Small fixes",
+  "1.1.0"  => "24.02.2026  Small adaptions to SVG",
+  "1.0.9"  => "17.02.2026  Special SVG handling for vitocal 200S",
+  "1.0.8"  => "06.02.2026  SVG mapping with alternative readings",
+  "1.0.7"  => "03.02.2026  HTML for ftui",
+  "1.0.6"  => "30.01.2026  Messages and SVG Kaeltegreislauf",
   "1.0.5"  => "05.01.2026  Auth and token requests changed to V3 API",
   "1.0.4"  => "04.01.2026  Log response body in case off access token error",
   "1.0.3"  => "11.12.2025  asSingleValue fixed – this time for real",
@@ -170,373 +180,398 @@ my %translations;       # Über das Attribut translations definierte Readings zu
 # Meldungs / Fehler Mapping für One Base geräte
 my %viessmann_code_text = (
     # Status codes (S-codes) - typically operational states
-	# Heating and Cooling Operations
-	'S.10' => 'Standby - Bereitschaftsmodus',
-	'S.11' => 'Kompressor läuft - Heizbetrieb',
-	'S.12' => 'Kompressor läuft - Kühlbetrieb',
-	'S.13' => 'Abtauung aktiv',
-	'S.14' => 'Notbetrieb/Störung',
-	'S.15' => 'Verdichter-Anlaufverzögerung',
+    # Heating and Cooling Operations
+    'S.1' => 'Netzspannung eingeschaltet',
+    'S.10' => 'Standby - Bereitschaftsmodus',
+    'S.11' => 'Kompressor läuft - Heizbetrieb',
+    'S.12' => 'Kompressor läuft - Kühlbetrieb',
+    'S.13' => 'Abtauung aktiv',
+    'S.14' => 'Notbetrieb/Störung',
+    'S.15' => 'Verdichter-Anlaufverzögerung',
 
-	# Temperature Management
-	'S.20' => 'Vorlauftemperatur zu hoch',
-	'S.21' => 'Vorlauftemperatur zu niedrig',
-	'S.22' => 'Rücklauftemperatur zu hoch',
-	'S.23' => 'Rücklauftemperatur zu niedrig',
-	'S.24' => 'Außentemperatur zu niedrig',
-	'S.25' => 'Außentemperatur zu hoch',
+    # Temperature Management
+    'S.20' => 'Vorlauftemperatur zu hoch',
+    'S.21' => 'Vorlauftemperatur zu niedrig',
+    'S.22' => 'Rücklauftemperatur zu hoch',
+    'S.23' => 'Rücklauftemperatur zu niedrig',
+    'S.24' => 'Außentemperatur zu niedrig',
+    'S.25' => 'Außentemperatur zu hoch',
 
-	# Pump Operations
-	'S.30' => 'Umwälzpumpe läuft',
-	'S.31' => 'Umwälzpumpe aus',
-	'S.32' => 'Pumpe Heizkreis 1 läuft',
-	'S.33' => 'Pumpe Heizkreis 2 läuft',
-	'S.34' => 'Ladepumpe läuft',
-	'S.35' => 'Zirkulationspumpe läuft',
+    # Pump Operations
+    'S.30' => 'Umwälzpumpe läuft',
+    'S.31' => 'Umwälzpumpe aus',
+    'S.32' => 'Pumpe Heizkreis 1 läuft',
+    'S.33' => 'Pumpe Heizkreis 2 läuft',
+    'S.34' => 'Ladepumpe läuft',
+    'S.35' => 'Zirkulationspumpe läuft',
 
-	# Heat Generator
-	'S.40' => 'Wärmepumpe läuft',
-	'S.41' => 'Zusatzheizung aktiv',
-	'S.42' => 'Elektrische Zusatzheizung aktiv',
-	'S.43' => 'Bivalente Heizung aktiv',
+    # Heat Generator
+    'S.40' => 'Wärmepumpe läuft',
+    'S.41' => 'Zusatzheizung aktiv',
+    'S.42' => 'Elektrische Zusatzheizung aktiv',
+    'S.43' => 'Bivalente Heizung aktiv',
 
-	# Hot Water
-	'S.50' => 'Warmwasserbereitung',
-	'S.51' => 'Warmwasser-Nachladung',
-	'S.52' => 'Legionellenschutz aktiv',
-	'S.53' => 'Warmwasser-Zirkulation',
+    # Hot Water
+    'S.50' => 'Warmwasserbereitung',
+    'S.51' => 'Warmwasser-Nachladung',
+    'S.52' => 'Legionellenschutz aktiv',
+    'S.53' => 'Warmwasser-Zirkulation',
 
-	# Additional Status Codes from PDF
-	'S.60' => 'Sommerbetrieb aktiv (Sparfunktion Aussentemperatur)',
-	'S.61' => 'Abtauung laeuft',
-	'S.62' => 'Abtauung beendet',
-	'S.63' => 'Verdampfer-Abtauung',
-	'S.70' => 'Testbetrieb',
-	'S.71' => 'Relaistest',
-	'S.72' => 'Sensortest',
-	'S.74' => 'Heizunterdrueckung Heizen bei Trinkwassererwaermung durch Sonnenkollektoren',
-	'S.75' => 'Zirkulationspumpe aktiv',
-	'S.80' => 'Kommunikation OK',
-	'S.81' => 'Kommunikation gestoert',
-	'S.82' => 'Bus-Kommunikation aktiv',
-	'S.88' => 'Solarkreispumpe aktiv',
-	'S.89' => 'Sonnenkollektoren in Stagnation',
-	'S.90' => 'EVU-Sperre aktiv',
-	'S.91' => 'Smart Grid aktiv',
-	'S.92' => 'PV-Ueberschuss-Nutzung',
-	'S.100' => 'Heizen - Normalbetrieb',
-	'S.101' => 'Heizen - Reduzierter Betrieb',
-	'S.102' => 'Heizen - Komfortbetrieb',
-	'S.103' => 'Heizen - Eco-Betrieb',
-	'S.104' => 'Heizen - Partybetrieb',
-	'S.105' => 'Heizen - Urlaubsbetrieb',
-	'S.110' => 'Kuehlen - Normalbetrieb',
-	'S.111' => 'Kuehlen - Reduzierter Betrieb',
-	'S.112' => 'Initialisierung 4/3-Wege-Ventil',
-	'S.113' => '4/3-Wege-Ventil schaltet in Richtung Trinkwassererwaermung',
-	'S.114' => '4/3-Wege-Ventil schaltet in Richtung Heiz-/Kuehlkreis 1',
-	'S.115' => '4/3-Wege-Ventil in Position Trinkwassererwaermung',
-	'S.116' => '4/3-Wege-Ventil in Position Heiz-/Kuehlkreis 1',
-	'S.117' => '4/3-Wege-Ventil in Position Heiz-/Kuehlkreis 2',
-	'S.118' => '4/3-Wege-Ventil in Position Integrierter Pufferspeicher',
-	'S.119' => 'Verdichter-Mindestlaufzeit',
-	'S.120' => 'Smart Grid: Normalbetrieb aktiv',
-	'S.121' => 'Smart Grid: Empfohlener Betrieb aktiv',
-	'S.122' => 'Smart Grid: Erzwungener Betrieb aktiv',
-	'S.123' => 'Waermepumpe aus',
-	'S.124' => 'Waermepumpe Vorlaufphase',
-	'S.125' => 'Waermepumpe im Heizbetrieb',
-	'S.126' => 'Waermepumpe im Kuehlbetrieb',
-	'S.127' => 'Waermepumpe: Abtauen vorbereiten',
-	'S.128' => 'Waermepumpe im Abtaubetrieb',
-	'S.129' => 'Waermepumpe Nachlaufphase',
-	'S.130' => 'Heizwasser-Durchlauferhitzer ausgeschaltet',
-	'S.131' => 'Heizwasser-Durchlauferhitzer: Stufe 1 aktiv',
-	'S.132' => 'Heizwasser-Durchlauferhitzer: Stufe 2 aktiv',
-	'S.133' => 'Heizwasser-Durchlauferhitzer: Stufe 3 aktiv',
-	'S.134' => '4/3-Wege-Ventil Leerlauf',
-	'S.135' => '4/3-Wege-Ventil Abtauen',
-	'S.136' => '4/3-Wege-Ventil Raumbeheizung/Raumkuehlung',
-	'S.137' => 'Heizbetrieb in Anlaufphase',
-	'S.138' => 'Heizbetrieb aktiv',
-	'S.139' => 'Heizbetrieb inaktiv',
-	'S.141' => 'Trinkwassererwaermung aktiv',
-	'S.142' => 'Trinkwassererwaermung inaktiv',
-	'S.143' => 'Kuehlbetrieb angefordert',
-	'S.144' => 'Kuehlbetrieb aktiv',
-	'S.145' => 'Kuehlbetrieb inaktiv',
-	'S.146' => 'Abtauen angefordert',
-	'S.147' => 'Waermebereitstellung fuer Abtauen aktiv',
-	'S.148' => 'Abtauen ueber Waermepumpe aktiv',
-	'S.149' => 'Abtauen ueber Waermepumpe inaktiv',
-	'S.153' => 'Regelung im Standby',
-	'S.160' => 'Lueftung - Stufe 1',
-	'S.161' => 'Befuellung aktiv',
-	'S.162' => 'Entlueftung aktiv',
-	'S.163' => 'Waermepumpe: Systemstatus inaktiv',
-	'S.164' => 'Waermepumpe: Systemstatus Wartung Standby',
-	'S.165' => 'Waermepumpe: Systemstatus Regelung',
-	'S.167' => 'Aktorentest aktiv',
-	'S.168' => 'Lueftungsbypass offen',
-	'S.170' => 'Systemcheck laeuft',
-	'S.171' => 'Initialisierung',
-	'S.172' => 'Software-Update',
-	'S.176' => 'Waermepumpenregelung: Abtauen angefordert',
-	'S.180' => 'Betriebsstundenzaehler',
-	'S.181' => 'Passiver Frostschutz Heiz-/Kuehlkreis 1 eingeschaltet',
-	'S.182' => 'Passiver Frostschutz Heiz-/Kuehlkreis 2 eingeschaltet',
-	'S.183' => 'Passiver Frostschutz Heiz-/Kuehlkreis 3 eingeschaltet',
-	'S.184' => 'Passiver Frostschutz Heiz-/Kuehlkreis 4 eingeschaltet',
-	'S.185' => 'Passiver Frostschutz Heizwasser-Durchlauferhitzer eingeschaltet',
-	'S.186' => 'Passiver Frostschutz Speicher-Wassererwärmer eingeschaltet',
-	'S.187' => 'Passiver Frostschutz Waermepumpe eingeschaltet',
-	'S.188' => 'Passiver Frostschutz externer Heiz-/Kuehlwasser-Pufferspeicher eingeschaltet',
-	'S.189' => 'Passiver Frostschutz externer Heizwasser-Pufferspeicher eingeschaltet',
-	'S.190' => 'Passiver Frostschutz externer Kuehlwasser-Pufferspeicher eingeschaltet',
-	'S.191' => 'Filter reinigen',
-	'S.192' => 'Wartung faellig',
-	'S.193' => 'Anforderung externer Waermeerzeuger ueber potenzialfreien Schaltkontakt',
-	'S.195' => 'Smart Grid: EVU-Sperre aktiv',
-	'S.196' => 'EVU-Sperre aktiv',
-	'S.197' => 'Waermeanforderung Heiz-/Kuehlkreis 1',
-	'S.198' => 'Kuehlanforderung Heiz-/Kuehlkreis 1',
-	'S.199' => 'Waermeanforderung Heiz-/Kuehlkreis 2',
-	'S.205' => 'Anforderung externer Heizwasser-Pufferspeicher',
-	'S.206' => 'Anforderung externer Kuehlwasser-Pufferspeicher',
-	'S.207' => 'Anforderung Trinkwassererwaermung',
-	'S.208' => 'Erwaermung integrierter Pufferspeicher aktiv',
-	'S.209' => 'Abbruch Befuellfunktion',
-	'S.210' => 'Abbruch Entlueftungsfunktion',
-	'S.211' => 'Befuellvorgang abgeschlossen',
-	'S.212' => 'Entlueftungsvorgang abgeschlossen',
-	'S.213' => 'Inbetriebnahme-Assistent aktiv',
-	'S.214' => 'Abbruch Inbetriebnahme',
-	'S.215' => 'Inbetriebnahme abgeschlossen',
-	'S.216' => 'Aktorentest aktiv',
-	'S.217' => 'Heizwasser-Durchlauferhitzer: Stufe 1 inaktiv',
-	'S.218' => 'Heizwasser-Durchlauferhitzer: Stufe 2 inaktiv',
-	'S.219' => 'Heizwasser-Durchlauferhitzer: Stufe 3 inaktiv',
-	'S.220' => 'Kaeltekreis ausgeschaltet',
-	'S.221' => 'Kaeltekreis Startphase Heizbetrieb',
-	'S.222' => 'Kaeltekreis Startphase Kuehlbetrieb',
-	'S.223' => 'Kaeltekreis Startphase Abtaubetrieb',
-	'S.224' => 'Kaeltekreis im Heizbetrieb',
-	'S.225' => 'Kaeltekreis im Kuehlbetrieb',
-	'S.226' => 'Kaeltekreis im Abtaubetrieb im Betriebsprogramm Frostschutz',
-	'S.227' => 'Kaeltekreis im Abtaubetrieb bei Regelbetrieb',
-	'S.228' => 'Kaeltekreis Abschaltsignal',
-	'S.229' => 'Kaeltekreisregler im Uebergang von Heizbetrieb zu Kuehlbetrieb',
-	'S.230' => 'Kaeltekreisregler im Uebergang von Kuehlbetrieb zu Heizbetrieb',
-	'S.231' => 'Kaeltekreisregler im Uebergang von Abtaubetrieb zu Heizbetrieb',
-	'S.240' => 'Kaeltekreisregler im Standby',
-	'S.392' => 'Kaeltekreisregler im Uebergang von Heizbetrieb zu Abtaubetrieb',
-	'S.393' => 'Aktiver Frostschutz Heiz-/Kuehlkreis 1 eingeschaltet',
-	'S.394' => 'Aktiver Frostschutz Heiz-/Kuehlkreis 2 eingeschaltet',
-	'S.395' => 'Aktiver Frostschutz Heiz-/Kuehlkreis 3 eingeschaltet',
-	'S.396' => 'Aktiver Frostschutz Heiz-/Kuehlkreis 4 eingeschaltet',
-	'S.397' => 'Aktiver Frostschutz Heizwasser-Durchlauferhitzer eingeschaltet',
-	'S.398' => 'Aktiver Frostschutz Speicher-Wassererwärmer eingeschaltet',
-	'S.399' => 'Aktiver Frostschutz Waermepumpe eingeschaltet',
-	'S.400' => 'Aktiver Frostschutz externer Heiz-/Kuehlwasser-Pufferspeicher eingeschaltet',
-	'S.401' => 'Aktiver Frostschutz externer Heizwasser-Pufferspeicher eingeschaltet',
-	'S.402' => 'Aktiver Frostschutz externer Kuehlwasser-Pufferspeicher eingeschaltet',
+    # Additional Status Codes from PDF
+    'S.60' => 'Sommerbetrieb aktiv (Sparfunktion Aussentemperatur)',
+    'S.61' => 'Abtauung laeuft',
+    'S.62' => 'Abtauung beendet',
+    'S.63' => 'Verdampfer-Abtauung',
+    'S.70' => 'Testbetrieb',
+    'S.71' => 'Relaistest',
+    'S.72' => 'Sensortest',
+    'S.74' => 'Heizunterdrueckung Heizen bei Trinkwassererwaermung durch Sonnenkollektoren',
+    'S.75' => 'Zirkulationspumpe aktiv',
+    'S.80' => 'Kommunikation OK',
+    'S.81' => 'Kommunikation gestoert',
+    'S.82' => 'Bus-Kommunikation aktiv',
+    'S.88' => 'Solarkreispumpe aktiv',
+    'S.89' => 'Sonnenkollektoren in Stagnation',
+    'S.90' => 'EVU-Sperre aktiv',
+    'S.91' => 'Smart Grid aktiv',
+    'S.92' => 'PV-Ueberschuss-Nutzung',
+    'S.100' => 'Heizen - Normalbetrieb',
+    'S.101' => 'Heizen - Reduzierter Betrieb',
+    'S.102' => 'Heizen - Komfortbetrieb',
+    'S.103' => 'Heizen - Eco-Betrieb',
+    'S.104' => 'Heizen - Partybetrieb',
+    'S.105' => 'Heizen - Urlaubsbetrieb',
+    'S.110' => 'Kuehlen - Normalbetrieb',
+    'S.111' => 'Kuehlen - Reduzierter Betrieb',
+    'S.112' => 'Initialisierung 4/3-Wege-Ventil',
+    'S.113' => '4/3-Wege-Ventil schaltet in Richtung Trinkwassererwaermung',
+    'S.114' => '4/3-Wege-Ventil schaltet in Richtung Heiz-/Kuehlkreis 1',
+    'S.115' => '4/3-Wege-Ventil in Position Trinkwassererwaermung',
+    'S.116' => '4/3-Wege-Ventil in Position Heiz-/Kuehlkreis 1',
+    'S.117' => '4/3-Wege-Ventil in Position Heiz-/Kuehlkreis 2',
+    'S.118' => '4/3-Wege-Ventil in Position Integrierter Pufferspeicher',
+    'S.119' => 'Verdichter-Mindestlaufzeit',
+    'S.120' => 'Smart Grid: Normalbetrieb aktiv',
+    'S.121' => 'Smart Grid: Empfohlener Betrieb aktiv',
+    'S.122' => 'Smart Grid: Erzwungener Betrieb aktiv',
+    'S.123' => 'Waermepumpe aus',
+    'S.124' => 'Waermepumpe Vorlaufphase',
+    'S.125' => 'Waermepumpe im Heizbetrieb',
+    'S.126' => 'Waermepumpe im Kuehlbetrieb',
+    'S.127' => 'Waermepumpe: Abtauen vorbereiten',
+    'S.128' => 'Waermepumpe im Abtaubetrieb',
+    'S.129' => 'Waermepumpe Nachlaufphase',
+    'S.130' => 'Heizwasser-Durchlauferhitzer ausgeschaltet',
+    'S.131' => 'Heizwasser-Durchlauferhitzer: Stufe 1 aktiv',
+    'S.132' => 'Heizwasser-Durchlauferhitzer: Stufe 2 aktiv',
+    'S.133' => 'Heizwasser-Durchlauferhitzer: Stufe 3 aktiv',
+    'S.134' => '4/3-Wege-Ventil Leerlauf',
+    'S.135' => '4/3-Wege-Ventil Abtauen',
+    'S.136' => '4/3-Wege-Ventil Raumbeheizung/Raumkuehlung',
+    'S.137' => 'Heizbetrieb in Anlaufphase',
+    'S.138' => 'Heizbetrieb aktiv',
+    'S.139' => 'Heizbetrieb inaktiv',
+    'S.141' => 'Trinkwassererwaermung aktiv',
+    'S.142' => 'Trinkwassererwaermung inaktiv',
+    'S.143' => 'Kuehlbetrieb angefordert',
+    'S.144' => 'Kuehlbetrieb aktiv',
+    'S.145' => 'Kuehlbetrieb inaktiv',
+    'S.146' => 'Abtauen angefordert',
+    'S.147' => 'Waermebereitstellung fuer Abtauen aktiv',
+    'S.148' => 'Abtauen ueber Waermepumpe aktiv',
+    'S.149' => 'Abtauen ueber Waermepumpe inaktiv',
+    'S.153' => 'Regelung im Standby',
+    'S.160' => 'Lueftung - Stufe 1',
+    'S.161' => 'Befuellung aktiv',
+    'S.162' => 'Entlueftung aktiv',
+    'S.163' => 'Waermepumpe: Systemstatus inaktiv',
+    'S.164' => 'Waermepumpe: Systemstatus Wartung Standby',
+    'S.165' => 'Waermepumpe: Systemstatus Regelung',
+    'S.167' => 'Aktorentest aktiv',
+    'S.168' => 'Lueftungsbypass offen',
+    'S.170' => 'Systemcheck laeuft',
+    'S.171' => 'Initialisierung',
+    'S.172' => 'Software-Update',
+    'S.176' => 'Waermepumpenregelung: Abtauen angefordert',
+    'S.180' => 'Betriebsstundenzaehler',
+    'S.181' => 'Passiver Frostschutz Heiz-/Kuehlkreis 1 eingeschaltet',
+    'S.182' => 'Passiver Frostschutz Heiz-/Kuehlkreis 2 eingeschaltet',
+    'S.183' => 'Passiver Frostschutz Heiz-/Kuehlkreis 3 eingeschaltet',
+    'S.184' => 'Passiver Frostschutz Heiz-/Kuehlkreis 4 eingeschaltet',
+    'S.185' => 'Passiver Frostschutz Heizwasser-Durchlauferhitzer eingeschaltet',
+    'S.186' => 'Passiver Frostschutz Speicher-Wassererwärmer eingeschaltet',
+    'S.187' => 'Passiver Frostschutz Waermepumpe eingeschaltet',
+    'S.188' => 'Passiver Frostschutz externer Heiz-/Kuehlwasser-Pufferspeicher eingeschaltet',
+    'S.189' => 'Passiver Frostschutz externer Heizwasser-Pufferspeicher eingeschaltet',
+    'S.190' => 'Passiver Frostschutz externer Kuehlwasser-Pufferspeicher eingeschaltet',
+    'S.191' => 'Filter reinigen',
+    'S.192' => 'Wartung faellig',
+    'S.193' => 'Anforderung externer Waermeerzeuger ueber potenzialfreien Schaltkontakt',
+    'S.195' => 'Smart Grid: EVU-Sperre aktiv',
+    'S.196' => 'EVU-Sperre aktiv',
+    'S.197' => 'Waermeanforderung Heiz-/Kuehlkreis 1',
+    'S.198' => 'Kuehlanforderung Heiz-/Kuehlkreis 1',
+    'S.199' => 'Waermeanforderung Heiz-/Kuehlkreis 2',
+    'S.205' => 'Anforderung externer Heizwasser-Pufferspeicher',
+    'S.206' => 'Anforderung externer Kuehlwasser-Pufferspeicher',
+    'S.207' => 'Anforderung Trinkwassererwaermung',
+    'S.208' => 'Erwaermung integrierter Pufferspeicher aktiv',
+    'S.209' => 'Abbruch Befuellfunktion',
+    'S.210' => 'Abbruch Entlueftungsfunktion',
+    'S.211' => 'Befuellvorgang abgeschlossen',
+    'S.212' => 'Entlueftungsvorgang abgeschlossen',
+    'S.213' => 'Inbetriebnahme-Assistent aktiv',
+    'S.214' => 'Abbruch Inbetriebnahme',
+    'S.215' => 'Inbetriebnahme abgeschlossen',
+    'S.216' => 'Aktorentest aktiv',
+    'S.217' => 'Heizwasser-Durchlauferhitzer: Stufe 1 inaktiv',
+    'S.218' => 'Heizwasser-Durchlauferhitzer: Stufe 2 inaktiv',
+    'S.219' => 'Heizwasser-Durchlauferhitzer: Stufe 3 inaktiv',
+    'S.220' => 'Kaeltekreis ausgeschaltet',
+    'S.221' => 'Kaeltekreis Startphase Heizbetrieb',
+    'S.222' => 'Kaeltekreis Startphase Kuehlbetrieb',
+    'S.223' => 'Kaeltekreis Startphase Abtaubetrieb',
+    'S.224' => 'Kaeltekreis im Heizbetrieb',
+    'S.225' => 'Kaeltekreis im Kuehlbetrieb',
+    'S.226' => 'Kaeltekreis im Abtaubetrieb im Betriebsprogramm Frostschutz',
+    'S.227' => 'Kaeltekreis im Abtaubetrieb bei Regelbetrieb',
+    'S.228' => 'Kaeltekreis Abschaltsignal',
+    'S.229' => 'Kaeltekreisregler im Uebergang von Heizbetrieb zu Kuehlbetrieb',
+    'S.230' => 'Kaeltekreisregler im Uebergang von Kuehlbetrieb zu Heizbetrieb',
+    'S.231' => 'Kaeltekreisregler im Uebergang von Abtaubetrieb zu Heizbetrieb',
+    'S.240' => 'Kaeltekreisregler im Standby',
+    'S.392' => 'Kaeltekreisregler im Uebergang von Heizbetrieb zu Abtaubetrieb',
+    'S.393' => 'Aktiver Frostschutz Heiz-/Kuehlkreis 1 eingeschaltet',
+    'S.394' => 'Aktiver Frostschutz Heiz-/Kuehlkreis 2 eingeschaltet',
+    'S.395' => 'Aktiver Frostschutz Heiz-/Kuehlkreis 3 eingeschaltet',
+    'S.396' => 'Aktiver Frostschutz Heiz-/Kuehlkreis 4 eingeschaltet',
+    'S.397' => 'Aktiver Frostschutz Heizwasser-Durchlauferhitzer eingeschaltet',
+    'S.398' => 'Aktiver Frostschutz Speicher-Wassererwärmer eingeschaltet',
+    'S.399' => 'Aktiver Frostschutz Waermepumpe eingeschaltet',
+    'S.400' => 'Aktiver Frostschutz externer Heiz-/Kuehlwasser-Pufferspeicher eingeschaltet',
+    'S.401' => 'Aktiver Frostschutz externer Heizwasser-Pufferspeicher eingeschaltet',
+    'S.402' => 'Aktiver Frostschutz externer Kuehlwasser-Pufferspeicher eingeschaltet',
+    # Quelle: vieventlog (mschneider82)
+    'S.427' => 'Leistungsbegrenzung durch den Netzbetreiber nach § 14a EnWG',
 
-	# Missing codes from PDF
-	'S.140' => 'Trinkwassererwaermung angefordert',
-	'S.150' => 'Abtauen ueber Heiz-/Kuehlkreis 1 oder externen Heizwasser-Pufferspeicher (falls vorhanden) in Vorbereitung',
-	'S.151' => 'Abtauen ueber Heiz-/Kuehlkreis 1 oder externen Heizwasser-Pufferspeicher (falls vorhanden) aktiv',
-	'S.152' => 'Abtauen ueber Heiz-/Kuehlkreis 1 oder externen Heizwasser-Pufferspeicher (falls vorhanden) inaktiv',
-	'S.200' => 'Kuehlanforderung Heiz-/Kuehlkreis 2',
-	'S.201' => 'Waermeanforderung Heiz-/Kuehlkreis 3',
-	'S.202' => 'Kuehlanforderung Heiz-/Kuehlkreis 3',
-	'S.203' => 'Waermeanforderung Heiz-/Kuehlkreis 4',
-	'S.204' => 'Kuehlanforderung Heiz-/Kuehlkreis 4',
+    # Missing codes from PDF
+    'S.140' => 'Trinkwassererwaermung angefordert',
+    'S.150' => 'Abtauen ueber Heiz-/Kuehlkreis 1 oder externen Heizwasser-Pufferspeicher (falls vorhanden) in Vorbereitung',
+    'S.151' => 'Abtauen ueber Heiz-/Kuehlkreis 1 oder externen Heizwasser-Pufferspeicher (falls vorhanden) aktiv',
+    'S.152' => 'Abtauen ueber Heiz-/Kuehlkreis 1 oder externen Heizwasser-Pufferspeicher (falls vorhanden) inaktiv',
+    'S.200' => 'Kuehlanforderung Heiz-/Kuehlkreis 2',
+    'S.201' => 'Waermeanforderung Heiz-/Kuehlkreis 3',
+    'S.202' => 'Kuehlanforderung Heiz-/Kuehlkreis 3',
+    'S.203' => 'Waermeanforderung Heiz-/Kuehlkreis 4',
+    'S.204' => 'Kuehlanforderung Heiz-/Kuehlkreis 4',
 
     # Maintenance codes (P-codes) - maintenance messages
-	'P.1' => 'Wartung nach Zeitintervall steht bevor',
-	'P.4' => 'Heizwasser nachfuellen',
-	'P.8' => 'Wartung nach Betriebsstunden steht bevor',
-	'P.34' => 'Wartung Heizwasserfilter',
-	'P.35' => 'Zeitintervall für Filterwechsel ist abgelaufen',
+    'P.1' => 'Wartung nach Zeitintervall steht bevor',
+    'P.4' => 'Heizwasser nachfuellen',
+    'P.8' => 'Wartung nach Betriebsstunden steht bevor',
+    'P.34' => 'Wartung Heizwasserfilter',
+    'P.35' => 'Zeitintervall für Filterwechsel ist abgelaufen',
 
     # Alert codes (A-codes) - warning messages
-	'A.2' => 'Frostschutzgrenze unterschritten',
-	'A.11' => 'Anlagendruck zu niedrig',
-	'A.12' => 'Batterie im Elektronikmodul HPMU',
-	'A.27' => 'Batterie geringer Ladezustand',
-	'A.16' => 'Mindestvolumenstrom unterschritten',
-	'A.17' => 'Erhöhte Trinkwasserhygiene',
-	'A.19' => 'Temperaturwächter hat ausgelöst',
-	'A.21' => 'Hydraulischer Anlagendruck',
-	'A.62' => 'PWM-Signal Heizkreispumpe Heiz-/Kühlkreis 1',
-	'A.63' => 'PWM-Signal Heizkreispumpe Heiz-/Kühlkreis 2',
-	'A.65' => 'Heizkreispumpe Heiz-/Kühlkreis 2 läuft trocken',
-	'A.66' => 'Heizkreispumpe Heiz-/Kühlkreis 1 läuft nicht',
-	'A.68' => 'Heizkreispumpe Heiz-/Kühlkreis 2 läuft nicht',
-	'A.70' => 'Filter im Kugelhahn Außeneinheit',
-	'A.71' => 'Überstrom am Verdichter',
-	'A.72' => 'Strom Leistungsfaktor-Korrekturfilter',
-	'A.73' => 'Frequenzabweichung Verdichterdrehzahl',
-	'A.74' => 'Druckverlust im Sekundärkreis',
-	'A.75' => 'Druckspitzen im Sekundärkreis',
-	'A.80' => 'Ventilator blockiert',
-	'A.81' => 'Unzureichende Wärmeübertragung Verdampfer',
-	'A.82' => 'Fehler Drucksensor CAN-BUS-Teilnehmer',
-	'A.83' => 'Signal Speichertemperatursensor fehlerhaft',
-	'A.84' => 'Signal Rücklauftemperatursensor Sekundärkreis',
-	'A.85' => 'Signal Vorlauftemperatursensor Sekundärkreis',
-	'A.86' => 'Signal Vorlauftemperatursensor Heiz-/Kühlkreis 1',
-	'A.87' => 'Signal Vorlauftemperatursensor Heiz-/Kühlkreis 2',
-	'A.91' => 'Kältekreis vorübergehend aus',
-	'A.93' => 'Heißgasdruck nicht plausibel',
-	'A.94' => 'Sauggasdruck nicht plausibel',
-	'A.96' => 'Luft im Sekundärkreis',
-	'A.99' => 'Vorlauftemperatur Sekundärkreis zu niedrig',
-	'A.100' => 'Einstellungen gelöscht',
-	'A.101' => 'Heißgastemperatur nicht plausibel',
-	'A.102' => 'Sauggastemperatur nicht plausibel',
-	'A.109' => 'Kesseltemperatur-Istwert zu niedrig',
-	'A.110' => 'Temperatur externer Wärmeerzeuger 1',
-	'A.111' => 'Temperatur externer Wärmeerzeuger 2',
-	'A.130' => 'Warnschwelle Einsatzgrenzen für Kühlbetrieb unterschritten',
-	'A.152' => 'Überlastschutz Wallbox nicht aktiv',
-	'A.153' => 'Kein PV-optimiertes Laden',
-	'A.159' => 'Werkseitige Einstellung Inverter',
-	'A.162' => 'Inverter Überspannung Zwischenkreis',
-	'A.163' => 'Überspannung im Zwischenkreis Inverter',
-	'A.164' => 'Gleichspannung im Zwischenkreis Inverter',
-	'A.174' => 'Innenraumtemperatur zu hoch',
+    'A.2' => 'Frostschutzgrenze unterschritten',
+    'A.11' => 'Anlagendruck zu niedrig',
+    'A.12' => 'Batterie im Elektronikmodul HPMU',
+    'A.27' => 'Batterie geringer Ladezustand',
+    'A.16' => 'Mindestvolumenstrom unterschritten',
+    'A.17' => 'Erhöhte Trinkwasserhygiene',
+    'A.19' => 'Temperaturwächter hat ausgelöst',
+    'A.21' => 'Hydraulischer Anlagendruck',
+    'A.62' => 'PWM-Signal Heizkreispumpe Heiz-/Kühlkreis 1',
+    'A.63' => 'PWM-Signal Heizkreispumpe Heiz-/Kühlkreis 2',
+    'A.65' => 'Heizkreispumpe Heiz-/Kühlkreis 2 läuft trocken',
+    'A.66' => 'Heizkreispumpe Heiz-/Kühlkreis 1 läuft nicht',
+    'A.68' => 'Heizkreispumpe Heiz-/Kühlkreis 2 läuft nicht',
+    'A.70' => 'Filter im Kugelhahn Außeneinheit',
+    'A.71' => 'Überstrom am Verdichter',
+    'A.72' => 'Strom Leistungsfaktor-Korrekturfilter',
+    'A.73' => 'Frequenzabweichung Verdichterdrehzahl',
+    'A.74' => 'Druckverlust im Sekundärkreis',
+    'A.75' => 'Druckspitzen im Sekundärkreis',
+    'A.80' => 'Ventilator blockiert',
+    'A.81' => 'Unzureichende Wärmeübertragung Verdampfer',
+    'A.82' => 'Fehler Drucksensor CAN-BUS-Teilnehmer',
+    'A.83' => 'Signal Speichertemperatursensor fehlerhaft',
+    'A.84' => 'Signal Rücklauftemperatursensor Sekundärkreis',
+    'A.85' => 'Signal Vorlauftemperatursensor Sekundärkreis',
+    'A.86' => 'Signal Vorlauftemperatursensor Heiz-/Kühlkreis 1',
+    'A.87' => 'Signal Vorlauftemperatursensor Heiz-/Kühlkreis 2',
+    'A.91' => 'Kältekreis vorübergehend aus',
+    'A.93' => 'Heißgasdruck nicht plausibel',
+    'A.94' => 'Sauggasdruck nicht plausibel',
+    'A.96' => 'Luft im Sekundärkreis',
+    'A.99' => 'Vorlauftemperatur Sekundärkreis zu niedrig',
+    'A.100' => 'Einstellungen gelöscht',
+    'A.101' => 'Heißgastemperatur nicht plausibel',
+    'A.102' => 'Sauggastemperatur nicht plausibel',
+    'A.109' => 'Kesseltemperatur-Istwert zu niedrig',
+    'A.110' => 'Temperatur externer Wärmeerzeuger 1',
+    'A.111' => 'Temperatur externer Wärmeerzeuger 2',
+    'A.130' => 'Warnschwelle Einsatzgrenzen für Kühlbetrieb unterschritten',
+    'A.152' => 'Überlastschutz Wallbox nicht aktiv',
+    'A.153' => 'Kein PV-optimiertes Laden',
+    'A.159' => 'Werkseitige Einstellung Inverter',
+    'A.162' => 'Inverter Überspannung Zwischenkreis',
+    'A.163' => 'Überspannung im Zwischenkreis Inverter',
+    'A.164' => 'Gleichspannung im Zwischenkreis Inverter',
+    'A.174' => 'Innenraumtemperatur zu hoch',
+    
 
     # Information codes (I-codes) - informational messages
-	'I.9' => 'Estrichtrocknung aktiv',
-	'I.10' => 'Laufzeitbegrenzung Trinkwassererwaermung',
-	'I.56' => 'Extern Anfordern aktiv',
-	'I.57' => 'Extern Sperren aktiv',
-	'I.63' => 'Kuehlkreis nicht bereit',
-	'I.70' => 'Inverter: Laststrom im Zwischenkreis Inverter zu hoch (Ueberstrom)',
-	'I.71' => 'Inverter: Netzspannung zu hoch, Verdichter temporaer aus',
-	'I.72' => 'Inverter: Netzspannung zu niedrig, Verdichter temporaer aus',
-	'I.73' => 'Inverter: Gleichspannung im Zwischenkreis Inverter zu hoch (Ueberspannung)',
-	'I.74' => 'Inverter: Gleichspannung im Zwischenkreis Inverter zu niedrig (Unterspannung), Verdichter temporaer aus',
-	'I.75' => 'Inverter: Temperatur am internen Leistungsmodul zu hoch, Verdichter temporaer aus',
-	'I.76' => 'Inverter: Zu hohe Temperatur im Leistungsfaktor-Korrekturfilter (PFC), Verdichter temporaer aus',
-	'I.77' => 'Inverter: Zu hoher Strom im Leistungsfaktor-Korrekturfilter (PFC), Verdichter temporaer aus',
-	'I.78' => 'Inverter: Leistungsreduzierung durch Inverter bei zu hoher Leistungsanforderung (Derating)',
-	'I.79' => 'Inverter: Leistungsreduzierung durch Inverter bei zu hoher Leistungsanforderung des Verdichters (Derating)',
-	'I.80' => 'Inverter: Leistungsbegrenzung durch Inverter bei zu hoher Leistungsanforderung des Verdichters (Feldschwaechebetrieb)',
-	'I.81' => 'Inverter: Leistungsreduzierung durch Inverter bei zu hoher Temperatur am internen Leistungsmodul (Derating)',
-	'I.82' => 'Inverter: Leistungsreduzierung durch Inverter bei zu hoher Temperatur am Leistungsfaktor-Korrekturfilter (Derating)',
-	'I.83' => '4/3-Wege-Ventil: Mindestvolumenstrom erreicht',
-	'I.84' => '4/3-Wege-Ventil: Min. Ruecklauftemperatur erreicht',
-	'I.85' => 'Kontrollierte Regelniederdruckabschaltung Kaeltekreis',
-	'I.86' => 'Kontrollierte Regelhochdruckabschaltung Kaeltekreis',
-	'I.89' => 'Uhrzeit vorgestellt (Sommerzeit)',
-	'I.90' => 'Uhrzeit zurueckgestellt (Winterzeit)',
-	'I.92' => 'Energiebilanz zurueckgesetzt',
-	'I.94' => 'Wartung in 30 Tagen fällig',
-	'I.95' => 'Filterwechsel in 14 Tagen fällig',
-	'I.96' => 'Unbekannte Folge-Waermepumpe (weiteres Viessmann Geraet)',
-	'I.98' => 'Neue Folge-Waermepumpe (weiteres Viessmann Geraet) wurde erkannt',
-	'I.99' => 'Zieltemperatur Hygienefunktion erreicht',
-	'I.100' => 'Max. Verfluessigungsdruck erreicht',
-	'I.101' => 'Min. Verdampfungsdruck fuer Heizbetrieb erreicht',
-	'I.102' => 'Min. Verdampfungsdruck fuer Kuehlbetrieb erreicht',
-	'I.103' => 'Max. Verdampfungsdruck erreicht',
-	'I.104' => 'Max. Heissgastemperatur erreicht',
-	'I.105' => 'Max. Laufzeit untere Verdampfungstemperatur erreicht',
-	'I.106' => 'Max. Druckdifferenz Verdichter erreicht',
-	'I.107' => 'Max. Verfluessigungstemperatur erreicht',
-	'I.108' => 'Max. Drehmoment Verdichter erreicht',
-	'I.109' => 'Max. Verdampfungstemperatur Verdichter erreicht',
-	'I.110' => 'Min. Druckverhaeltnis Verdichter erreicht',
-	'I.111' => 'Min. Verdampfungstemperatur Verdichter erreicht',
-	'I.112' => 'Min. Austrittstemperatur am Verfluessiger erreicht',
-	'I.113' => 'Smart Grid: Erzwungene Abschaltung aktiv',
-	'I.114' => 'Smart Grid: Normalbetrieb aktiv',
-	'I.115' => 'Smart Grid: Empfohlene Einschaltung aktiv',
-	'I.116' => 'Smart Grid: Erzwungene Einschaltung aktiv',
-	'I.117' => 'Energie-Management-System aktiv',
-	'I.118' => 'Fussbodentemperaturbegrenzer Heiz-/Kuehlkreis 1 aktiv',
-	'I.119' => 'Fussbodentemperaturbegrenzer Heiz-/Kuehlkreis 2 aktiv',
-	'I.120' => 'Geraeuschreduzierter Betrieb Waermepumpe aktiv',
-	'I.121' => 'Feuchteanbauschalter Heiz-/Kuehlkreis 1 aktiv',
-	'I.122' => 'Feuchteanbauschalter Heiz-/Kuehlkreis 2 aktiv',
-	'I.123' => 'Max. Ruecklauftemperatur Kaeltekreis erreicht',
-	'I.124' => 'Min. Ruecklauftemperatur Kaeltekreis erreicht',
-	'I.125' => 'Max. Lufteintrittstemperatur Kaeltekreis erreicht',
-	'I.126' => 'Min. Lufteintrittstemperatur Kaeltekreis erreicht',
-	'I.127' => 'Max. Druckdifferenz fuer Verdichterstart erreicht',
-	'I.128' => 'Min. Oelsumpftemperatur erreicht',
-	'I.129' => 'Kaeltekreisumkehr: Druckunterschied zu gering',
-	'I.130' => 'Startphase Waermepumpe: Zeitueberschreitung',
-	'I.131' => 'Min. Verdampfungstemperatur erreicht',
-	'I.132' => 'Neustart Waermepumpenregelung',
-	'I.133' => 'Reset der Elektronikmodule durch Neustart',
-	'I.134' => 'Abtauen aktiv im Betriebsprogramm Frostschutz',
-	'I.135' => 'Abtauen aktiv im Regelbetrieb',
-	'I.142' => 'Min. Laufzeit Verdichter unterschritten',
-	'I.143' => 'EVU-Sperre aktiv',
-	'I.144' => 'Frequenzabweichungen bei Spannungsversorgung des EVU',
-	'I.145' => 'Leistungsueberschreitung Ausseneinheit',
-	'I.146' => 'Ueberhitzung Verdampfer Kuehlbetrieb',
-	'I.147' => 'Ueberhitzung Verfluessiger Heizbetrieb',
-	'I.148' => 'Ueberhitzung Verdampfer Heizbetrieb',
-	'I.149' => 'Waermeanforderung waehrend Abtaubetrieb',
-	'I.150' => 'Anforderung Abtauen waehrend Regelbetrieb',
-	'I.151' => 'Betriebsgrenze Fluessiggas temperatur Verfluessiger erreicht',
-	'I.152' => 'Betriebsgrenze Niederdruck erreicht',
-	'I.155' => 'Estrichtrocknung durch Anwender abgebrochen',
-	'I.156' => 'Warnschwelle Wasser-Volumenstrom Abtaubetrieb erreicht',
-	'I.157' => 'Erforderliche Heissgastemperatur fuer Heizbetrieb ueberschritten',
-	'I.158' => 'Erforderliche Heissgastemperatur fuer Kuehlbetrieb ueberschritten',
-	'I.159' => 'Erhoehte Innenraumtemperatur in Ausseneinheit',
-	'I.163' => 'Strombegrenzung der Wallbox aktiv: Leistung der Photovoltaikanlage zu gering',
-	'I.168' => 'Waermepumpe ist als Fuehrungs-Waermepumpe konfiguriert',
-	'I.169' => 'Waermepumpe ist als Folge-Waermepumpe konfiguriert',
-	'I.170' => 'Durch eine Stoerung uebernimmt eine Folge-Waermepumpe voruebergehend die Aufgabe der Fuehrungs-Waermepumpe',
-	'I.171' => 'Inverter: Software-Update laeuft, Inverter aus',
-	'I.173' => 'Inverter: Ausgangsstrom zu hoch, reduzierte Verdichterdrehzahl',
-	'I.174' => 'Inverter: Leistung fuer Verdichter wird voruebergehend reduziert, reduzierte Verdichterdrehzahl',
-	'I.175' => 'Verdichter startet nicht: Umgebungstemperatur ist niedriger als zulaessige Betriebstemperatur fuer Verdichter, Verdichter temporaer aus',
-	'I.176' => 'Verdichter mit reduzierter Leistung: Umgebungstemperatur ist hoeher als zulaessige Betriebstemperatur fuer Verdichter',
-	'I.182' => 'Verdichter ueberlastet: Normales Regelverhalten',
+    'I.9' => 'Estrichtrocknung aktiv',
+    'I.10' => 'Laufzeitbegrenzung Trinkwassererwaermung',
+    'I.56' => 'Extern Anfordern aktiv',
+    'I.57' => 'Extern Sperren aktiv',
+    'I.63' => 'Kuehlkreis nicht bereit',
+    'I.70' => 'Inverter: Laststrom im Zwischenkreis Inverter zu hoch (Ueberstrom)',
+    'I.71' => 'Inverter: Netzspannung zu hoch, Verdichter temporaer aus',
+    'I.72' => 'Inverter: Netzspannung zu niedrig, Verdichter temporaer aus',
+    'I.73' => 'Inverter: Gleichspannung im Zwischenkreis Inverter zu hoch (Ueberspannung)',
+    'I.74' => 'Inverter: Gleichspannung im Zwischenkreis Inverter zu niedrig (Unterspannung), Verdichter temporaer aus',
+    'I.75' => 'Inverter: Temperatur am internen Leistungsmodul zu hoch, Verdichter temporaer aus',
+    'I.76' => 'Inverter: Zu hohe Temperatur im Leistungsfaktor-Korrekturfilter (PFC), Verdichter temporaer aus',
+    'I.77' => 'Inverter: Zu hoher Strom im Leistungsfaktor-Korrekturfilter (PFC), Verdichter temporaer aus',
+    'I.78' => 'Inverter: Leistungsreduzierung durch Inverter bei zu hoher Leistungsanforderung (Derating)',
+    'I.79' => 'Inverter: Leistungsreduzierung durch Inverter bei zu hoher Leistungsanforderung des Verdichters (Derating)',
+    'I.80' => 'Inverter: Leistungsbegrenzung durch Inverter bei zu hoher Leistungsanforderung des Verdichters (Feldschwaechebetrieb)',
+    'I.81' => 'Inverter: Leistungsreduzierung durch Inverter bei zu hoher Temperatur am internen Leistungsmodul (Derating)',
+    'I.82' => 'Inverter: Leistungsreduzierung durch Inverter bei zu hoher Temperatur am Leistungsfaktor-Korrekturfilter (Derating)',
+    'I.83' => '4/3-Wege-Ventil: Mindestvolumenstrom erreicht',
+    'I.84' => '4/3-Wege-Ventil: Min. Ruecklauftemperatur erreicht',
+    'I.85' => 'Kontrollierte Regelniederdruckabschaltung Kaeltekreis',
+    'I.86' => 'Kontrollierte Regelhochdruckabschaltung Kaeltekreis',
+    'I.89' => 'Uhrzeit vorgestellt (Sommerzeit)',
+    'I.90' => 'Uhrzeit zurueckgestellt (Winterzeit)',
+    'I.92' => 'Energiebilanz zurueckgesetzt',
+    'I.94' => 'Wartung in 30 Tagen fällig',
+    'I.95' => 'Filterwechsel in 14 Tagen fällig',
+    'I.96' => 'Unbekannte Folge-Waermepumpe (weiteres Viessmann Geraet)',
+    'I.98' => 'Neue Folge-Waermepumpe (weiteres Viessmann Geraet) wurde erkannt',
+    'I.99' => 'Zieltemperatur Hygienefunktion erreicht',
+    'I.100' => 'Max. Verfluessigungsdruck erreicht',
+    'I.101' => 'Min. Verdampfungsdruck fuer Heizbetrieb erreicht',
+    'I.102' => 'Min. Verdampfungsdruck fuer Kuehlbetrieb erreicht',
+    'I.103' => 'Max. Verdampfungsdruck erreicht',
+    'I.104' => 'Max. Heissgastemperatur erreicht',
+    'I.105' => 'Max. Laufzeit untere Verdampfungstemperatur erreicht',
+    'I.106' => 'Max. Druckdifferenz Verdichter erreicht',
+    'I.107' => 'Max. Verfluessigungstemperatur erreicht',
+    'I.108' => 'Max. Drehmoment Verdichter erreicht',
+    'I.109' => 'Max. Verdampfungstemperatur Verdichter erreicht',
+    'I.110' => 'Min. Druckverhaeltnis Verdichter erreicht',
+    'I.111' => 'Min. Verdampfungstemperatur Verdichter erreicht',
+    'I.112' => 'Min. Austrittstemperatur am Verfluessiger erreicht',
+    'I.113' => 'Smart Grid: Erzwungene Abschaltung aktiv',
+    'I.114' => 'Smart Grid: Normalbetrieb aktiv',
+    'I.115' => 'Smart Grid: Empfohlene Einschaltung aktiv',
+    'I.116' => 'Smart Grid: Erzwungene Einschaltung aktiv',
+    'I.117' => 'Energie-Management-System aktiv',
+    'I.118' => 'Fussbodentemperaturbegrenzer Heiz-/Kuehlkreis 1 aktiv',
+    'I.119' => 'Fussbodentemperaturbegrenzer Heiz-/Kuehlkreis 2 aktiv',
+    'I.120' => 'Geraeuschreduzierter Betrieb Waermepumpe aktiv',
+    'I.121' => 'Feuchteanbauschalter Heiz-/Kuehlkreis 1 aktiv',
+    'I.122' => 'Feuchteanbauschalter Heiz-/Kuehlkreis 2 aktiv',
+    'I.123' => 'Max. Ruecklauftemperatur Kaeltekreis erreicht',
+    'I.124' => 'Min. Ruecklauftemperatur Kaeltekreis erreicht',
+    'I.125' => 'Max. Lufteintrittstemperatur Kaeltekreis erreicht',
+    'I.126' => 'Min. Lufteintrittstemperatur Kaeltekreis erreicht',
+    'I.127' => 'Max. Druckdifferenz fuer Verdichterstart erreicht',
+    'I.128' => 'Min. Oelsumpftemperatur erreicht',
+    'I.129' => 'Kaeltekreisumkehr: Druckunterschied zu gering',
+    'I.130' => 'Startphase Waermepumpe: Zeitueberschreitung',
+    'I.131' => 'Min. Verdampfungstemperatur erreicht',
+    'I.132' => 'Neustart Waermepumpenregelung',
+    'I.133' => 'Reset der Elektronikmodule durch Neustart',
+    'I.134' => 'Abtauen aktiv im Betriebsprogramm Frostschutz',
+    'I.135' => 'Abtauen aktiv im Regelbetrieb',
+    'I.142' => 'Min. Laufzeit Verdichter unterschritten',
+    'I.143' => 'EVU-Sperre aktiv',
+    'I.144' => 'Frequenzabweichungen bei Spannungsversorgung des EVU',
+    'I.145' => 'Leistungsueberschreitung Ausseneinheit',
+    'I.146' => 'Ueberhitzung Verdampfer Kuehlbetrieb',
+    'I.147' => 'Ueberhitzung Verfluessiger Heizbetrieb',
+    'I.148' => 'Ueberhitzung Verdampfer Heizbetrieb',
+    'I.149' => 'Waermeanforderung waehrend Abtaubetrieb',
+    'I.150' => 'Anforderung Abtauen waehrend Regelbetrieb',
+    'I.151' => 'Betriebsgrenze Fluessiggas temperatur Verfluessiger erreicht',
+    'I.152' => 'Betriebsgrenze Niederdruck erreicht',
+    'I.155' => 'Estrichtrocknung durch Anwender abgebrochen',
+    'I.156' => 'Warnschwelle Wasser-Volumenstrom Abtaubetrieb erreicht',
+    'I.157' => 'Erforderliche Heissgastemperatur fuer Heizbetrieb ueberschritten',
+    'I.158' => 'Erforderliche Heissgastemperatur fuer Kuehlbetrieb ueberschritten',
+    'I.159' => 'Erhoehte Innenraumtemperatur in Ausseneinheit',
+    'I.163' => 'Strombegrenzung der Wallbox aktiv: Leistung der Photovoltaikanlage zu gering',
+    'I.168' => 'Waermepumpe ist als Fuehrungs-Waermepumpe konfiguriert',
+    'I.169' => 'Waermepumpe ist als Folge-Waermepumpe konfiguriert',
+    'I.170' => 'Durch eine Stoerung uebernimmt eine Folge-Waermepumpe voruebergehend die Aufgabe der Fuehrungs-Waermepumpe',
+    'I.171' => 'Inverter: Software-Update laeuft, Inverter aus',
+    'I.173' => 'Inverter: Ausgangsstrom zu hoch, reduzierte Verdichterdrehzahl',
+    'I.174' => 'Inverter: Leistung fuer Verdichter wird voruebergehend reduziert, reduzierte Verdichterdrehzahl',
+    'I.175' => 'Verdichter startet nicht: Umgebungstemperatur ist niedriger als zulaessige Betriebstemperatur fuer Verdichter, Verdichter temporaer aus',
+    'I.176' => 'Verdichter mit reduzierter Leistung: Umgebungstemperatur ist hoeher als zulaessige Betriebstemperatur fuer Verdichter',
+    'I.182' => 'Verdichter ueberlastet: Normales Regelverhalten',
 
     # Fault codes (F-codes) - actual errors
-	# Sensor Faults
-	'F.01' => 'Außentemperatursensor defekt',
-	'F.02' => 'Vorlauftemperatursensor 1 defekt',
-	'F.03' => 'Speichertemperatursensor defekt',
-	'F.04' => 'Rücklauftemperatursensor defekt',
-	'F.05' => 'Abgastemperatursensor defekt',
-	'F.10' => 'Kurzschluss Außentemperatursensor',
-	'F.11' => 'Kurzschluss Vorlauftemperatursensor',
-	'F.12' => 'Kurzschluss Speichertemperatursensor',
-	'F.13' => 'Kurzschluss Rücklauftemperatursensor',
+    # Sensor Faults
+    'F.01' => 'Außentemperatursensor defekt',
+    'F.02' => 'Vorlauftemperatursensor 1 defekt',
+    'F.03' => 'Speichertemperatursensor defekt',
+    'F.04' => 'Rücklauftemperatursensor defekt',
+    'F.05' => 'Abgastemperatursensor defekt',
+    'F.10' => 'Kurzschluss Außentemperatursensor',
+    'F.11' => 'Kurzschluss Vorlauftemperatursensor',
+    'F.12' => 'Kurzschluss Speichertemperatursensor',
+    'F.13' => 'Kurzschluss Rücklauftemperatursensor',
 
-	# Pressure and Flow
-	'F.20' => 'Wasserdruck zu niedrig',
-	'F.21' => 'Wasserdruck zu hoch',
-	'F.22' => 'Kein Durchfluss',
-	'F.23' => 'Durchfluss zu gering',
+    # Pressure and Flow
+    'F.20' => 'Wasserdruck zu niedrig',
+    'F.21' => 'Wasserdruck zu hoch',
+    'F.22' => 'Kein Durchfluss',
+    'F.23' => 'Durchfluss zu gering',
 
-	# Heat Pump Specific
-	'F.454' => 'Kältekreis gesperrt',
-	'F.472' => 'Fernbedienung nicht erreichbar',
-	'F.518' => 'Keine Kommunikation mit Energiezähler',
-	'F.519' => 'Betrieb mit internen Sollwerten',
-	'F.542' => 'Mischer schließt',
-	'F.543' => 'Mischer öffnet',
-	'F.685' => 'HPMU Kommunikationsfehler',
-	'F.686' => 'HPMU Modul defekt',
-	'F.687' => 'HPMU Verbindungsfehler',
-	'F.770' => 'Frostschutz aktiviert',
-	'F.771' => 'Passiver Frostschutz',
-	'F.764' => 'Weiterer CAN-BUS-Teilnehmer meldet eine Störung',
-	'F.788' => 'Kältekreis startet nicht',
-	'F.791' => 'Ausfall Heizwasser-Durchlauferhitzer Phase 1',
-	'F.792' => 'Ausfall Heizwasser-Durchlauferhitzer Phase 2',
-	'F.793' => 'Ausfall Heizwasser-Durchlauferhitzer Phase 3',
-	'F.1078' => 'Wiederholt zu geringer Volumenstrom bei Verdichteranlauf',
+    # Heat Pump Specific
+    'F.454' => 'Kältekreis gesperrt',
+    'F.472' => 'Fernbedienung nicht erreichbar',
+    'F.518' => 'Keine Kommunikation mit Energiezähler',
+    'F.519' => 'Betrieb mit internen Sollwerten',
+    'F.542' => 'Mischer schließt',
+    'F.543' => 'Mischer öffnet',
+    'F.685' => 'HPMU Kommunikationsfehler',
+    'F.686' => 'HPMU Modul defekt',
+    'F.687' => 'HPMU Verbindungsfehler',
+    'F.770' => 'Frostschutz aktiviert',
+    'F.771' => 'Passiver Frostschutz',
+    'F.764' => 'Weiterer CAN-BUS-Teilnehmer meldet eine Störung',
+    'F.788' => 'Kältekreis startet nicht',
+    'F.791' => 'Ausfall Heizwasser-Durchlauferhitzer Phase 1',
+    'F.792' => 'Ausfall Heizwasser-Durchlauferhitzer Phase 2',
+    'F.793' => 'Ausfall Heizwasser-Durchlauferhitzer Phase 3',
+    'F.1078' => 'Wiederholt zu geringer Volumenstrom bei Verdichteranlauf',
+    
+    # Zusätzliche Wärmepumpen-Fehlercodes (F-Codes)
+    'F.33'  => 'Unterbrechung Lufteintrittstemperatursensor – Kältekreis aus',
+    'F.34'  => 'Kurzschluss Lufteintrittstemperatursensor – Kältekreis aus',
+    'F.74'  => 'Hydraulischer Anlagendruck zu niedrig – Wärmepumpe ausschalten',
+    'F.111' => 'Unterbrechung Flüssiggastemperatursensor (Heizen) – Kältekreis aus',
+    'F.112' => 'Kurzschluss Flüssiggastemperatursensor (Heizen) – Kältekreis aus',
+    'F.117' => 'Unterbrechung Sauggastemperatursensor Verdampfer – Kältekreis aus',
+    'F.118' => 'Kurzschluss Sauggastemperatursensor Verdampfer – Kältekreis aus',
+    'F.121' => 'Kommunikationsfehler Wechselrichter Inverter – Kältekreis aus',
+    'F.123' => 'Unterbrechung Flüssiggastemperatursensor Verflüssiger',
+    'F.124' => 'Kurzschluss Flüssiggastemperatursensor Verflüssiger',
+    'F.160' => 'Kommunikationsstörung CAN-BUS',
+    'F.425' => 'Zeitsynchronisation fehlgeschlagen – Batterie HPMU ersetzen',
+    'F.430' => 'Kommunikationsfehler Gateway – Betrieb mit internen Sollwerten',
+    'F.846' => 'Inverter Verdichterdrehfeld gegenläufig – Kältekreis aus',
+    'F.1008'=> 'Anzahl unterstützter Geräte an Hauptsteuergerät überschritten',
+    'F.1009'=> 'Fehler elektrische Verdichterheizung Wärmepumpe',
+    'F.1010'=> 'Störung Wasserdrucksensor',
+    'F.1011'=> 'Störung Hochdrucksensor Kältekreis',
+    'F.1012'=> 'Störung Niederdrucksensor Kältekreis',
 );
 
 # Feste Readings, orignal Verhalten des Moduls, können über RequestListMapping oder translations überschrieben werden.
@@ -1651,6 +1686,274 @@ my $RequestListRoger = {
     "heating.solar.power.production.year"  => "Solarproduktion/Jahr"
 };
 
+#SVG for Kältkreislauf
+our $vitoconnect_svg_kaeltekreislauf = q{
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="25 0 495 280" preserveAspectRatio="xMinYMin meet" style="background:white; width:100%; height:auto; max-width:950px; font-family:Arial,Helvetica,sans-serif; display:block; margin:0;" xmlns:bx="https://boxy-svg.com">
+  <defs>
+    <pattern x="0" y="0" width="25" height="25" patternUnits="userSpaceOnUse" viewBox="0 0 100 100" id="pattern-0">
+      <rect x="0.261" y="8.964" width="99.484" height="2.597" style="stroke: rgb(0, 0, 0); fill: rgb(15, 11, 11); stroke-width: 1;"/>
+      <rect y="23.509" width="99.484" height="2.597" style="stroke: rgb(0, 0, 0); fill: rgb(15, 11, 11); stroke-width: 1;"/>
+      <rect x="0.26" y="39.094" width="99.484" height="2.597" style="stroke: rgb(0, 0, 0); fill: rgb(15, 11, 11); stroke-width: 1;"/>
+      <rect x="-0.259" y="54.159" width="99.484" height="2.597" style="stroke: rgb(0, 0, 0); fill: rgb(15, 11, 11); stroke-width: 1;"/>
+      <rect x="0.001" y="70.263" width="99.484" height="2.597" style="stroke: rgb(0, 0, 0); fill: rgb(15, 11, 11); stroke-width: 1;"/>
+      <rect x="0.521" y="85.589" width="99.484" height="2.597" style="stroke: rgb(0, 0, 0); fill: rgb(15, 11, 11); stroke-width: 1;"/>
+    </pattern>
+    <pattern id="pattern-0-0" href="#pattern-0" patternTransform="matrix(1, 0, 0, 1, 97.505501, 83.795998)"/>
+    <pattern id="pattern-1" href="#pattern-0" patternTransform="matrix(1, 0, 0, 1, 206.208389, 83.935008)"/>
+    <pattern id="pattern-2" href="#pattern-0" patternTransform="matrix(1, 0, 0, 1, 392.85718, 86.385434)"/>
+    <bx:guide x="-64.283" y="87.735" angle="0"/>
+    <bx:guide x="69.82" y="-32.374" angle="90"/>
+    <bx:guide x="46.836" y="352.215" angle="90"/>
+    <bx:guide x="96.255" y="324.975" angle="90"/>
+    <bx:guide x="157.999" y="317.708" angle="90"/>
+    <bx:guide x="615.522" y="70.274" angle="0"/>
+    <bx:guide x="562.908" y="58.355" angle="0"/>
+    <bx:guide x="595.332" y="52.908" angle="0"/>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="463.191" y1="43.415" x2="463.191" y2="171.007" id="gradient-0" gradientTransform="matrix(0.999963, 0.008737, -0.00363, 0.41554, -53.553903, 50.971219)">
+      <stop offset="0" style="stop-color: rgb(47, 106, 198);"/>
+      <stop offset="1" style="stop-color: rgb(217, 1, 23);"/>
+    </linearGradient>
+    <bx:guide x="557.061" y="102.827" angle="0"/>
+    <bx:guide x="-64.283" y="87.735" angle="0"/>
+    <bx:guide x="69.82" y="-32.374" angle="90"/>
+    <bx:guide x="46.836" y="352.215" angle="90"/>
+    <bx:guide x="96.255" y="324.975" angle="90"/>
+    <bx:guide x="157.999" y="317.708" angle="90"/>
+    <bx:guide x="615.522" y="70.274" angle="0"/>
+    <bx:guide x="562.908" y="58.355" angle="0"/>
+    <bx:guide x="595.332" y="52.908" angle="0"/>
+    <bx:guide x="557.061" y="102.827" angle="0"/>
+  </defs>
+  <rect x="111.764" y="126.722" width="118.851" height="63.673" rx="5" ry="5" style="fill: rgb(216, 216, 216); stroke: rgb(0, 0, 0);"/>
+  <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="132.586" cy="151.577" rx="9.438" ry="8.56"/>
+  <line style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1;" x1="132.696" y1="145.581" x2="132.541" y2="155.475"/>
+  <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17); stroke-width: 1;" cx="132.541" cy="154.161" rx="1.855" ry="1.778"/>
+  <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="194.466" cy="150.703" rx="9.438" ry="8.56"/>
+  <path style="fill: none; stroke-width: 2px; stroke: rgb(30, 105, 208);" d="M 175.81 82.808 L 109.471 83.122 L 109.157 193.478 L 354.078 193.479 L 353.449 84.694 L 222.971 83.751 L 222.971 120.222 L 327.353 120.851 L 327.353 162.038 L 214.77 161.902"/>
+  <path style="fill: none; stroke: rgb(231, 11, 11); stroke-width: 2px;" d="M 211.338 161.724 L 164.492 161.409 L 164.806 229.321 L 361.623 230.893 L 361.623 198.509 L 401.238 198.509 L 402.181 43.508 L 162.605 44.136 L 162.605 119.908 L 213.539 119.908 L 213.225 83.437 L 196.247 83.122"/>
+  <rect x="392.96" y="71.564" width="24.793" height="54.642" rx="5" ry="5" style="stroke: rgb(0, 0, 0); paint-order: fill; fill: url(&quot;#pattern-2&quot;); stroke-width: 1;"/>
+  <path style="fill: none; stroke-linejoin: round; stroke-width: 2px; paint-order: fill; stroke: url(&quot;#gradient-0&quot;);" d="M 517.461 43.415 L 409.209 43.415 L 408.92 171.007 L 517.461 171.007"/>
+  <g transform="matrix(1, 0, 0, 1, -0.378524, 3.357992)">
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgba(216, 216, 216, 0);" cx="44.996" cy="81.87" rx="9.438" ry="8.56"/>
+    <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -16.826176, -0.000004)">
+    <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="221.243" cy="162.447" rx="9.438" ry="8.56"/>
+    <path d="M 99.896 78.38 Q 101.531 74.629 103.166 78.38 L 105.953 84.77 Q 107.588 88.521 104.317 88.521 L 98.745 88.521 Q 95.474 88.521 97.109 84.77 Z" bx:shape="triangle 95.474 74.629 12.114 13.892 0.5 0.27 1@c238e5f3" style="stroke: rgb(0, 0, 0); fill: rgb(13, 13, 13); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 50%;" transform="matrix(0, -1, 1, 0, 118.753361, 79.795387)"/>
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17); stroke-width: 1;" cx="211.184" cy="153.928" rx="1.855" ry="1.778"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -33.288994, -20.075006)">
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgba(216, 216, 216, 0); stroke-width: 1;" cx="116.922" cy="105.303" rx="9.438" ry="8.56"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0);" d="M 115.7 105.414 C 114.737 105.414 113.774 105.414 112.811 105.414 C 112.33 105.414 110.014 105.729 109.699 105.414 C 108.42 104.135 110.597 101.751 112.366 102.635 C 113.135 103.02 113.76 103.695 114.367 104.302 C 114.586 104.521 115.811 105.015 115.811 105.414"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 50%;" d="M 121.06 103.384 C 120.097 103.384 119.134 103.384 118.171 103.384 C 117.69 103.384 115.374 103.699 115.059 103.384 C 113.78 102.105 115.957 99.721 117.726 100.605 C 118.495 100.99 119.12 101.665 119.727 102.272 C 119.946 102.491 121.171 102.985 121.171 103.384" transform="matrix(0, 1, -1, 0, -0.000017, -0.000002)"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1; transform-origin: 119.535px 107.136px;" d="M 122.672 108.552 C 121.709 108.552 120.746 108.552 119.783 108.552 C 119.302 108.552 116.986 108.867 116.671 108.552 C 115.392 107.273 117.569 104.889 119.338 105.773 C 120.107 106.158 120.732 106.833 121.339 107.44 C 121.558 107.659 122.783 108.153 122.783 108.552" transform="matrix(-1, 0, 0, -1, 0.000002, 0.000005)"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 50%;" d="M 118.17 110.163 C 117.207 110.163 116.244 110.163 115.281 110.163 C 114.8 110.163 112.484 110.478 112.169 110.163 C 110.89 108.884 113.067 106.5 114.836 107.384 C 115.605 107.769 116.23 108.444 116.837 109.051 C 117.056 109.27 118.281 109.764 118.281 110.163" transform="matrix(0, -1, 1, 0, -0.000006, 0.000006)"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -33.288994, 7.000388)">
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgba(216, 216, 216, 0); stroke-width: 1;" cx="116.922" cy="105.303" rx="9.438" ry="8.56"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0);" d="M 115.7 105.414 C 114.737 105.414 113.774 105.414 112.811 105.414 C 112.33 105.414 110.014 105.729 109.699 105.414 C 108.42 104.135 110.597 101.751 112.366 102.635 C 113.135 103.02 113.76 103.695 114.367 104.302 C 114.586 104.521 115.811 105.015 115.811 105.414"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 50%;" d="M 121.06 103.384 C 120.097 103.384 119.134 103.384 118.171 103.384 C 117.69 103.384 115.374 103.699 115.059 103.384 C 113.78 102.105 115.957 99.721 117.726 100.605 C 118.495 100.99 119.12 101.665 119.727 102.272 C 119.946 102.491 121.171 102.985 121.171 103.384" transform="matrix(0, 1, -1, 0, -0.000017, -0.000002)"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1; transform-origin: 119.535px 107.136px;" d="M 122.672 108.552 C 121.709 108.552 120.746 108.552 119.783 108.552 C 119.302 108.552 116.986 108.867 116.671 108.552 C 115.392 107.273 117.569 104.889 119.338 105.773 C 120.107 106.158 120.732 106.833 121.339 107.44 C 121.558 107.659 122.783 108.153 122.783 108.552" transform="matrix(-1, 0, 0, -1, 0.000002, 0.000005)"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 50%;" d="M 118.17 110.163 C 117.207 110.163 116.244 110.163 115.281 110.163 C 114.8 110.163 112.484 110.478 112.169 110.163 C 110.89 108.884 113.067 106.5 114.836 107.384 C 115.605 107.769 116.23 108.444 116.837 109.051 C 117.056 109.27 118.281 109.764 118.281 110.163" transform="matrix(0, -1, 1, 0, -0.000006, 0.000006)"/>
+  </g>
+  <rect x="97.609" y="68.975" width="24.793" height="54.642" rx="5" ry="5" style="stroke: rgb(0, 0, 0); paint-order: fill; fill: url(&quot;#pattern-0-0&quot;);"/>
+  <line style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1;" x1="194.513" y1="145.348" x2="194.358" y2="155.242"/>
+  <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="256.228" cy="162.447" rx="9.438" ry="8.56"/>
+  <line style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1;" x1="256.338" y1="156.451" x2="256.183" y2="166.345"/>
+  <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17); stroke-width: 1;" cx="256.183" cy="165.031" rx="1.855" ry="1.778"/>
+  <rect x="206.311" y="69.114" width="24.793" height="54.642" rx="5" ry="5" style="stroke: rgb(0, 0, 0); paint-order: fill; fill: url(&quot;#pattern-1&quot;); stroke-width: 1;"/>
+  <g transform="matrix(1, 0, 0, 1, 349.411072, -202.169891)">
+    <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="144.132" cy="246.518" rx="9.438" ry="8.56"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0);" d="M 139.661 238.786 L 139.661 251.453 C 140.944 251.453 152.264 251.177 151.501 251.177"/>
+  </g>
+  <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="356.927" cy="197.853" rx="9.438" ry="8.56"/>
+  <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="356.713" cy="197.681" rx="5.085" ry="4.396"/>
+  <rect x="430.184" y="70.077" width="45.423" height="86.72" rx="5" ry="5" style="stroke: rgb(0, 0, 0); fill: rgba(216, 216, 216, 0);"/>
+  <line style="fill: none; stroke: rgb(0, 0, 0);" x1="430.716" y1="115.7" x2="476.139" y2="115.7"/>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 27.9926px; stroke-width: 0.998643px; white-space: pre;" transform="matrix(0.337316, 0, 0, 0.327586, 300.168396, 52.801506)" x="455.318" y="83.568">WW</text>
+  <g transform="matrix(1, 0, 0, 1, 403.088989, -36.514595)">
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(255, 255, 255);" cx="44.996" cy="81.245" rx="9.438" ry="8.56"/>
+    <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+  </g>
+  <text style="white-space: pre; fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 28px;" x="455.318" y="83.568" transform="matrix(0.337316, 0, 0, 0.327586, 303.649292, 98.496986)">HK</text>
+  <g transform="matrix(1, 0, 0, 1, 403.610016, 89.059113)">
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(255, 255, 255);" cx="44.996" cy="81.87" rx="9.438" ry="8.56"/>
+    <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -1.696667, -23.990173)">
+    <path d="M -236.547 -33.366 Q -234.601 -36.483 -232.655 -33.366 L -229.338 -28.054 Q -227.392 -24.937 -231.285 -24.937 L -237.917 -24.937 Q -241.81 -24.937 -239.864 -28.054 Z" bx:shape="triangle -241.81 -36.483 14.418 11.546 0.5 0.27 1@d97a9276" style="stroke: rgb(0, 0, 0); fill: rgb(9, 1, 1); stroke-width: 1; transform-origin: -234.604px -29.931px;" transform="matrix(0, 1, -1, 0, 534.537537, 96.460785)"/>
+    <path d="M -236.547 -33.366 Q -234.601 -36.483 -232.655 -33.366 L -229.338 -28.054 Q -227.392 -24.937 -231.285 -24.937 L -237.917 -24.937 Q -241.81 -24.937 -239.864 -28.054 Z" bx:shape="triangle -241.81 -36.483 14.418 11.546 0.5 0.27 1@d97a9276" style="stroke: rgb(0, 0, 0); fill: rgb(9, 1, 1); stroke-width: 1; transform-origin: -234.604px -29.931px;" transform="matrix(0, 1, 1, 0, 544.299709, 96.307468)"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, 98.653221, 3.357992)">
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(255, 255, 255);" cx="44.996" cy="81.87" rx="9.438" ry="8.56"/>
+    <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -118.751167, 17.294722)">
+    <g>
+      <path d="M -236.547 -33.366 Q -234.601 -36.483 -232.655 -33.366 L -229.338 -28.054 Q -227.392 -24.937 -231.285 -24.937 L -237.917 -24.937 Q -241.81 -24.937 -239.864 -28.054 Z" bx:shape="triangle -241.81 -36.483 14.418 11.546 0.5 0.27 1@d97a9276" style="stroke: rgb(0, 0, 0); fill: rgb(9, 1, 1); stroke-width: 1; transform-origin: -234.604px -29.931px;" transform="matrix(0, 1, -1, 0, 534.537537, 96.460785)"/>
+      <path d="M 247.073 39.6 Q 249.019 36.483 250.965 39.6 L 254.282 44.912 Q 256.228 48.029 252.335 48.029 L 245.703 48.029 Q 241.81 48.029 243.756 44.912 Z" bx:shape="triangle 241.81 36.483 14.418 11.546 0.5 0.27 1@b84c7105" style="stroke: rgb(0, 0, 0); fill: rgb(9, 1, 1); stroke-width: 1; transform-origin: 249.016px 43.035px;" transform="matrix(0, 1, 1, 0, 60.679688, 23.341461)"/>
+    </g>
+  </g>
+  <g>
+    <g transform="matrix(1, 0, 0, 1, 258.55899, 3.357992)">
+      <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(255, 255, 255);" cx="44.996" cy="81.87" rx="9.438" ry="8.56"/>
+      <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+      <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+    </g>
+  </g>
+  <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="310.056" cy="162.447" rx="9.438" ry="8.56"/>
+  <path d="M 309.748 157.655 L 312.53 166.467 L 306.965 166.467 L 309.748 157.655 Z" bx:shape="triangle 306.965 157.655 5.565 8.812 0.5 0 1@b71052ea" style="stroke: rgb(0, 0, 0); fill: rgb(17, 16, 16); stroke-width: 1;"/>
+  <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="218.312" cy="229.84" rx="9.438" ry="8.56"/>
+  <line style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1;" x1="218.422" y1="223.844" x2="218.267" y2="233.738"/>
+  <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17); stroke-width: 1;" cx="218.267" cy="232.424" rx="1.855" ry="1.778"/>
+  <g transform="matrix(1, 0, 0, 1, 229.385986, 147.472778)">
+    <g>
+      <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="74.169" cy="82.367" rx="9.438" ry="8.56"/>
+      <path d="M 73.861 77.575 L 76.643 86.387 L 71.078 86.387 L 73.861 77.575 Z" bx:shape="triangle 71.078 77.575 5.565 8.812 0.5 0 1@9a2e2204" style="stroke: rgb(0, 0, 0); fill: rgb(17, 16, 16);"/>
+    </g>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, 53.371994, -40.880001)">
+    <g transform="matrix(1, 0, 0, 1, 258.55899, 3.357992)">
+      <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(255, 255, 255);" cx="44.996" cy="81.87" rx="9.438" ry="8.56"/>
+      <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+      <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+    </g>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -83.71759, -40.880005)">
+    <g transform="matrix(1, 0, 0, 1, 258.55899, 3.357992)">
+      <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(255, 255, 255);" cx="44.996" cy="81.87" rx="9.438" ry="8.56"/>
+      <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+      <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+    </g>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, 396.941376, -1.156075)">
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(255, 255, 255);" cx="44.996" cy="81.245" rx="9.438" ry="8.56"/>
+    <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, 397.527405, 45.397678)">
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(255, 255, 255);" cx="44.996" cy="81.245" rx="9.438" ry="8.56"/>
+    <line style="fill: none; stroke: rgb(0, 0, 0);" x1="45.106" y1="75.874" x2="44.951" y2="85.768"/>
+    <ellipse style="stroke: rgb(0, 0, 0); fill: rgb(17, 17, 17);" cx="44.951" cy="84.454" rx="1.855" ry="1.778"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, 419.289001, 1.134982)">
+    <g>
+      <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="74.169" cy="82.367" rx="9.438" ry="8.56"/>
+      <path d="M 73.861 77.575 L 76.643 86.387 L 71.078 86.387 L 73.861 77.575 Z" bx:shape="triangle 71.078 77.575 5.565 8.812 0.5 0 1@9a2e2204" style="stroke: rgb(0, 0, 0); fill: rgb(17, 16, 16);"/>
+    </g>
+  </g>
+  <g>
+    <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="493.458" cy="127.068" rx="9.438" ry="8.56"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0);" d="M 487.611 126.813 C 488.096 125.358 491.507 122.757 493.254 124.504 C 493.769 125.019 493.995 126.271 494.537 126.813 C 496.06 128.336 498.897 124.975 498.897 124.248"/>
+    <path style="fill: none; stroke: rgb(0, 0, 0); stroke-width: 1;" d="M 487.516 130.483 C 488.001 129.028 491.412 126.427 493.159 128.174 C 493.674 128.689 493.9 129.941 494.442 130.483 C 495.965 132.006 498.802 128.645 498.802 127.918"/>
+  </g>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 27px; white-space: pre;" x="27.06" y="100.494"> </text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; text-anchor: middle;" x="44.649" y="103.01">%out_tmp%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="83.787" y="72.96">%fan0%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="83.295" y="131.278">%fan1%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="143.717" y="102.598">%evp_tmp%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="256.625" y="180.185">%comp_in%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="218.222" y="248.488">%comp_out%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="204.836" y="180.185">%comp_speed%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="449.198" y="188.831">%heat_suppl%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="303.5" y="62.468">%valve1%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="186.976" y="102.98">%valve0%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="356.767" y="62.444">%cond_tmp%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="310.001" y="180.567">%comp_pres%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle; transform-box: fill-box; transform-origin: 55.1208% 50%;" x="303.614" y="103.362">%evp_tmp_over%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="193.754" y="139.241">%comp_motor%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle; transform-origin: 332.143px 245.429px;" x="304.21" y="248.297">%high_pres%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="448.264" y="62.252">%heat_return%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="493.194" y="63.018">%pump1%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="219.864" y="61.296">%eco_tmp%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="450.89" y="97.052">%dhw_tmp%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="453.826" y="143.706">%heat_tmp%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="493.959" y="144.854">%allengra%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="494.152" y="101.45">%heat_pres%</text>
+  <ellipse style="stroke: rgb(0, 0, 0); stroke-width: 1; fill: rgb(255, 255, 255);" cx="142.115" cy="161.461" rx="9.438" ry="8.56"/>
+  <path style="fill: none; stroke: rgb(0, 0, 0);" d="M 143.283 156.506 L 140.242 160.386 L 144.227 159.338 L 140.766 165.336 L 143.388 164.057"/>
+  <path style="fill: none; stroke: rgb(0, 0, 0);" d="M 140.556 162.903 L 140.137 165.84"/>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="132.994" y="138.501">%inv_tmp%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="141.642" y="178.677">%inv_watt%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="140.526" y="188.442">%inv_amp%</text>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 8px; white-space: pre; stroke-width: 1; text-anchor: middle;" x="206.897" y="189.256">Oil: %comp_oil%</text>
+  <rect id="re_back" x="23.391" y="31.415" width="499.317" height="225.069" style="fill: %overlay_color%; pointer-events: none;"/>
+  <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 18px; letter-spacing: 6px; white-space: pre; text-anchor: middle;" transform="matrix(1.063244, 0, 0, 1, 16.775244, -0.906249)" x="236.623" y="25.757">%TITEL%</text>
+  <g transform="matrix(1, 0, 0, 1, 0.902341, 0.902341)">
+    <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 11px; white-space: pre;" x="55.988" y="273.33">%status%</text>
+    <g transform="matrix(0.02242, 0, -0.023405, 0.029996, 47.15366, 250.144562)">
+      <ellipse cx="543.31" cy="862.2" rx="472.44" ry="35.433" fill="#c1c1c1" fill-opacity=".5"/>
+    </g>
+    <g transform="matrix(0.061256, 0, 0, 0.00055, -126.994232, 262.080444)">
+      <path d="m2875.4 307.04 6.48 637.82v0.02h-330.71v-0.02l6.48-637.82h317.75z" fill="#b3b3b3"/>
+    </g>
+    <g transform="matrix(0.061274, 0, 0, 0.018663, -127.045197, 256.869293)">
+      <rect x="2551.2" y="307.04" width="330.71" height="637.84" fill="#e6e6e6"/>
+    </g>
+    <g transform="matrix(0.01172, 0, 0, 0.010325, 7.367994, 251.027283)">
+      <path d="m2362.2 1181.1c260.75 0 472.45 211.7 472.45 472.44 0 260.75-211.7 472.44-472.45 472.44-260.74 0-472.44-211.69-472.44-472.44 0-260.74 211.7-472.44 472.44-472.44zm0 29.53c-244.45 0-442.91 198.46-442.91 442.91s198.46 442.92 442.91 442.92c244.46 0 442.92-198.47 442.92-442.92s-198.46-442.91-442.92-442.91zm0 29.53c228.16 0 413.39 185.23 413.39 413.38 0 228.16-185.23 413.39-413.39 413.39-228.15 0-413.38-185.23-413.38-413.39 0-228.15 185.23-413.38 413.38-413.38zm0 29.52c-211.85 0-383.85 172.01-383.85 383.86 0 211.86 172 383.86 383.85 383.86 211.86 0 383.86-172 383.86-383.86 0-211.85-172-383.86-383.86-383.86zm0 29.53c195.56 0 354.33 158.77 354.33 354.33s-158.77 354.33-354.33 354.33-354.33-158.77-354.33-354.33 158.77-354.33 354.33-354.33zm0 29.53c-179.26 0-324.8 145.54-324.8 324.8 0 179.27 145.54 324.81 324.8 324.81 179.27 0 324.81-145.54 324.81-324.81 0-179.26-145.54-324.8-324.81-324.8zm0 29.53c162.97 0 295.28 132.31 295.28 295.27 0 162.97-132.31 295.28-295.28 295.28-162.96 0-295.27-132.31-295.27-295.28 0-162.96 132.31-295.27 295.27-295.27zm0 29.53c-146.67 0-265.74 119.07-265.74 265.74s119.07 265.75 265.74 265.75c146.68 0 265.75-119.08 265.75-265.75s-119.07-265.74-265.75-265.74zm0 29.52c130.38 0 236.23 105.85 236.23 236.22 0 130.38-105.85 236.22-236.23 236.22-130.37 0-236.22-105.84-236.22-236.22 0-130.37 105.85-236.22 236.22-236.22zm0 29.53c-114.07 0-206.69 92.62-206.69 206.69 0 114.08 92.62 206.7 206.69 206.7 114.08 0 206.7-92.62 206.7-206.7 0-114.07-92.62-206.69-206.7-206.69zm0 29.53c97.79 0 177.17 79.38 177.17 177.16s-79.38 177.17-177.17 177.17c-97.77 0-177.16-79.39-177.16-177.17s79.39-177.16 177.16-177.16zm0 29.53c-81.48 0-147.63 66.15-147.63 147.63 0 81.49 66.15 147.64 147.63 147.64 81.49 0 147.64-66.15 147.64-147.64 0-81.48-66.15-147.63-147.64-147.63z" fill="#999" fill-opacity=".8"/>
+    </g>
+    <g transform="matrix(0.020455, 0, 0, 0.017585, -9.371134, 241.830399)">
+      <path d="m2456.7 1202.7v7.19h-566.93v-7.19h566.93zm0-21.57v7.19h-566.93v-7.19h566.93zm0 43.14v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.56v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 43.13v7.19h-566.93v-7.19h566.93zm0-21.56v7.19h-566.93v-7.19h566.93zm0 43.13v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.57v7.18h-566.93v-7.18h566.93zm0 21.56v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm-0.58 42.72v7.19h-566.93v-7.19h566.93zm0-21.57v7.19h-566.93v-7.19h566.93zm0 43.14v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.56v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 43.13v7.19h-566.93v-7.19h566.93zm0-21.56v7.19h-566.93v-7.19h566.93zm0 43.13v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93zm0 21.56v7.19h-566.93v-7.19h566.93zm0 21.57v7.19h-566.93v-7.19h566.93z"/>
+    </g>
+    <g transform="matrix(0.020382, 0, 0, 0.013467, -9.242441, 261.115326)">
+      <rect x="1937" y="992.13" width="47.244" height="94.488"/>
+    </g>
+    <g transform="matrix(0.020382, 0, 0, 0.017956, -9.723906, 254.965027)">
+      <rect x="1937" y="1157.5" width="94.488" height="23.622"/>
+    </g>
+    <g transform="matrix(0.020382, 0, 0, 0.017956, -10.205369, 257.529663)">
+      <g transform="matrix(1 0 0 .75 897.64 200.79)">
+        <rect x="1937" y="992.13" width="47.244" height="94.488"/>
+      </g>
+      <g transform="translate(874.02 -141.73)">
+        <rect x="1937" y="1157.5" width="94.488" height="23.622"/>
+      </g>
+    </g>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, 28.423752, 4.511705)">
+    <text style="fill: rgb(51, 51, 51); font-family: Arial, sans-serif; font-size: 11px; white-space: pre;" x="415.66" y="269.948">%sec_status%</text>
+    <g transform="matrix(0.135571, 0, 0, 0.117794, 396.783936, 258.119446)" id="Flamme" style="">
+      <g>
+        <radialGradient id="SVGID_1_" cx="68.8839" cy="124.2963" r="70.587" gradientTransform="matrix(-1 -4.343011e-03 -7.125917e-03 1.6408 131.9857 -79.3452)" gradientUnits="userSpaceOnUse">
+          <stop offset="0.3144" style="stop-color:#FF9800"/>
+          <stop offset="0.6616" style="stop-color:#FF6D00"/>
+          <stop offset="0.9715" style="stop-color:#F44336"/>
+        </radialGradient>
+        <path style="fill:url(#SVGID_1_);" d="M35.56,40.73c-0.57,6.08-0.97,16.84,2.62,21.42c0,0-1.69-11.82,13.46-26.65 c6.1-5.97,7.51-14.09,5.38-20.18c-1.21-3.45-3.42-6.3-5.34-8.29C50.56,5.86,51.42,3.93,53.05,4c9.86,0.44,25.84,3.18,32.63,20.22 c2.98,7.48,3.2,15.21,1.78,23.07c-0.9,5.02-4.1,16.18,3.2,17.55c5.21,0.98,7.73-3.16,8.86-6.14c0.47-1.24,2.1-1.55,2.98-0.56 c8.8,10.01,9.55,21.8,7.73,31.95c-3.52,19.62-23.39,33.9-43.13,33.9c-24.66,0-44.29-14.11-49.38-39.65 c-2.05-10.31-1.01-30.71,14.89-45.11C33.79,38.15,35.72,39.11,35.56,40.73z"/>
+        <g>
+          <radialGradient id="SVGID_2_" cx="64.9211" cy="54.0621" r="73.8599" gradientTransform="matrix(-0.0101 0.9999 0.7525 7.603777e-03 26.1538 -11.2668)" gradientUnits="userSpaceOnUse">
+            <stop offset="0.2141" style="stop-color:#FFF176"/>
+            <stop offset="0.3275" style="stop-color:#FFF27D"/>
+            <stop offset="0.4868" style="stop-color:#FFF48F"/>
+            <stop offset="0.6722" style="stop-color:#FFF7AD"/>
+            <stop offset="0.7931" style="stop-color:#FFF9C4"/>
+            <stop offset="0.8221" style="stop-color:#FFF8BD;stop-opacity:0.804"/>
+            <stop offset="0.8627" style="stop-color:#FFF6AB;stop-opacity:0.529"/>
+            <stop offset="0.9101" style="stop-color:#FFF38D;stop-opacity:0.2088"/>
+            <stop offset="0.9409" style="stop-color:#FFF176;stop-opacity:0"/>
+          </radialGradient>
+          <path style="fill:url(#SVGID_2_);" d="M76.11,77.42c-9.09-11.7-5.02-25.05-2.79-30.37c0.3-0.7-0.5-1.36-1.13-0.93 c-3.91,2.66-11.92,8.92-15.65,17.73c-5.05,11.91-4.69,17.74-1.7,24.86c1.8,4.29-0.29,5.2-1.34,5.36 c-1.02,0.16-1.96-0.52-2.71-1.23c-2.15-2.05-3.7-4.72-4.44-7.6c-0.16-0.62-0.97-0.79-1.34-0.28c-2.8,3.87-4.25,10.08-4.32,14.47 C40.47,113,51.68,124,65.24,124c17.09,0,29.54-18.9,19.72-34.7C82.11,84.7,79.43,81.69,76.11,77.42z"/>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g transform="matrix(0.028096, 0, 0, 0.021439, 408.741913, 259.626831)" style="">
+    <path d="m311.12 179.09c1.6567 1.4172 3.4341 2.8902 3.9499 3.2734s0.58405 0.89986 0.15184 1.1481c-0.99688 0.57266 2.3311 4.0132 3.8294 3.959 0.61556-0.02231 1.0921 0.98723 1.0589 2.2434-0.03515 1.3312 0.72562 2.6989 1.8236 3.2787 2.4384 1.2874 5.0418 4.814 7.6296 10.335 1.1393 2.4306 3.0759 5.7362 4.3035 7.3457 2.8029 3.675 6.0305 9.5427 6.1741 11.225 0.06004 0.70324 0.29243 0.95371 0.51642 0.55661s2.2468 2.4514 4.4951 6.33 6.1454 10.502 8.6601 14.72c29.643 49.71 45.21 76.264 45.838 78.187 0.41865 1.2819 1.0283 2.4218 1.3547 2.5332s2.6748 3.5186 5.2185 7.5716l4.625 7.3691-24.291-3.1214c-13.36-1.7168-24.725-3.2857-25.255-3.4864s-2.4076-0.41842-4.1708-0.48365-10.009-0.99174-18.325-2.0589l-15.119-1.9403 4.7569 7.9982c2.6163 4.399 5.0703 9.0058 5.4533 10.237s0.84508 1.964 1.0269 1.6279c0.30778-0.56898 7.7295 11.697 8.057 13.316 0.08158 0.40331 0.61143 1.1737 1.1774 1.7119s1.6264 2.345 2.3564 4.0151 1.5626 3.1786 1.8503 3.3524c0.96579 0.5834 20.169 33.342 20.061 34.222-0.05875 0.47805 0.28523 1.106 0.76441 1.3955 1.2117 0.73197 21.196 34.448 23.094 38.963 0.85206 2.0267 1.6838 3.4361 1.8483 3.132 0.29394-0.54337 7.7384 11.935 8.0035 13.415 0.07455 0.41632 0.46891 1.0474 0.87638 1.4024 1.5399 1.3416 48.089 80.568 48.948 83.309 0.49474 1.579 1.0456 2.6009 1.2241 2.2709s1.6735 1.564 3.3222 4.2089l2.9976 4.8089-8.4713-1.1773c-4.6592-0.64755-9.0886-1.424-9.8431-1.7256s-1.6815-0.42892-2.0602-0.28311-9.3379-0.97371-19.909-2.4878c-20.466-2.9313-27.938-3.9379-31.828-4.2879-2.1534-0.19378 7.2624 15.134 85.669 139.46 48.449 76.823 87.638 139.81 87.088 139.97s-0.23156 0.4133 0.70787 0.5663c1.5886 0.2586 1.6573 0.1146 0.983-2.0588-0.39876-1.2853-1.825-7.9255-3.1695-14.756s-3.2466-16.174-4.2269-20.764-1.3582-8.5888-0.83955-8.8867 0.54864-0.6374 0.06674-0.7544c-0.88617-0.2152-3.1917-9.8023-7.1535-29.746-1.1938-6.0098-2.7217-13.671-3.3954-17.025s-0.82864-6.3277-0.34447-6.6082 0.35837-0.4912-0.27956-0.4681c-1.2196 0.0442-2.784-8.8682-1.7325-9.8698 0.33552-0.3195 0.18232-0.5655-0.34042-0.5466-1.0619 0.0385-7.2244-29.352-6.4534-30.778 0.26957-0.4983 0.15501-1.1085-0.25458-1.3559s-1.7738-5.6598-3.0314-12.027c-2.814-14.247-3.3072-16.701-5.8055-28.88-1.0947-5.3369-1.54-9.9622-0.9895-10.278s0.47809-0.55603-0.16092-0.53287c-1.3671 0.04953-11.601-49.935-10.369-50.643 0.46088-0.26474 0.43816-0.58043-0.05048-0.70154-1.072-0.26566-5.1604-18.319-4.3373-19.153 0.31823-0.32228 0.12528-1.3499-0.42881-2.2836s-1.6646-5.1854-2.4679-9.4482l-1.4605-7.7506 8.9473 1.1615c4.921 0.63882 9.6238 1.4417 10.451 1.7842s2.1947 0.42359 3.0397 0.18021 1.9602-0.1865 2.4782 0.1264 2.3149 0.6635 3.9931 0.7791c6.9597 0.4794 28.022 3.5862 29.221 4.3101 0.71196 0.43007-0.26529-3.3998-2.1716-8.5109s-4.0665-11.599-4.8003-14.418-1.6731-5.3301-2.0873-5.5803-0.71782-0.82236-0.67472-1.2715-1.3085-4.6001-3.0035-9.2244-3.3111-9.488-3.5912-10.808-1.4934-4.7364-2.6962-7.5916-1.7275-5.4551-1.166-5.7777 0.5186-0.56827-0.09539-0.54603c-1.026 0.03718-3.6634-6.5863-7.0464-17.696-0.74314-2.4405-1.8425-5.5115-2.443-6.8246s-2.0852-5.4221-3.2992-9.1312-4.4219-13.078-7.1286-20.819-4.6107-14.4-4.2313-14.797 0.27429-0.70652-0.23362-0.68813c-0.89187 0.03233-22.314-60.12-26.375-74.059-1.0977-3.7681-2.3417-7.06-2.7645-7.3154s-0.72465-0.84797-0.67086-1.3168-0.72065-2.8685-1.721-5.3325l-1.8188-4.48 5.3591 0.60396c2.9475 0.33218 5.56 0.9945 5.8055 1.4718s0.74426 0.6214 1.1083 0.32021c0.69652-0.57635 18.285 1.8216 20.934 2.8541 0.8484 0.33064 2.7036 0.62265 4.1227 0.64893s8.084 0.95457 14.811 2.0629l12.231 2.0151-0.31662-4.0996c-0.17413-2.2548-0.49044-4.5061-0.70292-5.003-1.1281-2.6378-1.6154-9.4951-0.71166-10.014 0.5751-0.33036 0.5436-0.58247-0.07-0.56024-1.0224 0.03704-7.4159-36.547-6.5744-37.619 0.20232-0.25774 0.05763-2.9223-0.32152-5.9212s-0.23536-5.7134 0.31956-6.0322 0.4873-0.5607-0.15031-0.53759c-0.95955 0.03476-10.915-47.592-10.278-49.166 0.11156-0.27531-0.52266-3.41-1.4094-6.966-1.8793-7.5365 2.8867-7.6574 2.9867-10.438 0.05932-1.649-223.4-21.212-220.65-18.857z"/>
+  </g>
+</svg>
+};
+
+
+
+
+
+
 
 #####################################################################################################################
 # Modul initialisieren und Namen zusätzlicher Funktionen bekannt geben
@@ -1664,6 +1967,8 @@ sub vitoconnect_Initialize {
     $hash->{GetFn}   = \&vitoconnect_Get;       # get-Befehle
     $hash->{AttrFn}  = \&vitoconnect_Attr;      # Attribute setzen/ändern/löschen
     $hash->{ReadFn}  = \&vitoconnect_Read;
+    $hash->{FW_detailFn} = \&vitoconnect_FW_detailFn;
+    #$hash->{FW_summaryFn} = \&vitoconnect_FW_detailFn;
     $hash->{AttrList} =
         "disable:0,1 "
       . "vitoconnect_mappings:textField-long "
@@ -1677,6 +1982,7 @@ sub vitoconnect_Initialize {
       . "vitoconnect_serial:textField-long "            # Legt fest welcher Gateway abgefragt werden soll, wenn nicht gesetzt werden alle abgefragt
       . "vitoconnect_installationID:textField-long "    # Legt fest welche Installation abgefragt werden soll, muss zur serial passen
       . "vitoconnect_timeout:selectnumbers,10,1.0,30,0,lin "
+      . "vitoconnect_showKaeltekreislauf:0,1 "
       . $readingFnAttributes;
 
       eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -1748,14 +2054,45 @@ sub vitoconnect_Undef {
 
 
 #####################################################################################################################
-# bisher kein 'get' implementiert
+# Getter
 #####################################################################################################################
 sub vitoconnect_Get {
     my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
     return "get ".$name." needs at least one argument" unless (defined($opt) );
-    return;
+    
+    if ($opt =~ /^(html|ftui)$/) { 
+      return vitoconnect_GetHtml($hash, @args); 
+    }
+    elsif ($opt eq 'Select...') {
+      return "Select the action you want from the Drop-Down list";
+    }
+    
+     my $getlist = "Unknown argument $opt, choose one of ".
+                   "Select...:noArg ".
+                   "html:noArg "
+                   ;
+
+    return $getlist;
 }
 
+#####################################################################################################################
+# Html für ftui
+#####################################################################################################################
+sub vitoconnect_GetHtml {
+    my ($hash) = @_; 
+    my $name = $hash->{NAME};
+    
+    my $ret = "<html>";
+    $ret   .= vitoconnect_FW_detailFn("WEB", $name, "", {});
+    $ret   .= "</html>";
+    # SVG responsive machen 
+    $ret =~ s/<svg([^>]*)>/<svg$1 width="100%" height="100%" preserveAspectRatio="xMidYMid meet">/;
+    # viewBox hinzufügen, falls nicht vorhanden 
+    if ($ret !~ /viewBox=/) { $ret =~ s/<svg/<svg viewBox="0 0 1000 1000"/; }
+
+
+    return $ret;
+}
 
 #####################################################################################################################
 # Implementierung set-Befehle
@@ -1764,7 +2101,8 @@ sub vitoconnect_Set {
     my ($hash,$name,$opt,@args ) = @_;  # Übergabe-Parameter
     
     # Standard Parameter setzen
-    my $val = "unknown value $opt, choose one of update:noArg clearReadings:noArg password apiKey logResponseOnce:noArg clearMappedErrors:noArg ";
+    my $val = "Unknown argument $opt, choose one of Select...:noArg "
+              ."update:noArg clearReadings:noArg password apiKey logResponseOnce:noArg clearMappedErrors:noArg";
     Log(5,$name.", -vitoconnect_Set started: ". $opt); #debug
     
     # Setter für die Geräteauswahl dynamisch erstellen  
@@ -1780,7 +2118,7 @@ sub vitoconnect_Set {
     
     # Hier richtig?
     return "set ".$name." needs at least one argument" unless (defined($opt) );
-    
+
     # Setter für Device Werte rufen
     my $return;
     if  (AttrVal( $name, 'vitoconnect_raw_readings', 0 ) eq "1" ) {
@@ -1803,7 +2141,10 @@ sub vitoconnect_Set {
       return;
     }
 
-    if  ($opt eq "update")                            {   # set <name> update: update readings immeadiatlely
+    if ($opt eq 'Select...') {
+      return "Select the action you want from the Drop-Down list";
+    }
+    elsif  ($opt eq "update")                            {   # set <name> update: update readings immeadiatlely
         RemoveInternalTimer($hash);                         # bisherigen Timer löschen
         vitoconnect_GetUpdate($hash);                       # neue Abfrage starten
         return;
@@ -1856,7 +2197,7 @@ sub vitoconnect_Set {
      AnalyzeCommand($hash,"deletereading ".$name." device.messages.errors.mapped.*");
      return;
     }
-
+ #Log(1,$name.", -vitoconnect_Set val: ". $val);
 return $val;
 }
 
@@ -4455,7 +4796,7 @@ sub vitoconnect_action {
         } else {
             Log3($name, 1, "$name - vitoconnect_action: Abbruch nach 20 Fehlversuchen");
             readingsSingleUpdate($hash, "Aktion_Status", "Fehlgeschlagen: $opt $Text (nach 20 Versuchen)", 1);
-			# Abbruch nach 20 versuchen → Retry-Zähler und Daten zurücksetzen
+            # Abbruch nach 20 versuchen → Retry-Zähler und Daten zurücksetzen
             delete $hash->{".action_retry_count"};
             delete $hash->{".retry_feature"};
             delete $hash->{".retry_data"};
@@ -4492,13 +4833,13 @@ sub vitoconnect_action {
         
         
         Log3($name,4,$name.",vitoconnect_action: set feature:".$feature." data:".$data.", korrekt ausgefuehrt"); #4
-		
-		# Erfolg → Retry-Zähler und Daten zurücksetzen
-		delete $hash->{".action_retry_count"};
-		delete $hash->{".retry_feature"};
-		delete $hash->{".retry_data"};
-		delete $hash->{".retry_opt"};
-		delete $hash->{".retry_args"};
+        
+        # Erfolg → Retry-Zähler und Daten zurücksetzen
+        delete $hash->{".action_retry_count"};
+        delete $hash->{".retry_feature"};
+        delete $hash->{".retry_data"};
+        delete $hash->{".retry_opt"};
+        delete $hash->{".retry_args"};
 
     return;
 }
@@ -4582,6 +4923,242 @@ sub vitoconnect_errorHandling {
             }
         }
 };
+
+
+#####################################################################################################################
+# SVG füllen
+#####################################################################################################################
+sub vitoconnect_FW_detailFn {
+    my ($FW_wname, $d, $room, $pageHash) = @_;
+
+    # 1. Attribut abfragen (Default ist 0, wenn nicht gesetzt)
+    my $showKK = AttrVal($d, "vitoconnect_showKaeltekreislauf", 0);
+
+    # 2. Wenn 0, dann nichts anzeigen
+    return undef if (!$showKK);
+    
+    my $svg = $main::vitoconnect_svg_kaeltekreislauf;
+
+    # --- Logik für Stati und Farben ---
+    my $valvePos    = ReadingsVal($d, 'heating.valves.fourThreeWay.position.value', '');
+    my $isDefrost = ReadingsVal($d, 'heating.outdoor.defrosting.active', undef) // ReadingsVal($d, 'heating.circuits.1.frostprotection.status', 0);
+    my $compActive  = ReadingsVal($d, 'heating.compressors.0.active', 0);
+    my $secState    = ReadingsVal($d, 'heating.secondaryHeatGenerator.status.value', 'off');
+    my $secTemp     = ReadingsVal($d, 'heating.secondaryHeatGenerator.temperature.current.value', '--');
+
+    # Standardwerte (Standby / Aus)
+    my $overlayColor = "rgba(180, 180, 180, 0.2)"; # Sehr helles, neutrales Grau
+    my $statusStr    = "Standby";
+    my $wpIconClr    = "#bdc3c7"; # Silbergrau für das Icon
+
+    # Priorisierung der Zustände
+    if ($isDefrost == 1) { #|| $valvePos eq "climatCircuitTwoDefrost") {
+        # Abtauen (Türkis)
+        $overlayColor = "rgba(94, 187, 189, 0.5)";  
+        $statusStr    = "Abtauen";
+        $wpIconClr    = "#0088cc";  
+    } elsif ($compActive == 1) {
+        # WP läuft (Kompressor an)
+        $wpIconClr = "#2ecc71"; # Grün
+        
+        if ($valvePos eq "domesticHotWater") {
+            # Warmwasser (Bernstein)
+            $overlayColor = "rgba(255, 235, 150, 0.5)";
+            $statusStr    = "Warmwasser";
+        } else {
+            # Heizbetrieb (Keine Färbung oder ganz zartes Blau)
+            $overlayColor = "rgba(255, 255, 255, 0)";  
+            $statusStr    = "Heizbetrieb";
+        }
+    } else {
+        # Kompressor ist AUS, aber vielleicht läuft die interne Pumpe noch?
+        $overlayColor = "rgba(200, 200, 200, 0.5)";
+        $statusStr    = "WP Standby";
+    }
+
+
+    # Brenner-Status kombiniert mit Temperatur
+    my $secStatusStr = ($secState eq "on") ? "Aktiv (" . $secTemp . " &#176;C)" : "Aus";
+    my $secIconClr   = ($secState eq "on") ? "#ff4500" : "#999999";
+
+    # --- Die Map (Präzise Kleinschreibung für die Ersetzung) ---
+my %map = (
+
+    # 1 Außentemperatur
+    '%out_tmp%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.sensors.temperature.outside.value'
+    ),
+
+    # 18 Verdampfer Flüssiggas / Sauggas
+    '%evp_tmp%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+       (ReadingsVal($d,'heating.coolingCircuits.0.type.value','') =~ /200-S/i)
+           ? ()   # 200-S → kein echter Verdampfer-Flüssigsensor
+           : ('heating.evaporators.0.sensors.temperature.liquid.value')
+    ),
+
+    # 3 Überhitzung
+    '%evp_tmp_over%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.evaporators.0.sensors.temperature.overheat.value'
+    ),
+
+    # 5 Sauggastemperatur (vor Verdichter)
+    '%comp_in%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.compressors.0.sensors.temperature.inlet.value',
+    ),
+
+    # 12 Heißgastemperatur (nach Verdichter)
+    '%comp_out%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.compressors.0.sensors.temperature.outlet.value',
+    ),
+
+    # 6 Verdichtergehäuse / Motor
+    '%comp_motor%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.compressors.0.sensors.temperature.motorChamber.value',
+        'heating.compressors.0.sensors.temperature.ambient.value'
+    ),
+
+    # 16 Economizer Temperatur
+    '%eco_tmp%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.economizers.0.sensors.temperature.liquid.value'
+    ),
+
+    # 14 Kondensator Flüssiggastemperatur
+    '%cond_tmp%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        (ReadingsVal($d,'heating.coolingCircuits.0.type.value','') =~ /200-S/i)
+           ? 'heating.evaporators.0.sensors.temperature.liquid.value'   # 200-S falsch gemappt → hier korrigieren
+           : 'heating.condensors.0.sensors.temperature.liquid.value'    # 250-AH korrekt
+    ),
+
+    # 19 Vorlauf Sekundärkreis
+    '%heat_suppl%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.secondaryCircuit.sensors.temperature.supply.value'
+    ),
+
+    # 21 Rücklauf Sekundärkreis
+    '%heat_return%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.sensors.temperature.return.value'
+    ),
+
+    # 22 Warmwasser
+    '%dhw_tmp%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.dhw.sensors.temperature.hotWaterStorage.value',
+        'heating.dhw.sensors.temperature.hotWaterStorage.top.value',
+        'heating.dhw.sensors.temperature.dhwCylinder.value',
+        'heating.dhw.sensors.temperature.dhwCylinder.top.value'
+    ),
+
+    # 23 Pufferspeicher
+    '%heat_tmp%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.buffer.sensors.temperature.main.value',
+        'heating.bufferCylinder.sensors.temperature.main.value',
+        'heating.bufferCylinder.sensors.temperature.top.value'
+    ),
+
+    # 4 Sauggasdruck
+    '%comp_pres%' => vitoconnect_fmt_fallback($d, ' bar', 2,
+        'heating.compressors.0.sensors.pressure.inlet.value',
+    ),
+
+    # 25 Durchfluss Heizkreis (Original: bar!)
+    '%heat_pres%' => vitoconnect_fmt_fallback($d, ' bar', 1,
+        'heating.sensors.pressure.supply.value'
+    ),
+
+    # 13 Hochdruck (Original: kein Wert)
+    '%high_pres%' => vitoconnect_fmt_fallback($d, ' bar', 1,
+        'heating.sensors.pressure.hotGas.value'
+    ),
+
+    # 7 Verdichterleistung
+    '%comp_speed%' => vitoconnect_fmt_fallback($d, ' %', 0,
+        'heating.compressors.0.speed.current.value',
+        'heating.compressors.0.sensors.power.value'
+    ),
+
+    # 2.1 Ventilator 1
+    '%fan0%' => vitoconnect_fmt_fallback($d, ' %', 0,
+        'heating.primaryCircuit.fans.0.current.value',
+        'heating.primaryCircuit.sensors.rotation.value'
+    ),
+
+    # 2.2 Ventilator 2
+    '%fan1%' => vitoconnect_fmt_fallback($d, ' %', 0,
+        'heating.primaryCircuit.fans.1.current.value',
+        'heating.primaryCircuit.sensors.rotation.value'
+    ),
+
+    # 17 Expansionsventil 0
+    '%valve0%' => vitoconnect_fmt_fallback($d, ' %', 0,
+        'heating.sensors.valve.0.expansion.target.value'
+    ),
+
+    # 15 Expansionsventil 1
+    '%valve1%' => vitoconnect_fmt_fallback($d, ' %', 0,
+        'heating.sensors.valve.1.expansion.target.value'
+    ),
+
+    # 20 Sekundärpumpe
+    '%pump1%' => vitoconnect_fmt_fallback($d, ' %', 0,
+        'heating.boiler.pumps.internal.current.value'
+    ),
+
+    # 24 Allengra (Original: l/h!)
+    '%allengra%' => vitoconnect_fmt_fallback($d, ' l/h', 0,
+        'heating.sensors.volumetricFlow.allengra.value'
+    ),
+
+    # 8 Öltemperatur (Original: Reading, kein Status!)
+    '%comp_oil%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.compressors.0.sensors.temperature.oil.value'
+    ),
+
+    # 9 Inverter Temperatur
+    '%inv_tmp%' => vitoconnect_fmt_fallback($d, ' &#176;C', 1,
+        'heating.inverters.0.sensors.temperature.powerModule.value'
+    ),
+
+    # 10 Inverter Leistung
+    '%inv_watt%' => vitoconnect_fmt_fallback($d, ' W', 0,
+        'heating.inverters.0.sensors.power.output.value'
+    ),
+
+    # 11 Inverter Strom
+    '%inv_amp%' => vitoconnect_fmt_fallback($d, ' A', 1,
+        'heating.inverters.0.sensors.power.current.value'
+    ),
+
+    # Status / Farben
+    '%status%'        => $statusStr,
+    '%overlay_color%' => $overlayColor,
+    '%sec_status%'    => $secStatusStr,
+    '%sec_icon_clr%'  => $secIconClr,
+    '%wp_icon_clr%'   => $wpIconClr,
+
+    '%TITEL%'         => 'K&#228;ltekreislauf',
+);
+
+    # Ersetzung im SVG
+    for my $ph (keys %map) {
+        my $val = $map{$ph};
+        $svg =~ s/\Q$ph\E/$val/g;
+    }
+
+    return $svg;
+}
+
+sub vitoconnect_fmt_fallback {
+    my ($d, $unit, $dec, @paths) = @_;
+
+    foreach my $path (@paths) {
+        my $val = ReadingsVal($d, $path, undef);
+        next unless defined $val;
+
+        $unit =~ s/°/&#176;/g;
+        return sprintf("%.${dec}f", $val) . $unit;
+    }
+
+    return "---";
+}
 
 
 #####################################################################################################################
@@ -4819,10 +5396,12 @@ sub vitoconnect_DeleteKeyValue {
     </ul>
     <br>
 
-    <a name="vitoconnectget"></a>
+    <a name="vitoconnect-get"></a>
     <b>Get</b><br>
     <ul>
-        Nothing to get here. 
+        <a id="vitoconnect-get-html"></a>
+        <li><code>html</code><br>
+            get HTML of Kältekreislauf. Kältekreislauf can also be used in FTUI with widget_vitoconnect.js</li> 
     </ul>
     <br>
     
@@ -4912,6 +5491,10 @@ sub vitoconnect_DeleteKeyValue {
         <a id="vitoconnect-attr-vitoconnect_device"></a>
         <li><i>vitoconnect_device</i>:<br>
             You can define the device 0 (default) or 1. I cannot test this because I have only one device.
+        </li>
+        <a id="vitoconnect-attr-vitoconnect_showKaeltekreislauf"></a>
+        <li><i>vitoconnect_showKaeltekreislauf</i>:<br>
+            You can show the Viessmann Kältegreislauf at the top of the device view.
         </li>
     </ul>
 </ul>
@@ -5042,14 +5625,18 @@ sub vitoconnect_DeleteKeyValue {
         <li><code>Urlaub_stop</code><br>
             Entfernt die Urlaubsstart- und Endzeit.</li>
     </ul>
+
+<br>
+
+    <a name="vitoconnect-get"></a>
+    <b>Get</b><br>
+    <ul>
+        <a id="vitoconnect-get-html"></a>
+        <li><code>html</code><br>
+            Kältekreislauf als HTML, auch zur Benutzung auf dem Tablet UI mit widget_vitoconnect.js</li> 
+    </ul>
+    <br>
 </ul>
-<br>
-    <a name="vitoconnectget"></a>
-      <b>Get</b><br>
-        <ul>
-            Keine Daten zum Abrufen verfügbar.
-        </ul>
-<br>
 
 <a name="vitoconnect-attr"></a>
 <b>Attributes</b>
@@ -5131,6 +5718,10 @@ sub vitoconnect_DeleteKeyValue {
         <a id="vitoconnect-attr-vitoconnect_device"></a>
         <li><i>vitoconnect_device</i>:<br>
             Es kann zwischen den Geräten 0 (Standard) oder 1 gewählt werden. Diese Funktion konnte nicht getestet werden, da nur ein Gerät verfügbar ist.
+        </li>
+        <a id="vitoconnect-attr-vitoconnect_showKaeltekreislauf"></a>
+        <li><i>vitoconnect_showKaeltekreislauf</i>:<br>
+            Es kann der Viessmann Kältegreislauf oben in der Device Ansicht angeizeigt werden.
         </li>
     </ul>
 </ul>
