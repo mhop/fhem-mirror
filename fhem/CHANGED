@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 98_vitoconnect: Kaeltekreislauf SVG and tabletUI js + css
  - feature: 73_DepartureBnT : New attributes for FTUI Widget Departure
  - feature: 73_DepartureBnT : New attributes for disabling Details Page
  - feature: 82_LGTV_WebOS: Update license, version and add ZDF app support in
