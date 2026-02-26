@@ -1028,19 +1028,29 @@ name:zigbee2mqtt_Wireless_Button
 desc: Wireless button via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG12LM wireless switch with gyroscope
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
 order:L_12a
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","readingList","") =~ m,[\b]?([^/:]+)[/].*:, ? $1 : undef }
-par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
-par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal("DEVICE","devicetopic",AttrVal("DEVICE","readingList","")) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
-par:ICON;ICON as set, defaults to control_home;{ AttrVal("DEVICE","icon","control_home") }
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to control_home;{ AttrVal('DEVICE','icon','control_home') }
 attr DEVICE icon ICON
 attr DEVICE stateFormat Click: click Action: action
 attr DEVICE devicetopic BASE_TOPIC/DEV_ID
-attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/availability:.* { $EVENT=~s{state}{availability}x; json2nameValue($EVENT) }
 attr DEVICE jsonMap battery:batteryPercent voltage:batterymV
 attr DEVICE userReadings batteryVoltage:batterymV.* {ReadingsNum($name,'batterymV',0)/1000}
 deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_Wireless_Button
-setreading DEVICE attrTemplateVersion 20201208
+setreading DEVICE attrTemplateVersion 20260226
+
+# contributed by dadoc, source post: https://forum.fhem.de/index.php?msg=1358262
+name:zigbee2mqtt_Wireless_Rotation_Button
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+desc:for IKEA Bilresa E2490 remote with dial (Matter + Zigbee) or Moes ZG-101ZD
+order:L_12b
+set DEVICE attrTemplate zigbee2mqtt_Wireless_Button
+attr DEVICE stateFormat { ReadingsVal($name,'action','-') =~ m{brightness_}x ? 'scroll '.ReadingsVal($name,'action_level',ReadingsVal($name,'action_step_size','-')) : ReadingsVal($name,'action','-') }
+attr DEVICE model zigbee2mqtt_Wireless_Rotation_Button
+setreading DEVICE attrTemplateVersion 20260226
 
 name:zigbee2mqtt_wireless_button_old
 desc: Wireless button without gyro via zigbee2mqtt <br>Tested with: Xiaomi Aqara WXKG11LM wireless button
