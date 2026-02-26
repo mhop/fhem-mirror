@@ -7,10 +7,9 @@ attr Stromboerse_connect DbLogValueFn {\
     my ($sec, $min, $hour, $mday, $mon, $year) = localtime(time_str2num($TIMESTAMP));;\
    $year += 1900;;\
    $mon  += 1;;\
-   my $quarter = int($min / 15) * 15;;  # Minuten auf 0, 15, 30 oder 45 runden\
+   my $quarter = int($min / 15) * 15;;  # Minuten auf 0, 15, 30 oder 45 abrunden\
 \
    $TIMESTAMP = sprintf("%04d-%02d-%02d %02d:%02d:00", $year, $mon, $mday, $hour, $quarter);;\
-\
   }\
 }
 attr Stromboerse_connect comment Version: 20260129 18:00\\
@@ -1470,7 +1469,7 @@ conf_EVU_Summe_ct_kWh:conf_EVU.* {\
 current_level:fc._0000_total.* {\
 ## Aktueller Preis\
   my $hash = $defs{$name};;\
-  my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my ($sec, $min, $hour, $mday, $mon, $year) = localtime();;$year += 1900;;$mon  += 1;;\
 \
   # --- Readings setzen ---\
   readingsBeginUpdate($hash);;\
@@ -1480,8 +1479,8 @@ current_level:fc._0000_total.* {\
   readingsBulkUpdate($hash,"fc0_0000_startsAt",sprintf("%d-%02d-%02d 00:00:00", $year, $mon, $mday) );;\
   Log3($name,3,sprintf("%-20s ur_02 : ", $name)."fc0 Startzeit der Daten gesetzt");;\
 \
-  if (    ReadingsVal($name,"fc1_0000_total","null") eq "null"             ## Der nächste Tag ist noch nicht da\
-      and ReadingsVal($name,"fc1_0000_startsAt","0000-00-00 00:00:00") le sprintf("%d-%02d-%02d 00:00:00", $year, $mon, $mday))\
+  if (      ReadingsVal($name,"fc1_0000_total","null") eq "null"             ## Der nächste Tag ist noch nicht da\
+      and ReadingsVal($name,"fc1_0000_startsAt","9999-99-99 00:00:00") ge sprintf("%d-%02d-%02d 00:00:00", $year, $mon, $mday))\
   {\
     fhem("deletereading ".$name." fc1_0000_startsAt");;\
     Log3($name,3,sprintf("%-20s ur_02 : ", $name)."fc1 Daten sind noch nicht da");;\
@@ -1493,7 +1492,7 @@ current_level:fc._0000_total.* {\
 \
 fc_avg:current_price.* {\
 ## Berechnung des durchschnitt Wertes über alle Werte von fc0 und fc1\
-  my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my ($sec,$min,$hour) = localtime(time);;\
 \
   my $fc_tmp = 0;;\
 \
@@ -1533,7 +1532,7 @@ fc_med:current_price.* {\
 \
 fc_min:current_price.* {\
 ##  Ermittlung des minimal Wertes\
-  my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my ($sec,$min,$hour) = localtime(time);;\
 \
   my $fc_min = 0;;\
   my $fc_tmp = 0;;\
@@ -1561,7 +1560,7 @@ fc_min:current_price.* {\
 \
 fc_max:current_price.* {\
 ##  Ermittlung des minimal Wertes\
-  my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my ($sec,$min,$hour) = localtime(time);;\
 \
   my $fc_max = 0;;\
   my $fc_tmp = 0;;\
@@ -1637,8 +1636,20 @@ fc0_trigger_net_start:fc_trigger_net_price.* {\
   my $hash = $defs{$name};;\
   readingsBeginUpdate($hash);;\
 \
+  my ($sec,$min,$hour) = localtime(time);;\
+  # Nur in der ersten Viertelstunde neu berechnen\
+  if ($min >= 15) {\
+    Log3($name,3,sprintf("%-20s ur_07 : Neuberechnung von fc0_trigger_net_start gesperrt (Minute %02d)", $name,$min));;\
+    # vorhandenen Wert holen\
+    readingsBulkUpdate($hash,"fc0_trigger_net_dauer",ReadingsVal($name,"fc0_trigger_net_dauer","null"));;\
+    readingsBulkUpdate($hash,"fc0_trigger_bat_dauer",ReadingsVal($name,"fc0_trigger_bat_dauer","null"));;\
+    readingsEndUpdate($hash,1);;   # 1 = Event erzwingen\
+\
+    return;;\
+  }\
+\
   my $fc = 0;;\
-  my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+\
   my $fc_trigger_net_price = ReadingsVal($name,"fc_trigger_net_price",0);;\
   my $fc_trigger_bat_price = ReadingsVal($name,"fc_trigger_bat_price",0);;\
 \
@@ -1655,7 +1666,7 @@ fc0_trigger_net_start:fc_trigger_net_price.* {\
                        AND h2.TIMESTAMP = h1.TIMESTAMP\
                        AND (h2.READING LIKE 'fc0_trigger_bat_%' OR h2.READING LIKE 'fc0_trigger_net_%')\
                        AND (h2.READING <> 'fc0_trigger_bat_dauer' AND h2.READING <> 'fc0_trigger_net_dauer')\
-                       AND (    h2.VALUE = 'null' OR h2.VALUE = '24:00'\
+                       AND (    h2.VALUE = 'null' OR h2.VALUE = '23:59'\
                             OR (h2.VALUE REGEXP '^([01][0-9]|2[0-3]):[0-5][0-9]'\
                                 AND STR_TO_DATE(h2.VALUE,'%H:%i') > '$hour:$min'))\
                  )\
@@ -1663,7 +1674,7 @@ fc0_trigger_net_start:fc_trigger_net_price.* {\
            OR (\
                 (     h1.READING LIKE 'fc0_trigger_bat_%' OR h1.READING LIKE 'fc0_trigger_net_%')\
                  AND (h1.READING <> 'fc0_trigger_bat_dauer' OR h1.READING <> 'fc0_trigger_net_dauer')\
-                 AND (h1.VALUE = 'null' OR h1.VALUE = '24:00'\
+                 AND (h1.VALUE = 'null' OR h1.VALUE = '23:59'\
                       OR (h1.VALUE REGEXP '^([01][0-9]|2[0-3]):[0-5][0-9]'\
                           AND STR_TO_DATE(h1.VALUE,'%H:%i') > '$hour:$min')\
                 )\
@@ -1793,7 +1804,7 @@ fc0_trigger_net_stop:fc0_trigger_net_start.* {\
             $fc = 1;;\
             $loop_hour = -1;;                                                 # beginne wieder bei 00:00\
           } else {\
-            $fc_total_net_found = "24:00";;\
+            $fc_total_net_found = "23:59";;\
             Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_net_stop x      $fc_total_net_found"));;\
           } # end if fc1_0000_total\
         } # end if\
@@ -1831,7 +1842,7 @@ fc0_trigger_net_stop:fc0_trigger_net_start.* {\
             $fc = 1;;\
             $loop_hour = -1;;                                                 # beginne wieder bei 00:00\
           } else {\
-            $fc_total_bat_found = "24:00";;\
+            $fc_total_bat_found = "23:59";;\
             Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_bat_stop        $fc_total_bat_found"));;\
           } # end if fc1_0000_total\
         } # end if\
@@ -1911,23 +1922,44 @@ fc0_trigger_net:fc0_trigger_net_dauer.* {\
   my $hash = $defs{$name};;\
   readingsBeginUpdate($hash);;\
 \
-  if (    ReadingsVal($name,"fc0_trigger_bat_dauer","null") ne "null"\
-      and ReadingsVal($name,"current_price",100)  < ReadingsVal($name,"fc_trigger_bat_price",0) ) {\
-    readingsBulkUpdate($hash, "fc0_trigger_bat", "on");;\
-  } else {\
-    readingsBulkUpdate($hash, "fc0_trigger_bat", "off");;\
-  }\
+  my ($sec,$min,$hour) = localtime(time);;\
+  my $start_quarter = int($min / 15);;\
 \
-  if (    ReadingsVal($name,"fc0_trigger_net_dauer","null") ne "null"\
-      and ReadingsVal($name,"current_price",100)  < ReadingsVal($name,"fc_trigger_net_price",0) ) {\
-    readingsBulkUpdate($hash, "fc0_trigger_net", "on");;\
-  } else {\
-    readingsBulkUpdate($hash, "fc0_trigger_net", "off");;\
+  my $current_price = ReadingsVal($name,"current_price",100);;\
+\
+  my $state = "off";;\
+  if (    ReadingsVal($name,"fc0_trigger_bat_dauer","null") ne "null"\
+      and sprintf("%02d:%02d",$hour,$min) ge ReadingsVal($name,"fc0_trigger_bat_start","null")\
+      and $current_price  < ReadingsVal($name,"fc_trigger_bat_price",0) ) {\
+    $state = "on";;\
   }\
+  readingsBulkUpdate($hash, "fc0_trigger_bat", $state);;\
+  Log3($name,3,sprintf("%-20s ur_10 : ", $name)."fc0_trigger_bat             $state");;\
+\
+  $state = "off";;\
+  if (    ReadingsVal($name,"fc0_trigger_net_dauer","null") ne "null"\
+      and sprintf("%02d:%02d",$hour,$min) ge ReadingsVal($name,"fc0_trigger_net_start","null")\
+      and $current_price  < ReadingsVal($name,"fc_trigger_net_price",0) ) {\
+    $state = "on";;\
+  }\
+  readingsBulkUpdate($hash, "fc0_trigger_net", $state);;\
+  Log3($name,3,sprintf("%-20s ur_10 : ", $name)."fc0_trigger_net             $state");;\
+\
   return;;\
 },\
 \
 fc1_trigger_net_start:fc_trigger_net_price.* {\
+  my ($sec,$min,$hour) = localtime(time);;\
+\
+  # Nur in der ersten Viertelstunde neu berechnen\
+  if ($min >= 15) {\
+    my $hash = $defs{$name};;\
+    readingsBeginUpdate($hash);;\
+    Log3($name,3,sprintf("%-20s ur_11 : Neuberechnung von fc1_trigger_net_start gesperrt (Minute %02d)", $name,$min));;\
+    readingsBulkUpdate($hash,"fc1_trigger_net_dauer",ReadingsVal($name,"fc1_trigger_net_dauer","null"));;\
+    return;;\
+  }\
+\
   my $fc = 1;;\
   if (ReadingsVal($name,"fc1_0000_startsAt","null") ne "null") {\
     my $fc_trigger_net_price = ReadingsVal($name,"fc_trigger_net_price",0);;\
@@ -1938,9 +1970,9 @@ fc1_trigger_net_start:fc_trigger_net_price.* {\
     for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
       for (my $loop_quarter = 0;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour , $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_10 : ", $name).sprintf(" fc%d Start %02d:%02d total: %.2f net: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price));;\
+        Log3($name,4,sprintf("%-20s ur_11 : ", $name).sprintf(" fc%d Start %02d:%02d total: %.2f net: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price));;\
         if ( $fc_total < $fc_trigger_net_price ) {\
-          Log3($name,3,sprintf("%-20s ur_10 : ", $name).sprintf("fc%d_trigger_net_start       %02d:%02d",$fc, $loop_hour ,$loop_quarter*15));;\
+          Log3($name,3,sprintf("%-20s ur_11 : ", $name).sprintf("fc%d_trigger_net_start       %02d:%02d",$fc, $loop_hour ,$loop_quarter*15));;\
           return(sprintf("%02d:%02d",$loop_hour, $loop_quarter*15)) ;;\
         }\
       } # end $loop_quarter\
@@ -1990,7 +2022,7 @@ fc1_trigger_net_dauer:fc1_trigger_net_stop.* {\
   my $fc_trigger_start = ReadingsVal($name,"fc1_trigger_net_start","null");;\
   if ( $fc_trigger_start ne "null" ) {\
     my $fc_trigger_stop = ReadingsVal($name,"fc1_trigger_net_stop","null");;\
-       $fc_trigger_stop = "24:00" if ( $fc_trigger_stop eq "00:00" );;\
+       $fc_trigger_stop = "23:59" if ( $fc_trigger_stop eq "00:00" );;\
     my ($h1,$m1) = split(":", $fc_trigger_start);;\
     my ($h2,$m2) = split(":", $fc_trigger_stop);;\
 \
@@ -2019,7 +2051,17 @@ fc_trigger_max:fc_avg.* {\
 \
 fc0_trigger_max_start:fc_trigger_max.* {\
 ## Ermitteln des nächsten Trigger_max Fensters\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my ($sec,$min,$hour) = localtime(time);;\
+\
+  # Nur in der ersten Viertelstunde neu berechnen\
+  if ($min >= 15) {\
+    my $hash = $defs{$name};;\
+    readingsBeginUpdate($hash);;\
+    Log3($name,3,sprintf("%-20s ur_11 : Neuberechnung von fc0_trigger_max_start gesperrt (Minute %02d)", $name,$min));;\
+    readingsBulkUpdate($hash,"fc0_trigger_max_dauer",ReadingsVal($name,"fc0_trigger_max_dauer","null"));;\
+    return;;\
+  }\
+\
   my $fc = 0;;\
   my $fc_trigger_max = ReadingsVal($name,"fc_trigger_max",0);;\
   my $fc_total = 0;;\
@@ -2091,23 +2133,32 @@ fc0_trigger_max_dauer:fc0_trigger_max_stop.* {\
   return "null";;\
 },\
 \
-fc0_trigger_max:fc0_trigger_max_stop.* {\
-## Setzen des maximum Triggers für die aktuelle Stunde\
-  if ( ReadingsVal($name,"current_price",0)  > ReadingsVal($name,"fc_trigger_max",0) ) {\
-    return "on";;\
-  } else {\
-    return "off";;\
-  } # end if\
+fc0_trigger_max:fc0_trigger_max_dauer.* {\
+  my ($sec,$min,$hour) = localtime(time);;\
+\
+  ## Setzen des maximum Triggers für die aktuelle Stunde\
+  if ( ReadingsVal($name,"current_price",0) < ReadingsVal($name,"fc_trigger_max_price",0)\
+      and sprintf("%02d:%02d",$hour,$min) ge ReadingsVal($name,"fc0_trigger_max_start","null")\
+  ) { return "on" }\
+\
+  return "off";;\
 },\
 \
 fc1_trigger_max_start:fc_trigger_max.* {\
+  my ($sec,$min,$hour) = localtime(time);;\
+\
+  # Nur in der ersten Viertelstunde neu berechnen\
+  if ($min >= 15) {\
+    Log3($name,3,sprintf("%-20s ur_18 : Neuberechnung von fc1_trigger_max_start gesperrt (Minute %02d)", $name,$min));;\
+    return;;\
+  }\
+\
   my $fc = 1;;\
 \
   if (ReadingsVal($name,"fc1_0000_startsAt","null") ne "null") {\
     my $fc_trigger_max = ReadingsVal($name,"fc_trigger_max",0);;\
 \
     # Ermitteln des nächsten Trigger Fensters\
-    my ($sec,$min,$hour,$mday,$mon,$year) = localtime(time);; $year += 1900;; $mon += 1 ;;\
     my $fc_total = 0;;\
 \
     for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
@@ -2172,7 +2223,7 @@ fc1_trigger_max_dauer:fc1_trigger_max_stop.* {\
 },\
 \
 fc0_next1_quarter:current_price.* {\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my ($sec,$min,$hour) = localtime(time);;\
   my $quarter = int($min / 15);;                        # aktuelle Viertelstunde 0–3\
   my $next_quarter = ($quarter + 1) % 4;;               # nächste Viertelstunde\
   my $hour_offset = $hour;;                             # passen sich an wenn es über Mitternacht geht\
@@ -2187,7 +2238,7 @@ fc0_next1_quarter:current_price.* {\
 \
 fc0_next1_hour:current_price.* {\
   my $j;;\
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);; $year += 1900;; $mon += 1 ;;\
+  my ($sec,$min,$hour) = localtime(time);;\
   my $quarter      = int($min / 15);;                  # aktuelle Viertelstunde 0–3\
   my $next_quarter = ($quarter + 1) % 4;;              # nächste Viertelstunde\
   my $hour_offset  = $hour;;                           # passt sich an wenn es über Mitternacht geht\
@@ -2432,7 +2483,7 @@ fc_DbLog:fc0_0000_total.* {\
       for (my $loop_quarter = 0;; $loop_quarter <= 3;; $loop_quarter++) {\
         $timestamp = sprintf("%s %02d:%02d:00",$date,$loop_hour,$loop_quarter*15);;\
         $value     = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$loop_fc,$loop_hour,$loop_quarter*15),"null");;\
-##        Log3($name,4,sprintf("%-20s ur_35 : ", $name)."  $timestamp $name $conf_EVU fc${loop_fc}_total $value");;\
+        Log3($name,4,sprintf("%-20s ur_35 : ", $name)."  $timestamp $name $conf_EVU fc${loop_fc}_total $value");;\
         push @values_sql,sprintf("('%s','%s','%s','%s','%s')",$timestamp,$name,$conf_EVU,"fc${loop_fc}_total",$value);;\
       } # end quarter\
     } # end loop_hour\
