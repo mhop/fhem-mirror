@@ -34,8 +34,6 @@ use HttpUtils;
 use JSON;
 use SetExtensions;
 
-my $FULLY_VERSION = '2.4';
-
 # Timeout for Fully requests
 my $FULLY_TIMEOUT = 5;
 
@@ -56,9 +54,9 @@ my $FULLY_DEFAULT_PORT = '2323';
 # Initialize module
 ######################################################################
 
-sub FULLY_Initialize ($)
+sub FULLY_Initialize
 {
-    my ($hash) = @_;
+    my $hash = shift // return;
 
     $hash->{DefFn}       = "FULLY_Define";
     $hash->{UndefFn}     = "FULLY_Undef";
@@ -72,6 +70,7 @@ sub FULLY_Initialize ($)
     $hash->{AttrList} = "pingBeforeCmd:0,1,2 pollInterval:slider,10,10,86400 requestTimeout:slider,1,1,20 repeatCommand:0,1,2 " .
         "disable:0,1 expert:0,1 waitAfterPing:0,1,2 updateAfterCommand:0,1 " .
         $readingFnAttributes;
+	return;
 }
 
 ######################################################################
@@ -107,8 +106,6 @@ sub FULLY_Define
         $hash->{host} = $host;
         $hash->{port} = $FULLY_DEFAULT_PORT;
     }
-
-    $hash->{version}         = $FULLY_VERSION;
     $hash->{NOTIFYDEV}       = 'global,TYPE=FULLY';
     $hash->{onForTimer}      = 'off';
     $hash->{nextUpdate}      = 'off';
@@ -138,7 +135,7 @@ sub FULLY_Define
     }
 
     if (!$init_done && exists($hash->{fully}{password})) {
-        FULLY_Log ($hash, 1, "Version $FULLY_VERSION Opening device $hash->{host}");
+        FULLY_Log ($hash, 1, "Opening device $hash->{host}");
         FULLY_GetDeviceInfo ($name);
         if (exists($hash->{fully}{interval})) {
             FULLY_SetPolling ($hash, 1, $hash->{fully}{interval});
@@ -213,7 +210,7 @@ sub FULLY_SetPolling
     my $mode = shift // return;
     my $interval = shift;
 
-    return if !$init_done;
+    return if !$init_done || AttrVal($hash->{NAME}, 'disable', 0);
 
     my $name = $hash->{NAME};
     $interval //= AttrVal ($name, 'pollInterval', $hash->{fully}{interval} // $FULLY_POLL_INTERVAL);
@@ -223,17 +220,17 @@ sub FULLY_SetPolling
         FULLY_Log ($hash, 2, "Polling deactivated")
             if (!exists($hash->{nextUpdate}) || $hash->{nextUpdate} ne 'off');
         $hash->{nextUpdate} = 'off';
+        return;
     }
-    elsif ($mode == 1) {
+    if ($mode == 1) {
         RemoveInternalTimer ($hash, 'FULLY_UpdateDeviceInfo');
-        if (!exists($hash->{fully}{password})) {
-            FULLY_Log ($hash, 2, "Polling not activated. Fully password not defined");
+        if ( !exists $hash->{fully}{password} ) {
+            FULLY_Log ($hash, 2, 'Polling not activated. Fully password not defined');
             return;
         }
         $interval = $FULLY_POLL_RANGE[0] if ($interval < $FULLY_POLL_RANGE[0]);
         $interval = $FULLY_POLL_RANGE[1] if ($interval > $FULLY_POLL_RANGE[1]);
-        FULLY_Log ($hash, 2, "Polling activated")
-            if (exists($hash->{nextUpdate}) && $hash->{nextUpdate} eq 'off');
+        FULLY_Log ($hash, 2, 'Polling activated') if exists $hash->{nextUpdate} && $hash->{nextUpdate} eq 'off';
         $hash->{nextUpdate} = strftime "%d.%m.%Y %H:%M:%S", localtime (time+$interval);
         InternalTimer (gettimeofday()+$interval, "FULLY_UpdateDeviceInfo", $hash, 0);
     }
