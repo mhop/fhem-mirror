@@ -1,4 +1,4 @@
-REV 30885
+REV 30889
 DIR unused
 UPD 2026-02-26_07:45:03 454231 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -452,7 +452,7 @@ UPD 2022-03-09_07:45:03 22906 FHEM/88_xs1Dev.pm
 UPD 2022-03-31_07:45:02 29550 FHEM/89_AndroidDB.pm
 UPD 2022-03-31_07:45:02 15486 FHEM/89_AndroidDBHost.pm
 UPD 2021-10-08_07:45:09 132761 FHEM/89_ESPEInk.pm
-UPD 2025-11-28_07:45:03 41768 FHEM/89_FULLY.pm
+UPD 2026-02-27_07:45:03 41724 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2019-05-27_07:45:02 53160 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
@@ -661,7 +661,7 @@ UPD 2021-06-26_07:45:03 70653 FHEM/lib/AttrTemplate/httpmod.template
 UPD 2023-12-30_07:45:03 10369 FHEM/lib/AttrTemplate/huedevice.template
 UPD 2021-04-11_07:45:03 4324 FHEM/lib/AttrTemplate/ipcam.template
 UPD 2020-05-31_07:45:03 4671 FHEM/lib/AttrTemplate/max.template
-UPD 2026-01-25_07:45:03 454790 FHEM/lib/AttrTemplate/mqtt2.template
+UPD 2026-02-27_07:45:03 455343 FHEM/lib/AttrTemplate/mqtt2.template
 UPD 2021-12-18_07:45:03 15076 FHEM/lib/AttrTemplate/mqtt_generic_bridge.template
 UPD 2020-05-23_07:45:02 5625 FHEM/lib/AttrTemplate/mysensors.template
 UPD 2024-10-26_07:45:03 11260 FHEM/lib/AttrTemplate/speechcontrol.template
@@ -769,8 +769,8 @@ UPD 2026-02-26_07:45:10 5433797 docs/commandref.html
 UPD 2026-02-26_07:45:14 3433093 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-02-26_07:45:16 327916 docs/commandref_modular.html
-UPD 2026-02-26_07:45:17 339756 docs/commandref_modular_DE.html
+UPD 2026-02-27_07:45:16 327916 docs/commandref_modular.html
+UPD 2026-02-27_07:45:18 339756 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
