@@ -3098,6 +3098,7 @@ sub _setreset {                          ## no critic "not used"
 
       if ($dday) {
           $dday = sprintf "%02d", $dday;
+          
           if ($dhour) {
               $dhour = sprintf "%02d", $dhour;
 
@@ -3107,13 +3108,13 @@ sub _setreset {                          ## no critic "not used"
 
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
               $paref->{reorgday} = $dday;
-              $paref->{histname} = '';
+              $paref->{hkey}     = '';
 
               setPVhistory ($paref);
 
               delete $paref->{reorg};
               delete $paref->{reorgday};
-              delete $paref->{histname};
+              delete $paref->{hkey};
           }
           else {
               delete $data{$name}{pvhist}{$dday};
@@ -3139,13 +3140,13 @@ sub _setreset {                          ## no critic "not used"
 
               $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
               $paref->{reorgday} = $dday;
-              $paref->{histname} = '';
+              $paref->{hkey}     = '';
 
               setPVhistory ($paref);
 
               delete $paref->{reorg};
               delete $paref->{reorgday};
-              delete $paref->{histname};
+              delete $paref->{hkey};
           }
           else {
               for my $hr (sort keys %{$data{$name}{pvhist}{$dday}}) {
@@ -10429,7 +10430,7 @@ sub centralTask {
           if (!CurrentVal ($name, 'setupcomplete', 0)) {
               $ret = 'The setup routine is still incomplete';
           }
-          singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );                      # Central Task running Statusbit
+          singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );                       # Central Task running Statusbit
 
           return;
       }
@@ -10440,30 +10441,36 @@ sub centralTask {
       return;
   }
 
-  $data{$name}{current}{ctrunning} = 1;                                                        # Central Task running Statusbit
-  InternalTimer (gettimeofday() + 2.0, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);   # Freigabe centralTask
+  $data{$name}{current}{ctrunning} = 1;                                                         # Central Task running Statusbit
+  InternalTimer (gettimeofday() + 2.0, "FHEM::SolarForecast::releaseCentralTask", $hash, 0);    # Freigabe centralTask
 
-  my $t     = time;                                                                            # aktuelle Unix-Zeit
-  my $debug = getDebug ($hash);                                                                # Debug Module
+  my $t       = time;                                                                           # aktuelle Unix-Zeit
+  my $debug   = getDebug ($hash);                                                               # Debug Module
 
-  my $dt    = timestringsFromOffset ($t, 0);
-  my $chour = $dt->{hour};
-
+  my $dt      = timestringsFromOffset ($t, 0);
+  my $chour   = $dt->{hour};
+  my $day     = $dt->{day};
+  my $dayname = $dt->{dayname};
+  
   my $centpars = {
       name    => $name,
       type    => $type,
       t       => $t,
-      date    => $dt->{date},                                                                  # aktuelles Datum
-      month   => $dt->{month},                                                                 # Monat 01..12
-      minute  => $dt->{minute},                                                                # aktuelle Minute (00..59)
-      chour   => $chour,                                                                       # aktuelle Stunde in 24h format (00..23)
-      day     => $dt->{day},                                                                   # aktueller Tag (01..31)
-      dayname => $dt->{dayname},                                                               # aktueller Wochentagsname (locale-dependent!!)
+      date    => $dt->{date},                                                                   # aktuelles Datum
+      month   => $dt->{month},                                                                  # Monat 01..12
+      minute  => $dt->{minute},                                                                 # aktuelle Minute (00..59)
+      chour   => $chour,                                                                        # aktuelle Stunde in 24h format (00..23)
+      day     => $day,                                                                          # aktueller Tag (01..31)
+      dayname => $dayname,                                                                      # aktueller Wochentagsname (locale-dependent!!)
       debug   => $debug,
       lang    => getLang ($hash),
       state   => 'running',
       evt     => 0
   };
+  
+  $data{$name}{pvhist}{$day}{99}{dayname} = $dayname;                                           # akt. Wochentagsnamen in pvHistory eintragen
+
+  debugLog ($centpars, 'saveData2Cache', "setPVhistory -> stored simple  - current dayname=$dayname");
 
   if ($debug !~ /^none$/xs) {
       Log3 ($name, 4, "$name DEBUG> ################################################################");
@@ -11298,6 +11305,7 @@ return;
 sub _transferWeatherValues {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $day   = $paref->{day};
   my $chour = $paref->{chour};
   my $hash  = $defs{$name};
 
@@ -11387,12 +11395,12 @@ sub _transferWeatherValues {
       }
 
       if ($fd == 0 && $hod) {                                                                  # Weather in pvHistory speichern
-          writeToHistory ( { paref => $paref, key => 'weatherid',         val => $wid,       hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'weathercloudcover', val => $wcc // 0,  hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'windspeed',         val => $windspeed, hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'rr1c',              val => $rr1c,      hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'temperature',       val => $temp,      hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'DoN',               val => $don,       hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'weatherid',         val => $wid,       day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'weathercloudcover', val => $wcc // 0,  day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'windspeed',         val => $windspeed, day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'rr1c',              val => $rr1c,      day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'temperature',       val => $temp,      day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'DoN',               val => $don,       day => $day, hour => $hod } );
       }
   }
 
@@ -11688,6 +11696,7 @@ sub _transferInverterValues {
   my $warn         = '';
   my $pvsum        = 0;                                                 # Summe aktuelle PV aller Inverter
   my $ethishoursum = 0;                                                 # Summe Erzeugung akt. Stunde aller Inverter
+  my $hr_chg_diff  = 0;                                                 # Summe von Stundenwechsel-Differenzen etotal
 
   for my $in (1..MAXINVERTER) {
       $in = sprintf "%02d", $in;
@@ -11771,10 +11780,11 @@ sub _transferInverterValues {
           $diff = max (0, $diff);                                                                       # negative Werte verhindern
 
           if ($diff > 0) {                                                                              # Falls es eine echte Differenz gibt → der letzten Stunde zuschlagen
-              writeToHistory ( { paref => $paref, key => "pvrl$in", val => $prev_pvrl + $diff, hour => $lasthod } );
+              writeToHistory ( { paref => $paref, key => "pvrl$in", val => $prev_pvrl + $diff, day => $day, hour => $lasthod } );
+              $hr_chg_diff += $diff;
           }
 
-          writeToHistory ( { paref => $paref, key => "etotali$in", val => $etotal, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => "etotali$in", val => $etotal, day => $day, hour => $hod } );
 
           $ethishour = 0;
       }
@@ -11785,7 +11795,7 @@ sub _transferInverterValues {
               Log3 ($name, 1, "$name - WARNING - The generated PV of Inverter '$indev' is much more higher than capacity set in inverter key 'capacity'. It seems to be a failure and Energy Total is reinitialized.");
               $warn = ' (WARNING: too much generated PV was registered - see log file)';
 
-              writeToHistory ( { paref => $paref, key => 'etotali'.$in, val => $etotal, hour => $hod } );
+              writeToHistory ( { paref => $paref, key => 'etotali'.$in, val => $etotal, day => $day, hour => $hod } );
 
               $etotsvd   = InverterVal ($name, $in, 'ietotal', $etotal);
               $ethishour = round0 ($etotal - $etotsvd);
@@ -11825,7 +11835,7 @@ sub _transferInverterValues {
       $pvsum        += $pvout if($source eq 'pv');
       $ethishoursum += $ethishour;
 
-      writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, hour => $hod } );
+      writeToHistory ( { paref => $paref, key => 'pvrl'.$in, val => $ethishour, day => $day, hour => $hod } );
 
       debugLog ($paref, 'collectData|collectData_long', "collect Inverter $in data - device: $indev, source: $source, delivery: $feed =>");
       debugLog ($paref, 'collectData|collectData_long', "pvOut: $pvout W, pvIn: $pvin W, AC->DC: $pac2dc W, DC->AC: $pdc2ac W, etotal: $etotal Wh");
@@ -11860,7 +11870,30 @@ sub _transferInverterValues {
   debugLog ($paref, 'collectData|collectData_long', "currently saved 'pvrlvd' value: $pvrlvdsav");
   debugLog ($paref, 'collectData|collectData_long', "current percentage pvrl/pvapifc deviation of hod $hod: $percdev % -> pvrlvd: $valid");
 
-  writeToHistory ( { paref => $paref, key => 'pvrl', val => $ethishoursum, hour => $hod, valid => $valid } );   # valid=1: beim Learning berücksichtigen, 0: nicht
+  ## PV Erzeugung speichern
+  writeToHistory ( { paref => $paref, 
+                     key   => 'pvrl', 
+                     val   => $ethishoursum, 
+                     day   => $day, 
+                     hour  => $hod, 
+                     valid => $valid } );                                                                       # valid=1: beim Learning berücksichtigen, 0: nicht
+
+  if ($hr_chg_diff > 0) {
+      my $tfo     = timestringsFromOffset ($t, -3600);                                                          # Vorherige Stunde bestimmen
+      my $lastday = sprintf "%02d", $tfo->{day};
+      my $lasthod = sprintf "%02d", ($tfo->{hour} + 1);
+
+      my $lastpvrl = HistoryVal ($name, $lastday, $lasthod, 'pvrl', 0);
+
+      writeToHistory ( { paref => $paref, 
+                         key   => 'pvrl', 
+                         val   => $lastpvrl + $hr_chg_diff, 
+                         day   => $lastday, 
+                         hour  => $lasthod, 
+                         valid => $valid 
+                       } 
+                     );      
+  }
 
 return;
 }
@@ -11891,7 +11924,7 @@ sub __handleReductionState {
       my $pd  = HistoryVal ($name, $day, $hod, 'plantderated', 0);                                # evtl. schon gespeicherte Abregelungszeitpunkt
 
       if (!$pd && $rdcstate) {
-          writeToHistory ( { paref => $paref, key => 'plantderated', val => $t, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'plantderated', val => $t, day => $day, hour => $hod } );
       }
 
       $data{$name}{current}{reductionPlantState} = $rdcstate;
@@ -12053,9 +12086,9 @@ sub _transferAPIRadiationValues {
       }
 
       if ($fd == 0) {
-          writeToHistory ( { paref => $paref, key => 'pvapifcraw', val => $pvapifcraw, hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'pvfc',       val => $pvfc,       hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'radiation',  val => $rad1h,      hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'pvapifcraw', val => $pvapifcraw, day => $wtday, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'pvfc',       val => $pvfc,       day => $wtday, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'radiation',  val => $rad1h,      day => $wtday, hour => $hod } );
       }
   }
 
@@ -12105,8 +12138,8 @@ sub __calcSunPosition {
   debugLog ($paref, 'collectData_long', "Sun position: day: $wtday, hod: $hodn, $tstr, azimuth: $az, altitude: $alt");
 
   if ($fd == 0 && $hodn) {                                                                            # Sun Position für aktuellen Tag in pvHistory speichern
-      writeToHistory ( { paref => $paref, key => 'sunaz',  val => $az,  hour => $hodn } );
-      writeToHistory ( { paref => $paref, key => 'sunalt', val => $alt, hour => $hodn } );
+      writeToHistory ( { paref => $paref, key => 'sunaz',  val => $az,  day => $wtday, hour => $hodn } );
+      writeToHistory ( { paref => $paref, key => 'sunalt', val => $alt, day => $wtday, hour => $hodn } );
   }
 
 return;
@@ -12254,8 +12287,8 @@ return ($pvsum, $pvsumraw);
 sub ___readCandQ {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $num   = $paref->{num};
+  my $day   = $paref->{day};
   my $hod   = $paref->{hod};                                     # Stunde des Tages
   my $fd    = $paref->{fd};
   my $wcc   = $paref->{wcc};
@@ -12309,7 +12342,7 @@ sub ___readCandQ {
   $data{$name}{nexthours}{'NextHour'.sprintf("%02d",$num)}{pvcorrf} = $hc."/".$hq;
 
   if ($fd == 0 && $hod) {
-      writeToHistory ( { paref => $paref, key => 'pvcorrfactor', val => $hc.'/'.$hq, hour => $hod } );
+      writeToHistory ( { paref => $paref, key => 'pvcorrfactor', val => $hc.'/'.$hq, day => $day, hour => $hod } );
   }
 
 return ($hc, $hq);
@@ -12413,7 +12446,7 @@ sub _transferProducerValues {
       my ($ethishour, $etotsvd);
 
       if (!$histetot) {                                                                                       # etotal der aktuelle Stunde gesetzt ?
-          writeToHistory ( { paref => $paref, key => 'etotalp'.$pn, val => $etotal, hour => $nhour } );
+          writeToHistory ( { paref => $paref, key => 'etotalp'.$pn, val => $etotal, day => $day, hour => $nhour } );
 
           $etotsvd   = ProducerVal ($hash, $pn, 'petotal', $etotal);
           $ethishour = int ($etotal - $etotsvd);
@@ -12448,7 +12481,7 @@ sub _transferProducerValues {
 
       $data{$name}{circular}{sprintf("%02d",$nhour)}{'pprl'.$pn} = $ethishour;                        # Ringspeicher P real
 
-      writeToHistory ( { paref => $paref, key => 'pprl'.$pn, val => $ethishour, hour => $nhour } );
+      writeToHistory ( { paref => $paref, key => 'pprl'.$pn, val => $ethishour, day => $day, hour => $nhour } );
 
       debugLog ($paref, 'collectData|collectData_long', "collect Producer $pn data - device: $prdev =>");
       debugLog ($paref, 'collectData|collectData_long', "pcurr: $p W, etotal: $etotal Wh");
@@ -12464,12 +12497,11 @@ sub _transferMeterValues {
   my $paref = shift;
   my $name  = $paref->{name};
   my $t     = $paref->{t};
+  my $day   = $paref->{day};
   my $chour = $paref->{chour};
 
   my ($err, $medev, $h) = isDeviceValid ( { name => $name, obj => 'setupMeterDev', method => 'attr' } );
   return if($err);
-
-  my $type = $paref->{type};
 
   my ($gc, $gcunit) = split ":", $h->{gcon};                                                   # Readingname/Unit für aktuellen Netzbezug
   my ($gf, $gfunit) = split ":", $h->{gfeedin};                                                # Readingname/Unit für aktuelle Netzeinspeisung
@@ -12501,6 +12533,7 @@ sub _transferMeterValues {
       writeToHistory ( { paref => $paref,                                                      # Bezugspreis in pvHistory speichern
                          key   => 'conprice',
                          val   => CurrentVal ($name, 'ePurchasePrice', 0),
+                         day   => $day, 
                          hour  => $nhour
                        }
                      );
@@ -12527,6 +12560,7 @@ sub _transferMeterValues {
       writeToHistory ( { paref => $paref,                                                      # Einspeisevergütung in pvHistory speichern
                          key   => 'feedprice',
                          val   => CurrentVal ($name, 'eFeedInTariff', 0),
+                         day   => $day, 
                          hour  => $nhour
                        }
                      );
@@ -12626,7 +12660,7 @@ sub _transferMeterValues {
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_GridConsumption', $gctotthishour.' Wh');
       $data{$name}{circular}{sprintf("%02d",$nhour)}{gcons} = $gctotthishour;                               # Hilfshash Wert Bezug (Wh) Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
-      writeToHistory ( { paref => $paref, key => 'gcons', val => $gctotthishour, hour => $nhour } );
+      writeToHistory ( { paref => $paref, key => 'gcons', val => $gctotthishour, day => $day, hour => $nhour } );
 
       debugLog ($paref, "saveData2Cache|collectData", "write to pvHistory - day: $paref->{day}, hod: $nhour, GridConsumption (gcons): $gctotthishour Wh");
   }
@@ -12665,7 +12699,7 @@ sub _transferMeterValues {
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_GridFeedIn', $gftotthishour.' Wh');
       $data{$name}{circular}{sprintf("%02d",$nhour)}{gfeedin} = $gftotthishour;
 
-      writeToHistory ( { paref => $paref, key => 'gfeedin', val => $gftotthishour, hour => $nhour } );
+      writeToHistory ( { paref => $paref, key => 'gfeedin', val => $gftotthishour, day => $day, hour => $nhour } );
   }
 
 return;
@@ -12810,7 +12844,7 @@ sub _transferBatteryValues {
       my $batinthishour;
 
       if (!defined $histbatintot) {                                                                             # totale Batterieladung der aktuelle Stunde gesetzt?
-          writeToHistory ( { paref => $paref, key => 'batintotal'.$bn, val => $btotin, hour => $nhour } );
+          writeToHistory ( { paref => $paref, key => 'batintotal'.$bn, val => $btotin, day => $day, hour => $nhour } );
           $batinthishour = 0;
       }
       else {
@@ -12833,7 +12867,7 @@ sub _transferBatteryValues {
 
       $data{$name}{circular}{sprintf("%02d",$nhour)}{'batin'.$bn} = $batinthishour;                            # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
-      writeToHistory ( { paref => $paref, key => 'batinthishour'.$bn, val => $batinthishour, hour => $nhour } );
+      writeToHistory ( { paref => $paref, key => 'batinthishour'.$bn, val => $batinthishour, day => $day, hour => $nhour } );
 
       # Batterieentladung aktuelle Stunde in pvHistory speichern
       ############################################################
@@ -12841,7 +12875,7 @@ sub _transferBatteryValues {
       my $batoutthishour;
 
       if (!defined $histbatouttot) {                                                                           # totale Betterieladung der aktuelle Stunde gesetzt?
-          writeToHistory ( { paref => $paref, key => 'batouttotal'.$bn, val => $btotout, hour => $nhour } );
+          writeToHistory ( { paref => $paref, key => 'batouttotal'.$bn, val => $btotout, day => $day, hour => $nhour } );
           $batoutthishour = 0;
       }
       else {
@@ -12864,19 +12898,19 @@ sub _transferBatteryValues {
 
       $data{$name}{circular}{sprintf("%02d",$nhour)}{'batout'.$bn} = $batoutthishour;                          # Ringspeicher Battery In Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
 
-      writeToHistory ( { paref => $paref, key => 'batoutthishour'.$bn, val => $batoutthishour, hour => $nhour } );
+      writeToHistory ( { paref => $paref, key => 'batoutthishour'.$bn, val => $batoutthishour, day => $day, hour => $nhour } );
 
       # täglichen maximalen SOC in pvHistory speichern
       ##################################################
       my $batmaxsoc = HistoryVal ($name, $day, 99, 'batmaxsoc'.$bn, 0);                                        # gespeicherter max. SOC des Tages
 
       if ($soc >= $batmaxsoc) {
-          writeToHistory ( { paref => $paref, key => 'batmaxsoc'.$bn, val => $soc, hour => 99 } );
+          writeToHistory ( { paref => $paref, key => 'batmaxsoc'.$bn, val => $soc, day => $day, hour => 99 } );
       }
 
       # aktuellen SOC in pvHistory speichern
       ########################################
-      writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, hour => $nhour } );
+      writeToHistory ( { paref => $paref, key => 'batsoc'.$bn, val => $soc, day => $day, hour => $nhour } );
 
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatIn_'. $bn, $batinthishour. ' Wh'.$warnin);
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_BatOut_'.$bn, $batoutthishour.' Wh'.$warnout);
@@ -12916,7 +12950,7 @@ sub _transferBatteryValues {
       }
 
       $socwhsum = round0 ($socwhsum);
-      writeToHistory ( { paref => $paref, key => 'socwhsum', val => $socwhsum, hour => $nhour } );
+      writeToHistory ( { paref => $paref, key => 'socwhsum', val => $socwhsum, day => $day, hour => $nhour } );
 
       limitArray ($data{$name}{current}{batsocslidereg}, SLIDENUMMAX);
 
@@ -12937,6 +12971,7 @@ sub _transferEnvironmentValues {
   my $paref  = shift;
   my $name   = $paref->{name};
   my $t      = $paref->{t};
+  my $day    = $paref->{day};
   my $chour  = $paref->{chour};
   my $minute = $paref->{minute};
   
@@ -12985,7 +13020,7 @@ sub _transferEnvironmentValues {
   # Werte speichern
   if (defined $presence_weighted) {
       $data{$name}{circular}{$hod}{presence} = $presence_weighted;
-      writeToHistory ( { paref => $paref, key => 'presence', val => $presence_weighted, hour => $hod } );
+      writeToHistory ( { paref => $paref, key => 'presence', val => $presence_weighted, day => $day, hour => $hod } );
   }
 
 return;
@@ -13020,7 +13055,7 @@ sub _transferHolidayValues {
       $data{$name}{nexthours}{$nhtstr}{holiday} = $holiday;
 
       if ($fd == 0) {
-          writeToHistory ( { paref => $paref, key => 'holiday', val => $holiday, hour => '99' } );
+          writeToHistory ( { paref => $paref, key => 'holiday', val => $holiday, day => $wtday, hour => '99' } );
       }
   }
   
@@ -13033,6 +13068,7 @@ return;
 sub _batSocTarget {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $day   = $paref->{day};
   my $t     = $paref->{t};                                                                        # aktuelle Zeit
   my $debug = $paref->{debug};
 
@@ -13072,7 +13108,7 @@ sub _batSocTarget {
 
           ## pvHistory/Readings schreiben
           #################################
-          writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, hour => 99 } );
+          writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, day => $day, hour => 99 } );
           storeReading   ('Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
           storeReading   ('Battery_ChargeRequest_'.$bn, 0);
 
@@ -13231,7 +13267,7 @@ sub _batSocTarget {
 
       ## pvHistory/Readings schreiben
       #################################
-      writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $target, hour => 99 } );
+      writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $target, day => $day, hour => 99 } );
       storeReading   ('Battery_OptimumTargetSoC_'.$bn, $target.' %');
       storeReading   ('Battery_ChargeRequest_'.$bn,      $chargereq);
   }
@@ -13355,6 +13391,7 @@ return sprintf "%.2f", $sf;
 sub _batChargeMgmt {
   my $paref  = shift;
   my $name   = $paref->{name};
+  my $day    = $paref->{day};
   my $chour  = $paref->{chour};
   my $minute = $paref->{minute};                                                                 # aktuelle Minute (00-59)
   my $t      = $paref->{t};
@@ -13763,7 +13800,7 @@ sub _batChargeMgmt {
           my $hod   = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', '');
 
           if ($today && $hod) {                                                                                  # heutiger Tag
-              writeToHistory ( { paref => $paref, key => 'socprogwhsum', val => $hsoc->{$nhr}{socprogwhsum}, hour => $hod } );
+              writeToHistory ( { paref => $paref, key => 'socprogwhsum', val => $hsoc->{$nhr}{socprogwhsum}, day => $day, hour => $hod } );
           }
       }
   }
@@ -14306,6 +14343,7 @@ sub ___batChargeSaveResults {
   my $values = shift;
 
   my $name       = $paref->{name};
+  my $day        = $paref->{day};
   my $hsoc       = $values->{hsoc};                                          # Referenz SoC-Hash
   my $otp        = $values->{otp};                                           # Referenz OTP-Hash
   my $bn         = $values->{bn};                                            # Batterie Nummer
@@ -14335,8 +14373,8 @@ sub ___batChargeSaveResults {
       }
 
       if ($today && $hod) {
-          writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, hour => $hod } ) if($cgbt);
-          writeToHistory ( { paref => $paref, key => 'strategybat'.$bn, val => $strategy, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'lcintimebat'.$bn, val => $lcintime, day => $day, hour => $hod } ) if($cgbt);
+          writeToHistory ( { paref => $paref, key => 'strategybat'.$bn, val => $strategy, day => $day, hour => $hod } );
       }
   }
 
@@ -14363,7 +14401,7 @@ sub ___batChargeSaveResults {
       $data{$name}{nexthours}{'NextHour'.$nhr}{'rcdchargebat'.$bn} = $crel;
 
       if ($today && $hod) {
-          writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'batprogsoc'.$bn,  val => $progsoc,  day => $day, hour => $hod } );
       }
 
       __createNextHoursSFCReadings ( {name    => $name,
@@ -14759,7 +14797,9 @@ sub _manageConsumerData {
 
   my $hash        = $defs{$name};
   my $nhour       = $chour + 1;
+  
   $paref->{nhour} = sprintf "%02d", $nhour;
+  $paref->{nday}  = sprintf "%02d", $day;
 
   my $pcurrsum = 0;
 
@@ -14823,7 +14863,7 @@ sub _manageConsumerData {
               my $consumerco  = $etot - $ehist;
               $consumerco    += HistoryVal ($name, $day, sprintf("%02d",$nhour), "csme${c}", 0);
 
-              if ($consumerco < 0) {                                                              # V1.32.0
+              if ($consumerco < 0) {                                                              
                   $consumerco = 0;
                   my $vl      = 3;
                   my $pre     = '- WARNING -';
@@ -14836,21 +14876,21 @@ sub _manageConsumerData {
                   Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$consumer< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
               }
 
-              $paref->{val}      = sprintf "%.2f", $consumerco;                                  # Verbrauch des Consumers aktuelle Stunde
-              $paref->{histname} = "csme${c}";
+              $paref->{val}  = sprintf "%.2f", $consumerco;                                     # Verbrauch des Consumers aktuelle Stunde
+              $paref->{hkey} = "csme${c}";
 
               setPVhistory ($paref);
 
-              delete $paref->{histname};
+              delete $paref->{hkey};
               delete $paref->{val};
           }
 
-          $paref->{val}      = $etot;                                                             # Totalverbrauch des Verbrauchers
-          $paref->{histname} = "csmt${c}";
+          $paref->{val}  = $etot;                                                               # Totalverbrauch des Verbrauchers
+          $paref->{hkey} = "csmt${c}";
 
           setPVhistory ($paref);
 
-          delete $paref->{histname};
+          delete $paref->{hkey};
           delete $paref->{val};
       }
 
@@ -14928,6 +14968,7 @@ sub _manageConsumerData {
   $data{$name}{current}{dummyConsumption} = CurrentVal ($name, 'consumption', 0) - $pcurrsum;                     # aktueller Verbrauch - Summe aller ConsumerPower
 
   delete $paref->{consumer};
+  delete $paref->{nday};
   delete $paref->{nhour};
 
 return;
@@ -16275,7 +16316,6 @@ return $state;
 sub __getCyclesAndRuntime {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $t     = $paref->{t};
   my $chour = $paref->{chour};
   my $day   = $paref->{day};                                               # aktueller Tag  (range 01 to 31)
@@ -16353,15 +16393,17 @@ sub __getCyclesAndRuntime {
 
   ## History schreiben
   ######################
-  $paref->{val}      = ConsumerVal ($name, $c, "cycleDayNum", 0);                         # Anzahl Tageszyklen des Verbrauchers speichern
-  $paref->{histname} = "cyclescsm${c}";
+  $paref->{val}  = ConsumerVal ($name, $c, "cycleDayNum", 0);                           # Anzahl Tageszyklen des Verbrauchers speichern
+  $paref->{hkey} = "cyclescsm${c}";
+  
   setPVhistory ($paref);
 
-  $paref->{val}      = ceil ConsumerVal ($name, $c, "minutesOn", 0);                      # Verbrauchsminuten akt. Stunde des Consumers speichern
-  $paref->{histname} = "minutescsm${c}";
+  $paref->{val}  = ceil ConsumerVal ($name, $c, "minutesOn", 0);                        # Verbrauchsminuten akt. Stunde des Consumers speichern
+  $paref->{hkey} = "minutescsm${c}";
+  
   setPVhistory ($paref);
 
-  delete $paref->{histname};
+  delete $paref->{hkey};
   delete $paref->{val};
 
 return;
@@ -16591,8 +16633,6 @@ sub _calcConsForecast_legacy {
       my $hod     = NexthoursVal ($name, $nh, 'hourofday', undef);                                                      # Stunde des Tages vom NextHours Key (01,02,...24) 
       
       my $num = int ((split 'NextHour', $nh)[1]);
-      #next if($num == 0);                                                                                               # V 2.1.0 ->comment aktuelle Stunde 00 nicht berücksichtigen -> Problem Stunde 00 bei Tageswechsel erhält kein Ergebnis und dadurch kein AI
-      #last if($num > 24);                                                                                               # V 2.1.0 ->comment
       
       my ($msg1, $msg2, $msg3, $msg4) = ('', '', '', '');
      
@@ -16638,8 +16678,8 @@ sub _calcConsForecast_legacy {
       if ($isToday) {                                                                                                   # nur Werte des aktuellen Tags speichern
           $data{$name}{circular}{$hod}{confc} = $usage->{nxt}{$hod}{con};
           
-          writeToHistory ( { paref => $paref, key => 'confc',    val => $con, hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'conlegfc', val => $con, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'confc',    val => $con, day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'conlegfc', val => $con, day => $day, hour => $hod } );
 
           $msg4 = " ,STORE pvCircular/pvHistory -> confc=$con Wh";
       }  
@@ -16647,7 +16687,7 @@ sub _calcConsForecast_legacy {
       debugLog ($paref, 'saveData2Cache|consumption_long', "num=$num, isToday=$isToday, hod=$hod, $msg3".$msg4);
   }
   
-  debugLog ($paref, 'saveData2Cache|consumption_long', "################### ENDE Consumption forecast ###################");  
+  debugLog ($paref, 'consumption_long', "################### ENDE Consumption forecast ###################");  
 
 return;
 }
@@ -17481,7 +17521,7 @@ sub _saveEnergyConsumption {
   }
 
   if ($dowrite) {
-      writeToHistory ( { paref => $paref, key => 'con', val => $con, hour => $hod } );
+      writeToHistory ( { paref => $paref, key => 'con', val => $con, day => $day, hour => $hod } );
       $data{$name}{circular}{99}{todayConsumption} = HistoryVal ($name, $day, '99', 'con', undef);
 
       debugLog ($paref, 'consumption', "consumption since begin hour - day: $day, hod: $hod, con: $con Wh");
@@ -25404,8 +25444,8 @@ sub aiFannGetConResult {
           
       if (NexthoursVal ($name, $nhstr, 'today', 0)) {                                        # nur Werte des aktuellen Tags speichern
           $data{$name}{circular}{$hod}{confc} = $confc_final;
-          writeToHistory ( { paref => $paref, key => 'conaifc', val => $prediction,  hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'confc',   val => $confc_final, hour => $hod } );    
+          writeToHistory ( { paref => $paref, key => 'conaifc', val => $prediction,  day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'confc',   val => $confc_final, day => $day, hour => $hod } );    
                     
           debugLog ($paref, 'saveData2Cache|consumption_long', "store AI legacy alpha value to circular/history -> hod=$hod confc=$confc_final Wh");
       }
@@ -26427,12 +26467,14 @@ sub writeToHistory {
   my $paref = $ph->{paref};
   my $key   = $ph->{key};
   my $val   = $ph->{val};
-  my $hour  = $ph->{hour};
+  my $nday  = $ph->{day};
+  my $nhour = $ph->{hour};
   my $valid = $ph->{valid};
 
-  $paref->{val}      = $val;
-  $paref->{nhour}    = sprintf "%02d", $hour;
-  $paref->{histname} = $key;
+  $paref->{val}   = $val;
+  $paref->{nday}  = sprintf "%02d", $nday;
+  $paref->{nhour} = sprintf "%02d", $nhour;
+  $paref->{hkey}  = $key;
 
   if (defined $hfspvh{$key}{validkey}) {
       $paref->{$hfspvh{$key}{validkey}} = $valid;
@@ -26440,7 +26482,8 @@ sub writeToHistory {
 
   setPVhistory ($paref);
 
-  delete $paref->{histname};
+  delete $paref->{hkey};
+  delete $paref->{nday};
   delete $paref->{nhour};
   delete $paref->{val};
   delete $paref->{$hfspvh{$key}{validkey}} if(defined $hfspvh{$key}{validkey});
@@ -26453,76 +26496,71 @@ return;
 ################################################################
 sub setPVhistory {
   my $paref     = shift;
-  my $name      = $paref->{name};
-  my $day       = $paref->{day};
-  my $dayname   = $paref->{dayname};                                       # aktueller Wochentagsname
-  my $nhour     = $paref->{nhour};                                         # Stunde des Tages
-  my $histname  = $paref->{histname};
-  my $val       = $paref->{val};                                           # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
-  my $reorg     = $paref->{reorg}     // 0;                                # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
-  my $reorgday  = $paref->{reorgday}  // q{};                              # Tag der reorganisiert werden soll
+  my $name      = $paref->{name};                                            
+  my $nhour     = $paref->{nhour};                                          # Stunde des Tages
+  my $nday      = $paref->{nday};                                           # zu schreibenden Tag spezifizieren
+  my $hkey      = $paref->{hkey};
+  my $val       = $paref->{val};                                            # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
+  my $reorg     = $paref->{reorg}    // 0;                                  # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
+  my $reorgday  = $paref->{reorgday} // q{};                                # Tag der reorganisiert werden soll
 
-  my $hash = $defs{$name};
-
-  $data{$name}{pvhist}{$day}{99}{dayname} = $dayname if($day);
-
-  if ($hfspvh{$histname} && defined &{$hfspvh{$histname}{fn}}) {
-      &{$hfspvh{$histname}{fn}} ($paref);
+  if ($hfspvh{$hkey} && defined &{$hfspvh{$hkey}{fn}}) {
+      &{$hfspvh{$hkey}{fn}} ($paref);
       return;
   }
 
-  if ($histname =~ /csm[et][0-9]+$/xs) {                                                         # Verbrauch eines Verbrauchers
-      $data{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
+  if ($hkey =~ /csm[et][0-9]+$/xs) {                                                                # Verbrauch eines Verbrauchers
+      $data{$name}{pvhist}{$nday}{$nhour}{$hkey} = $val;
 
-      if ($histname =~ /csme[0-9]+$/xs) {
+      if ($hkey =~ /csme[0-9]+$/xs) {
           my $sum = 0;
 
-          for my $k (keys %{$data{$name}{pvhist}{$day}}) {
+          for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
               next if($k eq "99");
-              my $csme = HistoryVal ($name, $day, $k, "$histname", 0);
+              my $csme = HistoryVal ($name, $nday, $k, $hkey, 0);
               next if(!$csme);
 
               $sum += $csme;
           }
 
-          $data{$name}{pvhist}{$day}{99}{$histname} = sprintf "%.2f", $sum;
+          $data{$name}{pvhist}{$nday}{99}{$hkey} = sprintf "%.2f", $sum;
       }
   }
 
-  if ($histname =~ /minutescsm[0-9]+$/xs) {                                                     # Anzahl Aktivminuten des Verbrauchers
-      $data{$name}{pvhist}{$day}{$nhour}{$histname} = $val;
+  if ($hkey =~ /minutescsm[0-9]+$/xs) {                                                             # Anzahl Aktivminuten des Verbrauchers
+      $data{$name}{pvhist}{$nday}{$nhour}{$hkey} = $val;
       my $minutes = 0;
-      my $num     = substr ($histname,10,2);
+      my $num     = substr ($hkey,10,2);
 
-      for my $k (keys %{$data{$name}{pvhist}{$day}}) {
+      for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
           next if($k eq "99");
-          my $csmm = HistoryVal ($name, $day, $k, "$histname", 0);
+          my $csmm = HistoryVal ($name, $nday, $k, "$hkey", 0);
           next if(!$csmm);
 
           $minutes += $csmm;
       }
 
-      my $cycles = HistoryVal ($name, $day, 99, "cyclescsm${num}", 0);
+      my $cycles = HistoryVal ($name, $nday, 99, "cyclescsm${num}", 0);
 
       if ($cycles) {
-          $data{$name}{pvhist}{$day}{99}{"hourscsme${num}"}     = sprintf "%.2f", ($minutes / 60 );
-          $data{$name}{pvhist}{$day}{99}{"avgcycmntscsm${num}"} = sprintf "%.2f", ($minutes / $cycles);
+          $data{$name}{pvhist}{$nday}{99}{"hourscsme${num}"}     = sprintf "%.2f", ($minutes / 60 );
+          $data{$name}{pvhist}{$nday}{99}{"avgcycmntscsm${num}"} = sprintf "%.2f", ($minutes / $cycles);
       }
   }
 
-  if ($histname =~ /cyclescsm[0-9]+$/xs) {                                                        # Anzahl Tageszyklen des Verbrauchers
-      $data{$name}{pvhist}{$day}{99}{$histname} = $val;
+  if ($hkey =~ /cyclescsm[0-9]+$/xs) {                                                              # Anzahl Tageszyklen des Verbrauchers
+      $data{$name}{pvhist}{$nday}{99}{$hkey} = $val;
   }
   
-  if ($reorg) {                                                                                   # Reorganisation Stunde "99"
+  if ($reorg) {                                                                                     # Reorganisation Stunde "99"
       if (!$reorgday) {
          Log3 ($name, 1, "$name - ERROR reorg pvHistory - the day of reorganization is invalid or empty: >$reorgday<");
          return;
       }
 
       my ($r3, $r4, $r5, $r6, $r7, $r8) = (0,0,0,0,0,0);
-      my $ien = {};                                                                               # Hashref Inverter energy
-      my $pen = {};                                                                               # Hashref Producer energy
+      my $ien = {};                                                                                 # Hashref Inverter energy
+      my $pen = {};                                                                                 # Hashref Producer energy
       my $bin = {};
       my $bot = {};
 
@@ -26586,8 +26624,8 @@ sub setPVhistory {
       debugLog ($paref, 'saveData2Cache', "setPVhistory -> Day >$reorgday< reorganized keys: batinXX, batoutXX, pvrl, pvfc, con, confc, gcons, gfeedin, pvrlXX, pprlXX");
   }
 
-  if ($histname) {
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> store Day: $day, Hour of Day: $nhour, Key: $histname, Value: ".(defined $val ? $val : 'undef'));
+  if ($hkey) {
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> store Day: $nday, Hour of Day: $nhour, Key: $hkey, Value: ".(defined $val ? $val : 'undef'));
   }
 
 return;
@@ -26597,39 +26635,42 @@ return;
 # Wert mit optional weiteren Berechnungen in pvHistory speichen
 ################################################################
 sub _storeVal {                    ## no critic "not used"
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $type     = $paref->{type};
-  my $day      = $paref->{day};
-  my $nhour    = $paref->{nhour};
-  my $histname = $paref->{histname};
-  my $val      = $paref->{val};
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $day   = $paref->{day};
+  my $nhour = $paref->{nhour};
+  my $nday  = $paref->{nday};                                               # zu schreibenden Tag spezifizieren
+  my $hkey  = $paref->{hkey};
+  my $val   = $paref->{val};
 
   my $hash  = $defs{$name};
-  my $store = $hfspvh{$histname}{storname};
+  my $store = $hfspvh{$hkey}{storname};
+  
   my ($validkey, $validval);
 
-  $data{$name}{pvhist}{$day}{$nhour}{$store} = $val;
+  $data{$name}{pvhist}{$nday}{$nhour}{$store} = $val;
 
-  if (defined $hfspvh{$histname}{validkey}) {                            # 1: bestimmter Eintrag wird intern für Prozesse (z.B. Lernprozess) berücksichtigt oder nicht (0)
-      $validkey = $hfspvh{$histname}{validkey};
+  if (defined $hfspvh{$hkey}{validkey}) {                                   # 1: bestimmter Eintrag wird intern für Prozesse (z.B. Lernprozess) berücksichtigt oder nicht (0)
+      $validkey = $hfspvh{$hkey}{validkey};
       $validval = $paref->{$validkey};
-      $data{$name}{pvhist}{$day}{$nhour}{$validkey} = $validval;
+      
+      $data{$name}{pvhist}{$nday}{$nhour}{$validkey} = $validval;
   }
 
-  debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored simple  - Day: $day, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
+  debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored simple  - Day: $nday, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
                                       (defined $validkey ? ", ValidKey: $validkey, ValidValue: $validval" : '') );
 
-  if (defined $hfspvh{$histname}{fpar} && $hfspvh{$histname}{fpar} eq 'comp99') {
+  if (defined $hfspvh{$hkey}{fpar} && $hfspvh{$hkey}{fpar} eq 'comp99') {
       my $sum = 0;
-      for my $k (keys %{$data{$name}{pvhist}{$day}}) {
+      
+      for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
           next if($k eq '99');
-          $sum += HistoryVal ($name, $day, $k, $store, 0);
+          $sum += HistoryVal ($name, $nday, $k, $store, 0);
       }
 
-       $data{$name}{pvhist}{$day}{99}{$store} = $sum;
-
-       debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored compute - Day: $day, Hour: 99, Key: $store, Value: $sum");
+      $data{$name}{pvhist}{$nday}{99}{$store} = $sum;
+      
+      debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored compute - Day: $nday, Hour: 99, Key: $store, Value: $sum");
   }
 
 return;
