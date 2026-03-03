@@ -4660,7 +4660,7 @@ sub __getDWDSolarData {
               $pv = $rad * $af * KJ2KWH * $peak * PRDEF;                                            # Rad wird in kW/m2 erwartet
           }
 
-          $af = sprintf "%.2f", $af;
+          $af = round2 ($af);
           $pv = round1 ($pv);
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                        # Startzeit wird verwendet, nicht laufende Stunde
@@ -5144,7 +5144,7 @@ sub __VictronVRM_ApiResponseForecast {
               debugLog ($paref, "apiProcess", "Victron VRM API - CO estimate: ".$starttmstr.' => '.$val.' Wh');
 
               if ($val) {
-                  $val       = sprintf "%.2f", $val;
+                  $val       = round2  ($val);
                   my $string = AttrVal ($name, 'setupInverterStrings', '?');
 
                   $data{$name}{solcastapi}{$string.'_co'}{$starttmstr}{co_estimate} = $val;
@@ -5610,7 +5610,7 @@ sub __openMeteoDWD_ApiResponse {
                   }
 
                   if (defined $gtiwh) {                                                                 # Global Tilted Radiation - zur PV Berechnung jedes Strings
-                      my $pv = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);                     # GTI wird in kWh/m2 genutzt
+                      my $pv = round2 (int ($gtiwh / 1000 * $peak * PRDEF));                            # GTI wird in kWh/m2 genutzt
 
                       $data{$name}{solcastapi}{$string}{$pvtmstr}{pv_estimate50} = $pv;                 # Startstunde verschieben
                       $data{$name}{solcastapi}{$string}{$pvtmstr}{GTIWh}         = $gtiwh;              # Startstunde verschieben, GTI wird für jeden String separat geliefert
@@ -5750,7 +5750,7 @@ sub __openMeteoDWD_ApiResponse {
           if ($haggr) {
               for my $tmstr (sort keys %{$haggr->{hourly}}) {
                   my $gtiwh = $haggr->{hourly}{$tmstr}{$paref->{indicator}};
-                  my $pv    = sprintf "%.2f", int ($gtiwh / 1000 * $peak * PRDEF);
+                  my $pv    = round2 (int ($gtiwh / 1000 * $peak * PRDEF));
 
                   #$data{$name}{solcastapi}{$string}{$tmstr}{GTIWh}         = $gtiwh;
                   #$data{$name}{solcastapi}{$string}{$tmstr}{pv_estimate50} = $pv;
@@ -6547,8 +6547,8 @@ sub __dwdStatCatalog_Response {
 
           my ($latg, $latm) = split /\./, $lat;                                              # in Grad und Minuten splitten
           my ($long, $lonm) = split /\./, $lon;
-          my $latdec        = sprintf "%.2f", ($latg + ($latm / 60));
-          my $londec        = sprintf "%.2f", ($long + ($lonm / 60));
+          my $latdec        = round2 ($latg + ($latm / 60));
+          my $londec        = round2 ($long + ($lonm / 60));
 
           $data{$name}{dwdcatalog}{$id}{id}     = $id;
           $data{$name}{dwdcatalog}{$id}{stnam}  = $stnam;
@@ -11593,10 +11593,10 @@ sub __mergeDataWeather {
 
       next if(!$z);
 
-      $data{$name}{weatherdata}{$key}{merge}{neff}      = round0          ($neff / $z);
-      $data{$name}{weatherdata}{$key}{merge}{rr1c}      = sprintf "%.2f", ($rr1c / $z);
-      $data{$name}{weatherdata}{$key}{merge}{ttt}       = sprintf "%.2f", ($temp / $z);
-      $data{$name}{weatherdata}{$key}{merge}{windspeed} = sprintf "%.2f", ($windspeed / $z);
+      $data{$name}{weatherdata}{$key}{merge}{neff}      = round0 ($neff / $z);
+      $data{$name}{weatherdata}{$key}{merge}{rr1c}      = round2 ($rr1c / $z);
+      $data{$name}{weatherdata}{$key}{merge}{ttt}       = round2 ($temp / $z);
+      $data{$name}{weatherdata}{$key}{merge}{windspeed} = round2 ($windspeed / $z);
       
       debugLog ($paref, 'collectData_long', "Weather merged: $key, ".
                                        "don: $data{$name}{weatherdata}{$key}{merge}{don}, ".
@@ -12326,10 +12326,10 @@ sub ___readCandQ {
   }
 
   $hq //= '-';                                                                                        # keine Qualität definiert
-  $hq   = sprintf "%.2f", $hq if(isNumeric ($hq));
+  $hq   = round2 ($hq) if(isNumeric ($hq));
   $hc //= $hcraw;                                                                                     # Korrekturfaktor Voreinstellung
   $hc   = 1 if(1 * $hc == 0);                                                                         # 0.0-Werte ignorieren (Schleifengefahr)
-  $hc   = sprintf "%.2f", $hc;
+  $hc   = round2 ($hc);
 
   if ($cpcf =~ /manual\sfix/xs) {                                                                     # Voreinstellung pcf-Reading verwenden wenn 'manual fix'
       $hc = $hcraw;
@@ -12376,7 +12376,7 @@ sub ___calcPeaklossByTemp {
   my $temp  = $paref->{temp} // return (0,0);                                               # vorhergesagte Temperatur Stunde X
 
   my $modtemp  = $temp + (TEMPMODINC * (1 - ($wcc/100)));                                   # kalkulierte Modultemperatur
-  my $peakloss = sprintf "%.2f", TEMPCOEFFDEF * ($modtemp - TEMPBASEDEF) * $peak / 100;
+  my $peakloss = round2 (TEMPCOEFFDEF * ($modtemp - TEMPBASEDEF) * $peak / 100);
 
 return ($peakloss, $modtemp);
 }
@@ -12945,7 +12945,7 @@ sub _transferBatteryValues {
 
   if ($num) {
       if ($bcapsum) {
-          my $soctotal = sprintf "%.2f", ($socwhsum / $bcapsum * 100);                     # resultierender SoC (%) aller Batterien als "eine"
+          my $soctotal = round2 ($socwhsum / $bcapsum * 100);                              # resultierender SoC (%) aller Batterien als "eine"
           $data{$name}{current}{batsoctotal} = $soctotal;
           push @{$data{$name}{current}{batsocslidereg}}, $soctotal;                        # Schieberegister average SOC aller Batterien
       }
@@ -13351,7 +13351,7 @@ sub __batDeficitShareFactor {
   my $sf = 0;
   $sf    = (100 * $bdeficit / $batwhdeficitsum) / 100 if($batwhdeficitsum);                   # Anteilsfaktor Defizit Batt XX an Gesamtdefizit
 
-return sprintf "%.2f", $sf;
+return round2 ($sf);
 }
 
 ################################################################
@@ -13368,7 +13368,7 @@ sub __batLoadShareFactor {
 
   my $sf = (100 * $csocwh / $loadsum) / 100;                                                  # Anteilsfaktor Ladung Batt XX an Gesamtladung
 
-return sprintf "%.2f", $sf;
+return round2 ($sf);
 }
 
 ################################################################
@@ -13383,7 +13383,7 @@ sub __batCapShareFactor {
 
   my $sf = (100 * $binstcap / $batcapsum) / 100;                             # Anteilsfaktor der Batt XX Kapazität an Gesamtkapazität
 
-return sprintf "%.2f", $sf;
+return round2 ($sf);
 }
 
 ################################################################
@@ -13408,7 +13408,7 @@ sub _batChargeMgmt {
   my $inplim    = 0;
 
   my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs', $t);                                       # Timestamp Sonneuntergang am aktuellen Tag
-  my $hs2sunset = sprintf "%.2f", (($tdaysset - $t) / 3600);                                     # Rest-Stunden bis Sonnenuntergang
+  my $hs2sunset = round2 (($tdaysset - $t) / 3600);                                              # Rest-Stunden bis Sonnenuntergang
 
   my $hsurp  = {};                                                                               # Hashreferenz Überschuß
   my $hsoc   = {};                                                                               # Hashreferenz Prognose-SOC über alle Batterien
@@ -13942,7 +13942,7 @@ sub __batChargeOptTargetPower {
 
           if ($nhr eq '00') {
               storeReading ('Battery_TargetAchievable_'.$sbn, $achievable);
-              $ratio = sprintf "%.2f", ___batRatio ($runwhneed, $remainingSurp, $befficiency);
+              $ratio = round2 (___batRatio ($runwhneed, $remainingSurp, $befficiency));
               
               $data{$name}{current}{'batRatio'.$sbn} = $ratio;
               $otp->{$sbn}{ratio}                    = $ratio;
@@ -14877,7 +14877,7 @@ sub _manageConsumerData {
                   Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$consumer< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
               }
 
-              $paref->{val}  = sprintf "%.2f", $consumerco;                                     # Verbrauch des Consumers aktuelle Stunde
+              $paref->{val}  = round2 ($consumerco);                                            # Verbrauch des Consumers aktuelle Stunde
               $paref->{hkey} = "csme${c}";
 
               setPVhistory ($paref);
@@ -14937,13 +14937,13 @@ sub _manageConsumerData {
 
       if ($dnum) {
           if ($consumerco && $runhours) {
-              $data{$name}{consumers}{$c}{avgenergy} = sprintf "%.2f", ($consumerco / $runhours);              # Durchschnittsverbrauch pro Stunde in Wh
+              $data{$name}{consumers}{$c}{avgenergy} = round2 ($consumerco / $runhours);                        # Durchschnittsverbrauch pro Stunde in Wh
           }
           else {
               delete $data{$name}{consumers}{$c}{avgenergy};
           }
 
-          $data{$name}{consumers}{$c}{runtimeAvgDay} = sprintf "%.2f", (($runhours / $dnum) * 60);             # Durchschnittslaufzeit am Tag in Minuten
+          $data{$name}{consumers}{$c}{runtimeAvgDay} = round2 ($runhours / $dnum * 60);                         # Durchschnittslaufzeit am Tag in Minuten
       }
 
       ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln
@@ -15078,7 +15078,7 @@ sub __calcEnergyPieces {
       $he = $epiecem    if($h >  1 && $h < $hours);                                            # kalk. Energieverbrauch Folgestunde(n)
       $he = $epiecel    if($h == $hours          );                                            # kalk. Energieverbrauch letzte Stunde
 
-      $data{$name}{consumers}{$c}{epieces}{${h}} = sprintf ('%.2f', $he);
+      $data{$name}{consumers}{$c}{epieces}{${h}} = round2 ($he);
   }
 
 return;
@@ -15160,14 +15160,14 @@ sub ___csmSpecificEpieces {
       if ($curr_epiecHour != $hourSinceSwitch) {                                                                         # Betriebsstundenwechsel ? Differenz von etot noch auf die vorherige Betriebsstunde anrechnen
           my $epiecHour_last = $hourSinceSwitch - 1;
 
-          $data{$name}{consumers}{$c}{$ecycle}{$epiecHour_last} = sprintf '%.2f', ($etot - ConsumerVal ($name, $c, 'epiecStartEtotal', 0)) if($hourSinceSwitch > 1);
+          $data{$name}{consumers}{$c}{$ecycle}{$epiecHour_last} = round2 ($etot - ConsumerVal ($name, $c, 'epiecStartEtotal', 0)) if($hourSinceSwitch > 1);
           $data{$name}{consumers}{$c}{epiecStartEtotal}         = $etot;
 
           debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Operating hours change - new etotal (epiecStartEtotal): $etot});
       }
 
       my $ediff                                              = $etot - ConsumerVal ($name, $c, "epiecStartEtotal", 0);
-      $ediff                                                 = sprintf ('%.2f', $ediff);
+      $ediff                                                 = round2 ($ediff);
       $data{$name}{consumers}{$c}{$ecycle}{$hourSinceSwitch} = $ediff;
       $data{$name}{consumers}{$c}{epiecHour}                 = $hourSinceSwitch;
       $data{$name}{consumers}{$c}{$epiecHist_hours}          = $ediff > 0.0 ? $hourSinceSwitch : $hourSinceSwitch - 1;   # Stunde akzeptieren wenn mehr als 1 Wh verbraucht
@@ -15205,7 +15205,7 @@ sub ___csmSpecificEpieces {
               }
 
               my $ahval;
-              $ahval = sprintf '%.2f', ($hsum / $hoursE) if($hoursE > 0);                                                # Durchschnitt ermittelt und speichern
+              $ahval = round2 ($hsum / $hoursE) if($hoursE > 0);                                                       # Durchschnitt ermittelt und speichern
               
               $data{$name}{consumers}{$c}{epiecAVG}{$hour} = $ahval;
 
@@ -15577,7 +15577,7 @@ sub ___saveEhodpieces {
                : 0;
 
       $chod                                          = sprintf '%02d', $chod;
-      $data{$name}{consumers}{$c}{ehodpieces}{$chod} = sprintf '%.2f', $ep if($ep);
+      $data{$name}{consumers}{$c}{ehodpieces}{$chod} = round2 ($ep) if($ep);
 
       $p++;
   }
@@ -16336,14 +16336,14 @@ sub __getCyclesAndRuntime {
             $data{$name}{consumers}{$c}{cycleDayNum}++;                                                                                  # Anzahl der On-Schaltungen am Tag
         }
         else {
-            $data{$name}{consumers}{$c}{cycleTime} = sprintf "%.2f", ($t - ConsumerVal ($name, $c, 'cycleStarttime', $t)) / 60;                        # Minuten
+            $data{$name}{consumers}{$c}{cycleTime} = round2 ( ($t - ConsumerVal ($name, $c, 'cycleStarttime', $t)) / 60 );                        # Minuten
         }
 
         $starthour = strftime "%H", localtime(ConsumerVal ($name, $c, 'startTime', $t));
         $startday  = strftime "%d", localtime(ConsumerVal ($name, $c, 'startTime', $t));                                                 # aktueller Tag  (range 01 to 31)
 
         if ($chour eq $starthour) {
-            my $runtime                            = sprintf "%.2f", ($t - ConsumerVal ($name, $c, 'startTime', $t)) / 60;                             # in Minuten ! (gettimeofday sind ms !)
+            my $runtime                            = round2 ( ($t - ConsumerVal ($name, $c, 'startTime', $t)) / 60 );                             # in Minuten ! (gettimeofday sind ms !)
             $data{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($name, $c, 'lastMinutesOn', 0) + $runtime;
         }
         else {                                                                                                                           # Stundenwechsel
@@ -16854,7 +16854,7 @@ sub __exincl_from_pvHistory {
                           my $cegy = HistoryVal ($name, $dhist, $hod, "csme${c}", undef);
 
                           if (defined $cegy) {                                                              # historische Con und Anzahl für späteres Exclude zusammenfassen
-                              $cegy                        = sprintf "%.2f", $cegy;
+                              $cegy                         = round2 ($cegy);
                               $usage->{nxt}{$hod}{histcon} += $cegy;
                               $usage->{nxt}{$hod}{histnum}++;
                           
@@ -17039,12 +17039,12 @@ sub _calcTodayDeviation {
           my $sstime = timestringToTimestamp ($date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
 
           if ($t >= $sstime) {
-              $dpv        = sprintf "%.2f", (($pvfc - $pvre) / $pvfc * 100);                # V 2.0.0
+              $dpv        = round2 (($pvfc - $pvre) / $pvfc * 100);                         # V 2.0.0
               $dosave_dpv = 1;
           }
       }
       else {
-          $dpv        = sprintf "%.2f", (($pvfc - $pvre) / $pvfc * 100);                    # V 2.0.0
+          $dpv        = round2 (($pvfc - $pvre) / $pvfc * 100);                             # V 2.0.0
           $dosave_dpv = 1;
       }
 
@@ -17062,8 +17062,8 @@ sub _calcTodayDeviation {
   my $conre = ReadingsNum ($name, 'Today_CONreal', 0);
   
   if ($conre && $confc) {
-      $dcon  = sprintf "%.2f", (($confc - $conre) / $confc * 100);                         # V 2.0.0
-      $dcon *= -1 if($perspective eq 'reverse');                                           # Perspektivänderung
+      $dcon  = round2 (($confc - $conre) / $confc * 100);                                   # V 2.0.0
+      $dcon *= -1 if($perspective eq 'reverse');                                            # Perspektivänderung
       
       $data{$name}{circular}{99}{tdayConDvtn} = $dcon;
       
@@ -17101,7 +17101,7 @@ sub _calcDataEveryFullHour {
       }
 
       if ($t - $idts < 7200) {
-          my $rmh = sprintf "%.2f", ((7200 - ($t - $idts)) / 3600);
+          my $rmh = round2 ((7200 - ($t - $idts)) / 3600);
           readingsSingleUpdate ($hash, 'pvCorrectionFactor_Auto', "standby (remains in standby for $rmh hours)", 0);
 
           Log3 ($name, 4, "$name - Correction usage is in standby. It starts in $rmh hours.");
@@ -17384,16 +17384,16 @@ sub __calcNewFactor_migrated {
           $pvfcsum = $pvfcraw + $fccirc;
           $pvrl    = $pvrlsum / $dnum;
           $pvfcraw = $pvfcsum / $dnum;
-          $factor  = sprintf "%.2f", ($pvrl / $pvfcraw);                                                  # Faktorberechnung: reale PV / Prognose
+          $factor  = round2 ($pvrl / $pvfcraw);                                                           # Faktorberechnung: reale PV / Prognose
       }
       elsif ($oldfac && (!$pvcirc || !$fccirc)) {                                                         # Circular Hash liefert einen vorhandenen Korrekturfaktor aber keine gespeicherten PV-Werte
           $dnum   = 1;
-          $factor = sprintf "%.2f", ($pvrl / $pvfcraw);
-          $factor = sprintf "%.2f", ($factor + $oldfac) / 2;
+          $factor = round2 ($pvrl / $pvfcraw);
+          $factor = round2 (($factor + $oldfac) / 2);
       }
       else {                                                                                              # ganz neuer Wert
           $dnum   = 1;
-          $factor = sprintf "%.2f", ($pvrl / $pvfcraw);
+          $factor = round2 ($pvrl / $pvfcraw);
       }
   }
   else {
@@ -17402,7 +17402,7 @@ sub __calcNewFactor_migrated {
 
      $factor = 0;
      $dnum   = scalar (@{$data{$name}{circular}{$hh}{'pvrl_'.$sabin}{"$crang"}});
-     $factor = sprintf "%.2f", ($pvrl / $pvfcraw) if($pvrl && $pvfcraw);                                  # devision by zero Forum: https://forum.fhem.de/index.php?msg=1341884
+     $factor = round2 ($pvrl / $pvfcraw) if($pvrl && $pvfcraw);                                           # devision by zero Forum: https://forum.fhem.de/index.php?msg=1341884
 
      debugLog ($paref, 'pvCorrectionWrite', "$calc Corrf -> read stored values: PVreal median: $pvrl, PVforecast median: $pvfcraw, days: $dnum");
   }
@@ -17412,7 +17412,7 @@ sub __calcNewFactor_migrated {
   ## max. Faktorsteigerung berücksichtigen
   ##########################################
   if (abs($factor - $oldfac) > DEFMAXVAR) {
-      $factor = sprintf "%.2f", ($factor > $oldfac ? $oldfac + DEFMAXVAR : $oldfac - DEFMAXVAR);
+      $factor = round2 ($factor > $oldfac ? $oldfac + DEFMAXVAR : $oldfac - DEFMAXVAR);
       Log3 ($name, 3, "$name - new $calc correction factor calculated (limited by maximum Day Variance): $factor (old: $oldfac) for hour: $hh");
   }
   else {
@@ -17421,7 +17421,7 @@ sub __calcNewFactor_migrated {
 
   ## Qualität berechnen
   #######################
-  $oldfac  = sprintf "%.2f", $oldfac;
+  $oldfac  = round2 ($oldfac);
   my $qual = __calcFcQuality ($pvapifc, $pvrl);                                                          # Qualität der Vorhersage für die vergangene Stunde
 
   debugLog ($paref, 'pvCorrectionWrite',                "$calc Corrf -> determined values - hour: $hh, Sun Altitude range: $sabin, Cloud range: $crang, old factor: $oldfac, new factor: $factor, days: $dnum");
@@ -17458,7 +17458,7 @@ sub __calcFcQuality {
   my $hdv  = 1 - abs ($diff / $pvrl);                                      # Abweichung der Stunde, 1 = bestmöglicher Wert
 
   $hdv = $hdv < 0 ? 0 : $hdv;
-  $hdv = sprintf "%.2f", $hdv;
+  $hdv = round2 ($hdv);
 
 return $hdv;
 }
@@ -17590,7 +17590,7 @@ sub _genSpecialReadings {
               my $shr = ($ss - $t) / 3600;
               $shr    = $shr < 0 ? 0 : $shr;
 
-              storeReading ($prpo.'_'.$kpi, sprintf "%.2f", $shr);
+              storeReading ($prpo.'_'.$kpi, round2($shr));
           }
           elsif ($kpi eq 'SunMinutes_Remain') {
               my $ss  = &{$hcsr{$kpi}{fn}} ($hash, 'sunsetTodayTs',  $def);
@@ -17622,7 +17622,7 @@ sub _genSpecialReadings {
           elsif ($kpi =~ /careCycleViolationDays_/xs) {
               my $bn  = (split "_", $kpi)[1];                                                          # Batterienummer extrahieren
               my $ccv = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'careCycleViolation'.$bn, $def);
-              $ccv    = $ccv > 0 ? sprintf "%.2f", ($ccv / 86400) : 0;
+              $ccv    = $ccv > 0 ? round2($ccv / 86400) : 0;
 
               storeReading ($prpo.'_'.$kpi, $ccv);
           }
@@ -17679,7 +17679,7 @@ sub _genSpecialReadings {
                           $mintotal   -= int ($diflasth);
                       }
 
-                      $n = sprintf "%.2f", ($mintotal / 60);
+                      $n = round2 ($mintotal / 60);
                   }
 
                   storeReading ($prpo.'_'.$kpi, $n);
@@ -19997,9 +19997,9 @@ sub _beamGraphicFirstHour {
   $val3 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
   $val4 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
   $val5 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
-  $val6 = sprintf "%.2f", (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
+  $val6 = round2 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
   $val7 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gfeedin', 0);
-  $val8 = sprintf "%.2f", (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
+  $val8 = round2 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
 
   ## Batterien Selektionshash erstellen
   #######################################
@@ -20159,9 +20159,9 @@ sub _beamGraphicRemainingHours {
               $val3 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
               $val4 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
               $val5 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'con',   0);
-              $val6 = sprintf "%.2f", (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
+              $val6 = round2 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
               $val7 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
-              $val8 = sprintf "%.2f", (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
+              $val8 = round2 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
 
               ## Batterien Selektionshash erstellen
               #######################################
@@ -22196,7 +22196,7 @@ return $xstart;
 sub __normDecPlaces {
   my $p = shift;
 
-  $p = sprintf "%.2f", $p;
+  $p = round2 ($p);
   $p = round0 ($p) if($p > 10);
   $p = 0           if($p == 0);
 
@@ -24769,7 +24769,7 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{NoiseLevel}     = $noise_flag;
   $data{$name}{$fanntyp.'temp'}{$attempt}{BitFailSuggest} = $bitfail_suggestion;
   
-  my $runtime    = sprintf "%.2f", CurrentVal ($name, $fanntyp.'NNRuntimeTrain', 0);
+  my $runtime    = round2 (CurrentVal ($name, $fanntyp.'NNRuntimeTrain', 0));
   my $trainstate = !$err 
                     ? 'ok' 
                     : "aiNeuroNetConTraining performed, but error occurred while saving: $err";
@@ -25044,11 +25044,11 @@ sub _aiFannRetrainIndicator {
       $valstd         = sprintf "%.10f", $valstd;
       $valmean        = sprintf "%.10f", $valmean;
       $model_slope    = round6 ($model_slope);
-      $model_bias     = sprintf "%.2f", $model_bias;
-      $r2             = sprintf "%.2f", $r2;
+      $model_bias     = round2 ($model_bias);
+      $r2             = round2 ($r2);
       
       $rmse_mae_ratio = round4 ($rmse_mae_ratio);
-      $max_abs_error  = sprintf "%.2f", $max_abs_error;
+      $max_abs_error  = round2 ($max_abs_error);
       $p95_error      = round4 ($p95_error);
       $p99_error      = round4 ($p99_error);
       $bitfail_rate   = round4 ($bitfail_rate);
@@ -25663,17 +25663,17 @@ sub aiFannDetectDrift {
   }
 
   # --- Ergebnisse speichern ---
-  $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelLive}  = sprintf "%.2f", $rmse_rel_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = sprintf "%.2f", $bias_drift;
+  $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelLive}  = round2 ($rmse_rel_live);
+  $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = round2 ($bias_drift);
   $data{$name}{neuralnet}{$fanntyp}{DriftSlope}        = round3 ($slope_drift);
   $data{$name}{neuralnet}{$fanntyp}{DriftSlopeLive}    = round3 ($slope_live);
-  $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = sprintf "%.2f", $bias_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftMaeLive}      = sprintf "%.2f", $mae_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftRmseLive}     = sprintf "%.2f", $rmse_live;
-  $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = sprintf "%.2f", $drift_score;
-  $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = sprintf "%.2f", $rmse_rel_ratio;
+  $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);
+  $data{$name}{neuralnet}{$fanntyp}{DriftMaeLive}      = round2 ($mae_live);
+  $data{$name}{neuralnet}{$fanntyp}{DriftRmseLive}     = round2 ($rmse_live);
+  $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = round2 ($drift_score);
+  $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = round2 ($rmse_rel_ratio);
   $data{$name}{neuralnet}{$fanntyp}{DriftSlopeRel}     = round3 ($slope_drift_rel);
-  $data{$name}{neuralnet}{$fanntyp}{DriftBiasNorm}     = sprintf "%.2f", $bias_drift_norm;
+  $data{$name}{neuralnet}{$fanntyp}{DriftBiasNorm}     = round2 ($bias_drift_norm);
   $data{$name}{neuralnet}{$fanntyp}{DriftFlag}         = $flag;
 
 return $flag;
@@ -26520,7 +26520,7 @@ sub setPVhistory {
               $sum += $csme;
           }
 
-          $data{$name}{pvhist}{$nday}{99}{$hkey} = sprintf "%.2f", $sum;
+          $data{$name}{pvhist}{$nday}{99}{$hkey} = round2 ($sum);
       }
   }
 
@@ -26540,8 +26540,8 @@ sub setPVhistory {
       my $cycles = HistoryVal ($name, $nday, 99, "cyclescsm${num}", 0);
 
       if ($cycles) {
-          $data{$name}{pvhist}{$nday}{99}{"hourscsme${num}"}     = sprintf "%.2f", ($minutes / 60 );
-          $data{$name}{pvhist}{$nday}{99}{"avgcycmntscsm${num}"} = sprintf "%.2f", ($minutes / $cycles);
+          $data{$name}{pvhist}{$nday}{99}{"hourscsme${num}"}     = round2 ($minutes / 60);
+          $data{$name}{pvhist}{$nday}{99}{"avgcycmntscsm${num}"} = round2 ($minutes / $cycles);
       }
   }
 
@@ -29483,7 +29483,7 @@ sub isConsumerLogOn {
   }
 
   my $currpowerpercent;
-  if ($nompower > 0) { $currpowerpercent = sprintf ('%.2f', $pcurr / $nompower * 100) }
+  if ($nompower > 0) { $currpowerpercent = round2 ($pcurr / $nompower * 100) }
   else               { $currpowerpercent = 0 }
 
   $data{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
@@ -30823,6 +30823,11 @@ sub round0 {
 sub round1 {
   my ($x) = @_;
   return sprintf ("%.1f", $x);
+}
+
+sub round2 {
+  my ($x) = @_;
+  return sprintf ("%.2f", $x);
 }
 
 sub round3 {
