@@ -163,7 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.2.2"  => "03.03.2026  _transferInverterValues: change etotal init of new hour, new keys consumerControl->globalMode ",
+  "2.2.2"  => "03.03.2026  _transferInverterValues: change etotal init of new hour, new keys consumerControl->globalMode ".
+                           "add windspeed to aiRawData ",
   "2.2.1"  => "28.02.2026  _listDataPoolPvHist: clear non-numerical hours from history, new sub round0 ",
   "2.2.0"  => "15.02.2026  new Consumer mode 'mustNot', _aiCreateAdditionalSignals: fix problem devision by zero in special case 40 degrees ".
                            "edit comref, _attrconsumer refactored ",
@@ -22858,6 +22859,7 @@ sub __aiAddRawData {
           my $pvrlvd    = HistoryVal ($name, $pvd, $hod, 'pvrlvd',        1);                           # PV Generation valide?
           my $pvrl      = HistoryVal ($name, $pvd, $hod, 'pvrl',      undef);
           my $socwhsum  = HistoryVal ($name, $pvd, $hod, 'socwhsum',  undef);                           # erreichter SoC total (Wh)
+          my $windspeed = HistoryVal ($name, $pvd, $hod, 'windspeed', undef);                           # Windgeschwindigkeit
           
           $minutes_on_wp = HistoryVal ($name, $pvd, $hod, 'minutescsm'.$hp, undef) if(defined $hp);     # Aktivminuten der Wärmepumpe falls vorhanden
           
@@ -22878,6 +22880,7 @@ sub __aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{minutes_wp} = $minutes_on_wp                   if(defined $minutes_on_wp);
           $data{$name}{aidectree}{airaw}{$ridx}{presence}   = $presence                        if(defined $presence);
           $data{$name}{aidectree}{airaw}{$ridx}{holiday}    = $holiday                         if(defined $holiday);
+          $data{$name}{aidectree}{airaw}{$ridx}{windspeed}  = $windspeed                       if(defined $windspeed);
           $data{$name}{aidectree}{airaw}{$ridx}{pvrlvd}     = $pvrlvd;
 
           for my $c (1..MAXCONSUMER) {
@@ -27595,6 +27598,7 @@ sub _listDataPoolAiRawData {
       my $minutes_on_wp = AiRawdataVal ($name, $idx, 'minutes_wp', '-');
       my $presence      = AiRawdataVal ($name, $idx, 'presence',   '-');    
       my $holiday       = AiRawdataVal ($name, $idx, 'holiday',    '-'); 
+      my $windspeed     = AiRawdataVal ($name, $idx, 'windspeed',  '-');
       
       my $csm;
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
@@ -27611,7 +27615,7 @@ sub _listDataPoolAiRawData {
       $sq .= "$idx => hod: $hod, dayname: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, weatherid: $wid, ";
       $sq .= "rr1c: $rr1c, temp: $temp, socwhsum: $socwhsum ";
       $sq .= "\n              ";
-      $sq .= "pvrl: $pvrl, pvrlvd: $pvrlvd, minutes_wp: $minutes_on_wp, conaifc: $conaifc, con: $con, gcons: $gcons, ";
+      $sq .= "windspeed: $windspeed, pvrl: $pvrl, pvrlvd: $pvrlvd, minutes_wp: $minutes_on_wp, conaifc: $conaifc, con: $con, gcons: $gcons, ";
       $sq .= "presence: $presence, holiday: $holiday ";
        
       if (defined $csm) { $sq .= "\n              "; $sq .= $csm; }
