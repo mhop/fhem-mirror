@@ -163,7 +163,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.2.2"  => "01.03.2026  _transferInverterValues: change etotal init of new hour ",
+  "2.2.2"  => "03.03.2026  _transferInverterValues: change etotal init of new hour, new keys consumerControl->globalMode ",
   "2.2.1"  => "28.02.2026  _listDataPoolPvHist: clear non-numerical hours from history, new sub round0 ",
   "2.2.0"  => "15.02.2026  new Consumer mode 'mustNot', _aiCreateAdditionalSignals: fix problem devision by zero in special case 40 degrees ".
                            "edit comref, _attrconsumer refactored ",
@@ -3918,8 +3918,8 @@ sub __solCast_ApiResponse {
       }
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-      $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                                # Verarbeitungszeit ermitteln
-      $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));          # API Laufzeit ermitteln
+      $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                       # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                   # API Laufzeit ermitteln
 
       if ($debug =~ /apiProcess|apiCall/x) {
           my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', SOLCMAXREQDEF);
@@ -3939,8 +3939,8 @@ sub __solCast_ApiResponse {
       $data{$name}{statusapi}{SolCast}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-      $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                                 # Verarbeitungszeit ermitteln
-      $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));           # API Laufzeit ermitteln
+      $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                        # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                    # API Laufzeit ermitteln
 
       return;
   }
@@ -3953,8 +3953,8 @@ sub __solCast_ApiResponse {
           Log3 ($name, 1, "$name - $msg");
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
           return;
       }
@@ -3987,8 +3987,8 @@ sub __solCast_ApiResponse {
           }
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
           if ($debug =~ /apiProcess|apiCall/x) {
               my $apimaxreq = AttrVal ($name, 'ctrlSolCastAPImaxReq', SOLCMAXREQDEF);
@@ -4075,8 +4075,8 @@ sub __solCast_ApiResponse {
       lang       => $lang
   };
 
-  $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-  $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+  $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
+  $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
 return &$caller($param);
 }
@@ -4347,8 +4347,8 @@ sub __forecastSolar_ApiResponse {
       $data{$name}{statusapi}{ForecastSolar}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-      $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-      $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+      $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                            # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));        # API Laufzeit ermitteln
 
       return;
   }
@@ -4361,8 +4361,8 @@ sub __forecastSolar_ApiResponse {
           Log3 ($name, 1, "$name - $msg");
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                           # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
           return;
       }
@@ -4418,8 +4418,8 @@ sub __forecastSolar_ApiResponse {
               debugLog ($paref, "apiCall", "ForecastSolar API Call - retry at: ".$rtyat." ($rtyatts)");
           }
 
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
           ___setForeCastAPIcallKeyData ($paref);
 
@@ -4467,8 +4467,8 @@ sub __forecastSolar_ApiResponse {
       lang       => $lang
   };
 
-  $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-  $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+  $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                           # Verarbeitungszeit ermitteln
+  $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
 return &$caller($param);
 }
@@ -4661,7 +4661,7 @@ sub __getDWDSolarData {
           }
 
           $af = sprintf "%.2f", $af;
-          $pv = sprintf "%.1f", $pv;
+          $pv = round1 ($pv);
 
           $data{$name}{solcastapi}{$string}{$dateTime}{pv_estimate50} = $pv;                        # Startzeit wird verwendet, nicht laufende Stunde
 
@@ -4895,7 +4895,7 @@ sub __VictronVRM_ApiResponseLogin {
   my $msg;
   my $hash = $defs{$name};
   my $t    = time;
-  my $sta  = [gettimeofday];                                                                                # Start Response Verarbeitung
+  my $sta  = [gettimeofday];                                                                                                # Start Response Verarbeitung
 
   if ($err ne "") {
       $msg = 'Victron VRM API error response: '.$err;
@@ -4903,12 +4903,12 @@ sub __VictronVRM_ApiResponseLogin {
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
-      $data{$name}{current}{runTimeLastAPIProc}                = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-      $data{$name}{current}{runTimeLastAPIAnswer}              = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+      $data{$name}{current}{runTimeLastAPIProc}                    = round4 (tv_interval($sta));                            # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer}                  = round4 (tv_interval($stc) - tv_interval($sta));        # API Laufzeit ermitteln
 
       return;
   }
-  elsif ($myjson ne "") {                                                                                  # Evaluiere ob Daten im JSON-Format empfangen wurden
+  elsif ($myjson ne "") {                                                                                                   # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson ($hash, $myjson);
 
       if (!$success) {
@@ -4916,8 +4916,8 @@ sub __VictronVRM_ApiResponseLogin {
           Log3              ($name, 1, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                     # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                 # API Laufzeit ermitteln
 
           return;
       }
@@ -4929,8 +4929,8 @@ sub __VictronVRM_ApiResponseLogin {
           Log3              ($name, 3, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
           $data{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $jdata->{'error_code'};
           $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
@@ -5043,8 +5043,8 @@ sub __VictronVRM_ApiResponseForecast {
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
-      $data{$name}{current}{runTimeLastAPIProc}                    = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-      $data{$name}{current}{runTimeLastAPIAnswer}                  = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+      $data{$name}{current}{runTimeLastAPIProc}                    = round4 (tv_interval($sta));                           # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer}                  = round4 (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
       return;
   }
@@ -5056,8 +5056,8 @@ sub __VictronVRM_ApiResponseForecast {
           Log3              ($name, 1, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                           # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
           return;
       }
@@ -5069,8 +5069,8 @@ sub __VictronVRM_ApiResponseForecast {
           Log3              ($name, 3, "$name - $msg");
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
           $data{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $jdata->{'error_code'};
           $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
@@ -5093,8 +5093,8 @@ sub __VictronVRM_ApiResponseForecast {
               $msg = 'ERROR - invalid Victron VRM API Forecast response';
               singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
-              $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-              $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+              $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
+              $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
               $data{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $msg;
               $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
@@ -5155,8 +5155,8 @@ sub __VictronVRM_ApiResponseForecast {
       }
   }
 
-  $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval  ($sta);                             # Verarbeitungszeit ermitteln
-  $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval ($stc) - tv_interval ($sta));       # API Laufzeit ermitteln
+  $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval  ($sta));                                    # Verarbeitungszeit ermitteln
+  $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($stc) - tv_interval ($sta));                # API Laufzeit ermitteln
 
   __VictronVRM_ApiRequestLogout ($paref);
 
@@ -5491,8 +5491,8 @@ sub __openMeteoDWD_ApiResponse {
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $err;
 
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-      $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                                 # Verarbeitungszeit ermitteln
-      $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));           # API Laufzeit ermitteln
+      $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                        # Verarbeitungszeit ermitteln
+      $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                    # API Laufzeit ermitteln
 
       return;
   }
@@ -5505,8 +5505,8 @@ sub __openMeteoDWD_ApiResponse {
           Log3 ($name, 1, "$name - $msg");
 
           singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                             # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));         # API Laufzeit ermitteln
 
           return;
       }
@@ -5531,8 +5531,8 @@ sub __openMeteoDWD_ApiResponse {
 
           $data{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $jdata->{'reason'};
 
-          $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-          $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+          $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
+          $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
           return;
       }
@@ -5603,7 +5603,7 @@ sub __openMeteoDWD_ApiResponse {
                   my $radwh = $jdata->{hourly}{shortwave_radiation}[$k];                                # Solarstrahlung GHI
 
                   if (defined $radwh) {                                                                 # Globalstrahlung für KI
-                      my $radkJ = 10 * (round0 ($radwh * WH2KJ) / 10);                                   # Umrechnung Wh/m2 in kJ/m2
+                      my $radkJ = 10 * (round0 ($radwh * WH2KJ) / 10);                                  # Umrechnung Wh/m2 in kJ/m2
                       $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} = $radkJ;                       # Startstunde verschieben
 
                       debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - Global Radiation Rad1h: $radkJ");
@@ -5788,8 +5788,8 @@ sub __openMeteoDWD_ApiResponse {
       lang           => $lang
   };
 
-  $data{$name}{current}{runTimeLastAPIProc}   = sprintf "%.4f", tv_interval($sta);                             # Verarbeitungszeit ermitteln
-  $data{$name}{current}{runTimeLastAPIAnswer} = sprintf "%.4f", (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
+  $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                             # Verarbeitungszeit ermitteln
+  $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));         # API Laufzeit ermitteln
 
 return &$caller($param);
 }
@@ -6578,7 +6578,7 @@ sub __dwdStatCatalog_Response {
                     );
   }
 
-  my $prt = sprintf "%.4f", (tv_interval ($stc) - tv_interval ($sta));                                     # Laufzeit ermitteln
+  my $prt = round4 (tv_interval ($stc) - tv_interval ($sta));                                               # Laufzeit ermitteln
   debugLog ($paref, 'dwdComm', "DWD Station Catalog retrieval and processing required >$prt< seconds");
 
 return;
@@ -7465,10 +7465,11 @@ sub _attrconsumerControl {               ## no critic "not used"
   my $cmd   = $paref->{cmd};
 
   my $valid = {
-      adviceIcon => { comp => '.*',                                          act => 0 },
-      detailLink => { comp => '(0|1)',                                       act => 0 },
-      dummyIcon  => { comp => '.*',                                          act => 0 },
-      showLegend => { comp => '(icon_top|icon_bottom|text_top|text_bottom)', act => 0 },
+      adviceIcon    => { comp => '.*',                                          act => 0 },
+      detailLink    => { comp => '(0|1)',                                       act => 0 },
+      dummyIcon     => { comp => '.*',                                          act => 0 },
+      globalMode    => { comp => '(can|must|mustNot|unset)',                    act => 0 },
+      showLegend    => { comp => '(icon_top|icon_bottom|text_top|text_bottom)', act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -11371,7 +11372,7 @@ sub _transferWeatherValues {
               $temp          = $outTemp if(defined $outTemp);
           }
           
-          $data{$name}{current}{outsideTemp} = sprintf "%.1f", $temp;
+          $data{$name}{current}{outsideTemp} = round1 ($temp);
       }
 
       my $nhtstr                                  = 'NextHour'.(sprintf "%02d", $num);
@@ -11860,7 +11861,7 @@ sub _transferInverterValues {
   my $pvapifc   = CircularVal ($name, $hod, 'pvapifc', 0);                                                      # vorhergesagte PV Energie am Ende der vorherigen Stunde
   my $pvrlvdsav = HistoryVal  ($name, $day, $hod, 'pvrlvd',       1);
   my $plantdera = HistoryVal  ($name, $day, $hod, 'plantderated', 0);
-  $percdev      = sprintf "%.1f", abs (($pvapifc - $ethishoursum) / $ethishoursum * 100) if($ethishoursum);     # akt. prozentuale Abweicheichung zw. FC und real
+  $percdev      = round1 (abs (($pvapifc - $ethishoursum) / $ethishoursum * 100)) if($ethishoursum);            # akt. prozentuale Abweicheichung zw. FC und real
 
   $valid = 0  if($aln == 0);
   $valid = 0  if(!$pvrlvdsav);
@@ -12191,7 +12192,7 @@ sub __calcPVestimates {
 
       $peak    *= 1000;
       my $pvest = RadiationAPIVal ($name, $string, $wantdt, 'pv_estimate50', 0);
-      my $pv    = sprintf "%.1f", ($pvest * $hc);                                                     # Korrekturfaktor anwenden
+      my $pv    = round1 ($pvest * $hc);                                                              # Korrekturfaktor anwenden
 
       for my $in (keys %{$data{$name}{inverters}}) {
           my $istrings = InverterVal ($name, $in, 'istrings', 'all');                                 # dem Inverter zugeordnete Strings
@@ -12476,7 +12477,7 @@ sub _transferProducerValues {
           $warn = ' (WARNING $prdev invalid real produced energy occured - see Logfile)';
       }
 
-      storeReading ('Current_PP_'.$pn, sprintf("%.1f", $p).' W');
+      storeReading ('Current_PP_'.$pn, round1 ($p).' W');
       storeReading ('Today_Hour'.sprintf("%02d",$nhour).'_PPreal_'.$pn, $ethishour.' Wh'.$warn);
 
       $data{$name}{circular}{sprintf("%02d",$nhour)}{'pprl'.$pn} = $ethishour;                        # Ringspeicher P real
@@ -13539,7 +13540,7 @@ sub _batChargeMgmt {
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Battery efficiency used: ".($befficiency * 100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - weighted self-consumption: $wou %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Target load and target time: $goalpercent % / $goalwh Wh / ".(defined $timeTarget ? $timeTarget.' oclock' : '-'));
-          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Percentage of the total amount of charging energy required: ".(sprintf "%.1f", $sf*100)." %");
+          Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - Percentage of the total amount of charging energy required: ".round1($sf*100)." %");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - The PV generation, consumption and surplus listed below are based on the battery's share of the total amount of charging energy required!");
       }
 
@@ -13672,7 +13673,7 @@ sub _batChargeMgmt {
           $socwh  = ___batClampValue ($socwh, $lowSocwh, $batoptsocwh, $batinstcap);             # SoC begrenzen
 
           $socwh   = round0 ($socwh);                                                            # SoC Prognose in Wh
-          $progsoc = sprintf "%.1f", ___batSocWhToPercent ($batinstcap, $socwh);                 # Prognose SoC in %
+          $progsoc = round1 (___batSocWhToPercent ($batinstcap, $socwh));                        # Prognose SoC in %
 
           ## Debuglog LR
           ################
@@ -13742,7 +13743,7 @@ sub _batChargeMgmt {
               ## SOC-Prognose OTP
               #####################
               my $fcendwh = $hopt->{$shod}{$bat}{fcendwh} // 0;
-              $progsoc    = sprintf "%.1f", ___batSocWhToPercent ($hopt->{$shod}{$bat}{batinstcap}, $fcendwh);        # Prognose SoC in %
+              $progsoc    = round1 (___batSocWhToPercent ($hopt->{$shod}{$bat}{batinstcap}, $fcendwh));        # Prognose SoC in %
 
               ## Speicherung und Readings erstellen OTP
               ##########################################
@@ -14308,7 +14309,7 @@ sub ___batFindMinPhWh {
       $max_cap //= 0;
       $max_cap  /= $befficiency;
       
-      return { ph => round0 ($max_cap), iterations => $loop, blur => (sprintf "%.4f", 0) };
+      return { ph => round0 ($max_cap), iterations => $loop, blur => round4 (0) };
   }
 
   while (($high - $low) > $eps) {
@@ -14332,7 +14333,7 @@ sub ___batFindMinPhWh {
 
   $high = max (0, $high);
 
-return { ph => round0 ($high), iterations => $loop, blur => (sprintf "%.4f", ($high - $low)) };
+return { ph => round0 ($high), iterations => $loop, blur => round4 ($high - $low) };
 }
 
 ################################################################
@@ -14853,7 +14854,7 @@ sub _manageConsumerData {
           if (!$paread){
               my $timespan = $t    - ConsumerVal ($name, $c, "old_etottime",  $t);
               my $delta    = $etot - ConsumerVal ($name, $c, "old_etotal", $etot);
-              $pcurr       = sprintf "%.6f", ($delta / 3600 * $timespan) if($delta);               # Einheitenformel beachten !!: W = Wh / (3600 * s)
+              $pcurr       = round6 ($delta / 3600 * $timespan) if($delta);               # Einheitenformel beachten !!: W = Wh / (3600 * s)
 
               $data{$name}{consumers}{$c}{old_etotal}   = $etot;
               $data{$name}{consumers}{$c}{old_etottime} = $t;
@@ -14975,17 +14976,14 @@ return;
 }
 
 ################################################################
-#   Consumer Status Automatic Modus abfragen und im
-#   Hash consumers aktualisieren
+#   Consumer Status Automatic Modus abfragen und speichern
 ################################################################
 sub __getAutomaticState {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
 
-  my $hash     = $defs{$name};
-  my $consumer = ConsumerVal ($hash, $c, 'name', '');                                  # Name Consumer Device
+  my $consumer = ConsumerVal ($name, $c, 'name', '');                                  # Name Consumer Device
   my ($err)    = isDeviceValid ( { name   => $name,
                                    obj    => $consumer,
                                    method => 'string',
@@ -14993,7 +14991,7 @@ sub __getAutomaticState {
                                );
   return if($err);
 
-  my $dswitch = ConsumerVal ($hash, $c, 'dswitch', '');                                # alternatives Schaltdevice
+  my $dswitch = ConsumerVal ($name, $c, 'dswitch', '');                                # alternatives Schaltdevice
 
   if ($dswitch) {
       ($err) = isDeviceValid ( { name => $name, obj => $dswitch, method => 'string'  } );
@@ -15003,7 +15001,7 @@ sub __getAutomaticState {
       $dswitch = $consumer;
   }
 
-  my $autord = ConsumerVal ($hash, $c, 'autoreading', '');                             # Readingname f. Automatiksteuerung
+  my $autord = ConsumerVal ($name, $c, 'autoreading', '');                             # Readingname f. Automatiksteuerung
   my $auto   = 1;
   $auto      = ReadingsVal ($dswitch, $autord, 1) if($autord);                         # Reading für Ready-Bit -> Einschalten möglich ?
 
@@ -16189,17 +16187,16 @@ return $state;
 sub ___setConsumerSwitchingState {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
   my $state = $paref->{state};
   my $fscss = $paref->{fscss};                                                                     # erster Subaufruf: 1
 
   my $hash      = $defs{$name};
-  my $simpCstat = simplifyCstate (ConsumerVal ($hash, $c, 'planstate', ''));
-  my $calias    = ConsumerVal    ($hash, $c, 'alias',                   '');                       # Consumer Device Alias
-  my $auto      = ConsumerVal    ($hash, $c, 'auto',                     1);
-  my $oldpsw    = ConsumerVal    ($hash, $c, 'physoffon',            'off');                       # gespeicherter physischer Schaltzustand
+  my $simpCstat = simplifyCstate (ConsumerVal ($name, $c, 'planstate', ''));
+  my $calias    = ConsumerVal    ($name, $c, 'alias',                   '');                       # Consumer Device Alias
+  my $auto      = ConsumerVal    ($name, $c, 'auto',                     1);
+  my $oldpsw    = ConsumerVal    ($name, $c, 'physoffon',            'off');                       # gespeicherter physischer Schaltzustand
   my $dowri     = 0;
 
   debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - current planning state: $simpCstat});
@@ -17697,7 +17694,7 @@ sub _genSpecialReadings {
 
               my $dfi  = $cfi - $idfi;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dfi).' Wh');
+              storeReading ($prpo.'_'.$kpi, round1($dfi).' Wh');
           }
           elsif ($kpi eq 'todayGridConsumption') {
               my $idgcon = &{$hcsr{$kpi}{fn}} ($hash, $hcsr{$kpi}{par}, 'initdaygcon',  $def);         # initialer Tagesstartwert
@@ -17719,7 +17716,7 @@ sub _genSpecialReadings {
                   $tdbisum += ($cbitot - $idbitot);
               }
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbisum).' '.$hcsr{$kpi}{unit});
+              storeReading ($prpo.'_'.$kpi, round1($tdbisum).' '.$hcsr{$kpi}{unit});
           }
           elsif ($kpi eq 'todayBatOutSum') {                                                                   # Summe tägl. Entadeenergie (alle Batterien)
               my $tdbosum = 0;
@@ -17733,7 +17730,7 @@ sub _genSpecialReadings {
                   $tdbosum += ($cbotot - $idbotot);
               }
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $tdbosum).' '.$hcsr{$kpi}{unit});
+              storeReading ($prpo.'_'.$kpi, round1($tdbosum).' '.$hcsr{$kpi}{unit});
           }
           elsif ($kpi =~ /todayBatIn_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
@@ -17742,7 +17739,7 @@ sub _genSpecialReadings {
 
               my $dbi = $cbitot - $idbitot;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbi).' '.$hcsr{$kpi}{unit});
+              storeReading ($prpo.'_'.$kpi, round1($dbi).' '.$hcsr{$kpi}{unit});
           }
           elsif ($kpi =~ /todayBatOut_/xs) {
               my $bn = (split "_", $kpi)[1];                                                               # Batterienummer extrahieren
@@ -17751,7 +17748,7 @@ sub _genSpecialReadings {
 
               my $dbo = $cbotot - $idbotot;
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $dbo).' '.$hcsr{$kpi}{unit});
+              storeReading ($prpo.'_'.$kpi, round1($dbo).' '.$hcsr{$kpi}{unit});
           }
           elsif ($kpi eq 'dayAfterTomorrowPVforecast') {                                                   # PV Vorhersage Summe für Übermorgen (falls Werte vorhanden), Forum:#134226
               my $datpvfc = &{$hcsr{$kpi}{fn}} ($name, 'dayAfterTomorrowPVfc', $def);
@@ -17801,7 +17798,7 @@ sub _genSpecialReadings {
               my $nowncon = $contoday - $csme;
               $nowncon    = max (0, $nowncon);
 
-              storeReading ($prpo.'_'.$kpi, (sprintf "%.1f", $nowncon).' '.$hcsr{$kpi}{unit});
+              storeReading ($prpo.'_'.$kpi, round1($nowncon).' '.$hcsr{$kpi}{unit});
           }
           elsif ($kpi eq 'todayConsumptionForecast') {
              for my $hod (sort keys %{$data{$name}{pvhist}{$day}}) {
@@ -18592,14 +18589,14 @@ sub _graphicHeader {
   my ($rapi, $wapi) = getStatusApiName ($hash);                                                    # Status-API Name
 
   if ($kw eq 'kWh') {
-      $co4h = sprintf ("%.1f", $co4h/1000)."&nbsp;kWh";
-      $coRe = sprintf ("%.1f", $coRe/1000)."&nbsp;kWh";
-      $coTo = sprintf ("%.1f", $coTo/1000)."&nbsp;kWh";
-      $coCu = sprintf ("%.1f", $coCu/1000)."&nbsp;kW";
-      $pv4h = sprintf ("%.1f", $pv4h/1000)."&nbsp;kWh";
-      $pvRe = sprintf ("%.1f", $pvRe/1000)."&nbsp;kWh";
-      $pvTo = sprintf ("%.1f", $pvTo/1000)."&nbsp;kWh";
-      $pvCu = sprintf ("%.1f", $pvCu/1000)."&nbsp;kW";
+      $co4h = round1 ($co4h/1000)."&nbsp;kWh";
+      $coRe = round1 ($coRe/1000)."&nbsp;kWh";
+      $coTo = round1 ($coTo/1000)."&nbsp;kWh";
+      $coCu = round1 ($coCu/1000)."&nbsp;kW";
+      $pv4h = round1 ($pv4h/1000)."&nbsp;kWh";
+      $pvRe = round1 ($pvRe/1000)."&nbsp;kWh";
+      $pvTo = round1 ($pvTo/1000)."&nbsp;kWh";
+      $pvCu = round1 ($pvCu/1000)."&nbsp;kW";
   }
   else {
       $co4h .= "&nbsp;Wh";
@@ -19400,7 +19397,7 @@ sub __createOwnSpec {
 
           if ($uatr eq 'kWh') {
               if ($u->{$k} =~ /^Wh/xs) {
-                  $v->{$k} = sprintf "%.1f",($v->{$k} / 1000);
+                  $v->{$k} = round1 ($v->{$k} / 1000);
                   $u->{$k} = 'kWh';
               }
           }
@@ -20009,14 +20006,14 @@ sub _beamGraphicFirstHour {
   for my $bn (1..MAXBATTERIES) {
       $bn = sprintf "%02d", $bn;
 
-      $hbsocs->{0}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                     $beam1cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
-                                     $beam1cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+      $hbsocs->{0}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                     $beam1cont =~ /batsocForecast_${bn}/xs ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
+                                     $beam1cont =~ /batsocReal_${bn}/xs     ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
                                      0;
 
-      $hbsocs->{0}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                     $beam2cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
-                                     $beam2cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+      $hbsocs->{0}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                     $beam2cont =~ /batsocForecast_${bn}/xs ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
+                                     $beam2cont =~ /batsocReal_${bn}/xs     ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
                                      0;
 
       $hbsocs->{0}{$bn}{beam1cont} = 100 if($hbsocs->{0}{$bn}{beam1cont} >= 100);
@@ -20025,13 +20022,13 @@ sub _beamGraphicFirstHour {
 
   ## Batterien summarische Werte erstellen
   ##########################################
-  my $bcapsum = CurrentVal ($name, 'batcapsum', 0);                                                        # Summe installierte Batterie Kapazität in Wh
+  my $bcapsum = CurrentVal ($name, 'batcapsum', 0);                                                         # Summe installierte Batterie Kapazität in Wh
 
   if ($bcapsum) {
       my $socprogwhsum = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socprogwhsum', 0);
       my $socwhsum     = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socwhsum', 0);
-      $val9            = sprintf "%.1f", (100 * $socprogwhsum / $bcapsum);                                 # Summe Prognose SoC in % über alle Batterien
-      $val10           = sprintf "%.1f", (100 * $socwhsum / $bcapsum);                                     # Summe real erreichter SoC in % über alle Batterien
+      $val9            = round1 (100 * $socprogwhsum / $bcapsum);                                           # Summe Prognose SoC in % über alle Batterien
+      $val10           = round1 (100 * $socwhsum / $bcapsum);                                               # Summe real erreichter SoC in % über alle Batterien
   }
 
   ## Zuordnung Werte zu den Balken entsprechend Selektion
@@ -20066,7 +20063,7 @@ sub _beamGraphicFirstHour {
   $hfcg->{0}{beam2}  //= 0;
   my %roundable        = map { $_ => 1 } qw(pvForecast pvReal consumptionForecast consumption);
   my @beams            = ($beam1cont, $beam2cont);
-  $hfcg->{0}{diff}     = sprintf "%.1f", ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
+  $hfcg->{0}{diff}     = round1 ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
   $hfcg->{0}{diff}     = round0 ($hfcg->{0}{diff}) if($kw eq 'Wh' && grep { $roundable{$_} } @beams);
 
   my $epc = CurrentVal ($name, 'ePurchasePriceCcy', 0);
@@ -20171,14 +20168,14 @@ sub _beamGraphicRemainingHours {
               for my $bn (1..MAXBATTERIES) {
                   $bn = sprintf "%02d", $bn;
 
-                  $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                                  $beam1cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
-                                                  $beam1cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+                  $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                                  $beam1cont =~ /batsocForecast_${bn}/xs ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
+                                                  $beam1cont =~ /batsocReal_${bn}/xs     ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
                                                   0;
 
-                  $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                                  $beam2cont =~ /batsocForecast_${bn}/xs ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0) :       # nur SoC-Prognose
-                                                  $beam2cont =~ /batsocReal_${bn}/xs     ? sprintf "%.1f", HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0)     :       # nur real erreichter SoC
+                  $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                                  $beam2cont =~ /batsocForecast_${bn}/xs ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
+                                                  $beam2cont =~ /batsocReal_${bn}/xs     ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
                                                   0;
 
                   $hbsocs->{$i}{$bn}{beam1cont} = 100 if($hbsocs->{$i}{$bn}{beam1cont} >= 100);
@@ -20190,8 +20187,8 @@ sub _beamGraphicRemainingHours {
               if ($bcapsum) {
                   my $socprogwhsum = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'socprogwhsum', 0);
                   my $socwhsum     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'socwhsum', 0);
-                  $val9            = sprintf "%.1f", (100 * $socprogwhsum / $bcapsum);                        # Summe Prognose SoC in % über alle Batterien
-                  $val10           = sprintf "%.1f", (100 * $socwhsum / $bcapsum);                            # Summe real erreichter SoC in % über alle Batterien
+                  $val9            = round1 (100 * $socprogwhsum / $bcapsum);                           # Summe Prognose SoC in % über alle Batterien
+                  $val10           = round1 (100 * $socwhsum / $bcapsum);                               # Summe real erreichter SoC in % über alle Batterien
               }
 
               $hfcg->{$i}{day_str} = $ds;
@@ -20235,7 +20232,7 @@ sub _beamGraphicRemainingHours {
               ##########################################
               if ($bcapsum) {
                   my $socprogwhsum = NexthoursVal ($name, 'NextHour'.$nh, 'socprogwhsum', 0);
-                  $val9            = sprintf "%.1f", (100 * $socprogwhsum / $bcapsum);                                 # Summe Prognose SoC in % über alle Batterien
+                  $val9            = round1       (100 * $socprogwhsum / $bcapsum);                             # Summe Prognose SoC in % über alle Batterien
               }
 
           my $day_str = ($stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs)[2];
@@ -20280,7 +20277,7 @@ sub _beamGraphicRemainingHours {
       $hfcg->{$i}{beam2} //= 0;
       my %roundable        = map { $_ => 1 } qw(pvForecast pvReal consumptionForecast consumption);
       my @beams            = ($beam1cont, $beam2cont);
-      $hfcg->{$i}{diff}    = sprintf "%.1f", ($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2});
+      $hfcg->{$i}{diff}    = round1 ($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2});
       $hfcg->{$i}{diff}    = round0 ($hfcg->{$i}{diff}) if($kw eq 'Wh' && grep { $roundable{$_} } @beams);
 
       $maxVal   = $hfcg->{$i}{beam1}                      if($hfcg->{$i}{beam1} > $maxVal);
@@ -21691,7 +21688,7 @@ END3
 
       for my $c (@consumers) {
           my $shortalias   = $cnsmr->{$c}{shortalias} // '';
-          $cnsmrpower      = sprintf "%.1f", $cnsmr->{$c}{p};
+          $cnsmrpower      = round1 ($cnsmr->{$c}{p});
           $cnsmrpower      = round0 ($cnsmrpower) if($cnsmrpower > 10);
           my $consumerTime = ConsumerVal ($name, $c, 'remainTime', '');                               # Restlaufzeit
           my $rpcurr       = ConsumerVal ($name, $c, 'rpcurr',     '');                               # Readingname f. current Power
@@ -22228,9 +22225,9 @@ sub __normIconInnerScale {
       ($x, $y, $w, $h) = ($1, $2, $3, $4);
   }
 
-  my $scale = sprintf '%.4f', ( $size / ($w > $h ? $w : $h) );                                 # Berechne Skalierung und Versatz
-  my $ox    = sprintf '%.1f', ( ($size - $w * $scale) / 2 - $x * $scale );                     # zentriert den Inhalt in einem Kasten mit Seitenlänge $size
-  my $oy    = sprintf '%.1f', ( ($size - $h * $scale) / 2 - $y * $scale );
+  my $scale = round4 ( $size / ($w > $h ? $w : $h) );                                          # Berechne Skalierung und Versatz
+  my $ox    = round1 ( ($size - $w * $scale) / 2 - $x * $scale );                              # zentriert den Inhalt in einem Kasten mit Seitenlänge $size
+  my $oy    = round1 ( ($size - $h * $scale) / 2 - $y * $scale );
 
   $ox += $pad;                                                                                 # fügt $pad ViewBox-Einheiten Rand links bzw. oben hinzu.
   $oy += $pad;
@@ -22339,7 +22336,7 @@ sub normBeamWidth {
   }
 
   if ($doconvert) {                                                                         # bei Anzeige in kWh muss weniger aufgefüllt werden
-      $val  = sprintf "%.1f",($val / 1000);
+      $val  = round1 ($val / 1000);
       $val  += 0;                                                                           # keine 0.0 oder 6.0 etc
 
       if (defined $weather) {
@@ -22869,7 +22866,7 @@ sub __aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{dayname}    = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}        = $hod;
           $data{$name}{aidectree}{airaw}{$ridx}{socwhsum}   = $socwhsum                        if(defined $socwhsum);
-          $data{$name}{aidectree}{airaw}{$ridx}{temp}       = sprintf "%.1f", $temp            if(defined $temp);
+          $data{$name}{aidectree}{airaw}{$ridx}{temp}       = round1 ($temp)                   if(defined $temp);
           $data{$name}{aidectree}{airaw}{$ridx}{con}        = $con                             if(defined $con     && $con     >= 0);
           $data{$name}{aidectree}{airaw}{$ridx}{conaifc}    = $conaifc                         if(defined $conaifc && $conaifc >= 0);
           $data{$name}{aidectree}{airaw}{$ridx}{gcons}      = $gcons                           if(defined $gcons   && $gcons   >= 0);
@@ -24247,8 +24244,8 @@ sub aiFannTrain {
       $ann->layer_activation_steepness($i, max(0.1, $steepness[$i-1]));
   }
   
-  my $lr = sprintf "%.5f", $ann->learning_rate;
-  my $lm = sprintf "%.1f", $ann->learning_momentum;
+  my $lr = round5 ($ann->learning_rate);
+  my $lm = round1 ($ann->learning_momentum);
   my $ta = $ann->training_algorithm;
   
   if ($debug =~ /aiProcess/xs) {
@@ -25040,21 +25037,21 @@ sub _aiFannRetrainIndicator {
 
   
   if ($debug =~ /aiProcess/xs) {
-      $mse_train      = sprintf "%.6f", $mse_train;
-      $mse_val        = sprintf "%.6f", $mse_val;
-      $ratio          = sprintf "%.6f", $ratio;
-      $diff           = sprintf "%.6f", $diff;
+      $mse_train      = round6 ($mse_train);
+      $mse_val        = round6 ($mse_val);
+      $ratio          = round6 ($ratio);
+      $diff           = round6 ($diff);
       $valstd         = sprintf "%.10f", $valstd;
       $valmean        = sprintf "%.10f", $valmean;
-      $model_slope    = sprintf "%.6f", $model_slope;
+      $model_slope    = round6 ($model_slope);
       $model_bias     = sprintf "%.2f", $model_bias;
       $r2             = sprintf "%.2f", $r2;
       
-      $rmse_mae_ratio = sprintf "%.4f", $rmse_mae_ratio;
+      $rmse_mae_ratio = round4 ($rmse_mae_ratio);
       $max_abs_error  = sprintf "%.2f", $max_abs_error;
-      $p95_error      = sprintf "%.4f", $p95_error;
-      $p99_error      = sprintf "%.4f", $p99_error;
-      $bitfail_rate   = sprintf "%.4f", $bitfail_rate;
+      $p95_error      = round4 ($p95_error);
+      $p99_error      = round4 ($p99_error);
+      $bitfail_rate   = round4 ($bitfail_rate);
   
       Log3 ($name, 1, "$name DEBUG> Retrain check -> \n".
                       "-- In Normalization Space: -- \n".
@@ -25668,14 +25665,14 @@ sub aiFannDetectDrift {
   # --- Ergebnisse speichern ---
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelLive}  = sprintf "%.2f", $rmse_rel_live;
   $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = sprintf "%.2f", $bias_drift;
-  $data{$name}{neuralnet}{$fanntyp}{DriftSlope}        = sprintf "%.3f", $slope_drift;
-  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeLive}    = sprintf "%.3f", $slope_live;
+  $data{$name}{neuralnet}{$fanntyp}{DriftSlope}        = round3 ($slope_drift);
+  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeLive}    = round3 ($slope_live);
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = sprintf "%.2f", $bias_live;
   $data{$name}{neuralnet}{$fanntyp}{DriftMaeLive}      = sprintf "%.2f", $mae_live;
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseLive}     = sprintf "%.2f", $rmse_live;
   $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = sprintf "%.2f", $drift_score;
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = sprintf "%.2f", $rmse_rel_ratio;
-  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeRel}     = sprintf "%.3f", $slope_drift_rel;
+  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeRel}     = round3 ($slope_drift_rel);
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasNorm}     = sprintf "%.2f", $bias_drift_norm;
   $data{$name}{neuralnet}{$fanntyp}{DriftFlag}         = $flag;
 
@@ -29191,8 +29188,11 @@ sub getConsumerPlanningMode {
   my $hash = shift;
   my $c    = shift;
 
-  my $name    = $hash->{NAME};
-  my $cplmode = ConsumerVal ($name, $c, 'mode', DEFCMODE);                                    # Consumer Planungsmode
+  my $name        = $hash->{NAME};
+  my $cplmode     = ConsumerVal ($name, $c, 'mode', DEFCMODE);                                       # Consumer Planungsmode
+  my $globalmode  = CurrentVal  ($name, 'globalMode', 'unset');                                      # globaler Mode
+  
+  $cplmode        = $globalmode if($globalmode ne 'unset');
 
   if ($cplmode =~ /^(?:can|must|mustNot)$/xs) {
       return $cplmode;
@@ -29244,7 +29244,7 @@ sub getConsumerMintime {
       my $tdiff                  = (CurrentVal ($name, 'sunsetTodayTs',  0) + $setshift) -
                                    (defined $startts ? $startts : $sunrisestartts);
 
-      $mintime                   = sprintf '%.1f', ($tdiff / 60);
+      $mintime                   = round1 ($tdiff / 60);
 
       if ($debug =~ /consumerPlanning/x && !$nolog) {
           Log3 ($name, 1, "$name DEBUG> consumer '$c' - mintime is controlled by 'SunPath'");
@@ -29358,7 +29358,7 @@ sub setTimeTracking {
   my $st   = shift;                  # Startzeitstempel
   my $tkn  = shift;                  # Name des Zeitschlüssels
 
-  $data{$name}{current}{$tkn} = sprintf "%.5f", tv_interval($st);
+  $data{$name}{current}{$tkn} = round5 (tv_interval($st));
 
 return;
 }
@@ -30813,11 +30813,36 @@ return $bin;
 }
 
 ################################################################
-#    Mathematisch ohne Nachkommastelle runden
+#                    Mathematisch runden
 ################################################################  
 sub round0 {
   my ($x) = @_;
   return sprintf ("%.0f", $x);
+}
+
+sub round1 {
+  my ($x) = @_;
+  return sprintf ("%.1f", $x);
+}
+
+sub round3 {
+  my ($x) = @_;
+  return sprintf ("%.3f", $x);
+}
+
+sub round4 {
+  my ($x) = @_;
+  return sprintf ("%.4f", $x);
+}
+
+sub round5 {
+  my ($x) = @_;
+  return sprintf ("%.5f", $x);
+}
+
+sub round6 {
+  my ($x) = @_;
+  return sprintf ("%.6f", $x);
 }
 
 ################################################################
@@ -33182,25 +33207,32 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>adviceIcon</b>          </td><td>Defines the type of information about the planned switching times of a consumer in the consumer legend.                 </td></tr>
-            <tr><td>                            </td><td><b>&lt;Icon&gt[@&lt;Color]&gt</b> - Activation recommendation is displayed by icon and color (default: clock@gold)      </td></tr>
-            <tr><td>                            </td><td><b>times</b> - the planning status and the planned switching times are displayed as text                                </td></tr>
-            <tr><td>                            </td><td><b>none</b>  - no display of planning data                                                                              </td></tr>
-            <tr><td>                            </td><td>                                                                                                                        </td></tr>
-            <tr><td> <b>detailLink</b>          </td><td>If set, the devices can be clicked on in the consumer legend to open the detailed view of the device.                   </td></tr>
-            <tr><td>                            </td><td>Value: <b>0|1</b>, default: 1                                                                                           </td></tr>
-            <tr><td>                            </td><td>                                                                                                                        </td></tr>
-            <tr><td> <b>dummyIcon</b>           </td><td>Icon and, if applicable, its color for displaying the dummy consumer in the flow chart (optional).                      </td></tr>
-            <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Color&gt;]</b>                                                                           </td></tr>
-            <tr><td>                            </td><td>If only the color of the standard dummy icon is to be changed, only '@&lt;color&gt;' can be specified.                  </td></tr>
-            <tr><td>                            </td><td>The color can be specified as a hex value (e.g. #cc3300) or designation (e.g. red, blue).                               </td></tr>
-            <tr><td>                            </td><td>                                                                                                                        </td></tr>
-            <tr><td> <b>showLegend</b>          </td><td>Defines the position or display method of the consumer legend if consumers are registered.                              </td></tr>
-            <tr><td>                            </td><td>To hide the consumer panel, please use <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>.                   </td></tr>
-            <tr><td>                            </td><td><b>icon_top</b> - the legend is displayed above the bar chart with consumer icons (default)                             </td></tr>
-            <tr><td>                            </td><td><b>icon_bottom</b> - the legend is displayed below the bar and flow chart with consumer icons                           </td></tr>
-            <tr><td>                            </td><td><b>text_top</b> - the legend is displayed above the bar chart without consumer icons                                    </td></tr>
-            <tr><td>                            </td><td><b>text_bottom</b> - the legend is displayed below the bar chart and flow chart without consumer icons                  </td></tr>
+            <tr><td> <b>adviceIcon</b>          </td><td>Defines the type of information about the planned switching times of a consumer in the consumer legend.                                            </td></tr>
+            <tr><td>                            </td><td><b>&lt;Icon&gt[@&lt;Color]&gt</b> - Activation recommendation is displayed by icon and color (default: clock@gold)                                 </td></tr>
+            <tr><td>                            </td><td><b>times</b> - the planning status and the planned switching times are displayed as text                                                           </td></tr>
+            <tr><td>                            </td><td><b>none</b>  - no display of planning data                                                                                                         </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>detailLink</b>          </td><td>If set, the devices can be clicked on in the consumer legend to open the detailed view of the device.                                              </td></tr>
+            <tr><td>                            </td><td>Value: <b>0|1</b>, default: 1                                                                                                                      </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>dummyIcon</b>           </td><td>Icon and, if applicable, its color for displaying the dummy consumer in the flow chart (optional).                                                 </td></tr>
+            <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Color&gt;]</b>                                                                                                      </td></tr>
+            <tr><td>                            </td><td>If only the color of the standard dummy icon is to be changed, only '@&lt;color&gt;' can be specified.                                             </td></tr>
+            <tr><td>                            </td><td>The color can be specified as a hex value (e.g. #cc3300) or designation (e.g. red, blue).                                                          </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>globalMode</b>          </td><td>Sets the planning mode globally for all consumers. This setting takes precedence over specific mode settings.                                      </td></tr>
+            <tr><td>                            </td><td>The meaning of the options is identical to the setting of the specific <i>consumerXX->mode</i>:                                                    </td></tr>
+            <tr><td>                            </td><td><b>unset</b> - No global mode setting; consumer-specific mode applies. Corresponds to an unset attribute key.                                      </td></tr>
+			<tr><td>                            </td><td><b>can</b>  - Scheduling takes place at a time when there is likely to be sufficient PV surplus available.                                         </td></tr>
+            <tr><td>                            </td><td><b>must</b> - The consumer is optimally scheduled, even if there is likely to be insufficient PV surplus available.                                </td></tr>
+            <tr><td>                            </td><td><b>mustNot</b> - The consumer must not be scheduled or started. Started consumers are stopped.                                                     </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>showLegend</b>          </td><td>Defines the position or display method of the consumer legend if consumers are registered.                                                         </td></tr>
+            <tr><td>                            </td><td>To hide the consumer panel, please use <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>.                                              </td></tr>
+            <tr><td>                            </td><td><b>icon_top</b> - the legend is displayed above the bar chart with consumer icons (default)                                                        </td></tr>
+            <tr><td>                            </td><td><b>icon_bottom</b> - the legend is displayed below the bar and flow chart with consumer icons                                                      </td></tr>
+            <tr><td>                            </td><td><b>text_top</b> - the legend is displayed above the bar chart without consumer icons                                                               </td></tr>
+            <tr><td>                            </td><td><b>text_bottom</b> - the legend is displayed below the bar chart and flow chart without consumer icons                                             </td></tr>
          </table>
          </ul>
 
@@ -36162,26 +36194,33 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
-            <tr><td> <b>adviceIcon</b>          </td><td>Definiert die Art der Information über die geplanten Schaltzeiten eines Verbrauchers in der Verbraucherlegende.                 </td></tr>
-            <tr><td>                            </td><td><b>&lt;Icon&gt[@&lt;Farbe]&gt</b> - Aktivierungsempfehlung wird durch Icon und Farbe dargestellt (default: clock@gold)          </td></tr>
-            <tr><td>                            </td><td><b>times</b> - der Planungsstatus und die geplanten Schaltzeiten werden als Text angezeigt                                      </td></tr>
-            <tr><td>                            </td><td><b>none</b>  - keine Anzeige der Planungsdaten                                                                                  </td></tr>
-            <tr><td>                            </td><td>                                                                                                                                </td></tr>
-            <tr><td> <b>detailLink</b>          </td><td>Wenn gesetzt, sind die Geräte in der Verbraucher-Legende anklickbar um die Detailansicht des Gerätes zu öffnen.                 </td></tr>
-            <tr><td>                            </td><td>Wert: <b>0|1</b>, default: 1                                                                                                    </td></tr>
-            <tr><td>                            </td><td>                                                                                                                                </td></tr>
-            <tr><td> <b>dummyIcon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Dummy-Verbrauchers in der Flußgrafik (optional)                                  </td></tr>
-            <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Farbe&gt;]</b>                                                                                   </td></tr>
-            <tr><td>                            </td><td>Soll nur die Farbe des Standard Dummy-Icon geändert werden, kann lediglich '@&lt;Farbe&gt;' angegeben werden.                   </td></tr>
-            <tr><td>                            </td><td>Die Farbe kann als Hex-Wert (z.B. #cc3300) oder Bezeichnung (z.B. red, blue) angegeben werden.                                  </td></tr>
-            <tr><td>                            </td><td>                                                                                                                                </td></tr>
-            <tr><td> <b>showLegend</b>          </td><td>Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher registriert sind.                           </td></tr>
-            <tr><td>                            </td><td>Zur Ausblendung des Verbraucherpaneels bitte <a href="#SolarForecast-attr-graphicSelect ">graphicSelect</a> verwenden.          </td></tr>
-            <tr><td>                            </td><td><b>icon_top</b> - die Legende wird oberhalb der Balkengrafik mit Verbrauchericons angezeigt (default)                           </td></tr>
-            <tr><td>                            </td><td><b>icon_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik mit Verbrauchericons angezeigt                       </td></tr>
-            <tr><td>                            </td><td><b>text_top</b> - die Legende wird oberhalb der Balkengrafik ohne Verbrauchericons angezeigt                                    </td></tr>
-            <tr><td>                            </td><td><b>text_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik ohne Verbrauchericons angezeigt                      </td></tr>
-            <tr><td>                            </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>adviceIcon</b>          </td><td>Definiert die Art der Information über die geplanten Schaltzeiten eines Verbrauchers in der Verbraucherlegende.                                    </td></tr>
+            <tr><td>                            </td><td><b>&lt;Icon&gt[@&lt;Farbe]&gt</b> - Aktivierungsempfehlung wird durch Icon und Farbe dargestellt (default: clock@gold)                             </td></tr>
+            <tr><td>                            </td><td><b>times</b> - der Planungsstatus und die geplanten Schaltzeiten werden als Text angezeigt                                                         </td></tr>
+            <tr><td>                            </td><td><b>none</b>  - keine Anzeige der Planungsdaten                                                                                                     </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>detailLink</b>          </td><td>Wenn gesetzt, sind die Geräte in der Verbraucher-Legende anklickbar um die Detailansicht des Gerätes zu öffnen.                                    </td></tr>
+            <tr><td>                            </td><td>Wert: <b>0|1</b>, default: 1                                                                                                                       </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>dummyIcon</b>           </td><td>Icon und ggf. dessen Farbe zur Darstellung des Dummy-Verbrauchers in der Flußgrafik (optional)                                                     </td></tr>
+            <tr><td>                            </td><td>Syntax: <b>[&lt;Icon&gt;][@&lt;Farbe&gt;]</b>                                                                                                      </td></tr>
+            <tr><td>                            </td><td>Soll nur die Farbe des Standard Dummy-Icon geändert werden, kann lediglich '@&lt;Farbe&gt;' angegeben werden.                                      </td></tr>
+            <tr><td>                            </td><td>Die Farbe kann als Hex-Wert (z.B. #cc3300) oder Bezeichnung (z.B. red, blue) angegeben werden.                                                     </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>globalMode</b>          </td><td>Setzt den Planungsmodus global für alle Verbraucher. Diese Einstellung ist dominant gegenüber spezifischen mode Einstellungen.                     </td></tr>
+            <tr><td>                            </td><td>Die Bedeutung der Optionen ist identisch mit der Einstellung des spezifischen <i>consumerXX->mode</i>:                                             </td></tr>
+            <tr><td>                            </td><td><b>unset</b> - keine globale mode Einstellung, es gilt der verbraucherspezifische mode. Entspricht einem nicht gesetzten Attributschlüssel.        </td></tr>
+			<tr><td>                            </td><td><b>can</b>  - die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß                                            </td></tr>
+            <tr><td>                            </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                   </td></tr>
+            <tr><td>                            </td><td><b>mustNot</b> - Der Verbraucher darf nicht geplant bzw. gestartet werden. Gestartete Verbraucher werden gestoppt                                  </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>showLegend</b>          </td><td>Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher registriert sind.                                              </td></tr>
+            <tr><td>                            </td><td>Zur Ausblendung des Verbraucherpaneels bitte <a href="#SolarForecast-attr-graphicSelect ">graphicSelect</a> verwenden.                             </td></tr>
+            <tr><td>                            </td><td><b>icon_top</b> - die Legende wird oberhalb der Balkengrafik mit Verbrauchericons angezeigt (default)                                              </td></tr>
+            <tr><td>                            </td><td><b>icon_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik mit Verbrauchericons angezeigt                                          </td></tr>
+            <tr><td>                            </td><td><b>text_top</b> - die Legende wird oberhalb der Balkengrafik ohne Verbrauchericons angezeigt                                                       </td></tr>
+            <tr><td>                            </td><td><b>text_bottom</b> - die Legende wird unterhalb der Balken- und Flußgrafik ohne Verbrauchericons angezeigt                                         </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
           </table>
          </ul>
 
