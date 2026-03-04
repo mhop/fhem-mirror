@@ -1,5 +1,5 @@
 defmod Stromboerse_connect HTTPMOD none 0
-attr Stromboerse_connect userattr conf_EVU_Tibber_Grundgebuehr_EUR_Jahr conf_EVU_Tibber_Korrektur conf_EVU_Tibber_Zuschlag_ct_kWh conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr conf_EVU_aWATTar_Zuschlag_ct_kWh conf_Netz_Jahresverbrauch_kWh conf_Speicher_Ladepreisdifferenz conf_VAT conf_VNB conf_VNB_Arbeitspreis_ct_kWh conf_VNB_KWKG_ct_kWh conf_VNB_Konzession_ct_kWh conf_VNB_Leistungspreis_EUR_Jahr conf_VNB_MSB_iMSys_EUR_Jahr conf_VNB_MSB_mME_EUR_Jahr conf_VNB_Messstelle conf_VNB_Netzentgelt_ct_kWh conf_VNB_Paragraph_19_Umlage_ct_kWh conf_VNB_Stromsteuer_ct_kWh ws_homeId ws_minInterval ws_myId ws_token ws_websocketURL
+attr Stromboerse_connect userattr conf_EVU_Tibber_Grundgebuehr_EUR_Jahr conf_EVU_Tibber_Korrektur conf_EVU_Tibber_Zuschlag_ct_kWh conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr conf_EVU_aWATTar_Zuschlag_ct_kWh conf_Netz_Jahresverbrauch_kWh conf_Netz_Zaehler conf_Netz_Zaehler_Reading  conf_Speicher_Ladepreisdifferenz conf_VAT conf_VNB conf_VNB_Arbeitspreis_ct_kWh conf_VNB_KWKG_ct_kWh conf_VNB_Konzession_ct_kWh conf_VNB_Leistungspreis_EUR_Jahr conf_VNB_MSB_iMSys_EUR_Jahr conf_VNB_MSB_mME_EUR_Jahr conf_VNB_Messstelle conf_VNB_Netzentgelt_ct_kWh conf_VNB_Paragraph_19_Umlage_ct_kWh conf_VNB_Stromsteuer_ct_kWh ws_homeId ws_minInterval ws_myId ws_token ws_websocketURL
 attr Stromboerse_connect DbLogExclude .*
 attr Stromboerse_connect DbLogInclude total_cost_.*,fc._trigger.*
 attr Stromboerse_connect DbLogValueFn {\
@@ -61,7 +61,9 @@ attr Stromboerse_connect conf_EVU_Tibber_Korrektur 0.755
 attr Stromboerse_connect conf_EVU_Tibber_Zuschlag_ct_kWh 2.15
 attr Stromboerse_connect conf_EVU_aWATTar_Grundgebuehr_EUR_Jahr 46.20
 attr Stromboerse_connect conf_EVU_aWATTar_Zuschlag_ct_kWh 0
-attr Stromboerse_connect conf_Netz_Jahresverbrauch_kWh 5099
+attr Stromboerse_connect conf_Netz_Jahresverbrauch_kWh 3500
+attr Stromboerse_connect conf_Netz_Zaehler WR_0_KSEM
+attr Stromboerse_connect conf_Netz_Zaehler_Reading Active_energy+
 attr Stromboerse_connect conf_Speicher_Ladepreisdifferenz 20
 attr Stromboerse_connect conf_VAT 1.19
 attr Stromboerse_connect conf_VNB Mainzer Netze GmbH (64560)
@@ -1429,9 +1431,8 @@ conf_EVU_Summe_ct_kWh:conf_EVU.* {\
        + AttrVal($name,"conf_VNB_Stromsteuer_ct_kWh",0);;\
 \
     $Summe_ct_kWh *= AttrVal($name,"conf_EVU_".$conf_EVU."_Korrektur",1);;\
-    $Summe_ct_kWh  = round($Summe_ct_kWh ,4);;                   # Netto Aufschlag pro kWh\
 \
-    Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Zuschlag von $Summe_ct_kWh ct/kWh für $conf_EVU berechnet");;\
+    Log3($name,3,sprintf("%-20s ur_01 : Zuschlag von %.4f ct/kWh für %s berechnet", $name, $Summe_ct_kWh, $conf_EVU));;\
   } # end if\
 \
   if ( $conf_EVU eq "aWATTar" ) {                                              # Es wurde ein EVU ausgewählt\
@@ -1447,12 +1448,12 @@ conf_EVU_Summe_ct_kWh:conf_EVU.* {\
 \
     $Summe_ct_kWh *= AttrVal($name,"conf_EVU_".$conf_EVU."_Korrektur",1);;\
     $Summe_ct_kWh  = round($Summe_ct_kWh ,4);;                    # Netto Aufschlag pro kWh\
-    Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Zuschlag von $Summe_ct_kWh für $conf_EVU berechnet");;\
-    Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Zusätzlich erfolgt bei $conf_EVU ein dynamischer Zuschlag von val+0.03*abs(val) pro kWh");;\
+    Log3($name,3,sprintf("%-20s ur_01 : Zuschlag von $Summe_ct_kWh für %s berechnet", $name, $conf_EVU));;\
+    Log3($name,3,sprintf("%-20s ur_01 : Zusätzlich erfolgt bei $conf_EVU ein dynamischer Zuschlag von val+0.03*abs(val) pro kWh", $name));;\
   } # end if\
 \
   if ( $conf_EVU eq "EPEX_Spot" ) {\
-    Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Zuschlag von 0 für $conf_EVU");;\
+    Log3($name,3,sprintf("%-20s ur_01 : Zuschlag von 0 für $conf_EVU", $name));;\
   } # end if\
 \
   if ( $conf_EVU ne "Tibber_Live" ) {\
@@ -1461,7 +1462,7 @@ conf_EVU_Summe_ct_kWh:conf_EVU.* {\
    fhem("get $name 02_Preis_Info_Tibber_Live");;\
   }\
 \
-  Log3($name,3,sprintf("%-20s ur_01 : ", $name)."Daten für $conf_EVU aktualisiert");;\
+  Log3($name,3,sprintf("%-20s ur_01 : Daten für $conf_EVU aktualisiert", $name));;\
 \
   return $Summe_ct_kWh;;\
 },\
@@ -1475,18 +1476,18 @@ current_level:fc._0000_total.* {\
   readingsBeginUpdate($hash);;\
   readingsBulkUpdate($hash,"current_price",ReadingsVal($name,sprintf("fc0_%02d%02d_total",$hour, int($min/15)*15),0) );;\
   readingsBulkUpdate($hash,"current_date",sprintf("%d-%02d-%02d %02d:%02d:00", $year, $mon, $mday, $hour, int($min/15)*15) );;\
-  Log3($name,3,sprintf("%-20s ur_02 : ", $name)."fc  Current Werte gesetzt");;\
+  Log3($name,3,sprintf("%-20s ur_02 : fc  Current Werte gesetzt", $name));;\
   readingsBulkUpdate($hash,"fc0_0000_startsAt",sprintf("%d-%02d-%02d 00:00:00", $year, $mon, $mday) );;\
-  Log3($name,3,sprintf("%-20s ur_02 : ", $name)."fc0 Startzeit der Daten gesetzt");;\
+  Log3($name,3,sprintf("%-20s ur_02 : fc0 Startzeit der Daten gesetzt", $name));;\
 \
   if (      ReadingsVal($name,"fc1_0000_total","null") eq "null"             ## Der nächste Tag ist noch nicht da\
       and ReadingsVal($name,"fc1_0000_startsAt","9999-99-99 00:00:00") ge sprintf("%d-%02d-%02d 00:00:00", $year, $mon, $mday))\
   {\
     fhem("deletereading ".$name." fc1_0000_startsAt");;\
-    Log3($name,3,sprintf("%-20s ur_02 : ", $name)."fc1 Daten sind noch nicht da");;\
+    Log3($name,3,sprintf("%-20s ur_02 : fc1 Daten sind noch nicht da", $name));;\
   } else {\
     readingsBulkUpdate($hash,"fc1_0000_startsAt",strftime("%Y-%m-%d 00:00:00",localtime(time+86400)) );;\
-    Log3($name,3,sprintf("%-20s ur_02 : ", $name)."fc1 Startzeit der Daten gesetzt");;\
+    Log3($name,3,sprintf("%-20s ur_02 : fc1 Startzeit der Daten gesetzt", $name));;\
   } # end if\
 },\
 \
@@ -1496,7 +1497,7 @@ fc_avg:current_price.* {\
 \
   my $fc_tmp = 0;;\
 \
-  my $stop_fc      = (ReadingsVal($name,"fc1_0000_startsAt","null") ne "null") ? 1 : 0;;\
+  my $stop_fc = (ReadingsVal($name,"fc1_0000_startsAt","null") ne "null") ? 1 : 0;;\
   my $start_quarter = int($min / 15);;\
   for (my $loop_fc = 0;; $loop_fc <= $stop_fc;; $loop_fc++) {\
     my $start_hour = ($loop_fc == 0) ? $hour : 0;;\
@@ -1504,19 +1505,19 @@ fc_avg:current_price.* {\
       my $start_quarter = ($loop_fc == 0 && $loop_hour == $hour) ? $start_quarter : 0;;\
       for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_tmp += ReadingsVal($name,sprintf("fc%d_%02d%02d_total", $loop_fc, $loop_hour, $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_03 : ", $name).sprintf(" fc%d %02d:%02d fc_sum %.2f", $loop_fc, $loop_hour, $loop_quarter*15, $fc_tmp));;\
+        Log3($name,4,sprintf("%-20s ur_03 :  fc%d %02d:%02d fc_sum %.2f", $name, $loop_fc, $loop_hour, $loop_quarter*15, $fc_tmp));;\
       } # end $loop_quarter\
     } # end $loop_hour\
   } # end $loop_fc\
 \
-  $fc_tmp = round($fc_tmp / ( (96 - $hour*4) + (96 *$stop_fc) ) ,2);;        # Durchschnitt berechnen\
-  Log3($name,3,sprintf("%-20s ur_03 : ", $name)."berechne Durchschnittspreis $fc_tmp");;\
+  $fc_tmp = round($fc_tmp / ( (96 - $hour*4) + (96 *$stop_fc) ),2);;        # Durchschnitt berechnen\
+  Log3($name,3,sprintf("%-20s ur_03 : berechne Durchschnittspreis %.2f", $name, $fc_tmp));;\
   return $fc_tmp;;\
 },\
 \
 fc_med:current_price.* {\
 ## Berechnung des median Wertes\
-  my $fc_tmp = ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
+  my $fc_tmp = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
            SELECT\
              cast( (   (SUBSTRING_INDEX(SUBSTRING_INDEX(group_concat(VALUE order by VALUE), ',', floor(1+((count(VALUE)-1) / 2)))  , ',', -1))\
                        + (SUBSTRING_INDEX(SUBSTRING_INDEX(group_concat(VALUE order by VALUE), ',', ceiling(1+((count(VALUE)-1) / 2))), ',', -1))\
@@ -1526,7 +1527,7 @@ fc_med:current_price.* {\
            WHERE DEVICE='".$name."'\
              AND (   READING='fc0_total' AND TIMESTAMP >= DATE_FORMAT(NOW(), '%Y-%m-%d 00:00:00')\
                      OR READING='fc1_total' AND TIMESTAMP >= DATE_FORMAT(NOW() + INTERVAL 1 DAY, '%Y-%m-%d 00:00:00') ) ;;") ;;\
-  Log3($name,3,sprintf("%-20s ur_04 : ", $name)."berechne Medianwert         $fc_tmp");;\
+  Log3($name,3,sprintf("%-20s ur_04 : berechne Medianwert         %.2f", $name, $fc_tmp));;\
   return $fc_tmp;;\
 },\
 \
@@ -1547,23 +1548,27 @@ fc_min:current_price.* {\
         $fc_tmp = ReadingsVal($name,sprintf("fc%d_%02d%02d_total", $loop_fc, $loop_hour, $loop_quarter*15),0);;\
         if (($fc_tmp < $fc_min) || ($loop_fc == 0 && $loop_hour == $hour && $loop_quarter == $start_quarter)) {\
           $fc_min = $fc_tmp;;\
-          Log3($name,4,sprintf("%-20s ur_05 : ", $name).sprintf(" fc%d %02d:%02d fc_min %.2f", $loop_fc, $loop_hour, $loop_quarter*15, $fc_min));;\
+          Log3($name,4,sprintf("%-20s ur_05 :  fc%d %02d:%02d fc_min %.2f", $name, $loop_fc, $loop_hour, $loop_quarter*15, $fc_min));;\
         } # end if min\
       } # end $loop_quarter\
     } # end $loop_hour\
   } # end $loop_fc\
 \
   $fc_min = round($fc_min ,2);;\
-  Log3($name,3,sprintf("%-20s ur_05 : ", $name)."berechne Minimalpreis       $fc_min");;\
+  Log3($name,3,sprintf("%-20s ur_05 : berechne Minimalpreis       %.2f", $name, $fc_min));;\
   return $fc_min;;                                                       # Min Wert gerundet in Cent ausgeben\
 },\
 \
-fc_max:current_price.* {\
-##  Ermittlung des minimal Wertes\
+fc_max1:current_price.* {\
+##  Ermittlung des maximal Wertes\
+  my $hash = $defs{$name};;\
+  readingsBeginUpdate($hash);;\
+\
   my ($sec,$min,$hour) = localtime(time);;\
 \
-  my $fc_max = 0;;\
-  my $fc_tmp = 0;;\
+  my $fc_max1 = 0;;\
+  my $fc_max2 = 0;;\
+  my $fc_tmp  = 0;;\
 \
   my $stop_fc      = (ReadingsVal($name,"fc1_0000_startsAt","null") ne "null") ? 1 : 0;;\
   my $start_quarter = int($min / 15);;\
@@ -1573,24 +1578,32 @@ fc_max:current_price.* {\
       my $start_quarter = ($loop_fc == 0 && $loop_hour == $hour) ? $start_quarter : 0;;\
       for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_tmp = ReadingsVal($name,sprintf("fc%d_%02d%02d_total", $loop_fc, $loop_hour, $loop_quarter*15),0);;\
-        if (($fc_tmp > $fc_max) || ($loop_fc == 0 && $loop_hour == 0 && $loop_quarter == 0)) {\
-          $fc_max = $fc_tmp;;\
-          Log3($name,4,sprintf("%-20s ur_06 : ", $name).sprintf(" fc%d %02d:%02d fc_max: %.2f",$loop_fc, $loop_hour, $loop_quarter*15, $fc_max));;\
+        if (($fc_tmp > $fc_max1) || ($loop_fc == 0 && $loop_hour == 0 && $loop_quarter == 0)) {\
+          if ( $fc_tmp > $fc_max2 ) {\
+            $fc_max2 = $fc_max1;;\
+          }\
+          $fc_max1  = $fc_tmp;;\
+          Log3($name,3,sprintf("%-20s ur_06 :  fc%d %02d:%02d fc_max1: %.2f fc_max2: %.2f", $name, $loop_fc, $loop_hour, $loop_quarter*15, $fc_max1, $fc_max2));;\
         } # end if max\
       } # end $loop_quarter\
     } # end $loop_hour\
   } # end $loop_fc\
-  $fc_max = round($fc_max ,2);;\
-  Log3($name,3,sprintf("%-20s ur_06 : ", $name)."berechne Maximalpreis       $fc_max");;\
-  return $fc_max;;                                                       # Max Wert gerundet in Cent ausgeben\
+  # Max Wert gerundet in Cent ausgeben\
+  $fc_max1 = round($fc_max1 ,2);;\
+  $fc_max2 = round($fc_max2 ,2);;\
+  Log3($name,3,sprintf("%-20s ur_06 : berechne Maximalpreis       %.2f %.2f", $name, $fc_max1, $fc_max2));;\
+  readingsBulkUpdate($hash, "fc_max1", $fc_max1);;\
+  readingsBulkUpdate($hash, "fc_max2", $fc_max2);;\
+  readingsEndUpdate($hash,1);;   # 1 = Event erzwingen\
+  return;;\
 },\
 \
-current_level:fc_max.* {\
+current_level:fc_max1.* {\
 ##  Einstufung des Preisniveaus\
   my $current = ReadingsVal($name,"current_price",0);;\
   my $fc_avg  = ReadingsVal($name,"fc_avg",0);;\
   my $fc_min  = ReadingsVal($name,"fc_min",0);;\
-  my $fc_max  = ReadingsVal($name,"fc_max",0);;\
+  my $fc_max  = ReadingsVal($name,"fc_max1",0);;\
   my $range   = $fc_max - $fc_min;;\
 \
 ## Aufteilung 25% / 50% / 25%\
@@ -1608,8 +1621,8 @@ current_level:fc_max.* {\
 #    $fc_avg >= $high ? "NORMAL"  :\
 #                       "TEUER";;\
 \
-  Log3($name,3,sprintf("%-20s ur_07 : ", $name)."berechne current_level Einteilung");;\
-  Log3($name,4,sprintf("%-20s ur_07 : ", $name).sprintf(" avg: %.2f min: %.2f max: %.2f range: %.2f current_price: %.2f current_level: %s",$fc_avg, $fc_min, $fc_max, $range, $current, $class));;\
+  Log3($name,3,sprintf("%-20s ur_07 : berechne current_level Einteilung", $name));;\
+  Log3($name,4,sprintf("%-20s ur_07 :  avg: %.2f min: %.2f max: %.2f range: %.2f current_price: %.2f current_level: %s", $name, $fc_avg, $fc_min, $fc_max, $range, $current, $class));;\
   return $class;;\
 },\
 \
@@ -1625,10 +1638,10 @@ fc_trigger_net_price:fc_avg.* {\
   my $fc_trigger_net_price= round( ($fc_avg - $fc_min)/2 + $fc_min , 2);;\
 \
   # Abschätzung von Wirtschaftlichkeit beim Speicher Laden, falls die Börse zu teuer wird\
-  my $fc_trigger_bat_price = round( ReadingsVal($name,"fc_max",0) *(1-(AttrVal($name,"conf_Speicher_Ladepreisdifferenz",0)/100)), 2);;\
+  my $fc_trigger_bat_price = round( ReadingsVal($name,"fc_max1",0) *(1-(AttrVal($name,"conf_Speicher_Ladepreisdifferenz",0)/100)), 2);;\
   readingsBulkUpdate($hash, "fc_trigger_bat_price", $fc_trigger_bat_price);;\
 \
-  Log3($name,3,sprintf("%-20s ur_07 : ", $name)."berechne Triggerpreis  net: $fc_trigger_net_price bat: $fc_trigger_bat_price");;\
+  Log3($name,3,sprintf("%-20s ur_07 : berechne Triggerpreis  net: %.2f bat: %.2f ", $name, $fc_trigger_net_price, $fc_trigger_bat_price));;\
   return $fc_trigger_net_price;;\
 },\
 \
@@ -1636,10 +1649,11 @@ fc0_trigger_net_start:fc_trigger_net_price.* {\
   my $hash = $defs{$name};;\
   readingsBeginUpdate($hash);;\
 \
+  my $fc = 0;;\
   my ($sec,$min,$hour) = localtime(time);;\
   # Nur in der ersten Viertelstunde neu berechnen\
   if ($min >= 15) {\
-    Log3($name,3,sprintf("%-20s ur_07 : Neuberechnung von fc0_trigger_net_start gesperrt (Minute %02d)", $name,$min));;\
+    Log3($name,3,sprintf("%-20s ur_07 : Neuberechnung von fc%d_trigger_net_start gesperrt (Minute %02d)", $name, $fc, $min));;\
     # vorhandenen Wert holen\
     readingsBulkUpdate($hash,"fc0_trigger_net_dauer",ReadingsVal($name,"fc0_trigger_net_dauer","null"));;\
     readingsBulkUpdate($hash,"fc0_trigger_bat_dauer",ReadingsVal($name,"fc0_trigger_bat_dauer","null"));;\
@@ -1647,8 +1661,6 @@ fc0_trigger_net_start:fc_trigger_net_price.* {\
 \
     return;;\
   }\
-\
-  my $fc = 0;;\
 \
   my $fc_trigger_net_price = ReadingsVal($name,"fc_trigger_net_price",0);;\
   my $fc_trigger_bat_price = ReadingsVal($name,"fc_trigger_bat_price",0);;\
@@ -1681,7 +1693,7 @@ fc0_trigger_net_start:fc_trigger_net_price.* {\
               )\
            OR h1.READING LIKE 'fc1_trigger_bat_%' OR h1.READING LIKE 'fc1_trigger_net_%'\
           );;";;\
-  Log3($name,4,sprintf("%-20s ur_07 : ", $name)."Löschen von zeitlich überholten Datenbankeinträgen\n".($sql =~ s/\),\s*\(/\),\n\(/gr));;   # für die Anzeige lesbar umformatieren\
+  Log3($name,4,sprintf("%-20s ur_07 : Löschen von zeitlich überholten Datenbankeinträgen\n%s", $name, ($sql =~ s/\),\s*\(/\),\n\(/gr) ));;   # für die Anzeige lesbar umformatieren\
 ##  ::CommandGet(undef,"LogDBRep_${name}_SQL sqlCmdBlocking $sql");;\
 \
   # Ermitteln des nächsten Trigger Fensters\
@@ -1695,58 +1707,58 @@ fc0_trigger_net_start:fc_trigger_net_price.* {\
     my $start_quarter = ($loop_hour == $hour) ? $fc_trigger_start_quarter : 0;;\
     for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
       $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour , $loop_quarter*15),0);;\
-      Log3($name,4,sprintf("%-20s ur_07 : ", $name).sprintf(" fc%d Start     %02d:%02d total: %.2f net: %.2f bat: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price, $fc_trigger_bat_price));;\
+      Log3($name,4,sprintf("%-20s ur_07 :  fc%d Start     %02d:%02d total: %.2f net: %.2f bat: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price, $fc_trigger_bat_price));;\
       if ( $fc_total < $fc_trigger_net_price  and !$fc_total_net_found) {\
         $fc_total_net_found = sprintf("%02d:%02d", $loop_hour, $loop_quarter*15);;\
         if ( $loop_quarter+1 <= 3 ) {\
           $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, ($loop_quarter+1)*15),0);;\
-          Log3($name,4,sprintf("%-20s ur_07 : ", $name).sprintf(" fc%d Next net  %02d:%02d  next: %.2f",$fc, $loop_hour, ($loop_quarter+1)*15, $fc_total_next));;\
+          Log3($name,4,sprintf("%-20s ur_07 :  fc%d Next net  %02d:%02d  next: %.2f", $name, $fc, $loop_hour, ($loop_quarter+1)*15, $fc_total_next));;\
         } else {\
           if ( $loop_hour+1 <= 23 ) {\
             $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour+1, 0),0);;\
-            Log3($name,4,sprintf("%-20s ur_07 : ", $name).sprintf(" fc%d Next net  %02d:%02d  next: %.2f",$fc, $loop_hour+1, 0, $fc_total_next));;\
+            Log3($name,4,sprintf("%-20s ur_07 :  fc%d Next net  %02d:%02d  next: %.2f", $name, $fc, $loop_hour+1, 0, $fc_total_next));;\
           } else {\
             $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc+1, 0, 0),0);;\
-            Log3($name,4,sprintf("%-20s ur_07 : ", $name).sprintf(" fc%d Next net  %02d:%02d  next: %.2f",$fc+1, 0, 0, $fc_total_next));;\
+            Log3($name,4,sprintf("%-20s ur_07 :  fc%d Next net  %02d:%02d  next: %.2f", $name, $fc+1, 0, 0, $fc_total_next));;\
           } # end if loop_hour+1\
         } # end if quarter+1\
         if ( $fc_total_next > $fc_trigger_net_price ) {\
           $fc_total_net_found = undef;;\
-          Log3($name,3,sprintf("%-20s ur_07 : ", $name).sprintf("fc%d Next net  Trigger ist zu kurz",$fc));;\
+          Log3($name,3,sprintf("%-20s ur_07 : fc%d Next net  Trigger ist zu kurz", $name, $fc));;\
         } # end if\
-        Log3($name,3,sprintf("%-20s ur_07 : ", $name).sprintf("fc%d_trigger_net_start       %02d:%02d",$fc, $loop_hour, $loop_quarter*15));;\
+        Log3($name,3,sprintf("%-20s ur_07 : fc%d_trigger_net_start       %02d:%02d", $name, $fc, $loop_hour, $loop_quarter*15));;\
       } # end if $fc_total_net_found\
 \
       if ( $fc_total < $fc_trigger_bat_price and !$fc_total_bat_found ) {\
         $fc_total_bat_found = sprintf("%02d:%02d", $loop_hour, $loop_quarter*15);;\
         if ( $loop_quarter+1 <= 3 ) {\
           $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, ($loop_quarter+1)*15),0);;\
-          Log3($name,4,sprintf("%-20s ur_07 : ", $name).sprintf(" fc%d Next bat  %02d:%02d  next: %.2f",$fc, $loop_hour, ($loop_quarter+1)*15, $fc_total_next));;\
+          Log3($name,4,sprintf("%-20s ur_07 :  fc%d Next bat  %02d:%02d  next: %.2f", $name, $fc, $loop_hour, ($loop_quarter+1)*15, $fc_total_next));;\
         } else {\
           if ( $loop_hour+1 <= 23 ) {\
             $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour+1, 0),0);;\
-            Log3($name,4,sprintf("%-20s ur_07 : ", $name).sprintf(" fc%d Next bat  %02d:%02d  next: %.2f",$fc, $loop_hour+1, 0, $fc_total_next));;\
+            Log3($name,4,sprintf("%-20s ur_07 :  fc%d Next bat  %02d:%02d  next: %.2f", $name, $fc, $loop_hour+1, 0, $fc_total_next));;\
           } else {\
             $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc+1, 0, 0),0);;\
-            Log3($name,4,sprintf("%-20s ur_07 : ", $name).sprintf(" fc%d Next bat  %02d:%02d  next: %.2f",$fc+1, 0, 0, $fc_total_next));;\
+            Log3($name,4,sprintf("%-20s ur_07 :  fc%d Next bat  %02d:%02d  next: %.2f", $name, $fc+1, 0, 0, $fc_total_next));;\
           } # end if loop_hour+1\
         } # end if quarter+1\
         if ( $fc_total_next > $fc_trigger_bat_price ) {\
           $fc_total_bat_found = undef;;\
-          Log3($name,3,sprintf("%-20s ur_07 : ", $name).sprintf("fc%d Next bat  Trigger ist zu kurz",$fc));;\
+          Log3($name,3,sprintf("%-20s ur_07 : fc%d Next bat  Trigger ist zu kurz", $name, $fc));;\
         } # end if\
-        Log3($name,3,sprintf("%-20s ur_07 : ", $name).sprintf("fc%d_trigger_bat_start       %02d:%02d ",$fc, $loop_hour, $loop_quarter*15));;\
+        Log3($name,3,sprintf("%-20s ur_07 : fc%d_trigger_bat_start       %02d:%02d", $name, $fc, $loop_hour, $loop_quarter*15));;\
       } # end if $fc_total_bat_found\
 #####################\
         # wenn es 23:45 is wechsel zum nächsten Tag\
         if ($loop_hour == 23 and $fc == 0 and $loop_quarter == 3) {\
           if ( !$fc_total_net_found ) {\
             $fc_total_net_found = "null";;\
-            Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_net_start       null"));;\
+            Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_net_start       null", $name, $fc));;\
           }\
           if ( !$fc_total_bat_found ) {\
             $fc_total_bat_found = "null" if ( !$fc_total_bat_found );;\
-            Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_bat_start       null"));;\
+            Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_bat_start       null", $name, $fc));;\
           }\
         } # end if\
 #####################\
@@ -1759,7 +1771,7 @@ fc0_trigger_net_start:fc_trigger_net_price.* {\
     readingsBulkUpdate($hash, "fc0_trigger_bat_start", $fc_total_bat_found);;\
   } else {\
     readingsBulkUpdate($hash, "fc0_trigger_bat_start", "null");;\
-    Log3($name,3,sprintf("%-20s ur_07 : ", $name).sprintf("fc0_trigger_bat_start       null"));;\
+    Log3($name,3,sprintf("%-20s ur_07 : fc%d_trigger_bat_start       null", $name, $fc));;\
   } #end if $fc_total_bat_found\
 \
   $fc_total_net_found = "null" if ( !$fc_total_net_found );;\
@@ -1791,11 +1803,16 @@ fc0_trigger_net_stop:fc0_trigger_net_start.* {\
       my $start_quarter = ($loop_hour == $fc_trigger_start_hour) ? $fc_trigger_start_quarter : 0;;\
       for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_08 : ", $name).sprintf(" fc%d Stop      %02d:%02d total: %.2f net: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price));;\
+        Log3($name,4,sprintf("%-20s ur_08 :  fc%d Stop      %02d:%02d total: %.2f net: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price));;\
 \
         if ( $fc_total > $fc_trigger_net_price  and !$fc_total_net_found) {\
-          $fc_total_net_found = sprintf("%02d:%02d", $loop_hour, $loop_quarter*15);;\
-          Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_net_stop        %02d:%02d", $loop_hour, $loop_quarter*15));;\
+          if ( $loop_quarter > 0 ) {\
+            $fc_total_net_found = sprintf("%02d:%02d", $loop_hour, ($loop_quarter-1)*15);;\
+            Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_net_stop        %02d:%02d", $name, $fc, $loop_hour, ($loop_quarter-1)*15));;\
+          } else {\
+            $fc_total_net_found = sprintf("%02d:%02d", $loop_hour-1, 3*15);;\
+            Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_net_stop        %02d:%02d", $name, $fc, $loop_hour-1, 3*15));;\
+          }\
         } # end if\
 \
         # wenn es 23:45 is wechsel zum nächsten Tag\
@@ -1805,7 +1822,7 @@ fc0_trigger_net_stop:fc0_trigger_net_start.* {\
             $loop_hour = -1;;                                                 # beginne wieder bei 00:00\
           } else {\
             $fc_total_net_found = "23:59";;\
-            Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_net_stop x      $fc_total_net_found"));;\
+            Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_net_stop        %s", $name, $fc, $fc_total_net_found));;\
           } # end if fc1_0000_total\
         } # end if\
        last if ( $fc_total_net_found );;\
@@ -1830,10 +1847,15 @@ fc0_trigger_net_stop:fc0_trigger_net_start.* {\
       my $start_quarter = ($loop_hour == $fc_trigger_start_hour) ? $fc_trigger_start_quarter : 0;;\
       for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_08 : ", $name).sprintf(" fc%d Stop  bat %02d:%02d total: %.2f bat: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_bat_price));;\
+        Log3($name,4,sprintf("%-20s ur_08 :  fc%d Stop  bat %02d:%02d total: %.2f bat: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_bat_price));;\
         if ( $fc_total > $fc_trigger_bat_price and !$fc_total_bat_found ) {\
-          $fc_total_bat_found = sprintf("%02d:%02d", $loop_hour, $loop_quarter*15);;\
-          Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_bat_stop        %02d:%02d", $loop_hour, $loop_quarter*15));;\
+          if ( $loop_quarter > 0 ) {\
+            $fc_total_bat_found = sprintf("%02d:%02d", $loop_hour, ($loop_quarter-1)*15);;\
+            Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_bat_stop        %02d:%02d", $name, $fc, $loop_hour, ($loop_quarter-1)*15));;\
+          } else {\
+            $fc_total_bat_found = sprintf("%02d:%02d", $loop_hour-1, 3*15);;\
+            Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_bat_stop        %02d:%02d", $name, $fc, $loop_hour-1, 3*15));;\
+          }\
         } # end if\
 \
         # wenn es 23:45 is wechsel zum nächsten Tag\
@@ -1843,7 +1865,7 @@ fc0_trigger_net_stop:fc0_trigger_net_start.* {\
             $loop_hour = -1;;                                                 # beginne wieder bei 00:00\
           } else {\
             $fc_total_bat_found = "23:59";;\
-            Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_bat_stop        $fc_total_bat_found"));;\
+            Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_bat_stop        %s", $name, $fc, $fc_total_bat_found));;\
           } # end if fc1_0000_total\
         } # end if\
       last if ( $fc_total_bat_found );;\
@@ -1857,7 +1879,7 @@ fc0_trigger_net_stop:fc0_trigger_net_start.* {\
     readingsBulkUpdate($hash, "fc0_trigger_bat_stop", $fc_total_bat_found);;\
   } else {\
     readingsBulkUpdate($hash, "fc0_trigger_bat_stop", "null");;\
-    Log3($name,3,sprintf("%-20s ur_08 : ", $name).sprintf("fc0_trigger_bat_stop        null"));;\
+    Log3($name,3,sprintf("%-20s ur_08 : fc%d_trigger_bat_stop        null", $name, $fc));;\
   } # end if\
   $fc_total_net_found = "null" if ( !$fc_total_net_found );;\
   return $fc_total_net_found;;\
@@ -1867,6 +1889,8 @@ fc0_trigger_net_dauer:fc0_trigger_net_stop.* {\
 ## Berechnung des Trigger Fensters in Minuten\
   my $hash = $defs{$name};;\
   readingsBeginUpdate($hash);;\
+\
+  my $fc = 0;;\
 \
 ## Ermittle Dauer für bat\
   my $fc_trigger_dauer = "null";;\
@@ -1884,11 +1908,11 @@ fc0_trigger_net_dauer:fc0_trigger_net_stop.* {\
         readingsBulkUpdate($hash, "fc0_trigger_bat_start", "null");;\
         readingsBulkUpdate($hash, "fc0_trigger_bat_stop", "null");;\
         $fc_trigger_dauer = "null";;\
-        Log3($name,3,sprintf("%-20s ur_09 : ", $name)."fc0_trigger_bat_dauer       ist zu kurz");;\
+        Log3($name,3,sprintf("%-20s ur_09 : fc%d_trigger_bat_dauer       ist zu kurz", $name, $fc));;\
       }\
     }\
   } # end if $fc_trigger_start\
-  Log3($name,3,sprintf("%-20s ur_09 : ", $name)."fc0_trigger_bat_dauer       $fc_trigger_dauer");;\
+  Log3($name,3,sprintf("%-20s ur_09 : fc%d_trigger_bat_dauer       %s", $name, $fc, $fc_trigger_dauer));;\
   readingsBulkUpdate($hash, "fc0_trigger_bat_dauer", $fc_trigger_dauer);;\
 \
 ## Ermittle Dauer für net\
@@ -1908,10 +1932,10 @@ fc0_trigger_net_dauer:fc0_trigger_net_stop.* {\
         readingsBulkUpdate($hash, "fc0_trigger_net_start", "null");;\
         readingsBulkUpdate($hash, "fc0_trigger_net_stop", "null");;\
         $fc_trigger_dauer = "null";;\
-        Log3($name,3,sprintf("%-20s ur_09 : ", $name)."fc0_trigger_net_dauer       ist zu kurz");;\
+        Log3($name,3,sprintf("%-20s ur_09 : fc%d_trigger_net_dauer       ist zu kurz", $name, $fc));;\
       }\
     }\
-    Log3($name,3,sprintf("%-20s ur_09 : ", $name)."fc0_trigger_net_dauer       $fc_trigger_dauer");;\
+    Log3($name,3,sprintf("%-20s ur_09 : fc%d_trigger_net_dauer       %s", $name, $fc, $fc_trigger_dauer));;\
     return($fc_trigger_dauer);;\
   }\
   return "null";;\
@@ -1922,6 +1946,7 @@ fc0_trigger_net:fc0_trigger_net_dauer.* {\
   my $hash = $defs{$name};;\
   readingsBeginUpdate($hash);;\
 \
+  my $fc = 0;;\
   my ($sec,$min,$hour) = localtime(time);;\
   my $start_quarter = int($min / 15);;\
 \
@@ -1934,7 +1959,7 @@ fc0_trigger_net:fc0_trigger_net_dauer.* {\
     $state = "on";;\
   }\
   readingsBulkUpdate($hash, "fc0_trigger_bat", $state);;\
-  Log3($name,3,sprintf("%-20s ur_10 : ", $name)."fc0_trigger_bat             $state");;\
+  Log3($name,3,sprintf("%-20s ur_10 : fc%d_trigger_bat             %s", $name, $fc, $state));;\
 \
   $state = "off";;\
   if (    ReadingsVal($name,"fc0_trigger_net_dauer","null") ne "null"\
@@ -1943,24 +1968,24 @@ fc0_trigger_net:fc0_trigger_net_dauer.* {\
     $state = "on";;\
   }\
   readingsBulkUpdate($hash, "fc0_trigger_net", $state);;\
-  Log3($name,3,sprintf("%-20s ur_10 : ", $name)."fc0_trigger_net             $state");;\
+  Log3($name,3,sprintf("%-20s ur_10 : fc%d_trigger_net             %s", $name, $fc, $state));;\
 \
   return;;\
 },\
 \
 fc1_trigger_net_start:fc_trigger_net_price.* {\
   my ($sec,$min,$hour) = localtime(time);;\
+  my $fc = 1;;\
 \
   # Nur in der ersten Viertelstunde neu berechnen\
   if ($min >= 15) {\
     my $hash = $defs{$name};;\
     readingsBeginUpdate($hash);;\
-    Log3($name,3,sprintf("%-20s ur_11 : Neuberechnung von fc1_trigger_net_start gesperrt (Minute %02d)", $name,$min));;\
+    Log3($name,3,sprintf("%-20s ur_11 : Neuberechnung von fc%d_trigger_net_start gesperrt (Minute %02d)", $name, $fc, $min));;\
     readingsBulkUpdate($hash,"fc1_trigger_net_dauer",ReadingsVal($name,"fc1_trigger_net_dauer","null"));;\
     return;;\
   }\
 \
-  my $fc = 1;;\
   if (ReadingsVal($name,"fc1_0000_startsAt","null") ne "null") {\
     my $fc_trigger_net_price = ReadingsVal($name,"fc_trigger_net_price",0);;\
 \
@@ -1970,9 +1995,9 @@ fc1_trigger_net_start:fc_trigger_net_price.* {\
     for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
       for (my $loop_quarter = 0;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour , $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_11 : ", $name).sprintf(" fc%d Start %02d:%02d total: %.2f net: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price));;\
+        Log3($name,4,sprintf("%-20s ur_11 :  fc%d Start %02d:%02d total: %.2f net: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price));;\
         if ( $fc_total < $fc_trigger_net_price ) {\
-          Log3($name,3,sprintf("%-20s ur_11 : ", $name).sprintf("fc%d_trigger_net_start       %02d:%02d",$fc, $loop_hour ,$loop_quarter*15));;\
+          Log3($name,3,sprintf("%-20s ur_11 : fc%d_trigger_net_start       %02d:%02d", $name, $fc, $loop_hour ,$loop_quarter*15));;\
           return(sprintf("%02d:%02d",$loop_hour, $loop_quarter*15)) ;;\
         }\
       } # end $loop_quarter\
@@ -2002,11 +2027,11 @@ fc1_trigger_net_stop:fc1_trigger_net_start.* {\
       my $start_quarter = ($loop_hour == $fc_trigger_start_hour) ? $fc_trigger_start_quarter : 0;;\
       for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_12 : ", $name).sprintf(" fc%d Stop  %02d:%02d total: %.2f net: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price));;\
+        Log3($name,4,sprintf("%-20s ur_12 :  fc%d Stop  %02d:%02d total: %.2f net: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_net_price));;\
         if ( $fc_total < $fc_trigger_net_price ) {\
           $fc_trigger_stop = sprintf("%02d:%02d",$loop_hour, $loop_quarter*15) ;;\
         } else {\
-          Log3($name,3,sprintf("%-20s ur_12 : ", $name).sprintf("fc%d_trigger_net_stop        %02d:%02d",$fc, $loop_hour, $loop_quarter*15));;\
+          Log3($name,3,sprintf("%-20s ur_12 : fc%d_trigger_net_stop        %02d:%02d", $name, $fc, $loop_hour, $loop_quarter*15));;\
           return(sprintf("%02d:%02d",$loop_hour, $loop_quarter*15));;\
         }\
       } # end $loop_quarter\
@@ -2033,23 +2058,26 @@ fc1_trigger_net_dauer:fc1_trigger_net_stop.* {\
       readingsBulkUpdate($hash, "fc1_trigger_net_start", "null");;\
       readingsBulkUpdate($hash, "fc1_trigger_net_stop", "null");;\
       $fc_trigger_dauer = "null";;\
-      Log3($name,3,sprintf("%-20s ur_13 : ", $name)."fc1_trigger_net_dauer ist zu kurz");;\
+      Log3($name,3,sprintf("%-20s ur_13 : fc1_trigger_net_dauer ist zu kurz", $name));;\
     } # end if\
-    Log3($name,3,sprintf("%-20s ur_13 : ", $name)."fc1_trigger_net_dauer       $fc_trigger_dauer");;\
+    Log3($name,3,sprintf("%-20s ur_13 : fc1_trigger_net_dauer       %s", $name, $fc_trigger_dauer));;\
     return $fc_trigger_dauer;;\
   } # end if\
   return "null";;\
 },\
 \
-fc_trigger_max:fc_avg.* {\
+fc_trigger_max_price:fc_avg.* {\
   my $fc_avg = ReadingsVal($name,"fc_avg",0);;\
-  my $fc_max = ReadingsVal($name,"fc_max",0);;\
+  my $fc_max1 = ReadingsVal($name,"fc_max1",0);;\
+  my $fc_max2 = ReadingsVal($name,"fc_max2",0);;\
 \
+  $fc_max1 = $fc_max2 if ( $fc_max2*100/$fc_max1 < 80 );;\
+    \
   # Berechnung eines Schwellwertes als täglichen Maximalpreises\
-  return round( ($fc_max - $fc_avg)/2 + $fc_avg , 2);;\
+  return round( ($fc_max1 - $fc_avg)/2 + $fc_avg , 2);;\
 },\
 \
-fc0_trigger_max_start:fc_trigger_max.* {\
+fc0_trigger_max_start:fc_trigger_max_price.* {\
 ## Ermitteln des nächsten Trigger_max Fensters\
   my ($sec,$min,$hour) = localtime(time);;\
 \
@@ -2057,33 +2085,67 @@ fc0_trigger_max_start:fc_trigger_max.* {\
   if ($min >= 15) {\
     my $hash = $defs{$name};;\
     readingsBeginUpdate($hash);;\
-    Log3($name,3,sprintf("%-20s ur_11 : Neuberechnung von fc0_trigger_max_start gesperrt (Minute %02d)", $name,$min));;\
+    Log3($name,3,sprintf("%-20s ur_15 : Neuberechnung von fc0_trigger_max_start gesperrt (Minute %02d)", $name, $min));;\
     readingsBulkUpdate($hash,"fc0_trigger_max_dauer",ReadingsVal($name,"fc0_trigger_max_dauer","null"));;\
     return;;\
   }\
 \
   my $fc = 0;;\
-  my $fc_trigger_max = ReadingsVal($name,"fc_trigger_max",0);;\
+  my $fc_trigger_max_price = ReadingsVal($name,"fc_trigger_max_price",0);;\
+\
+  # Ermitteln des nächsten Trigger Fensters\
   my $fc_total = 0;;\
+  my $fc_total_max_found;;\
+  my $fc_total_next;;\
+  my $fc_trigger_start_quarter = int($min / 15);;\
 \
   for (my $loop_hour = $hour;; $loop_hour <= 23;; $loop_hour++) {\
-    for (my $loop_quarter = 0;; $loop_quarter <= 3;; $loop_quarter++) {\
-      $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total", $fc, $loop_hour , $loop_quarter*15),0);;\
-      Log3($name,4,sprintf("%-20s ur_14 : ", $name).sprintf(" fc%d Start max %02d:%02d total: %.2f max: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_max));;\
-      if ( $fc_total > $fc_trigger_max ) {\
-        Log3($name,3,sprintf("%-20s ur_14 : ", $name).sprintf("fc%d_trigger_max_start       %02d:%02d ",$fc, $loop_hour, $loop_quarter*15));;\
-        return(sprintf("%02d:%02d",$loop_hour, $loop_quarter*15));;\
-      } # end if\
-    } # end $loop_quarter\
-  } # end for loop_hour\
-  Log3($name,3,sprintf("%-20s ur_14 : ", $name).sprintf("fc%d_trigger_max_start       null",$fc));;\
-  return "null";;\
+    my $start_quarter = ($loop_hour == $hour) ? $fc_trigger_start_quarter : 0;;\
+    for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
+      $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour , $loop_quarter*15),0);;\
+      Log3($name,4,sprintf("%-20s ur_15 :  fc%d Start     %02d:%02d total: %.2f max: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_max_price));;\
+      if ( $fc_total > $fc_trigger_max_price  and !$fc_total_max_found) {\
+        $fc_total_max_found = sprintf("%02d:%02d", $loop_hour, $loop_quarter*15);;\
+        if ( $loop_quarter+1 <= 3 ) {\
+          $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour, ($loop_quarter+1)*15),0);;\
+          Log3($name,4,sprintf("%-20s ur_15 :  fc%d Next max  %02d:%02d  next: %.2f", $name, $fc, $loop_hour, ($loop_quarter+1)*15, $fc_total_next));;\
+        } else {\
+          if ( $loop_hour+1 <= 23 ) {\
+            $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc, $loop_hour+1, 0),0);;\
+            Log3($name,4,sprintf("%-20s ur_15 :  fc%d Next max  %02d:%02d  next: %.2f", $name, $fc, $loop_hour+1, 0, $fc_total_next));;\
+          } else {\
+            $fc_total_next = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$fc+1, 0, 0),0);;\
+            Log3($name,4,sprintf("%-20s ur_15 :  fc%d Next max  %02d:%02d  next: %.2f", $name, $fc+1, 0, 0, $fc_total_next));;\
+          } # end if loop_hour+1\
+        } # end if quarter+1\
+        if ( $fc_total_next < $fc_trigger_max_price ) {\
+          $fc_total_max_found = undef;;\
+          Log3($name,3,sprintf("%-20s ur_15 : fc%d Next max Trigger ist zu kurz", $name, $fc));;\
+        } # end if\
+        Log3($name,3,sprintf("%-20s ur_15 : fc%d_trigger_max_start       %02d:%02d", $name, $fc, $loop_hour, $loop_quarter*15));;\
+      } # end if $fc_total_max_found\
+#####################\
+        # wenn es 23:45 is wechsel zum nächsten Tag\
+        if ($loop_hour == 23 and $fc == 0 and $loop_quarter == 3) {\
+          if ( !$fc_total_max_found ) {\
+            $fc_total_max_found = "null";;\
+            Log3($name,3,sprintf("%-20s ur_15 : fc0_trigger_max_start       null", $name));;\
+          }\
+        } # end if\
+#####################\
+      last if ( $fc_total_max_found );;\
+    } # end for $loop_quarter\
+   last  if ( $fc_total_max_found );;\
+  } # end for $loop_hour\
+\
+  $fc_total_max_found = "null" if ( !$fc_total_max_found );;\
+  return $fc_total_max_found;;\
 },\
 \
 fc0_trigger_max_stop:fc0_trigger_max_start.* {\
 ## Ermitteln des nächsten Trigger Fensters\
   my $fc = 0;;\
-  my $fc_trigger_max = ReadingsVal($name,"fc_trigger_max",0);;\
+  my $fc_trigger_max_price = ReadingsVal($name,"fc_trigger_max_price",0);;\
 \
   my $fc_trigger_max_start = ReadingsVal($name,"fc0_trigger_max_start","null");;\
   my $fc_trigger_max_stop = $fc_trigger_max_start;;\
@@ -2100,12 +2162,12 @@ fc0_trigger_max_stop:fc0_trigger_max_start.* {\
       my $start_quarter = ($loop_hour == $fc_trigger_max_start_hour) ? $fc_trigger_max_start_quarter : 0;;\
       for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total", $fc, $loop_hour, $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_15 : ", $name).sprintf(" fc%d Stop  max %02d:%02d total: %.2f max: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_max));;\
-        if ( $fc_total > $fc_trigger_max ) {\
+        Log3($name,4,sprintf("%-20s ur_16 :  fc%d Stop  max %02d:%02d total: %.2f max: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_max_price));;\
+        if ( $fc_total > $fc_trigger_max_price ) {\
           $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $loop_quarter*15) ;;\
         } else {\
           $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $loop_quarter*15) ;;\
-          Log3($name,3,sprintf("%-20s ur_14 : ", $name).sprintf("fc%d_trigger_max_stop        %s",$fc, $fc_trigger_max_stop));;\
+          Log3($name,3,sprintf("%-20s ur_16 : fc%d_trigger_max_stop        %s", $name, $fc, $fc_trigger_max_stop));;\
           return $fc_trigger_max_stop;;\
         } # end if\
       } # end $loop_quarter\
@@ -2117,46 +2179,64 @@ fc0_trigger_max_stop:fc0_trigger_max_start.* {\
      } # end if\
     } # end for loop_hour\
   } # end if $fc_trigger_max_start\
-  Log3($name,3,sprintf("%-20s ur_14 : ", $name).sprintf("fc%d_trigger_max_stop        %s", $fc, $fc_trigger_max_stop));;\
+  Log3($name,3,sprintf("%-20s ur_16 : fc%d_trigger_max_stop        %s", $name, $fc, $fc_trigger_max_stop));;\
   return $fc_trigger_max_stop;;\
 },\
 \
 fc0_trigger_max_dauer:fc0_trigger_max_stop.* {\
-## Berechnung des Trigger Fensters in Minuten\
-  my $fc_trigger_max_start = ReadingsVal($name,"fc0_trigger_max_start","null");;\
-  if ( $fc_trigger_max_start ne "null" ) {\
-    my $fc_trigger_max_stop = ReadingsVal($name,"fc0_trigger_max_stop","null");;\
-    my ($h1,$m1) = split(":", $fc_trigger_max_start);;\
-    my ($h2,$m2) = split(":", $fc_trigger_max_stop);;\
-    return ($h2*60 + $m2) - ($h1*60 + $m1);;\
-  } # end if\
+## Ermittle Dauer für max\
+  my $fc_trigger_dauer = "null";;\
+  my $fc_trigger_start = ReadingsVal($name,"fc0_trigger_max_start","null");;\
+  if ( $fc_trigger_start ne "null" ) {\
+    my $fc_trigger_stop = ReadingsVal($name,"fc0_trigger_max_stop","null");;\
+\
+    if ( $fc_trigger_stop ne "null" ) {\
+      my ($h1,$m1) = split(":", $fc_trigger_start);;\
+      my ($h2,$m2) = split(":", $fc_trigger_stop);;\
+      $h2 += 24 if ( $h2 < $h1 );;\
+\
+      $fc_trigger_dauer = ($h2*60 + $m2) - ($h1*60 + $m1);;\
+      if ( $fc_trigger_dauer <= 15 ) {                               # Das Trigger Fenster ist zu klein\
+        my $hash = $defs{$name};;\
+        readingsBeginUpdate($hash);;\
+        readingsBulkUpdate($hash, "fc0_trigger_max_start", "null");;\
+        readingsBulkUpdate($hash, "fc0_trigger_max_stop", "null");;\
+        $fc_trigger_dauer = "null";;\
+        Log3($name,3,sprintf("%-20s ur_17 : fc0_trigger_max_dauer       ist zu kurz", $name));;\
+      }\
+    }\
+    Log3($name,3,sprintf("%-20s ur_17 : fc0_trigger_max_dauer       %s", $name, $fc_trigger_dauer));;\
+    return($fc_trigger_dauer);;\
+  }\
   return "null";;\
 },\
 \
 fc0_trigger_max:fc0_trigger_max_dauer.* {\
+## Setzen des Triggers für die aktuelle viertel Stunde\
   my ($sec,$min,$hour) = localtime(time);;\
 \
-  ## Setzen des maximum Triggers für die aktuelle Stunde\
-  if ( ReadingsVal($name,"current_price",0) < ReadingsVal($name,"fc_trigger_max_price",0)\
+  if (    ReadingsVal($name,"fc0_trigger_max_dauer","null") ne "null"\
       and sprintf("%02d:%02d",$hour,$min) ge ReadingsVal($name,"fc0_trigger_max_start","null")\
-  ) { return "on" }\
-\
+      and ReadingsVal($name,"current_price",0) >= ReadingsVal($name,"fc_trigger_max_price",0) ) {\
+    Log3($name,3,sprintf("%-20s ur_18 : fc0_trigger_max             on", $name));;\
+    return "on";;\
+  }\
+  Log3($name,3,sprintf("%-20s ur_18 : fc0_trigger_max             off", $name));;\
   return "off";;\
 },\
 \
-fc1_trigger_max_start:fc_trigger_max.* {\
+fc1_trigger_max_start:fc_trigger_max_price.* {\
   my ($sec,$min,$hour) = localtime(time);;\
+  my $fc = 1;;\
 \
   # Nur in der ersten Viertelstunde neu berechnen\
   if ($min >= 15) {\
-    Log3($name,3,sprintf("%-20s ur_18 : Neuberechnung von fc1_trigger_max_start gesperrt (Minute %02d)", $name,$min));;\
+    Log3($name,3,sprintf("%-20s ur_19 : Neuberechnung von fc%d_trigger_max_start gesperrt (Minute %02d)", $name, $fc, $min));;\
     return;;\
   }\
 \
-  my $fc = 1;;\
-\
   if (ReadingsVal($name,"fc1_0000_startsAt","null") ne "null") {\
-    my $fc_trigger_max = ReadingsVal($name,"fc_trigger_max",0);;\
+    my $fc_trigger_max_price = ReadingsVal($name,"fc_trigger_max_price",0);;\
 \
     # Ermitteln des nächsten Trigger Fensters\
     my $fc_total = 0;;\
@@ -2164,24 +2244,24 @@ fc1_trigger_max_start:fc_trigger_max.* {\
     for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
       for (my $loop_quarter = 0;; $loop_quarter <= 3;; $loop_quarter++) {\
         $fc_total = ReadingsVal($name,sprintf("fc%d_%02d%02d_total", $fc, $loop_hour , $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_18 : ", $name).sprintf(" fc%d Start max  %02d:%02d total: %.2f max: %.2f",$fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_max));;\
-        if ( $fc_total > $fc_trigger_max ) {\
-          Log3($name,3,sprintf("%-20s ur_14 : ", $name).sprintf("fc%d_trigger_max_start       %02d:%02d", $fc, $loop_hour, $loop_quarter*15));;\
+        Log3($name,4,sprintf("%-20s ur_19 :  fc%d Start max  %02d:%02d total: %.2f max: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_max_price));;\
+        if ( $fc_total > $fc_trigger_max_price ) {\
+          Log3($name,3,sprintf("%-20s ur_19 : fc%d_trigger_max_start       %02d:%02d", $name, $fc, $loop_hour, $loop_quarter*15));;\
           return(sprintf("%02d:%02d", $loop_hour, $loop_quarter*15));;\
         }\
       } # end for $loop_quarter\
     } # end  for $loop_hour\
   } # end if fc1_0000_startsAt\
-  Log3($name,3,sprintf("%-20s ur_14 : ", $name).sprintf("fc%d_trigger_max_start       null", $fc));;\
+  Log3($name,3,sprintf("%-20s ur_19 : fc%d_trigger_max_start       null", $name, $fc));;\
   return "null";;\
 },\
 \
 fc1_trigger_max_stop:fc1_trigger_max_start.* {\
 ## Ermitteln des nächsten Trigger Fensters\
   my $fc = 1;;\
-  my $fc_trigger_max = ReadingsVal("$NAME","fc_trigger_max",0);;\
+  my $fc_trigger_max_price = ReadingsVal("$name","fc_trigger_max_price",0);;\
 \
-  my $fc_trigger_max_start = ReadingsVal("$NAME","fc1_trigger_max_start","null");;\
+  my $fc_trigger_max_start = ReadingsVal("$name","fc1_trigger_max_start","null");;\
   my $fc_trigger_max_stop = $fc_trigger_max_start;;\
 \
   if ( $fc_trigger_max_start ne "null" ) {\
@@ -2193,20 +2273,20 @@ fc1_trigger_max_stop:fc1_trigger_max_start.* {\
     for (my $loop_hour = $fc_trigger_max_start_hour;; $loop_hour <= 23;; $loop_hour++) {\
       my $start_quarter = ($loop_hour == $fc_trigger_max_start_hour) ? $fc_trigger_max_start_quarter : 0;;\
       for (my $loop_quarter = $start_quarter;; $loop_quarter <= 3;; $loop_quarter++) {\
-        $fc_total = ReadingsVal("$NAME",sprintf("fc%d_%02d%02d_total", $fc, $loop_hour, $loop_quarter*15),0);;\
-        Log3($name,4,sprintf("%-20s ur_19 : ", $name).sprintf(" fc%d Stop  max  %02d:%02d total: %.2f max: %.2f", $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_max));;\
-        if ( $fc_total > $fc_trigger_max ) {\
+        $fc_total = ReadingsVal("$name",sprintf("fc%d_%02d%02d_total", $fc, $loop_hour, $loop_quarter*15),0);;\
+        Log3($name,4,sprintf("%-20s ur_20 :  fc%d Stop  max  %02d:%02d total: %.2f max: %.2f", $name, $fc, $loop_hour, $loop_quarter*15, $fc_total, $fc_trigger_max_price));;\
+        if ( $fc_total > $fc_trigger_max_price ) {\
           $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $loop_quarter*15) ;;\
         } else {\
           $fc_trigger_max_stop = sprintf("%02d:%02d",$loop_hour, $loop_quarter*15) ;;\
-          Log3($name,3,sprintf("%-20s ur_19 : ", $name).sprintf("fc%d_trigger_max_stop        %s", $fc, $fc_trigger_max_stop));;\
+          Log3($name,3,sprintf("%-20s ur_20 : fc%d_trigger_max_stop        %s", $name, $fc, $fc_trigger_max_stop));;\
           return $fc_trigger_max_stop;;\
         } # end if\
       } # end $loop_quarter\
     } # end for loop_hour\
   } # end if $fc_trigger_max_start\
 \
-  Log3($name,3,sprintf("%-20s ur_19 : ", $name).sprintf("fc%d_trigger_max_stop        %s ", $fc, $fc_trigger_max_stop));;\
+  Log3($name,3,sprintf("%-20s ur_20 : fc%d_trigger_max_stop        %s", $name, $fc, $fc_trigger_max_stop));;\
   return $fc_trigger_max_stop;;\
 },\
 \
@@ -2253,112 +2333,258 @@ fc0_next1_hour:current_price.* {\
   return round($j/4,2);;                               # Für die nächste Stunde wird der Durchschnitt ausgegeben\
  },\
 \
-nodes_TIMESTAMP:nodes_00_00_cost.* {\
-  my ($timestamp,$value,$tmp);;\
+nodes_TIMESTAMP:current_price.* {\
+  my ($sec,$min,$hour) = localtime(time);;\
+\
+  # Nur in der ersten Viertelstunde neu berechnen\
+  if ($min >= 15) {\
+    Log3($name,3,sprintf("%-20s ur_24 : Neuberechnung der Kosten gesperrt (Minute %02d)", $name,$min));;\
+    return;;\
+  }\
+\
+  my $conf_EVU = ReadingsVal("$name","conf_EVU","EPEX_Spot");;\
+  if ( $conf_EVU ne "Tibber_Live" ) {             # Tibber_Live liefert die Kosten selber\
+    my $conf_Netz_Zaehler = AttrVal($name,"conf_Netz_Zaehler","null");;\
+    my $conf_Netz_Zaehler_Reading = AttrVal($name,"conf_Netz_Zaehler_Reading","null");;\
+    my $sql = "\
+      INSERT INTO history (TIMESTAMP, DEVICE, TYPE, READING, VALUE)\
+      WITH price AS (\
+        SELECT\
+          TIMESTAMP AS interval_start,\
+          VALUE AS price_ct_per_kWh\
+        FROM history\
+        WHERE DEVICE = '$name'\
+          AND READING = 'fc0_total'\
+          AND TIMESTAMP >= CURDATE()\
+          AND TIMESTAMP < CURDATE() + INTERVAL 1 DAY\
+      ),\
+      \
+      consumption AS (\
+        SELECT\
+          interval_start,\
+          CASE\
+            WHEN interval_start = CURDATE() THEN 0\
+            WHEN VALUE < LAG(VALUE) OVER (ORDER BY interval_start) THEN NULL\
+            ELSE VALUE - LAG(VALUE) OVER (ORDER BY interval_start)\
+          END AS kWh_15min\
+        FROM (\
+          SELECT\
+            FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(TIMESTAMP) / 900) * 900) AS interval_start,\
+            VALUE,\
+            ROW_NUMBER() OVER (\
+              PARTITION BY FLOOR(UNIX_TIMESTAMP(TIMESTAMP) / 900)\
+              ORDER BY TIMESTAMP DESC\
+            ) AS rn\
+          FROM history\
+          WHERE DEVICE  = '$conf_Netz_Zaehler'\
+            AND READING = '$conf_Netz_Zaehler_Reading'\
+            AND TIMESTAMP >= CURDATE() - INTERVAL 2 DAY\
+        ) t\
+        WHERE rn = 1\
+          AND interval_start >= CURDATE()\
+          AND interval_start < CURDATE() + INTERVAL 1 DAY\
+      )\
+      \
+      SELECT *\
+      FROM (\
+        SELECT\
+          c.interval_start                   AS TIMESTAMP,\
+          '$name'              AS DEVICE,\
+          'cost'                             AS TYPE,\
+          'nodes_cost'                       AS READING,\
+      	ROUND(COALESCE(c.kWh_15min,0) * COALESCE(p.price_ct_per_kWh,0) / 100, 6 ) AS VALUE\
+        FROM consumption c\
+      LEFT JOIN price p\
+             ON p.interval_start = c.interval_start\
+      ) AS new\
+      WHERE TIMESTAMP >= CURDATE()\
+      ON DUPLICATE KEY UPDATE\
+        VALUE = new.VALUE;;\
+    ";;\
+\
+    Log3($name,4,sprintf("%-20s ur_24 : Neuberechnung der Kosten in der Datenbank\n%s", $name, ($sql =~ s/\),\s*\(/\),\n\(/gr) ));;   # für die Anzeige lesbar umformatieren\
+    Log3($name,3,sprintf("%-20s ur_24 : Neuberechnung der Kosten mit Zähler %s und Reading %s", $name, $conf_Netz_Zaehler, $conf_Netz_Zaehler_Reading ));;\
+    ::CommandGet(undef,"LogDBRep_${name}_SQL sqlCmdBlocking $sql");;\
+\
+    $sql = "\
+      SELECT *\
+      FROM history\
+      WHERE DEVICE  = '$name'\
+        AND TYPE    = 'cost'\
+        AND READING = 'nodes_cost'\
+        AND TIMESTAMP >= CURDATE()\
+      ORDER BY TIMESTAMP;;\
+    ";;\
+\
+    Log3($name,4,sprintf("%-20s ur_24 : Abfrage der Kosten aus der Datenbank\n%s", $name, ($sql =~ s/\),\s*\(/\),\n\(/gr) ));;   # für die Anzeige lesbar umformatieren\
+    Log3($name,3,sprintf("%-20s ur_24 : Abfrage der Kosten aus der Datenbank", $name));;\
+    my @rows = ::CommandGet(undef,"LogDBRep_${name}_SQL sqlCmdBlocking $sql");;\
+\
+    my %cost_values;;\
+\
+    # 1. Vorhandene DB-Werte einlesen\
+    foreach my $line (@rows) {\
+      next unless defined $line;;        # undef vermeiden\
+      next if $line =~ /^\s*$/;;         # leere Zeilen ignorieren\
+\
+      chomp($line);;\
+      my ($ts, undef, undef, undef, undef, $value) = split(/\|/, $line);;\
+\
+      my ($date, $time) = split(/\s+/, $ts);;\
+      my ($hh, $mm) = split(/:/, $time);;\
+\
+      my $reading = sprintf("nodes_%02d%02d_cost", $hh, $mm);;\
+      $cost_values{$reading} = $value;;\
+    }\
+\
+    # 2. Alle 96 Viertelstunden des Tages erzeugen\
+\
+    for (my $h = 0;; $h < 24;; $h++) {\
+      for (my $m = 0;; $m < 60;; $m += 15) {\
+        my $reading = sprintf("nodes_%02d%02d_cost", $h, $m);;\
+        # Falls nicht vorhanden mit 0 belegen\
+        $cost_values{$reading} = 0\
+            unless exists $cost_values{$reading};;\
+      }\
+    }\
+\
+    my $hash = $defs{$name};;\
+    readingsBeginUpdate($hash);;\
+\
+    foreach my $reading (sort keys %cost_values) {\
+      readingsBulkUpdate($hash,$reading,$cost_values{$reading});;\
+    }\
+  } # End if not Tibber_Live\
+\
+  return FmtDateTime(time());;\
+},\
+\
+nodes_TIMESTAMP:nodes_0000_cost.* {\
+########################################### Tibber_Live ##############################################\
+  my ($timestamp,$cost_value,$cost_value,$tmp);;\
   my $conf_EVU = ReadingsVal("$name","conf_EVU","EPEX_Spot");;\
 \
-  for (my $loop_last = 0;; $loop_last <= 2;; $loop_last++) {\
-    $timestamp = ReadingsVal("$name","nodes_00_".sprintf("%02d",$loop_last)."_from","null");;\
-    $value = ReadingsVal("$name","nodes_00_".sprintf("%02d",$loop_last)."_cost","null");;\
-\
-    if ( $value ne "null" ) {\
-      # Eintragen der Kosten für die Stunde\
-      ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
-              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                VALUES('".$timestamp."','$name','$conf_EVU','nodes_cost','".$value."')\
-              ON DUPLICATE KEY UPDATE\
-                VALUE='".$value."';;") ;;\
-      # Eintragen des Verbrauchs für die Stunde\
-      $value = ReadingsVal("$name","nodes_00_".sprintf("%02d",$loop_last)."_consumption","null");;\
-      ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
-              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                VALUES('".$timestamp."','$name','$conf_EVU','nodes_consumption','".$value."')\
-              ON DUPLICATE KEY UPDATE\
-                VALUE='".$value."';;") ;;\
-    } else {\
-      $tmp = "null";;\
-    } # end if\
-  } # end for\
+  if ( $conf_EVU eq "Tibber_Live" ) {             # Tibber_Live liefert die Kosten und den Verbrauch selber\
+    # Eintragen der Kosten und des Verbrauchs für die letzten drei Stunden\
+    for (my $loop_last = 0;; $loop_last <= 2;; $loop_last++) {\
+      $timestamp = ReadingsVal("$name",sprintf("nodes_00_%02d_from",$loop_last),"null");;\
+      $cost_value = ReadingsVal("$name",sprintf("nodes_00_%02d_cost",$loop_last),"null");;\
+      $cons_value = ReadingsVal("$name",sprintf("nodes_00_%02d_consumption",$loop_last),"null");;\
+      if ( $cost_value ne "null" ) {\
+        # Eintragen der Kosten und des Verbrauchs pro die Stunde\
+        my $sql = "\
+          INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE) VALUES\
+            ('$timestamp','$name','$conf_EVU','nodes_cost','$cost_value'),\
+            ('$timestamp','$name','$conf_EVU','nodes_consumption','$cons_value')\
+          ON DUPLICATE KEY UPDATE\
+             VALUE = VALUES(VALUE);;\
+        ";;\
+        ::CommandGet(undef,"LogDBRep_${name}_SQL sqlCmdBlocking $sql");;\
+      } else {\
+        $tmp = "null";;\
+      } # end if\
+    } # end for\
+  } # End if not Tibber_Live\
   $timestamp = $tmp if ($tmp eq "null");;\
   return $timestamp;;\
 },\
 \
 nodes_TIMESTAMP:nodes_24_00_cost.* {\
-  my ($timestamp,$value,$tmp);;\
+  my ($timestamp,$cost_value,$cons_value,$tmp);;\
   my $conf_EVU = ReadingsVal("$name","conf_EVU","EPEX_Spot");;\
 \
-  for (my $loop_last = 0;; $loop_last <= 23;; $loop_last++) {\
-    $timestamp = ReadingsVal("$","nodes_24_".sprintf("%02d",$loop_last)."_from","null");;\
-    $value     = ReadingsVal("$name","nodes_24_".sprintf("%02d",$loop_last)."_cost","null");;\
+  if ( $conf_EVU eq "Tibber_Live" ) {             # Tibber_Live liefert die Kosten und den Verbrauch selber\
+    for (my $loop_last = 0;; $loop_last <= 23;; $loop_last++) {\
+      $timestamp = ReadingsVal("$name",sprintf("nodes_24_%02d_from",$loop_last),"null");;\
+      $cost_value = ReadingsVal("$name",sprintf("nodes_24_%02d_cost",$loop_last),"null");;\
+      $cons_value = ReadingsVal("$name",sprintf("nodes_24_%02d_consumption",$loop_last),"null");;\
 \
-    if ( $value ne "null" ) {\
-      # Eintragen der Kosten für die Stunde\
-      ::CommandGet(undef, "LogDBRep_".$NAME."_SQL sqlCmdBlocking\
-              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                VALUES('".$timestamp."','$name','$conf_EVU','nodes_cost','".$value."')\
-              ON DUPLICATE KEY UPDATE\
-                VALUE='".$value."';;") ;;\
-      # Eintragen des Verbrauchs für die Stunde\
-      $value = ReadingsVal("$name","nodes_24_".sprintf("%02d",$loop_last)."_consumption","null");;\
-      ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
-              INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                VALUES('".$timestamp."','$name','$conf_EVU','nodes_consumption','".$value."')\
-              ON DUPLICATE KEY UPDATE\
-                VALUE='".$value."';;") ;;\
-    } else {\
-      $tmp = "null";;\
-    } # end if\
-  } # end for\
+      if ( $cost_value ne "null" ) {\
+        # Eintragen der Kosten und des Verbrauchs pro die Stunde\
+        my $sql = "\
+          INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE) VALUES\
+            ('$timestamp','$name','$conf_EVU','nodes_cost','$cost_value'),\
+            ('$timestamp','$name','$conf_EVU','nodes_consumption','$cons_value')\
+          AS new\
+          ON DUPLICATE KEY UPDATE\
+            VALUE = new.VALUE;;\
+        ";;\
+        ::CommandGet(undef,"LogDBRep_${name}_SQL sqlCmdBlocking $sql");;\
+      } else {\
+        $tmp = "null";;\
+      } # end if\
+    } # end for\
+  } # End if not Tibber_Live\
   $timestamp = $tmp if ($tmp eq "null");;\
   return $timestamp;;\
 },\
 \
 nodes_TIMESTAMP:05_consumption_hourly_100-0001.* {\
-  my ($timestamp,$value);;\
+\
   my $conf_EVU = ReadingsVal("$name","conf_EVU","EPEX_Spot");;\
 \
-  for (my $loop_last = 1;; $loop_last <= 300;; $loop_last += 3) {\
+  if ( $conf_EVU eq "Tibber_Live" ) {             # Tibber_Live liefert die Kosten und den Verbrauch selber\
+    my $vat = AttrVal("$name","conf_VAT",1);;\
 \
-    $timestamp =  ReadingsVal("$name","05_consumption_hourly_100-".sprintf("%04d",$loop_last+2),"null");; # timestamp\
-    $timestamp =~ s/T/ /g ;;\
-    $timestamp =  substr($timestamp,0,19);;\
+    my @values_sql;;        # sammelt alle VALUES(...)\
+    my $last_timestamp;;\
 \
-    # cost aus tibber-Api ohne MwSt\
-    $value = ReadingsVal("$name","05_consumption_hourly_100-".sprintf("%04d",$loop_last+1),"null");;\
+    for (my $loop_last = 1;; $loop_last <= 300;; $loop_last += 3) {\
 \
-    if ( $value ne "" ) {\
-      # Berechnung der Kosten inkl. 19% MwSt für die Stunde\
-      $value = round($value*AttrVal($name,"conf_VAT",0),4);;\
+      # Timestamp\
+      my $timestamp = ReadingsVal("$name",sprintf("05_consumption_hourly_100-%04d",$loop_last+2),"null");;\
 \
-      # Schreiben der Kosten für die Stunde in die Datenbank\
-      ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
-                INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                  VALUES('".$timestamp."','$name','$conf_EVU','nodes_cost','".$value."')\
-                ON DUPLICATE KEY UPDATE\
-                  VALUE='".$value."';;") ;;\
-      # Schreiben des Verbrauchs für die Stunde in die Datenbank\
-      $value = ReadingsVal("$name","05_consumption_hourly_100-".sprintf("%04d",$loop_last),"null");;  # consumption\
-      $value = round($value,4);;\
-      ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
-                INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
-                  VALUES('".$timestamp."','$name','$conf_EVU','nodes_consumption','".$value."')\
-                ON DUPLICATE KEY UPDATE\
-                  VALUE='".$value."';;") ;;\
+      next if (!$timestamp || $timestamp eq "null");;\
+\
+      $timestamp =~ s/T/ /g;;\
+      $timestamp = substr($timestamp,0,19);;\
+      $last_timestamp = $timestamp;;\
+\
+      # Cost (ohne MwSt)\
+      my $cost = ReadingsVal("$name",sprintf("05_consumption_hourly_100-%04d",$loop_last+1),"");;\
+\
+      next if ($cost eq "");;\
+\
+      $cost = round($cost * $vat, 4);;\
+\
+      push @values_sql,"('$timestamp','$name','$conf_EVU','nodes_cost','$cost')";;\
+\
+      # Consumption\
+      my $cons = ReadingsVal("$name","05_consumption_hourly_100-".sprintf("%04d",$loop_last),"null");;\
+\
+      if (defined $cons && $cons ne "null") {\
+        $cons = round($cons,4);;\
+        push @values_sql,"('$timestamp','$name','$conf_EVU','nodes_consumption','$cons')";;\
+      }\
     }\
-  } # end for\
-  return $timestamp;;\
+\
+    # Ein einziges INSERT wenn Daten vorhanden\
+    if (@values_sql) {\
+      my $sql = "\
+        INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE)\
+        VALUES\
+          ".join(",\n", @values_sql)."\
+        AS new\
+        ON DUPLICATE KEY UPDATE\
+          VALUE = new.VALUE;;\
+      ";;\
+      ::CommandGet(undef,"LogDBRep_${name}_SQL sqlCmdBlocking $sql");;\
+    }\
+  } # End if not Tibber_Live\
+\
+  return $last_timestamp;;\
 },\
 \
 nodes_cost_avg:nodes_TIMESTAMP.* {\
 ## Berechnung des Tages Wertes\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
+    my $nodes_cost_avg = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
            SELECT cast(avg(VALUE) AS DECIMAL(4,2)) FROM history\
            WHERE DEVICE='".$name."'\
              AND READING='nodes_cost'\
              AND TIMESTAMP >= curdate() ;;") ;;\
-  } else {\
-    return ReadingsVal("$NAME","nodes_cost_avg","null");;\
+    return 0 if (!defined $nodes_cost_avg || $nodes_cost_avg =~ /^\s*$/);;\
+    return $nodes_cost_avg;;\
   } # end if\
   return "null";;\
 },\
@@ -2366,13 +2592,13 @@ nodes_cost_avg:nodes_TIMESTAMP.* {\
 nodes_cost_min:nodes_TIMESTAMP.* {\
 ##  Ermittlung des minimal Wertes\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
+    my $nodes_cost_min = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
            SELECT cast(min(VALUE) AS DECIMAL(4,2)) FROM history\
            WHERE DEVICE='".$name."'\
              AND READING='nodes_cost'\
              AND TIMESTAMP >= curdate() ;;") ;;\
-  } else {\
-    return ReadingsVal("$NAME","nodes_cost_min","null");;\
+    return 0 if (!defined $nodes_cost_min || $nodes_cost_min =~ /^\s*$/);;\
+    return $nodes_cost_min;;\
   } # end if\
   return "null";;\
 },\
@@ -2380,11 +2606,13 @@ nodes_cost_min:nodes_TIMESTAMP.* {\
 nodes_cost_max:nodes_TIMESTAMP.* {\
 ## Ermittlung des maximal Wertes\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    return ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
+    my $nodes_cost_max = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
            SELECT cast(max(VALUE) AS DECIMAL(4,2)) FROM history\
            WHERE DEVICE='".$name."'\
              AND READING='nodes_cost'\
              AND TIMESTAMP >= curdate() ;;") ;;\
+    return 0 if (!defined $nodes_cost_max || $nodes_cost_max =~ /^\s*$/);;\
+    return $nodes_cost_max;;\
   } # end if\
   return "null";;\
 },\
@@ -2392,11 +2620,13 @@ nodes_cost_max:nodes_TIMESTAMP.* {\
 nodes_consumption_day:nodes_TIMESTAMP.* {\
 ## Berechnung des Tages Verbrauches\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    return ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
-             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
+    my $nodes_consumption_day = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
+             SELECT cast(sum(VALUE) AS DECIMAL(10,2)) FROM history\
              WHERE DEVICE='".$name."'\
                AND READING='nodes_consumption'\
                AND date(TIMESTAMP) = curdate() ;;") ;;\
+    return 0 if (!defined $nodes_consumption_day || $nodes_consumption_day =~ /^\s*$/);;\
+    return $nodes_consumption_day;;\
   } # end if\
   return "null";;\
 },\
@@ -2404,12 +2634,14 @@ nodes_consumption_day:nodes_TIMESTAMP.* {\
 nodes_consumption_month:nodes_TIMESTAMP.* {\
 ## Berechnung des Monats Verbrauches\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    return ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
-             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
+    my $nodes_consumption_month = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
+             SELECT cast(sum(VALUE) AS DECIMAL(10,0)) FROM history\
              WHERE DEVICE='".$name."'\
                AND READING='nodes_consumption'\
                AND YEAR(TIMESTAMP)  = YEAR(curdate())\
                AND MONTH(TIMESTAMP) = MONTH(curdate()) ;;") ;;\
+    return 0 if (!defined $nodes_consumption_month || $nodes_consumption_month =~ /^\s*$/);;\
+    return $nodes_consumption_month;;\
   } # end if\
   return "null";;\
 },\
@@ -2417,11 +2649,13 @@ nodes_consumption_month:nodes_TIMESTAMP.* {\
 nodes_consumption_year:nodes_TIMESTAMP.* {\
 ## Berechnung des Jahres Verbrauches\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    return ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
-             SELECT cast(sum(VALUE) AS DECIMAL(10,4)) FROM history\
+    my $nodes_consumption_year = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
+             SELECT cast(sum(VALUE) AS DECIMAL(10,0)) FROM history\
              WHERE DEVICE='".$name."'\
                AND READING='nodes_consumption'\
                AND YEAR(TIMESTAMP) = YEAR(curdate()) ;;") ;;\
+    return 0 if (!defined $nodes_consumption_year || $nodes_consumption_year =~ /^\s*$/);;\
+    return $nodes_consumption_year;;\
   } # end if\
   return "null";;\
 },\
@@ -2429,12 +2663,14 @@ nodes_consumption_year:nodes_TIMESTAMP.* {\
 total_cost_day:nodes_TIMESTAMP.* {\
 ## Berechnung des Tages Wertes\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
+    my $total_cost_day = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
              SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
              FROM history\
              WHERE DEVICE='".$name."'\
                AND READING='nodes_cost'\
                AND date(TIMESTAMP) = curdate() ;;") ;;\
+    return 0 if (!defined $total_cost_day || $total_cost_day =~ /^\s*$/);;\
+    return $total_cost_day;;\
   } # end if\
   return "null";;\
 },\
@@ -2442,13 +2678,15 @@ total_cost_day:nodes_TIMESTAMP.* {\
 total_cost_month:nodes_TIMESTAMP.* {\
 ## Berechnung des monats Wertes\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
+    my $total_cost_month = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
              SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
              FROM history\
              WHERE DEVICE='".$name."'\
                AND READING='nodes_cost'\
                AND YEAR(TIMESTAMP) = YEAR(curdate())\
                AND MONTH(TIMESTAMP) = MONTH(curdate()) ;;") ;;\
+    return 0 if (!defined $total_cost_month || $total_cost_month =~ /^\s*$/);;\
+    return $total_cost_month;;\
   } # end if\
   return "null";;\
 },\
@@ -2456,12 +2694,14 @@ total_cost_month:nodes_TIMESTAMP.* {\
 total_cost_year:nodes_TIMESTAMP.* {\
 ## Berechnung des Jahres Wertes\
   if ( ReadingsVal("$name","nodes_TIMESTAMP","null") ne "null" ) {\
-    ::CommandGet(undef, "LogDBRep_".$name."_SQL sqlCmdBlocking\
+    my $total_cost_year = ::CommandGet(undef, "LogDBRep_${name}_SQL sqlCmdBlocking\
              SELECT CAST(SUM(VALUE) AS DECIMAL(8,2)) AS VALUE\
              FROM history\
              WHERE DEVICE='".$name."'\
                AND READING='nodes_cost'\
                AND YEAR(TIMESTAMP) = YEAR(curdate()) ;;") ;;\
+    return 0 if (!defined $total_cost_year || $total_cost_year =~ /^\s*$/);;\
+    return $total_cost_year;;\
   } # end if\
   return "null";;\
 },\
@@ -2472,18 +2712,18 @@ fc_DbLog:fc0_0000_total.* {\
   my $conf_EVU = ReadingsVal("$name","conf_EVU","EPEX_Spot");;\
   my @values_sql;;                                                          # Array für alle INSERT-Werte\
 \
-  Log3($name,3,sprintf("%-20s ur_35 : ", $name)."fc*_total Daten für $conf_EVU in die Datenbank schreiben");;\
-  my $stop_fc = (ReadingsVal($name,"fc1_0000_startsAt","null") ne "null") ? 1 : 0;;\
+  Log3($name,3,sprintf("%-20s ur_36 : ", $name)."fc*_total Daten für $conf_EVU in die Datenbank schreiben");;\
+  my $stop_fc = (ReadingsVal("$name","fc1_0000_startsAt","null") ne "null") ? 1 : 0;;\
   for (my $loop_fc = 0;; $loop_fc <= $stop_fc;; $loop_fc++) {\
-    $date = ReadingsVal($name,"fc${loop_fc}_0000_startsAt","null");;\
+    $date = ReadingsVal("$name","fc${loop_fc}_0000_startsAt","null");;\
     next if (!$date || $date eq "null");;\
     $date = (split(' ',$date))[0];;\
-    Log3($name,3,sprintf("%-20s ur_35 : ", $name)."fc$loop_fc Daten vom $date für $conf_EVU gefunden");;\
+    Log3($name,3,sprintf("%-20s ur_36 : ", $name)."fc$loop_fc Daten vom $date für $conf_EVU gefunden");;\
     for (my $loop_hour = 0;; $loop_hour <= 23;; $loop_hour++) {\
       for (my $loop_quarter = 0;; $loop_quarter <= 3;; $loop_quarter++) {\
         $timestamp = sprintf("%s %02d:%02d:00",$date,$loop_hour,$loop_quarter*15);;\
-        $value     = ReadingsVal($name,sprintf("fc%d_%02d%02d_total",$loop_fc,$loop_hour,$loop_quarter*15),"null");;\
-        Log3($name,4,sprintf("%-20s ur_35 : ", $name)."  $timestamp $name $conf_EVU fc${loop_fc}_total $value");;\
+        $value     = ReadingsVal("$name",sprintf("fc%d_%02d%02d_total",$loop_fc,$loop_hour,$loop_quarter*15),"null");;\
+        Log3($name,4,sprintf("%-20s ur_36 : ", $name)."  $timestamp $name $conf_EVU fc${loop_fc}_total $value");;\
         push @values_sql,sprintf("('%s','%s','%s','%s','%s')",$timestamp,$name,$conf_EVU,"fc${loop_fc}_total",$value);;\
       } # end quarter\
     } # end loop_hour\
@@ -2491,7 +2731,7 @@ fc_DbLog:fc0_0000_total.* {\
 \
   if (@values_sql) {\
     my $sql = "INSERT INTO history (TIMESTAMP,DEVICE,TYPE,READING,VALUE) VALUES " . join(", ",@values_sql) . " AS new ON DUPLICATE KEY UPDATE VALUE = new.VALUE;;";;\
-    Log3($name,4,sprintf("%-20s ur_35 : ", $name)."Eintragen neuer Daten in die Datenbank\n".($sql =~ s/\),\s*\(/\),\n\(/gr));;   # für die Anzeige lesbar umformatieren\
+    Log3($name,4,sprintf("%-20s ur_36 : Eintragen neuer Daten in die Datenbank\n%s", $name, ($sql =~ s/\),\s*\(/\),\n\(/gr) ));;   # für die Anzeige lesbar umformatieren\
     ::CommandGet(undef,"LogDBRep_${name}_SQL sqlCmdBlocking $sql");;\
   }\
 \
