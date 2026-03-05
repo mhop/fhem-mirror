@@ -163,6 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
+                           "_transferAPIRadiationValues: fix round0 ",
   "2.2.2"  => "03.03.2026  _transferInverterValues: change etotal init of new hour, new keys consumerControl->globalMode ".
                            "add windspeed to aiRawData ",
   "2.2.1"  => "28.02.2026  _listDataPoolPvHist: clear non-numerical hours from history, new sub round0 ",
@@ -306,41 +308,6 @@ my %vNotesIntern = (
                            "Bugfix: https://forum.fhem.de/index.php?msg=1340666 ",
   "1.51.7" => "01.05.2025  __createAdditionalEvents: optimized for SVG 'steps', new key plantControl->genPVforecastsToEvent ".
                            "__aiAddRawData: add gcons, _listDataPoolCircular: add gcons_a ",
-  "1.51.6" => "30.04.2025  graphicBeamXContent: change batsocforecast_XX to batsocCombi_XX, new options batsocForecast_XX, batsocReal_XX ".
-                           "new Paramaeter socprogwhsum, socwhsum in pvHisory & NextHours ",
-  "1.51.5" => "28.04.2025  attr transformed: graphicBeamWidth, graphicHourCount, graphicEnergyUnit, graphicSpaceSize ".
-                           "graphicHeaderDetail, graphicHourStyle, graphicLayoutType ".
-                           "graphicControl->beamWidth, graphicControl->hourCount, graphicControl->energyUnit, graphicControl->spaceSize ".
-                           "graphicControl->headerDetail, graphicControl->hourStyle, graphicControl->layoutType ",
-  "1.51.4" => "27.04.2025  avoid warnings uninitialized value \$FW_ME, \$FW_subdir in line 14434 ".
-                           "bugfix in attr .*Control, fix 'ERROR deleting file' if no consumers are registered ".
-                           "save batprogsocXX to pvHistory, prepared for new Attr graphicControl ",
-  "1.51.3" => "22.04.2025  change battery text to 'load if above feed-in limit' ".
-                           "transform set setupStringAzimuth, setupStringDeclination to attr setupStringAzimuth, setupStringDeclination ",
-  "1.51.2" => "21.04.2025  Attributes obsolet: graphicHeaderShow replaced by graphicSelect, Value 'none' of consumerControl->showLegend deleted ",
-  "1.51.1" => "20.04.2025  consumer: interruptable, swoncond, swoffcond, spignorecond can be perl code enclosed by {..} ".
-                           "check key is valid in plantControl, aiControl, flowGraphicControl, consumerControl, setupMeterDev ".
-                           "setupOtherProducer, setupInverterDev, setupBatteryDev, consumer ".
-                           "writeCacheToFile: bugfix - cache File on OS is deleted if cache is empty ".
-                           "new Setter attrKeyVal, graphicEnergyUnit: fix display of 'diff' ",
-  "1.51.0" => "16.04.2025  obsolete Attr deleted: affectBatteryPreferredCharge, affectConsForecastInPlanning, ctrlShowLink, ctrlBackupFilesKeep ".
-                           "affectConsForecastIdentWeekdays, affectConsForecastLastDays, ctrlInterval, ctrlGenPVdeviation ".
-                           "affectSolCastPercentile, ctrlSolCastAPIoptimizeReq, consumerAdviceIcon, consumerLink, consumerLegend ",
-  "1.50.4" => "16.04.2025  Consumer Strokes: fix val2pahColor, new key flowGraphicControl->strokeCmrRedColLimit ".
-                           "__getopenMeteoData: fix get calclated call interval, new Setter cycleInterval ".
-                           "normBeamWidth: decouple content batsocCombi_, energycosts, feedincome from the conversion Wh -> kWh ".
-                           "___ownSpecGetFWwidget: textField-long -> textFieldNL-long ",
-  "1.50.3" => "12.04.2025  __calcPVestimates: Fix missing limitation for strings if more than one string is assigned to an inverter ".
-                           "code change in _attrInverterStrings, _attrStringPeak, checkPlantConfig: improved string check ",
-  "1.50.2" => "11.04.2025  take inverter cap into account if no strings key is set, ctrlSpecialReadings: new option tomorrowConsumptionForecast ".
-                           "plant check: print out module version in header, decouple graphicBeamHeightLevelX from each other ",
-  "1.50.1" => "07.04.2025  new pvCorrectionFactor_Auto option 'on_complex_api_ai' to use average of AI + API forecast if AI Hit ".
-                           "some code changes ",
-  "1.50.0" => "05.04.2025  changes V 1.49.1 - 1.49.6 as new major release ",
-  "1.49.6" => "05.04.2025  some code changes, _flowGraphic: position of home text element, new attr consumerControl->dummyIcon, _batChargeMgmt: change loading release ".
-                           "attr consumerAdviceIcon replaced by consumerControl->adviceIcon ".
-                           "attr consumerLegend replaced by consumerControl->showLegend ".
-                           "attr consumerLink replaced by consumerControl->detailLink ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -11750,6 +11717,7 @@ sub _transferInverterValues {
           my ($edread, $etunit)   = split ":", $h->{etotal};                                           # Readingname/Unit für Energie total (PV Erzeugung)
           my $etuf                = $etunit =~ /^kWh$/xi ? 1000 : 1;
           $etotal                 = ReadingsNum ($indev, $edread, 0) * $etuf;                          # Erzeugung total (Wh)
+          $etotal                 = round0 ($etotal);
 
           my ($pvoread, $pvounit) = split ":", $h->{pvOut};                                            # Readingname/Unit für aktuelle Leistung aus PV-Erzeugung
           my $pvouf               = $pvounit =~ /^kW$/xi ? 1000 : 1;
@@ -11773,8 +11741,8 @@ sub _transferInverterValues {
           my $lastday = sprintf "%02d", $tfo->{day};
           my $lasthod = sprintf "%02d", ($tfo->{hour} + 1);
 
-          my $prev_etot = HistoryVal ($name, $lastday, $lasthod, "etotali$in", 0);                      # Werte der vorherigen Stunde holen
-          my $prev_pvrl = HistoryVal ($name, $lastday, $lasthod, "pvrl$in",    0);
+          my $prev_etot = round0 (HistoryVal ($name, $lastday, $lasthod, "etotali$in", 0));             # Werte der vorherigen Stunde holen
+          my $prev_pvrl = round0 (HistoryVal ($name, $lastday, $lasthod, "pvrl$in",    0));
 
           my $diff = $etotal - ($prev_etot + $prev_pvrl);                                               # Differenz berechnen
 
@@ -11783,7 +11751,8 @@ sub _transferInverterValues {
           $diff = max (0, $diff);                                                                       # negative Werte verhindern
 
           if ($diff > 0) {                                                                              # Falls es eine echte Differenz gibt → der letzten Stunde zuschlagen
-              writeToHistory ( { paref => $paref, key => "pvrl$in", val => $prev_pvrl + $diff, day => $day, hour => $lasthod } );
+              my $pvrl_new = round0 ($prev_pvrl + $diff);
+              writeToHistory ( { paref => $paref, key => "pvrl$in", val => $pvrl_new, day => $day, hour => $lasthod } );
               $hr_chg_diff += $diff;
           }
 
@@ -12045,7 +12014,7 @@ sub _transferAPIRadiationValues {
               $useai = 1;
 
               if ($acu =~ /api_ai/xs) {
-                  $pvfc  = $pvapifc ? (round0 ($pvaifc + $pvapifc) / 2) : $pvaifc;                      # Durchschnitt AI und API verwenden
+                  $pvfc  = $pvapifc ? round0 (($pvaifc + $pvapifc) / 2) : $pvaifc;                      # Durchschnitt AI und API verwenden
                   $dbmsg = 'average of accurate AI & API result used';
               }
               else {
@@ -12062,7 +12031,7 @@ sub _transferAPIRadiationValues {
       }
 
       if ($useai) {
-          $data{$name}{nexthours}{$nhtstr}{pvaifc} = $pvaifc;                                  # durch AI gelieferte PV Forecast
+          $data{$name}{nexthours}{$nhtstr}{pvaifc} = $pvaifc;                                           # durch AI gelieferte PV Forecast
       }
       else {
           delete $data{$name}{nexthours}{$nhtstr}{pvaifc};
@@ -12072,11 +12041,11 @@ sub _transferAPIRadiationValues {
           debugLog ($paref, 'aiData', "use PV from API (no AI or AI result tolerance overflow) -> hod: $hod, Rad1h: ".(defined $rad1h ? $rad1h : '-').", pvfc: $pvfc Wh");
       }
 
-      $data{$name}{nexthours}{$nhtstr}{pvapifc}    = $pvapifc;                                 # durch API gelieferte PV Forecast mit Korrekturfaktor
-      $data{$name}{nexthours}{$nhtstr}{pvapifcraw} = $pvapifcraw;                              # durch API gelieferte PV Forecast Raw
-      $data{$name}{nexthours}{$nhtstr}{pvfc}       = $pvfc;                                    # resultierende PV Forecast zuweisen
+      $data{$name}{nexthours}{$nhtstr}{pvapifc}    = $pvapifc;                                          # durch API gelieferte PV Forecast mit Korrekturfaktor
+      $data{$name}{nexthours}{$nhtstr}{pvapifcraw} = $pvapifcraw;                                       # durch API gelieferte PV Forecast Raw
+      $data{$name}{nexthours}{$nhtstr}{pvfc}       = $pvfc;                                             # resultierende PV Forecast zuweisen
       
-      if ($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      if ($num < 23 && $fh < 24) {                                                                      # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
           $data{$name}{circular}{$hod}{pvapifc}    = NexthoursVal ($name, $nhtstr, 'pvapifc',    undef);
           $data{$name}{circular}{$hod}{pvapifcraw} = NexthoursVal ($name, $nhtstr, 'pvapifcraw', undef);
           $data{$name}{circular}{$hod}{pvaifc}     = NexthoursVal ($name, $nhtstr, 'pvaifc',     undef);
@@ -12084,7 +12053,7 @@ sub _transferAPIRadiationValues {
           $data{$name}{circular}{$hod}{pvfc}       = $pvfc;
       }
 
-      if ($fd == 0 && int $pvfc > 0) {                                                         # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
+      if ($fd == 0 && int $pvfc > 0) {                                                                  # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           storeReading ('Today_Hour'.$hod.'_PVforecast', "$pvfc Wh");
       }
 
@@ -12095,7 +12064,7 @@ sub _transferAPIRadiationValues {
       }
   }
 
-  storeReading ('.lastupdateForecastValues', $t);                                              # Statusreading letzter update
+  storeReading ('.lastupdateForecastValues', $t);                                                       # Statusreading letzter update
 
 return;
 }
@@ -17496,8 +17465,12 @@ sub _saveEnergyConsumption {
       $ppreal += ReadingsNum ($name, 'Today_Hour'.$hod.'_PPreal_'.$prn, 0);
   }
 
+  my $dowrite = 0;
   my $con     = $pvrl + $ppreal - $gfeedin + $gcon - $batin + $batout;
-  my $dowrite = 1;
+  
+  if ($con >= 0) {
+      $dowrite = 1;
+  }
 
   if (int $paref->{minute} > 30 && $con < 0) {                                  # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
       $dowrite = 0;
