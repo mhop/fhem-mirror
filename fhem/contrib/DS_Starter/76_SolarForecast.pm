@@ -163,7 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ",
+  "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
+                           "_transferAPIRadiationValues: fix round0 ",
   "2.2.2"  => "03.03.2026  _transferInverterValues: change etotal init of new hour, new keys consumerControl->globalMode ".
                            "add windspeed to aiRawData ",
   "2.2.1"  => "28.02.2026  _listDataPoolPvHist: clear non-numerical hours from history, new sub round0 ",
@@ -12013,7 +12014,7 @@ sub _transferAPIRadiationValues {
               $useai = 1;
 
               if ($acu =~ /api_ai/xs) {
-                  $pvfc  = $pvapifc ? (round0 ($pvaifc + $pvapifc) / 2) : $pvaifc;                      # Durchschnitt AI und API verwenden
+                  $pvfc  = $pvapifc ? round0 (($pvaifc + $pvapifc) / 2) : $pvaifc;                      # Durchschnitt AI und API verwenden
                   $dbmsg = 'average of accurate AI & API result used';
               }
               else {
@@ -12030,7 +12031,7 @@ sub _transferAPIRadiationValues {
       }
 
       if ($useai) {
-          $data{$name}{nexthours}{$nhtstr}{pvaifc} = $pvaifc;                                  # durch AI gelieferte PV Forecast
+          $data{$name}{nexthours}{$nhtstr}{pvaifc} = $pvaifc;                                           # durch AI gelieferte PV Forecast
       }
       else {
           delete $data{$name}{nexthours}{$nhtstr}{pvaifc};
@@ -12040,11 +12041,11 @@ sub _transferAPIRadiationValues {
           debugLog ($paref, 'aiData', "use PV from API (no AI or AI result tolerance overflow) -> hod: $hod, Rad1h: ".(defined $rad1h ? $rad1h : '-').", pvfc: $pvfc Wh");
       }
 
-      $data{$name}{nexthours}{$nhtstr}{pvapifc}    = $pvapifc;                                 # durch API gelieferte PV Forecast mit Korrekturfaktor
-      $data{$name}{nexthours}{$nhtstr}{pvapifcraw} = $pvapifcraw;                              # durch API gelieferte PV Forecast Raw
-      $data{$name}{nexthours}{$nhtstr}{pvfc}       = $pvfc;                                    # resultierende PV Forecast zuweisen
+      $data{$name}{nexthours}{$nhtstr}{pvapifc}    = $pvapifc;                                          # durch API gelieferte PV Forecast mit Korrekturfaktor
+      $data{$name}{nexthours}{$nhtstr}{pvapifcraw} = $pvapifcraw;                                       # durch API gelieferte PV Forecast Raw
+      $data{$name}{nexthours}{$nhtstr}{pvfc}       = $pvfc;                                             # resultierende PV Forecast zuweisen
       
-      if ($num < 23 && $fh < 24) {                                                             # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+      if ($num < 23 && $fh < 24) {                                                                      # Ringspeicher PV forecast Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
           $data{$name}{circular}{$hod}{pvapifc}    = NexthoursVal ($name, $nhtstr, 'pvapifc',    undef);
           $data{$name}{circular}{$hod}{pvapifcraw} = NexthoursVal ($name, $nhtstr, 'pvapifcraw', undef);
           $data{$name}{circular}{$hod}{pvaifc}     = NexthoursVal ($name, $nhtstr, 'pvaifc',     undef);
@@ -12052,7 +12053,7 @@ sub _transferAPIRadiationValues {
           $data{$name}{circular}{$hod}{pvfc}       = $pvfc;
       }
 
-      if ($fd == 0 && int $pvfc > 0) {                                                         # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
+      if ($fd == 0 && int $pvfc > 0) {                                                                  # Vorhersagedaten des aktuellen Tages zum manuellen Vergleich in Reading speichern
           storeReading ('Today_Hour'.$hod.'_PVforecast', "$pvfc Wh");
       }
 
@@ -12063,7 +12064,7 @@ sub _transferAPIRadiationValues {
       }
   }
 
-  storeReading ('.lastupdateForecastValues', $t);                                              # Statusreading letzter update
+  storeReading ('.lastupdateForecastValues', $t);                                                       # Statusreading letzter update
 
 return;
 }
