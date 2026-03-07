@@ -23140,7 +23140,7 @@ sub aiFannCreateConTrainData {
               && defined $rec->{temp}) {
 
              my $ignore = "$idx -> ";
-             $ignore   .= "$fanntyp=undefined "         if(!defined $rec->{$fanntyp});
+             $ignore   .= "$fanntyp=undef "             if(!defined $rec->{$fanntyp});
              $ignore   .= "$fanntyp=$rec->{$fanntyp} "  if(defined $rec->{$fanntyp} && $rec->{$fanntyp} < 0);
              $ignore   .= "dayname=undef "              if(!defined $rec->{dayname});
              $ignore   .= "hod=undef "                  if(!defined $rec->{hod});
