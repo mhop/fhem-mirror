@@ -163,6 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.3.1"  => "08.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
+                           "change last_presence_check to central 'last_transfer' ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -10389,13 +10391,14 @@ sub centralTask {
   #    CommandAttr (undef, "$name graphicControl $newval");
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
+  
+  delete $data{$name}{circular}{99}{last_presence_check};                # 08.03.2026
 
   #for my $bn (1..MAXBATTERIES) {                                        # 02.10.
   #    $bn = sprintf "%02d", $bn;
   #    readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
   #}
   
-  #Log3 ($name, 1, "$name - Circular: \n".Dumper $data{$name}{circular}) if($name eq 'openMeteo');
   ##########################################################################################################################
 
   if (!CurrentVal ($name, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -10475,7 +10478,7 @@ sub centralTask {
   _transferEnvironmentValues  ($centpars);                                            # Umweltsensorik einsammeln
   _transferHolidayValues      ($centpars);                                            # Wochentage, Feiertage und Urlaubstage einsammeln
   
-  $data{$name}{circular}{99}{last_presence_check} = $t;                               # Zeit des letzten Transfers
+  $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
   
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
   _batChargeMgmt              ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
@@ -11360,7 +11363,7 @@ sub _transferWeatherValues {
               my $windsp  = ReadingsNum ($winddev, $windrdg, undef);
 
               if (defined $windsp) {                                                        # zwei geglättete Wind-Signale erstellen
-                  my $last_check_t = CircularVal ($name, 99, 'last_presence_check', $t);    # die letzte Check-Zeit
+                  my $last_check_t = CircularVal ($name, 99, 'last_transfer', $t);          # der letzte Transfer-Zeitstamp
                   my $dt           = $t - $last_check_t;                                    # Diff seit letzter Messung                  
                   
                   $paref->{hod}    = $hod;
@@ -13033,7 +13036,7 @@ sub _transferEnvironmentValues {
       my $presence       = $prestring =~ m/^$presenceRgx$/x ? 1 : 0;
       $presence_weighted = $presence;
       
-      my $last_check    = CircularVal ($name, 99, 'last_presence_check',   $t);
+      my $last_check    = CircularVal ($name, 99, 'last_transfer',   $t);
       my $accum_seconds = CircularVal ($name, 99, 'accum_presence_seconds', 0);
       
       my $delta         = $t - $last_check;
@@ -13055,9 +13058,7 @@ sub _transferEnvironmentValues {
       }
       else {
           $data{$name}{circular}{99}{accum_presence_seconds} = 0;
-      }
-
-      #$data{$name}{circular}{99}{last_presence_check} = $t;      
+      }  
   }
   
   my $hod = sprintf "%02d", ($chour + 1);                                                 
@@ -20460,8 +20461,8 @@ sub _beamGraphic {
 
   my $colspan = $maxhours + 2;
   my $m       = $paref->{modulo} % 2;
-  $maxVal     = 1.1 if(!int $maxVal);                                                      # devision by zero & log(x) Problem
-  $maxStVal   = 1.1 if(!int $maxStVal);                                                    # devision by zero Problem
+  #$maxVal     = 1.1 if(!int $maxVal);                                                      # devision by zero & log(x) Problem
+  #$maxStVal   = 1.1 if(!int $maxStVal);                                                    # devision by zero Problem
 
   ## zusätzlicher Abstand vor der ersten Reihe
   ##############################################
@@ -20525,14 +20526,20 @@ sub _beamGraphic {
       if ($lotype eq 'single') {
           $z1 = __normBeamHeight ( { val       => $maxVal - $hfcg->{$i}{beam1},
                                      maxVal    => $maxVal,
-                                     maxStVal  => $maxStVal,
                                      height    => $height,
                                      ground    => 0,
                                      scalemode => 'lin'
                                    }
                                  ) + $spacesz * 10;
 
-          $z3    =__normBeamHeight ( { val => $hfcg->{$i}{beam1}, maxVal => $maxVal, height => $height, ground => 0, scalemode => $scm  } );
+          $z3    =__normBeamHeight ( { val => $hfcg->{$i}{beam1}, 
+                                       maxVal    => $maxVal, 
+                                       height    => $height, 
+                                       ground    => 0, 
+                                       scalemode => $scm  
+                                     } 
+                                   );
+                                   
           $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
       }
 
@@ -20858,24 +20865,27 @@ return $skip;
 sub __normBeamHeight {
   my $paref     = shift;
   my $val       = $paref->{val}       // 0;
-  my $maxVal    = $paref->{maxVal};
+  my $maxVal    = $paref->{maxVal}    // 0;
   my $height    = $paref->{height};
-  my $ground    = $paref->{ground}    // 0;             # eine minimale Balkenhöhe die immer eingehalten werden soll
-  my $scalemode = $paref->{scalemode} // 'lin';         # lin / log / staple
+  my $ground    = $paref->{ground}    // 0;                                     # eine minimale Balkenhöhe die immer eingehalten werden soll
+  my $scalemode = $paref->{scalemode} // 'lin';                                 # lin / log / staple
 
-  my $px = 0;
+  my $px = $ground;
+  return int($px) if($maxVal <= 0);                                             # Schutz: maxVal darf nicht 0 oder negativ sein
 
-  if ($scalemode eq 'lin') {
+  if ($scalemode eq 'lin' || $scalemode eq 'staple') {
       $px = $ground + (($val / $maxVal) * ($height - $ground));
   }
-  elsif ($scalemode eq 'staple') {
-      $px = $ground + (($val / $maxVal) * ($height - $ground));
-  }
-  elsif ($scalemode eq 'log' && $val * 1 > 0) {                               # logarithmische Anzeige wenn Mode log, kein Logarithmus für negative Zahlen
-      $px = $ground + ((log ($val) / log ($maxVal)) * ($height - $ground));
+  elsif ($scalemode eq 'log') {
+      return int($px) if($val <= 0);                                            # Logarithmus nur für positive Werte
+
+      my $logMax = log($maxVal);
+      return int($px) if($logMax <= 0);                                         # verhindert log(1)=0 oder log(<1)<0
+
+      $px = $ground + ((log($val) / $logMax) * ($height - $ground));
   }
 
-return int ($px);
+return int($px);
 }
 
 ################################################################
@@ -22926,8 +22936,8 @@ sub __aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{wcc}            = $wcc                             if(defined $wcc);
           $data{$name}{aidectree}{airaw}{$ridx}{weatherid}      = $wid >= 100 ? $wid - 100 : $wid  if(defined $wid);
           $data{$name}{aidectree}{airaw}{$ridx}{rr1c}           = $rr1c                            if(defined $rr1c);
-          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}          = $rad1h                           if(defined $rad1h && $rad1h > 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{pvrl}           = $pvrl                            if(defined $pvrl  && $pvrl  > 0);
+          $data{$name}{aidectree}{airaw}{$ridx}{rad1h}          = $rad1h                           if(defined $rad1h && $rad1h >  0);
+          $data{$name}{aidectree}{airaw}{$ridx}{pvrl}           = $pvrl                            if(defined $pvrl  && $pvrl  >= 0);
           $data{$name}{aidectree}{airaw}{$ridx}{minutes_wp}     = $minutes_on_wp                   if(defined $minutes_on_wp);
           $data{$name}{aidectree}{airaw}{$ridx}{presence}       = $presence                        if(defined $presence);
           $data{$name}{aidectree}{airaw}{$ridx}{holiday}        = $holiday                         if(defined $holiday);
@@ -23167,8 +23177,8 @@ sub aiFannCreateConTrainData {
       my $rr1c      = $rec->{rr1c};
       my $con       = $rec->{con};
       my $pvrl      = clampValue ($rec->{pvrl} // 0, 0, $pvpeak);
-      my $wcc       = clampValue (int $rec->{wcc}, 0, 100);
-      my $temp      = clampValue (int $rec->{temp}, -40, 40);
+      my $wcc       = clampValue ($rec->{wcc}, 0, 100);
+      my $temp      = clampValue ($rec->{temp}, -40, 40);
       my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                  # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend'
       my $holiday   = defined $rec->{holiday}  ? $rec->{holiday}  : 0;                  # nicht definierte Feiertage/Uerlaub als 0 belegen
       
@@ -27329,7 +27339,7 @@ sub _listDataPoolCircular {
           my $nntlfts     = CircularVal ($name, $idx, 'conNNTrainLastFinishTs',   '-');     
           my $aicts       = CircularVal ($name, $idx, 'attrInvChangedTs',         '-');
           my $conq30      = CircularVal ($name, $idx, 'con_quantile30',           '-');
-          my $lpreschk    = CircularVal ($name, $idx, 'last_presence_check',      '-');
+          my $ltransfer   = CircularVal ($name, $idx, 'last_transfer',            '-');
           my $accum_secs  = CircularVal ($name, $idx, 'accum_presence_seconds',   '-');
 
           for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
@@ -27373,7 +27383,7 @@ sub _listDataPoolCircular {
           $sq .= "      $batvl8\n";
           $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, aiRulesNumber: $airn \n";
           $sq .= "      conNNRuntimeTrain: $nnrtt, conNNTrainLastFinishTs: $nntlfts \n";
-          $sq .= "      last_presence_check: $lpreschk, accum_presence_seconds: $accum_secs \n";
+          $sq .= "      last_transfer: $ltransfer, accum_presence_seconds: $accum_secs \n";
           $sq .= "      attrInvChangedTs: $aicts \n";
       }
   }
@@ -32892,7 +32902,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>initdaybatintotXX</b>      </td><td>initial value of the total energy charged into the battery XX at the beginning of the current day. (Wh)               </td></tr>
             <tr><td> <b>initdaybatouttotXX</b>     </td><td>initial value of the total energy drawn from the battery XX at the beginning of the current day. (Wh)                 </td></tr>
             <tr><td> <b>lastTsMaxSocRchdXX</b>     </td><td>Time stamp of last achievement of battery XX SoC >= maxSoC (default 95%)                                              </td></tr>
-            <tr><td> <b>last_presence_check</b>    </td><td>Time stamp of the last check of the attendance status of the residents of the household                               </td></tr>
+            <tr><td> <b>last_transfer</b>          </td><td>Timestamp of the last data transfer in the central loop                                                               </td></tr>
             <tr><td> <b>accum_presence_seconds</b> </td><td>accumulated seconds with status 'Presence' of residents in the current evaluation cycle (auxiliary value)             </td></tr>
             <tr><td> <b>nextTsMaxSocChgeXX</b>     </td><td>Time stamp by which the battery XX should reach maxSoC at least once                                                  </td></tr>
             <tr><td> <b>pprlXX</b>                 </td><td>Energy generation of producer XX (see attribute setupOtherProducerXX) in the last 24 hours (Wh)                       </td></tr>
@@ -35887,7 +35897,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>initdaybatintotXX</b>      </td><td>initialer Wert der total in die Batterie XX geladenen Energie zu Beginn des aktuellen Tages (Wh)                          </td></tr>
             <tr><td> <b>initdaybatouttotXX</b>     </td><td>initialer Wert der total aus der Batterie XX entnommenen Energie zu Beginn des aktuellen Tages (Wh)                       </td></tr>
             <tr><td> <b>lastTsMaxSocRchdXX</b>     </td><td>Zeitstempel des letzten Erreichens von Batterie XX SoC >= maxSoC (default 95%)                                            </td></tr>       
-            <tr><td> <b>last_presence_check</b>    </td><td>Zeitstempel der letzten Prüfung des Anwesenheitsstatus der Bewohner des Haushalts                                         </td></tr>
+            <tr><td> <b>last_transfer</b>          </td><td>Zeitstempel des letzten Datentransfers in der Zentralschleife                                                             </td></tr>
             <tr><td> <b>accum_presence_seconds</b> </td><td>akkumulierte Sekunden mit Status 'Anwesenheit' der Bewohner im laufenden Bewertungszyklus (Hilfswert)                     </td></tr>
             <tr><td> <b>nextTsMaxSocChgeXX</b>     </td><td>Zeitstempel bis zu dem die Batterie XX mindestens einmal maxSoC erreichen soll                                            </td></tr>
             <tr><td> <b>pprlXX</b>                 </td><td>Energieerzeugung des Produzenten XX (siehe Attribut setupOtherProducerXX) der letzten 24 Stunden (Wh)                     </td></tr>
