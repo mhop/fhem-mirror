@@ -34050,7 +34050,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
             <tr><td> <b>beamHeightlevel</b>     </td><td>The bar height for each level of the bar chart can be specified.                                                                          </td></tr>
             <tr><td>                            </td><td>The specification for a layer consists of the layer number (1..X), a ':' followed by a positive integer > 0.                              </td></tr>
-            <tr><td>                            </td><td>The numerical value is used as a normalization factor in the height calculation.                                                          </td></tr>
+            <tr><td>                            </td><td>It is <b>not an absolute value for the level height</b>, but is used as a normalization factor in the height calculation.                 </td></tr>
             <tr><td>                            </td><td>Further levels are specified separated by commas (see example).                                                                           </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:&lt;Integer&gt;</b> - normalization factor (default: 200)                                                                </td></tr>
             <tr><td>                            </td><td>                                                                                                                                          </td></tr>
@@ -37047,7 +37047,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
             <tr><td> <b>beamHeightlevel</b>     </td><td>Für jede Ebene der Balkengrafik kann die Balkenhöhe der jeweiligen Ebene festgelegt werden.                                     </td></tr>
             <tr><td>                            </td><td>Die Angabe für eine Ebene besteht aus der Ebenen-Nummer (1..X), einem ':' gefolgt von einer positiven Ganzzahl > 0.             </td></tr>
-            <tr><td>                            </td><td>Der Zahlenwert wird als Normierungsfaktor bei der Höhenberechnung verwendet.                                                    </td></tr>
+            <tr><td>                            </td><td>Es ist <b>kein Absolutwert für die Ebenenhöhe</b>, sondern wird als Normierungsfaktor bei der Höhenberechnung verwendet.        </td></tr>
             <tr><td>                            </td><td>Die Angabe für weitere Ebenen erfolgt durch Komma getrennt (siehe Beispiel).                                                    </td></tr>
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:&lt;Ganzzahl&gt;</b> - Normierungsfaktor (default: 200)                                                        </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
