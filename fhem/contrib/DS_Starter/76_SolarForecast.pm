@@ -10898,11 +10898,6 @@ sub _specialActivities {
   $gcon = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
   storeReading ('LastHourGridconsumptionReal', "$gcon Wh", $ts1);
   
-  
-          my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
-          aiFannDetectDrift   ($name, $debug, 'con', 150) if($rdy);                            # Drift von AI 'con' Werten ermitteln
-
-  
   ## überhängende Daten in Nexthours löschen
   ############################################
   for my $num (0..MAXNEXTHOURS) {
