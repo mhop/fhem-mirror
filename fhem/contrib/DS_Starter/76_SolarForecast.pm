@@ -10877,12 +10877,12 @@ return;
 sub _specialActivities {
   my $paref  = shift;
   my $name   = $paref->{name};
-  my $type   = $paref->{type};
   my $date   = $paref->{date};                                              # aktuelles Datum
   my $chour  = $paref->{chour};
   my $minute = $paref->{minute};
   my $t      = $paref->{t};                                                 # aktuelle Zeit
   my $day    = $paref->{day};
+  my $debug  = $paref->{debug};
 
   my $hash  = $defs{$name};
   my ($ts,$ts1,$pvfc,$pvrl,$gcon);
@@ -10897,6 +10897,11 @@ sub _specialActivities {
 
   $gcon = ReadingsNum ($name, "Today_Hour".sprintf("%02d",$chour)."_GridConsumption", 0);
   storeReading ('LastHourGridconsumptionReal', "$gcon Wh", $ts1);
+  
+  
+          my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+          aiFannDetectDrift   ($name, $debug, 'con', 150) if($rdy);                            # Drift von AI 'con' Werten ermitteln
+
   
   ## überhängende Daten in Nexthours löschen
   ############################################
@@ -11129,7 +11134,7 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 started");
           
-          aiFannDetectDrift   ($name, 'con', 150) if($rdy);                                    # Drift von AI 'con' Werten ermitteln
+          aiFannDetectDrift   ($name, $debug, 'con', 150) if($rdy);                            # Drift von AI 'con' Werten ermitteln
           aiFannEnterTraining ($paref)            if($prepared && $t >= $newctrstts);          # NN Consumption Forecast Training starten
           
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 finished");
@@ -24142,7 +24147,7 @@ sub aiFannTrainstartAndRetry {
       }
       else {
           if ($debug =~ /aiProcess/xs) {
-              Log3 ($name, 1, "$name DEBUG> AI FANN training data successfuly written to file: ".$neuralnet.$name);
+              Log3 ($name, 1, "$name DEBUG> AI FANN training data successfully written to file: ".$neuralnet.$name);
           }     
       }
 
@@ -25627,8 +25632,16 @@ return ($res, $bc, $zone);
 ###########################################################################
 sub aiFannDetectDrift {
   my $name    = shift;
+  my $debug   = shift;
   my $fanntyp = shift;
   my $window  = shift // 150;                                                           # Anzahl Stunden für Driftanalyse -> default 6.25 Tage
+
+  my @drift_kpis = qw(
+      DriftRmseRelLive DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftMaeLive
+      DriftRmseLive DriftScore DriftRmseRelRatio DriftSlopeRel DriftBiasNorm DriftFlag
+  );
+
+  delete @{$data{$name}{neuralnet}{$fanntyp}}{@drift_kpis};
 
   my $rawref = $data{$name}{aidectree}{airaw};
   return unless $rawref && ref $rawref eq 'HASH';
@@ -25754,6 +25767,17 @@ sub aiFannDetectDrift {
   $data{$name}{neuralnet}{$fanntyp}{DriftSlopeRel}     = round3 ($slope_drift_rel);
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasNorm}     = round2 ($bias_drift_norm);
   $data{$name}{neuralnet}{$fanntyp}{DriftFlag}         = $flag;
+  
+  my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
+
+  if ($err) {
+      Log3 ($name, 1, "$name - ERROR while writing file: ".$neuralnet.$name);
+  }
+  else {
+      if ($debug =~ /aiProcess/xs) {
+          Log3 ($name, 1, "$name DEBUG> AI FANN drift data type '$fanntyp' successfully written to file: ".$neuralnet.$name);
+      }     
+  }
 
 return $flag;
 }
