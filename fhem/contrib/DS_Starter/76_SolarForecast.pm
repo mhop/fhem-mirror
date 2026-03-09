@@ -164,7 +164,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "2.3.1"  => "08.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
-                           "change last_presence_check to central 'last_transfer' ",
+                           "change last_presence_check to central 'last_transfer', edit comref ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -24133,6 +24133,8 @@ sub aiFannTrainstartAndRetry {
       $data{$name}{$fanntyp.'temp'}     = ();
       
       delete $data{$name}{$fanntyp.'temp'};
+      
+      aiFannDetectDrift ($name, $debug, $fanntyp, 150);                                     # Drift von AI 'con' Werten ermitteln
 
       my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
 
@@ -24146,7 +24148,7 @@ sub aiFannTrainstartAndRetry {
           }     
       }
 
-      $retref->{fannType} = $fanntyp;                                            # Trainingstyp für Auswertung Rückgabe     
+      $retref->{fannType} = $fanntyp;                                                       # Trainingstyp für Auswertung Rückgabe     
   }
   
   my $serial = encode_base64 ( Serialize ($retref), "");
@@ -25568,51 +25570,107 @@ return $denorm_val;
 }
 
 ################################################################
-#                 Bias-Korrektur gewichtet
+#  Bias-Korrektur gewichtet inklusive Drift-Scaler + Drift-Bias
+#  Modell-Bias-Zonenlogik arbeitet auf dem driftbereinigten Wert
 ################################################################
 sub _aiFannApplyBiasCorrection {
   my ($name, $fanntyp, $val, $targetref) = @_;
 
-  my $bias       = AiNeuralVal ($name, $fanntyp, 'ModelBias',      500);
-  my $slope      = AiNeuralVal ($name, $fanntyp, 'ModelSlope',       0);
-  my $rmse_rel   = AiNeuralVal ($name, $fanntyp, 'RmseRel',        100);
-  my $mae        = AiNeuralVal ($name, $fanntyp, 'Mae',            100);
-  my $ref_level  = CircularVal ($name, '99', $fanntyp.'_quantile30', 0);                 # Wert des 30%-Quantils als Referenzniveau bestimmen
+  my $bias             = AiNeuralVal ($name, $fanntyp, 'ModelBias',       500);
+  my $slope            = AiNeuralVal ($name, $fanntyp, 'ModelSlope',        0);
+  my $rmse_rel         = AiNeuralVal ($name, $fanntyp, 'RmseRel',         100);
+  my $mae              = AiNeuralVal ($name, $fanntyp, 'Mae',             100);
+  my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',      1.0);
+  my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',       0.0);
+  my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRatio',  1.0);
+  
+  my $ref_level        = CircularVal ($name, '99', $fanntyp.'_quantile30',  0);                 # Wert des 30%-Quantils als Referenzniveau bestimmen
     
   my $zone       = 3;
   my $bc         = 0;
   my $res        = $val;
   my $bias_ratio = abs($bias) / (max($mae, 0.1));
 
+  # --- Drift-Level-Korrektur ---
+  my $ds_min = 0.75;
+  my $ds_max = 1.05;
+
+  # Slope clampen
+  my $ds = $drift_slope;
+  $ds    = $ds_min if($ds < $ds_min);
+  $ds    = $ds_max if($ds > $ds_max);
+
+  # Sicherheitsnetz
+  $ds = 0.5 if($ds < 0.5);
+  
+  # --- Adaptive Drift-Gewichtung ---
+  my $slope_dev    = abs (1.0 - $drift_slope);                                                  # 1. Slope-Abweichung (je weiter weg von 1.0, desto stärker) 0.0 .. 1.0
+  my $rmse_dev     = log (1 + max(0, $drift_rmse_ratio - 1));                                   # 2. RMSE-Ratio-Effekt (sanft logarithmisch) 0 .. ~1.1
+  my $mae_scale    = min (1.0, $mae / 200);                                                     # 3. MAE-Skalierung (größere Fehler → mehr Drift-Korrektur erlaubt) 0 .. 1
+  my $drift_weight = min (1.0, 0.5 * $slope_dev + 0.3 * $rmse_dev + 0.2 * $mae_scale);          # 4. Kombinierter Drift-Impact
+  my $ds_adapted   = 1.0 + ($ds - 1.0) * $drift_weight;                                         # 5. DriftScaler adaptiv mischen
+  $ds_adapted      = max (0.5, min(1.05, $ds_adapted));                                         # 6. Sicherheitsnetz
+
+  # --- Drift-Zonenlogik ---
+  my $drift_zone = 3;                                                                           # 1=grün, 2=gelb, 3=rot
+
+  if ($drift_slope >= 0.9 && $drift_slope <= 1.1 && $drift_rmse_ratio < 1.5) {                  # Drift fast nicht vorhanden
+      $drift_zone = 1;
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.3;                                            # nur 30% der Drift-Korrektur
+  }
+  elsif ($drift_slope >= 0.75 && $drift_slope < 0.9 && $drift_rmse_ratio < 2.5) {               # moderater Drift
+      $drift_zone = 2;
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.7;                                            # 70% der Drift-Korrektur
+  }
+  else {                                                                                        # starker Drift
+      $drift_zone = 3;
+      $ds_adapted = $ds_adapted;                                                                # volle Drift-Korrektur
+  }
+
+  $ds_adapted = max (0.5, min(1.05, $ds_adapted));                                              # Sicherheitsnetz erneut anwenden
+
+
+  # Drift-Bias clampen
+  my $drift_bias_max     = 1.0 * $mae;
+  my $clamped_drift_bias = $drift_bias;
+  $clamped_drift_bias    =  $drift_bias_max if($clamped_drift_bias >  $drift_bias_max);
+  $clamped_drift_bias    = -$drift_bias_max if($clamped_drift_bias < -$drift_bias_max);
+
+
   # --- Sicherheitsbegrenzung des Bias ---
-  my $max_bias     = 0.5 * $mae;                                                          # Maximal 50% des MAE berücksichtigen
+  my $max_bias     = 0.5 * $mae;                                                                # Maximal 50% des MAE berücksichtigen
   my $clamped_bias = $bias;
   $clamped_bias    =  $max_bias if($clamped_bias >  $max_bias);
   $clamped_bias    = -$max_bias if($clamped_bias < -$max_bias);
-                                                                                          # Nur ein Teil des (geclampeten) Bias wird angewendet
-  my $alpha_green  = 0.7;                                                                 # 50% in grüner Zone
-  my $alpha_yellow = 0.5;                                                                 # 30% in gelber Zone
+                                                                                                # Nur ein Teil des (geclampeten) Bias wird angewendet
+  my $alpha_green  = 0.7;                                                                       # 50% in grüner Zone
+  my $alpha_yellow = 0.5;                                                                       # 30% in gelber Zone
 
-  # --- Peak-Schutz: nur Grundlast korrigieren ---
-  # Wenn kein RefLevel oder val deutlich drüber liegt -> keine Korrektur.
+  # --- Drift-Korrektur anwenden ---
+  $res = $res * $ds_adapted;                                                                    # Level-Skalierung immer
+  
+  # --- Peak-Schutz: nur Grundlast korrigieren ---                                              # Wenn kein RefLevel oder val deutlich drüber liegt -> keine Korrektur.
   my $is_baseline = 0;
     
   if ($ref_level > 0) {
-      $is_baseline = ($val <= 1.2 * $ref_level) ? 1 : 0;                  
+      $is_baseline = ($res <= 1.2 * $ref_level) ? 1 : 0;                  
   }
   else {
       $is_baseline = 0;
   }
+  
+  $res = $res - $clamped_drift_bias if($is_baseline);                                       # Drift-Bias nur auf Baseline anwenden
 
+  # --- Zonenlogik ---
   if ($is_baseline) {
-      if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {      # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
+      if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {        # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
           my $soft_bias = $clamped_bias * $alpha_green;
-          $res          = $val + $soft_bias;                                              # nur additive Basiskorrektur, kein Slope!
+          $res          = $res + $soft_bias;                                                # nur additive Basiskorrektur, kein Slope!
           $zone         = 1;
       }
-      elsif ($slope >= 0.7 && $slope < 0.9 && $bias_ratio <= 2.0 && $rmse_rel <= 40) {    # --- Zone 2: Gelbe Zone (noch sanfter, aber gleiche Logik) ---
+      elsif ($slope >= 0.7 && $slope < 0.9 && $bias_ratio <= 2.0 && $rmse_rel <= 40) {      # --- Zone 2: Gelbe Zone (noch sanfter, aber gleiche Logik) ---
           my $soft_bias = $clamped_bias * $alpha_yellow;
-          $res          = $val + $soft_bias;
+          $res          = $res + $soft_bias;
           $zone         = 2;
       }
   }                                                                                       # Zone 3: keine Korrektur
@@ -34050,7 +34108,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
             <tr><td> <b>beamHeightlevel</b>     </td><td>The bar height for each level of the bar chart can be specified.                                                                          </td></tr>
             <tr><td>                            </td><td>The specification for a layer consists of the layer number (1..X), a ':' followed by a positive integer > 0.                              </td></tr>
-            <tr><td>                            </td><td>It is <b>not an absolute value for the level height</b>, but is used as a normalization factor in the height calculation.                 </td></tr>
+            <tr><td>                            </td><td>It is <b>not an absolute value for the level height</b>, but is used as a <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wirkung_von_graphicControl-%3EbeamHeightlevel_auf_die_Zonen_(z1_bis_z3)_je_nach_layoutType' target='_blank'>normalization factor</a> in the height calculation.                 </td></tr>
             <tr><td>                            </td><td>Further levels are specified separated by commas (see example).                                                                           </td></tr>
             <tr><td>                            </td><td><b>&lt;Level&gt;:&lt;Integer&gt;</b> - normalization factor (default: 200)                                                                </td></tr>
             <tr><td>                            </td><td>                                                                                                                                          </td></tr>
@@ -37047,7 +37105,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="15%"> <col width="85%"> </colgroup>
             <tr><td> <b>beamHeightlevel</b>     </td><td>Für jede Ebene der Balkengrafik kann die Balkenhöhe der jeweiligen Ebene festgelegt werden.                                     </td></tr>
             <tr><td>                            </td><td>Die Angabe für eine Ebene besteht aus der Ebenen-Nummer (1..X), einem ':' gefolgt von einer positiven Ganzzahl > 0.             </td></tr>
-            <tr><td>                            </td><td>Es ist <b>kein Absolutwert für die Ebenenhöhe</b>, sondern wird als Normierungsfaktor bei der Höhenberechnung verwendet.        </td></tr>
+            <tr><td>                            </td><td>Es ist <b>kein Absolutwert für die Ebenenhöhe</b>, sondern wird als <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wirkung_von_graphicControl-%3EbeamHeightlevel_auf_die_Zonen_(z1_bis_z3)_je_nach_layoutType' target='_blank'>Normierungsfaktor</a> bei der Höhenberechnung verwendet.        </td></tr>
             <tr><td>                            </td><td>Die Angabe für weitere Ebenen erfolgt durch Komma getrennt (siehe Beispiel).                                                    </td></tr>
             <tr><td>                            </td><td><b>&lt;Ebene&gt;:&lt;Ganzzahl&gt;</b> - Normierungsfaktor (default: 200)                                                        </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
