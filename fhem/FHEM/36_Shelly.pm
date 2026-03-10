@@ -185,27 +185,30 @@
 # 6.05.4    fix: Status call on web commands, misc.
 # 6.05.5    fix: "not enough parameter" on pct-command
 # 6.05.6    fix: misc
+# 6.05.7    add attribute 'updateDelay', fix timing of updates
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
 
 use strict;
 use warnings;
-use 5.10.0;     # defined-or
+#use 5.10.0;     # defined-or:  //
+use v5.32;       # chained comparisions eg. a<x<b
 
 use JSON;
 use HttpUtils;
 use SetExtensions;
 use Socket;     # gethostbyname() gethostbyaddr() ...
 
-use vars qw{%attr %defs};
+#use vars qw{%attr %defs};
+our (%attr, %defs);
 
 sub Log($$);
 sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.6 03.03.2026";
+my $version = "6.05.7 10.03.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -939,7 +942,7 @@ sub Shelly_Initialize ($) {
                      " ShellyName".
                      $attributes{'modes'}.
                #      " mode:relay,roller,white,color".
-                     " interval timeout shellyuser".
+                     " interval timeout shellyuser updateDelay".
                      $attributes{'multichannel'}.
                      $attributes{'roller'}.
                      $attributes{'dimmer'}.
@@ -983,19 +986,16 @@ sub Shelly_Define($$) {   # use Socket;
   if( $a[2] =~ m|^((\d{1,3}\.?\b){4})| ){
     $definit=$1; #ipaddr
     if( $a[2] =~ m/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}(\:\d+)?$/ ){
-      # we have a valid ip-address
-      Log 4,"[Shelly_define] IPv4-Addr \'$definit\' is valid"; 
-      $hostname = gethostbyaddr( inet_aton($definit),AF_INET);
-      if( defined($hostname) && $a[2] !~ /\:/ ){
-          Log 4,"[Shelly_define] Hostname of $definit is $hostname";
-          $hostname =~ s/\.fritz\.box//;
-          readingsSingleUpdate($hash,"network_DNS",$hostname,1);
-      }else{
-          readingsSingleUpdate($hash,"network_DNS","-",1);
-      }
+       my $port=$4//'';
+       # we have a valid ip-address
+       Log 1,"[Shelly_define] IPv4-Addr \'$definit\' is valid"; #4
+       $hostname = gethostbyaddr( inet_aton($definit),AF_INET)//'-';
+       Log 1,"[Shelly_define] Hostname of $definit is $hostname$port"; #4
+       $hostname =~ s/\.fritz\.box//;
+       readingsSingleUpdate($hash,"network_DNS",$hostname.$port,1);
     }else{
-      Log 1,"[Shelly_define] looks like an ip4-address, but is not valid";
-      return "looks like an ip4-address, but is not valid";
+       Log 1,"[Shelly_define] looks like an ip4-address, but is not valid";
+       return "looks like an ip4-address, but is not valid";
     }
 
   #-- check DNS-name [:portnumber]
@@ -1013,11 +1013,11 @@ sub Shelly_Define($$) {   # use Socket;
       if( defined($packed_ip) ){
           my $ip_addr=Socket::inet_ntoa($packed_ip); # use
           Log 3,"[Shelly_define] $name: found ip-address=$ip_addr for host=\'$dnsname\'";
-          if( $a[2] !~ /\:/ ){
-              readingsSingleUpdate($hash,"network_DNS",$dnsname,1);
-          }else{
-              readingsSingleUpdate($hash,"network_DNS","-",1);
-          }
+          $dnsname='--'    if( $a[2] =~ /\:/ );
+          readingsSingleUpdate($hash,"network_DNS",$dnsname,1);
+    #      }else{
+     #         readingsSingleUpdate($hash,"network_DNS","-",1);
+      #    }
       }else{
           Log 1,"[Shelly_define] $name: cannot find \'$dnsname\'";
           return "cannot find $dnsname";
@@ -1114,7 +1114,7 @@ sub Shelly_Define($$) {   # use Socket;
           fhem("attr -silent $name host_ip xxx.xxx.xxx.xxx");
           Log3 $name,1,"[Shelly_define] $name: Please set attribute \'host_ip\'  ($^O)";
       }else{
-          Log3 $name,1,"[Shelly_define] $name: \'host_ip\'=$host_ip";      
+          Log3 $name,1,"[Shelly_define] $name: ip_fhem_host=$host_ip";      
       }
   }
   return undef;
@@ -2491,7 +2491,7 @@ sub Shelly_Set ($@) {
   #-- following commands do not occur in command list, eg. out_on, input_on, single_push
   #-- command received via web to register local changes of the device 
   my ($signal,$isWhat,$channels,$subs,$err,$verb);
-  my $update_delay = 0.25; # delay for Shelly_status call
+  my $update_delay = AttrVal($name,"updateDelay",0.5); # delay for Shelly_status call 
   #-- Part 1: web commands without a value, but a conditon. Channel only on multichannel devices.
   if( $cmd =~ /^(out|button|input|single|double|triple|short|long|touch|voltage|temperature|humidity)_(on|off|push|up|down|multi|over|under|changed)$/ ){
             #  ||  $cmd =~ /^(Active_Power|Voltage|Current)_(a|b|c)$/ 
@@ -2677,7 +2677,7 @@ sub Shelly_Set ($@) {
      #-- Call status after switch.n
      if( $signal !~ /^(Active_Power|Voltage|Current|apower|voltage|current)/ ){
         #-- scheduling next status update
-        Shelly_status($hash,"Shelly_Set",0.75);
+        Shelly_status($hash,"Shelly_Set",1.75); # 0.75
      }
      return undef;
   #---------------------------
@@ -3799,7 +3799,7 @@ sub Shelly_status(@){
   my $name = $hash->{NAME};
   ##$hash->{callFn}=$callFn;  # to be used by Shelly_status2G
   
-  Log3 $name,5,"[Shelly_status:1] $name: callFn=".($callFn//"loop_back")." sched=".($scheduled//"no").", helper=".$hash->{helper}{timer}; #4
+  Log3 $name,4,"[Shelly_status:1] $name: callFn=".($callFn//"loop_back")." sched=".($scheduled//"no").", helper=".$hash->{helper}{timer}; #4
   if( $scheduled//0 ){  
       Log3 $name,6,"[Shelly_status:1a] $name: set internal Timer  ---and------BYE------";
       readingsSingleUpdate($hash,"/_nextUpdateTimer","$scheduled sec $callFn",1)
@@ -3914,8 +3914,7 @@ sub Shelly_status1G {
   readingsBulkUpdateIfChanged($hash,"network_connection","online");
   Shelly_readingsBulkUpdate($hash,"network_rssi",$jhash->{wifi_sta}{rssi},"rssi=2" );
   readingsBulkUpdateMonitored($hash,"network_ip-address",$jhash->{wifi_sta}{ip} );
-  readingsBulkUpdateMonitored($hash,"network_ssid",$jhash->{'wifi_sta'}{'ssid'} )
-                                                                      if( $jhash->{'wifi_sta'}{'ssid'} );
+  readingsBulkUpdateMonitored($hash,"network_ssid",$jhash->{'wifi_sta'}{'ssid'}//'-' );
   fhem("deletereading $name error",1) if( ReadingsAge($name,"error",-1)>86400 ); # 24 hours / silent
   #-----------------------------------------------------------------------------------------
   #-- 1st generation: we have a switch type device and 'relay'-mode, e.g. shelly1, shelly1pm, shelly4, shelly2, shelly2.5, shellyplug or shellyem
@@ -4500,6 +4499,7 @@ sub Shelly_settings1G {
     # ap-roaming
     my $ap_roaming = $jhash->{ap_roaming}{enabled} // 2 ;
     $ap_roaming = $jhash->{ap_roaming}{threshold}  if( $ap_roaming == 1 );
+  ##  my $ap_roaming = $jhash->{ap_roaming}{enabled}?$jhash->{ap_roaming}{threshold}:'Disabled';
     Shelly_readingsBulkUpdate($hash,"network_wifi_roaming",$ap_roaming,"rssi=3");
     
     # name
@@ -4761,20 +4761,20 @@ sub Shelly_status2G {
   }
 
   ############ checking if connected to Wifi. Is similiar given as answer to /rpc/Wifi.GetStatus
-  my ($wifi_ip,$wifi_ssid,$wifi_rssi);
+#  my ($wifi_ip,$wifi_ssid,$wifi_rssi);
   my $wifi_status= $jhash->{wifi}{status};  # disconnected, got ip
-  if( $wifi_status eq "got ip" ){
-      $wifi_ip   = $jhash->{wifi}{sta_ip};
-      $wifi_ssid = $jhash->{wifi}{ssid};
-      $wifi_rssi = $jhash->{wifi}{rssi};
-  }else{
-      $wifi_ip   = "-";
-      $wifi_ssid = "-";
-      $wifi_rssi = "-";
-  }
+#  if( $wifi_status eq "got ip" ){
+  my $wifi_ip   = $jhash->{wifi}{sta_ip}//'-';
+  my $wifi_ssid = $jhash->{wifi}{ssid}//'-';   # name of connected WLAN 
+    #  $wifi_rssi = $jhash->{wifi}{rssi};
+ # }else{
+  #    $wifi_ip   = "-";
+   #   $wifi_ssid = "-";
+   #   $wifi_rssi = "-";
+ # }
   readingsBulkUpdateIfChanged($hash,"network_ip-address".$netw_subs,$wifi_ip );
   readingsBulkUpdateIfChanged($hash,"network_ssid",$wifi_ssid);
-  Shelly_readingsBulkUpdate($hash,"network_rssi",$wifi_rssi,"rssi=2");
+  Shelly_readingsBulkUpdate($hash,"network_rssi",$jhash->{wifi}{rssi}//'-',"rssi=2");
 
   if( $eth_ip eq "-" && $wifi_ssid eq "-" ){   # disconnected
       Shelly_error_handling($hash,"Shelly_status2G:status","not connected",2);
@@ -4796,7 +4796,7 @@ sub Shelly_status2G {
       $netw_subs =~ s/online/remote/   if( ReadingsVal($name,"network_host",undef) );  # if connected via another Shellies range extender
       readingsBulkUpdateIfChanged($hash,"network_connection",$netw_subs);
   }
-  Log3 $name,6,"[Shelly_status2G:network] $name ethernet=$eth_ip,wifi=$wifi_ssid @ $wifi_rssi";
+#  Log3 $name,6,"[Shelly_status2G:network] $name ethernet=$eth_ip,wifi=$wifi_ssid @ $wifi_rssi";
 
   ############ checking uptime
   Shelly_readingsBulkUpdate($hash,"uptime",$jhash->{sys}{uptime},"time=5");
@@ -5047,37 +5047,41 @@ sub Shelly_status2G {
       my $CC = "$comp:$channel"; #namespace
       my $reading = "timer";
       $reading .= "_".$jhash->{$CC}{id}   if( $chnls[$CP]>1 );
-      
-      Log3 $name,4,"[Shelly_status2G:timer] $name processing timer of $CC and reading is >$reading<";#4
+ 
+      my $msg="processing timer of $CC, reading is \'$reading\'";
       if( $jhash->{$CC}{timer_started_at} ){
          my ($tmrDur,$tmrEnd);
-         Log3 $name,5,"[Shelly_status2G:timer] $name processing timer";
          if( $jhash->{$CC}{timer_remaining} ){
             $tmrDur = $jhash->{$CC}{timer_remaining};
-            Log3 $name,5,"[Shelly_status2G:timer] $name remaining timer$subs is $tmrDur"; #5
+            $msg.=", remaining time=$tmrDur";
             $tmrEnd = $tmrDur + time();
          }else{
             $tmrEnd = $jhash->{$CC}{timer_started_at} + $jhash->{$CC}{timer_duration};
             $tmrDur =  $tmrEnd - time();
             $tmrDur =  round($tmrDur,1);
-            Log3 $name,4,"[Shelly_status2G:tmr] $name calculated timer$subs from start and duration is $tmrDur"; #5
+            $msg.=", calc.time=$tmrDur";
          }
          $tmrDur = 0   if($tmrDur<0);
-         Log3 $name,6,"[Shelly_status2G:timer] $name calculated update timer is $timer vs duration=$tmrDur"; #5
-         $timer = $hash->{INTERVAL}>0 ? minNum( $hash->{INTERVAL},$tmrDur ) : $tmrDur;# 
-         Log3 $name,6,"[Shelly_status2G:timer] $name calculated update timer is $timer"; #5
-         $tmrDur .= " sec = ".FmtDateTime($tmrEnd)  if( $hash->{units} );
+      #   $timer = $hash->{INTERVAL}>0 ? minNum( $hash->{INTERVAL},$tmrDur ) : $tmrDur;
+         if( 0 < $hash->{INTERVAL} < $tmrDur ){   # use v5.32
+                $timer = $hash->{INTERVAL};
+         }else{
+                $timer = $tmrDur;
+         }
+         $tmrDur .= " sec = ".FmtDateTime($tmrEnd)  if( $hash->{units} );  # add a time-date-string, if units in use
          readingsBulkUpdateMonitored($hash,$reading,$tmrDur);
+         $timer +=0.80;  # extra time to get update after end of timer
+         $msg.=", forwarded time=$timer";
       }elsif( $jhash->{$CC}{move_started_at} ){  # cover, if moving
-         Log3 $name,6,"[Shelly_status2G:move] $name processing movement-stated at=".$jhash->{$CC}{move_started_at};
+         Log3 $name,6,"[Shelly_status2G:move] $name processing movement-started at=".$jhash->{$CC}{move_started_at};
          $timer = $jhash->{$CC}{move_started_at}+$jhash->{$CC}{move_timeout}-time();
          $timer +=0.25;  # extra time to avoid delays in positioning
-         Log3 $name,6,"[Shelly_status2G:move] $name calculated remaining time=$timer";
-         
+         $msg.=", calculated remaining time=$timer";         
       }elsif(ReadingsVal($name,$reading,undef) ){
          readingsBulkUpdateMonitored($hash,$reading,'-');
          $hash->{helper}{timer}=0;
       }
+      Log3 $name,4,"[Shelly_status2G:timer] $name $msg";
     }
   }  
   
@@ -5332,6 +5336,7 @@ sub Shelly_settings2G {
         # ap-roaming
         my $ap_roaming = $jhash->{wifi}{roam}{interval} // 2;
         $ap_roaming = $jhash->{wifi}{roam}{rssi_thr} if( $ap_roaming > 0 ); 
+        ## my $ap_roaming = ($jhash->{wifi}{roam}{interval}//0)>0?$jhash->{wifi}{roam}{rssi_thr}:'-';
         Shelly_readingsBulkUpdate($hash,"network_wifi_roaming",$ap_roaming,"rssi=3");
         #**********
 
@@ -5545,7 +5550,7 @@ sub Shelly_settings2G {
   }elsif($comp eq "info"){
       Log3 $name,4,"[Shelly_settings2G:info] $name: processing the answer from the \"/rpc/Shelly.GetDeviceInfo\" call";#4
 
-       $hash->{SHELLYID}=$jhash->{id};
+       $hash->{SHELLYID}=$jhash->{id}; # this is Shellies network DNS
        my $model_id = $jhash->{model};  # vendor id
        readingsBulkUpdateIfChanged($hash,"model_ID",$model_id);
 
@@ -5634,20 +5639,20 @@ sub Shelly_settings2G {
            }
            
            if( $client_name ){
-               Log3 $name,4,"[Shelly_settings2G:APclients] $name: found client \'$client_name\' with MAC=$mac";
+               Log3 $name,4,"[Shelly_settings2G:APclients] $name: found client \'$client_name\' with MAC=$mac";#4
                Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_model",ReadingsVal($client_name,"model_name","unknown"),undef,undef,$timestamp );
                $client = InternalVal($client_name,"DEF",undef);
                if( $client ne $ip_int ) {
                    Log3 $name,1,"[Shelly_settings2G:APclients] $client_name: wrong definition \'$client\', use <DNS-name>:<port>";
                    $client = "clients \'$client_name\' definition \'$client\' is wrong";                  
                }else{
-                   Log3 $name,4,"[Shelly_settings2G:APclients] device \'$client_name\' is defined as $client (OK)"; 
+                   Log3 $name,4,"[Shelly_settings2G:APclients] device \'$client_name\' is defined as $client (OK)"; #4
                    # format as clickable link
                    $client = "<html><a href=\"http://$ip_int\">$client_name</a></html>";  
                }
            }else{
                $client = "no definition";  # may be a smartphone as client - this is no error
-               Log3 $name,3,"[Shelly_settings2G:APclients] $name: no fhem device found with MAC=$mac ";
+               Log3 $name,3,"[Shelly_settings2G:APclients] $name: no fhem device found with MAC=$mac ";#3
            }
            Shelly_readingsBulkUpdate($hash,"ap_clients_$xi\_name",$client,undef,undef,$timestamp );
            $xi++;
@@ -8172,6 +8177,17 @@ sub Shelly_HttpResponse($){
                 Careful: Use this attribute only if you get 'connect to ... timed out' errors in your log.
                 </li>
              <li>
+                <a id="Shelly-attr-updateDelay"></a>
+                <code>attr &lt;name&gt; updateDelay &lt;seconds&gt;</code>
+                <br />Verzögerungszeit zwischen dem Empfang eines Webcommands 
+                      (z.B. <code>set &lt;name&gt; out_on</code>) und dem Abruf des Status.
+                      Der Standardwert ist 0.5 Sekunden.
+                Dieses Attribut sollte bei langsamer Hardware auf einen höheren Wert gestellt werden. 
+                </li>
+                <br />Durch das Erhöhen dieses Attributs auf z.B. 2.5 sec wird dem Shelly mehr Zeit 
+                      für die Aktualisierung seiner Werte, insbesondere Spannung, Strom, Leistung, gegeben.
+                      Empfehlenswert, wenn die Aktualisierung durch Actions ausgelöst wird.
+             <li>
                 <a id="Shelly-attr-webhook"></a>
                 <code>attr &lt;name&gt; webhook none|&lt;FHEMWEB-device&gt; (default:none) </code>
                 <br />create a set of webhooks on the shelly device which send a status request to fhem (only 2nd gen devices).
@@ -9034,6 +9050,17 @@ sub Shelly_HttpResponse($){
                       Diese Readings werden durch Löschen des Attributes entfernt und 
                       mit <code>set &lt;name&gt; clear responsetimes</code> zurückgesetzt.
                 </li>
+             <li>
+                <a id="Shelly-attr-updateDelay"></a>
+                <code>attr &lt;name&gt; updateDelay &lt;seconds&gt;</code>
+                <br />Verzögerungszeit zwischen dem Empfang eines Webcommands
+                      (z.B. <code>set &lt;name&gt; out_on</code>) und dem Abruf des Status.
+                      Der Standardwert ist 0.5 Sekunden.
+                Dieses Attribut sollte bei langsamer Hardware auf einen höheren Wert gestellt werden. 
+                </li>
+                <br />Durch das Erhöhen dieses Attributs auf z.B. 2.5 sec wird dem Shelly mehr Zeit 
+                      für die Aktualisierung seiner Werte, insbesondere Spannung, Strom, Leistung, gegeben.
+                      Empfehlenswert, wenn die Aktualisierung durch Actions ausgelöst wird.
              <li>
                 <a id="Shelly-attr-webhook"></a>
                 <code>attr &lt;name&gt; webhook &lt;FHEMWEB-device&gt; </code>
