@@ -64,6 +64,7 @@ sub DepartureBnT_Initialize($) {
 	$hash->{SetFn}           	= "DepartureBnT_Set";
     $hash->{AttrFn}				= "DepartureBnT_Attr";
 	$hash->{FW_detailFn}        = "DepartureBnT_FW_detailFn";
+	$hash->{FW_deviceOverview}  = 1;
 	$hash->{NotifyOrderPrefix}	= "50-";
 
 	$hash->{AttrList}       	= "disable:0,1 " .
@@ -196,8 +197,15 @@ sub DepartureBnT_Attr(@) {
 	elsif ($a[2] eq "ShowDetails") 
 	{
 		### Log Entry for debugging purposes
-		Log3 $name, 5, $name. " : DepartureBnT_Attr - ShowDetails              : " . $a[3];
+		Log3 $name, 1, $name. " : DepartureBnT_Attr - ShowDetails              : " . $a[3];
 		
+		# if ($a[3] eq "Fhem"){
+			# $modules{DepartureBnT}{FW_detailFn} = "";
+		# }
+		# elsif ($a[3] eq "Departure"){
+			# $modules{DepartureBnT}{FW_detailFn} = "DepartureBnT_FW_detailFn";
+		# }
+
 		### Update all Departures
 		DepartureBnT_Update($hash);
 	}
@@ -765,11 +773,12 @@ sub DepartureBnT_UpdateResponse($) {
 		Log3 $name, 5, $name. " : DepartureBnT_UpdateResponseResponse - DepartureTimeUtc         : " . $DepartureTimeUtc;
 
 		####### Create ConcatList for compatibility to FTUI Widget Departure https://wiki.fhem.de/wiki/FTUI_Widget_Departure #######
+		$DepartureEntry->{number} =~ s/ /_/g;
 		$ConcatList[$ReadingOrderNo]= '["' . $DepartureEntry->{number} . '","' . $DepartureEntry->{to} . '","' . $DepartureEntry->{departureTimeInMinutes} . '"]';
 	}
 
 	### Create ReadingValue for compatibility to FTUI Widget Departure if attribute is enabled
-	if (AttrVal($name, "ConcatReading", "") == 1){
+	if (AttrVal($name, "ConcatReading", "") eq "1"){
 		$ConcatReadingValue ='[' . join(',' , @ConcatList) . ']';
 		readingsBulkUpdate($hash, "departure_concat", $ConcatReadingValue , 1);
 	}
@@ -925,7 +934,7 @@ sub DepartureBnT_FW_detailFn($$$$) {
 	my $IconUnknown       = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 469 469"         ><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>Unknown        </title><path class="cls-1" d="M 809,1820 C 205,1745 -161,1123 70,567 224,197 616,-37 1005,9 c 456,54 790,406 812,858 17,335 -134,630 -415,814 -165,108 -400,163 -593,139 z m 306,-155 c 203,-55 385,-203 484,-395 63,-120 85,-213 85,-355 0,-141 -16,-211 -74,-333 C 1503,357 1310,205 1067,153 978,135 792,140 705,164 561,204 410,302 314,418 249,496 179,636 155,735 c -23,94 -23,267 0,360 39,160 153,336 276,430 82,61 224,129 314,149 87,19 283,15 370,-9 z" id="path8" /> </g> <g id="text2989" fill="#000000" stroke="none"> <path d="m 216.47819,309.81169 c -0.12157,-4.37349 -0.18232,-7.65367 -0.18223,-9.84052 -9e-5,-12.87764 1.82223,-23.99378 5.46696,-33.34846 2.67264,-7.04619 6.98546,-14.15323 12.93847,-21.32114 4.37346,-5.22385 12.2398,-12.84721 23.59904,-22.87012 11.35899,-10.02259 18.73938,-18.01042 22.14119,-23.9635 3.40151,-5.95273 5.10234,-12.45233 5.1025,-19.49883 -1.6e-4,-12.75603 -4.98116,-23.96328 -14.94303,-33.6218 -9.96214,-9.65806 -22.17167,-14.4872 -36.62863,-14.48744 -13.97121,2.4e-4 -25.63404,4.3738 -34.98854,13.1207 -9.35463,8.74736 -15.48977,22.41474 -18.40543,41.0022 l -33.71292,-4.00911 c 3.03718,-24.90481 12.05766,-43.97841 27.06145,-57.22084 15.00371,-13.24193 34.83661,-19.86302 59.49875,-19.86329 26.11979,2.7e-4 46.95496,7.10731 62.50557,21.32114 15.55028,14.21434 23.32551,31.40487 23.3257,51.57166 -1.9e-4,11.66303 -2.73367,22.41471 -8.20044,32.25506 -5.46714,9.84069 -16.15807,21.80724 -32.07283,35.8997 -10.69109,9.47619 -17.67664,16.46174 -20.95668,20.95668 -3.2803,4.49516 -5.71006,9.6584 -7.28928,15.48972 -1.57947,5.83151 -2.49063,15.30757 -2.73348,28.42819 z m -2.00455,65.78575 0,-37.35756 37.35756,0 0,37.35756 z" id="path2994" /> </svg>';
 
 	### If the Details shall be the Departure Board with Map
-	if (AttrVal($name, "ShowDetails","Fhem") eq "Departure"){
+	if (AttrVal($name, "ShowDetails","Departure") eq "Departure"){
 
 		$htmlCode = '
 		<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
@@ -1128,13 +1137,17 @@ sub DepartureBnT_FW_detailFn($$$$) {
 				</table>	
 			</body>
 		</html>';
-	}
-	### If the Details shall be the fhem Standard
-	else{
-		
-	}
 
-	return($htmlCode);		
+		return($htmlCode);
+	}
+	# ### If the Details shall be the fhem Standard
+	# else{
+		# # $hash->{FW_deviceOverview} = 1;
+		
+		# $hash->{FW_detailFn} = "";
+		# return(undef);
+	# }
+
 }
 1;
 
