@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  73_DepartureBnT : FTUI Widget Departure_concat without blanks
  - bugfix:  76_SolarForecast: Version 2.2.3 - fix round0
  - feature: 76_SolarForecast: Version 2.2.2
  - feature: 98_vitoconnect: Kaeltekreislauf SVG and tabletUI js + css
