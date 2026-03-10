@@ -7789,7 +7789,7 @@ sub _attraiControl {                     ## no critic "not used"
       aiConActivate      => { comp => '(0|1|2)',                                                   act => 0 },
       aiConHiddenLayers  => { comp => '(?:[1-9]\d{1,2}-[1-9]\d{1,2}(?:-[1-9]\d{1,2})?)',           act => 0 },
       aiConTrainAlgo     => { comp => '(RPROP|INCREMENTAL)',                                       act => 0 },
-      aiConLearnRate     => { comp => '(0\.01|0\.05|0\.001|0\.005)',                               act => 0 },
+      aiConLearnRate     => { comp => '(0\.01|0\.05|0\.00[1-5])',                                  act => 0 },
       aiConMomentum      => { comp => '(0\.[2-9])',                                                act => 0 },
       aiConShuffleMode   => { comp => '[0-2]',                                                     act => 0 },
       aiConBitFailLimit  => { comp => '0\.(0[5-9]|[1-4]\d|50)',                                    act => 0 },
@@ -25486,8 +25486,8 @@ sub aiFannGetConResult {
  
       # Prognose + BiasKorrektur abfragen
       #####################################
-      my $denorm_val               = _aiFannPredict             ($name, $fanntyp, \@new_input); 
-      my ($prediction, $bc, $zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
+      my $denorm_val                            = _aiFannPredict             ($name, $fanntyp, \@new_input); 
+      my ($prediction, $bc, $zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
       
       my $nngrst = CurrentVal ($name, $fanntyp.'NNGetResultState', 'ok');
       
@@ -25512,7 +25512,7 @@ sub aiFannGetConResult {
       my $confc_final = $alpha * $prediction + (1 - $alpha) * $intlegacyconfc;
       $confc_final    = round0 ($confc_final);
       
-      debugLog ($paref, 'aiData', "AI FANN con fc - Time: $starttime, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, BC=$bc Wh, zone=$zone)");
+      debugLog ($paref, 'aiData', "AI FANN con fc - Time: $starttime, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, BC=$bc Wh, bias/drift zone=$zone/$drift_zone)");
       
       
       # Daten speichern
@@ -25592,44 +25592,48 @@ sub _aiFannApplyBiasCorrection {
   my $bias_ratio = abs($bias) / (max($mae, 0.1));
 
   # --- Drift-Level-Korrektur ---
-  my $ds_min = 0.75;
-  my $ds_max = 1.05;
+  my $ds_min = 0.80;                                                                            # sanfter, aber reagiert
+  my $ds_max = 1.10;
 
-  # Slope clampen
   my $ds = $drift_slope;
-  $ds    = $ds_min if($ds < $ds_min);
-  $ds    = $ds_max if($ds > $ds_max);
+  $ds = $ds_min if($ds < $ds_min);
+  $ds = $ds_max if($ds > $ds_max);
 
-  # Sicherheitsnetz
-  $ds = 0.5 if($ds < 0.5);
-  
-  # --- Adaptive Drift-Gewichtung ---
-  my $slope_dev    = abs (1.0 - $drift_slope);                                                  # 1. Slope-Abweichung (je weiter weg von 1.0, desto stärker) 0.0 .. 1.0
-  my $rmse_dev     = log (1 + max(0, $drift_rmse_ratio - 1));                                   # 2. RMSE-Ratio-Effekt (sanft logarithmisch) 0 .. ~1.1
-  my $mae_scale    = min (1.0, $mae / 200);                                                     # 3. MAE-Skalierung (größere Fehler → mehr Drift-Korrektur erlaubt) 0 .. 1
-  my $drift_weight = min (1.0, 0.5 * $slope_dev + 0.3 * $rmse_dev + 0.2 * $mae_scale);          # 4. Kombinierter Drift-Impact
-  my $ds_adapted   = 1.0 + ($ds - 1.0) * $drift_weight;                                         # 5. DriftScaler adaptiv mischen
-  $ds_adapted      = max (0.5, min(1.05, $ds_adapted));                                         # 6. Sicherheitsnetz
+  # --- Adaptive Drift-Gewichtung (sanft) ---
+  my $slope_dev = abs (1.0 - $drift_slope);
+  my $rmse_dev  = log (1 + max(0, $drift_rmse_ratio - 1));
+  my $mae_scale = min (1.0, $mae / 200);
 
-  # --- Drift-Zonenlogik ---
-  my $drift_zone = 3;                                                                           # 1=grün, 2=gelb, 3=rot
+  my $drift_weight = min (1.0,
+      0.4 * $slope_dev +
+      0.1 * $rmse_dev  +
+      0.1 * $mae_scale
+  );
 
-  if ($drift_slope >= 0.9 && $drift_slope <= 1.1 && $drift_rmse_ratio < 1.5) {                  # Drift fast nicht vorhanden
+  my $ds_adapted = 1.0 + ($ds - 1.0) * $drift_weight;
+
+  $ds_adapted = max (0.70, min(1.10, $ds_adapted));                                             # sanftes Sicherheitsnetz
+
+  # --- Drift-Zonenlogik (entschärft) ---
+  my $drift_zone = 3;
+
+  if ($drift_slope >= 0.9 && $drift_rmse_ratio < 1.5) {
       $drift_zone = 1;
-      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.3;                                            # nur 30% der Drift-Korrektur
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.10;                                           # 10%
   }
-  elsif ($drift_slope >= 0.75 && $drift_slope < 0.9 && $drift_rmse_ratio < 2.5) {               # moderater Drift
+  elsif ($drift_slope >= 0.75 && $drift_rmse_ratio < 2.5) {
       $drift_zone = 2;
-      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.7;                                            # 70% der Drift-Korrektur
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.40;                                           # 40%
   }
-  else {                                                                                        # starker Drift
+  else {
       $drift_zone = 3;
-      $ds_adapted = $ds_adapted;                                                                # volle Drift-Korrektur
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.70;                                           # 70%
   }
 
-  $ds_adapted = max (0.5, min(1.05, $ds_adapted));                                              # Sicherheitsnetz erneut anwenden
+  $ds_adapted = max(0.70, min(1.10, $ds_adapted));                                              # final clamp
 
 
+  # --- Bias-Korrektur ---
   # Drift-Bias clampen
   my $drift_bias_max     = 1.0 * $mae;
   my $clamped_drift_bias = $drift_bias;
@@ -25661,7 +25665,7 @@ sub _aiFannApplyBiasCorrection {
   
   $res = $res - $clamped_drift_bias if($is_baseline);                                       # Drift-Bias nur auf Baseline anwenden
 
-  # --- Zonenlogik ---
+  # --- Bias-Zonenlogik ---
   if ($is_baseline) {
       if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {        # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
           my $soft_bias = $clamped_bias * $alpha_green;
@@ -25673,11 +25677,11 @@ sub _aiFannApplyBiasCorrection {
           $res          = $res + $soft_bias;
           $zone         = 2;
       }
-  }                                                                                       # Zone 3: keine Korrektur
+  }                                                                                         # Zone 3: keine Korrektur
 
   $bc = $res - $val;
 
-return ($res, $bc, $zone);
+return ($res, $bc, $zone, $drift_zone);
 }
 
 ###########################################################################
@@ -25772,34 +25776,34 @@ sub aiFannDetectDrift {
   my $flag;
 
   if (
-      $drift_score      > 2.5 &&
-      $rmse_rel_ratio   > 2.0 &&
-      $slope_drift_rel  > 0.6 &&
-      $bias_drift_norm  > 3.0
+      $drift_score      > 1.8  &&
+      $rmse_rel_ratio   > 2.0  &&
+      $slope_drift_rel  > 0.35 &&
+      $bias_drift_norm  > 1.5
   ) {
       $flag = "severe";
   }
   elsif (
-      $drift_score      > 2.0 &&
-      $rmse_rel_ratio   > 1.6 &&
-      $slope_drift_rel  > 0.4 &&
-      $bias_drift_norm  > 2.0
+      $drift_score      > 1.5  &&
+      $rmse_rel_ratio   > 1.6  &&
+      $slope_drift_rel  > 0.25 &&
+      $bias_drift_norm  > 1.0
   ) {
       $flag = "moderate";
   }
   elsif (
-      $drift_score      > 1.4  &&
+      $drift_score      > 1.2  &&
       $rmse_rel_ratio   > 1.3  &&
-      $slope_drift_rel  > 0.25 &&
-      $bias_drift_norm  > 1.0
+      $slope_drift_rel  > 0.15 &&
+      $bias_drift_norm  > 0.5
   ) {
       $flag = "mild";
   }
   elsif (
-      $drift_score      > 1.15 &&
-      $rmse_rel_ratio   > 1.2  &&
-      $slope_drift_rel  > 0.20 &&
-      $bias_drift_norm  > 0.6
+      $drift_score      > 1.05 &&
+      $rmse_rel_ratio   > 1.1  &&
+      $slope_drift_rel  > 0.10 &&
+      $bias_drift_norm  > 0.3
   ) {
       $flag = "low";
   }
@@ -33319,7 +33323,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * small (e.g., 0.001): slow, stable learning; low risk of overshoot, but longer training time. </ul>                                                    </td></tr>
             <tr><td>                          </td><td><ul> * medium (e.g., 0.005): good compromise between speed and stability; often a sensible default value </ul>                                               </td></tr>
             <tr><td>                          </td><td><ul> * large (e.g., 0.05): fast learning, but risk of instability or divergence if the steps are too large </ul>                                             </td></tr>
-            <tr><td>                          </td><td>Values:<b> 0.05 | 0.01 | 0.005 | 0.001 </b>, default: 0.005                                                                                                  </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0.05 | 0.01 | 0.001 - 0.005 </b>, default: 0.005                                                                                                  </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConBitFailLimit</b> </td><td>The bit-fail limit defines the error (within the normal range) at which a training example counts as an 'error'.                                             </td></tr>
             <tr><td>                          </td><td>The smaller the value, the more intense the training and the better the peaks are achieved. Larger values are more robust but less peak-sensitive.           </td></tr>
@@ -36313,7 +36317,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * Klein (z.B. 0.001): langsames, stabiles Lernen; geringes Risiko von Überschwingen, aber längere Trainingszeit. </ul>                                  </td></tr>
             <tr><td>                          </td><td><ul> * Mittel (z.B. 0.005): guter Kompromiss zwischen Geschwindigkeit und Stabilität; oft ein sinnvoller Standardwert </ul>                                  </td></tr>
             <tr><td>                          </td><td><ul> * Groß (z.B. 0.05): schnelles Lernen, aber Gefahr von Instabilität oder Divergenz, wenn die Schritte zu groß sind </ul>                                 </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0.05 | 0.01 | 0.005 | 0.001 </b>, default: 0.005                                                                                                   </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.05 | 0.01 | 0.001 - 0.005 </b>, default: 0.005                                                                                                   </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConBitFailLimit</b> </td><td>Das Bit-Fail-Limit definiert ab welchem Fehler (im Normbereich) ein Trainingsbeispiel als 'Fehler' zählt.                                                    </td></tr>
             <tr><td>                          </td><td>Je kleiner der Wert, desto strenger das Training und desto besser werden Peaks getroffen. Größere Werte sind robuster, aber weniger peak-sensitiv.           </td></tr>
