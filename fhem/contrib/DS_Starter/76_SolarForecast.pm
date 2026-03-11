@@ -6734,8 +6734,8 @@ sub __getaiFannConState {            ## no critic "not used"
   
   my $drift_score   = AiNeuralVal ($name, 'con', 'DriftScore',        '-'); 
   my $drift_rmserel = AiNeuralVal ($name, 'con', 'DriftRmseRelRatio', '-');  
-  my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlopeRel',     '-'); 
-  my $drift_bias    = AiNeuralVal ($name, 'con', 'DriftBiasNorm',     '-'); 
+  my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlope',        '-'); 
+  my $drift_bias    = AiNeuralVal ($name, 'con', 'DriftBias',         '-'); 
   my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',         '-');                                      
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
@@ -10445,8 +10445,12 @@ sub centralTask {
       state   => 'running',
       evt     => 0
   };
-  
+
   $data{$name}{pvhist}{$day}{99}{dayname} = $dayname;                                           # akt. Wochentagsnamen in pvHistory eintragen
+  
+      # --- Drift Analyse ---
+      #my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
+      #aiFannDetectDrift ($name, $debug, 'con', 96) if($rdy);                                      # Drift von AI 'con' Werten ermitteln
 
   debugLog ($centpars, 'saveData2Cache', "setPVhistory -> stored simple  - current dayname=$dayname");
 
@@ -11129,8 +11133,7 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 started");
           
-          aiFannDetectDrift   ($name, $debug, 'con', 150) if($rdy);                            # Drift von AI 'con' Werten ermitteln
-          aiFannEnterTraining ($paref)            if($prepared && $t >= $newctrstts);          # NN Consumption Forecast Training starten
+          aiFannEnterTraining ($paref) if($prepared && $t >= $newctrstts);                              # NN Consumption Forecast Training starten
           
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 finished");
       }
@@ -17127,6 +17130,7 @@ return;
 #  - PV-Prognosekorrekturfaktoren und deren Qualität
 #  - AI Quellendaten hinzufügen
 #  - Verbrauchswerte für Medianauswertung
+#  - Drift Analyse
 ################################################################
 sub _calcDataEveryFullHour {
   my $paref = shift;
@@ -17134,6 +17138,7 @@ sub _calcDataEveryFullHour {
   my $chour = $paref->{chour};
   my $day   = $paref->{day};                                                          # aktueller Tag (range 01 to 31)
   my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
+  my $debug = $paref->{debug};
 
   my $hash        = $defs{$name};
   my ($acu, $aln) = isAutoCorrUsed ($name);
@@ -17194,8 +17199,11 @@ sub _calcDataEveryFullHour {
       _addHourAiRawdata ($paref);                                                                 # AI Raw Data hinzufügen
       _addCon2CircArray ($paref);                                                                 # Hausverbrauch / Netzbezug der vergangenen Stunde zum con-Array im Circular Speicher hinzufügen
 
-      # con - Quantil 30 bestimmen  
-      ##############################      
+      # --- Drift Analyse ---
+      my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
+      aiFannDetectDrift ($name, $debug, 'con', 96) if($rdy);                                      # Drift von AI 'con' Werten ermitteln
+
+      # --- con - Quantil 30 bestimmen ---    
       my ($targetref, $dmy1, $dmy2) = getPvHistTargetArray ( { name  => $name, 
                                                                debug => 'do_not', 
                                                                par1  => 'con', 
@@ -24133,8 +24141,6 @@ sub aiFannTrainstartAndRetry {
       $data{$name}{$fanntyp.'temp'}     = ();
       
       delete $data{$name}{$fanntyp.'temp'};
-      
-      aiFannDetectDrift ($name, $debug, $fanntyp, 150);                                     # Drift von AI 'con' Werten ermitteln
 
       my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
 
@@ -25686,14 +25692,15 @@ return ($res, $bc, $zone, $drift_zone);
 
 ###########################################################################
 #   Drift-Analyse (peak-aware, semantik-adaptiv, modellskaliert)
+#   mit Rekalibrierung ModelSlope, ModelBias
 ###########################################################################
 sub aiFannDetectDrift {
   my $name    = shift;
   my $debug   = shift;
   my $fanntyp = shift;
-  my $window  = shift // 150;                                                           # Anzahl Stunden für Driftanalyse -> default 6.25 Tage
+  my $window  = shift // 96;                                                             # Anzahl Stunden für Driftanalyse
 
-  my @drift_kpis = qw(
+  my @drift_kpis = qw (
       DriftRmseRelLive DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftMaeLive
       DriftRmseLive DriftScore DriftRmseRelRatio DriftSlopeRel DriftBiasNorm DriftFlag
   );
@@ -25709,6 +25716,7 @@ sub aiFannDetectDrift {
   my @tail_idx = @indices[-$window .. -1];
 
   my (@targets, @preds, @abs_errors);
+  my (@slope_list, @bias_list);
 
   for my $idx (@tail_idx) {
       my $rec = $rawref->{$idx} or next;
@@ -25719,20 +25727,33 @@ sub aiFannDetectDrift {
 
       push @targets,    $a;
       push @preds,      $p;
-      push @abs_errors, abs($p - $a);
+      push @abs_errors, abs ($p - $a);
+      
+      # Slope/Bias pro Stunde berechnen
+      push @slope_list, ($p / $a) if($a != 0);
+      push @bias_list,  ($p - $a);
   }
 
   my $n = @abs_errors || return;
+  
+  # --- Varianz berechnen
+  my $slope_var = _aiSampleVariance (\@slope_list);
+  my $bias_var  = _aiSampleVariance (\@bias_list);
+
 
   # --- Basis-Metriken ---
-  my $mae_live      = sum(@abs_errors) / $n;
+  my $mae_live      = sum (@abs_errors) / $n;
   my $rmse_live     = sqrt(sum(map { $_**2 } @abs_errors) / $n);
-  my $median        = medianArray(\@targets) || 1;
+  
+  my $median        = medianArray (\@targets) || 1;
+  my @sorted        = sort { $a <=> $b } @targets;
+
+  
   my $rmse_rel_live = ($rmse_live / $median) * 100;
-  my $mae_model     = AiNeuralVal($name, $fanntyp, 'Mae', 1) || 1;
+  my $mae_model     = AiNeuralVal ($name, $fanntyp, 'Mae', 1) || 1;
   my $drift_score   = $mae_live / $mae_model;
 
-  # --- Slope/Bias ---
+  # --- Slope/Bias Live ---
   my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);
     
   for my $i (0 .. $#targets) {
@@ -25745,15 +25766,16 @@ sub aiFannDetectDrift {
   my $den         = $n * $sum_xx - $sum_x * $sum_x;
   my $slope_live  = $den != 0 ? ($n * $sum_xy - $sum_x * $sum_y) / $den : 0;
   my $bias_live   = ($sum_y - $slope_live * $sum_x) / $n;
-  my $slope_model = AiNeuralVal($name, $fanntyp, 'ModelSlope', 1);
-  my $bias_model  = AiNeuralVal($name, $fanntyp, 'ModelBias',  0);
-  my $slope_drift = abs($slope_live - $slope_model);
-  my $bias_drift  = abs($bias_live  - $bias_model);
+  
+  my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
+  my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
+  my $slope_drift = $slope_live - $slope_model;
+  my $bias_drift  = $bias_live  - $bias_model;
 
   my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel', 30);
   my $rmse_rel_ratio  = $rmse_rel_model > 0 ? ($rmse_rel_live / $rmse_rel_model) : 1;
-  my $slope_drift_rel = $slope_model != 0   ? ($slope_drift / abs($slope_model)) : $slope_drift;
-  my $bias_drift_norm = $mae_model > 0      ? ($bias_drift / $mae_model)         : $bias_drift;
+  my $slope_drift_rel = $slope_model != 0   ? abs($slope_drift) / abs($slope_model) : abs($slope_drift);
+  my $bias_drift_norm = $mae_model > 0      ? abs($bias_drift) / $mae_model         : abs($bias_drift);
 
   # --- Semantik-Trigger (modellskaliert) ---
   my $semantics_active = 0;
@@ -25773,7 +25795,7 @@ sub aiFannDetectDrift {
   my $peak_ratio = $peak_active / $n;
 
   # --- Ampel-Logik (modellskaliert) ---
-  my $flag;
+  my $flag = 'stable';
 
   if (
       $drift_score      > 1.8  &&
@@ -25781,7 +25803,7 @@ sub aiFannDetectDrift {
       $slope_drift_rel  > 0.35 &&
       $bias_drift_norm  > 1.5
   ) {
-      $flag = "severe";
+      $flag = 'severe';
   }
   elsif (
       $drift_score      > 1.5  &&
@@ -25789,7 +25811,7 @@ sub aiFannDetectDrift {
       $slope_drift_rel  > 0.25 &&
       $bias_drift_norm  > 1.0
   ) {
-      $flag = "moderate";
+      $flag = 'moderate';
   }
   elsif (
       $drift_score      > 1.2  &&
@@ -25797,7 +25819,7 @@ sub aiFannDetectDrift {
       $slope_drift_rel  > 0.15 &&
       $bias_drift_norm  > 0.5
   ) {
-      $flag = "mild";
+      $flag = 'mild';
   }
   elsif (
       $drift_score      > 1.05 &&
@@ -25805,11 +25827,15 @@ sub aiFannDetectDrift {
       $slope_drift_rel  > 0.10 &&
       $bias_drift_norm  > 0.3
   ) {
-      $flag = "low";
+      $flag = 'low';
   }
-  else {
-      $flag = "none";
+  elsif (
+      ($drift_score    > 1.02 && $drift_score    <= 1.05) ||
+      ($rmse_rel_ratio > 1.05 && $rmse_rel_ratio <= 1.1)
+  ) {
+      $flag = 'very_low';
   }
+
 
   # --- Ergebnisse speichern ---
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelLive}  = round2 ($rmse_rel_live);
@@ -25823,7 +25849,93 @@ sub aiFannDetectDrift {
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = round2 ($rmse_rel_ratio);
   $data{$name}{neuralnet}{$fanntyp}{DriftSlopeRel}     = round3 ($slope_drift_rel);
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasNorm}     = round2 ($bias_drift_norm);
-  $data{$name}{neuralnet}{$fanntyp}{DriftFlag}         = $flag;
+  
+  
+  # --- Drift-Rekalibrierung (automatisch) ---
+  # die Werte aus dem ursprünglichen Training werden überschrieben.
+  # die letzten 96 Stunden bestimmen danach das neue Modellniveau ($window)
+  # Bias → absolut ersetzt
+  # Slope → multiplikativ angepasst
+  # Drift‑KPIs → zurückgesetzt
+  # Drift‑Zonen‑Timer → zurückgesetzt
+  #  
+  # Historie der letzten Drift-Zonen speichern
+  $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory} //= [];
+  push @{$data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory}}, $flag;
+
+  my $hist = $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory};
+  splice @$hist, 0, @$hist - 20 if @$hist > 20;
+
+  # Hysterese: stabile Zone 3 nur wenn 3 von 4 Messungen "moderate" oder "severe"
+  my $hist_ref    = $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory} // [];                  # Historie holen, falls undef → leeres Array
+  my @hist        = @$hist_ref;
+  my $len         = scalar @hist;
+  my $start       = $len > 4 ? $len - 4 : 0;                                                    # Nur die letzten bis zu 4 Einträge betrachten
+  my $zone3_count = 0;
+  
+  if ($len > 0) {
+      $zone3_count = scalar grep { $_ eq 'moderate' || $_ eq 'severe' } @hist[$start .. $len - 1];
+  }
+
+  my $stable_zone3 = ($zone3_count >= 3) ? 1 : 0;
+  
+  # Rekalibrierung auslösen, wenn Zone 3 > 12 Stunden stabil  
+  if (!$stable_zone3) {
+      $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
+  }
+  
+  $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}++;
+  
+  my $block_reason = _drift_safety_blocked ( {  name            => $name,                       # prüfen ob Rekalibrierung vorgenommen werden darf
+                                                median          => $median,
+                                                targets         => \@targets,
+                                                slope_live      => $slope_live,
+                                                bias_live       => $bias_live,
+                                                rmse_rel_ratio  => $rmse_rel_ratio,
+                                                drift_score     => $drift_score,
+                                                slope_drift_rel => $slope_drift_rel,
+                                                bias_drift_norm => $bias_drift_norm,
+                                                slope_var       => $slope_var,
+                                                bias_var        => $bias_var,
+                                             }
+                                           );
+
+  if (!$block_reason) {
+      # --- Rekalibrierung ---
+      if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= 12) {                                 
+          my $new_bias  = $bias_model  + $bias_drift;                                                 # ist identisch zu $bias_live
+          my $new_slope = $slope_model * $slope_live;
+        
+          $data{$name}{neuralnet}{$fanntyp}{ModelBias}  = $new_bias;
+          $data{$name}{neuralnet}{$fanntyp}{ModelSlope} = $new_slope;
+        
+          $data{$name}{neuralnet}{$fanntyp}{DriftBias}  = 0;
+          $data{$name}{neuralnet}{$fanntyp}{DriftSlope} = 1;
+
+          $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
+        
+          $flag = 'recalibrated';
+      }
+  }
+  
+  
+  $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
+  
+  if ($debug =~ /aiProcess/xs) {
+      Log3 ($name, 1, sprintf (
+          "%s DEBUG> DRIFT [%s]: ".
+          "Flag=%s | Block=%s | SlopeLive=%.3f | SlopeDrift=%.3f | BiasLive=%.2f | BiasDrift=%.2f | ".
+          "RMSErelLive=%.1f | RMSErelRatio=%.2f | DriftScore=%.2f | ".
+          "Zone3Hours=%d | Hist=[%s]",
+          $name, $fanntyp,
+          $flag,
+          ($block_reason // 'none'),
+          $slope_live, $slope_drift, $bias_live, $bias_drift,
+          $rmse_rel_live, $rmse_rel_ratio, $drift_score,
+          $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} // 0,
+          join (",", @hist)
+      ) );
+  }
   
   my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
 
@@ -25835,8 +25947,89 @@ sub aiFannDetectDrift {
           Log3 ($name, 1, "$name DEBUG> AI FANN drift data type '$fanntyp' successfully written to file: ".$neuralnet.$name);
       }     
   }
-
+  
 return $flag;
+}
+
+###########################################################################
+#   Varianz berechnen
+###########################################################################
+sub _aiSampleVariance {
+  my ($arr_ref) = @_;
+  return unless($arr_ref && @$arr_ref > 1);
+
+  my $n    = @$arr_ref;
+  my $mean = sum(@$arr_ref) / $n;
+
+  my $sq_sum = 0;
+  $sq_sum   += ($_ - $mean) ** 2 for @$arr_ref;
+
+return $sq_sum / ($n - 1);                                              # Stichprobenvarianz
+}
+
+################################################################
+#  Drift-Sicherheitslogik
+#  Verhindert falsche Rekalibrierungen durch:
+#  - PV-Nachtwerte
+#  - Ausreißer
+#  - API-/Sensorfehler
+#  - instabile Drift
+#  - schlechte Modelle ohne Drift          
+################################################################
+sub _drift_safety_blocked {                  
+  my $paref = shift;
+  my $name  = $paref->{name};
+
+  my $median          = $paref->{median};
+  my $targets         = $paref->{targets};                                          # Array-Ref
+  my $slope_live      = $paref->{slope_live};
+  my $bias_live       = $paref->{bias_live};
+  my $rmse_rel_ratio  = $paref->{rmse_rel_ratio};
+  my $drift_score     = $paref->{drift_score};
+  my $slope_drift_rel = $paref->{slope_drift_rel};
+  my $bias_drift_norm = $paref->{bias_drift_norm};
+  my $slope_var       = $paref->{slope_var};
+  my $bias_var        = $paref->{bias_var};
+  
+  my @targets = @$targets;
+    
+  return 'no_data' unless (@targets && @targets > 10);                              # --- Safety: Targets müssen existieren und ausreichend groß sein ---
+
+  # --- Dynamischer Nacht-Detektor ---
+  my @sorted = sort { $a <=> $b } @targets;
+  my $n      = @sorted;
+  my $p20    = $sorted[int($n * 0.2)] // 0;                                         # Unteres 20%-Perzentil (typischer Nachtwert)
+
+  if ($median <= $p20 * 1.2) {                                                      # Nacht, wenn Median nahe am unteren Cluster liegt (kritisch)
+      return 'pv_night'; 
+  }
+
+  # --- Datenfehler / API-Fehler erkennen
+  return 'slope_implausible' if(defined $slope_live && $slope_live < 0.3);          # SlopeLive < 0.3 → Modell ist nicht falsch, Daten sind falsch
+  return 'rmse_anomaly'      if(defined $rmse_rel_ratio && $rmse_rel_ratio > 3.0);  # RMSErelRatio > 3.0 → API liefert Mist, kein Drift
+  return 'bias_implausible'  if(defined $bias_live && abs($bias_live) > 300);       # BiasLive extrem hoch → Sensor-/API-Fehler
+
+  # --- Modell schlecht, aber NICHT driftend
+  if (                                                                              # DriftScore & RMSE hoch, aber Slope/Bias stabil → kein Drift
+      $drift_score     > 1.8 &&
+      $rmse_rel_ratio  > 2.0 &&
+      $slope_drift_rel < 0.1 &&
+      $bias_drift_norm < 0.3
+  ) {
+      return 'model_bad_but_stable';
+  }
+
+  # --- Instabile Drift (Ausreißer)
+  # Wenn Slope/Bias extrem schwanken → keine Rekalibrierung
+  if (defined $paref->{slope_var} && $paref->{slope_var} > 0.05) {
+      return 'unstable_slope';
+  }
+  
+  if (defined $paref->{bias_var} && $paref->{bias_var} > 20) {
+      return 'unstable_bias';
+  }
+
+return 0;                                                                           # 0 = kein Block, Rekalibrierung erlaubt
 }
 
 ###############################################################
