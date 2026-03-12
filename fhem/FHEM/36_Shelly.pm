@@ -186,14 +186,15 @@
 # 6.05.5    fix: "not enough parameter" on pct-command
 # 6.05.6    fix: misc
 # 6.05.7    add attribute 'updateDelay', fix timing of updates
+# 6.05.8    fix: downgrade perl-version, get properties
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
 
 use strict;
 use warnings;
-#use 5.10.0;     # defined-or:  //
-use v5.32;       # chained comparisions eg. a<x<b
+use 5.10.0;     # defined-or:  //
+#use v5.32;       # chained comparisions eg. a<x<b
 
 use JSON;
 use HttpUtils;
@@ -208,7 +209,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.7 10.03.2026";
+my $version = "6.05.8 12.03.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -280,130 +281,132 @@ my %shelly_dropdowns = (
 # Device name as given by KB listed as comment
 my %shelly_vendor_ids = (
     # keys: 'Device model' as in KB Device identification
-    # value 0:  the 'model' attribute used by the Fhem
-    # value 1:  the 'Device name' as in KB 
-    # value 2:  the 'Device Bluetooth ID', Gen3 only
+    # value 0:  the Generation identifier 0=Gen1, others equal to Gen
+    # value 1:  the 'model' attribute used by the Fhem
+    # value 2:  the 'Device name' as in KB 
+    # value 3:  the 'Device Bluetooth ID', Gen3 only
+    # value 4:  plugs only: name of the user-interface
     ## Gen1 devices
-    "SHSW-1"     => ["shelly1",        "Shelly 1"],   ## no power metering
-    "SHSW-PM"    => ["shelly1pm",      "Shelly 1PM"],
-    "SHSW-L"     => ["shelly1L",       "Shelly 1L"],  ## with AC power metering
-    "SHSW-21"    => ["shelly2",        "Shelly 2"],   ## not listed in KB
-    "SHSW-25"    => ["shelly2.5",      "Shelly 2.5"],
-    "SHSW-44"    => ["shelly4",        "Shelly 4 Pro"],      ## not listed in KB
-    "SHIX3-1"    => ["shellyi3",       "Shelly i3"],
-    "SHEM"       => ["shellyem",       "Shelly EM"],
-    "SHEM-3"     => ["shelly3em",      "Shelly 3EM"],
-    "SHUNI-1"    => ["shellyuni",      "Shelly Uni"],
-    "SHSTRV-01"  => ["generic",        "Shelly TRV"],
-    "SHBTN-1"    => ["generic",        "Shelly Button 1"],
-    "SHBTN-2"    => ["generic",        "Shelly Button 2"],   ##  not listed in KB
-    "SHPLG2-1"   => ["shellyplug",     "Shelly Plug"],
-    "SHPLG-S"    => ["shellyplug",     "Shelly Plug S"],
-    "SHPLG-US"   => ["shellyplug",     "Shelly Plug US"],    ##  check device model >SHPLG-US<
-    "SHRGBW2"    => ["shellyrgbw",     "Shelly RGBW2"],
-    "SHDM-1"     => ["shellydimmer",   "Shelly Dimmer 1"],   ## not listed in KB
-    "SHDM-2"     => ["shellydimmer",   "Shelly Dimmer 2"],
+    "SHSW-1"     => [ 0, "shelly1",        "Shelly 1"],   ## no power metering
+    "SHSW-PM"    => [ 0, "shelly1pm",      "Shelly 1PM"],
+    "SHSW-L"     => [ 0, "shelly1L",       "Shelly 1L"],  ## with AC power metering
+    "SHSW-21"    => [ 0, "shelly2",        "Shelly 2"],   ## not listed in KB
+    "SHSW-25"    => [ 0, "shelly2.5",      "Shelly 2.5"],
+    "SHSW-44"    => [ 0, "shelly4",        "Shelly 4 Pro"],      ## not listed in KB
+    "SHIX3-1"    => [ 0, "shellyi3",       "Shelly i3"],
+    "SHEM"       => [ 0, "shellyem",       "Shelly EM"],
+    "SHEM-3"     => [ 0, "shelly3em",      "Shelly 3EM"],
+    "SHUNI-1"    => [ 0, "shellyuni",      "Shelly Uni"],
+    "SHSTRV-01"  => [ 0, "generic",        "Shelly TRV"],
+    "SHBTN-1"    => [ 0, "generic",        "Shelly Button 1"],
+    "SHBTN-2"    => [ 0, "generic",        "Shelly Button 2"],   ##  not listed in KB
+    "SHPLG2-1"   => [ 0, "shellyplug",     "Shelly Plug"],
+    "SHPLG-S"    => [ 0, "shellyplug",     "Shelly Plug S"],
+    "SHPLG-US"   => [ 0, "shellyplug",     "Shelly Plug US"],    ##  check device model >SHPLG-US<
+    "SHRGBW2"    => [ 0, "shellyrgbw",     "Shelly RGBW2"],
+    "SHDM-1"     => [ 0, "shellydimmer",   "Shelly Dimmer 1"],   ## not listed in KB
+    "SHDM-2"     => [ 0, "shellydimmer",   "Shelly Dimmer 2"],
 
-    "SHBDUO-1"   => ["shellybulb",     "Shelly Duo/Duo GU10"],  ## dimmable white (WW/CW) light with submodels: E27 or GU10 fitting
-    "SHVIN-1"    => ["shellybulb",     "Shelly Vintage"],       ## dimmable white light with different fittings
-    "SHBLB-1"    => ["shellybulb",     "Shelly Bulb"],          #
-    "SHCB-1"     => ["shellybulb",     "Shelly Duo RGBW G10"],  # = shelly color bulb   submodels: E27, GU10
+    "SHBDUO-1"   => [ 0, "shellybulb",     "Shelly Duo/Duo GU10"],  ## dimmable white (WW/CW) light with submodels: E27 or GU10 fitting
+    "SHVIN-1"    => [ 0, "shellybulb",     "Shelly Vintage"],       ## dimmable white light with different fittings
+    "SHBLB-1"    => [ 0, "shellybulb",     "Shelly Bulb"],          #
+    "SHCB-1"     => [ 0, "shellybulb",     "Shelly Duo RGBW G10"],  # = shelly color bulb   submodels: E27, GU10
 
-    "SHHT-1"     => ["generic",        "Shelly H&T"],           ## humidity and temperature sensor
-    "SHWT-1"     => ["generic",        "Shelly Flood"],         ## flood sensor
-    "SHDW-1"     => ["generic",        "Shelly Door/Window"],   ## not listed in KB
-    "SHDW-2"     => ["generic",        "Shelly Door/Window 2"],
-    "SHGS-1"     => ["generic",        "Shelly Gas"],           ## gas sensor
-    "SHSM-1"     => ["generic",        "Shelly Smoke"],         ## smoke sensor ## not listed in KB
-    "SHMOS-01"   => ["generic",        "Shelly Motion"],        ## motion sensor
-    "SHMOS-02"   => ["generic",        "Shelly Motion 2"],      ## motion sensor 2
-    "SHSEN-1"    => ["generic",        "Shelly motion & ir-controller"],  ## not listed in KB
+    "SHHT-1"     => [ 0, "generic",        "Shelly H&T"],           ## humidity and temperature sensor
+    "SHWT-1"     => [ 0, "generic",        "Shelly Flood"],         ## flood sensor
+    "SHDW-1"     => [ 0, "generic",        "Shelly Door/Window"],   ## not listed in KB
+    "SHDW-2"     => [ 0, "generic",        "Shelly Door/Window 2"],
+    "SHGS-1"     => [ 0, "generic",        "Shelly Gas"],           ## gas sensor
+    "SHSM-1"     => [ 0, "generic",        "Shelly Smoke"],         ## smoke sensor ## not listed in KB
+    "SHMOS-01"   => [ 0, "generic",        "Shelly Motion"],        ## motion sensor
+    "SHMOS-02"   => [ 0, "generic",        "Shelly Motion 2"],      ## motion sensor 2
+    "SHSEN-1"    => [ 0, "generic",        "Shelly motion & ir-controller"],  ## not listed in KB
     ## Plus devices  ## 2nd Gen
-    "SNSW-001X16EU" => ["shellyplus1",      "Shelly Plus 1"],
-    "SNSW-001P16EU" => ["shellyplus1pm",    "Shelly Plus 1PM"],
-    "SNSW-001P15UL" => ["shellyplus1pm",    "Shelly Plus 1PM UL"],  ## new
-    "SNSW-002P16EU" => ["shellyplus2pm",    "Shelly Plus 2PM"],
-    "SNSW-102P16EU" => ["shellyplus2pm",    "Shelly Plus 2PM"],     ## 102 ?? not more listed in KB
-    "SNSW-002P15UL" => ["shellyplus2pm",    "Shelly Plus 2PM UL"],  ## new
-    "SNSN-0024X"    => ["shellyplusi4",     "Shelly Plus i4"],      ## AC operated
-    "SNSN-0D24X"    => ["shellyplusi4",     "Shelly Plus i4DC"],
-    "SNSN-0013A"    => ["generic",          "Shelly Plus H&T"],     ## temp&humidity sensor
-    "SNPL-00110IT"  => ["shellyplusplug",   "Shelly Plus Plug IT",  0x9999,  undef],        ## italian style
-    "SNPL-00112EU"  => ["shellyplusplug",   "Shelly Plus Plug S V1",0x9999,  "PLUGS_UI"],   ## german style
-    "SNPL-10112EU"  => ["shellyplusplug",   "Shelly Plus Plug S V2",0x9999,  "PLUGS_UI"],   ## german style  V2
-    "SNPL-00112UK"  => ["shellyplusplug",   "Shelly Plus Plug UK",  0x9999,  "PLUGUK_UI"],  ## UK style
-    "SNPL-00116US"  => ["shellyplusplug",   "Shelly Plus Plug US",  0x9999,  undef],        ## US style
-    "SNSN-0031Z"    => ["generic",          "Shelly Plus Smoke"],
-    "SNDM-0013US"   => ["generic",          "Shelly Plus Wall Dimmer"],  ##
-    "SNSN-0043X"    => ["shellyplusuni",    "Shelly Plus Uni"],
-    "SNDM-00100WW"  => ["shellyplus010v",   "Shelly Plus 0-10V Dimmer"],
-    "SNDC-0D4P10WW" => ["shellyplusrgbwpm", "Shelly Plus RGBW PM"],  ##new
+    "SNSW-001X16EU"   => [ 2, "shellyplus1",      "Shelly Plus 1"],
+    "SNSW-001P16EU"   => [ 2, "shellyplus1pm",    "Shelly Plus 1PM"],
+    "SNSW-001P15UL"   => [ 2, "shellyplus1pm",    "Shelly Plus 1PM UL"],   ## new
+    "SNSW-002P16EU"   => [ 2, "shellyplus2pm",    "Shelly Plus 2PM"],
+    "SNSW-102P16EU"   => [ 2, "shellyplus2pm",    "Shelly Plus 2PM"],      ## 102 ?? not more listed in KB
+    "SNSW-002P15UL"   => [ 2, "shellyplus2pm",    "Shelly Plus 2PM UL"],   ## new
+    "SNSN-0024X"      => [ 2, "shellyplusi4",     "Shelly Plus i4"],       ## AC operated
+    "SNSN-0D24X"      => [ 2, "shellyplusi4",     "Shelly Plus i4DC"],
+    "SNSN-0013A"      => [ 2, "generic",          "Shelly Plus H&T"],      ## temp&humidity sensor
+    "SNPL-00110IT"    => [ 2, "shellyplusplug",   "Shelly Plus Plug IT",   0x9999,  undef],        ## italian style
+    "SNPL-00112EU"    => [ 2, "shellyplusplug",   "Shelly Plus Plug S V1", 0x9999,  "PLUGS_UI"],   ## german style
+    "SNPL-10112EU"    => [ 2, "shellyplusplug",   "Shelly Plus Plug S V2", 0x9999,  "PLUGS_UI"],   ## german style  V2
+    "SNPL-00112UK"    => [ 2, "shellyplusplug",   "Shelly Plus Plug UK",   0x9999,  "PLUGUK_UI"],  ## UK style
+    "SNPL-00116US"    => [ 2, "shellyplusplug",   "Shelly Plus Plug US",   0x9999,  undef],        ## US style
+    "SNSN-0031Z"      => [ 2, "generic",          "Shelly Plus Smoke"],
+    "SNDM-0013US"     => [ 2, "generic",          "Shelly Plus Wall Dimmer"],  ##
+    "SNSN-0043X"      => [ 2, "shellyplusuni",    "Shelly Plus Uni"],
+    "SNDM-00100WW"    => [ 2, "shellyplus010v",   "Shelly Plus 0-10V Dimmer"],
+    "SNDC-0D4P10WW"   => [ 2, "shellyplusrgbwpm", "Shelly Plus RGBW PM"],  ##new
     ## Mini Devices
-    "SNSW-001X8EU"    => ["shellyplus1",    "Shelly Plus 1 Mini"],
-    "SNSW-001P8EU"    => ["shellyplus1pm",  "Shelly Plus 1PM Mini"],
-    "SNPM-001PCEU16"  => ["shellypmmini",   "Shelly Plus PM Mini"],
-    ## Gen3 Devices
-    "S3SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen3",           0x1018],   ##new
-    "S3SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen3",         0x1019],   ##new
-    "S3SW-002P16EU"   => ["shellyplus2pm",  "Shelly 2PM Gen3",         0x1005],   # added 10/2024
-    "S3SW-0A1X1EUL"   => ["shelly1LG3",     "Shelly 1L Gen3",          0x1014],   # added 12/2025   two inputs
-    "S3SW-0A2X4EUL"   => ["shelly2LG3",     "Shelly 2L Gen3",          0x1013],   # added 12/2025
-    "S3SN-0024X"      => ["shellyplusi4",   "Shelly i4 Gen3",          0x1812],   ## (AC), new
-    "S3SN-0U12A"      => ["generic",        "Shelly H&T Gen3",         0x1809],   ## new, not yet implemented
-    "S3SN-0053X"      => ["shellypill",     "The Pill by Shelly",      0x1829],   # added 01/2026 # (AC), new
-    "S3DM-0010WW"     => ["shellyplus010v", "Shelly Dimmer 0/1-10V PM Gen3",0x1072], ## new
-    "S3PL-00112EU"    => ["shellyplusplug", "Shelly Plug S MTR Gen3",  0x1805,   "PLUGS_UI"],   # added 10/2024
-    "S3DM-0A101WWL"   => ["shellyprodm1pm", "Shelly Dimmer Gen3",      0x1073],   # added 01/2025
-    "S3DM-0A1WW"      => ["generic",        "Shelly DALI Dimmer Gen3", 0x1071],   # added 10/2024
-    "S3EM-002CXCEU"   => ["shellyemG3",     "Shelly EM Gen3",          0x1027],   # added 10/2024
-    "S3EM-003CXCEU63" => ["shelly3emG3",    "Shelly 3EM 63 Gen3",      0x1026],   # added 01/2025    
-    "S3PL-10112EU"    => ["shellyplusplug", "Shelly AZ Plug",          0x1850,   "PLUGS_UI"],   # added 01/2025  amazon compatible
-    "S3PL-20112EU"    => ["shellyplusplug", "Shelly Outdoor Plug S Gen3",0x1853, "PLUGS_UI"],   # added 02/2025
-    "S3PL-30110EU"    => ["shellyplusplug", "Shelly Plug M Gen3",      0x1865,   "PLUGS_UI"],   # added 02/2026 
-    "S3PL-30116EU"    => ["shellyplugpm",   "Shelly Plug PM Gen3",     0x1854,   "PLUGPM_UI"],   # added 01/2026    
-    "S3SH-0A2P4EU"    => ["shellyshutter",  "Shelly Shutter",          0x1039],   # added 09/2025
+    "SNSW-001X8EU"    => [ 2, "shellyplus1",    "Shelly Plus 1 Mini"],
+    "SNSW-001P8EU"    => [ 2, "shellyplus1pm",  "Shelly Plus 1PM Mini"],
+    "SNPM-001PCEU16"  => [ 2, "shellypmmini",   "Shelly Plus PM Mini",     0x9999,   'PM1'],
+    ## Gen3 Devices 
+    "S3SW-001X16EU"   => [ 3, "shellyplus1",    "Shelly 1 Gen3",           0x1018],   ##new
+    "S3SW-001P16EU"   => [ 3, "shellyplus1pm",  "Shelly 1PM Gen3",         0x1019],   ##new
+    "S3SW-002P16EU"   => [ 3, "shellyplus2pm",  "Shelly 2PM Gen3",         0x1005],   # added 10/2024
+    "S3SW-0A1X1EUL"   => [ 3, "shelly1LG3",     "Shelly 1L Gen3",          0x1014],   # added 12/2025   two inputs
+    "S3SW-0A2X4EUL"   => [ 3, "shelly2LG3",     "Shelly 2L Gen3",          0x1013],   # added 12/2025
+    "S3SN-0024X"      => [ 3, "shellyplusi4",   "Shelly i4 Gen3",          0x1812],   ## (AC), new
+    "S3SN-0U12A"      => [ 3, "generic",        "Shelly H&T Gen3",         0x1809],   ## new, not yet implemented
+    "S3SN-0053X"      => [ 3, "shellypill",     "The Pill by Shelly",      0x1829],   # added 01/2026 # (AC), new
+    "S3DM-0010WW"     => [ 3, "shellyplus010v", "Shelly Dimmer 0/1-10V PM Gen3",0x1072], ## new
+    "S3PL-00112EU"    => [ 3, "shellyplusplug", "Shelly Plug S MTR Gen3",  0x1805,   "PLUGS_UI"],   # added 10/2024
+    "S3DM-0A101WWL"   => [ 3, "shellyprodm1pm", "Shelly Dimmer Gen3",      0x1073],   # added 01/2025
+    "S3DM-0A1WW"      => [ 3, "generic",        "Shelly DALI Dimmer Gen3", 0x1071],   # added 10/2024
+    "S3EM-002CXCEU"   => [ 3, "shellyemG3",     "Shelly EM Gen3",          0x1027,   'EM1'],   # added 10/2024
+    "S3EM-003CXCEU63" => [ 3, "shelly3emG3",    "Shelly 3EM 63 Gen3",      0x1026,   'EM1'],   # added 01/2025    EM in triphase profile   
+    "S3PL-10112EU"    => [ 3, "shellyplusplug", "Shelly AZ Plug",          0x1850,   "PLUGS_UI"],   # added 01/2025  amazon compatible
+    "S3PL-20112EU"    => [ 3, "shellyplusplug", "Shelly Outdoor Plug S Gen3",0x1853, "PLUGS_UI"],   # added 02/2025
+    "S3PL-30110EU"    => [ 3, "shellyplusplug", "Shelly Plug M Gen3",      0x1865,   "PLUGS_UI"],   # added 02/2026 
+    "S3PL-30116EU"    => [ 3, "shellyplugpm",   "Shelly Plug PM Gen3",     0x1854,   "PLUGPM_UI"],   # added 01/2026       PM1 
+    "S3SH-0A2P4EU"    => [ 3, "shellyshutter",  "Shelly Shutter",          0x1039],   # added 09/2025
     ## Mini Gen3 Devices
-    "S3SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen3",      0x1015],
-    "S3SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1PM Mini Gen3",    0x1016],
-    "S3PM-001PCEU16"  => ["shellypmmini",   "Shelly PM Mini Gen3",     0x1023],
+    "S3SW-001X8EU"    => [ 3, "shellyplus1",    "Shelly 1 Mini Gen3",      0x1015],
+    "S3SW-001P8EU"    => [ 3, "shellyplus1pm",  "Shelly 1PM Mini Gen3",    0x1016],
+    "S3PM-001PCEU16"  => [ 3, "shellypmmini",   "Shelly PM Mini Gen3",     0x1023,   'PM1'],
     ## Gen4 Devices
-    "S4SW-001X16EU"   => ["shellyplus1",    "Shelly 1 Gen4",           0x1028],   # added 03/2025
-    "S4SW-001P16EU"   => ["shellyplus1pm",  "Shelly 1PM Gen4",         0x1019],   # added 03/2025
-    "S4PL-00116US"    => ["shellyplugus",   "Shelly Plug US Gen4",     0x1852,   "PLUGS_UI"],   # added 01/2026
-    "S4PL-00416EU"    => ["shellypstrip4", "Shelly Power Strip 4 Gen4",0x1851,   "POWERSTRIP_UI"],   # added 12/2025   ADE7953
-    "S4PL-10416EU"    => ["shellypstrip4", "Shelly Power Strip 4 Gen4",0x1851,   "POWERSTRIP_UI"],   # added 12/2025   BL0973
-    "S4DM-0A101WWL"   => ["shellydimmerg4", "Shelly Dimmer Gen4",      0x1075],   # added 01/2026
+    "S4SW-001X16EU"   => [ 4, "shellyplus1",    "Shelly 1 Gen4",           0x1028],   # added 03/2025
+    "S4SW-001P16EU"   => [ 4, "shellyplus1pm",  "Shelly 1PM Gen4",         0x1019],   # added 03/2025
+    "S4PL-00116US"    => [ 4, "shellyplugus",   "Shelly Plug US Gen4",     0x1852,   "PLUGS_UI"],   # added 01/2026
+    "S4PL-00416EU"    => [ 4, "shellypstrip4", "Shelly Power Strip 4 Gen4",0x1851,   "POWERSTRIP_UI"],   # added 12/2025   ADE7953
+    "S4PL-10416EU"    => [ 4, "shellypstrip4", "Shelly Power Strip 4 Gen4",0x1851,   "POWERSTRIP_UI"],   # added 12/2025   BL0973
+    "S4DM-0A101WWL"   => [ 4, "shellydimmerg4", "Shelly Dimmer Gen4",      0x1075],   # added 01/2026
     ## Mini Gen4 Devices
-    "S4SW-001X8EU"    => ["shellyplus1",    "Shelly 1 Mini Gen4",      0x1030],   # added 03/2025
-    "S4SW-001P8EU"    => ["shellyplus1pm",  "Shelly 1PM Mini Gen4",    0x1031],   # added 03/2025
-    "S4EM-001PXCEU16" => ["shellyemmini",   "Shelly EM Mini Gen4",     0x1033],   # added 03/2025
+    "S4SW-001X8EU"    => [ 4, "shellyplus1",    "Shelly 1 Mini Gen4",      0x1030],   # added 03/2025
+    "S4SW-001P8EU"    => [ 4, "shellyplus1pm",  "Shelly 1PM Mini Gen4",    0x1031],   # added 03/2025
+    "S4EM-001PXCEU16" => [ 4, "shellyemmini",   "Shelly EM Mini Gen4",     0x1033,    'EM1'],   # added 03/2025
     ## 2nd Gen PRO devices
-    "SPSW-001XE16EU"  => ["shellypro1",     "Shelly Pro 1"],      ## not listed by KB
-    "SPSW-201XE16EU"  => ["shellypro1",     "Shelly Pro 1 v.1"],
-    "SPSW-001PE16EU"  => ["shellypro1pm",   "Shelly Pro 1PM"],    ## not listed by KB
-    "SPSW-201PE16EU"  => ["shellypro1pm",   "Shelly Pro 1PM v.1"],
-    "SPSW-002XE16EU"  => ["shellypro2",     "Shelly Pro 2"],      ## not listed by KB
-    "SPSW-202XE16EU"  => ["shellypro2",     "Shelly Pro 2 v.1"],
-    "SPSW-002PE16EU"  => ["shellypro2pm",   "Shelly Pro 2PM"],    ## not listed by KB
-    "SPSW-202PE16EU"  => ["shellypro2pm",   "Shelly Pro 2PM v.1"],
-    "SPSH-002PE16EU"  => ["shellyprodual",  "Shelly Pro Dual Cover/Shutter PM"],
-    "SPCC-001PE10EU"  => ["shellyplus010v", "Shelly Pro Dimmer 0/1-10V PM",   0x2011],    # addes 03/2025  <<< 1V base not supported here
-    "SPDC-0D5PE16EU"  => ["shellyprorgbwpm","Shelly Pro RGBWW PM",    0x2012],    # added 02/2025  <<<< two channels of White not supported here
-    "SPDM-001PE01EU"  => ["shellyprodm1pm", "Shelly Pro Dimmer 1PM",  0x200D],    ##new
-    "SPDM-002PE01EU"  => ["shellyprodm2pm", "Shelly Pro Dimmer 2PM",  0x200E],
-    "SPSW-003XE16EU"  => ["shellypro3",     "Shelly Pro 3"],
-    "SPEM-003CEBEU"   => ["shellypro3em",   "Shelly Pro 3EM"],
-    "SPEM-003CEBEU400"=> ["shellypro3em",   "Shelly Pro 3EM-400"],
-    "SPEM-003CEBEU63" => ["shellypro3em",   "Shelly Pro 3EM-3CT63"],
-    "SPEM-002CEBEU50" => ["shellyproem50",  "Shelly Pro EM-50"],
-    "SPSW-004PE16EU"  => ["shellypro4pm",   "Shelly Pro 4PM V1"],
-    "SPSW-104PE16EU"  => ["shellypro4pm",   "Shelly Pro 4PM V2"],
+    "SPSW-001XE16EU"  => [ 2, "shellypro1",     "Shelly Pro 1"],      ## not listed by KB
+    "SPSW-201XE16EU"  => [ 2, "shellypro1",     "Shelly Pro 1 v.1"],
+    "SPSW-001PE16EU"  => [ 2, "shellypro1pm",   "Shelly Pro 1PM"],    ## not listed by KB
+    "SPSW-201PE16EU"  => [ 2, "shellypro1pm",   "Shelly Pro 1PM v.1"],
+    "SPSW-002XE16EU"  => [ 2, "shellypro2",     "Shelly Pro 2"],      ## not listed by KB
+    "SPSW-202XE16EU"  => [ 2, "shellypro2",     "Shelly Pro 2 v.1"],
+    "SPSW-002PE16EU"  => [ 2, "shellypro2pm",   "Shelly Pro 2PM"],    ## not listed by KB
+    "SPSW-202PE16EU"  => [ 2, "shellypro2pm",   "Shelly Pro 2PM v.1"],
+    "SPSH-002PE16EU"  => [ 2, "shellyprodual",  "Shelly Pro Dual Cover/Shutter PM"],
+    "SPCC-001PE10EU"  => [ 2, "shellyplus010v", "Shelly Pro Dimmer 0/1-10V PM",   0x2011],    # addes 03/2025  <<< 1V base not supported here
+    "SPDC-0D5PE16EU"  => [ 2, "shellyprorgbwpm","Shelly Pro RGBWW PM",    0x2012],  # added 02/2025 <<< two channels of White not supported here
+    "SPDM-001PE01EU"  => [ 2, "shellyprodm1pm", "Shelly Pro Dimmer 1PM",  0x200D],    ##new
+    "SPDM-002PE01EU"  => [ 2, "shellyprodm2pm", "Shelly Pro Dimmer 2PM",  0x200E],
+    "SPSW-003XE16EU"  => [ 2, "shellypro3",     "Shelly Pro 3"],
+    "SPEM-003CEBEU"   => [ 2, "shellypro3em",   "Shelly Pro 3EM",        0x9999,  'EM1'],  # EM in triphase profile
+    "SPEM-003CEBEU400"=> [ 2, "shellypro3em",   "Shelly Pro 3EM-400",    0x9999,  'EM1'],  # EM in triphase profile
+    "SPEM-003CEBEU63" => [ 2, "shellypro3em",   "Shelly Pro 3EM-3CT63",  0x9999,  'EM1'],  # EM in triphase profile
+    "SPEM-002CEBEU50" => [ 2, "shellyproem50",  "Shelly Pro EM-50",      0x9999,  'EM1'],
+    "SPSW-004PE16EU"  => [ 2, "shellypro4pm",   "Shelly Pro 4PM V1"],
+    "SPSW-104PE16EU"  => [ 2, "shellypro4pm",   "Shelly Pro 4PM V2"],
     # Android Devices / Control Panels
-    "SAWD-0A1XX10EU1" => ["walldisplay1",   "Shelly Wall Display"], ## prelim version ?  ## not listed by KB
-    "SAWD1"           => ["walldisplay1",   "Shelly Wall Display"],
-    "SAWD-2A1XX10EU1" => ["walldisplay1",   "Shelly Wall Display", 0x3002],   # added 03/2025
+    "SAWD-0A1XX10EU1" => [ 2, "walldisplay1",   "Shelly Wall Display"], ## prelim version ?  ## not listed by KB
+    "SAWD1"           => [ 2, "walldisplay1",   "Shelly Wall Display"],
+    "SAWD-2A1XX10EU1" => [ 2, "walldisplay1",   "Shelly Wall Display", 0x3002],   # added 03/2025
     # UL-Types
-    "SPSW-202XE12UL"  => ["shellypro2",     "Shelly Pro 2 v.1"]          # added 10/2025, not listed by KB
+    "SPSW-202XE12UL"  => [ 2, "shellypro2",     "Shelly Pro 2 v.1"]          # added 10/2025, not listed by KB
     );
 
 my %shelly_family = (
@@ -445,7 +448,10 @@ my %URLnamespaces = (
         "light" => [ 'light',   'Light'  ],   # 2
         "cct"   => [ 'white',   'CCT'    ],   # 9   new
         "color" => [ 'color',   'RGB'    ],   # 7   and RGBW
-        "input" => [ 'input',   'Input'  ]    # 5
+        "input" => [ 'input',   'Input'  ],   # 5
+        "meters"=> [ 'meters',  'PM1'    ],   # 3
+        "em1"   => [ '---',     'EM1'    ],   # 6 Gen2+ monophase profile
+        "em"    => [ '---',     'EM'     ]    # -      in triphase profile
         );
 
 my %shelly_models = (
@@ -469,7 +475,7 @@ my %shelly_models = (
     #-- 2nd generation devices
     "shellyplusplug"=> [1,0,0, 1,1,-1, 0,0,0],    # has a button, that is NOT reachable via action
     "shellyplugpm"  => [0,0,0, 1,1,0,  0,0,0],    # only power-metering
-    "shellypluspm"  => [0,0,0, 1,1,0,  0,0,0],
+    "shellypluspm"  => [0,0,0, 1,1,0,  0,0,0],    # no corresp. model_id
     "shellyplus1"   => [1,0,0, 0,1,1,  0,0,0],
     "shellyplus1pm" => [1,0,0, 1,1,1,  0,0,0],
     "shellyplus2pm" => [2,1,0, 2,2,2,  0,0,2],    # switch profile, cover profile
@@ -988,9 +994,9 @@ sub Shelly_Define($$) {   # use Socket;
     if( $a[2] =~ m/^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}(\:\d+)?$/ ){
        my $port=$4//'';
        # we have a valid ip-address
-       Log 1,"[Shelly_define] IPv4-Addr \'$definit\' is valid"; #4
+       Log 4,"[Shelly_define] IPv4-Addr \'$definit\' is valid"; #4
        $hostname = gethostbyaddr( inet_aton($definit),AF_INET)//'-';
-       Log 1,"[Shelly_define] Hostname of $definit is $hostname$port"; #4
+       Log 4,"[Shelly_define] Hostname of $definit is $hostname$port"; #4
        $hostname =~ s/\.fritz\.box//;
        readingsSingleUpdate($hash,"network_DNS",$hostname.$port,1);
     }else{
@@ -1203,9 +1209,9 @@ sub Shelly_getModel {
         readingsSingleUpdate($hash,"model_ID",$model_id,1);
         readingsSingleUpdate($hash,"model_family",$shelly_family{substr($model_id,0,2)},1);
         readingsSingleUpdate($hash,"model_function",$shelly_category{substr($model_id,2,2)}//"unknown",1);
-        readingsSingleUpdate($hash,"model_name",$shelly_vendor_ids{$model_id}[1],1);
+        readingsSingleUpdate($hash,"model_name",$shelly_vendor_ids{$model_id}[2],1);
         #--------
-        $model = $shelly_vendor_ids{$model_id}[0];
+        $model = $shelly_vendor_ids{$model_id}[1];
         if ( $model ){
             Log3 $name,4,"[Shelly_getModel] $call: discovered model=$model for device $name";
         }else{
@@ -1300,87 +1306,105 @@ sub Shelly_getModel {
 
 ########################################################################################
 #
-# Shelly_getProperties - get number of availabe and used channes for a device
+# Shelly_getProperties - get number of availabe and used channels for a device
 # Parameter:        parameter-hash, optional '1' to get printout on screen
 #
 ########################################################################################
 
 sub Shelly_getProperties {
   my ($hash,@a) = @_;
-  my $opt = (shift @a)//0; # get a printout on screen if this parameter is set to 1
+  my $opt = (shift @a)//0; # get a printout on screen, if this parameter is set to 1
   my $name = $hash->{NAME};
   my $model = AttrVal($name,"model","generic");
   my $mode  = AttrVal($name,"mode","");
+  
+  my @Keys=( 'relay','roller','light','cct','color','input','button','meters','em1' ); # ordered, don't use: keys %URLnamespaces
 
   my @chnls=@{$shelly_models{$model}};   # extract the array of 'model' out of the hash 
-  my $Gen = $chnls[4]==0?0:1;
+  $hash->{props}{gen} = $chnls[4];
+  my $Gen = $hash->{props}{gen}==0?'1':'2+';
   if( $opt==1 || !defined($hash->{props}{relay}) ){
-    Log3 $name,4,"[Shelly_getProperties] processing properties of device $name "; #4
-    $hash->{props}{gen} = $Gen;
-    #(    0     1     2           3    4    5       6    7    8)
-    #(relays,rollers,light,  meters, NG,inputs,  EM,color,modes)
-    $hash->{props}{relay}  =$chnls[0]; 
-    $hash->{props}{roller} =$chnls[1]; 
-    $hash->{props}{light}  =$chnls[2]; #rgbw_white CCT
-    $hash->{props}{cct}    =$chnls[9]//0; 
-    $hash->{props}{color}  =$chnls[7];
-    $hash->{props}{input}  =$chnls[5];
-    $hash->{props}{meters} =$chnls[3];
-    $hash->{props}{em}     =$chnls[6];
+     Log3 $name,4,"[Shelly_getProperties] processing properties of device $name "; #4
+    
+     #(    0     1     2         3    4    5       6    7    8)
+     #(relays,rollers,light,  meters, NG,inputs,  EM1,color,modes)
+     $hash->{props}{relay}  =$chnls[0]; 
+     $hash->{props}{roller} =$chnls[1]; 
+     $hash->{props}{light}  =$chnls[2]; #rgbw_white CCT
+     $hash->{props}{cct}    =$chnls[9]//0; 
+     $hash->{props}{color}  =$chnls[7];
+     $hash->{props}{meters} =$chnls[3];
+     if( $mode eq 'triphase' ){
+        $hash->{props}{em}  =$chnls[6]/3;
+        $hash->{props}{em1} =0;
+     }else{  # 'monophase' or without profile
+        $hash->{props}{em1} =$chnls[6];
+        $hash->{props}{em}  =0;
+     }   
+     if( $chnls[5]<0 ){
+        $hash->{props}{input}  =0;
+        $hash->{props}{button} =abs($chnls[5]);
+     }else{
+        $hash->{props}{input}  =$chnls[5];
+        $hash->{props}{button} =0;
+     }
   
-    # modify number of channels for Shelly Pro RGBW PM (has 2 profiles with multi use of components )
-    if( $model eq "shellyprorgbwpm" ){
-       # init values
-       $hash->{props}{light}=0;
-       $hash->{props}{color}=0;
-       $hash->{props}{cct}=0;
-       if( $mode eq "light" ){ 
+     # modify number of channels for Shelly Pro RGBW PM (has 2 profiles with multi use of components )
+     if( $model eq "shellyprorgbwpm" ){
+        # init values
+        $hash->{props}{light}=0;
+        $hash->{props}{color}=0;
+        $hash->{props}{cct}=0;
+        if( $mode eq "light" ){ 
            $hash->{props}{light}=5;
-       }elsif( $mode eq "rgbcct" ){
+        }elsif( $mode eq "rgbcct" ){
            $hash->{props}{color}=1;
            $hash->{props}{cct}=1;
-       }elsif( $mode eq "cctx2" ){
+        }elsif( $mode eq "cctx2" ){
            $hash->{props}{cct}=2;
-       }elsif( $mode eq "rgbx2light" ){
+        }elsif( $mode eq "rgbx2light" ){
            $hash->{props}{color}=1;
            $hash->{props}{light}=2;
-       }
-    # modify number of channels for other multi-mode devices
-    }elsif( $chnls[8] > 0 ){
-       if( $mode eq "relay" ){
+        }
+     # modify number of channels for other multi-mode devices
+     }elsif( $chnls[8] > 0 ){
+        if( $mode eq "relay" ){
            $hash->{props}{roller}=0;
-       }elsif( $mode eq "roller" ){ 
+        }elsif( $mode eq "roller" ){ 
            $hash->{props}{relay}=0; # no relay channel
            $hash->{props}{meters}=$chnls[1]; # no of energy metering channels is number of rollers 
-       }elsif( $mode =~ /white|light/ ){ 
+        }elsif( $mode =~ /white|light/ ){ 
            $hash->{props}{color}=0; # no color channel
-       }elsif( $mode =~ /color|rgb/ ){ 
+        }elsif( $mode =~ /color|rgb/ ){ 
            $hash->{props}{light}=0; # no dimmer/white channel
            $hash->{props}{meters}=$chnls[7]; # no of energy metering channels is number of color channels         
-       }
-    }
-    # get key for URLnamespaces  (component)
-    foreach my $unsKey ( 'relay','roller','light','cct','color','input' ){ 
+        }
+     }      
+     # get key for URLnamespaces  (component)
+     foreach my $unsKey ( @Keys ){ 
         if( $hash->{props}{$unsKey}>0 ){
             $hash->{props}{namespace} = $unsKey;
             last;
         }
-    }
+     }  
+     $hash->{props}{namespace} = 'em'  if( $mode eq 'triphase' );
   }
   if( $opt == 1 ){
-    my $channels;
-    my $msg="[Shelly_getProperties] device $name has properties in use:"; 
-    $msg .= "\nGeneration: ".($hash->{props}{gen}eq'0'?'1':'2+');
-    $msg .= "\nModel:      ".$model;
-    $msg .= "\nMode:       ".$mode."  available: ".$chnls[8]   if( $chnls[8] > 0 );
-    foreach my $comp ( 'relay','roller','light','cct','color','input','meters','em' ){
+     my $channels;
+     my $msg="[Shelly_getProperties] device $name has properties in use:"; 
+   #  $msg .= "\nGeneration: ".$hash->{props}{gen}." -> Gen_$Gen";
+     $msg .= "\nGeneration: Gen_$Gen";
+     $msg .= "\nModel:      ".$model;
+     $msg .= "\nMode:       ".$mode."  available: ".$chnls[8]   if( $chnls[8] > 0 );
+#    foreach my $comp ( 'relay','roller','light','cct','color','input','meters','em1' ){
+     foreach my $comp ( @Keys, 'em' ){
         $channels=$hash->{props}{$comp};
         $msg .="\n-$comp: $channels"  if( $channels );
-    }
-    $msg .="\nworking namespace = ".$hash->{props}{namespace};
-    $msg .=", URL keyword is = ".$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen} ];
-    Log3 $name,4,$msg;  #4
-    return $msg; 
+     }
+     $msg .="\nworking namespace = ".$hash->{props}{namespace};
+     $msg .=", URL keyword is = ".$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen}==0?0:1 ];
+     Log3 $name,4,$msg;  #4
+     return $msg; 
   }
 } #end Shelly_getProperties()
 
@@ -2262,7 +2286,7 @@ sub Shelly_Get ($@) {
 
   #-- get colors of PLUG-S via PLUGS_UI
   }elsif( $a[1] eq "colors" ){
-      my $UI = $shelly_vendor_ids{ReadingsVal( $name, "model_ID", undef )}[3];
+      my $UI = $shelly_vendor_ids{ReadingsVal( $name, "model_ID", undef )}[4];
       #if( ReadingsVal( $name, "model_ID", "" ) !~ /^S.PL-\d\d112EU$/ ){
       if( !defined($UI) ){
               my $err = "Plug user interface not supported by this model";
@@ -3264,8 +3288,8 @@ my $cmd_orig=$cmd;
   # command:  colorsOn  colorsOff     set the leds-colour of the plugs
   }elsif( $cmd =~ /colors(.*)$/  &&  ReadingsVal($name,"model_function","unknown") eq "plug" ){  #  
     my $model_id = ReadingsVal($name,"model_ID","unknown");
-    my $UI = $shelly_vendor_ids{$model_id}[3]; # get the name of the User-Interface
-    my $mn = $shelly_vendor_ids{$model_id}[1];
+    my $UI = $shelly_vendor_ids{$model_id}[4]; # get the name of the User-Interface
+    my $mn = $shelly_vendor_ids{$model_id}[2]; # model name
     Log3 $name,1,"[Shelly_Set:PLUG_UI] processing command $cmd for $name: model_id=$model_id \'$mn\' and interface=".$UI//"na";#5
     
     my $onoff=lc($1);
@@ -4964,7 +4988,7 @@ sub Shelly_status2G {
   $channels = $hash->{props}{light};  # number of dimmers
   if( $channels>0 ){
     $comp="light";
-    Log3 $name,3,"[Shelly_status2G:light] Processing $channels light states for device $name ($model)";
+    Log3 $name,4,"[Shelly_status2G:light] Processing $channels light states for device $name ($model)";
 
     for($channel=0; $channel<$channels; $channel++){
         Log3 $name,5,"[Shelly_status2G:light] Processing state of dimmer $channel for device $name ";#5
@@ -5062,12 +5086,12 @@ sub Shelly_status2G {
             $msg.=", calc.time=$tmrDur";
          }
          $tmrDur = 0   if($tmrDur<0);
-      #   $timer = $hash->{INTERVAL}>0 ? minNum( $hash->{INTERVAL},$tmrDur ) : $tmrDur;
-         if( 0 < $hash->{INTERVAL} < $tmrDur ){   # use v5.32
-                $timer = $hash->{INTERVAL};
-         }else{
-                $timer = $tmrDur;
-         }
+         $timer = $hash->{INTERVAL}>0 ? minNum( $hash->{INTERVAL},$tmrDur ) : $tmrDur;
+      #   if( 0 < $hash->{INTERVAL} < $tmrDur ){   # use v5.32
+      #          $timer = $hash->{INTERVAL};
+      #   }else{
+      #          $timer = $tmrDur;
+      #   }
          $tmrDur .= " sec = ".FmtDateTime($tmrEnd)  if( $hash->{units} );  # add a time-date-string, if units in use
          readingsBulkUpdateMonitored($hash,$reading,$tmrDur);
          $timer +=0.80;  # extra time to get update after end of timer
