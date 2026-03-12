@@ -17207,11 +17207,12 @@ sub _calcDataEveryFullHour {
       my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
       aiFannDetectDrift ($name, $debug, 'con', 96) if($rdy);                                      # Drift von AI 'con' Werten ermitteln
 
-      # --- con - Quantil 30 bestimmen ---    
+      # --- con - Quantile bestimmen ---    
       my ($targetref, $dmy1, $dmy2) = getPvHistTargetArray ( { name  => $name, 
                                                                debug => 'do_not', 
                                                                par1  => 'con', 
-                                                               par2  => 'con', 
+                                                               par2  => 'con',
+                                                               par3  => 'con',
                                                                limit => 750,
                                                              }
                                                            );        
@@ -17220,12 +17221,14 @@ sub _calcDataEveryFullHour {
       if (@targets) {                                                                             # Wert des 30%-Quantils als Referenzniveau bestimmen
           my @sorted = sort { $a <=> $b } @targets;
           my $n      = @sorted;
-          my $q      = 0.30;                                                                      # 30%-Quantil
-          my $idx    = int ($q * ($n - 1));                                                       # Index berechnen
+          my $q30    = 0.30;                                                                      # 30%-Quantil
+          my $q90    = 0.90;                                                                      # 90%-Quantil
+          my $idx30  = int ($q30 * ($n - 1));                                                     # Index berechnen
+          my $idx90  = int ($q90 * ($n - 1));
           
-          $data{$name}{circular}{99}{con_quantile30} = round0 ($sorted[$idx]);                    # in Circular persistieren
+          $data{$name}{circular}{99}{con_quantile30} = round0 ($sorted[$idx30]);                  # in Circular persistieren
+          $data{$name}{circular}{99}{con_quantile90} = round0 ($sorted[$idx90]);
       }
-
 
       storeReading ('.signaldone_'.$hh, 'done');                                                  # Sperrsignal (erledigt) setzen
 
@@ -26050,26 +26053,38 @@ sub _aiDrift_safety_blocked {
   
   my @targets = @$targets;
     
-  return 'no_data' unless(@targets && @targets > 10);                                               # --- Safety: Targets müssen existieren und ausreichend groß sein ---
+  return 'no_data' unless(@targets && @targets > 10);                                                       # --- Safety: Targets müssen existieren und ausreichend groß sein ---
 
   # --- Dynamischer Nacht-Detektor ---
-  my $baseline = CircularVal($name, 99, $fanntyp.'_quantile30', 0);
-  my $current  = $targets[-1];                                                                      # letzter Wert im Fenster = letzte abgeschlossene Stunde
+  my $quant30 = CircularVal($name, 99, $fanntyp.'_quantile30', 0);
+  my $quant90 = CircularVal($name, 99, $fanntyp.'_quantile90', 0);
+  my $current = $targets[-1];                                                                               # letzter Wert im Fenster = letzte abgeschlossene Stunde
 
-  if ($current < $baseline * 1.2) {
+  if ($current < $quant30 * 1.2) {
       return 'pv_night';
   }
+  
+  my $median_load     = $median || 1;
+  my $bias_var_limit  = 0.15    * ($median_load ** 2);
+  my $slope_var_limit = 0.00002 * ($median_load ** 2) + 0.02;                                               # dynamische Schwelle für Slope-Varianz
+
+  my $bias_limit = max(
+      $quant30     * 1.2,                                                                                   # Grundlast + 20%
+      $median_load * 0.5,                                                                                   # 50% der Medianlast
+  );
+  
+  $bias_limit = max ($bias_limit, $quant90 * 0.3);
+  
+  my $rmse_limit = 3.0 + ($median_load / 800);
 
   # --- Datenfehler / API-Fehler erkennen
-  my $median_load = $median || 1;
-  
-  return 'slope_implausible' if(defined $slope_live && ($slope_live < 0.3 || $slope_live > 1.7));   # Modell ist nicht falsch, Daten sind falsch
-  return 'rmse_anomaly'      if(defined $rmse_rel_ratio && $rmse_rel_ratio > 4.0);                  # RMSErelRatio > 4.0 → API liefert Mist, kein Drift
-  return 'bias_implausible'  if(defined $bias_live && abs($bias_live) > $median_load * 0.8);        # BiasLive extrem hoch → Sensor-/API-Fehler
+  return 'slope_implausible' if(defined $slope_live && (abs($slope_live) < 0.25 || $slope_live > 1.8));     # Modell ist nicht falsch, Daten sind falsch
+  return 'rmse_anomaly'      if(defined $rmse_rel_ratio && $rmse_rel_ratio > $rmse_limit);                  # RMSErelRatio > X → API liefert Mist, kein Drift
+  return 'bias_implausible'  if(defined $bias_live && abs($bias_live) > $bias_limit);                       # BiasLive extrem hoch → Sensor-/API-Fehler
 
   # --- Modell schlecht, aber NICHT driftend
-  if (                                                                                              # DriftScore & RMSE hoch, aber Slope/Bias stabil → kein Drift
-      $drift_score     > 1.8 &&
+  if (                                                                                                      # DriftScore & RMSE hoch, aber Slope/Bias stabil → kein Drift
+      $drift_score     > 1.6 &&
       $rmse_rel_ratio  > 2.0 &&
       $slope_drift_rel < 0.1 &&
       $bias_drift_norm < 0.3
@@ -26079,11 +26094,11 @@ sub _aiDrift_safety_blocked {
 
   # --- Instabile Drift (Ausreißer)
   # Wenn Slope/Bias extrem schwanken → keine Rekalibrierung
-  if (defined $paref->{slope_var} && $paref->{slope_var} > 0.10) {
+  if (defined $slope_var && $slope_var > $slope_var_limit) {
       return 'unstable_slope';
   }
   
-  if (defined $paref->{bias_var} && $paref->{bias_var} > 50) {
+  if (defined $bias_var && $bias_var > $bias_var_limit) {
       return 'unstable_bias';
   }
 
@@ -27671,6 +27686,7 @@ sub _listDataPoolCircular {
           my $nntlfts     = CircularVal ($name, $idx, 'conNNTrainLastFinishTs',   '-');     
           my $aicts       = CircularVal ($name, $idx, 'attrInvChangedTs',         '-');
           my $conq30      = CircularVal ($name, $idx, 'con_quantile30',           '-');
+          my $conq90      = CircularVal ($name, $idx, 'con_quantile90',           '-');
           my $ltransfer   = CircularVal ($name, $idx, 'last_transfer',            '-');
           my $accum_secs  = CircularVal ($name, $idx, 'accum_presence_seconds',   '-');
 
@@ -27704,7 +27720,7 @@ sub _listDataPoolCircular {
 
           $sq .= $idx." => tdayDvtn: $tdayDvtn, ydayDvtn: $ydayDvtn, tdayConDvtn: $tdayConDvtn, ydayConDvtn: $ydayConDvtn \n";
           $sq .= "      todayConsumption: $con, feedintotal: $fitot, initdayfeedin: $idfi \n";
-          $sq .= "      con_quantile30: $conq30, gridcontotal: $gcontot, initdaygcon: $idgcon \n";
+          $sq .= "      con_quantile30: $conq30, con_quantile90: $conq90, gridcontotal: $gcontot, initdaygcon: $idgcon \n";
           $sq .= "      $batvl1\n";
           $sq .= "      $batvl2\n";
           $sq .= "      $batvl3\n";
@@ -33222,6 +33238,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>careCycleViolationXX</b>   </td><td>Time stamp of the defined careCycle cycle being exceeded for battery XX                                               </td></tr>
             <tr><td> <b>confc</b>                  </td><td>expected energy consumption (Wh) of the house on the current day                                                      </td></tr>
             <tr><td> <b>con_quantile30</b>         </td><td>30% quantile of energy consumption (Wh) for the last available days in pvHistory                                      </td></tr>
+            <tr><td> <b>con_quantile90</b>         </td><td>90% quantile of energy consumption (Wh) for the last available days in pvHistory                                      </td></tr>
             <tr><td> <b>con_all</b>                </td><td>an array of values of the house consumption (Wh) on certain days of the selected hour                                 </td></tr>
             <tr><td> <b>days2careXX</b>            </td><td>remaining days until the battery XX maintenance SoC (default 95%) is reached                                          </td></tr>
             <tr><td> <b>dnumsum</b>                </td><td>Number of days per cloudy area over the entire term                                                                   </td></tr>
@@ -36218,6 +36235,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>careCycleViolationXX</b>   </td><td>Zeitstempel der Überschreitung des definierten careCycle-Zyklus von Batterie XX                                           </td></tr>
             <tr><td> <b>confc</b>                  </td><td>erwarteter Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                              </td></tr> 
             <tr><td> <b>con_quantile30</b>         </td><td>30%-Quantil des Energieverbrauchs (Wh) der letzten verfügbaren Tage in pvHistory                                          </td></tr>
+            <tr><td> <b>con_quantile90</b>         </td><td>90%-Quantil des Energieverbrauchs (Wh) der letzten verfügbaren Tage in pvHistory                                          </td></tr>
             <tr><td> <b>con_all</b>                </td><td>ein Array aus Werten des Hausverbrauches (Wh) an bestimmten Tagen der ausgewählten Stunde                                 </td></tr>
             <tr><td> <b>days2careXX</b>            </td><td>verbleibende Tage bis der Batterie XX Pflege-SoC (default 95%) erreicht sein soll                                         </td></tr>
             <tr><td> <b>dnumsum</b>                </td><td>Anzahl Tage pro Bewölkungsbereich über die gesamte Laufzeit                                                               </td></tr>
