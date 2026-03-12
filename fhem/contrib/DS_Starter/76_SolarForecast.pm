@@ -25708,6 +25708,7 @@ return ($res, $bc, $bias_zone, $drift_zone);
 ###########################################################################
 #   Drift-Analyse (peak-aware, semantik-adaptiv, modellskaliert)
 #   mit Rekalibrierung ModelSlope, ModelBias
+#   !! DARF NUR 1 x pro Stunde aufgerufen werden !!
 ###########################################################################
 sub aiFannDetectDrift {
   my $name    = shift;
@@ -25922,10 +25923,10 @@ sub aiFannDetectDrift {
   splice @$hist, 0, @$hist - 20 if @$hist > 20;
 
   # Hysterese: stabile Zone 3 nur wenn 3 von 4 Messungen "moderate" oder "severe"
-  my $hist_ref    = $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory} // [];                  # Historie holen, falls undef → leeres Array
+  my $hist_ref    = $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory} // [];                      # Historie holen, falls undef → leeres Array
   my @hist        = @$hist_ref;
   my $len         = scalar @hist;
-  my $start       = $len > 4 ? $len - 4 : 0;                                                    # Nur die letzten bis zu 4 Einträge betrachten
+  my $start       = $len > 4 ? $len - 4 : 0;                                                        # Nur die letzten bis zu 4 Einträge betrachten
   my $zone3_count = 0;
   
   if ($len > 0) {
@@ -25941,24 +25942,25 @@ sub aiFannDetectDrift {
   
   $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}++;
   
-  my $block_reason = _drift_safety_blocked ( {  name            => $name,                       # prüfen ob Rekalibrierung vorgenommen werden darf
-                                                median          => $median,
-                                                targets         => \@targets,
-                                                slope_live      => $slope_live,
-                                                bias_live       => $bias_live,
-                                                rmse_rel_ratio  => $rmse_rel_ratio,
-                                                drift_score     => $drift_score,
-                                                slope_drift_rel => $slope_drift_rel,
-                                                bias_drift_norm => $bias_drift_norm,
-                                                slope_var       => $slope_var,
-                                                bias_var        => $bias_var,
-                                             }
-                                           );
+  my $block_reason = _aiDrift_safety_blocked ( {  name            => $name,                         # prüfen ob Rekalibrierung vorgenommen werden darf
+                                                  fanntyp         => $fanntyp,
+                                                  median          => $median,
+                                                  targets         => \@targets,
+                                                  slope_live      => $slope_live,
+                                                  bias_live       => $bias_live,
+                                                  rmse_rel_ratio  => $rmse_rel_ratio,
+                                                  drift_score     => $drift_score,
+                                                  slope_drift_rel => $slope_drift_rel,
+                                                  bias_drift_norm => $bias_drift_norm,
+                                                  slope_var       => $slope_var,
+                                                  bias_var        => $bias_var,
+                                               }
+                                             );
 
   if (!$block_reason) {
       # --- Rekalibrierung ---
       if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= 12) {                                 
-          my $new_bias  = $bias_model  + $bias_drift;                                                 # ist identisch zu $bias_live
+          my $new_bias  = $bias_model  + $bias_drift;                                               # ist identisch zu $bias_live
           my $new_slope = $slope_model * $slope_live;
         
           $data{$name}{neuralnet}{$fanntyp}{ModelBias}  = $new_bias;
@@ -26031,9 +26033,10 @@ return $sq_sum / ($n - 1);                                              # Stichp
 #  - instabile Drift
 #  - schlechte Modelle ohne Drift          
 ################################################################
-sub _drift_safety_blocked {                  
+sub _aiDrift_safety_blocked {                  
   my $paref           = shift;
   my $name            = $paref->{name};
+  my $fanntyp         = $paref->{fanntyp};
   my $median          = $paref->{median};
   my $targets         = $paref->{targets};                                                          # Array-Ref
   my $slope_live      = $paref->{slope_live};
@@ -26047,21 +26050,22 @@ sub _drift_safety_blocked {
   
   my @targets = @$targets;
     
-  return 'no_data' unless (@targets && @targets > 10);                                              # --- Safety: Targets müssen existieren und ausreichend groß sein ---
+  return 'no_data' unless(@targets && @targets > 10);                                               # --- Safety: Targets müssen existieren und ausreichend groß sein ---
 
   # --- Dynamischer Nacht-Detektor ---
-  my @sorted = sort { $a <=> $b } @targets;
-  my $n      = @sorted;
-  my $p20    = $sorted[int($n * 0.2)] // 0;                                                         # Unteres 20%-Perzentil (typischer Nachtwert)
+  my $baseline = CircularVal($name, 99, $fanntyp.'_quantile30', 0);
+  my $current  = $targets[-1];                                                                      # letzter Wert im Fenster = letzte abgeschlossene Stunde
 
-  if ($median <= $p20 * 1.2) {                                                                      # Nacht, wenn Median nahe am unteren Cluster liegt (kritisch)
-      return 'pv_night'; 
+  if ($current < $baseline * 1.2) {
+      return 'pv_night';
   }
 
   # --- Datenfehler / API-Fehler erkennen
-  return 'slope_implausible' if(defined $slope_live && ($slope_live < 0.3 || $slope_live > 1.7));   # SlopeLive < 0.3 → Modell ist nicht falsch, Daten sind falsch
-  return 'rmse_anomaly'      if(defined $rmse_rel_ratio && $rmse_rel_ratio > 3.0);                  # RMSErelRatio > 3.0 → API liefert Mist, kein Drift
-  return 'bias_implausible'  if(defined $bias_live && abs($bias_live) > 300);                       # BiasLive extrem hoch → Sensor-/API-Fehler
+  my $median_load = $median || 1;
+  
+  return 'slope_implausible' if(defined $slope_live && ($slope_live < 0.3 || $slope_live > 1.7));   # Modell ist nicht falsch, Daten sind falsch
+  return 'rmse_anomaly'      if(defined $rmse_rel_ratio && $rmse_rel_ratio > 4.0);                  # RMSErelRatio > 4.0 → API liefert Mist, kein Drift
+  return 'bias_implausible'  if(defined $bias_live && abs($bias_live) > $median_load * 0.8);        # BiasLive extrem hoch → Sensor-/API-Fehler
 
   # --- Modell schlecht, aber NICHT driftend
   if (                                                                                              # DriftScore & RMSE hoch, aber Slope/Bias stabil → kein Drift
@@ -26075,11 +26079,11 @@ sub _drift_safety_blocked {
 
   # --- Instabile Drift (Ausreißer)
   # Wenn Slope/Bias extrem schwanken → keine Rekalibrierung
-  if (defined $paref->{slope_var} && $paref->{slope_var} > 0.05) {
+  if (defined $paref->{slope_var} && $paref->{slope_var} > 0.10) {
       return 'unstable_slope';
   }
   
-  if (defined $paref->{bias_var} && $paref->{bias_var} > 20) {
+  if (defined $paref->{bias_var} && $paref->{bias_var} > 50) {
       return 'unstable_bias';
   }
 
