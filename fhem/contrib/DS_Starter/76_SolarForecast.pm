@@ -969,6 +969,8 @@ my %hqtxt = (                                                                # H
               DE => qq{Trainingsalgorithmus}                                                                                },  
   rangen => { EN => qq{Random Generator},
               DE => qq{Zufallsgenerator}                                                                                    },  
+  modage => { EN => qq{Model Age},
+              DE => qq{Modellalter}                                                                                         },
   trmetc => { EN => qq{Training Metrics},
               DE => qq{Trainingsmetriken}                                                                                   },  
   bmoaep => { EN => qq{best model at Epoche},
@@ -6736,7 +6738,8 @@ sub __getaiFannConState {            ## no critic "not used"
   my $drift_rmserel = AiNeuralVal ($name, 'con', 'DriftRmseRelRatio', '-');  
   my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlope',        '-'); 
   my $drift_bias    = AiNeuralVal ($name, 'con', 'DriftBias',         '-'); 
-  my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',         '-');                                      
+  my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',         '-'); 
+  my $model_age     = AiNeuralVal ($name, 'con', 'ModelAgeHours',     '-');  
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6785,6 +6788,7 @@ sub __getaiFannConState {            ## no critic "not used"
   $model   .= "<b>".$hqtxt{actvat}{$lang}.":</b> Hidden=$conhaf, Steepness=$hidste, Output=$conoaf"."\n";                                               # Aktivierungen
   $model   .= "<b>".$hqtxt{tralgo}{$lang}.":</b> $talgo, Registry Version=$regv"."\n";                                                                  # Trainingsalgorithmus
   $model   .= "<b>".$hqtxt{rangen}{$lang}.":</b> Mode=$shmode, Period=$shperi"."\n";                                                                    # Zufallsgenerator
+  $model   .= "<b>".$hqtxt{modage}{$lang}.":</b> $model_age h"."\n";                                                                                    # Alter des Modells (Stunden)  
   
   # Trainingsmetriken
   #####################
@@ -6823,7 +6827,7 @@ sub __getaiFannConState {            ## no critic "not used"
   $drift    .= "<b>Drift Score:</b> $drift_score"."\n";
   $drift    .= "<b>Drift RMSE ratio:</b> $drift_rmserel"."\n";
   $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
-  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";
+  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";                
   $drift    .= "<b>".$hqtxt{drfrat}{$lang}.":</b> $drift_flag"."\n";                                                                                    # Drift Bewertung
     
   # Erläuterungstext
@@ -25492,8 +25496,8 @@ sub aiFannGetConResult {
  
       # Prognose + BiasKorrektur abfragen
       #####################################
-      my $denorm_val                            = _aiFannPredict             ($name, $fanntyp, \@new_input); 
-      my ($prediction, $bc, $zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
+      my $denorm_val                                 = _aiFannPredict             ($name, $fanntyp, \@new_input); 
+      my ($prediction, $bc, $bias_zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
       
       my $nngrst = CurrentVal ($name, $fanntyp.'NNGetResultState', 'ok');
       
@@ -25518,7 +25522,7 @@ sub aiFannGetConResult {
       my $confc_final = $alpha * $prediction + (1 - $alpha) * $intlegacyconfc;
       $confc_final    = round0 ($confc_final);
       
-      debugLog ($paref, 'aiData', "AI FANN con fc - Time: $starttime, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, BC=$bc Wh, bias/drift zone=$zone/$drift_zone)");
+      debugLog ($paref, 'aiData', "AI FANN con fc - $starttime, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$bc Wh, bias/drift zone=$bias_zone/$drift_zone)");
       
       
       # Daten speichern
@@ -25589,21 +25593,23 @@ sub _aiFannApplyBiasCorrection {
   my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',      1.0);
   my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',       0.0);
   my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRatio',  1.0);
-  
+  my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',     0);
+
   my $ref_level        = CircularVal ($name, '99', $fanntyp.'_quantile30',  0);                 # Wert des 30%-Quantils als Referenzniveau bestimmen
     
-  my $zone       = 3;
   my $bc         = 0;
   my $res        = $val_predict;
   my $bias_ratio = abs($bias) / (max($mae, 0.1));
 
   # --- Drift-Level-Korrektur ---
+  my $drift_enabled = ($model_age >= 24) ? 1 : 0;                                               # Freischaltung Drift-Korrektur
+  
   my $ds_min = 0.80;                                                                            # sanfter, aber reagiert
   my $ds_max = 1.10;
 
   my $ds = $drift_slope;
-  $ds = $ds_min if($ds < $ds_min);
-  $ds = $ds_max if($ds > $ds_max);
+  $ds    = $ds_min if($ds < $ds_min);
+  $ds    = $ds_max if($ds > $ds_max);
 
   # --- Adaptive Drift-Gewichtung (sanft) ---
   my $slope_dev = abs (1.0 - $drift_slope);
@@ -25617,11 +25623,10 @@ sub _aiFannApplyBiasCorrection {
   );
 
   my $ds_adapted = 1.0 + ($ds - 1.0) * $drift_weight;
-
-  $ds_adapted = max (0.70, min(1.10, $ds_adapted));                                             # sanftes Sicherheitsnetz
+  $ds_adapted    = max (0.70, min(1.10, $ds_adapted));                                          # sanftes Sicherheitsnetz
 
   # --- Drift-Zonenlogik (entschärft) ---
-  my $drift_zone = 3;
+  my $drift_zone = '-';
 
   if ($drift_slope >= 0.9 && $drift_rmse_ratio < 1.5) {
       $drift_zone = 1;
@@ -25656,8 +25661,12 @@ sub _aiFannApplyBiasCorrection {
   my $alpha_green  = 0.7;                                                                       # 50% in grüner Zone
   my $alpha_yellow = 0.5;                                                                       # 30% in gelber Zone
 
-  # --- Drift-Korrektur anwenden ---
-  $res = $res * $ds_adapted;                                                                    # Level-Skalierung immer
+  # --- Drift-Korrektur anwenden ---                                                            # Level-Skalierung Freischaltung
+  if (!$drift_enabled) {
+      $ds_adapted = 1.0;
+      $drift_zone = '-';      
+  }
+  $res = $res * $ds_adapted;                                                                    
   
   # --- Peak-Schutz: nur Grundlast korrigieren ---                                              # Wenn kein RefLevel oder val deutlich drüber liegt -> keine Korrektur.
   my $is_baseline = 0;
@@ -25669,25 +25678,31 @@ sub _aiFannApplyBiasCorrection {
       $is_baseline = 0;
   }
   
-  $res = $res + $clamped_drift_bias if($is_baseline);                                           # Drift-Bias nur auf Baseline anwenden
+  $clamped_drift_bias = 0                          if(!$drift_enabled);                         # Level-Skalierung Freischaltung              
+  $res                = $res + $clamped_drift_bias if($is_baseline);                            # Drift-Bias nur auf Baseline anwenden (bei Freischaltung)
 
   # --- Bias-Zonenlogik ---
+  my $bias_zone = '-';
+  
   if ($is_baseline) {
       if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {            # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
           my $soft_bias = $clamped_bias * $alpha_green;
           $res          = $res + $soft_bias;                                                    # nur additive Basiskorrektur, kein Slope!
-          $zone         = 1;
+          $bias_zone    = 1;
       }
       elsif ($slope >= 0.7 && $slope < 0.9 && $bias_ratio <= 2.0 && $rmse_rel <= 40) {          # --- Zone 2: Gelbe Zone (noch sanfter, aber gleiche Logik) ---
           my $soft_bias = $clamped_bias * $alpha_yellow;
           $res          = $res + $soft_bias;
-          $zone         = 2;
+          $bias_zone    = 2;
       }
-  }                                                                                             # Zone 3: keine Korrektur
+      else {
+          $bias_zone = 3;                                                                       # --- Zone 3: Rote Zone (Baseline erkannt, aber die Modellqualität ist zu schlecht, um eine additive Bias‑Korrektur zuzulassen)
+      }  
+  }                                                                                             
 
   $bc = $res - $val_predict;
 
-return ($res, $bc, $zone, $drift_zone);
+return ($res, $bc, $bias_zone, $drift_zone);
 }
 
 ###########################################################################
@@ -25713,11 +25728,34 @@ sub aiFannDetectDrift {
   my @indices = sort { $a <=> $b } keys %$rawref;
   return unless @indices >= $window;
 
-  my @tail_idx = @indices[-$window .. -1];
+  my @tail_idx   = @indices[-$window .. -1];
+  my $latest_idx = $indices[-1];
+  my $flag       = 'stable';
+  
+  # --- ModelAgeHours bestimmen und speichern
+  my $liyear  = int ($latest_idx / 1000000);
+  my $limonth = sprintf "%02d", int (($latest_idx % 1000000) / 10000);
+  my $liday   = sprintf "%02d", int (($latest_idx % 10000) / 100);
+  my $lihour  = sprintf "%02d", int ($latest_idx % 100);
+
+  my $litimestamp = timestringToTimestamp ("$liyear-$limonth-$liday $lihour:00:00");           
+  my $atf         = CircularVal ($name, 99, $fanntyp.'NNTrainLastFinishTs', $litimestamp);
+  my $age_hours   = round0 (($litimestamp - $atf) / 3600);
+  $age_hours      = 0 if($age_hours < 0);
+
+  $data{$name}{neuralnet}{$fanntyp}{ModelAgeHours} = $age_hours;
+  #Log3 ($name, 1, "$name - latest_idx: $latest_idx, liyear: $liyear, limonth: $limonth, liday: $liday, lihour: $lihour, age_hours: $age_hours, litimestamp: $litimestamp ");
+  if ($age_hours < 24) {
+      $flag = 'fresh_model';
+      $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
+      return $flag;
+  } 
+  
 
   my (@targets, @preds, @abs_errors);
   my (@slope_list, @bias_list);
 
+  # --- Slope/Bias pro Stunde berechnen
   for my $idx (@tail_idx) {
       my $rec = $rawref->{$idx} or next;
       my $a   = $rec->{$fanntyp};
@@ -25729,7 +25767,6 @@ sub aiFannDetectDrift {
       push @preds,      $p;
       push @abs_errors, abs ($p - $a);
       
-      # Slope/Bias pro Stunde berechnen
       push @slope_list, ($p / $a) if($a != 0);
       push @bias_list,  ($p - $a);
   }
@@ -25795,8 +25832,6 @@ sub aiFannDetectDrift {
   my $peak_ratio = $peak_active / $n;
 
   # --- Ampel-Logik (modellskaliert) ---
-  my $flag = 'stable';
-
   if (
       $drift_score      > 1.8  &&
       $rmse_rel_ratio   > 2.0  &&
