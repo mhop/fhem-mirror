@@ -25580,7 +25580,7 @@ return $denorm_val;
 #  Modell-Bias-Zonenlogik arbeitet auf dem driftbereinigten Wert
 ################################################################
 sub _aiFannApplyBiasCorrection {
-  my ($name, $fanntyp, $val, $targetref) = @_;
+  my ($name, $fanntyp, $val_predict, $targetref) = @_;
 
   my $bias             = AiNeuralVal ($name, $fanntyp, 'ModelBias',       500);
   my $slope            = AiNeuralVal ($name, $fanntyp, 'ModelSlope',        0);
@@ -25594,7 +25594,7 @@ sub _aiFannApplyBiasCorrection {
     
   my $zone       = 3;
   my $bc         = 0;
-  my $res        = $val;
+  my $res        = $val_predict;
   my $bias_ratio = abs($bias) / (max($mae, 0.1));
 
   # --- Drift-Level-Korrektur ---
@@ -25636,7 +25636,7 @@ sub _aiFannApplyBiasCorrection {
       $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.70;                                           # 70%
   }
 
-  $ds_adapted = max(0.70, min(1.10, $ds_adapted));                                              # final clamp
+  $ds_adapted = max (0.70, min(1.10, $ds_adapted));                                             # final clamp
 
 
   # --- Bias-Korrektur ---
@@ -25669,23 +25669,23 @@ sub _aiFannApplyBiasCorrection {
       $is_baseline = 0;
   }
   
-  $res = $res - $clamped_drift_bias if($is_baseline);                                       # Drift-Bias nur auf Baseline anwenden
+  $res = $res + $clamped_drift_bias if($is_baseline);                                           # Drift-Bias nur auf Baseline anwenden
 
   # --- Bias-Zonenlogik ---
   if ($is_baseline) {
-      if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {        # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
+      if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {            # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
           my $soft_bias = $clamped_bias * $alpha_green;
-          $res          = $res + $soft_bias;                                                # nur additive Basiskorrektur, kein Slope!
+          $res          = $res + $soft_bias;                                                    # nur additive Basiskorrektur, kein Slope!
           $zone         = 1;
       }
-      elsif ($slope >= 0.7 && $slope < 0.9 && $bias_ratio <= 2.0 && $rmse_rel <= 40) {      # --- Zone 2: Gelbe Zone (noch sanfter, aber gleiche Logik) ---
+      elsif ($slope >= 0.7 && $slope < 0.9 && $bias_ratio <= 2.0 && $rmse_rel <= 40) {          # --- Zone 2: Gelbe Zone (noch sanfter, aber gleiche Logik) ---
           my $soft_bias = $clamped_bias * $alpha_yellow;
           $res          = $res + $soft_bias;
           $zone         = 2;
       }
-  }                                                                                         # Zone 3: keine Korrektur
+  }                                                                                             # Zone 3: keine Korrektur
 
-  $bc = $res - $val;
+  $bc = $res - $val_predict;
 
 return ($res, $bc, $zone, $drift_zone);
 }
