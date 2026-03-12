@@ -25628,11 +25628,11 @@ sub _aiFannApplyBiasCorrection {
   # --- Drift-Zonenlogik (entschärft) ---
   my $drift_zone = '-';
 
-  if ($drift_slope >= 0.9 && $drift_rmse_ratio < 1.5) {
+  if (abs($drift_slope) >= 0.9 && $drift_rmse_ratio < 1.5) {
       $drift_zone = 1;
       $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.10;                                           # 10%
   }
-  elsif ($drift_slope >= 0.75 && $drift_rmse_ratio < 2.5) {
+  elsif (abs($drift_slope) >= 0.75 && $drift_rmse_ratio < 2.5) {
       $drift_zone = 2;
       $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.40;                                           # 40%
   }
@@ -25726,9 +25726,8 @@ sub aiFannDetectDrift {
   return unless $rawref && ref $rawref eq 'HASH';
 
   my @indices = sort { $a <=> $b } keys %$rawref;
-  return unless @indices >= $window;
-
-  my @tail_idx   = @indices[-$window .. -1];
+  return unless(@indices >= $window);
+  
   my $latest_idx = $indices[-1];
   my $flag       = 'stable';
   
@@ -25739,29 +25738,50 @@ sub aiFannDetectDrift {
   my $lihour  = sprintf "%02d", int ($latest_idx % 100);
 
   my $litimestamp = timestringToTimestamp ("$liyear-$limonth-$liday $lihour:00:00");           
-  my $atf         = CircularVal ($name, 99, $fanntyp.'NNTrainLastFinishTs', $litimestamp);
-  my $age_hours   = round0 (($litimestamp - $atf) / 3600);
+  my $train_ts    = CircularVal ($name, 99, $fanntyp.'NNTrainLastFinishTs', $litimestamp);
+  my $age_hours   = round0 (($litimestamp - $train_ts) / 3600);
   $age_hours      = 0 if($age_hours < 0);
 
   $data{$name}{neuralnet}{$fanntyp}{ModelAgeHours} = $age_hours;
-  #Log3 ($name, 1, "$name - latest_idx: $latest_idx, liyear: $liyear, limonth: $limonth, liday: $liday, lihour: $lihour, age_hours: $age_hours, litimestamp: $litimestamp ");
+
   if ($age_hours < 24) {
       $flag = 'fresh_model';
       $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
       return $flag;
   } 
-  
+
+  # --- nur Daten, die vom neuen Modell stammen
+  my @post_train_idx = grep {   
+      my $idx   = $_;
+      my $year  = int ($idx / 1000000);
+      my $month = sprintf "%02d", int (($idx % 1000000) / 10000);
+      my $day   = sprintf "%02d", int (($idx % 10000) / 100);
+      my $hour  = sprintf "%02d", int ($idx % 100);
+
+      my $ts = timestringToTimestamp ("$year-$month-$day $hour:00:00");
+      $ts >= $train_ts;
+  } @indices;
+
+  if (@post_train_idx < 24) {
+      $flag = 'insufficient_data';
+      $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
+      return $flag;
+  }
+
+  #my @tail_idx   = @indices[-$window .. -1];       
+  my @tail_idx = @post_train_idx[-$window .. -1];
 
   my (@targets, @preds, @abs_errors);
   my (@slope_list, @bias_list);
 
   # --- Slope/Bias pro Stunde berechnen
   for my $idx (@tail_idx) {
+      next if(!$idx);
       my $rec = $rawref->{$idx} or next;
       my $a   = $rec->{$fanntyp};
       my $p   = $rec->{$fanntyp.'aifc'};
 
-      next unless (defined $a && defined $p && $a >= 0 && $p >= 0);
+      next unless(defined $a && defined $p && $a >= 0 && $p >= 0);
 
       push @targets,    $a;
       push @preds,      $p;
@@ -26012,9 +26032,8 @@ return $sq_sum / ($n - 1);                                              # Stichp
 #  - schlechte Modelle ohne Drift          
 ################################################################
 sub _drift_safety_blocked {                  
-  my $paref = shift;
-  my $name  = $paref->{name};
-
+  my $paref           = shift;
+  my $name            = $paref->{name};
   my $median          = $paref->{median};
   my $targets         = $paref->{targets};                                          # Array-Ref
   my $slope_live      = $paref->{slope_live};
