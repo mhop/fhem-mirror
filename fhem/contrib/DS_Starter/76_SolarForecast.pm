@@ -163,8 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.3.1"  => "08.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
-                           "change last_presence_check to central 'last_transfer', edit comref ",
+  "2.3.1"  => "12.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
+                           "change last_presence_check to central 'last_transfer', edit comref, Drift recalculation & lock ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -26035,7 +26035,7 @@ sub _drift_safety_blocked {
   my $paref           = shift;
   my $name            = $paref->{name};
   my $median          = $paref->{median};
-  my $targets         = $paref->{targets};                                          # Array-Ref
+  my $targets         = $paref->{targets};                                                          # Array-Ref
   my $slope_live      = $paref->{slope_live};
   my $bias_live       = $paref->{bias_live};
   my $rmse_rel_ratio  = $paref->{rmse_rel_ratio};
@@ -26047,24 +26047,24 @@ sub _drift_safety_blocked {
   
   my @targets = @$targets;
     
-  return 'no_data' unless (@targets && @targets > 10);                              # --- Safety: Targets müssen existieren und ausreichend groß sein ---
+  return 'no_data' unless (@targets && @targets > 10);                                              # --- Safety: Targets müssen existieren und ausreichend groß sein ---
 
   # --- Dynamischer Nacht-Detektor ---
   my @sorted = sort { $a <=> $b } @targets;
   my $n      = @sorted;
-  my $p20    = $sorted[int($n * 0.2)] // 0;                                         # Unteres 20%-Perzentil (typischer Nachtwert)
+  my $p20    = $sorted[int($n * 0.2)] // 0;                                                         # Unteres 20%-Perzentil (typischer Nachtwert)
 
-  if ($median <= $p20 * 1.2) {                                                      # Nacht, wenn Median nahe am unteren Cluster liegt (kritisch)
+  if ($median <= $p20 * 1.2) {                                                                      # Nacht, wenn Median nahe am unteren Cluster liegt (kritisch)
       return 'pv_night'; 
   }
 
   # --- Datenfehler / API-Fehler erkennen
-  return 'slope_implausible' if(defined $slope_live && $slope_live < 0.3);          # SlopeLive < 0.3 → Modell ist nicht falsch, Daten sind falsch
-  return 'rmse_anomaly'      if(defined $rmse_rel_ratio && $rmse_rel_ratio > 3.0);  # RMSErelRatio > 3.0 → API liefert Mist, kein Drift
-  return 'bias_implausible'  if(defined $bias_live && abs($bias_live) > 300);       # BiasLive extrem hoch → Sensor-/API-Fehler
+  return 'slope_implausible' if(defined $slope_live && ($slope_live < 0.3 || $slope_live > 1.7));   # SlopeLive < 0.3 → Modell ist nicht falsch, Daten sind falsch
+  return 'rmse_anomaly'      if(defined $rmse_rel_ratio && $rmse_rel_ratio > 3.0);                  # RMSErelRatio > 3.0 → API liefert Mist, kein Drift
+  return 'bias_implausible'  if(defined $bias_live && abs($bias_live) > 300);                       # BiasLive extrem hoch → Sensor-/API-Fehler
 
   # --- Modell schlecht, aber NICHT driftend
-  if (                                                                              # DriftScore & RMSE hoch, aber Slope/Bias stabil → kein Drift
+  if (                                                                                              # DriftScore & RMSE hoch, aber Slope/Bias stabil → kein Drift
       $drift_score     > 1.8 &&
       $rmse_rel_ratio  > 2.0 &&
       $slope_drift_rel < 0.1 &&
@@ -26083,7 +26083,7 @@ sub _drift_safety_blocked {
       return 'unstable_bias';
   }
 
-return 0;                                                                           # 0 = kein Block, Rekalibrierung erlaubt
+return 0;                                                                                           # 0 = kein Block, Rekalibrierung erlaubt
 }
 
 ###############################################################
