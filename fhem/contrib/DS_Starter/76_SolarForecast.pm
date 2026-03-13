@@ -25976,15 +25976,18 @@ sub aiFannDetectDrift {
                                                   bias_drift_norm => $bias_drift_norm,
                                                   slope_var       => $slope_var,
                                                   bias_var        => $bias_var,
+                                                  sem_ratio       => $sem_ratio,
+                                                  peak_ratio      => $peak_ratio,
                                                }
                                              );
 
   if (!$block_reason) {
       # --- Rekalibrierung ---
       if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= 12) {                                 
-          my $new_bias  = $bias_model  + $bias_drift;                                               # ist identisch zu $bias_live
-          my $new_slope = $slope_model * $slope_live;
-        
+          my $new_bias  = $bias_model + 0.7 * $bias_drift;
+          my $new_slope = 1.0 + ($slope_live - 1.0) * 0.5;
+          $new_slope    = max (0.85, min (1.15, $new_slope));
+     
           $data{$name}{neuralnet}{$fanntyp}{DriftRecalModelBias}  = $new_bias;
           $data{$name}{neuralnet}{$fanntyp}{DriftRecalModelSlope} = $new_slope;
         
@@ -26069,6 +26072,8 @@ sub _aiDrift_safety_blocked {
   my $bias_drift_norm = $paref->{bias_drift_norm};
   my $slope_var       = $paref->{slope_var};
   my $bias_var        = $paref->{bias_var};
+  my $peak_ratio      = $paref->{peak_ratio};
+  my $sem_ratio       = $paref->{sem_ratio};
   
   my @targets = @$targets;
     
@@ -26077,10 +26082,14 @@ sub _aiDrift_safety_blocked {
   # --- Dynamischer Nacht-Detektor ---
   my $quant30 = CircularVal($name, 99, $fanntyp.'_quantile30', 0);
   my $quant90 = CircularVal($name, 99, $fanntyp.'_quantile90', 0);
-  my $current = $targets[-1];                                                                               # letzter Wert im Fenster = letzte abgeschlossene Stunde
 
-  if ($current < $quant30 * 1.2) {
-      return 'pv_night';
+  my $night_count = 0;
+  for my $tgt (@targets[-6 .. -1]) {                                                                        # letzte 6 Stunden
+      $night_count++ if($tgt < $quant30 * 1.15);
+  }
+
+  if ($night_count >= 5 && $peak_ratio < 0.02) {                                                            # 5 von 6 Stunden = Nacht
+      return 'low_load_phase';
   }
   
   my $median_load     = $median || 1;
@@ -26097,8 +26106,18 @@ sub _aiDrift_safety_blocked {
   my $rmse_limit = 3.0 + ($median_load / 800);
 
   # --- Datenfehler / API-Fehler erkennen
-  return 'slope_implausible' if(defined $slope_live && (abs($slope_live) < 0.25 || $slope_live > 1.8));     # Modell ist nicht falsch, Daten sind falsch
-  return 'rmse_anomaly'      if(defined $rmse_rel_ratio && $rmse_rel_ratio > $rmse_limit);                  # RMSErelRatio > X → API liefert Mist, kein Drift
+  if ((abs($slope_live) < 0.25 || $slope_live > 1.8) && 
+       $slope_var > $slope_var_limit * 1.5           &&
+       $peak_ratio < 0.05) {                                                                                # Blockiert nur, wenn Slope extrem UND instabil ist, Echte Drift (z. B. SlopeLive = 0.2 stabil) wird nicht blockiert
+      return 'slope_implausible';
+  }
+
+  my $rmse_dynamic_limit = 2.5 + ($peak_ratio * 1.0) + ($sem_ratio * 0.8) + ($slope_var * 0.5);             # RMSE‑Limit steigt automatisch, wenn viele Peaks, viele semantische Abweichungen, hohe Varianz | RMSE‑Limit sinkt bei Grundlast → Nachtfehler werden erkannt
+
+  if ($rmse_rel_ratio > $rmse_dynamic_limit) {                                                              
+      return 'rmse_anomaly';
+  }
+
   return 'bias_implausible'  if(defined $bias_live && abs($bias_live) > $bias_limit);                       # BiasLive extrem hoch → Sensor-/API-Fehler
 
   # --- Modell schlecht, aber NICHT driftend
