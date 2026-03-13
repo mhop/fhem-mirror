@@ -25528,7 +25528,7 @@ sub aiFannGetConResult {
       # Prognose + BiasKorrektur abfragen
       #####################################
       my $denorm_val                                 = _aiFannPredict             ($name, $fanntyp, \@new_input); 
-      my ($prediction, $bc, $bias_zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
+      my ($prediction, $bc, $bias_zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $hod, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
       
       my $nngrst = CurrentVal ($name, $fanntyp.'NNGetResultState', 'ok');
       
@@ -25615,7 +25615,7 @@ return $denorm_val;
 #  Modell-Bias-Zonenlogik arbeitet auf dem driftbereinigten Wert
 ################################################################
 sub _aiFannApplyBiasCorrection {
-  my ($name, $fanntyp, $val_predict, $targetref) = @_;
+  my ($name, $fanntyp, $hod, $val_predict, $targetref) = @_;
 
   my $rmse_rel         = AiNeuralVal ($name, $fanntyp, 'RmseRel',         100);
   my $mae              = AiNeuralVal ($name, $fanntyp, 'Mae',             100);
@@ -25640,7 +25640,9 @@ sub _aiFannApplyBiasCorrection {
   my $bias_ratio = abs($bias) / (max($mae, 0.1));
 
   # --- Drift-Level-Korrektur ---
-  my $drift_enabled = ($model_age >= 24) ? 1 : 0;                                               # Freischaltung Drift-Korrektur
+  my $drift_enabled = 1;
+  $drift_enabled    = 0 if($model_age < 24);                                                    # Mindestalter       
+  $drift_enabled    = 0 if($hod < 7);                                                           # Nachts keine Drift-Korrektur (00–05 Uhr)
   
   my $ds_min = 0.80;                                                                            # sanfter, aber reagiert
   my $ds_max = 1.10;
@@ -25676,7 +25678,7 @@ sub _aiFannApplyBiasCorrection {
   }
   else {
       $drift_zone = 3;
-      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.70;                                           # 70%
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.55;                                           # 55%
   }
 
   $ds_adapted = max (0.70, min(1.10, $ds_adapted));                                             # final clamp
@@ -25685,7 +25687,7 @@ sub _aiFannApplyBiasCorrection {
   # --- Bias-Korrektur ---
   # Drift-Bias clampen
   my $drift_bias_max     = 1.0 * $mae;
-  my $clamped_drift_bias = $drift_bias;
+  my $clamped_drift_bias = $drift_bias * 0.5;
   $clamped_drift_bias    =  $drift_bias_max if($clamped_drift_bias >  $drift_bias_max);
   $clamped_drift_bias    = -$drift_bias_max if($clamped_drift_bias < -$drift_bias_max);
 
@@ -26108,8 +26110,13 @@ sub _aiDrift_safety_blocked {
       return 'low_load_phase';
   }
   
-  my $median_load     = $median || 1;
-  my $bias_var_limit  = 0.15    * ($median_load ** 2);
+  my $median_load    = $median || 1;
+  my $bias_var_limit = 0.20 * ($median_load ** 2);
+  
+  if (defined $rmse_rel_ratio && $rmse_rel_ratio > 2.2) {
+      $bias_var_limit *= 1.5;
+  }
+  
   my $slope_var_limit = 0.00002 * ($median_load ** 2) + 0.02;                                               # dynamische Schwelle für Slope-Varianz
 
   my $bias_limit = max(
