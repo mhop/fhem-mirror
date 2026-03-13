@@ -6734,12 +6734,14 @@ sub __getaiFannConState {            ## no critic "not used"
   my $bflim    = AiNeuralVal ($name, 'con', 'BitFailLimit',   '-');                       # Bit_Fail_Limit aktuell
   my $bfsug    = AiNeuralVal ($name, 'con', 'BitFailSuggest', '-');                       # Bit_Fail_Limit Empfehlung
   
-  my $drift_score   = AiNeuralVal ($name, 'con', 'DriftScore',        '-'); 
-  my $drift_rmserel = AiNeuralVal ($name, 'con', 'DriftRmseRelRatio', '-');  
-  my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlope',        '-'); 
-  my $drift_bias    = AiNeuralVal ($name, 'con', 'DriftBias',         '-'); 
-  my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',         '-'); 
-  my $model_age     = AiNeuralVal ($name, 'con', 'ModelAgeHours',     '-');  
+  my $drift_score   = AiNeuralVal ($name, 'con', 'DriftScore',           '-'); 
+  my $drift_rmserel = AiNeuralVal ($name, 'con', 'DriftRmseRelRatio',    '-');  
+  my $drift_slope   = AiNeuralVal ($name, 'con', 'DriftSlope',           '-'); 
+  my $drift_bias    = AiNeuralVal ($name, 'con', 'DriftBias',            '-'); 
+  my $drift_flag    = AiNeuralVal ($name, 'con', 'DriftFlag',            '-');
+  my $bias_recal    = AiNeuralVal ($name, 'con', 'DriftRecalModelBias',  '-');                              
+  my $slope_recal   = AiNeuralVal ($name, 'con', 'DriftRecalModelSlope', '-');  
+  my $model_age     = AiNeuralVal ($name, 'con', 'ModelAgeHours',        '-');  
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6823,12 +6825,14 @@ sub __getaiFannConState {            ## no critic "not used"
   
   # Drift
   #########
-  my $drift  = '<b>=== '.$hqtxt{drftid}{$lang}.' ===</b>'."\n\n";                                                                                       # Drift-Kennzahlen                                                                                                   # Drift-Kennzahlen                                
+  my $drift  = '<b>=== '.$hqtxt{drftid}{$lang}.' ===</b>'."\n\n";                                                                                       # Drift-Kennzahlen                          
   $drift    .= "<b>Drift Score:</b> $drift_score"."\n";
   $drift    .= "<b>Drift RMSE ratio:</b> $drift_rmserel"."\n";
   $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
-  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";                
+  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";    
   $drift    .= "<b>".$hqtxt{drfrat}{$lang}.":</b> $drift_flag"."\n";                                                                                    # Drift Bewertung
+  $drift    .= "<b>Model Slope recalibrated:</b> $slope_recal"."\n";                                                                                    # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
+  $drift    .= "<b>Model Bias recalibrated:</b> $bias_recal"."\n";                                                                                      # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
     
   # Erläuterungstext
   ####################
@@ -6874,6 +6878,8 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', 'Der Wert wird in Wh angegeben und beschreibt die durchschnittliche Abweichung pro Stunde.'))."\n";
       $note .= $spc6.(encode('utf8', 'Die interne Bias‑Korrektur hebt oder senkt die Vorhersage entsprechend, jedoch nur'))."\n";
       $note .= $spc6.(encode('utf8', 'im Bereich der Grundlast, um Peaks nicht zu verfälschen.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Wenn eine Drift‑Rekalibrierung stattgefunden hat, ersetzt <b>Model Bias recalibrated</b> den ursprünglichen Model Bias als neue Basislinie.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Er repräsentiert den neu berechneten durchschnittlichen Modellfehler, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
       $note .= "\n";
       
       $note .= (encode('utf8', '<b>Model Slope</b> → zeigt, ob das Modell zu flach oder zu steil reagiert.'))."\n";
@@ -6885,6 +6891,8 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', 'Slope = 1.0 → Das Modell bildet die Verbrauchshöhen korrekt ab. Steigt der echte Verbrauch um X, steigt die Vorhersage ebenfalls um X'))."\n";
       $note .= $spc6.(encode('utf8', 'Slope < 1.0 → Das Modell reagiert zu flach. Peaks werden abgeschwächt. Beispiel: Slope = 0.9 → Das Modell bildet 90% der realen Dynamik ab.'))."\n";
       $note .= $spc6.(encode('utf8', 'Slope > 1.0 → Das Modell reagiert zu stark. Peaks werden überbetont, Schwankungen überzeichnet.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Wenn eine Drift‑Rekalibrierung stattgefunden hat, ersetzt <b>Model Slope recalibrated</b> den ursprünglichen Model Slope als neue Steigungsbasis.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Er repräsentiert die neu berechnete Modellreaktion, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
       $note .= "\n";
       
       $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
@@ -6959,6 +6967,8 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', 'The value is given in Wh and describes the average deviation per hour.'))."\n";
       $note .= $spc6.(encode('utf8', 'The internal bias correction raises or lowers the prediction accordingly, but only'))."\n";
       $note .= $spc6.(encode('utf8', 'in the base load range so as not to distort peaks.'))."\n";
+      $note .= $spc6.(encode('utf8', 'When a drift recalibration has taken place, <b>Model Bias recalibrated</b> replaces the original model bias as the new baseline.'))."\n";
+      $note .= $spc6.(encode('utf8', 'It represents the newly calculated average model error after longer-term drift has been detected and corrected.'))."\n";
       $note .= "\n";
       
       $note .= (encode('utf8', '<b>Model Slope</b> → indicates whether the model responds too flatly or too steeply.'))."\n";
@@ -6970,6 +6980,8 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', 'Slope = 1.0 → The model correctly reflects consumption levels. If actual consumption increases by X, the prediction also increases by X'))."\n";
       $note .= $spc6.(encode('utf8', 'Slope < 1.0 → The model responds too flatly. Peaks are attenuated. Example: Slope = 0.9 → The model depicts 90% of the actual dynamics.')) ."\n";
       $note .= $spc6.(encode('utf8', 'Slope > 1.0 → The model reacts too strongly. Peaks are overemphasised, fluctuations are exaggerated.'))."\n";
+      $note .= $spc6.(encode('utf8', 'When a drift recalibration has occurred, <b>Model Slope recalibrated</b> replaces the original Model Slope as the new slope basis.'))."\n";
+      $note .= $spc6.(encode('utf8', 'It represents the recalculated model response after longer-term drift has been detected and corrected.'))."\n";
       $note .= "\n";
       
       $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → how well the network trains and generalizes. Rule of thumb:'))."\n";
@@ -25589,17 +25601,24 @@ return $denorm_val;
 sub _aiFannApplyBiasCorrection {
   my ($name, $fanntyp, $val_predict, $targetref) = @_;
 
-  my $bias             = AiNeuralVal ($name, $fanntyp, 'ModelBias',       500);
-  my $slope            = AiNeuralVal ($name, $fanntyp, 'ModelSlope',        0);
   my $rmse_rel         = AiNeuralVal ($name, $fanntyp, 'RmseRel',         100);
   my $mae              = AiNeuralVal ($name, $fanntyp, 'Mae',             100);
   my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',      1.0);
   my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',       0.0);
   my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRatio',  1.0);
   my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',     0);
+  
+  my $bias             = AiNeuralVal ($name, $fanntyp, 'ModelBias',              500);
+  my $slope            = AiNeuralVal ($name, $fanntyp, 'ModelSlope',               0);
+  my $bias_recal       = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelBias',  undef);
+  my $slope_recal      = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelSlope', undef);
 
   my $ref_level        = CircularVal ($name, '99', $fanntyp.'_quantile30',  0);                 # Wert des 30%-Quantils als Referenzniveau bestimmen
-    
+  
+  # --- Rekalibrierte Werte verwenden wenn vorhanden
+  $bias  = $bias_recal  if(defined $bias_recal);
+  $slope = $slope_recal if(defined $slope_recal);
+  
   my $bc         = 0;
   my $res        = $val_predict;
   my $bias_ratio = abs($bias) / (max($mae, 0.1));
@@ -25966,8 +25985,8 @@ sub aiFannDetectDrift {
           my $new_bias  = $bias_model  + $bias_drift;                                               # ist identisch zu $bias_live
           my $new_slope = $slope_model * $slope_live;
         
-          $data{$name}{neuralnet}{$fanntyp}{ModelBias}  = $new_bias;
-          $data{$name}{neuralnet}{$fanntyp}{ModelSlope} = $new_slope;
+          $data{$name}{neuralnet}{$fanntyp}{DriftRecalModelBias}  = $new_bias;
+          $data{$name}{neuralnet}{$fanntyp}{DriftRecalModelSlope} = $new_slope;
         
           $data{$name}{neuralnet}{$fanntyp}{DriftBias}  = 0;
           $data{$name}{neuralnet}{$fanntyp}{DriftSlope} = 1;
