@@ -187,6 +187,7 @@
 # 6.05.6    fix: misc
 # 6.05.7    add attribute 'updateDelay', fix timing of updates
 # 6.05.8    fix: downgrade perl-version, get properties
+# 6.05.9    fix: error in command for Light devices, new internals ID, GEN
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -209,7 +210,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.8 12.03.2026";
+my $version = "6.05.9 13.03.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -287,40 +288,40 @@ my %shelly_vendor_ids = (
     # value 3:  the 'Device Bluetooth ID', Gen3 only
     # value 4:  plugs only: name of the user-interface
     ## Gen1 devices
-    "SHSW-1"     => [ 0, "shelly1",        "Shelly 1"],   ## no power metering
-    "SHSW-PM"    => [ 0, "shelly1pm",      "Shelly 1PM"],
-    "SHSW-L"     => [ 0, "shelly1L",       "Shelly 1L"],  ## with AC power metering
-    "SHSW-21"    => [ 0, "shelly2",        "Shelly 2"],   ## not listed in KB
-    "SHSW-25"    => [ 0, "shelly2.5",      "Shelly 2.5"],
-    "SHSW-44"    => [ 0, "shelly4",        "Shelly 4 Pro"],      ## not listed in KB
-    "SHIX3-1"    => [ 0, "shellyi3",       "Shelly i3"],
-    "SHEM"       => [ 0, "shellyem",       "Shelly EM"],
-    "SHEM-3"     => [ 0, "shelly3em",      "Shelly 3EM"],
-    "SHUNI-1"    => [ 0, "shellyuni",      "Shelly Uni"],
-    "SHSTRV-01"  => [ 0, "generic",        "Shelly TRV"],
-    "SHBTN-1"    => [ 0, "generic",        "Shelly Button 1"],
-    "SHBTN-2"    => [ 0, "generic",        "Shelly Button 2"],   ##  not listed in KB
-    "SHPLG2-1"   => [ 0, "shellyplug",     "Shelly Plug"],
-    "SHPLG-S"    => [ 0, "shellyplug",     "Shelly Plug S"],
-    "SHPLG-US"   => [ 0, "shellyplug",     "Shelly Plug US"],    ##  check device model >SHPLG-US<
-    "SHRGBW2"    => [ 0, "shellyrgbw",     "Shelly RGBW2"],
-    "SHDM-1"     => [ 0, "shellydimmer",   "Shelly Dimmer 1"],   ## not listed in KB
-    "SHDM-2"     => [ 0, "shellydimmer",   "Shelly Dimmer 2"],
+    "SHSW-1"     => [ 1, "shelly1",        "Shelly 1"],   ## no power metering
+    "SHSW-PM"    => [ 1, "shelly1pm",      "Shelly 1PM"],
+    "SHSW-L"     => [ 1, "shelly1L",       "Shelly 1L"],  ## with AC power metering
+    "SHSW-21"    => [ 1, "shelly2",        "Shelly 2"],   ## not listed in KB
+    "SHSW-25"    => [ 1, "shelly2.5",      "Shelly 2.5"],
+    "SHSW-44"    => [ 1, "shelly4",        "Shelly 4 Pro"],      ## not listed in KB
+    "SHIX3-1"    => [ 1, "shellyi3",       "Shelly i3"],
+    "SHEM"       => [ 1, "shellyem",       "Shelly EM"],
+    "SHEM-3"     => [ 1, "shelly3em",      "Shelly 3EM"],
+    "SHUNI-1"    => [ 1, "shellyuni",      "Shelly Uni"],
+    "SHSTRV-01"  => [ 1, "generic",        "Shelly TRV"],
+    "SHBTN-1"    => [ 1, "generic",        "Shelly Button 1"],
+    "SHBTN-2"    => [ 1, "generic",        "Shelly Button 2"],   ##  not listed in KB
+    "SHPLG2-1"   => [ 1, "shellyplug",     "Shelly Plug"],
+    "SHPLG-S"    => [ 1, "shellyplug",     "Shelly Plug S"],
+    "SHPLG-US"   => [ 1, "shellyplug",     "Shelly Plug US"],    ##  check device model >SHPLG-US<
+    "SHRGBW2"    => [ 1, "shellyrgbw",     "Shelly RGBW2"],
+    "SHDM-1"     => [ 1, "shellydimmer",   "Shelly Dimmer 1"],   ## not listed in KB
+    "SHDM-2"     => [ 1, "shellydimmer",   "Shelly Dimmer 2"],
 
-    "SHBDUO-1"   => [ 0, "shellybulb",     "Shelly Duo/Duo GU10"],  ## dimmable white (WW/CW) light with submodels: E27 or GU10 fitting
-    "SHVIN-1"    => [ 0, "shellybulb",     "Shelly Vintage"],       ## dimmable white light with different fittings
-    "SHBLB-1"    => [ 0, "shellybulb",     "Shelly Bulb"],          #
-    "SHCB-1"     => [ 0, "shellybulb",     "Shelly Duo RGBW G10"],  # = shelly color bulb   submodels: E27, GU10
+    "SHBDUO-1"   => [ 1, "shellybulb",     "Shelly Duo/Duo GU10"],  ## dimmable white (WW/CW) light with submodels: E27 or GU10 fitting
+    "SHVIN-1"    => [ 1, "shellybulb",     "Shelly Vintage"],       ## dimmable white light with different fittings
+    "SHBLB-1"    => [ 1, "shellybulb",     "Shelly Bulb"],          #
+    "SHCB-1"     => [ 1, "shellybulb",     "Shelly Duo RGBW G10"],  # = shelly color bulb   submodels: E27, GU10
 
-    "SHHT-1"     => [ 0, "generic",        "Shelly H&T"],           ## humidity and temperature sensor
-    "SHWT-1"     => [ 0, "generic",        "Shelly Flood"],         ## flood sensor
-    "SHDW-1"     => [ 0, "generic",        "Shelly Door/Window"],   ## not listed in KB
-    "SHDW-2"     => [ 0, "generic",        "Shelly Door/Window 2"],
-    "SHGS-1"     => [ 0, "generic",        "Shelly Gas"],           ## gas sensor
-    "SHSM-1"     => [ 0, "generic",        "Shelly Smoke"],         ## smoke sensor ## not listed in KB
-    "SHMOS-01"   => [ 0, "generic",        "Shelly Motion"],        ## motion sensor
-    "SHMOS-02"   => [ 0, "generic",        "Shelly Motion 2"],      ## motion sensor 2
-    "SHSEN-1"    => [ 0, "generic",        "Shelly motion & ir-controller"],  ## not listed in KB
+    "SHHT-1"     => [ 1, "generic",        "Shelly H&T"],           ## humidity and temperature sensor
+    "SHWT-1"     => [ 1, "generic",        "Shelly Flood"],         ## flood sensor
+    "SHDW-1"     => [ 1, "generic",        "Shelly Door/Window"],   ## not listed in KB
+    "SHDW-2"     => [ 1, "generic",        "Shelly Door/Window 2"],
+    "SHGS-1"     => [ 1, "generic",        "Shelly Gas"],           ## gas sensor
+    "SHSM-1"     => [ 1, "generic",        "Shelly Smoke"],         ## smoke sensor ## not listed in KB
+    "SHMOS-01"   => [ 1, "generic",        "Shelly Motion"],        ## motion sensor
+    "SHMOS-02"   => [ 1, "generic",        "Shelly Motion 2"],      ## motion sensor 2
+    "SHSEN-1"    => [ 1, "generic",        "Shelly motion & ir-controller"],  ## not listed in KB
     ## Plus devices  ## 2nd Gen
     "SNSW-001X16EU"   => [ 2, "shellyplus1",      "Shelly Plus 1"],
     "SNSW-001P16EU"   => [ 2, "shellyplus1pm",    "Shelly Plus 1PM"],
@@ -1206,11 +1207,13 @@ sub Shelly_getModel {
   }
   if( defined($model_id) ){
         Log3 $name,4,"[Shelly_getModel] device $name is of model_ID \'$model_id\'";
+        $hash->{ID}=$model_id;
         readingsSingleUpdate($hash,"model_ID",$model_id,1);
         readingsSingleUpdate($hash,"model_family",$shelly_family{substr($model_id,0,2)},1);
         readingsSingleUpdate($hash,"model_function",$shelly_category{substr($model_id,2,2)}//"unknown",1);
         readingsSingleUpdate($hash,"model_name",$shelly_vendor_ids{$model_id}[2],1);
         #--------
+        $hash->{GEN} = $shelly_vendor_ids{$model_id}[0]; # model generation: 1, 2, 3, ...
         $model = $shelly_vendor_ids{$model_id}[1];
         if ( $model ){
             Log3 $name,4,"[Shelly_getModel] $call: discovered model=$model for device $name";
@@ -1318,6 +1321,9 @@ sub Shelly_getProperties {
   my $model = AttrVal($name,"model","generic");
   my $mode  = AttrVal($name,"mode","");
   
+  Shelly_HttpRequest($hash,"/shelly","","Shelly_getModel" )
+                                            if( !defined($hash->{ID}) );
+  
   my @Keys=( 'relay','roller','light','cct','color','input','button','meters','em1' ); # ordered, don't use: keys %URLnamespaces
 
   my @chnls=@{$shelly_models{$model}};   # extract the array of 'model' out of the hash 
@@ -1394,6 +1400,7 @@ sub Shelly_getProperties {
      my $msg="[Shelly_getProperties] device $name has properties in use:"; 
    #  $msg .= "\nGeneration: ".$hash->{props}{gen}." -> Gen_$Gen";
      $msg .= "\nGeneration: Gen_$Gen";
+     $msg .= "\nModel-ID:   ".($hash->{ID}//'-');
      $msg .= "\nModel:      ".$model;
      $msg .= "\nMode:       ".$mode."  available: ".$chnls[8]   if( $chnls[8] > 0 );
 #    foreach my $comp ( 'relay','roller','light','cct','color','input','meters','em1' ){
@@ -1402,7 +1409,7 @@ sub Shelly_getProperties {
         $msg .="\n-$comp: $channels"  if( $channels );
      }
      $msg .="\nworking namespace = ".$hash->{props}{namespace};
-     $msg .=", URL keyword is = ".$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen}==0?0:1 ];
+     $msg .=", URL keyword is = ".$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen}?1:0 ];
      Log3 $name,4,$msg;  #4
      return $msg; 
   }
@@ -2932,7 +2939,8 @@ my $cmd_orig=$cmd;
     $cmd .="&transition=$transit" if( $transit );
 
     Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd";#4
-    my $comp = $URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen} ];
+   # Log3 $name,0,"[Shelly_Set] $name ".$hash->{props}{namespace}."  ".($hash->{props}{gen}?1:0);
+    my $comp = $URLnamespaces{ $hash->{props}{namespace} }[ ($hash->{props}{gen}?1:0) ];
     if( $hash->{props}{gen}>=1 ){ #Gen2+
         # translate Gen1-commands to Gen2
         $cmd =~ s/\?/\&/g;
