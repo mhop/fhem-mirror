@@ -25687,7 +25687,7 @@ sub _aiFannApplyBiasCorrection {
   # --- Bias-Korrektur ---
   # Drift-Bias clampen
   my $drift_bias_max     = 1.0 * $mae;
-  my $clamped_drift_bias = $drift_bias * 0.5;
+  my $clamped_drift_bias = $drift_bias;
   $clamped_drift_bias    =  $drift_bias_max if($clamped_drift_bias >  $drift_bias_max);
   $clamped_drift_bias    = -$drift_bias_max if($clamped_drift_bias < -$drift_bias_max);
 
@@ -25868,7 +25868,8 @@ sub aiFannDetectDrift {
   my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
 
   my $slope_drift = $slope_live / max($slope_model, 0.01);
-  my $bias_drift  = $bias_live  - $bias_model;
+  #my $bias_drift  = $bias_live  - $bias_model;
+  my $bias_drift  = $bias_model - $bias_live;
 
   my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel', 30);
   my $rmse_rel_ratio  = $rmse_rel_model > 0 ? ($rmse_rel_live / $rmse_rel_model) : 1;
