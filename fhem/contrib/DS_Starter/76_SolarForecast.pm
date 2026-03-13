@@ -25665,20 +25665,20 @@ sub _aiFannApplyBiasCorrection {
   my $ds_adapted = 1.0 + ($ds - 1.0) * $drift_weight;
   $ds_adapted    = max (0.70, min(1.10, $ds_adapted));                                          # sanftes Sicherheitsnetz
 
-  # --- Drift-Zonenlogik (entschärft) ---
+  # --- Drift-Zonenlogik ---
   my $drift_zone = '-';
 
-  if (abs($drift_slope) >= 0.9 && $drift_rmse_ratio < 1.5) {
+  if ($drift_slope >= 0.85 && $drift_slope <= 1.15 && $drift_rmse_ratio < 1.5) {
       $drift_zone = 1;
-      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.10;                                           # 10%
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.10;                                           # perfekt -> 10%
   }
-  elsif (abs($drift_slope) >= 0.75 && $drift_rmse_ratio < 2.5) {
+  elsif ($drift_slope >= 0.70 && $drift_slope <= 1.30 && $drift_rmse_ratio < 2.5) {
       $drift_zone = 2;
-      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.40;                                           # 40%
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.40;                                           # leichte Drift -> 40%
   }
   else {
       $drift_zone = 3;
-      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.55;                                           # 55%
+      $ds_adapted = 1.0 + ($ds_adapted - 1.0) * 0.70;                                           # 55%
   }
 
   $ds_adapted = max (0.70, min(1.10, $ds_adapted));                                             # final clamp
@@ -25706,6 +25706,7 @@ sub _aiFannApplyBiasCorrection {
       $ds_adapted = 1.0;
       $drift_zone = '-';      
   }
+  
   $res = $res * $ds_adapted;                                                                    
   
   # --- Peak-Schutz: nur Grundlast korrigieren ---                                              # Wenn kein RefLevel oder val deutlich drüber liegt -> keine Korrektur.
@@ -25808,8 +25809,7 @@ sub aiFannDetectDrift {
       $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
       return $flag;
   }
-
-  #my @tail_idx   = @indices[-$window .. -1];       
+      
   my @tail_idx = @post_train_idx[-$window .. -1];
 
   my (@targets, @preds, @abs_errors);
@@ -25840,13 +25840,12 @@ sub aiFannDetectDrift {
 
 
   # --- Basis-Metriken ---
-  my $mae_live      = sum (@abs_errors) / $n;
-  my $rmse_live     = sqrt(sum(map { $_**2 } @abs_errors) / $n);
+  my $mae_live  = sum (@abs_errors) / $n;
+  my $rmse_live = sqrt(sum(map { $_**2 } @abs_errors) / $n);
   
-  my $median        = medianArray (\@targets) || 1;
-  my @sorted        = sort { $a <=> $b } @targets;
+  my $median    = medianArray (\@targets) || 1;
+  my @sorted    = sort { $a <=> $b } @targets;
 
-  
   my $rmse_rel_live = ($rmse_live / $median) * 100;
   my $mae_model     = AiNeuralVal ($name, $fanntyp, 'Mae', 1) || 1;
   my $drift_score   = $mae_live / $mae_model;
@@ -25867,7 +25866,8 @@ sub aiFannDetectDrift {
   
   my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
   my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
-  my $slope_drift = $slope_live - $slope_model;
+
+  my $slope_drift = $slope_live / max($slope_model, 0.01);
   my $bias_drift  = $bias_live  - $bias_model;
 
   my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel', 30);
