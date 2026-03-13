@@ -25617,12 +25617,12 @@ return $denorm_val;
 sub _aiFannApplyBiasCorrection {
   my ($name, $fanntyp, $hod, $val_predict, $targetref) = @_;
 
-  my $rmse_rel         = AiNeuralVal ($name, $fanntyp, 'RmseRel',         100);
-  my $mae              = AiNeuralVal ($name, $fanntyp, 'Mae',             100);
-  my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',      1.0);
-  my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',       0.0);
-  my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRatio',  1.0);
-  my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',     0);
+  my $rmse_rel         = AiNeuralVal ($name, $fanntyp, 'RmseRel',           100);
+  my $mae              = AiNeuralVal ($name, $fanntyp, 'Mae',               100);
+  my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',        1.0);
+  my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',         0.0);
+  my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio', 1.0);
+  my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',       0);
   
   my $bias             = AiNeuralVal ($name, $fanntyp, 'ModelBias',              500);
   my $slope            = AiNeuralVal ($name, $fanntyp, 'ModelSlope',               0);
