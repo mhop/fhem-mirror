@@ -15,7 +15,7 @@
 # Copyright notice
 #
 # (c) 2019 Harald Schmitz (70_Pylontech.pm)
-# (c) 2023 - 2024 Heiko Maaz
+# (c) 2023 - 2026 Heiko Maaz
 #
 # This script is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -121,6 +121,7 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "1.2.2"  => "14.03.2026 _composeAddr: bug fix addressing batteries with address 9 and above ",
   "1.2.1"  => "29.12.2024 manageUpdate: use random time delay ",
   "1.2.0"  => "05.10.2024 _composeAddr: bugfix of effective battaery addressing ",
   "1.1.0"  => "25.08.2024 manage time shift for active gateway connections of all defined  devices ",
@@ -1469,15 +1470,20 @@ return $cmd;
 #    ADR = 0x07 + 0x10*3 = 0x37; INFO of COMMAND = ADR = 0x37
 ###############################################################
 sub _composeAddr {
-   my $hash = shift;
-   
-   my $ba = sprintf "%02x", ($hash->{HELPER}{BATADDRESS} + 1);                          # Master startet mit "02"
-   my $ga = sprintf "%02x", $hash->{HELPER}{GROUP};                    
-   my $ad = sprintf "%02x", (hex ($ga) * hex (10) + hex ($ba));
-   
-   my $name  = $hash->{NAME};
-   Log3 ($name, 5, "$name - Addressing (HEX) - Bat: $ba, Group: $ga, effective Bat address: $ad");
-   
+  my $hash = shift;
+
+  my $ba_num = $hash->{HELPER}{BATADDRESS} + 1;   # n (Master startet mit "02")
+  my $ga_num = $hash->{HELPER}{GROUP};            # m
+
+  my $adr_num = $ba_num + 0x10 * $ga_num;         # ADR = n + 0x10*m
+  my $ad      = sprintf "%02X", $adr_num;
+
+  my $name = $hash->{NAME};
+  my $ba_hex = sprintf "%02X", $ba_num;
+  my $ga_hex = sprintf "%02X", $ga_num;
+
+  Log3 ($name, 5, "$name - Addressing (HEX) - Bat: $ba_hex, Group: $ga_hex, effective Bat address: $ad");
+
 return $ad;
 }
 
