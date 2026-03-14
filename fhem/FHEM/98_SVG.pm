@@ -1344,7 +1344,8 @@ SVG_digestConf($$)
   my (@lAxis,@lTitle,@lType,@lStyle,@lWidth);
   my $i;
   $i = 0; $plot =~ s/ axes (\w+)/$lAxis[$i++]=$1;" axes $1"/gse;
-  $i = 0; $plot =~ s/ title '([^']*)'/$lTitle[$i++]=$1;" title '$1'"/gse;
+  $i = 0; $plot =~ s/( (no)?title( '([^']*)')?)/$lTitle[$i++]=defined($4)?$4:"";
+                        $1/gse;
   $i = 0; $plot =~ s/ with ([\w+:.]+)/$lType[$i++]=$1;" with $1"/gse;
   $i = 0; $plot =~ s/ ls (\w+)/$lStyle[$i++]=$1;" ls $1"/gse;
   $i = 0; $plot =~ s/ lw ([\w.]+)/$lWidth[$i++]=$1;" lw $1"/gse;
