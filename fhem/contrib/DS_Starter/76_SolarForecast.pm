@@ -6754,23 +6754,25 @@ sub __getaiFannState {            ## no critic "not used"
   my $ars  = CurrentVal  ($name, 'conNNGetResultState',      '-');
   my $agt  = CurrentVal  ($name, 'conNNLastGetResultTime',    '');
   my $rtt  = CircularVal ($name, 99, 'conNNRuntimeTrain',    '-');         
-  $rtt     = sprintf "%0.0f", $rtt if(isNumeric($rtt)); 
+  $rtt     = round0 ($rtt) if(isNumeric($rtt)); 
            
-  $valstd = sprintf "%0.6f", $valstd if($valstd ne '-');
-  $valavg = sprintf "%0.6f", $valavg if($valavg ne '-');
-  $tramse = sprintf "%0.6f", $tramse if($tramse ne '-');
-  $valmse = sprintf "%0.6f", $valmse if($valmse ne '-');
-  $conmae = sprintf "%0.2f", $conmae if($conmae ne '-');
-  $comdae = sprintf "%0.2f", $comdae if($comdae ne '-');
-  $cormse = sprintf "%0.2f", $cormse if($cormse ne '-');
-  $comape = sprintf "%0.2f", $comape if($comape ne '-');
-  $codape = sprintf "%0.2f", $codape if($codape ne '-');
-  $conr2  = sprintf "%0.2f", $conr2  if($conr2  ne '-');
-  $bias   = sprintf "%0.0f", $bias   if($bias   ne '-');
-  $slope  = sprintf "%0.1f", $slope  if($slope  ne '-');
-  $tgtmax = sprintf "%0.0f", $tgtmax if($tgtmax ne '-');
+  $valstd      = round6 ($valstd)      if($valstd      ne '-');
+  $valavg      = round6 ($valavg)      if($valavg      ne '-');
+  $tramse      = round6 ($tramse)      if($tramse      ne '-');
+  $valmse      = round6 ($valmse)      if($valmse      ne '-');
+  $conmae      = round2 ($conmae)      if($conmae      ne '-');
+  $comdae      = round2 ($comdae)      if($comdae      ne '-');
+  $cormse      = round2 ($cormse)      if($cormse      ne '-');
+  $comape      = round2 ($comape)      if($comape      ne '-');
+  $codape      = round2 ($codape)      if($codape      ne '-');
+  $conr2       = round2 ($conr2)       if($conr2       ne '-');
+  $bias        = round0 ($bias)        if($bias        ne '-');
+  $slope       = round1 ($slope)       if($slope       ne '-');
+  $tgtmax      = round0 ($tgtmax)      if($tgtmax      ne '-');
+  $bias_recal  = round0 ($bias_recal)  if($bias_recal  ne '-');
+  $slope_recal = round1 ($slope_recal) if($slope_recal ne '-');
   
-  my $pvpeak = sprintf "%0.0f", ($aspeak * AIASPEAKSFAC);
+  my $pvpeak = round0 ($aspeak * AIASPEAKSFAC);
   
   my $tgt      = '';
   my $headline = '';
@@ -11776,6 +11778,7 @@ sub _transferInverterValues {
   my $pvsum        = 0;                                                 # Summe aktuelle PV aller Inverter
   my $ethishoursum = 0;                                                 # Summe Erzeugung akt. Stunde aller Inverter
   my $hr_chg_diff  = 0;                                                 # Summe von Stundenwechsel-Differenzen etotal
+  my $pvInvCapSum  = 0;                                                 # Summe Capacity PV-Wechselrichter + Solar-Ladegeräte
 
   for my $in (1..MAXINVERTER) {
       $in = sprintf "%02d", $in;
@@ -11839,6 +11842,8 @@ sub _transferInverterValues {
               $pvin                   = ReadingsNum ($indev, $pviread, 0) * $pviuf;
               $pvin                   = $pvin <= 0 ? 0 : round0 ($pvin);
           }
+      
+          $pvInvCapSum += $h->{capacity};                                                               # Inverter Capa mit PV Generatoren summieren
       }
 
       my ($ethishour, $etotsvd);
@@ -11897,21 +11902,21 @@ sub _transferInverterValues {
           $warn = ' (WARNING invalid real PV occured - see Logfile)';
       }
 
-      $data{$name}{inverters}{$in}{ipvin}       = $pvin;                                         # aktuelle DC PV-Eingangsleistung
-      $data{$name}{inverters}{$in}{ipvout}      = $pvout;                                        # aktuelle Leistung aus PV-Erzeugung, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
-      $data{$name}{inverters}{$in}{ipac2dc}     = $pac2dc;                                       # aktuelle Leistung AC->DC
-      $data{$name}{inverters}{$in}{ipdc2ac}     = $pdc2ac;                                       # aktuelle Leistung DC->AC
-      $data{$name}{inverters}{$in}{ietotal}     = $etotal;                                       # aktuellen etotal des WR speichern
-      $data{$name}{inverters}{$in}{iname}       = $indev;                                        # Name des Inverterdevices
-      $data{$name}{inverters}{$in}{ialias}      = AttrVal ($indev, 'alias', $indev);             # Alias Inverter
-      $data{$name}{inverters}{$in}{invertercap} = $h->{capacity}  if(defined $h->{capacity});    # optionale Angabe max. WR-Leistung
-      $data{$name}{inverters}{$in}{ilimit}      = $h->{limit} // 100;                            # Wirkleistungsbegrenzung
-      $data{$name}{inverters}{$in}{iicon}       = $h->{icon}      if($h->{icon});                # Icon des Inverters
-      $data{$name}{inverters}{$in}{istrings}    = $strings;                                      # dem Inverter zugeordnete Strings | none
-      $data{$name}{inverters}{$in}{itype}       = $itype;                                        # Inverter Arbeitsvariante
-      $data{$name}{inverters}{$in}{iasynchron}  = $h->{asynchron} if($h->{asynchron});           # Inverter Mode
-      $data{$name}{inverters}{$in}{ifeed}       = $feed;                                         # Eigenschaften der Energielieferung
-      $data{$name}{inverters}{$in}{isource}     = $source;                                       # Eigenschaften des Energiebezugs, normal pv
+      $data{$name}{inverters}{$in}{ipvin}       = $pvin;                                            # aktuelle DC PV-Eingangsleistung
+      $data{$name}{inverters}{$in}{ipvout}      = $pvout;                                           # aktuelle Leistung aus PV-Erzeugung, Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
+      $data{$name}{inverters}{$in}{ipac2dc}     = $pac2dc;                                          # aktuelle Leistung AC->DC
+      $data{$name}{inverters}{$in}{ipdc2ac}     = $pdc2ac;                                          # aktuelle Leistung DC->AC
+      $data{$name}{inverters}{$in}{ietotal}     = $etotal;                                          # aktuellen etotal des WR speichern
+      $data{$name}{inverters}{$in}{iname}       = $indev;                                           # Name des Inverterdevices
+      $data{$name}{inverters}{$in}{ialias}      = AttrVal ($indev, 'alias', $indev);                # Alias Inverter
+      $data{$name}{inverters}{$in}{invertercap} = $h->{capacity};                                   # Angabe max. WR-Leistung
+      $data{$name}{inverters}{$in}{ilimit}      = $h->{limit} // 100;                               # Wirkleistungsbegrenzung
+      $data{$name}{inverters}{$in}{istrings}    = $strings;                                         # dem Inverter zugeordnete Strings | none
+      $data{$name}{inverters}{$in}{itype}       = $itype;                                           # Inverter Arbeitsvariante
+      $data{$name}{inverters}{$in}{iasynchron}  = $h->{asynchron} if($h->{asynchron});              # Inverter Mode
+      $data{$name}{inverters}{$in}{iicon}       = $h->{icon}      if($h->{icon});                   # Icon des Inverters
+      $data{$name}{inverters}{$in}{ifeed}       = $feed;                                            # Eigenschaften der Energielieferung
+      $data{$name}{inverters}{$in}{isource}     = $source;                                          # Eigenschaften des Energiebezugs, normal pv
 
       $pvsum        += $pvout if($source eq 'pv');
       $ethishoursum += $ethishour;
@@ -11925,8 +11930,9 @@ sub _transferInverterValues {
   storeReading ('Current_PV', $pvsum.' W');
   storeReading ('Today_Hour'.$hod.'_PVreal', $ethishoursum.' Wh'.$warn);
 
-  $data{$name}{circular}{$hod}{pvrl} = $ethishoursum;                                                           # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
-
+  $data{$name}{circular}{$hod}{pvrl}      = $ethishoursum;                                                      # Ringspeicher PV real Forum: https://forum.fhem.de/index.php/topic,117864.msg1133350.html#msg1133350
+  $data{$name}{current}{pvInverterCapSum} = $pvInvCapSum;
+  
   push @{$data{$name}{current}{genslidereg}}, $pvsum;                                                           # Schieberegister PV Erzeugung
   limitArray ($data{$name}{current}{genslidereg}, SLIDENUMMAX);
 
@@ -13605,7 +13611,7 @@ sub _batChargeMgmt {
       my $lowSocwh    = ___batSocPercentToWh ($batinstcap, $lowSoc);                              # lowSoC in Wh
       my $socwh       = round0 (___batSocPercentToWh ($batinstcap, $csoc));                       # aktueller SoC in Wh
 
-      my $whneed      = $goalwh - $socwh;
+      my $whneed      = max (0, ($goalwh - $socwh));
 
       ## Zeitfenster für aktives Lademanagement ermitteln
       #####################################################
@@ -13776,7 +13782,7 @@ sub _batChargeMgmt {
 
           ## Fortschreibung
           ###################
-          $whneed = $goalwh - $socwh;
+          $whneed = max (0, ($goalwh - $socwh));
 
           ## Speicherung und Readings erstellen LR
           ##########################################
@@ -14016,7 +14022,7 @@ sub __batChargeOptTargetPower {
           
           $remainingSurp = max ($remainingSurp, 0);
           my $goalwh     = $hsurp->{$hod}{$sbn}{goalwh};                                                         # Ladeziel
-          my $runwhneed  = $goalwh - $runwh;
+          my $runwhneed  = max (0, ($goalwh - $runwh));
           my $achievable = 1;
 
           if ($runwhneed > 0 && $remainingSurp < ($runwhneed / $befficiency)) {                                  # Erreichbarkeit des Ziels (benötigte Ladeenergie total) prüfen
@@ -14098,7 +14104,7 @@ sub __batChargeOptTargetPower {
           my $pneedmin = $limpower * (1 + $otpMargin / 100);                                                     # optPower: Sicherheitsaufschlag
 
           if ($strategy eq 'smartPower') {
-              $pneedmin = ___batAdjustPowerByMargin ($limpower,                                                # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
+              $pneedmin = ___batAdjustPowerByMargin ($limpower,                                                  # smartPower: Sicherheitsaufschlag abfallend proportional zum linearen Überschuss
                                                      $bpinmax,
                                                      $runwhneed,
                                                      $otpMargin,
@@ -23130,7 +23136,8 @@ sub aiFannCreateConTrainData {
   my $debug = $paref->{debug}; 
 
   my ($msg, $serial, $regv);
-  my $aspeak = CurrentVal ($name, 'allstringspeak', 0);                                   # PV Anlage Peakleistung (W)
+  my $aspeak      = CurrentVal ($name, 'allstringspeak',   0);                              # PV Anlage Peakleistung (W)
+  my $pvInvCapSum = CurrentVal ($name, 'pvInverterCapSum', 0);                              # Summe Inverterleistungen mit PV Generatoren
   
   if (!$aspeak ) {
       $msg = 'No peak output is provided by the PV system';
@@ -23141,9 +23148,11 @@ sub aiFannCreateConTrainData {
                                            }
                                          ), "");
       return $serial;
-  }  
+  }
 
-  my $cst = [gettimeofday];                                                               # Training Startzeit
+  my $pv_max_limit = min ($aspeak, $pvInvCapSum);
+
+  my $cst = [gettimeofday];                                                                 # Training Startzeit
   
   my (@training_data, @targets, @rr1cs, @skipped, @temp_comfort_norm_values);                                                   
   my (@delta_pos_values, @delta_neg_values, @delta_values, @sunalt_norm_values, @weekday_values);                    
@@ -23166,7 +23175,7 @@ sub aiFannCreateConTrainData {
   my $haf               = CurrentVal ($name, 'aiConActFunc',       'SIGMOID');            # Hidden Activation Function
   my $oaf               = 'LINEAR';                                                       # Output Activation Function 
   my $mse_error         = 0.001;                                                          # gewünschter Fehler (MSE-Schwelle)
-  my $pvpeak            = $aspeak * AIASPEAKSFAC;                                         # Peak Sicherheitsaufschlag
+  my $pvpeak            = $pv_max_limit * AIASPEAKSFAC;                                   # Peak mit Sicherheitsaufschlag
   my $range             = _aiFannAfNormRange ($haf);
   my $fanntyp           = 'con';                                                          # FANN Verwendungsart 'consumption' Prognose
   
@@ -24142,13 +24151,13 @@ sub aiFannTrainstartAndRetry {
           }
 
           if ($debug =~ /aiProcess/xs) {
-              $best_modelslope_final = sprintf "%0.2f", $best_modelslope_final;
-              $best_modelbias_final  = sprintf "%0.2f", $best_modelbias_final;
-              $best_val_mse_final    = sprintf "%0.6f", $best_val_mse_final;
-              $best_val_mae_final    = sprintf "%0.2f", $best_val_mae_final;
-              $best_val_medae_final  = sprintf "%0.2f", $best_val_medae_final;
-              $best_r2_final         = sprintf "%0.2f", $best_r2_final;
-              $best_rmse_final       = sprintf "%0.2f", $best_rmse_final;
+              $best_modelslope_final = round2 ($best_modelslope_final);
+              $best_modelbias_final  = round2 ($best_modelbias_final);
+              $best_val_mse_final    = round6 ($best_val_mse_final);
+              $best_val_mae_final    = round2 ($best_val_mae_final);
+              $best_val_medae_final  = round2 ($best_val_medae_final);
+              $best_r2_final         = round2 ($best_r2_final);
+              $best_rmse_final       = round2 ($best_rmse_final);
               
               Log3 ($name, 1, "$name DEBUG> Best model after retries comes from Attempt=$best_attempt with: \n".
                                             "Seed=$best_seed, \n".
@@ -24686,7 +24695,7 @@ sub aiFannTrain {
   # relative RMSE 
   my @targets_wh    = map { _aiFannDenormMinMaxValue ($_->[0], $minval, $maxval) } @test_targets;
   my $target_median = medianArray (\@targets_wh); 
-  my $rmse_rel      = sprintf "%0.0f", (($rmse / $target_median) * 100);                    # relative RMSE in %
+  my $rmse_rel      = round0 ($rmse / $target_median * 100);                                # relative RMSE in %
   
   #my $rmse_rating;
   #if    ($rmse_rel < 20)  { $rmse_rating = "excellent"; }                                   # extrem selten
@@ -25831,8 +25840,6 @@ sub aiFannDetectDrift {
       push @slope_list, ($p / $a) if($a != 0);
       push @bias_list,  ($p - $a);
   }
-
-  my $n = @abs_errors || return;
   
   # --- Varianz berechnen
   my $slope_var = _aiSampleVariance (\@slope_list);
@@ -25840,8 +25847,9 @@ sub aiFannDetectDrift {
 
 
   # --- Basis-Metriken ---
-  my $mae_live  = sum (@abs_errors) / $n;
-  my $rmse_live = sqrt(sum(map { $_**2 } @abs_errors) / $n);
+  my $n_err     = @abs_errors || return;
+  my $mae_live  = sum (@abs_errors) / $n_err;
+  my $rmse_live = sqrt(sum(map { $_**2 } @abs_errors) / $n_err);
   
   my $median    = medianArray (\@targets) || 1;
   my @sorted    = sort { $a <=> $b } @targets;
@@ -25852,6 +25860,7 @@ sub aiFannDetectDrift {
 
   # --- Slope/Bias Live ---
   my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);
+  my $n_tgt = scalar @targets;                                                             # Anzahl der gültigen Datenpunkte für Regression
     
   for my $i (0 .. $#targets) {
       $sum_x  += $targets[$i];
@@ -25860,9 +25869,9 @@ sub aiFannDetectDrift {
       $sum_xx += $targets[$i] * $targets[$i];
   }
 
-  my $den         = $n * $sum_xx - $sum_x * $sum_x;
-  my $slope_live  = $den != 0 ? ($n * $sum_xy - $sum_x * $sum_y) / $den : 0;
-  my $bias_live   = ($sum_y - $slope_live * $sum_x) / $n;
+  my $den         = $n_tgt * $sum_xx - $sum_x * $sum_x;
+  my $slope_live  = $den != 0 ? ($n_tgt * $sum_xy - $sum_x * $sum_y) / $den : 0;
+  my $bias_live   = ($sum_y - $slope_live * $sum_x) / $n_tgt;
   
   my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
   my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
@@ -25890,47 +25899,33 @@ sub aiFannDetectDrift {
       $peak_active++      if($a > $peak_threshold);
   }
 
-  my $sem_ratio  = $semantics_active / $n;
-  my $peak_ratio = $peak_active / $n;
+  my $sem_ratio  = $semantics_active / $n_tgt;
+  my $peak_ratio = $peak_active / $n_tgt;
 
   # --- Ampel-Logik (modellskaliert) ---
-  if (
-      $drift_score      > 1.8  &&
-      $rmse_rel_ratio   > 2.0  &&
-      $slope_drift_rel  > 0.35 &&
-      $bias_drift_norm  > 1.5
-  ) {
+  my $drift_index = 
+      0.45 * min (3.0, $drift_score)     +                                      # stärkster Indikator
+      0.30 * min (3.0, $rmse_rel_ratio)  +                                      # Peaks / Fehlerexplosionen
+      0.15 * min (2.0, $slope_drift_rel) +                                      # echte Dynamikdrift
+      0.10 * min (2.0, $bias_drift_norm);                                       # additive Verschiebung
+
+  if ($drift_index > 3.2) {
       $flag = 'severe';
-  }
-  elsif (
-      $drift_score      > 1.5  &&
-      $rmse_rel_ratio   > 1.6  &&
-      $slope_drift_rel  > 0.25 &&
-      $bias_drift_norm  > 1.0
-  ) {
+  } 
+  elsif ($drift_index > 2.3) {
       $flag = 'moderate';
   }
-  elsif (
-      $drift_score      > 1.2  &&
-      $rmse_rel_ratio   > 1.3  &&
-      $slope_drift_rel  > 0.15 &&
-      $bias_drift_norm  > 0.5
-  ) {
+  elsif ($drift_index > 1.5) {
       $flag = 'mild';
   }
-  elsif (
-      $drift_score      > 1.05 &&
-      $rmse_rel_ratio   > 1.1  &&
-      $slope_drift_rel  > 0.10 &&
-      $bias_drift_norm  > 0.3
-  ) {
+  elsif ($drift_index > 1.1) {
       $flag = 'low';
   }
-  elsif (
-      ($drift_score    > 1.02 && $drift_score    <= 1.05) ||
-      ($rmse_rel_ratio > 1.05 && $rmse_rel_ratio <= 1.1)
-  ) {
+  elsif ($drift_index > 1.02) {
       $flag = 'very_low';
+  }
+  else {
+      $flag = 'stable';
   }
 
 
