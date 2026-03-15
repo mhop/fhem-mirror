@@ -140,7 +140,7 @@ f18_menu()
 function
 f18_stt()
 {
-  if(!window.webkitSpeechRecognition)
+  if(!window.SpeechRecognition)
     return FW_okDialog("SpeechRecognition Interface missing");
   var stt = new SpeechRecognition();
   stt.continuous = true;
@@ -155,7 +155,7 @@ f18_stt()
     for(var i1=0; i1<event.results.length; i1++)
       txt += event.results[i1][0].transcript;
     $("#f18_stt").html(txt);
-  }
+  };
 
   $("#FW_okDialog").remove();
   var div = $("<div id='FW_okDialog'>");
