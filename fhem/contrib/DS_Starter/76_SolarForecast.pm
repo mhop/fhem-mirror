@@ -25570,8 +25570,8 @@ sub aiFannGetConResult {
       # Daten speichern
       ###################
       $data{$name}{nexthours}{$nhstr}{conbiascorr} = $tc;
-      $data{$name}{nexthours}{$nhstr}{conaifc} = $prediction;
-      $data{$name}{nexthours}{$nhstr}{confc}   = $confc_final;                               # hybriden prognostizierten Verbrauch speichern
+      $data{$name}{nexthours}{$nhstr}{conaifc}     = $prediction;
+      $data{$name}{nexthours}{$nhstr}{confc}       = $confc_final;                           # hybriden prognostizierten Verbrauch speichern
           
       if (NexthoursVal ($name, $nhstr, 'today', 0)) {                                        # nur Werte des aktuellen Tags speichern
           $data{$name}{circular}{$hod}{confc} = $confc_final;
@@ -27872,6 +27872,7 @@ sub _listDataPoolNextHours {
       my $temp       = NexthoursVal ($name, $idx, 'temp',           '-');
       my $confc      = NexthoursVal ($name, $idx, 'confc',          '-');
       my $conaifc    = NexthoursVal ($name, $idx, 'conaifc',        '-');
+      my $conbiascor = NexthoursVal ($name, $idx, 'conbiascorr',    '-');
       my $conlegfc   = NexthoursVal ($name, $idx, 'conlegfc',       '-');
       my $confcex    = NexthoursVal ($name, $idx, 'confcEx',        '-');
       my $don        = NexthoursVal ($name, $idx, 'DoN',            '-');
@@ -27903,7 +27904,7 @@ sub _listDataPoolNextHours {
       $sq .= "\n              ";
       $sq .= "pvapifcraw: $pvapifcraw, pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
       $sq .= "\n              ";
-      $sq .= "conlegfc: $conlegfc, conaifc: $conaifc, confc: $confc, confcEx: $confcex, weatherid: $wid, wcc: $wcc, rr1c: $rr1c";
+      $sq .= "conlegfc: $conlegfc, conaifc: $conaifc, confc: $confc, conbiascorr: $conbiascor, confcEx: $confcex, weatherid: $wid, wcc: $wcc, rr1c: $rr1c";
       $sq .= "\n              ";
       $sq .= "temp: $temp, windspeed: $windspeed, windspeed_fast: $wind_fast, rad1h: $rad1h, sunaz: $sunaz, sunalt: $sunalt, DoN: $don";
       $sq .= "\n              ";
@@ -33201,6 +33202,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>aihit</b>           </td><td>delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)              </td></tr>
             <tr><td> <b>conaifc</b>         </td><td>energy consumption (Wh) predicted by AI                                                </td></tr>
+            <tr><td> <b>conbiascorr</b>     </td><td>combined bias and drift correction of the AI energy consumption forecast (Wh)          </td></tr>
             <tr><td> <b>conlegfc</b>        </td><td>conventional energy consumption forecast without AI (Wh)                               </td></tr>
             <tr><td> <b>confc</b>           </td><td>expected energy consumption including the shares of registered consumers (Wh)          </td></tr>
             <tr><td> <b>confcEx</b>         </td><td>expected energy consumption without consumer shares with set key exconfc=1 (Wh)        </td></tr>
@@ -36197,6 +36199,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>aihit</b>           </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                 </td></tr>
             <tr><td> <b>conaifc</b>         </td><td>durch KI prognostizierter Energieverbrauch (Wh)                                            </td></tr>
+            <tr><td> <b>conbiascorr</b>     </td><td>kombinierte Bias- und Driftkorrektur der KI Verbrauchsprognose (Wh)                        </td></tr>
             <tr><td> <b>conlegfc</b>        </td><td>herkömmlich ohne KI prognostizierter Energieverbrauch (Wh)                                 </td></tr>
             <tr><td> <b>confc</b>           </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher (Wh)           </td></tr>
             <tr><td> <b>confcEx</b>         </td><td>erwarteter Energieverbrauch ohne Anteile Verbraucher mit gesetztem Schlüssel exconfc=1 (Wh)</td></tr>
