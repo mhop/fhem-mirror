@@ -26028,7 +26028,7 @@ sub aiFannDetectDrift {
   }
   
   
-  $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $block_reason ? $block_reason : $flag;
+  $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $block_reason ? 'recalibration blocked: '.$block_reason : $flag;
   
   if ($debug =~ /aiProcess/xs) {
       Log3 ($name, 1, sprintf (
