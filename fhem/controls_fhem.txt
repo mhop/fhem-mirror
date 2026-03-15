@@ -1,6 +1,6 @@
-REV 30948
+REV 30954
 DIR unused
-UPD 2026-03-11_07:45:03 454406 ./CHANGED
+UPD 2026-03-15_07:45:03 454484 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2026-02-23_07:45:03 47734 ./MAINTAINER.txt
 UPD 2026-01-30_07:45:03 47178 ./configDB.pm
@@ -358,7 +358,7 @@ UPD 2016-03-11_07:45:12 7152 FHEM/70_PushNotifier.pm
 UPD 2015-10-31_07:45:12 23797 FHEM/70_Pushbullet.pm
 UPD 2026-02-07_07:45:03 76510 FHEM/70_Pushover.pm
 UPD 2020-02-08_07:45:04 25433 FHEM/70_Pushsafer.pm
-UPD 2024-12-30_07:45:03 96929 FHEM/70_PylonLowVoltage.pm
+UPD 2026-03-15_07:45:03 97098 FHEM/70_PylonLowVoltage.pm
 UPD 2015-07-28_14:05:31 7500 FHEM/70_SCIVT.pm
 UPD 2021-10-02_07:45:03 20117 FHEM/70_SISPM.pm
 UPD 2016-01-29_07:45:11 16312 FHEM/70_SML.pm
@@ -526,7 +526,7 @@ UPD 2020-06-22_07:45:03 25785 FHEM/98_ModbusTrovis5576.pm
 UPD 2022-04-15_07:45:02 63647 FHEM/98_PHC.pm
 UPD 2025-01-13_07:45:03 39885 FHEM/98_PID20.pm
 UPD 2024-06-20_07:45:03 33013 FHEM/98_RandomTimer.pm
-UPD 2026-02-07_07:45:03 108346 FHEM/98_SVG.pm
+UPD 2026-03-15_07:45:03 108385 FHEM/98_SVG.pm
 UPD 2017-05-04_07:45:02 52568 FHEM/98_THRESHOLD.pm
 UPD 2018-03-19_07:45:04 49956 FHEM/98_TRAFFIC.pm
 UPD 2024-09-09_07:45:03 83365 FHEM/98_Text2Speech.pm
@@ -769,8 +769,8 @@ UPD 2026-03-11_07:45:10 5436834 docs/commandref.html
 UPD 2026-03-11_07:45:14 3435779 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-03-14_07:45:16 327962 docs/commandref_modular.html
-UPD 2026-03-14_07:45:18 339802 docs/commandref_modular_DE.html
+UPD 2026-03-15_07:45:16 327962 docs/commandref_modular.html
+UPD 2026-03-15_07:45:17 339802 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2514,8 +2514,8 @@ UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2024-10-27_07:45:03 5964 www/pgm2/defaultCommon.css
 UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
-UPD 2026-02-02_07:45:04 32695 www/pgm2/f18.js
-UPD 2025-03-29_07:45:04 10122 www/pgm2/f18style.css
+UPD 2026-03-15_07:45:03 35125 www/pgm2/f18.js
+UPD 2026-03-15_07:45:03 10225 www/pgm2/f18style.css
 UPD 2026-01-04_07:45:04 1302 www/pgm2/fbtam.js
 UPD 2023-03-18_07:45:02 8651 www/pgm2/fhemdoc_modular.js
 UPD 2026-02-03_07:45:04 74848 www/pgm2/fhemweb.js
@@ -2584,7 +2584,7 @@ UPD 2015-07-28_14:05:34 3636 www/pgm2/ios7touchpadfloorplanstyle.css
 UPD 2015-07-28_14:05:34 230 www/pgm2/ios7touchpadstyle.css
 UPD 2015-07-28_14:05:34 30163 www/pgm2/jquery-ui.min.css
 UPD 2015-07-28_14:05:34 240427 www/pgm2/jquery-ui.min.js
-UPD 2015-07-28_14:05:34 11892 www/pgm2/jquery.knob.min.js
+UPD 2026-03-15_07:45:03 10795 www/pgm2/jquery.knob.min.js
 UPD 2015-07-28_14:05:34 95931 www/pgm2/jquery.min.js
 UPD 2017-03-08_07:45:03 4545 www/pgm2/jquery.vticker.min.js
 UPD 2026-02-02_07:45:04 240 www/pgm2/manifest.json
