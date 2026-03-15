@@ -142,13 +142,13 @@ f18_stt()
 {
   if(!window.SpeechRecognition)
     return FW_okDialog("SpeechRecognition Interface missing");
+
   var stt = new SpeechRecognition();
   stt.continuous = true;
-  stt.interimResults = true;
   stt.lang = $("body").attr("data-language") == "EN" ? "en-US":"de-DE";
+
   var doSend = false;
   var txt;
-  stt.start();
 
   stt.onresult = function(e){
     txt='';
@@ -156,10 +156,17 @@ f18_stt()
       txt += event.results[i1][0].transcript;
     $("#f18_stt").html(txt);
   };
+  stt.onaudiostart = function(e){ $("#stt_state").html("Audio started") };
+  stt.onaudioend   = function(e){ $("#stt_state").html("Audio stopped") };
+  stt.onspeechstart= function(e){ $("#stt_state").html("Speech started") };
+  stt.onspeechend  = function(e){ $("#stt_state").html("Speech stopped") };
+  stt.onnomatch    = function(e){ $("#stt_state").html("No match") };
+  stt.onerror      = function(e){ $("#stt_state").html(e.message) };
+  stt.start();
 
   $("#FW_okDialog").remove();
   var div = $("<div id='FW_okDialog'>");
-  $(div).html('<div>Recording</div><div id="f18_stt" '+
+  $(div).html('<div id="stt_state"></div><div id="f18_stt" '+
               'style="min-height:200px;min-width:200px"></div>');
   $("body").append(div);
   var oldPos = $("body").scrollTop();
