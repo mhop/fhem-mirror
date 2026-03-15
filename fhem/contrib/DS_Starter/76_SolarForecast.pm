@@ -163,8 +163,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.3.1"  => "12.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
-                           "change last_presence_check to central 'last_transfer', edit comref, Drift recalculation & lock ",
+  "2.4.0"  => "15.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
+                           "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
+                           "aiFannCreateConTrainData: use new value pvInverterCapSum ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -6694,8 +6695,8 @@ sub __getaiFannState {            ## no critic "not used"
       return $rs;
   }
   
-  my $aspeak   = CurrentVal  ($name, 'allstringspeak',           '-');
   my $hpinst   = CurrentVal  ($name, 'heatpumpInstalled',        '-');                      # WP installiert?
+  my $pvmaxlim = AiNeuralVal ($name, $fanntyp, 'PVMaxLimit',     '?'); 
   my $tgtmin   = AiNeuralVal ($name, $fanntyp, 'MinVal',         '-');              
   my $tgtmax   = AiNeuralVal ($name, $fanntyp, 'MaxVal',         '-');               
   my $dsnum    = AiNeuralVal ($name, $fanntyp, 'NumDatasets',    '-'); 
@@ -6771,8 +6772,7 @@ sub __getaiFannState {            ## no critic "not used"
   $tgtmax      = round0 ($tgtmax)      if($tgtmax      ne '-');
   $bias_recal  = round0 ($bias_recal)  if($bias_recal  ne '-');
   $slope_recal = round1 ($slope_recal) if($slope_recal ne '-');
-  
-  my $pvpeak = round0 ($aspeak * AIASPEAKSFAC);
+  $pvmaxlim    = round0 ($pvmaxlim)    if($pvmaxlim    ne '?');
   
   my $tgt      = '';
   my $headline = '';
@@ -6795,7 +6795,7 @@ sub __getaiFannState {            ## no critic "not used"
   # Modellparameter
   ###################  
   my $model = '<b>=== '.$hqtxt{nmdpar}{$lang}.' ===</b>'."\n\n";                                                                                        # Modellparameter
-  $model   .= "<b>".$hqtxt{nnmlim}{$lang}.":</b> PV=$pvpeak Wh, ".$tgt.": Min=$tgtmin Wh / Max=$tgtmax Wh"."\n";                                        # Normierungsgrenzen, Hausverbrauch/PV-Prognose
+  $model   .= "<b>".$hqtxt{nnmlim}{$lang}.":</b> PV=$pvmaxlim Wh, ".$tgt.": Min=$tgtmin Wh / Max=$tgtmax Wh"."\n";                                  # Normierungsgrenzen, Hausverbrauch/PV-Prognose
   $model   .= (encode("utf8", "<b>".$hqtxt{tradat}{$lang}.":</b> $dsnum ".$hqtxt{dtsets}{$lang}." (Training=$trdnum, Validation=$tednum)"))."\n";       # Trainingsdaten, Datensätze
   $model   .= "<b>".$hqtxt{archit}{$lang}.":</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";                                          # Architektur
   $model   .= "<b>".$hqtxt{hyppar}{$lang}.":</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim"."\n";                                   # Hyperparameter
@@ -23136,10 +23136,10 @@ sub aiFannCreateConTrainData {
   my $debug = $paref->{debug}; 
 
   my ($msg, $serial, $regv);
-  my $aspeak      = CurrentVal ($name, 'allstringspeak',   0);                              # PV Anlage Peakleistung (W)
-  my $pvInvCapSum = CurrentVal ($name, 'pvInverterCapSum', 0);                              # Summe Inverterleistungen mit PV Generatoren
   
-  if (!$aspeak ) {
+  my $pv_max_limit = _aiFannPvMaxLimit ($name);
+
+  if (!$pv_max_limit ) {
       $msg = 'No peak output is provided by the PV system';
       debugLog ($paref, 'aiProcess', "AI FANN - Training aborted: $msg");
 
@@ -23150,7 +23150,7 @@ sub aiFannCreateConTrainData {
       return $serial;
   }
 
-  my $pv_max_limit = min ($aspeak, $pvInvCapSum);
+  $pv_max_limit = $pv_max_limit * AIASPEAKSFAC;                                             # Peak mit Sicherheitsaufschlag
 
   my $cst = [gettimeofday];                                                                 # Training Startzeit
   
@@ -23175,7 +23175,6 @@ sub aiFannCreateConTrainData {
   my $haf               = CurrentVal ($name, 'aiConActFunc',       'SIGMOID');            # Hidden Activation Function
   my $oaf               = 'LINEAR';                                                       # Output Activation Function 
   my $mse_error         = 0.001;                                                          # gewünschter Fehler (MSE-Schwelle)
-  my $pvpeak            = $pv_max_limit * AIASPEAKSFAC;                                   # Peak mit Sicherheitsaufschlag
   my $range             = _aiFannAfNormRange ($haf);
   my $fanntyp           = 'con';                                                          # FANN Verwendungsart 'consumption' Prognose
   
@@ -23228,7 +23227,7 @@ sub aiFannCreateConTrainData {
       my $sunalt    = $rec->{sunalt};
       my $rr1c      = $rec->{rr1c};
       my $con       = $rec->{con};
-      my $pvrl      = clampValue ($rec->{pvrl} // 0, 0, $pvpeak);
+      my $pvrl      = clampValue ($rec->{pvrl} // 0, 0, $pv_max_limit);
       my $wcc       = clampValue ($rec->{wcc}, 0, 100);
       my $temp      = clampValue ($rec->{temp}, -40, 40);
       my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                  # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend'
@@ -23236,16 +23235,16 @@ sub aiFannCreateConTrainData {
       
       # Ableitungen und Normierungen
       ################################
-      my $hour_norm              = ($inthod - 1) / 24;                                  # Stunde des Tages normiert 0..1
-      my $isday                  = $sunalt > 0 ? 1 : 0; 
-      my $sunalt_norm            = _aiFannNormSunalt ($sunalt,    $range);              # Sonnenaltitude symmetrisch oder asymmetriech normalisieren
-      my $wcc_norm               = _aiFannNormWcc    ($wcc,       $range);              # Bewölkung symmetrisch oder asymmetriech normalisieren
-      my $temp_norm              = _aiFannNormTemp   ($temp,      $range);              # Temperatur symmetrisch oder asymmetriech normalisieren
-      my $temp_comfort_norm      = _aiFannNormTemp   ($comftemp,  $range);              # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
-      my $pv_norm                = _aiFannNormPv     ($pvrl,      $pvpeak, $range);     # PV symmetrisch oder asymmetriech normalisieren
-      my $pv_norm_prev           = _aiFannNormPv     ($pvrl_prev, $pvpeak, $range);
-      my $day_hour_norm          = $isday  ? $hour_norm : 0;                            # Tagstunden normiert, sonst 0
-      my $night_hour_norm        = !$isday ? $hour_norm : 0;                            # Nachtstunden normiert, sonst 0  
+      my $hour_norm         = ($inthod - 1) / 24;                                       # Stunde des Tages normiert 0..1
+      my $isday             = $sunalt > 0 ? 1 : 0; 
+      my $sunalt_norm       = _aiFannNormSunalt ($sunalt,    $range);                   # Sonnenaltitude symmetrisch oder asymmetriech normalisieren
+      my $wcc_norm          = _aiFannNormWcc    ($wcc,       $range);                   # Bewölkung symmetrisch oder asymmetriech normalisieren
+      my $temp_norm         = _aiFannNormTemp   ($temp,      $range);                   # Temperatur symmetrisch oder asymmetriech normalisieren
+      my $temp_comfort_norm = _aiFannNormTemp   ($comftemp,  $range);                   # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
+      my $pv_norm           = _aiFannNormPv     ($pvrl,      $pv_max_limit, $range);    # PV symmetrisch oder asymmetriech normalisieren
+      my $pv_norm_prev      = _aiFannNormPv     ($pvrl_prev, $pv_max_limit, $range);
+      my $day_hour_norm     = $isday  ? $hour_norm : 0;                                 # Tagstunden normiert, sonst 0
+      my $night_hour_norm   = !$isday ? $hour_norm : 0;                                 # Nachtstunden normiert, sonst 0  
       
       $pvrl_prev = $pvrl;                                                               # pvrl ist Vorgänger für nächsten loop
       
@@ -23574,6 +23573,7 @@ sub aiFannCreateConTrainData {
   $paref->{haf}               = $haf;
   $paref->{oaf}               = $oaf;
   
+  $paref->{pv_max_limit}      = $pv_max_limit;                            # maximal möglicher PV Ertrag als oberes Limit
   $paref->{minval}            = $targminval;                              # Target Denormalisierungsparameter
   $paref->{maxval}            = $targmaxval;                              # Target Denormalisierungsparameter
   $paref->{rr1min}            = $rr1min;
@@ -24885,6 +24885,7 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRating}     = $weighted_rmse_rating;  
   $data{$name}{$fanntyp.'temp'}{$attempt}{ModelScore}     = $quality_href->{score};
   $data{$name}{$fanntyp.'temp'}{$attempt}{ModelAmpel}     = $quality_href->{ampel};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{PVMaxLimit}     = $paref->{pv_max_limit};
   $data{$name}{$fanntyp.'temp'}{$attempt}{Mape}           = $mape; 
   $data{$name}{$fanntyp.'temp'}{$attempt}{Mdape}          = $mdape; 
   $data{$name}{$fanntyp.'temp'}{$attempt}{R2}             = $r2;
@@ -25234,19 +25235,18 @@ sub _aiFannRetrainIndicator {
 sub aiFannGetConResult {
   my $paref   = shift;
   my $name    = $paref->{name};
-  my $chour   = $paref->{chour};                                                         # aktuelle Stunde (00 .. 23)
+  my $chour   = $paref->{chour};                                                                # aktuelle Stunde (00 .. 23)
   my $debug   = $paref->{debug};
-  my $fanntyp = 'con';                                                                   # FANN Verwendungsart 'consumption' Prognose                   
+  my $fanntyp = 'con';                                                                          # FANN Verwendungsart 'consumption' Prognose                   
   
   my ($msg, $presence);
   
   debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
   $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
   
-  my $aspeak = CurrentVal ($name, 'allstringspeak', undef);                               # PV Anlage Peakleistung (W)
-  my $alpha  = CurrentVal ($name, 'aiConAlpha',         1);                               # Steuerung Hybridmodell
+  my $pv_max_limit = _aiFannPvMaxLimit ($name);
   
-  if (!defined $aspeak) {
+  if (!$pv_max_limit) {
       $msg = 'no peak output is provided by the PV system';
       $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
       debugLog ($paref, 'aiData', "AI FANN - consumption prediction aborted: No peak output is provided by the PV system");
@@ -25254,11 +25254,13 @@ sub aiFannGetConResult {
       return $msg;
   }
   
+  $pv_max_limit         = $pv_max_limit * AIASPEAKSFAC;                                         # Peak Sicherheitsaufschlag
+  
   my $cst               = [gettimeofday];                                                       # Startzeit
   my $haf               = AiNeuralVal ($name, 'con', 'HiddActFunc', 'SIGMOID');                 # Hidden Activation Function
+  my $alpha             = CurrentVal  ($name, 'aiConAlpha', 1);                                 # Steuerung Hybridmodell
   my $oaf               = 'LINEAR';                                                             # Output Activation Function
   my $range             = _aiFannAfNormRange ($haf);
-  my $pvpeak            = $aspeak * AIASPEAKSFAC;                                               # Peak Sicherheitsaufschlag
   my ($hp, $comftemp)   = isHeatPumpUsed ($name);                                               # Consumer Nummer , Solltemp falls WP verwendet
   $comftemp           //= HPCOMFTEMP;                                                           # Solltemperatur WP-Heizung
   
@@ -25347,21 +25349,21 @@ sub aiFannGetConResult {
 
       # Ableitungen und Normierungen
       ################################
-      my $month            = int ((split '-', $starttime)[1]);
-      $weekday             = $hwdmap{$weekday};                                        # Wochentag numerisch (1..7)
-      my $intlegacyconfc   = int ($legacyconfc);
-      my $inthod           = int ($hod);                                               # Stunde des Tages numerisch (1..24)
-      my $hour_norm        = ($inthod - 1) / 24;                                       # Stunde des Tages normiert 0..1   
-      $wcc                 = clampValue (int $wcc,   0, 100);
-      $temp                = clampValue (int $temp, -40, 40);
-      $pv                  = clampValue ($pv, 0, $pvpeak);
+      my $month              = int ((split '-', $starttime)[1]);
+      $weekday               = $hwdmap{$weekday};                                        # Wochentag numerisch (1..7)
+      my $intlegacyconfc     = int ($legacyconfc);
+      my $inthod             = int ($hod);                                               # Stunde des Tages numerisch (1..24)
+      my $hour_norm          = ($inthod - 1) / 24;                                       # Stunde des Tages normiert 0..1   
+      $wcc                   = clampValue (int $wcc,   0, 100);
+      $temp                  = clampValue (int $temp, -40, 40);
+      $pv                    = clampValue ($pv, 0, $pv_max_limit);
       
       my $sunalt_norm        = _aiFannNormSunalt ($sunalt,      $range);                 # Sonnenaltitude normalisieren im Bereich 0..+1      
       my $wcc_norm           = _aiFannNormWcc    ($wcc,         $range);                 # Bewölkung symmetrisch oder asymmetriech normalisieren
       my $temp_norm          = _aiFannNormTemp   ($temp,        $range);                 # Temperatur symmetrisch oder asymmetriech normalisieren
       my $temp_comfort_norm  = _aiFannNormTemp   ($comftemp,    $range);                 # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
-      my $pv_norm            = _aiFannNormPv     ($pv, $pvpeak, $range);                 # PV symmetrisch oder asymmetriech normalisieren
-      my $pv_norm_prev       = _aiFannNormPv     ($pv_prev, $pvpeak, $range); 
+      my $pv_norm            = _aiFannNormPv     ($pv, $pv_max_limit, $range);           # PV symmetrisch oder asymmetriech normalisieren
+      my $pv_norm_prev       = _aiFannNormPv     ($pv_prev, $pv_max_limit, $range); 
       my $day_hour_norm      = $isday  ? $hour_norm : 0;                                 # Tagstunden normiert, sonst 0
       my $night_hour_norm    = !$isday ? $hour_norm : 0;                                 # Nachtstunden normiert, sonst 0 
       
@@ -25537,7 +25539,7 @@ sub aiFannGetConResult {
       # Prognose + BiasKorrektur abfragen
       #####################################
       my $denorm_val                                 = _aiFannPredict             ($name, $fanntyp, \@new_input); 
-      my ($prediction, $bc, $bias_zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $hod, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
+      my ($prediction, $tc, $bias_zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $hod, $denorm_val, $targetref);                     # gewichtete Bias-Korrektur anwenden
       
       my $nngrst = CurrentVal ($name, $fanntyp.'NNGetResultState', 'ok');
       
@@ -25549,7 +25551,7 @@ sub aiFannGetConResult {
       
       $denorm_val = round0 ($denorm_val);
       $prediction = round0 ($prediction);
-      $bc         = round0 ($bc);
+      $tc         = round0 ($tc);
       
       # Fortschreibung der Arrays!
       ##############################
@@ -25562,11 +25564,12 @@ sub aiFannGetConResult {
       my $confc_final = $alpha * $prediction + (1 - $alpha) * $intlegacyconfc;
       $confc_final    = round0 ($confc_final);
       
-      debugLog ($paref, 'aiData', "AI FANN con fc - $starttime, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$bc Wh, bias/drift zone=$bias_zone/$drift_zone)");
+      debugLog ($paref, 'aiData', "AI FANN con fc - $starttime, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)");
       
       
       # Daten speichern
       ###################
+      $data{$name}{nexthours}{$nhstr}{conbiascorr} = $tc;
       $data{$name}{nexthours}{$nhstr}{conaifc} = $prediction;
       $data{$name}{nexthours}{$nhstr}{confc}   = $confc_final;                               # hybriden prognostizierten Verbrauch speichern
           
@@ -25644,7 +25647,6 @@ sub _aiFannApplyBiasCorrection {
   $bias  = $bias_recal  if(defined $bias_recal);
   $slope = $slope_recal if(defined $slope_recal);
   
-  my $bc         = 0;
   my $res        = $val_predict;
   my $bias_ratio = abs($bias) / (max($mae, 0.1));
 
@@ -25750,9 +25752,9 @@ sub _aiFannApplyBiasCorrection {
       }  
   }                                                                                             
 
-  $bc = $res - $val_predict;
+  my $corr_val = $res - $val_predict;
 
-return ($res, $bc, $bias_zone, $drift_zone);
+return ($res, $corr_val, $bias_zone, $drift_zone);
 }
 
 ###########################################################################
@@ -25843,7 +25845,9 @@ sub aiFannDetectDrift {
   
   # --- Varianz berechnen
   my $slope_var = _aiSampleVariance (\@slope_list);
-  my $bias_var  = _aiSampleVariance (\@bias_list);
+  
+  my @bias_last24 = @bias_list[-24 .. -1];                              # Bias Varianz über die letzten 24h -> keine Peak-Dominanz über 96h
+  my $bias_var    = _aiSampleVariance (\@bias_last24);
 
 
   # --- Basis-Metriken ---
@@ -25872,18 +25876,27 @@ sub aiFannDetectDrift {
   my $den         = $n_tgt * $sum_xx - $sum_x * $sum_x;
   my $slope_live  = $den != 0 ? ($n_tgt * $sum_xy - $sum_x * $sum_y) / $den : 0;
   my $bias_live   = ($sum_y - $slope_live * $sum_x) / $n_tgt;
-  
-  my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
-  my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
 
-  my $slope_drift = $slope_live / max($slope_model, 0.01);
-  #my $bias_drift  = $bias_live  - $bias_model;
+  my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',              500);  
+  my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope',               1);
+  my $bias_recal  = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelBias',  undef);
+  my $slope_recal = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelSlope', undef);
+  
+  # --- BiasLive glätten (EMA) ---
+  my $prev_bias_live = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive', $bias_live); 
+  $bias_live         = 0.7 * $bias_live + 0.3 * $prev_bias_live;
+  
+  # --- Rekalibrierte Werte verwenden wenn vorhanden
+  $bias_model  = $bias_recal  if(defined $bias_recal);
+  $slope_model = $slope_recal if(defined $slope_recal);
+
+  my $slope_drift = $slope_model != 0 ? ($slope_live / $slope_model) : 0;
   my $bias_drift  = $bias_model - $bias_live;
 
   my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel', 30);
-  my $rmse_rel_ratio  = $rmse_rel_model > 0 ? ($rmse_rel_live / $rmse_rel_model) : 1;
+  my $rmse_rel_ratio  = $rmse_rel_model > 0 ? ($rmse_rel_live   / $rmse_rel_model)  : 1;
   my $slope_drift_rel = $slope_model != 0   ? abs($slope_drift) / abs($slope_model) : abs($slope_drift);
-  my $bias_drift_norm = $mae_model > 0      ? abs($bias_drift) / $mae_model         : abs($bias_drift);
+  my $bias_drift_norm = $mae_model > 0      ? abs($bias_drift)  / $mae_model        : abs($bias_drift);
 
   # --- Semantik-Trigger (modellskaliert) ---
   my $semantics_active = 0;
@@ -25971,7 +25984,7 @@ sub aiFannDetectDrift {
 
   my $stable_zone3 = ($zone3_count >= 3) ? 1 : 0;
   
-  # Rekalibrierung auslösen, wenn Zone 3 > 12 Stunden stabil  
+  # --- Rekalibrierung auslösen, wenn Zone 3 > 12 Stunden stabil  
   if (!$stable_zone3) {
       $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
   }
@@ -25983,6 +25996,7 @@ sub aiFannDetectDrift {
                                                   median          => $median,
                                                   targets         => \@targets,
                                                   slope_live      => $slope_live,
+                                                  slope_drift     => $slope_drift,
                                                   bias_live       => $bias_live,
                                                   rmse_rel_ratio  => $rmse_rel_ratio,
                                                   drift_score     => $drift_score,
@@ -25995,8 +26009,7 @@ sub aiFannDetectDrift {
                                                }
                                              );
 
-  if (!$block_reason) {
-      # --- Rekalibrierung ---
+  if (!$block_reason) {                                                                             # Rekalibrierung
       if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= 12) {                                 
           my $new_bias  = $bias_model + 0.7 * $bias_drift;
           my $new_slope = 1.0 + ($slope_live - 1.0) * 0.5;
@@ -26015,7 +26028,7 @@ sub aiFannDetectDrift {
   }
   
   
-  $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
+  $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $block_reason ? $block_reason : $flag;
   
   if ($debug =~ /aiProcess/xs) {
       Log3 ($name, 1, sprintf (
@@ -26079,6 +26092,7 @@ sub _aiDrift_safety_blocked {
   my $median          = $paref->{median};
   my $targets         = $paref->{targets};                                                                  # Array-Ref
   my $slope_live      = $paref->{slope_live};
+  my $slope_drift     = $paref->{slope_drift};
   my $bias_live       = $paref->{bias_live};
   my $rmse_rel_ratio  = $paref->{rmse_rel_ratio};
   my $drift_score     = $paref->{drift_score};
@@ -26093,6 +26107,11 @@ sub _aiDrift_safety_blocked {
     
   return 'no_data' unless(@targets && @targets > 10);                                                       # --- Safety: Targets müssen existieren und ausreichend groß sein ---
 
+  # --- Kritischer Fehler: negative slope_drift (invertierte Dynamik)
+  if ($slope_drift < 0 || $slope_live < 0) {
+      return 'negative_slope_drift';
+  }
+
   # --- Dynamischer Nacht-Detektor ---
   my $quant30 = CircularVal($name, 99, $fanntyp.'_quantile30', 0);
   my $quant90 = CircularVal($name, 99, $fanntyp.'_quantile90', 0);
@@ -26106,13 +26125,7 @@ sub _aiDrift_safety_blocked {
       return 'low_load_phase';
   }
   
-  my $median_load    = $median || 1;
-  my $bias_var_limit = 0.20 * ($median_load ** 2);
-  
-  if (defined $rmse_rel_ratio && $rmse_rel_ratio > 2.2) {
-      $bias_var_limit *= 1.5;
-  }
-  
+  my $median_load     = $median || 1;  
   my $slope_var_limit = 0.00002 * ($median_load ** 2) + 0.02;                                               # dynamische Schwelle für Slope-Varianz
 
   my $bias_limit = max(
@@ -26153,8 +26166,8 @@ sub _aiDrift_safety_blocked {
       return 'unstable_slope';
   }
   
-  if (defined $bias_var && $bias_var > $bias_var_limit) {
-      return 'unstable_bias';
+  if ($rmse_rel_ratio > 2.0 && $bias_var > 0.5) {
+      return "unstable_bias";
   }
 
 return 0;                                                                                                   # 0 = kein Block, Rekalibrierung erlaubt
@@ -26184,6 +26197,20 @@ sub _aiFannAfNormRange {
                '01';
   
 return $range; 
+}
+
+################################################################
+#    PV maximum Limit - Begrenzung durch Strings oder 
+#    installierter Inverterleistung
+################################################################
+sub _aiFannPvMaxLimit {            
+  my ($name) = @_;              
+    
+  my $aspeak       = CurrentVal ($name, 'allstringspeak',   0);                     # PV Anlage Peakleistung (W)
+  my $pvInvCapSum  = CurrentVal ($name, 'pvInverterCapSum', 0);                     # Summe Inverterleistungen mit PV Generatoren
+  my $pv_max_limit = min ($aspeak, $pvInvCapSum);
+  
+return $pv_max_limit;
 }
 
 ###############################################################
@@ -26363,16 +26390,16 @@ sub _aiFannNormTemp {
 }
 
 ###############################################################
-#   Bereich [0 .. $pvpeak] auf [0,1] verschieben für SIGMOID 
+#   Bereich [0 .. $pv_max_limit] auf [0,1] verschieben für SIGMOID 
 #   bzw. auf -1..1 normalisieren für SIGMOID_SYMMETRIC
 ###############################################################      
 sub _aiFannNormPv {
-  my $pv     = shift;
-  my $pvpeak = shift;
-  my $range  = shift // '01';
+  my $pv           = shift;
+  my $pv_max_limit = shift;
+  my $range        = shift // '01';
   
-  if ($range eq '-11') { return ($pv / $pvpeak) * 2 - 1 }                       # [-1 .. 1] für SYMMETRIC
-  else                 { return $pv / $pvpeak; }                                # [0 .. 1] für ASYMMETRIC
+  if ($range eq '-11') { return ($pv / $pv_max_limit) * 2 - 1 }                       # [-1 .. 1] für SYMMETRIC
+  else                 { return $pv / $pv_max_limit; }                                # [0 .. 1] für ASYMMETRIC
 }
 
 ###############################################################
