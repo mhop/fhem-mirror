@@ -6737,14 +6737,14 @@ sub __getaiFannState {            ## no critic "not used"
   my $bflim    = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   '-');                       # Bit_Fail_Limit aktuell
   my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');                       # Bit_Fail_Limit Empfehlung
   
-  my $drift_score   = AiNeuralVal ($name, $fanntyp, 'DriftScore',           '-'); 
-  my $drift_rmserel = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio',    '-');  
-  my $drift_slope   = AiNeuralVal ($name, $fanntyp, 'DriftSlope',           '-'); 
-  my $drift_bias    = AiNeuralVal ($name, $fanntyp, 'DriftBias',            '-'); 
-  my $drift_flag    = AiNeuralVal ($name, $fanntyp, 'DriftFlag',            '-');
-  my $bias_recal    = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelBias',  '-');                              
-  my $slope_recal   = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelSlope', '-');  
-  my $model_age     = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',        '-');  
+  my $drift_score   = AiNeuralVal ($name, $fanntyp, 'DriftScore',        '-'); 
+  my $drift_rmserel = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio', '-');  
+  my $drift_slope   = AiNeuralVal ($name, $fanntyp, 'DriftSlope',        '-'); 
+  my $drift_bias    = AiNeuralVal ($name, $fanntyp, 'DriftBias',         '-'); 
+  my $drift_flag    = AiNeuralVal ($name, $fanntyp, 'DriftFlag',         '-');
+  my $bias_recal    = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',      '-');                              
+  my $slope_recal   = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope',     '-');  
+  my $model_age     = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',     '-');  
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6843,8 +6843,8 @@ sub __getaiFannState {            ## no critic "not used"
   $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
   $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";    
   $drift    .= "<b>".$hqtxt{drfrat}{$lang}.":</b> $drift_flag"."\n";                                                                                    # Drift Bewertung
-  $drift    .= "<b>Model Slope recalibrated:</b> $slope_recal"."\n";                                                                                    # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
-  $drift    .= "<b>Model Bias recalibrated:</b> $bias_recal"."\n";                                                                                      # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
+  $drift    .= "<b>Slope recalibrated:</b> $slope_recal"."\n";                                                                                    # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
+  $drift    .= "<b>Bias recalibrated:</b> $bias_recal"."\n";                                                                                      # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
     
   # Erläuterungstext
   ####################
@@ -25636,10 +25636,10 @@ sub _aiFannApplyBiasCorrection {
   my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio', 1.0);
   my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',       0);
   
-  my $bias             = AiNeuralVal ($name, $fanntyp, 'ModelBias',              500);
-  my $slope            = AiNeuralVal ($name, $fanntyp, 'ModelSlope',               0);
-  my $bias_recal       = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelBias',  undef);
-  my $slope_recal      = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelSlope', undef);
+  my $bias             = AiNeuralVal ($name, $fanntyp, 'ModelBias',       500);
+  my $slope            = AiNeuralVal ($name, $fanntyp, 'ModelSlope',        0);
+  my $bias_recal       = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',  undef);
+  my $slope_recal      = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope', undef);
 
   my $ref_level        = CircularVal ($name, '99', $fanntyp.'_quantile30',  0);                 # Wert des 30%-Quantils als Referenzniveau bestimmen
   
@@ -25769,8 +25769,8 @@ sub aiFannDetectDrift {
   my $window  = shift // 96;                                                             # Anzahl Stunden für Driftanalyse
 
   my @drift_kpis = qw (
-      DriftRmseRelLive DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftMaeLive
-      DriftRmseLive DriftScore DriftRmseRelRatio DriftSlopeRel DriftBiasNorm DriftFlag
+      DriftBias DriftSlope DriftBiasLive DriftRefMae
+      DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag
   );
 
   delete @{$data{$name}{neuralnet}{$fanntyp}}{@drift_kpis};
@@ -25824,9 +25824,14 @@ sub aiFannDetectDrift {
   my @tail_idx = @post_train_idx[-$window .. -1];
 
   my (@targets, @preds, @abs_errors);
-  my (@slope_list, @bias_list);
+  my (@slope_list, @bias_live_list);
+  
+  my $mae_model = AiNeuralVal ($name, $fanntyp, 'Mae',                  1);
+  my $ref_mae   = AiNeuralVal ($name, $fanntyp, 'DriftRefMae', $mae_model);
 
   # --- Slope/Bias pro Stunde berechnen
+  my $prev_bias_live_hour;
+
   for my $idx (@tail_idx) {
       next if(!$idx);
       my $rec = $rawref->{$idx} or next;
@@ -25838,29 +25843,42 @@ sub aiFannDetectDrift {
       push @targets,    $a;
       push @preds,      $p;
       push @abs_errors, abs ($p - $a);
-      
       push @slope_list, ($p / $a) if($a != 0);
-      push @bias_list,  ($p - $a);
+
+      my $bias_hour = $p - $a;
+      
+      # --- Clamping gegen extreme Ausreißer
+      my $max_bias = 3 * $ref_mae;                                           # 3x Modell-MAE
+      $bias_hour   = max (-$max_bias, min($max_bias, $bias_hour));
+
+      # --- Glättung
+      if (!defined $prev_bias_live_hour) {
+          $prev_bias_live_hour = $bias_hour;
+      }
+
+      my $alpha       = 0.3;  
+      my $bias_smooth = $alpha * $bias_hour + (1 - $alpha) * $prev_bias_live_hour;
+      push @bias_live_list, $bias_smooth;
+
+      $prev_bias_live_hour = $bias_smooth;
   }
+
+  my @bias_last24 = @bias_live_list[-24 .. -1];                                    # Bias Varianz über die letzten 24h -> keine Peak-Dominanz über 96h                           
   
   # --- Varianz berechnen
   my $slope_var = _aiSampleVariance (\@slope_list);
+  my $bias_var  = _aiSampleVariance (\@bias_last24);
   
-  my @bias_last24 = @bias_list[-24 .. -1];                              # Bias Varianz über die letzten 24h -> keine Peak-Dominanz über 96h
-  my $bias_var    = _aiSampleVariance (\@bias_last24);
+  my $bias_var_norm = $ref_mae > 0 ? $bias_var / ($ref_mae ** 2) : $bias_var;
 
 
   # --- Basis-Metriken ---
-  my $n_err     = @abs_errors || return;
-  my $mae_live  = sum (@abs_errors) / $n_err;
-  my $rmse_live = sqrt(sum(map { $_**2 } @abs_errors) / $n_err);
-  
-  my $median    = medianArray (\@targets) || 1;
-  my @sorted    = sort { $a <=> $b } @targets;
-
+  my $n_err         = @abs_errors || return;
+  my $mae_live      = sum  (@abs_errors) / $n_err;
+  my $rmse_live     = sqrt (sum(map { $_**2 } @abs_errors) / $n_err);
+  my $median        = medianArray (\@targets) || 1;
   my $rmse_rel_live = ($rmse_live / $median) * 100;
-  my $mae_model     = AiNeuralVal ($name, $fanntyp, 'Mae', 1) || 1;
-  my $drift_score   = $mae_live / $mae_model;
+  my $drift_score   = $mae_live / $ref_mae;
 
   # --- Slope/Bias Live ---
   my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);
@@ -25879,24 +25897,22 @@ sub aiFannDetectDrift {
 
   my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',              500);  
   my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope',               1);
-  my $bias_recal  = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelBias',  undef);
-  my $slope_recal = AiNeuralVal ($name, $fanntyp, 'DriftRecalModelSlope', undef);
+  my $ref_bias    = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',   $bias_model);
+  my $ref_slope   = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope', $slope_model);
   
-  # --- BiasLive glätten (EMA) ---
+  # --- Bias-Live glätten (EMA) ---
   my $prev_bias_live = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive', $bias_live); 
   $bias_live         = 0.7 * $bias_live + 0.3 * $prev_bias_live;
+
+  my $slope_drift = $ref_slope  != 0 ? ($slope_live / $ref_slope ) : 0;
+  my $bias_drift  = $ref_bias - $bias_live;
+
+  my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel',                   30);
+  my $ref_rmse        = AiNeuralVal ($name, $fanntyp, 'DriftRefRmse', $rmse_rel_model);
   
-  # --- Rekalibrierte Werte verwenden wenn vorhanden
-  $bias_model  = $bias_recal  if(defined $bias_recal);
-  $slope_model = $slope_recal if(defined $slope_recal);
-
-  my $slope_drift = $slope_model != 0 ? ($slope_live / $slope_model) : 0;
-  my $bias_drift  = $bias_model - $bias_live;
-
-  my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel', 30);
-  my $rmse_rel_ratio  = $rmse_rel_model > 0 ? ($rmse_rel_live   / $rmse_rel_model)  : 1;
-  my $slope_drift_rel = $slope_model != 0   ? abs($slope_drift) / abs($slope_model) : abs($slope_drift);
-  my $bias_drift_norm = $mae_model > 0      ? abs($bias_drift)  / $mae_model        : abs($bias_drift);
+  my $rmse_rel_ratio  = $ref_rmse > 0 ? ($rmse_rel_live   / $ref_rmse) : 1;
+  my $bias_drift_norm = $ref_mae  > 0 ? abs($bias_drift) / $ref_mae    : abs($bias_drift);
+  my $slope_rel_drift = abs ($slope_drift - 1.0);
 
   # --- Semantik-Trigger (modellskaliert) ---
   my $semantics_active = 0;
@@ -25919,7 +25935,7 @@ sub aiFannDetectDrift {
   my $drift_index = 
       0.45 * min (3.0, $drift_score)     +                                      # stärkster Indikator
       0.30 * min (3.0, $rmse_rel_ratio)  +                                      # Peaks / Fehlerexplosionen
-      0.15 * min (2.0, $slope_drift_rel) +                                      # echte Dynamikdrift
+      0.15 * min (2.0, $slope_rel_drift) +                                      # echte Dynamikdrift
       0.10 * min (2.0, $bias_drift_norm);                                       # additive Verschiebung
 
   if ($drift_index > 3.2) {
@@ -25943,17 +25959,13 @@ sub aiFannDetectDrift {
 
 
   # --- Ergebnisse speichern ---
-  $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelLive}  = round2 ($rmse_rel_live);
   $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = round2 ($bias_drift);
   $data{$name}{neuralnet}{$fanntyp}{DriftSlope}        = round3 ($slope_drift);
-  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeLive}    = round3 ($slope_live);
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);
-  $data{$name}{neuralnet}{$fanntyp}{DriftMaeLive}      = round2 ($mae_live);
-  $data{$name}{neuralnet}{$fanntyp}{DriftRmseLive}     = round2 ($rmse_live);
   $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = round2 ($drift_score);
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = round2 ($rmse_rel_ratio);
-  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeRel}     = round3 ($slope_drift_rel);
-  $data{$name}{neuralnet}{$fanntyp}{DriftBiasNorm}     = round2 ($bias_drift_norm);
+  $data{$name}{neuralnet}{$fanntyp}{DriftRefRmse}      = round3 ($rmse_rel_live);
+  $data{$name}{neuralnet}{$fanntyp}{DriftRefMae}       = round2 ($mae_live);
   
   
   # --- Drift-Rekalibrierung (automatisch) ---
@@ -26000,10 +26012,10 @@ sub aiFannDetectDrift {
                                                   bias_live       => $bias_live,
                                                   rmse_rel_ratio  => $rmse_rel_ratio,
                                                   drift_score     => $drift_score,
-                                                  slope_drift_rel => $slope_drift_rel,
+                                                  slope_rel_drift => $slope_rel_drift,
                                                   bias_drift_norm => $bias_drift_norm,
+                                                  bias_var_norm   => $bias_var_norm,
                                                   slope_var       => $slope_var,
-                                                  bias_var        => $bias_var,
                                                   sem_ratio       => $sem_ratio,
                                                   peak_ratio      => $peak_ratio,
                                                }
@@ -26011,12 +26023,12 @@ sub aiFannDetectDrift {
 
   if (!$block_reason) {                                                                             # Rekalibrierung
       if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= 12) {                                 
-          my $new_bias  = $bias_model + 0.7 * $bias_drift;
+          my $new_bias  = $ref_bias + 0.7 * $bias_drift;
           my $new_slope = 1.0 + ($slope_live - 1.0) * 0.5;
           $new_slope    = max (0.85, min (1.15, $new_slope));
      
-          $data{$name}{neuralnet}{$fanntyp}{DriftRecalModelBias}  = $new_bias;
-          $data{$name}{neuralnet}{$fanntyp}{DriftRecalModelSlope} = $new_slope;
+          $data{$name}{neuralnet}{$fanntyp}{DriftRefBias}  = $new_bias;
+          $data{$name}{neuralnet}{$fanntyp}{DriftRefSlope} = $new_slope;
         
           $data{$name}{neuralnet}{$fanntyp}{DriftBias}  = 0;
           $data{$name}{neuralnet}{$fanntyp}{DriftSlope} = 1;
@@ -26034,13 +26046,13 @@ sub aiFannDetectDrift {
       Log3 ($name, 1, sprintf (
           "%s DEBUG> DRIFT [%s]: ".
           "Flag=%s | Block=%s | SlopeLive=%.3f | DriftSlope=%.3f | BiasLive=%.2f | DriftBias=%.2f | ".
-          "RMSErelLive=%.1f | RMSErelRatio=%.2f | DriftScore=%.2f | ".
+          "RMSErelLive=%.1f | RMSErelRatio=%.2f | BiasVarNorm=%.2f |DriftScore=%.2f | ".
           "Zone3Hours=%d | Hist=[%s]",
           $name, $fanntyp,
           $flag,
           ($block_reason // 'none'),
           $slope_live, $slope_drift, $bias_live, $bias_drift,
-          $rmse_rel_live, $rmse_rel_ratio, $drift_score,
+          $rmse_rel_live, $rmse_rel_ratio, $bias_var_norm, $drift_score,
           $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} // 0,
           join (",", @hist)
       ) );
@@ -26068,7 +26080,7 @@ sub _aiSampleVariance {
   return unless($arr_ref && @$arr_ref > 1);
 
   my $n    = @$arr_ref;
-  my $mean = sum(@$arr_ref) / $n;
+  my $mean = sum (@$arr_ref) / $n;
 
   my $sq_sum = 0;
   $sq_sum   += ($_ - $mean) ** 2 for @$arr_ref;
@@ -26096,10 +26108,10 @@ sub _aiDrift_safety_blocked {
   my $bias_live       = $paref->{bias_live};
   my $rmse_rel_ratio  = $paref->{rmse_rel_ratio};
   my $drift_score     = $paref->{drift_score};
-  my $slope_drift_rel = $paref->{slope_drift_rel};
+  my $slope_rel_drift = $paref->{slope_rel_drift};
   my $bias_drift_norm = $paref->{bias_drift_norm};
+  my $bias_var_norm   = $paref->{bias_var_norm};
   my $slope_var       = $paref->{slope_var};
-  my $bias_var        = $paref->{bias_var};
   my $peak_ratio      = $paref->{peak_ratio};
   my $sem_ratio       = $paref->{sem_ratio};
   
@@ -26128,7 +26140,7 @@ sub _aiDrift_safety_blocked {
   my $median_load     = $median || 1;  
   my $slope_var_limit = 0.00002 * ($median_load ** 2) + 0.02;                                               # dynamische Schwelle für Slope-Varianz
 
-  my $bias_limit = max(
+  my $bias_limit = max (
       $quant30     * 1.2,                                                                                   # Grundlast + 20%
       $median_load * 0.5,                                                                                   # 50% der Medianlast
   );
@@ -26144,7 +26156,7 @@ sub _aiDrift_safety_blocked {
       return 'slope_implausible';
   }
              
-  my $rmse_dynamic_limit = 2.5 + ($peak_ratio * 1.0) + ($sem_ratio * 0.8) + min (0.5, $slope_var * 0.5);    # RMSE‑Limit steigt automatisch, wenn viele Peaks, viele semantische Abweichungen, hohe Varianz | RMSE‑Limit sinkt bei Grundlast → Nachtfehler werden erkannt
+  my $rmse_dynamic_limit = 4.0 + ($peak_ratio * 1.0) + ($sem_ratio * 0.8) + min (0.5, $slope_var * 0.5);    # RMSE‑Limit steigt automatisch, wenn viele Peaks, viele semantische Abweichungen, hohe Varianz | RMSE‑Limit sinkt bei Grundlast → Nachtfehler werden erkannt
 
 
   if ($rmse_rel_ratio > $rmse_dynamic_limit) {                                                              
@@ -26156,7 +26168,8 @@ sub _aiDrift_safety_blocked {
   # --- Modell schlecht, aber NICHT driftend
   if ($drift_score        > (1.8 + $sem_ratio  * 0.5) 
       && $rmse_rel_ratio  > (1.5 + $peak_ratio * 1.5) 
-      && $slope_drift_rel < 0.1 
+      && $slope_rel_drift > 0.1 
+      && $slope_rel_drift < 0.3 
       && $bias_drift_norm < 0.4
      ) { return 'model_bad_but_stable'; }
 
@@ -26166,7 +26179,7 @@ sub _aiDrift_safety_blocked {
       return 'unstable_slope';
   }
   
-  if ($rmse_rel_ratio > 2.0 && $bias_var > 0.5) {
+  if ($rmse_rel_ratio > 2.0 && $bias_var_norm > 3.0) {
       return "unstable_bias";
   }
 
