@@ -163,9 +163,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.4.0"  => "15.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
+  "2.4.0"  => "16.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
-                           "aiFannCreateConTrainData: use new value pvInverterCapSum ",
+                           "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -7396,7 +7396,7 @@ sub _attrconsumer {                      ## no critic "not used"
       surpmeth      => { comp => '.*',                              must => 0, act => 1 },
       spignorecond  => { comp => '.*',                              must => 0, act => 1 },
       interruptable => { comp => '.*',                              must => 0, act => 1 },
-      locktime      => { comp => '[1-9]\d*(?::[1-9]\d*)?',          must => 0, act => 0 },
+      locktime      => { comp => '[0-9]\d*(?::[0-9]\d*)?',          must => 0, act => 0 },
       noshow        => { comp => '',                                must => 0, act => 0 },
       exconfc       => { comp => '[012]',                           must => 0, act => 0 },
       pvshare       => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
