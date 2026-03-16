@@ -1578,6 +1578,7 @@ my %hfspvh = (
   pvfc              => { fn => \&_storeVal, storname => 'pvfc',           validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
   confc             => { fn => \&_storeVal, storname => 'confc',          validkey => undef,    fpar => 'comp99' },    # durch KI oder herkömmlich prognostizierter Hausverbrauch
   conaifc           => { fn => \&_storeVal, storname => 'conaifc',        validkey => undef,    fpar => undef    },    # Hilfswert: durch KI prognostizierter Hausverbrauch
+  conbiascorr       => { fn => \&_storeVal, storname => 'conbiascorr',    validkey => undef,    fpar => undef    },    # in der KI Verbrauchsprognose enthaltene kombinierte Bias- und Driftkorrektur 
   conlegfc          => { fn => \&_storeVal, storname => 'conlegfc',       validkey => undef,    fpar => undef    },    # Hilfswert: herkömmlich prognostizierter Hausverbrauch
   gcons             => { fn => \&_storeVal, storname => 'gcons',          validkey => undef,    fpar => 'comp99' },    # bezogene Energie
   gfeedin           => { fn => \&_storeVal, storname => 'gfeedin',        validkey => undef,    fpar => 'comp99' },    # eingespeiste Energie
@@ -25575,8 +25576,9 @@ sub aiFannGetConResult {
           
       if (NexthoursVal ($name, $nhstr, 'today', 0)) {                                        # nur Werte des aktuellen Tags speichern
           $data{$name}{circular}{$hod}{confc} = $confc_final;
-          writeToHistory ( { paref => $paref, key => 'conaifc', val => $prediction,  day => $day, hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'confc',   val => $confc_final, day => $day, hour => $hod } );    
+          writeToHistory ( { paref => $paref, key => 'conaifc',     val => $prediction,  day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'confc',       val => $confc_final, day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'conbiascorr', val => $tc,          day => $day, hour => $hod } );           
                     
           debugLog ($paref, 'saveData2Cache|consumption_long', "store AI legacy alpha value to circular/history -> hod=$hod confc=$confc_final Wh");
       }
@@ -25996,7 +25998,7 @@ sub aiFannDetectDrift {
 
   my $stable_zone3 = ($zone3_count >= 3) ? 1 : 0;
   
-  # --- Rekalibrierung auslösen, wenn Zone 3 > 12 Stunden stabil  
+  # --- Rekalibrierung auslösen, wenn Zone 3 > X Stunden stabil  
   if (!$stable_zone3) {
       $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
   }
@@ -26022,7 +26024,7 @@ sub aiFannDetectDrift {
                                              );
 
   if (!$block_reason) {                                                                             # Rekalibrierung
-      if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= 12) {                                 
+      if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= 8) {                                 
           my $new_bias  = $ref_bias + 0.7 * $bias_drift;
           my $new_slope = 1.0 + ($slope_live - 1.0) * 0.5;
           $new_slope    = max (0.85, min (1.15, $new_slope));
@@ -27278,6 +27280,7 @@ sub _listDataPoolPvHist {
           my $con          = HistoryVal ($name, $day, $key, 'con',            '-');
           my $confc        = HistoryVal ($name, $day, $key, 'confc',          '-');
           my $conaifc      = HistoryVal ($name, $day, $key, 'conaifc',        '-');
+          my $conbiascorr  = HistoryVal ($name, $day, $key, 'conbiascorr',    '-');
           my $conlegfc     = HistoryVal ($name, $day, $key, 'conlegfc',       '-');
           my $gfeedin      = HistoryVal ($name, $day, $key, 'gfeedin',        '-');
           my $wid          = HistoryVal ($name, $day, $key, 'weatherid',      '-');
@@ -27309,6 +27312,7 @@ sub _listDataPoolPvHist {
               $hexp->{$day}{$key}{Consumption}         = $con;
               $hexp->{$day}{$key}{confc}               = $confc;
               $hexp->{$day}{$key}{conaifc}             = $conaifc;
+              $hexp->{$day}{$key}{conbiascorr}         = $conbiascorr;
               $hexp->{$day}{$key}{conlegfc}            = $conlegfc;
               $hexp->{$day}{$key}{GridFeedIn}          = $gfeedin;
               $hexp->{$day}{$key}{WeatherId}           = $wid;
@@ -27428,7 +27432,7 @@ sub _listDataPoolPvHist {
           $ret .= "\n            " if($prde && $key ne '99');
           $ret .= $prdl            if($prdl);
           $ret .= "\n            " if($prdl);
-          $ret .= "conlegfc: $conlegfc, conaifc: $conaifc, confc: $confc, con: $con, gcons: $gcons, conprice: $conprc";
+          $ret .= "conlegfc: $conlegfc, conaifc: $conaifc, confc: $confc, conbiascorr: $conbiascorr, con: $con, gcons: $gcons, conprice: $conprc";
           $ret .= "\n            ";
           $ret .= "gfeedin: $gfeedin, feedprice: $feedprc";
           $ret .= "\n            ";
@@ -33202,7 +33206,7 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>aihit</b>           </td><td>delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)              </td></tr>
             <tr><td> <b>conaifc</b>         </td><td>energy consumption (Wh) predicted by AI                                                </td></tr>
-            <tr><td> <b>conbiascorr</b>     </td><td>combined bias and drift correction of the AI energy consumption forecast (Wh)          </td></tr>
+            <tr><td> <b>conbiascorr</b>     </td><td>combined bias and drift correction included in the AI consumption forecast (Wh)        </td></tr>
             <tr><td> <b>conlegfc</b>        </td><td>conventional energy consumption forecast without AI (Wh)                               </td></tr>
             <tr><td> <b>confc</b>           </td><td>expected energy consumption including the shares of registered consumers (Wh)          </td></tr>
             <tr><td> <b>confcEx</b>         </td><td>expected energy consumption without consumer shares with set key exconfc=1 (Wh)        </td></tr>
@@ -33269,6 +33273,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batsetsocXX</b>    </td><td>Optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>
             <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                                         </td></tr>
             <tr><td> <b>conaifc</b>        </td><td>energy consumption predicted by AI (Wh)                                                                                  </td></tr>
+            <tr><td> <b>conbiascorr</b>     </td><td>combined bias and drift correction included in the AI consumption forecast (Wh)        </td></tr>
             <tr><td> <b>conlegfc</b>       </td><td>conventional energy consumption forecast without AI (Wh)                                                                 </td></tr>
             <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
             <tr><td> <b>conprice</b>       </td><td>Price for the purchase of one kWh. The currency of the price is defined in the setupMeterDev.                            </td></tr>
@@ -36199,7 +36204,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
             <tr><td> <b>aihit</b>           </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                 </td></tr>
             <tr><td> <b>conaifc</b>         </td><td>durch KI prognostizierter Energieverbrauch (Wh)                                            </td></tr>
-            <tr><td> <b>conbiascorr</b>     </td><td>kombinierte Bias- und Driftkorrektur der KI Verbrauchsprognose (Wh)                        </td></tr>
+            <tr><td> <b>conbiascorr</b>     </td><td>in der KI Verbrauchsprognose enthaltene kombinierte Bias- und Driftkorrektur (Wh)          </td></tr>
             <tr><td> <b>conlegfc</b>        </td><td>herkömmlich ohne KI prognostizierter Energieverbrauch (Wh)                                 </td></tr>
             <tr><td> <b>confc</b>           </td><td>erwarteter Energieverbrauch inklusive der Anteile registrierter Verbraucher (Wh)           </td></tr>
             <tr><td> <b>confcEx</b>         </td><td>erwarteter Energieverbrauch ohne Anteile Verbraucher mit gesetztem Schlüssel exconfc=1 (Wh)</td></tr>
@@ -36268,6 +36273,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)            </td></tr>
             <tr><td> <b>confc</b>           </td><td>erwarteter Energieverbrauch (Wh)                                                                       </td></tr>
             <tr><td> <b>conaifc</b>         </td><td>durch KI prognostizierter Energieverbrauch (Wh)                                                        </td></tr>
+            <tr><td> <b>conbiascorr</b>     </td><td>in der KI Verbrauchsprognose enthaltene kombinierte Bias- und Driftkorrektur (Wh)                      </td></tr>
             <tr><td> <b>conlegfc</b>        </td><td>herkömmlich ohne KI prognostizierter Energieverbrauch (Wh)                                             </td></tr>
             <tr><td> <b>con</b>             </td><td>realer Energieverbrauch (Wh) des Hauses                                                                </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.                 </td></tr>
