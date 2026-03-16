@@ -9854,15 +9854,15 @@ sub readCacheFile {
               else               { $err = $hqtxt{aifane}{$lang}; }              
               
               if (!$err) {
-                  delete $data{$name}{neuralnet}{con}{FannModel};                                   # evtl. altes Modell löschen
-                  $data{$name}{neuralnet}{con}{FannModel} = AI::FANN->new_from_file ($tmpfile);     # im Hash ablegen für direkten Zugriff
+                  my $model = AI::FANN->new_from_file($tmpfile);
                   
-                  if ( eval { $data{$name}{neuralnet}{con}{FannModel}->MSE(); 1 } ) {
-                      $data{$name}{current}{conNNTrainstate} = 'ok';
+                  if ($model && eval { $model->MSE(); 1 }) {
+                      $data{$name}{neuralnet}{con}{FannModel} = $model;
+                      $data{$name}{current}{conNNTrainstate}  = 'ok';
                       Log3 ($name, 3, qq{$name - cached data "$title" restored});
                   }
                   else {
-                      $data{$name}{current}{conNNTrainstate} = $@;
+                      $data{$name}{current}{conNNTrainstate} = $@ || 'AI::FANN object is empty or faulty';
                       Log3 ($name, 1, qq{$name - WARNING - cached data "$title" restored, but AI::FANN object is empty or faulty});
                   }
               }
@@ -9871,7 +9871,7 @@ sub readCacheFile {
                       Log3 ($name, 1, qq{$name - WARNING - cached data "$title" restored, but AI::FANN object is empty or faulty});                  
               }
           
-              unlink $tmpfile;
+              unlink $tmpfile if -e $tmpfile;
           }
           else {
               $data{$name}{current}{conNNTrainstate} = "Perl Modul AI::FANN is missing. Install it first with e.g. 'cpan AI::FANN' or 'cpanm AI::FANN'";
@@ -10013,12 +10013,50 @@ sub writeCacheToFile {
   
   if ($cachename eq 'neuralnet') {
       if (scalar keys %{$data{$name}{neuralnet}}) {
-          $error = fileStore ($data{$name}{neuralnet}, $file);
+          my $nnref = $data{$name}{neuralnet};
+          my $obj;
+          
+          if (exists $nnref->{con}{FannModel}) {                        # --- FANN-Objekt sichern und aus Struktur entfernen ---
+              $obj = $nnref->{con}{FannModel};
 
+              if (defined $obj && ref($obj)) {                          # XS-Destructor entschärfen (falls noch nicht geschehen)
+                  my $class = ref($obj);
+                  no strict 'refs';
+                  no warnings 'redefine';
+                  *{$class . '::DESTROY'} = sub { };
+              }
+
+              delete $nnref->{con}{FannModel};                          # Objekt aus der Struktur entfernen
+          }
+
+          my $error = fileStore ($nnref, $file);                        # --- Cache speichern ---
+
+          if (defined $obj) {                                           # --- FANN-Objekt wieder einsetzen ---
+              my $ok = eval { $obj->MSE(); 1 };                         # Objekt testen – falls kaputt → neu laden
+
+              if ($ok) {                                                # Objekt ist gültig → zurück in die Struktur
+                  $nnref->{con}{FannModel} = $obj;
+              }
+              else {                                                    # Objekt ist kaputt → neu aus Blob laden
+                  my $blob = $nnref->{con}{FannBlob};
+
+                  if (defined $blob) {
+                      my $tmpfile = $file . "_reload_fannmodel";
+                      write_blob($tmpfile, $blob);
+
+                      my $new = AI::FANN->new_from_file($tmpfile);
+                      unlink $tmpfile;
+
+                      $nnref->{con}{FannModel} = $new if $new;
+                  }
+              }
+          }
+
+          # --- Fehlerbehandlung ---
           if ($error) {
-              $err = qq{ERROR while writing AI FANN data to file "$file": $error};
-              Log3 ($name, 1, "$name - $err");
-              return $err;
+              my $msg = qq{ERROR while writing AI FANN data to file "$file": $error};
+              Log3($name, 1, "$name - $msg");
+              return $msg;
           }
       }
       else {
@@ -24514,8 +24552,8 @@ sub aiFannTrain {
       my $snapshot_saved  = 0;                                                                             # pro Epoche zurücksetzen
 
       # Zweig 1: echte metrische Verbesserung
-      if ($mse_val         <  $best_val_mse - 1e-6
-          && $mae_val      <  $best_val_mae - 1e-6
+      if ($mse_val         <  $best_val_mse   - 1e-6
+          && $mae_val      <  $best_val_mae   - 1e-6
           && $medae_val    <  $best_val_medae - 1e-6
           && $bit_fail_val <= $best_bit_fail) {
 
@@ -24543,8 +24581,8 @@ sub aiFannTrain {
           $snap_bit_count++;
       }
       # Zweig 3: Trade-off
-      elsif ($bit_fail_val <= $best_bit_fail - $bitfail_gain
-             && $mse_val   <= $best_val_mse + 1e-6
+      elsif ($bit_fail_val <= $best_bit_fail  - $bitfail_gain
+             && $mse_val   <= $best_val_mse   + 1e-6
              && $mae_val   <= $best_val_mae   + $mae_tolerance
              && $medae_val <= $best_val_medae + $medae_tolerance) {
 
@@ -24698,13 +24736,6 @@ sub aiFannTrain {
   my $target_median = medianArray (\@targets_wh); 
   my $rmse_rel      = round0 ($rmse / $target_median * 100);                                # relative RMSE in %
   
-  #my $rmse_rating;
-  #if    ($rmse_rel < 20)  { $rmse_rating = "excellent"; }                                   # extrem selten
-  #elsif ($rmse_rel < 40)  { $rmse_rating = "good"; }                                        # sehr gut
-  #elsif ($rmse_rel < 70)  { $rmse_rating = "acceptable"; }                                  # normal
-  #elsif ($rmse_rel < 120) { $rmse_rating = "weak"; }                                        # noch ok
-  #else                    { $rmse_rating = "very bad"; }                                    # kritisch
-  
   # weighted RMSE und RMSE relative
   my @weighted_sq;
   my @weights;
@@ -24736,32 +24767,22 @@ sub aiFannTrain {
 
   # Bester Snapshot ->  Modell-Slope und Modell-Bias auf denormalisierten Werten
   #################################################################################
-  my $mx_sum_x  = 0; 
-  my $mx_sum_y  = 0;
-  my $mx_sum_xy = 0;
-  my $mx_sum_xx = 0;
+  my @targets;
+  my @preds;
 
   for my $i (0 .. $#test_inputs) {
       my $target_norm     = $test_targets[$i]->[0];
       my $prediction_norm = $ann->run($test_inputs[$i])->[0];
 
-      my $target     = _aiFannDenormMinMaxValue($target_norm,     $minval, $maxval);         # Denormalisiert
-      my $prediction = _aiFannDenormMinMaxValue($prediction_norm, $minval, $maxval);         # Denormalisiert
+      my $target     = _aiFannDenormMinMaxValue ($target_norm,     $minval, $maxval);
+      my $prediction = _aiFannDenormMinMaxValue ($prediction_norm, $minval, $maxval);
 
-      $mx_sum_x  += $target; 
-      $mx_sum_y  += $prediction;
-      $mx_sum_xy += $target * $prediction;
-      $mx_sum_xx += $target * $target;
+      push @targets, $target;
+      push @preds,   $prediction;
   }
 
-  my $mx_n   = scalar (@test_inputs);
-  my $mx_den = $mx_n * $mx_sum_xx - $mx_sum_x * $mx_sum_x;
+  my ($model_slope, $model_bias) = _aiFannSlopeBias (\@targets, \@preds);
 
-  my $model_slope = $mx_den != 0                                                             # Steigung der Regression (Vorhersage vs. Ziel), Originalskala
-                    ? ($mx_n * $mx_sum_xy - $mx_sum_x * $mx_sum_y) / $mx_den
-                    : 0;
-
-  my $model_bias = ($mx_sum_y - $model_slope * $mx_sum_x) / $mx_n;                           # Achsenabschnitt der Regression, Originalskala
 
   
   # Validation Mittelwert und Standardabweichung berechnen
@@ -24779,23 +24800,6 @@ sub aiFannTrain {
   my $sq_sum   = 0;
   $sq_sum     += ($_ - $val_mean) ** 2 for @val_tail;
   my $val_std  = sqrt ($sq_sum / @val_tail);                                                # val_std = Streuung der Validation-MSE
-    
-  #my $ntail  = scalar (@val_tail);
-  #my $sum_x  = 0;
-  #my $sum_y  = 0;
-  #my $sum_xy = 0;
-  #my $sum_x2 = 0;
-
-  #for my $i (0 .. $ntail-1) {
-  #    $sum_x  += $i;
-  #    $sum_y  += $val_tail[$i];
-  #    $sum_xy += $i * $val_tail[$i];
-  #    $sum_x2 += $i * $i;
-  #}
-
-  #my $denom = ($ntail * $sum_x2 - $sum_x * $sum_x) || 1;
-  #my $slope = ($ntail * $sum_xy - $sum_x * $sum_y) / $denom;                               # Steigung der MSE-Historie im Window, nicht Modell-Slope
-  
   
   if ($debug =~ /aiProcess/xs) {
       Log3 ($name, 1, sprintf "%s DEBUG> Validation finished - Best Training MSE=%.6f, Validation MSE=%.6f, Validation Bit_Fail=%d",
@@ -25883,19 +25887,7 @@ sub aiFannDetectDrift {
   my $drift_score   = $mae_live / $ref_mae;
 
   # --- Slope/Bias Live ---
-  my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);
-  my $n_tgt = scalar @targets;                                                             # Anzahl der gültigen Datenpunkte für Regression
-    
-  for my $i (0 .. $#targets) {
-      $sum_x  += $targets[$i];
-      $sum_y  += $preds[$i];
-      $sum_xy += $targets[$i] * $preds[$i];
-      $sum_xx += $targets[$i] * $targets[$i];
-  }
-
-  my $den         = $n_tgt * $sum_xx - $sum_x * $sum_x;
-  my $slope_live  = $den != 0 ? ($n_tgt * $sum_xy - $sum_x * $sum_y) / $den : 0;
-  my $bias_live   = ($sum_y - $slope_live * $sum_x) / $n_tgt;
+  my ($slope_live, $bias_live) = _aiFannSlopeBias (\@targets, \@preds);
 
   my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',              500);  
   my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope',               1);
@@ -25930,6 +25922,7 @@ sub aiFannDetectDrift {
       $peak_active++      if($a > $peak_threshold);
   }
 
+  my $n_tgt      = @targets;
   my $sem_ratio  = $semantics_active / $n_tgt;
   my $peak_ratio = $peak_active / $n_tgt;
 
@@ -26072,6 +26065,40 @@ sub aiFannDetectDrift {
   }
   
 return $flag;
+}
+
+###########################################################################
+#       Slope und Bias berechnen
+###########################################################################
+sub _aiFannSlopeBias {
+  my ($targets_ref, $preds_ref) = @_;
+
+  my @targets = @$targets_ref;
+  my @preds   = @$preds_ref;
+
+  my $n = @targets;
+  return (0, 0) if($n < 2);                                     # zu wenige Daten für Regression
+
+  my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);
+
+  for my $i (0 .. $#targets) {
+      my $x = $targets[$i];
+      my $y = $preds[$i];
+
+      $sum_x  += $x;
+      $sum_y  += $y;
+      $sum_xy += $x * $y;
+      $sum_xx += $x * $x;
+  }
+
+  my $den   = $n * $sum_xx - $sum_x * $sum_x;
+  my $slope = $den != 0
+              ? ($n * $sum_xy - $sum_x * $sum_y) / $den
+              : 0;
+
+  my $bias  = ($sum_y - $slope * $sum_x) / $n;
+
+return ($slope, $bias);
 }
 
 ###########################################################################
