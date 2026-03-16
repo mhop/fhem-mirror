@@ -25844,13 +25844,13 @@ sub aiFannDetectDrift {
 
       push @targets,    $a;
       push @preds,      $p;
-      push @abs_errors, abs ($p - $a);
+      push @abs_errors, abs ($a - $p);
       push @slope_list, ($p / $a) if($a != 0);
 
-      my $bias_hour = $p - $a;
+      my $bias_hour = $a - $p;                                                      # real - Prognose !
       
       # --- Clamping gegen extreme Ausreißer
-      my $max_bias = 3 * $ref_mae;                                           # 3x Modell-MAE
+      my $max_bias = 3 * $ref_mae;                                                  # 3x Modell-MAE
       $bias_hour   = max (-$max_bias, min($max_bias, $bias_hour));
 
       # --- Glättung
@@ -25907,7 +25907,7 @@ sub aiFannDetectDrift {
   $bias_live         = 0.7 * $bias_live + 0.3 * $prev_bias_live;
 
   my $slope_drift = $ref_slope  != 0 ? ($slope_live / $ref_slope ) : 0;
-  my $bias_drift  = $ref_bias - $bias_live;
+  my $bias_drift  = $bias_live - $ref_bias;
 
   my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel',                   30);
   my $ref_rmse        = AiNeuralVal ($name, $fanntyp, 'DriftRefRmse', $rmse_rel_model);
