@@ -163,9 +163,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.4.0"  => "16.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
+  "2.4.0"  => "17.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
-                           "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ",
+                           "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
+                           "extended/refactored: writeCacheToFile, readCacheFile, timestampToTimestring ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -983,7 +984,9 @@ my %hqtxt = (                                                                # H
   nserat => { EN => qq{Noise Rating},
               DE => qq{Rauschen Bewertung}                                                                                  },   
   rcdfor => { EN => qq{Recommendation for},
-              DE => qq{Empfehlung für}                                                                                      }, 
+              DE => qq{Empfehlung für}                                                                                      },
+  lstrcl => { EN => qq{last recalibration},
+              DE => qq{letzte Rekalibrierung}                                                                               }, 
   setof  => { EN => qq{Setting of},
               DE => qq{Einstellung von}                                                                                     },  
   drftid => { EN => qq{Drift Indicators},
@@ -992,7 +995,6 @@ my %hqtxt = (                                                                # H
               DE => qq{Drift Bewertung}                                                                                     },  
   fcerma => { EN => qq{Forecast Error Measures},
               DE => qq{Fehlermaße der Prognosen}                                                                            },  
-  
   aifane => { EN => qq{the AI::FANN object loaded from file is empty},
               DE => qq{das aus der Datei geladene AI::FANN-Objekt ist leer}                                                 },
   ailatr => { EN => qq{last AI training:},
@@ -6738,14 +6740,15 @@ sub __getaiFannState {            ## no critic "not used"
   my $bflim    = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   '-');                       # Bit_Fail_Limit aktuell
   my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');                       # Bit_Fail_Limit Empfehlung
   
-  my $drift_score   = AiNeuralVal ($name, $fanntyp, 'DriftScore',        '-'); 
-  my $drift_rmserel = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio', '-');  
-  my $drift_slope   = AiNeuralVal ($name, $fanntyp, 'DriftSlope',        '-'); 
-  my $drift_bias    = AiNeuralVal ($name, $fanntyp, 'DriftBias',         '-'); 
-  my $drift_flag    = AiNeuralVal ($name, $fanntyp, 'DriftFlag',         '-');
-  my $bias_recal    = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',      '-');                              
-  my $slope_recal   = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope',     '-');  
-  my $model_age     = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',     '-');  
+  my $drift_score   = AiNeuralVal ($name, $fanntyp, 'DriftScore',         '-'); 
+  my $drift_rmserel = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio',  '-');  
+  my $drift_slope   = AiNeuralVal ($name, $fanntyp, 'DriftSlope',         '-'); 
+  my $drift_bias    = AiNeuralVal ($name, $fanntyp, 'DriftBias',          '-'); 
+  my $drift_flag    = AiNeuralVal ($name, $fanntyp, 'DriftFlag',          '-');
+  my $bias_recal    = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',       '-');                              
+  my $slope_recal   = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope',      '-');  
+  my $model_age     = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',      '-');
+  my $last_recaltm  = AiNeuralVal ($name, $fanntyp, 'DriftLastRecalTime', '-'); 
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6844,8 +6847,9 @@ sub __getaiFannState {            ## no critic "not used"
   $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
   $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";    
   $drift    .= "<b>".$hqtxt{drfrat}{$lang}.":</b> $drift_flag"."\n";                                                                                    # Drift Bewertung
-  $drift    .= "<b>Slope recalibrated:</b> $slope_recal"."\n";                                                                                    # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
-  $drift    .= "<b>Bias recalibrated:</b> $bias_recal"."\n";                                                                                      # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
+  $drift    .= "<b>Slope recalibrated:</b> $slope_recal"."\n";                                                                                          # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
+  $drift    .= "<b>Bias recalibrated:</b> $bias_recal"."\n";                                                                                            # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
+  $drift    .= "<b>".$hqtxt{lstrcl}{$lang}.":</b> $last_recaltm"."\n";                                                                                  # Zeitpunkt letzte Rekalibrierung
     
   # Erläuterungstext
   ####################
@@ -9841,40 +9845,51 @@ sub readCacheFile {
       return;
   }
   elsif ($cachename eq 'neuralnet') {
-      my ($err, $net) = fileRetrieve ($file);
+      my ($err, $net) = fileRetrieve($file);
 
       if (!$err && $net) {
-          $data{$name}{neuralnet} = $net;
-          
-          if (!$aifannabs) {
-              my $blob    = $data{$name}{neuralnet}{con}{FannBlob};                                 # String aus Hash holen und zurückschreiben in temporäre Datei
-              my $tmpfile = $neuralnet.'fannmodel_'.$name; 
-              
-              if (defined $blob) { $err = write_blob ($tmpfile, $blob); } 
-              else               { $err = $hqtxt{aifane}{$lang}; }              
-              
-              if (!$err) {
-                  my $model = AI::FANN->new_from_file($tmpfile);
-                  
-                  if ($model && eval { $model->MSE(); 1 }) {
-                      $data{$name}{neuralnet}{con}{FannModel} = $model;
-                      $data{$name}{current}{conNNTrainstate}  = 'ok';
-                      Log3 ($name, 3, qq{$name - cached data "$title" restored});
-                  }
-                  else {
-                      $data{$name}{current}{conNNTrainstate} = $@ || 'AI::FANN object is empty or faulty';
-                      Log3 ($name, 1, qq{$name - WARNING - cached data "$title" restored, but AI::FANN object is empty or faulty});
-                  }
-              }
-              else {
-                      $data{$name}{current}{conNNTrainstate} = $err;
-                      Log3 ($name, 1, qq{$name - WARNING - cached data "$title" restored, but AI::FANN object is empty or faulty});                  
-              }
-          
-              unlink $tmpfile if -e $tmpfile;
-          }
-          else {
+          $data{$name}{neuralnet} = $net;                                                                   # --- kompletten Zustand übernehmen ---
+
+          if ($aifannabs) {
               $data{$name}{current}{conNNTrainstate} = "Perl Modul AI::FANN is missing. Install it first with e.g. 'cpan AI::FANN' or 'cpanm AI::FANN'";
+              return;
+          }
+
+          my @fanntypes = qw(con pv);                                                                       # --- Liste aller FANN-Typen, die geladen werden sollen ---
+
+          # --- für jeden Typ das Modell aus dem Blob neu erzeugen ---
+          for my $fanntyp (@fanntypes) {
+              my $blob = $data{$name}{neuralnet}{$fanntyp}{FannBlob};
+
+              if (!defined $blob) {                                                                         # Kein Blob → kein Modell
+                  $data{$name}{current}{$fanntyp.'NNTrainstate'} = "No FANN blob found for type '$fanntyp'";
+                  next;
+              }
+
+              my $tmpfile = $neuralnet."fannmodel_${name}_${fanntyp}";
+              my $werr    = write_blob ($tmpfile, $blob);
+
+              if ($werr) {
+                  $data{$name}{current}{$fanntyp.'NNTrainstate'} = $werr;
+                  Log3 ($name, 1, qq{$name - WARNING - cached data "$title" restored, but FANN blob for '$fanntyp' could not be written});
+                  next;
+              }
+
+              my $model = AI::FANN->new_from_file ($tmpfile);                                               # Modell neu laden
+              unlink $tmpfile if -e $tmpfile;
+
+              if ($model && eval { $model->MSE(); 1 }) {                                                    # Modell testen
+                  $data{$name}{neuralnet}{$fanntyp}{FannModel} = $model;                                    # gültiges Modell → in Struktur einfügen
+
+                  $data{$name}{current}{$fanntyp.'NNTrainstate'} = 'ok';
+                  Log3 ($name, 3, qq{$name - cached data "$title" restored for FANN type '$fanntyp'});
+              }
+              else {                                                                                        # Modell kaputt → Status setzen
+                  my $msg = $@ || "AI::FANN object for '$fanntyp' is empty or faulty";
+                  $data{$name}{current}{$fanntyp.'NNTrainstate'} = $msg;
+
+                  Log3 ($name, 1, qq{$name - WARNING - cached data "$title" restored, but FANN object for '$fanntyp' is faulty});
+              }
           }
       }
 
@@ -10014,40 +10029,44 @@ sub writeCacheToFile {
   if ($cachename eq 'neuralnet') {
       if (scalar keys %{$data{$name}{neuralnet}}) {
           my $nnref = $data{$name}{neuralnet};
-          my $obj;
-          
-          if (exists $nnref->{con}{FannModel}) {                        # --- FANN-Objekt sichern und aus Struktur entfernen ---
-              $obj = $nnref->{con}{FannModel};
+          my %saved_models;
 
-              if (defined $obj && ref($obj)) {                          # XS-Destructor entschärfen (falls noch nicht geschehen)
+          for my $fanntyp (qw(con pv)) {                                                  # --- Alle FANN-Objekte sichern und entfernen ---
+              next unless exists $nnref->{$fanntyp}{FannModel};
+
+              my $obj = $nnref->{$fanntyp}{FannModel};
+              $saved_models{$fanntyp} = $obj;
+
+              if (defined $obj && ref($obj)) {                                            # XS-Destructor entschärfen
                   my $class = ref($obj);
                   no strict 'refs';
                   no warnings 'redefine';
                   *{$class . '::DESTROY'} = sub { };
               }
 
-              delete $nnref->{con}{FannModel};                          # Objekt aus der Struktur entfernen
+              delete $nnref->{$fanntyp}{FannModel};
           }
 
-          my $error = fileStore ($nnref, $file);                        # --- Cache speichern ---
+          my $error = fileStore ($nnref, $file);                                          # --- EINMAL speichern ---
 
-          if (defined $obj) {                                           # --- FANN-Objekt wieder einsetzen ---
-              my $ok = eval { $obj->MSE(); 1 };                         # Objekt testen – falls kaputt → neu laden
+          for my $fanntyp (keys %saved_models) {
+              my $obj = $saved_models{$fanntyp};
+              my $ok  = eval { $obj->MSE(); 1 };                                          # Objekt testen
 
-              if ($ok) {                                                # Objekt ist gültig → zurück in die Struktur
-                  $nnref->{con}{FannModel} = $obj;
+              if ($ok) {                                                                  # gültig → zurück in Struktur
+                  $nnref->{$fanntyp}{FannModel} = $obj;
               }
-              else {                                                    # Objekt ist kaputt → neu aus Blob laden
-                  my $blob = $nnref->{con}{FannBlob};
+              else {
+                  my $blob = $nnref->{$fanntyp}{FannBlob};                                # kaputt → neu aus Blob laden
 
                   if (defined $blob) {
-                      my $tmpfile = $file . "_reload_fannmodel";
-                      write_blob($tmpfile, $blob);
+                      my $tmpfile = $file . "_reload_fannmodel_$fanntyp";
+                      write_blob ($tmpfile, $blob);
 
-                      my $new = AI::FANN->new_from_file($tmpfile);
+                      my $new = AI::FANN->new_from_file ($tmpfile);
                       unlink $tmpfile;
 
-                      $nnref->{con}{FannModel} = $new if $new;
+                      $nnref->{$fanntyp}{FannModel} = $new if($new);
                   }
               }
           }
@@ -10058,12 +10077,12 @@ sub writeCacheToFile {
               Log3($name, 1, "$name - $msg");
               return $msg;
           }
+
+          return;
       }
       else {
           return "The AI FANN data cache is empty";
       }
-
-      return;
   }
 
   if ($cachename eq 'dwdcatalog') {
@@ -10523,7 +10542,7 @@ sub centralTask {
   
       # --- Drift Analyse ---
       #my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
-      #aiFannDetectDrift ($name, $debug, 'con', 96) if($rdy);                                      # Drift von AI 'con' Werten ermitteln
+      #aiFannDetectDrift ($name, $t, 'DE', $debug, 'con', 96) if($rdy);                         # Drift von AI 'con' Werten ermitteln
 
   debugLog ($centpars, 'saveData2Cache', "setPVhistory -> stored simple  - current dayname=$dayname");
 
@@ -17216,6 +17235,7 @@ sub _calcDataEveryFullHour {
   my $day   = $paref->{day};                                                          # aktueller Tag (range 01 to 31)
   my $t     = $paref->{t};                                                            # aktuelle Unix-Zeit
   my $debug = $paref->{debug};
+  my $lang  = $paref->{lang};
 
   my $hash        = $defs{$name};
   my ($acu, $aln) = isAutoCorrUsed ($name);
@@ -17278,7 +17298,7 @@ sub _calcDataEveryFullHour {
 
       # --- Drift Analyse ---
       my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
-      aiFannDetectDrift ($name, $debug, 'con', 96) if($rdy);                                      # Drift von AI 'con' Werten ermitteln
+      aiFannDetectDrift ($name, $t, $lang, $debug, 'con', 96) if($rdy);                           # Drift von AI 'con' Werten ermitteln
 
       # --- con - Quantile bestimmen ---    
       my ($targetref, $dmy1, $dmy2) = getPvHistTargetArray ( { name  => $name, 
@@ -18803,12 +18823,12 @@ sub _graphicHeader {
 
       ## Message-Icon
       #################
-      my $tfl            = $data{$name}{messages}{999000}{TS}                                     ?
-                           (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0] :
-                           'n.a.';
-      my $tfn            = $data{$name}{messages}{999000}{TSNEXT}                                     ?
-                           (timestampToTimestring ($data{$name}{messages}{999000}{TSNEXT}, $lang))[0] :
-                           'n.a.';
+      my $tfl            = $data{$name}{messages}{999000}{TS}                                    
+                           ? (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0]
+                           : 'n.a.';
+      my $tfn            = $data{$name}{messages}{999000}{TSNEXT}                                     
+                           ? (timestampToTimestring ($data{$name}{messages}{999000}{TSNEXT}, $lang))[0]
+                           : 'n.a.';
       my ($micon, $midx) = fillupMessageSystem ($paref);
       $img               = FW_makeImage ($micon);
       my $msgicon        = $midx ? "<a onClick=$cmdoutmsg>$img</a>" : $img;
@@ -22610,7 +22630,7 @@ sub getMessageFileNonBlocking {
   my $hash = shift;
   my $name = $hash->{NAME};
 
-  my $tsnext = gettimeofday() + GMFILEREPEAT + int(rand(GMFILERANDOM));
+  my $tsnext = time + GMFILEREPEAT + int(rand(GMFILERANDOM));
 
   RemoveInternalTimer ($hash,   "FHEM::SolarForecast::getMessageFileNonBlocking");
   InternalTimer       ($tsnext, "FHEM::SolarForecast::getMessageFileNonBlocking", $hash, 0);
@@ -25770,6 +25790,8 @@ return ($res, $corr_val, $bias_zone, $drift_zone);
 ###########################################################################
 sub aiFannDetectDrift {
   my $name    = shift;
+  my $t       = shift;
+  my $lang    = shift;
   my $debug   = shift;
   my $fanntyp = shift;
   my $window  = shift // 96;                                                             # Anzahl Stunden für Driftanalyse
@@ -26028,7 +26050,8 @@ sub aiFannDetectDrift {
           $data{$name}{neuralnet}{$fanntyp}{DriftBias}  = 0;
           $data{$name}{neuralnet}{$fanntyp}{DriftSlope} = 1;
 
-          $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
+          $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}    = 0;
+          $data{$name}{neuralnet}{$fanntyp}{DriftLastRecalTime} = (timestampToTimestring ($t, $lang))[0];
         
           $flag = 'recalibrated';
       }
@@ -29278,35 +29301,48 @@ return ($val1,$val2);
 #  gibt Zeitstring in lokaler Zeit zurück
 ################################################################
 sub timestampToTimestring {
-  my $epoch = shift;
-  my $lang  = shift // '';
+  my ($epoch, $lang) = @_;
+  $lang //= 'EN';
 
-  return if($epoch !~ /[0-9]/xs);
+  $epoch = trim ($epoch) if(defined $epoch);
+  # Erlaubt: 1234567890
+  # Erlaubt: 1234567890.123456
+  # Verboten: alles andere
+  return unless $epoch =~ /^\d+(?:\.\d+)?$/;
 
-  if (strlength ($epoch) == 13) {                                                                   # Millisekunden
-      $epoch = $epoch / 1000;
+  if ($epoch =~ /\./) {                                                             # --- 3. Normalisierung auf Sekunden ---
+      $epoch = int ($epoch);
+  }
+  else {                                                                            # Länge bestimmt die Einheit
+      my $len = length($epoch);
+
+      if    ($len > 13) { $epoch = int($epoch / 1_000_000_000); }                   # ns → s
+      elsif ($len > 10) { $epoch = int($epoch / 1000); }                            # ms → s
+      else              { $epoch = int($epoch); }                                   # s
   }
 
-  my ($lyear,$lmonth,$lday,$lhour,$lmin,$lsec) = (localtime($epoch))[5,4,3,2,1,0];
-  my $tm;
-
-  $lyear += 1900;                                                                                   # year is 1900 based
-  $lmonth++;                                                                                        # month number is zero based
-
-  my ($sec,$min,$hour,$day,$mon,$year) = (localtime(time))[0,1,2,3,4,5];                            # Standard f. z.B. Readingstimstamp
+  my ($sec,$min,$hour,$day,$mon,$year) = localtime ($epoch);
   $year += 1900;
-  $mon++;
+  $mon  += 1;
 
-  my $realtm = sprintf ("%04d-%02d-%02d %02d:%02d:%02d", $year,$mon,$day,$hour,$min,$sec);          # engl. Variante von aktuellen timestamp
-  my $tmdef  = sprintf ("%04d-%02d-%02d %02d:%s", $lyear,$lmonth,$lday,$lhour,"00:00");             # engl. Variante von $epoch für Logging-Timestamps etc. (Minute/Sekunde == 00)
-  my $tmfull = sprintf ("%04d-%02d-%02d %02d:%02d:%02d", $lyear,$lmonth,$lday,$lhour,$lmin,$lsec);  # engl. Variante Vollzeit von $epoch
+  my %fmt = (                                                                       # Formatstrings definieren
+      EN_full => "%04d-%02d-%02d %02d:%02d:%02d",
+      EN_def  => "%04d-%02d-%02d %02d:%s",
+      DE_full => "%02d.%02d.%04d %02d:%02d:%02d",
+  );
 
-  if ($lang eq "DE") {
-      $tm = sprintf ("%02d.%02d.%04d %02d:%02d:%02d", $lday,$lmonth,$lyear,$lhour,$lmin,$lsec);     # deutsche Variante Vollzeit von $epoch
-  }
-  else {
-      $tm = $tmfull;
-  }
+  my $tm = ($lang eq 'DE')                                                          # Vollzeit abhängig von Sprache
+           ? sprintf($fmt{DE_full}, $day,$mon,$year,$hour,$min,$sec)
+           : sprintf($fmt{EN_full}, $year,$mon,$day,$hour,$min,$sec);
+
+  my $tmdef = sprintf ($fmt{EN_def}, $year,$mon,$day,$hour,"00:00");                # Definierte Zeit (Min/Sek = 00:00)
+
+  my ($s2,$m2,$h2,$d2,$mo2,$y2) = localtime (time);                                 # Aktuelle Zeit (englisch)
+  $y2       += 1900;
+  $mo2      += 1;
+  my $realtm = sprintf ($fmt{EN_full}, $y2,$mo2,$d2,$h2,$m2,$s2);
+
+  my $tmfull = sprintf($fmt{EN_full}, $year,$mon,$day,$hour,$min,$sec);             # Englische Vollzeit des Epoch
 
 return ($tm, $tmdef, $realtm, $tmfull);
 }
