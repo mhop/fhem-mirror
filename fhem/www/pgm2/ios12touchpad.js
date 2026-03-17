@@ -269,7 +269,7 @@ $(document).ready(function() {
 			calccolumns();
 		}
 		if (spaltensumme < 200) {
-			mobiletoggle();
+			//mobiletoggle();
 			resetcolumns();
 			calccolumns();
 		}
