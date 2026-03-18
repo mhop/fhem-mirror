@@ -1,4 +1,4 @@
-REV 30966
+REV 30969
 DIR unused
 UPD 2026-03-15_07:45:03 454484 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -769,8 +769,8 @@ UPD 2026-03-11_07:45:10 5436834 docs/commandref.html
 UPD 2026-03-11_07:45:14 3435779 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-03-17_07:45:15 327962 docs/commandref_modular.html
-UPD 2026-03-17_07:45:17 339802 docs/commandref_modular_DE.html
+UPD 2026-03-18_07:45:16 327962 docs/commandref_modular.html
+UPD 2026-03-18_07:45:17 339802 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2560,7 +2560,7 @@ UPD 2019-04-04_07:45:03 132 www/pgm2/ios12floorplanstyle.css
 UPD 2019-04-04_07:45:03 123 www/pgm2/ios12style.css
 UPD 2019-12-29_07:45:10 6803 www/pgm2/ios12svg_defs.svg
 UPD 2019-12-29_07:45:10 5896 www/pgm2/ios12svg_style.css
-UPD 2019-04-04_07:45:03 10938 www/pgm2/ios12touchpad.js
+UPD 2026-03-18_07:45:03 10942 www/pgm2/ios12touchpad.js
 UPD 2019-04-04_07:45:03 6743 www/pgm2/ios12touchpadfloorplanstyle.css
 UPD 2019-12-29_07:45:10 17146 www/pgm2/ios12touchpadstyle.css
 UPD 2019-03-18_07:45:03 235 www/pgm2/ios6.js
