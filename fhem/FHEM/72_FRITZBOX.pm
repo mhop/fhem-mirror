@@ -42,11 +42,17 @@ package main;
 
 use strict;
 use warnings;
+use Time::HiRes qw(gettimeofday time);    
+use strict;
+use warnings;
 use Blocking;
 use HttpUtils;
 use feature 'state';
+use Blocking;
+use FHEM::Meta;
 
-my $ModulVersion = "08.20.09";
+
+my $ModulVersion = "08.20.10 frozen"; # Fehler bei disable behoben
 my $missingModul = "";
 my $missingXML = "";
 my $FRITZBOX_TR064pwd;
@@ -85,10 +91,20 @@ eval "use Data::Dumper;1"   or $missingModul .= "Data::Dumper ";
 
 use FritzBoxUtils; ## only for web access login
 
+sub FRITZBOX_Initialize($);
+sub FRITZBOX_Define($$);
+sub FRITZBOX_Undefine($$);
+sub FRITZBOX_Delete($$);
+sub FRITZBOX_Rename($$);
+sub FRITZBOX_Notify($$);
+# sub FRITZBOX_detailFn;
+sub FRITZBOX_Set($$@);
+sub FRITZBOX_Get($@);
+sub FRITZBOX_Attr($@);
+
 sub FRITZBOX_Log($$$);
 sub FRITZBOX_DebugLog($$$$;$);
 sub FRITZBOX_dbgLogInit($@);
-sub FRITZBOX_Initialize($);
 
 # Sub, die den nonBlocking Timer umsetzen
 sub FRITZBOX_Readout_Start($);
@@ -161,6 +177,7 @@ sub FRITZBOX_call_Lua_Query($$@);
 sub FRITZBOX_call_LuaData($$$@);
 sub FRITZBOX_write_javaScript($$;@);
 sub FRITZBOX_call_javaScript($$@);
+sub FRITZBOX_store_supportData($@);
 
 # Sub, die Helferfunktionen bereit stellen
 sub FRITZBOX_Helper_make_TableRow($@);
@@ -179,6 +196,14 @@ sub FRITZBOX_Helper_Url_Regex;
 sub FRITZBOX_Helper_Dumper($$;@);
 # sub FRITZBOX_Helper_Json2HTML($);
 sub FRITZBOX_Helper_encode_json;
+
+sub FRITZBOX_Helper_XMLin;
+sub FRITZBOX_Helper_XMLinArray;
+sub FRITZBOX_Helper_removeComments;
+sub FRITZBOX_Helper_simplify;
+sub FRITZBOX_Helper_insertbranch;
+sub FRITZBOX_Helper_removeAfA;
+sub FRITZBOX_Helper_reformat;
 
 my %IGD064   = (
         WANCommonInterfaceConfig1  => { service => "WANCommonInterfaceConfig:1",
@@ -454,7 +479,8 @@ my %JavaScript = (
                                    810 => "generic/landevice"},
         landevice_landevice   => { 800 => "landevice/landevice",
                                    810 => "generic/landevice/landevice"},
-        media                 => { 810 => "media"},
+        media                 => { 800 => "media",
+                                   810 => "media"},
         misc                  => { 800 => "misc",
                                    810 => "dino/misc"},
         mobiled               => { 800 => "generic?ui=mobiled",
@@ -517,6 +543,8 @@ my %JavaScript = (
                                    810 => "dino/misc/updateStatus"},
         umts                  => { 800 => "generic?ui=umts",
                                    810 => "generic/umts"},
+        usb                   => { 800 => "usb",
+                                   810 => "usb"},
         usbdevices            => { 800 => "generic?ui=usbdevices",
                                    810 => "generic/usbdevices"},
         user                  => { 800 => "generic?ui=user",
@@ -884,6 +912,200 @@ my @cmdBuffer = ();
 my $cmdBufferTimeout = 0;
 
 ###############################################################################
+sub FRITZBOX_Initialize($)
+{
+  my ($hash) = @_;
+
+  $hash->{DefFn}       = "FRITZBOX_Define";
+  $hash->{UndefFn}     = "FRITZBOX_Undefine";
+  $hash->{DeleteFn}    = "FRITZBOX_Delete";
+  $hash->{RenameFn}    = "FRITZBOX_Rename";
+  $hash->{NotifyFn}    = "FRITZBOX_Notify";
+  # $hash->{FW_detailFn} = "FRITZBOX_detailFn";
+
+  $hash->{SetFn}    = "FRITZBOX_Set";
+  $hash->{GetFn}    = "FRITZBOX_Get";
+  $hash->{AttrFn}   = "FRITZBOX_Attr";
+
+  $hash->{AttrList} = "boxUser "
+                ."disable:0,1 "
+
+                ."nonblockingTimeOut:30,35,40,50,75,100,125 "
+                ."setgetTimeout:10,30,40,50,75,100,125 "
+
+                ."INTERVAL "
+                ."reConnectInterval "
+                ."maxSIDrenewErrCnt "
+
+                ."userAgentTimeOut "
+                ."userTickets "
+
+                ."wlanNeighborsPrefix "
+
+                ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,statIP,_noDefInf_ "
+
+                ."disableHostIPv4check:0,1 "
+                ."disableDectInfo:0,1 "
+                ."disableFonInfo:0,1 "
+                ."disableBoxReadings:multiple-strict,"
+                                ."box_connect,box_connection_Type,box_cpuTemp,box_dect,box_dsl_downStream,box_dsl_upStream,"
+                                ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
+                                ."box_IPv6_Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
+                                ."box_ip_name,box_ip_IPv4_Extern,box_ip_connection_Type,box_ip_connect,box_ip_last_connect_err,box_ip_last_auth_err,box_ip_mac_Address,box_ip_connection_Trigger,box_ip_uptimeConnect,"
+                                ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
+                                ."box_macFilter_active,"
+                                ."box_moh,box_rateDown,box_rateUp,box_stdDialPort,box_tr064,box_tr069,"
+                                ."box_upnp,box_upnp_control_activated,box_uptime,"
+                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_Active,box_wlan_LogExtended "
+
+                ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
+
+                ."enableAlarmInfo:0,1 "
+                ."enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 "
+                ."enableDocsisInfo:0,1 " 
+                ."enablePhoneBookInfo:0,1 "
+                ."enableKidProfiles:0,1 "
+                ."enableMobileInfo:0,1 "
+                ."enablePassivLanDevices:0,1 "
+                ."enableVPNShares:0,1 "
+                ."enableUserInfo:0,1 "
+                ."enableWLANneighbors:0,1 "
+                ."enableXtamInfo:0,1 "
+                ."enableSIP:0,1 "
+
+#                ."SHInfoExtTables:0,1 "
+                ."SHInfoExtEnable:0,1 "
+                ."SHInfoExtInterval:15,30,45,60,120 "
+                ."SHInfoExtReadings:multiple-strict,shdevice??_RXItem?? "
+                ."enableSmartHome:off,all,group,device "
+                ."enableReadingsFilter:multiple-strict,"
+                                ."dectID_alarmRingTone,dectID_custRingTone,dectID_device,dectID_fwVersion,dectID_intern,dectID_intRingTone,"
+                                ."dectID_manufacturer,dectID_model,dectID_NoRingWithNightSetting,dectID_radio,dectID_NoRingTime,"
+                                ."shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
+                                ."shdeviceID_battery,shdeviceID_batteryLow,shdeviceID_buttonLocked,"
+                                ."shdeviceID_category,shdeviceID_currentInAmp,shdeviceID_currentState,shdeviceID_currentStateAction,shdeviceID_currentStateEndTime,"
+                                ."shdeviceID_device,shdeviceID_externalLocked,shdeviceID_firmwareVersion,shdeviceID_holidayActive,"
+                                ."shdeviceID_ledState,shdeviceID_manufacturer,shdeviceID_mode,shdeviceID_modeNextChangeTime,shdeviceID_model,"
+                                ."shdeviceID_powerPerHour,shdeviceID_powerInWatt,"
+                                ."shdeviceID_state,shdeviceID_status,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_summerTimePeriod,shdeviceID_summerTimeRepetition,"
+                                ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
+                                ."shdeviceID_uid,shdeviceID_voltage "
+                ."enableBoxReadings:multiple-strict,"
+                                ."box_energyMode,box_globalFilter,box_led,box_vdsl,box_dns,box_pwr,box_guestWlan,box_usb,box_notify "
+                ."enableLogReadings:multiple-strict,"
+                                ."box_sys_Log,box_wlan_Log,box_fon_Log "
+
+                ."FhemLog3Std:0,1 "
+                ."lanDeviceReading:mac,ip "
+                ."retMsgbySet:all,error,none "
+                .$readingFnAttributes;
+
+    $hash->{AttrRenameMap} = { "enableMobileModem" => "enableMobileInfo"
+                             };
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
+
+} # end FRITZBOX_Initialize
+
+# Starts the data capturing and sets the new readout timer
+###############################################################################
+sub FRITZBOX_Readout_SHInfoExt($)
+{
+   my ($timerpara) = @_;
+
+   if (!defined $timerpara) {
+     Log 1, "FATAL ERROR - FRITZBOX_Readout_SHInfoExt: no parameter handed over";
+     return "ERROR: FRITZBOX_Readout_SHInfoExt: no parameter handed over";
+   }
+
+   # my ( $name, $func ) = split( /\./, $timerpara );
+   my $index = rindex( $timerpara, "." );    # rechter Punkt
+   my $func  = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
+   my $name  = substr $timerpara, 0, $index;                         # name extrahieren
+   my $hash  = $defs{$name};
+
+   my $runFn;
+
+   $hash->{SID_RENEW_ERR_CNT} =  $hash->{fhem}{sidErrCount} if defined $hash->{fhem}{sidErrCount};
+   $hash->{SID_RENEW_CNT}     += $hash->{fhem}{sidNewCount} if defined $hash->{fhem}{sidNewCount};
+
+   if( defined $hash->{fhem}{sidErrCount} && $hash->{fhem}{sidErrCount} >= AttrVal($name, "maxSIDrenewErrCnt", 5) ) {
+      RemoveInternalTimer($hash->{helper}{TimerSHInfoExt});
+
+      if ($hash->{APICHECKED} == -1) {
+        readingsSingleUpdate( $hash, "state", "stopped while to many network errors", 1 );
+        FRITZBOX_Log $hash, 2, "stopped while to many network errors";
+      } else {
+        readingsSingleUpdate( $hash, "state", "stopped while to many authentication errors", 1 );
+        FRITZBOX_Log $hash, 2, "stopped while to many API errors";
+      }
+
+      return "ERROR: starting TimerSHInfoExt not possible: network error.";
+   }
+
+#   if( $hash->{helper}{timerInActive} && $hash->{fhem}{readOutState} != 1) {
+#
+#      FRITZBOX_Log $hash, 2, "stopped while timerInActive and readOutState != 1";
+#      RemoveInternalTimer($hash->{helper}{TimerSHInfoExt});
+#
+#      readingsSingleUpdate( $hash, "state", "inactive", 1 );
+#
+#      $hash->{STATUS} = "inactive";
+#      return "ERROR: starting TimerSHInfoExt not possible: inactiv.";
+#   }
+
+   if( AttrVal( $name, "disable", 0 ) == 1 && $hash->{fhem}{readOutState} != 1) {
+
+      FRITZBOX_Log $hash, 2, "stopped while disabled and readOutState != 1";
+      RemoveInternalTimer($hash->{helper}{TimerSHInfoExt});
+
+      readingsSingleUpdate( $hash, "state", "disabled", 1 );
+
+      $hash->{STATUS} = "disabled";
+      return "ERROR: starting TimerSHInfoExt not possible: disabled.";
+   }
+
+# Set timer value (min. 60)
+#   $hash->{INTERVAL} = AttrVal( $name, "INTERVAL", 300 );
+#   $hash->{INTERVAL} = 60     if $hash->{INTERVAL} < 60 && $hash->{INTERVAL} != 0;
+
+# Kill running process if "set update" is used
+   if ( exists( $hash->{helper}{SHINFO_RUNNING_PID} ) && $hash->{fhem}{readOutState} == 1 ) {
+
+      FRITZBOX_Log $hash, 3, "Old readout process still running. Killing old process " . $hash->{helper}{SHINFO_RUNNING_PID};
+      BlockingKill( $hash->{helper}{SHINFO_RUNNING_PID} );
+
+      # stop FHEM, giving a FritzBox some time to free the memory
+      delete( $hash->{helper}{SHINFO_RUNNING_PID} );
+   }
+
+   $hash->{fhem}{readOutState} = 2 if $hash->{fhem}{readOutState} == 1;
+   my $interval = $hash->{INTERVAL};
+
+# Set timeout for BlockinCall
+   $hash->{TIMEOUT}        = AttrVal( $name, "nonblockingTimeOut", 55 );
+   $hash->{TIMEOUT}        = $interval - 10 if $hash->{TIMEOUT} > $hash->{INTERVAL};
+
+   $hash->{AGENTTMOUT}     = AttrVal( $name, "userAgentTimeOut", $hash->{TIMEOUT} - 5);
+   $hash->{AGENTTMOUT}     = $hash->{TIMEOUT} - 5 if $hash->{AGENTTMOUT} > $hash->{TIMEOUT};
+
+   my $timeout = $hash->{TIMEOUT};
+
+   $hash->{helper}{runFN} = $runFn;
+
+   $interval = $hash->{INTERVAL};
+   if( $interval != 0 ) {
+      RemoveInternalTimer($hash->{helper}{TimerSHInfoExt});
+      InternalTimer(gettimeofday() + $interval, "FRITZBOX_store_supportData", $hash->{helper}{TimerSHInfoExt}, 1);
+   }
+
+   $hash->{STATUS_SHINFO} = "active";
+
+   return "starting TimerSHInfoExt ...";
+
+} # end FRITZBOX_Readout_SHInfoExt
+
+###############################################################################
 sub FRITZBOX_Log($$$)
 {
    my ( $hash, $loglevel, $text ) = @_;
@@ -1074,97 +1296,6 @@ sub FRITZBOX_Notify($$)
 }
 
 ###############################################################################
-sub FRITZBOX_Initialize($)
-{
-  my ($hash) = @_;
-
-  $hash->{DefFn}       = "FRITZBOX_Define";
-  $hash->{UndefFn}     = "FRITZBOX_Undefine";
-  $hash->{DeleteFn}    = "FRITZBOX_Delete";
-  $hash->{RenameFn}    = "FRITZBOX_Rename";
-  $hash->{NotifyFn}    = "FRITZBOX_Notify";
-  # $hash->{FW_detailFn} = "FRITZBOX_detailFn";
-
-  $hash->{SetFn}    = "FRITZBOX_Set";
-  $hash->{GetFn}    = "FRITZBOX_Get";
-  $hash->{AttrFn}   = "FRITZBOX_Attr";
-
-  $hash->{AttrList} = "boxUser "
-                ."disable:0,1 "
-
-                ."nonblockingTimeOut:30,35,40,50,75,100,125 "
-                ."setgetTimeout:10,30,40,50,75,100,125 "
-
-                ."INTERVAL "
-                ."reConnectInterval "
-                ."maxSIDrenewErrCnt "
-
-                ."userAgentTimeOut "
-                ."userTickets "
-
-                ."wlanNeighborsPrefix "
-
-                ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,statIP,_noDefInf_ "
-
-                ."disableHostIPv4check:0,1 "
-                ."disableDectInfo:0,1 "
-                ."disableFonInfo:0,1 "
-                ."disableBoxReadings:multiple-strict,"
-                                ."box_connect,box_connection_Type,box_cpuTemp,box_dect,box_dsl_downStream,box_dsl_upStream,"
-                                ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
-                                ."box_IPv6_Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
-                                ."box_ip_name,box_ip_IPv4_Extern,box_ip_connection_Type,box_ip_connect,box_ip_last_connect_err,box_ip_last_auth_err,box_ip_mac_Address,box_ip_connection_Trigger,box_ip_uptimeConnect,"
-                                ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
-                                ."box_macFilter_active,"
-                                ."box_moh,box_rateDown,box_rateUp,box_stdDialPort,box_tr064,box_tr069,"
-                                ."box_upnp,box_upnp_control_activated,box_uptime,"
-                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_Active,box_wlan_LogExtended "
-
-                ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
-
-                ."enableAlarmInfo:0,1 "
-                ."enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 "
-                ."enableDocsisInfo:0,1 " 
-                ."enablePhoneBookInfo:0,1 "
-                ."enableKidProfiles:0,1 "
-                ."enableMobileInfo:0,1 "
-                ."enablePassivLanDevices:0,1 "
-                ."enableVPNShares:0,1 "
-                ."enableUserInfo:0,1 "
-                ."enableWLANneighbors:0,1 "
-                ."enableXtamInfo:0,1 "
-                ."enableSIP:0,1 "
-
-                ."enableSmartHome:off,all,group,device "
-                ."enableReadingsFilter:multiple-strict,"
-                                ."dectID_alarmRingTone,dectID_custRingTone,dectID_device,dectID_fwVersion,dectID_intern,dectID_intRingTone,"
-                                ."dectID_manufacturer,dectID_model,dectID_NoRingWithNightSetting,dectID_radio,dectID_NoRingTime,"
-                                ."shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
-                                ."shdeviceID_battery,shdeviceID_batteryLow,shdeviceID_buttonLocked,"
-                                ."shdeviceID_category,shdeviceID_currentInAmp,shdeviceID_currentState,shdeviceID_currentStateAction,shdeviceID_currentStateEndTime,"
-                                ."shdeviceID_device,shdeviceID_externalLocked,shdeviceID_firmwareVersion,shdeviceID_holidayActive,"
-                                ."shdeviceID_ledState,shdeviceID_manufacturer,shdeviceID_mode,shdeviceID_modeNextChangeTime,shdeviceID_model,"
-                                ."shdeviceID_powerPerHour,shdeviceID_powerInWatt,"
-                                ."shdeviceID_state,shdeviceID_status,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_summerTimePeriod,shdeviceID_summerTimeRepetition,"
-                                ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
-                                ."shdeviceID_uid,shdeviceID_voltage "
-                ."enableBoxReadings:multiple-strict,"
-                                ."box_energyMode,box_globalFilter,box_led,box_vdsl,box_dns,box_pwr,box_guestWlan,box_usb,box_notify "
-                ."enableLogReadings:multiple-strict,"
-                                ."box_sys_Log,box_wlan_Log,box_fon_Log "
-
-                ."FhemLog3Std:0,1 "
-                ."lanDeviceReading:mac,ip "
-                ."retMsgbySet:all,error,none "
-                .$readingFnAttributes;
-
-    $hash->{AttrRenameMap} = { "enableMobileModem" => "enableMobileInfo"
-                             };
-
-
-} # end FRITZBOX_Initialize
-
-###############################################################################
 sub FRITZBOX_detailFn {
 
    my ($FW_wname, $name, $room, $pageHash) = @_;
@@ -1261,6 +1392,13 @@ sub FRITZBOX_Define($$)
    readingsSingleUpdate( $hash, "state", "initializing", 1 );
 
    # INTERNALS
+   $hash->{_BITTE_LESEN}           = "Das Modul 72_FRITZBOX.pm wird unter dem Namen nicht mehr weiter entwickelt, da ich das Modul auf Perl Package Technologie umgestellt habe.\n";
+   $hash->{_BITTE_LESEN}          .= "Die Umbenennung auf 72_FritzSmart.pm resultiert aus der Überlegung des Parallelbetriebs und der Tatsache, dass es ja nicht mehr nur die  FritzBox,\nsondern mittlerweile ein ganzer Fritz-Zoo geworden ist.\n";
+   $hash->{_BITTE_LESEN}          .= "Für den Umzug die 'Raw definition', ohne die 'setstate' Zeilen, kopieren, das Device löschen, die Zeilen in eine neue 'Raw definition' einfügen,\nund mit der Änderung im define von 'FRITZBOX' auf 'FritzSmart' ausführen. Zum Schluss das Passwort neu setzen.\n";
+   $hash->{_PLEASE_READ}           = "The module 72_FRITZBOX.pm is no longer being developed under that name, as I have switched the module to Perl package technology.\n";
+   $hash->{_PLEASE_READ}          .= "The renaming to 72_FritzSmart.pm results from the consideration of parallel operation and the fact that it is no longer just the FritzBox, but has now become a whole Fritz zoo.\n";
+   $hash->{_PLEASE_READ}          .= "To move the device, copy the 'Raw definition' without the 'setstate' lines, delete the device, and then execute the new 'Raw definition'\nwith the change from 'FRITZBOX' to 'FritzSmart' in the define field. Afterwards, reset the password.";
+
    $hash->{INTERVAL}               = 300;
    $hash->{TIMEOUT}                = 55;
    $hash->{SID_RENEW_ERR_CNT}      = 0;
@@ -1274,10 +1412,11 @@ sub FRITZBOX_Define($$)
    $hash->{fhem}{multiple_wlan}{cnt} = 1;
    $hash->{fhem}{multiple_wlan}{names} = "wlan2.4";
 
-   $hash->{helper}{TimerReadout}  = $name . ".Readout";
-   $hash->{helper}{TimerCmd}      = $name . ".Cmd";
-   $hash->{helper}{FhemLog3Std}   = AttrVal($name, "FhemLog3Std", 0);
-   $hash->{helper}{timerInActive} = 0;
+   $hash->{helper}{TimerReadout}   = $name . ".Readout";
+   $hash->{helper}{TimerCmd}       = $name . ".Cmd";
+   $hash->{helper}{TimerSHInfoExt} = $name . ".SHExt";
+   $hash->{helper}{FhemLog3Std}    = AttrVal($name, "FhemLog3Std", 0);
+   $hash->{helper}{timerInActive}  = 0;
 
    $hash->{fhem}{sidTime}     = 0;
    $hash->{fhem}{sidErrCount} = 0;
@@ -1338,6 +1477,9 @@ sub FRITZBOX_Undefine($$)
    BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} )
       if exists $hash->{helper}{READOUT_RUNNING_PID};
 
+   BlockingKill( $hash->{helper}{SHINFO_RUNNING_PID} )
+      if exists $hash->{helper}{SHINFO_RUNNING_PID};
+
    BlockingKill( $hash->{helper}{CMD_RUNNING_PID} )
       if exists $hash->{helper}{CMD_RUNNING_PID};
 
@@ -1345,7 +1487,7 @@ sub FRITZBOX_Undefine($$)
 } # end FRITZBOX_Undefine
 
 ###############################################################################
-sub FRITZBOX_Delete ($$)
+sub FRITZBOX_Delete($$)
 {
    my ( $hash, $name ) = @_;
 
@@ -1385,6 +1527,9 @@ sub FRITZBOX_Rename($$)
   BlockingKill( $hash->{helper}{READOUT_RUNNING_PID} )
      if exists $hash->{helper}{READOUT_RUNNING_PID};
 
+  BlockingKill( $hash->{helper}{SHINFO_RUNNING_PID} )
+     if exists $hash->{helper}{SHINFO_RUNNING_PID};
+
   BlockingKill( $hash->{helper}{CMD_RUNNING_PID} )
      if exists $hash->{helper}{CMD_RUNNING_PID};
 
@@ -1402,10 +1547,11 @@ sub FRITZBOX_Rename($$)
 
   $hash->{APICHECKED}         = 2; # basis check
   $hash->{CKECKAPI_TMOUT}     = 55;
-  $hash->{fhem}{readOutState} = 1;
+  $hash->{fhem}{readOutState} = !AttrVal($new, "disable", 0);
   FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
   $hash->{fhem}{readOutState} = 0;
 
+  AttrVal($hash, "SHInfoExtInterval", 3600);
 }
 
 ###############################################################################
@@ -1784,6 +1930,40 @@ sub FRITZBOX_Attr($@)
      }
    }
 
+   if ($aName eq "SHInfoExtEnable") {
+     if ($cmd eq "set") {
+       return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
+     }
+     if ($cmd eq "del" || $aVal == 0) {
+       foreach (keys %{ $hash->{READINGS} }) {
+         readingsDelete($hash, $_) if $_ =~ /^shdevice(\d+)_RXItem(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
+       }
+     }
+
+     if ($cmd eq "set" && $hash->{APICHECKED} == 1) {
+        return "only available for Fritz!OS equal or greater than 7.50" if $hash->{fhem}{fwVersion} < 750;
+     }
+   }
+
+   if ($aName eq "SHInfoExtInterval") {
+     if ($cmd eq "set") {
+       return "$aName: $aVal. Valid is 15|30|45|60|120 minutes." if $aVal !~ /[15|30|45|60|120]/;
+     }
+     if ($cmd eq "del" || $aVal == 0) {
+     }
+   }
+
+   if ($aName eq "SHInfoExtReadings") {
+     if ($cmd eq "set") {
+       return "$aName: $aVal. Valid is shdevice??_RXItem??." if $aVal !~ /shdevice??_RXItem??/;
+     }
+     if ($cmd eq "del" || $aVal == 0) {
+       foreach (keys %{ $hash->{READINGS} }) {
+         readingsDelete($hash, $_) if $_ =~ /^shdevice(\d+)_RXItem(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
+       }
+     }
+   }
+
    if ($aName eq "enableMobileInfo") {
      if ($cmd eq "set") {
        return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
@@ -1795,7 +1975,19 @@ sub FRITZBOX_Attr($@)
      }
 
      if ($cmd eq "set" && $hash->{APICHECKED} == 1) {
-        return "only available for Fritz!OS equal or greater than 7.50" if $hash->{fhem}{fwVersion} >= 750;
+        return "only available for Fritz!OS equal or greater than 7.50" if $hash->{fhem}{fwVersion} < 750;
+     }
+   }
+
+   if ($aName eq "disable") {
+     if ($cmd eq "set") {
+       return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
+       if( $aVal == 0 ) {
+         $hash->{STATUS} = "active";
+       } else {
+         $hash->{STATUS} = "disabled";
+#         readingsSingleUpdate($hash, "state", "disabled", 0);
+       }
      }
    }
 
@@ -1859,9 +2051,15 @@ sub FRITZBOX_Attr($@)
       FRITZBOX_Log $hash, 3, "Attr $cmd $aName -> Neustart internal Timer - APICHECKED = $hash->{APICHECKED}";
       $hash->{WEBCONNECT} = 0;
 
-      $hash->{APICHECKED}     = 2; # basis check
-      $hash->{CKECKAPI_TMOUT} = 55;
-      $hash->{fhem}{readOutState} = 1;
+      if ($aName =~ /disable/) {
+        $hash->{CKECKAPI_TMOUT}   = $hash->{CKECKAPI_MAX_TMOUT};
+        $hash->{APICHECKED} = 0; # full check
+        $hash->{fhem}{readOutState} = !$aVal;
+      } else {
+        $hash->{CKECKAPI_TMOUT} = 55;
+        $hash->{APICHECKED}     = 2; # basis check
+        $hash->{fhem}{readOutState} = !AttrVal($name, "disable", 0);
+      }
       FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
       $hash->{fhem}{readOutState} = 0;
    }
@@ -1956,7 +2154,7 @@ sub FRITZBOX_Set($$@)
           $hash->{APICHECKED}       = 0;
           $hash->{CKECKAPI_TMOUT}   = $hash->{CKECKAPI_MAX_TMOUT};
         }
-        $hash->{fhem}{readOutState} = 1;
+        $hash->{fhem}{readOutState} = 1; #!AttrVal($name, "disable", 0);
         RemoveInternalTimer($hash->{helper}{TimerReadout});
         $retMsg = "set <name> checkAPIs: " . FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
         $hash->{fhem}{readOutState} = 0;
@@ -1992,7 +2190,7 @@ sub FRITZBOX_Set($$@)
 
          $hash->{APICHECKED}         = 2; # basic check
          $hash->{CKECKAPI_TMOUT}     = 55;
-         $hash->{fhem}{readOutState} = 1;
+         $hash->{fhem}{readOutState} = !AttrVal($name, "disable", 0);
          RemoveInternalTimer($hash->{helper}{TimerReadout});
          $retMsg = FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
          $hash->{fhem}{readOutState} = 0;
@@ -2008,7 +2206,7 @@ sub FRITZBOX_Set($$@)
 
    elsif ( lc $cmd eq 'update' ) {
 
-      $hash->{fhem}{readOutState} = 1;
+      $hash->{fhem}{readOutState} = !AttrVal($name, "disable", 0);
       readingsSingleUpdate($hash, "state", "readings update running", 0);
 
       RemoveInternalTimer($hash->{helper}{TimerReadout});
@@ -4170,6 +4368,7 @@ sub FRITZBOX_Get($@)
 
        if (int @val == 2 && $val[0] =~ /post|get/) {
          $methode = $val[0];
+         shift(@val);
        } else {
          if (int @val == 1) {
            $methode = "get";
@@ -4188,7 +4387,7 @@ sub FRITZBOX_Get($@)
 
        FRITZBOX_Log $hash, 4, "result luaFunction: \n" . $tmp;
 
-       my $outhash = XMLin($tmp, StrictMode => 0, KeyAttr => []);
+       my $outhash = FRITZBOX_Helper_XMLin($tmp, StrictMode => 0, KeyAttr => []);
 
        return $returnStr . FRITZBOX_Helper_encode_json($outhash);
 
@@ -5069,15 +5268,20 @@ sub FRITZBOX_Readout_Run_Web($)
 
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, ".calledFrom", "runWeb";
 
-   push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
-
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $sid if $sid ne "";
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidNewCount", $sidNew;
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 1;
 
+   use Devel::Size qw(total_size);
+   my $size = total_size($hash);
+
+   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "retStat_HashSize", $size;
+#   push @roReadings, "readoutHashSize", $size;
+
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
+
    $returnStr = join('|', @roReadings );
 
    FRITZBOX_Log $hash, 4, "Captured " . @roReadings . " values";
@@ -7121,7 +7325,7 @@ sub FRITZBOX_Readout_Run_Web_LuaData($$$$)
            my $outhash;
 
            eval {
-             $outhash = XMLin($XMLtmp, StrictMode => 0, KeyAttr => []);
+             $outhash = FRITZBOX_Helper_XMLin($XMLtmp, StrictMode => 0, KeyAttr => []);
            };
            if ($@) {
              FRITZBOX_Log $hash, 3, "ERROR: SmartHome - getting XML data: $SmartHome";
@@ -8755,7 +8959,7 @@ sub FRITZBOX_Readout_Done($)
   FRITZBOX_Readout_Process ($hash, $string2);
 
   if ($hash->{helper}{runFN} eq "FRITZBOX_Readout_API_Check") {
-    $hash->{fhem}{readOutState} = 1;
+    $hash->{fhem}{readOutState} = !AttrVal($name, "disable", 0);
     FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
     $hash->{fhem}{readOutState} = 0;
   }
@@ -8962,6 +9166,10 @@ sub FRITZBOX_Readout_Process($$)
                   ."enableWLANneighbors:0,1 "
                   ."enableXtamInfo:0,1 "
 
+#                 ."SHInfoExtTables:0,1 "
+                  ."SHInfoExtEnable:0,1 "
+                  ."SHInfoExtInterval:15,30,45,60,120 "
+                  ."SHInfoExtReadings:multiple-strict,shdevice??_RXItem?? "
                   ."enableSmartHome:off,all,group,device "
                   ."enableReadingsFilter:multiple-strict,"
                                 ."dectID_alarmRingTone,dectID_custRingTone,dectID_device,dectID_fwVersion,dectID_intern,dectID_intRingTone,"
@@ -9088,7 +9296,7 @@ sub FRITZBOX_Readout_Process($$)
 
      $hash->{CKECKAPI_TMOUT}     = $hash->{CKECKAPI_MAX_TMOUT};
      $hash->{APICHECKED}         = 0; # full check
-     $hash->{fhem}{readOutState} = 1;
+     $hash->{fhem}{readOutState} = !AttrVal($name, "disable", 0);
      FRITZBOX_Readout_Start($hash->{helper}{TimerReadout});
      $hash->{fhem}{readOutState} = 0;
 
@@ -9439,6 +9647,13 @@ sub FRITZBOX_Readout_SetGet_Start($)
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "FRITZBOX_Get_Fritz_Log_Info_nonBlk";
+   }
+# Preparing GET supportData information -> result in retStat_supportData and {fhem}->{resultData} 
+   elsif ($val[0] eq "supportdata") {
+      $timeout = 300;
+      $cmdBufferTimeout = time() + $timeout;
+      $handover = $name . "|" . join( "|", @val );
+      $cmdFunction = "FRITZBOX_store_supportData";
    }
 # No valid set operation 
    else {
@@ -10018,7 +10233,11 @@ sub FRITZBOX_Readout_API_Check($)
 
    push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
 
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, ".calledFrom", "checkApis";
+   FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, ".calledFrom", "checkApis");
+   
+   if(ReadingsNum($hash, "shdevices_busyReadout", 0)) {
+     FRITZBOX_Readout_Add_Reading ($hash, \@roReadings, "shdevices_busyReadout", 0) if AttrVal($hash, "SHInfoExtEnable", 0);
+   }
 
    my $returnStr = join('|', @roReadings );
 
@@ -11332,7 +11551,6 @@ sub FRITZBOX_Set_lock_Landevice_OnOffRt_8($)
    } else {
      $result = FRITZBOX_call_javaScript($hash, "generic/user");
    }
-
 
    if (defined $result->{data}->{user}) {
      $views = $result->{data}->{user};
@@ -15259,48 +15477,53 @@ sub FRITZBOX_call_TR064_Cmd($$$;@)
       if ($igd) {
         # igd WANCommonInterfaceConfig:1 WANCommonIFC1 GetAddonInfos
 
-        FRITZBOX_Log $hash, 4, "Perform TR-064 (idg) call - $action => " . $logMsg;
-
         if ($hash->{fhem}{fwVersion} < 625) {
+          FRITZBOX_Log $hash, 4, "Perform TR-064 (idg < 625) call - $action => " . $logMsg;
+          $port = "49000";
           $soap = SOAP::Lite
              -> on_fault ( sub {} )
              -> uri( "urn:schemas-upnp-org:service:" . $service )
-             -> proxy('http://' . $host . ":49000" . "/igdupnp/control/" . $control, timeout => 10  )
+             -> proxy('http://' .$host. ":" .$port. "/igdupnp/control/" . $control, timeout => 10  )
              -> readable(1);
         } else {
+          FRITZBOX_Log $hash, 4, "Perform TR-064 (idg/SSL < 625) call - $action => " . $logMsg;
+          $port = $hash->{SECPORT};
           $soap = SOAP::Lite
              -> on_fault ( sub {} )
              -> uri( "urn:schemas-upnp-org:service:" . $service )
-             -> proxy('https://' . $host . ":" . $port . "/igdupnp/control/" . $control, ssl_opts => [ SSL_verify_mode => 0 ], timeout => 10  )
+             -> proxy('https://' .$host. ":" .$port. "/igdupnp/control/" . $control, ssl_opts => [ SSL_verify_mode => 0 ], timeout => 10  )
              -> readable(1);
         }
-        $res = eval { $soap -> call( $action => @soapParams )};
 
       } else {
 
-        FRITZBOX_Log $hash, 4, "Perform TR-064 (tr64) call - $action => " . $logMsg;
-
         if ($hash->{fhem}{fwVersion} < 625) {
+          FRITZBOX_Log $hash, 4, "Perform TR-064 (tr64) call - $action => " . $logMsg;
+          $port = "49000";
           $soap = SOAP::Lite
              -> on_fault ( sub {} )
              -> uri( "urn:dslforum-org:service:" . $service )
-             -> proxy('http://' . $host . ":49000" . "/upnp/control/" . $control, timeout => 10  )
+             -> proxy('http://' .$host. ":" .$port. "/upnp/control/" . $control, timeout => 10  )
              -> readable(1);
+
         } else {
+          FRITZBOX_Log $hash, 4, "Perform TR-064 (tr64/SSL) call - $action => " . $logMsg;
+          $port = $hash->{SECPORT};
           $soap = SOAP::Lite
              -> on_fault ( sub {} )
              -> uri( "urn:dslforum-org:service:" . $service )
-             -> proxy('https://' . $host . ":" . $port . "/upnp/control/" . $control, ssl_opts => [ SSL_verify_mode => 0 ], timeout => 10  )
+             -> proxy('https://' .$host. ":" .$port. "/upnp/control/" . $control, ssl_opts => [ SSL_verify_mode => 0 ], timeout => 10  )
              -> readable(1);
+
         }
-        $res = eval { $soap -> call( $action => @soapParams )};
+        
       }
 
+      $res = eval { $soap -> call( $action => @soapParams )};
       if ($@) {
         FRITZBOX_Log $hash, 4, "TR064-PARAM-Error: " . $@;
         my %errorMsg = ( "Error" => $@ );
         push @retArray, \%errorMsg;
-        $FRITZBOX_TR064pwd = undef;
 
       } else {
 
@@ -15308,7 +15531,6 @@ sub FRITZBOX_call_TR064_Cmd($$$;@)
           FRITZBOX_Log $hash, 4, "TR064-Transport-Error: ".$soap->transport->status;
           my %errorMsg = ( "Error" => $soap->transport->status );
           push @retArray, \%errorMsg;
-          $FRITZBOX_TR064pwd = undef;
         }
         elsif( $res->fault ) { # SOAP Error - will be defined if Fault element is in the message
           # my $fcode   =  $s->faultcode;   #
@@ -15325,7 +15547,6 @@ sub FRITZBOX_call_TR064_Cmd($$$;@)
           # return "Error\n".$fdetail;
 
           push @retArray, $res->faultdetail;
-          $FRITZBOX_TR064pwd = undef;
         }
         else { # normal result
           push @retArray, $res->body;
@@ -15333,6 +15554,9 @@ sub FRITZBOX_call_TR064_Cmd($$$;@)
       }
    }
 
+#   FRITZBOX_Log $hash, 3, "TR064 \n" . Dumper(@retArray);
+
+   $FRITZBOX_TR064pwd = undef;
    @{$cmdArray} = ();
    return @retArray;
 
@@ -15685,9 +15909,8 @@ sub FRITZBOX_call_Lua_Query($$@)
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => $hash->{AGENTTMOUT});
    my $response;
 
-   FRITZBOX_Log $hash, 4, "get -> URL: $url";
-
    if ($methode eq "get") {
+     FRITZBOX_Log $hash, 4, "get -> URL: $url";
      $response = $agent->get ( $url );
    } else {
      my @para = split('\?', $queryStr);
@@ -16541,6 +16764,164 @@ sub FRITZBOX_call_javaScript($$@)
 
 } # end FRITZBOX_call_javaScript
 
+###############################################################################
+# stores support data from extern FritzBox via web interface (http)
+# {FRITZBOX_store_supportData($defs{FritzBox})}
+#
+sub FRITZBOX_store_supportData($@)
+{
+   my ($hash, $makeReading, $filename) = @_;
+
+   my $name      = $hash->{NAME};
+   my $sidNew    = 0;
+   my $startTime = time();
+
+   my $dirdef    = Logdir() . "/";
+   $filename     = $dirdef .$name. '-supportData.fritz' if(!defined ($filename));
+
+   $makeReading  = 1 if(!defined ($makeReading));
+
+   $hash->{fhem}{storeSupDataState} = 0;
+
+   my $result = FRITZBOX_open_Web_Connection( $hash );
+
+   return $result unless $result->{sid};
+
+   $sidNew = $result->{sidNew} if defined $result->{sidNew};
+
+   my $host           = $hash->{HOST};
+   my $url            = 'http://' . $host;
+
+   my $unresult = unlink glob($filename);
+   FRITZBOX_Log $name, 4, "FB SupData -- old files deleted" if $unresult;
+
+   my $data2file = sub {
+     my ($param, $err, $data) = @_;
+
+     my $RxReading = AttrVal($hash, "SHInfoExtReadings", "") =~ /RXItem/;
+
+     FRITZBOX_Log $name, 4, "FB SupData -- writing to file: $filename";
+
+     my $len   = $data ? length($data) : 0;
+     my $error;
+     if($err) {
+       $error = $err;
+     } else {
+       $error = FileWrite($filename, $data) if $filename;
+     }
+
+     my $readoutTime = sprintf( "%.2f", time()-$startTime);
+     $hash->{fhem}{storeSupDataState} = $error ? 0 : $readoutTime;
+
+     readingsBeginUpdate($hash);
+     if ($error) {
+       readingsBulkUpdate($hash, "shdevices_stateReadout", "$error, $err", 1);
+       FRITZBOX_Log $name, 3, "FB SupData -- error ($error, $err) with time: $readoutTime" if $error;
+     } else {
+       if($makeReading) {
+         while( $data =~ /(ule_id: \d+,.*?stat_index:)/isg) {
+           my $ahaData = $1;
+
+           my $uleID          = "";
+           my $valve_position = "";
+           my $valve_motions  = "";
+           my $valve_steps    = "";
+
+           if ($ahaData =~ /ule_id: (\d+),/isg) {
+             $uleID    = $1 ;
+             my $RName = "shdevice" .$uleID. "_";
+
+             if ($ahaData =~ /valve_position: (\d+),/isg) {
+               $valve_position = $1;
+               readingsBulkUpdate($hash, $RName. "valvePosition", $valve_position, 1);
+             } else {
+               readingsDelete($hash, $RName. "valvePosition") if defined $hash->{READINGS}{$RName. "valvePosition"}{VAL};
+             }
+
+             if ($ahaData =~ /valve_motions: (\d+),/isg) {
+               $valve_motions = $1;
+               readingsBulkUpdate($hash, $RName. "valveMotions", $valve_motions, 1);
+             } else {
+               readingsDelete($hash, $RName. "valveMotions") if defined $hash->{READINGS}{$RName. "valveMotions"}{VAL};
+             }
+
+             if ($ahaData =~ /valve_steps: (\d+)/isg) {
+               $valve_steps = $1;
+               readingsBulkUpdate($hash, $RName. "valveSteps", $valve_steps, 1);
+             } else {
+               readingsDelete($hash, $RName. "valveSteps") if defined $hash->{READINGS}{$RName. "valveSteps"}{VAL};
+             }
+ 
+             FRITZBOX_Log $hash, 4, "SupportData AHA: $uleID $valve_position $valve_motions $valve_steps";
+
+             if ($RxReading && ($ahaData =~ /RX Lastitems:(.*?)stat_index:/isg)) {
+               my $RX_LastItems = $1 ;
+               my $ItemID = 0;
+
+               while ($RX_LastItems =~ /time: (\d+),.*?nextm: \d+,(.*?)\n/isg) {
+                 my $RName = "shdevice" .$uleID. "_RXItem" .sprintf("%02d", $ItemID);
+                 if($1 > 0) {
+                   # FRITZBOX_Log $hash, 4, "SupportData AHA RX_Time: $1";
+                   my ($S, $M, $H, $d, $m, $Y) = localtime($1);
+                   $m += 1;
+                   $Y += 1900;
+                   my $dt = sprintf("%02d.%02d.%04d %02d:%02d:%02d", $d, $m, $Y, $H, $M, $S);
+                   # FRITZBOX_Log $hash, 4, "SupportData AHA RX_Time: $dt";
+                   readingsBulkUpdate($hash, $RName , "$dt | ". $2, 1);
+                 } else {
+                   readingsDelete($hash, $RName) if defined $hash->{READINGS}{$RName}{VAL};
+                 }
+                 $ItemID ++;
+                 FRITZBOX_Log $hash, 4, "SupportData AHA RX_LastItems: $1 $2";
+               }
+             }
+           }
+         }
+
+         readingsBulkUpdate($hash, "shdevices_stateReadout", "done", 1);
+
+       } # end makeReading
+
+       my $readoutTime = sprintf( "%.2f", time()-$startTime);
+       readingsBulkUpdate($hash, "shdevices_busyReadout", 0, 1);
+       readingsBulkUpdate($hash, "shdevices_processReadout", $readoutTime, 1);
+       readingsEndUpdate($hash, 1);
+       FRITZBOX_Log $name, 4, "FB SupData -- bytes: $len in time: $readoutTime" ;
+     }
+
+#    delete the marker for RUNNING_PID process
+     delete($hash->{helper}{SHINFO_RUNNING_PID});
+   };
+
+   if ( ReadingsVal($name, "shdevices_busyReadout", 0) == 0 ) {
+     readingsSingleUpdate($hash, "shdevices_busyReadout", 1, 1);
+     my $param;
+     $param->{callback}   = $data2file;
+     $param->{url}        = $url . "/cgi-bin/firmwarecfg";
+     $param->{noshutdown} = 1;
+     $param->{timeout}    = 600; # AttrVal($name, "fritzbox-remote-timeout", 5);
+     $param->{loglevel}   = 4;
+     $param->{method}     = "POST";
+     $param->{header}     = "Content-Type: multipart/form-data; boundary=boundary";
+
+     $param->{data} = "--boundary\r\n".
+                     "Content-Disposition: form-data; name=\"sid\"\r\n".
+                     "\r\n".
+                     "$result->{sid}\r\n".
+                     "--boundary\r\n".
+                     "Content-Disposition: form-data; name=\"SupportData\"\r\n".
+                     "--boundary--";
+    
+     FRITZBOX_Log $name, 3, "get supportData export";
+
+     HttpUtils_NonblockingGet($param);
+
+     $hash->{helper}{SHINFO_RUNNING_PID} = "SHINFO_RUNNING";
+   }
+   
+   return undef;
+
+} # end FRITZBOX_store_supportData
 
 ###############################################################################
 # Ab hier Helfer Sub
@@ -16788,6 +17169,63 @@ sub FRITZBOX_Helper_analyse_Lua_Result($$;@)
 } # end FRITZBOX_Helper_analyse_Lua_Result
 
 ###############################################################################
+# loads support data from extern FritzBox via web interface (http)
+# {FRITZBOX_supportData_readRemote($defs{FritzBox}, "1")}
+# {Dumper (FRITZBOX_supportData_readRemote($defs{FritzBox}, "1"))}
+sub FRITZBOX_supportData_readRemote($$)
+{
+   my ($hash, $supportId) = @_;
+   my $name   = $hash->{NAME};
+   my $sidNew = 0;
+   my $startTime = time();
+
+   my $result = FRITZBOX_open_Web_Connection( $hash );
+
+   return $result unless $result->{sid};
+
+   $sidNew = $result->{sidNew} if defined $result->{sidNew};
+
+   my $dirdef         = Logdir() . "/";
+   my $FB_SupportData = $dirdef .$name. '-supportData.fritz';
+   my $supportData    = "";
+
+    while( $supportData =~ /(ule_id: \d+,.*?stat_index:)/isg) {
+      my $ahaData = $1;
+
+      my $uleID          = "";
+      my $valve_position = "";
+      my $valve_motions  = "";
+      my $valve_steps    = "";
+
+         $uleID          = $1 if ($ahaData =~ /ule_id: (\d+),/isg);
+         $valve_position = $1 if ($ahaData =~ /valve_position: (\d+),/isg);
+         $valve_motions  = $1 if ($ahaData =~ /valve_motions: (\d+),/isg);
+         $valve_steps    = $1 if ($ahaData =~ /valve_steps: (\d+)/isg);
+ 
+      FRITZBOX_Log $hash, 3, "SupportData AHA: $uleID $valve_position $valve_motions $valve_steps";
+     
+
+      if ($ahaData =~ /RX Lastitems:(.*?)stat_index:/isg) {
+        my $RX_LastItems = $1 ;
+
+        while ($RX_LastItems =~ /nextm: \d+,(.*?)\n/isg) {
+          FRITZBOX_Log $hash, 3, "SupportData AHA RX_LastItems: $1";
+        }
+      }
+    }
+
+    my $readoutTime = sprintf( "%.2f", time()-$startTime);
+
+    FRITZBOX_Log $hash, 3, "SupportData AHA time: $readoutTime";
+
+    return $readoutTime;
+
+    my %retHash = ( "data" => $supportData ) ;
+    return \%retHash;
+
+} # end FRITZBOX_supportData_readRemote
+
+###############################################################################
 # loads internal and online phonebooks from extern FritzBox via web interface (http)
 sub FRITZBOX_Phonebook_readRemote($$)
 {
@@ -16807,7 +17245,7 @@ sub FRITZBOX_Phonebook_readRemote($$)
    my $param;
    $param->{url}        = $url . "/cgi-bin/firmwarecfg";
    $param->{noshutdown} = 1;
-   $param->{timeout}    = AttrVal($name, "fritzbox-remote-timeout", 5);
+   $param->{timeout}    = 300; # AttrVal($name, "fritzbox-remote-timeout", 5);
    $param->{loglevel}   = 4;
    $param->{method}     = "POST";
    $param->{header}     = "Content-Type: multipart/form-data; boundary=boundary";
@@ -16823,7 +17261,6 @@ sub FRITZBOX_Phonebook_readRemote($$)
                      "--boundary\r\n".
                      "Content-Disposition: form-data; name=\"PhonebookExportName\"\r\n".
                      "\r\n".
-#                     $hash->{helper}{PHONEBOOK_NAMES}{$phonebookId}."\r\n".
                      "--boundary\r\n".
                      "Content-Disposition: form-data; name=\"PhonebookExport\"\r\n".
                      "\r\n".
@@ -17197,6 +17634,184 @@ sub FRITZBOX_Helper_Dumper($$;@) {
 } # end FRITZBOX_Helper_Dumper
 
 ###############################################################################
+# https://github.com/meirm/xml2hash/tree/master
+
+sub FRITZBOX_Helper_XMLin
+{
+
+  my($in)=@_;
+
+  $in =~s /\n//g;
+  $in =~s /<!--.*?-->//g;
+  $in =~s />\s*</>\n</g;
+
+  my @lines = split("\n",$in);
+  my $hash  = FRITZBOX_Helper_XMLinArray(@lines);
+  my @root  = keys %{$hash};
+
+  return \%{$hash->{$root[0]}};
+}
+
+sub FRITZBOX_Helper_XMLinArray
+{
+
+  my @lines;
+  my %hash;
+
+  @lines = @_;
+  @lines = &FRITZBOX_Helper_reformat(@lines);
+
+  &FRITZBOX_Helper_removeComments(\@lines);
+
+  &FRITZBOX_Helper_insertbranch(\%hash, \@lines) while @lines;
+
+  &FRITZBOX_Helper_simplify(\%hash);
+
+  return \%hash;
+}
+
+sub FRITZBOX_Helper_removeComments
+{
+
+  my ($lineref) = @_;
+  my $in        = 0;
+
+  foreach(@{$lineref}){
+
+    if(m/<!--/){
+      $in = 1;
+    }
+
+    if (m/-->/){
+      $in = 0;
+      $_  = "";
+    }	
+
+    $_ = "" if $in == 1;
+  }
+}
+
+sub FRITZBOX_Helper_simplify
+{
+
+  my($hashref) = @_;
+  
+  if (ref($hashref) =~  m/^(HASH|ARRAY)$/){
+  
+    foreach (keys %{$hashref}){
+      if (ref($hashref->{$_}) eq 'ARRAY'){
+
+        if (@{$hashref->{$_}} == 1){
+          $hashref->{$_}=$hashref->{$_}[0];
+
+          if (ref($hashref->{$_}) =~  m/^(HASH|ARRAY)$/){
+            &FRITZBOX_Helper_simplify(\%{$hashref->{$_}});
+          }
+        } else {
+
+          foreach(@{$hashref->{$_}}){
+            if (ref($_) =~  m/^(HASH|ARRAY)$/) {
+              &FRITZBOX_Helper_simplify($_);
+            }
+          }
+        }
+      } else {
+        if (ref($hashref->{$_}) eq 'HASH'){
+          &FRITZBOX_Helper_simplify(\%{$hashref->{$_}});
+        }
+      }
+    }
+  }
+}
+
+sub FRITZBOX_Helper_insertbranch
+{
+
+  my($hashref, $linesref) = @_;
+
+  my $keyline = shift @{$linesref};
+
+  return if $keyline =~ m/^\s*$/;
+
+  while ($keyline =~ m#<(.*)>(.*)</\1>#){
+    push @{$hashref->{$1}},$2;
+
+    return unless @{$linesref};
+
+    $keyline = shift @{$linesref};
+  }
+
+   while (defined ($keyline) && $keyline =~ m#<([^/]+)>#){
+     my $key = $1;
+     my (@temparray) = &FRITZBOX_Helper_removeAfA($key, $linesref);
+     push @{$hashref->{$key}}, undef;
+     &FRITZBOX_Helper_insertbranch(\%{$hashref->{$key}[-1]}, \@temparray) while @temparray;
+
+     return unless @{$linesref};
+     $keyline = shift @{$linesref};
+  }
+}
+
+sub FRITZBOX_Helper_removeAfA
+{
+
+  my($key, $linesref) = @_;
+  my @temparray;
+
+  while(@{$linesref}){
+    $_=shift @{$linesref};
+
+    return @temparray if m#</$key>#;
+
+    push @temparray,$_;
+  }
+  return @temparray; 
+}
+
+sub FRITZBOX_Helper_reformat
+{
+
+  my(@lineref) = @_;
+  my @lines;
+
+  foreach (@lineref){
+    chomp;
+    s/^\s*(.*?)\s*$/$1/;
+
+    next if m/^\s*$/;
+
+    if (($_ !~ m#</#) && (m#<(.*?)\s+(.*)>#)){
+      my $key    = $1;
+      my $params = $2;
+      push @lines, "<$key>";
+
+      while ($params=~ s/\s*(.*?)\s*=\s*"(.*?)"\s*//){
+        push @lines, "<$1>$2</$1>";
+      }
+
+      next;
+    } elsif (m#<(.*)\s(.*)>(.*)</\1>#){
+      push @lines, "<$1>", "<content>$3</content>";
+      my $key    = $1;
+      my $params = $2;
+
+      while ($params =~ s/\s*(.*?)\s*=\s*"(.*?)"\s*//){
+        push @lines,"<$1>$2</$1>";
+      }
+
+      push @lines,"</$key>";
+
+      next;
+    }
+    push @lines,$_;
+  }
+  return @lines;
+}
+
+# https://github.com/meirm/xml2hash/tree/master
+###############################################################################
+
+###############################################################################
 # This example Perl script demonstrates converting arbitrary JSON             #
 # to HTML using JSON::Parse and HTML::Make                                    #
 # Regular expression for URL validation in Perl                               #
@@ -17271,327 +17886,157 @@ sub FRITZBOX_Helper_Dumper($$;@) {
 #         return Dumper $result;
 #         $returnStr .= $json_doc;
 #       }
-
-sub json_indent_string
-{
-    # How many levels to indent?
-    my $indent_string = "";
-    for(my $i = 0; $i < $json_level; $i++)
-    {
-        $indent_string .= "    ";
-    }
-
-    return $indent_string;
-}
+#
+#sub json_indent_string
+#{
+#    # How many levels to indent?
+#    my $indent_string = "";
+#    for(my $i = 0; $i < $json_level; $i++)
+#    {
+#        $indent_string .= "    ";
+#    }
+#
+#    return $indent_string;
+#}
 
 # Escape strings as per json.org
-sub json_char_escape
-{
-    my $string = shift;
-
-    $string =~ s/\\/\\\\/g;
-    $string =~ s/"/\\"/g;
-    #$string =~ s/\b/\\b/g;  # Says json.org.  What character is \b?
-                             # Does not map to Perl
-    $string =~ s/\f/\\f/g;   # Valid in XML 1.1
-    $string =~ s/\n/\\n/g;
-    $string =~ s/\r/\\r/g;
-    $string =~ s/\t/\\t/g;
-    $string =~ s/([^ -~])/sprintf("\\u%04X", ord($1))/eg;
-
-    return $string;
-}
-
+#sub json_char_escape
+#{
+#    my $string = shift;
+#
+#    $string =~ s/\\/\\\\/g;
+#    $string =~ s/"/\\"/g;
+#    #$string =~ s/\b/\\b/g;  # Says json.org.  What character is \b?
+#                             # Does not map to Perl
+#    $string =~ s/\f/\\f/g;   # Valid in XML 1.1
+#    $string =~ s/\n/\\n/g;
+#    $string =~ s/\r/\\r/g;
+#    $string =~ s/\t/\\t/g;
+#    $string =~ s/([^ -~])/sprintf("\\u%04X", ord($1))/eg;
+#
+#    return $string;
+#}
+#
 # Handle start of the document
-sub init_handler
-{
-    $json_doc = "{\n";
-    $json_level = 1;
-    @json_stack = ();
-    $need_comma = 0;
-}
-
+#sub init_handler
+#{
+#    $json_doc = "{\n";
+#    $json_level = 1;
+#    @json_stack = ();
+#    $need_comma = 0;
+#}
+#
 # Handle the end of the document
-sub final_handler
-{
-    $json_doc .= "\n" if $crlf;
-    $json_doc .= "}";
-    $json_doc .= "\n" if $crlf;
-}
-
+#sub final_handler
+#{
+#    $json_doc .= "\n" if $crlf;
+#    $json_doc .= "}";
+#    $json_doc .= "\n" if $crlf;
+#}
+#
 # XML Parsing call-back routines
-sub start_handler
-{
-    my($expat, $element, %attrs) = @_;
-    my $i;
-
-    # Do we need a comma to separate?
-    if ($need_comma)
-    {
-        $json_doc .= ",";
-        $json_doc .= "\n" if $crlf;
-    }
-    elsif ($json_level > 1)
-    {
-        $json_doc .= "\n" if $crlf;
-    }
-
-    # Append the element block start
-    $json_doc .= json_indent_string() . '"' . $element . '" : {';
-    $json_level++;
-
-    $i = 0;
-    while( my ($key, $value) = each(%attrs) )
-    {
-        if ($i)
-        {
-            $json_doc .= ",";
-            $json_doc .= "\n" if $crlf;
-        }
-        else
-        {
-            $json_doc .= "\n" if $crlf;
-            $i = 1;
-        }
-        $key = json_char_escape($key);
-        $json_doc .= json_indent_string() . '"' . $key . '" : "' .
-                     $value . '"';
-    }
-
-    if ($i)
-    {
-        $need_comma = 1;
-    }
-    else
-    {
-        $need_comma = 0;
-    }
-
-    $element_string = "";
-
-    push(@json_stack, $need_comma);
-}
-
-sub char_handler
-{
-    my ($expat, $chardata) = @_;
-
-    $element_string .= $chardata;
-}
-
-sub end_handler
-{
-    my ($expat, $element) = @_;
-
-    # Do we need a comma?
-    $need_comma = pop(@json_stack);
-
-    # Remove any leading or tailing whitespace on element string
-    $element_string =~ s/^[ \t\r\n]*//;
-    $element_string =~ s/[ \t\r\n]*$//;
-
-    # Escape certain characters
-    $element_string = json_char_escape($element_string);
-
-    if (length($element_string) > 0)
-    {
-        # If we need a comma, insert one
-        if ($need_comma) 
-        {
-            $json_doc .= ",";
-            $json_doc .= "\n" if $crlf;
-        }
-        else
-        {
-            $json_doc .= "\n" if $crlf;
-        }
-
-        $json_doc .= json_indent_string() . '"value" : "' .
-                     $element_string . '"';
-        $json_doc .= "\n" if $crlf;
-    }
-    else
-    {
-        $json_doc .= "\n" if $crlf;
-    }
-
-    # End of element
-    $element_string = "";
-    $json_level--;
-    $json_doc .= json_indent_string() . "}";
-    $need_comma = 1;
-}
+#sub start_handler
+#{
+#    my($expat, $element, %attrs) = @_;
+#    my $i;
+#
+#    # Do we need a comma to separate?
+#    if ($need_comma)
+#    {
+#        $json_doc .= ",";
+#        $json_doc .= "\n" if $crlf;
+#    }
+#    elsif ($json_level > 1)
+#    {
+#        $json_doc .= "\n" if $crlf;
+#    }
+#
+#    # Append the element block start
+#    $json_doc .= json_indent_string() . '"' . $element . '" : {';
+#    $json_level++;
+#
+#    $i = 0;
+#    while( my ($key, $value) = each(%attrs) )
+#    {
+#        if ($i)
+#        {
+#            $json_doc .= ",";
+#            $json_doc .= "\n" if $crlf;
+#        }
+#        else
+#        {
+#            $json_doc .= "\n" if $crlf;
+#            $i = 1;
+#        }
+#        $key = json_char_escape($key);
+#        $json_doc .= json_indent_string() . '"' . $key . '" : "' .
+#                     $value . '"';
+#    }
+#
+#    if ($i)
+#    {
+#        $need_comma = 1;
+#    }
+#    else
+#    {
+#        $need_comma = 0;
+#    }
+#
+#    $element_string = "";
+#
+#    push(@json_stack, $need_comma);
+#}
+#
+#sub char_handler
+#{
+#    my ($expat, $chardata) = @_;
+#
+#    $element_string .= $chardata;
+#}
+#
+#sub end_handler
+#{
+#    my ($expat, $element) = @_;
+#
+#    # Do we need a comma?
+#    $need_comma = pop(@json_stack);
+#
+#    # Remove any leading or tailing whitespace on element string
+#    $element_string =~ s/^[ \t\r\n]*//;
+#    $element_string =~ s/[ \t\r\n]*$//;
+#
+#    # Escape certain characters
+#    $element_string = json_char_escape($element_string);
+#
+#    if (length($element_string) > 0)
+#    {
+#        # If we need a comma, insert one
+#        if ($need_comma) 
+#        {
+#            $json_doc .= ",";
+#            $json_doc .= "\n" if $crlf;
+#        }
+#        else
+#        {
+#            $json_doc .= "\n" if $crlf;
+#        }
+#
+#        $json_doc .= json_indent_string() . '"value" : "' .
+#                     $element_string . '"';
+#        $json_doc .= "\n" if $crlf;
+#    }
+#    else
+#    {
+#        $json_doc .= "\n" if $crlf;
+#    }
+#
+#    # End of element
+#    $element_string = "";
+#    $json_level--;
+#    $json_doc .= json_indent_string() . "}";
+#    $need_comma = 1;
+#}
 # Help do the pretty printing to ident text with spaces
-###############################################################################
-
-###############################################################################
-# https://github.com/meirm/xml2hash/tree/master
-sub XMLin{
-
-  my($in)=@_;
-
-  $in =~s /\n//g;
-  $in =~s /<!--.*?-->//g;
-  $in =~s />\s*</>\n</g;
-
-  my @lines = split("\n",$in);
-  my $hash  = XMLinArray(@lines);
-  my @root  = keys %{$hash};
-
-  return \%{$hash->{$root[0]}};
-}
-
-sub XMLinArray{
-
-  my @lines;
-  my %hash;
-
-  @lines = @_;
-  @lines = &reformat(@lines);
-
-  &removeComments(\@lines);
-
-  &insertbranch(\%hash, \@lines) while @lines;
-
-  &simplify(\%hash);
-
-  return \%hash;
-}
-
-sub removeComments{
-
-  my ($lineref) = @_;
-  my $in        = 0;
-
-  foreach(@{$lineref}){
-
-    if(m/<!--/){
-      $in = 1;
-    }
-
-    if (m/-->/){
-      $in = 0;
-      $_  = "";
-    }	
-
-    $_ = "" if $in == 1;
-  }
-}
-
-sub simplify{
-
-  my($hashref) = @_;
-  
-  if (ref($hashref) =~  m/^(HASH|ARRAY)$/){
-  
-    foreach (keys %{$hashref}){
-      if (ref($hashref->{$_}) eq 'ARRAY'){
-
-        if (@{$hashref->{$_}} == 1){
-          $hashref->{$_}=$hashref->{$_}[0];
-
-          if (ref($hashref->{$_}) =~  m/^(HASH|ARRAY)$/){
-            &simplify(\%{$hashref->{$_}});
-          }
-        } else {
-
-          foreach(@{$hashref->{$_}}){
-            if (ref($_) =~  m/^(HASH|ARRAY)$/) {
-              &simplify($_);
-            }
-          }
-        }
-      } else {
-        if (ref($hashref->{$_}) eq 'HASH'){
-          &simplify(\%{$hashref->{$_}});
-        }
-      }
-    }
-  }
-}
-
-sub insertbranch{
-
-  my($hashref, $linesref) = @_;
-
-  my $keyline = shift @{$linesref};
-
-  return if $keyline =~ m/^\s*$/;
-
-  while ($keyline =~ m#<(.*)>(.*)</\1>#){
-    push @{$hashref->{$1}},$2;
-
-    return unless @{$linesref};
-
-    $keyline = shift @{$linesref};
-  }
-
-   while (defined ($keyline) && $keyline =~ m#<([^/]+)>#){
-     my $key = $1;
-     my (@temparray) = &removeAfA($key, $linesref);
-     push @{$hashref->{$key}}, undef;
-     &insertbranch(\%{$hashref->{$key}[-1]}, \@temparray) while @temparray;
-
-     return unless @{$linesref};
-     $keyline = shift @{$linesref};
-  }
-}
-
-
-sub removeAfA{
-
-  my($key, $linesref) = @_;
-  my @temparray;
-
-  while(@{$linesref}){
-    $_=shift @{$linesref};
-
-    return @temparray if m#</$key>#;
-
-    push @temparray,$_;
-  }
-  return @temparray; 
-}
-
-sub reformat{
-
-  my(@lineref) = @_;
-  my @lines;
-
-  foreach (@lineref){
-    chomp;
-    s/^\s*(.*?)\s*$/$1/;
-
-    next if m/^\s*$/;
-
-    if (($_ !~ m#</#) && (m#<(.*?)\s+(.*)>#)){
-      my $key    = $1;
-      my $params = $2;
-      push @lines, "<$key>";
-
-      while ($params=~ s/\s*(.*?)\s*=\s*"(.*?)"\s*//){
-        push @lines, "<$1>$2</$1>";
-      }
-
-      next;
-    } elsif (m#<(.*)\s(.*)>(.*)</\1>#){
-      push @lines, "<$1>", "<content>$3</content>";
-      my $key    = $1;
-      my $params = $2;
-
-      while ($params =~ s/\s*(.*?)\s*=\s*"(.*?)"\s*//){
-        push @lines,"<$1>$2</$1>";
-      }
-
-      push @lines,"</$key>";
-
-      next;
-    }
-    push @lines,$_;
-  }
-  return @lines;
-}
-# https://github.com/meirm/xml2hash/tree/master
 ###############################################################################
 
 1;
