@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - new: 72_FritzSmart: Umgestellt aud Perl Package Technologie.
+                       Fehlerkorrekturen aus altem Modul 72_FRITZBOX
+ - change: 72_FRITZBOX: die Entwicklung wird im Modul 72_FritzSmart.pm
+           weiter geführt
  - bugfix:  70_PylonLowVoltage: addressing batteries with address 9 and above
  - bugfix:  73_DepartureBnT : FTUI Widget Departure_concat without blanks
  - bugfix:  76_SolarForecast: Version 2.2.3 - fix round0
