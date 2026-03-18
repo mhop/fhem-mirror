@@ -392,6 +392,7 @@ FHEM/72_FB_CALLLIST.pm       JoWiemann            FRITZ!Box
 FHEM/72_FB_CALLMONITOR.pm    JoWiemann            FRITZ!Box
 FHEM/72_FBTAM.pm             pahenning            FRITZ!Box 
 FHEM/72_FRITZBOX.pm          JoWiemann            FRITZ!Box (link als PM an JoWiemann)
+FHEM/72_FritzSmart.pm        JoWiemann            FRITZ!Box (link als PM an JoWiemann)
 FHEM/72_TA_CMI_JSON.pm       delmar               Sonstige Systeme
 FHEM/72_UBUS_CALL.pm         xenos1984            Sonstige Systeme
 FHEM/72_UBUS_CLIENT.pm       xenos1984            Sonstige Systeme
