@@ -167,7 +167,7 @@ my %vNotesIntern = (
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
                            "extended/refactored: writeCacheToFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
-                           "new key graphicControl->headerShowEnv ",
+                           "new key graphicControl->headerShowEnv, _saveEnergyConsumption: implemntation of MAXCONLIMIT ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -401,6 +401,7 @@ use constant {
 
   MAXNEXTHOURS   => 71,                                                             # max. Anzahl Stunden der Wertebasis (Start mit 0 -> 72h) z.B. in Nexthours
   MAXNEXTDAYS    => 2,                                                              # max. Anzahl volle Tage in NextHours (Start mit 0 -> 3d)
+  MAXCONLIMIT    => 100000,                                                         # oberes Limit stündlicher Energieverbrauch des Hauses (Wh)
   DWDFCDAYSMIN   => 2,                                                              # Mindestwert Attr 'forecastDays' im DWD-Device
   SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
   FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
@@ -17665,8 +17666,12 @@ sub _saveEnergyConsumption {
   my $dowrite = 0;
   my $con     = $pvrl + $ppreal - $gfeedin + $gcon - $batin + $batout;
   
-  if ($con >= 0) {
+  if ($con >= 0 && $con < MAXCONLIMIT) {
       $dowrite = 1;
+  }
+  
+  if ($con >= MAXCONLIMIT) {
+      Log3 ($name, 1, "$name - WARNING - day=$day, hod=$hod - Energy consumption of $con Wh is higher than limit of ".MAXCONLIMIT." Wh and is not saved.");
   }
 
   if (int $paref->{minute} > 30 && $con < 0) {                                  # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
