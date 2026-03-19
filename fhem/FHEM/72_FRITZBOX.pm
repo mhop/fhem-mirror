@@ -5274,12 +5274,6 @@ sub FRITZBOX_Readout_Run_Web($)
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "fhem->sidNewCount", $sidNew;
    FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 1;
 
-   use Devel::Size qw(total_size);
-   my $size = total_size($hash);
-
-   FRITZBOX_Readout_Add_Reading $hash, \@roReadings, "retStat_HashSize", $size;
-#   push @roReadings, "readoutHashSize", $size;
-
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
 
    $returnStr = join('|', @roReadings );
