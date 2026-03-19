@@ -163,10 +163,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.4.0"  => "17.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
+  "2.4.0"  => "19.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
-                           "extended/refactored: writeCacheToFile, readCacheFile, timestampToTimestring ",
+                           "extended/refactored: writeCacheToFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
+                           "new key graphicControl->headerShowEnv ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -7634,6 +7635,7 @@ sub _attrgraphicControl {                ## no critic "not used"
       energyUnit        => { comp => '(Wh|kWh)',                                                       act => 0 },
       beamHeightlevel   => { comp => '(?:[1-3]:(?:[1-9][0-9]*))(?:,(?:[1-3]:(?:[1-9][0-9]*)))*',       act => 0 },
       headerDetail      => { comp => '.*',                                                             act => 1 },
+      headerShowEnv     => { comp => '.*',                                                             act => 1 },
       hourCount         => { comp => '([4-9]|1[0-9]|2[0-4])',                                          act => 0 },
       hourStyle         => { comp => ':(0{1,2})',                                                      act => 0 },
       layoutType        => { comp => '(single|double|diff)',                                           act => 0 },
@@ -8943,6 +8945,16 @@ sub __attrKeyAction {
           for my $val (@hda) {
               if (!grep /^$val$/, qw (all co pv own status)) {
                   return qq{The value '$val' is not valid for key '$akey'};
+              }
+          }
+      }
+      
+      if ($init_done && $akey eq 'headerShowEnv') {
+          my @hse = split ",", $akeyval;
+
+          for my $env (@hse) {
+              if (!grep /^$env$/, qw (outsideTemp presence windSpeed)) {
+                  return qq{The value '$env' is not valid for key '$akey'};
               }
           }
       }
@@ -16721,8 +16733,8 @@ sub _calcConsForecast_legacy {
                                 tomdayname => $tomdayname,
                                 cofciwd    => $cofciwd,
                                 usage      => $usage,
-                                ncds       => $ncds,
-                                nhist      => $nhist,
+                                ncds       => $ncds,                                                   # consForecastIdentWeekdays ? consForecastLastDays * 7 : consForecastLastDays
+                                nhist      => $nhist,                                                  # Anzahl vorhandener Tage in pvHistory
                               }
                             );
   }
@@ -16849,9 +16861,9 @@ sub __readConFromCircular {
   my $dayname    = $paref->{dayname};
   my $tomdayname = $paref->{tomdayname};
   my $cofciwd    = $paref->{cofciwd};
-  my $usage      = $paref->{usage};                       # Referenz von %usage
-  my $ncds       = $paref->{ncds};
-  my $nhist      = $paref->{nhist};
+  my $usage      = $paref->{usage};                         # Referenz von %usage
+  my $ncds       = $paref->{ncds};                          # consForecastIdentWeekdays ? consForecastLastDays * 7 : consForecastLastDays
+  my $nhist      = $paref->{nhist};                         # Anzahl vorhandener Tage in pvHistory
       
   my (@conh, @conhtom);
   my $mix = 0;
@@ -18857,6 +18869,36 @@ sub _graphicHeader {
       }
 
       my $waicon = "<a>$img</a>";                                                                       # Icon Wetterdaten Alter
+      
+      ## Umgebungskomponenten
+      #########################
+      my $showenv  = CurrentVal  ($name, 'headerShowEnv', '');
+      my ($sa,$sh) = parseParams ($showenv, ',');
+      my @aenvs    = @$sa;                               
+      
+      my $dt       = timestringsFromOffset ($paref->{t}, 0);
+      my $hod      = sprintf "%02d", ($dt->{hour} + 1);
+      my $presence = CircularVal ($name, $hod, 'presence', undef);                                      # Anwesenheit
+      
+      my $presimg  = !defined $presence                         
+                     ? FW_makeImage ('user_unknown@grey')
+                     : $presence
+                     ? FW_makeImage ('user_available')
+                     : FW_makeImage ('user_n_a@grey');
+
+      my $wind_fast = NexthoursVal ($name, 'NextHour00', 'windspeed_fast', undef);                      # Wind
+      $wind_fast    = round1 ($wind_fast) if(defined $wind_fast);
+                     
+      my $windimg   = !defined $wind_fast                         
+                      ? FW_makeImage ('weather_wind_speed_ms@grey')
+                      : $wind_fast >= 24.5
+                      ? FW_makeImage ('weather_wind_speed_ms@#ee5500')
+                      : $wind_fast >= 20.8
+                      ? FW_makeImage ('weather_wind_speed_ms@#884400')
+                      : $wind_fast >= 17.2
+                      ? FW_makeImage ('weather_wind_speed_ms@#555500')
+                      : FW_makeImage ('weather_wind_speed_ms@#007700');
+                      
 
       ## Autokorrektur-Icon
       ######################
@@ -18872,8 +18914,8 @@ sub _graphicHeader {
                 q{};
 
       my $nscc = ReadingsVal  ($name, 'nextRadiationAPICall', '?');
-      my $lrt  = StatusAPIVal ($hash, $rapi, '?All', 'lastretrieval_time', '-');
-      my $scrm = StatusAPIVal ($hash, $rapi, '?All', 'response_message',   '-');
+      my $lrt  = StatusAPIVal ($name, $rapi, '?All', 'lastretrieval_time', '-');
+      my $scrm = StatusAPIVal ($name, $rapi, '?All', 'response_message',   '-');
 
       if ($lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x) {
           my ($sly, $slmo, $sld, $slt) = $lrt =~ /(\d{4})-(\d{2})-(\d{2})\s+(.*)/x;
@@ -18908,9 +18950,9 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.' / '.$htitles{rapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($name, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIrequests', SOLCMAXREQDEF);
+          $api .= StatusAPIVal ($name, $rapi, '?All', 'todayRemainingAPIrequests', SOLCMAXREQDEF);
           $api .= ')';
           $api .= '</span>';
       }
@@ -18932,9 +18974,9 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.' / '.$htitles{raricp}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($name, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'requests_remaining', '-');
+          $api .= StatusAPIVal ($name, $rapi, '?All', 'requests_remaining', '-');
           $api .= ')';
           $api .= '</span>';
       }
@@ -18953,7 +18995,7 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($name, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= ')';
           $api .= '</span>';
       }
@@ -18980,7 +19022,7 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($name, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= ')';
           $api .= '</span>';
       }
@@ -18999,9 +19041,9 @@ sub _graphicHeader {
           $api .= '&nbsp;&nbsp;'.$scicon;
           $api .= '<span title="'.$htitles{dapic}{$lang}.' / '.$htitles{rapic}{$lang}.'">';
           $api .= '&nbsp;&nbsp;(';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayDoneAPIrequests', 0);
+          $api .= StatusAPIVal ($name, $rapi, '?All', 'todayDoneAPIrequests', 0);
           $api .= '/';
-          $api .= StatusAPIVal ($hash, $rapi, '?All', 'todayRemainingAPIrequests', OMETMAXREQ);
+          $api .= StatusAPIVal ($name, $rapi, '?All', 'todayRemainingAPIrequests', OMETMAXREQ);
           $api .= ')';
           $api .= '</span>';
       }
@@ -19022,8 +19064,8 @@ sub _graphicHeader {
 
       ## Abweichung PV Prognose/Erzeugung
       #####################################
-      my $tdayDvtn = CircularVal ($hash, 99, 'tdayDvtn', '-');
-      my $ydayDvtn = CircularVal ($hash, 99, 'ydayDvtn', '-');
+      my $tdayDvtn = CircularVal ($name, 99, 'tdayDvtn', '-');
+      my $ydayDvtn = CircularVal ($name, 99, 'ydayDvtn', '-');
       $tdayDvtn    = sprintf "%.1f %%", $tdayDvtn if(isNumeric($tdayDvtn));
       $ydayDvtn    = sprintf "%.1f %%", $ydayDvtn if(isNumeric($ydayDvtn));
       $tdayDvtn    =~ s/\./,/;
@@ -19054,8 +19096,8 @@ sub _graphicHeader {
       
       ## Abweichung CON Prognose/Erzeugung
       ######################################
-      my $tdayConDvtn = CircularVal ($hash, 99, 'tdayConDvtn', '-');
-      my $ydayConDvtn = CircularVal ($hash, 99, 'ydayConDvtn', '-');
+      my $tdayConDvtn = CircularVal ($name, 99, 'tdayConDvtn', '-');
+      my $ydayConDvtn = CircularVal ($name, 99, 'ydayConDvtn', '-');
       $tdayConDvtn    = sprintf "%.1f %%", $tdayConDvtn if(isNumeric($tdayConDvtn));
       $ydayConDvtn    = sprintf "%.1f %%", $ydayConDvtn if(isNumeric($ydayConDvtn));
       $tdayConDvtn    =~ s/\./,/;
@@ -19083,20 +19125,24 @@ sub _graphicHeader {
 
       ## Aufbau Header
       #######################
-      my $alias = AttrVal ($name, "alias", $name );                                               # Linktext als Aliasname
+      my $alias = AttrVal ($name, "alias", $name );                                                 # Linktext als Aliasname
       my $dlink = qq{<a href="$::FW_ME$::FW_subdir?detail=$name">$alias</a>};
       my $space = '&nbsp;&nbsp;&nbsp;';
       my $disti = qq{<span title="$chktitle"> $chkicon </span> $space <span title="$fthtitle"> $fthicon </span> $space <span title="$wiktitle"> $wikicon </span> $space <span title="$msgtitle"> $msgicon </span>};
       
-      my @parts1 = (
-          [ $tempimg,  0 ],
-          [ $temptxt,  3 ],
+      my @parts1;
+
+      push @parts1, [ $presimg, 3 ]                    if(grep /^presence$/,    @$sa);              # Anwesenheitssymbol  
+      push @parts1, [ $windimg, 1 ], [ $wind_fast, 1 ] if(grep /^windSpeed$/,   @$sa);              # Windanzeige  
+      push @parts1, [ $tempimg, 0 ], [ $temptxt,   3 ] if(grep /^outsideTemp$/, @$sa);              # Außentemperatur
+      
+      push @parts1,
           [ $sriseimg, 1 ],
           [ $srisetxt, 3 ],
           [ $ssetimg,  1 ],
           [ $ssettxt,  3 ],
           [ $waicon,   0 ],  # am Ende kein zusätzlicher Abstand
-      );
+          ;
 
       my @parts2 = (
           [ $autoct,  2 ],
@@ -24498,15 +24544,15 @@ sub aiFannTrain {
       my $mse_train = $ann->MSE();                                                                          # Aktuellen Fehler abfragen
       my $bfail     = $ann->bit_fail();                                                                     # Anzahl der Ausgaben, die außerhalb einer vorgegebenen Toleranz liegen, Standardtoleranz: 0.35
 
-      # Validierung
-      ###############     
+      # --- Validierung im Normraum
+      ###############################   
       my $sum_sq       = 0;
       my $bit_fail_val = 0;
       my @targetvals; 
       my @predictvals;
-      my @err_norm_sq;                                                                                     # für robustes Clipping
-      my $werr_sum   = 0;                                                                                  # gewichtete Fehler-Summe
-      my $w_sum      = 0;                                                                                  # Gewicht-Summe
+      my @err_norm_sq;                                                                                      # für robustes Clipping
+      my $werr_sum   = 0;                                                                                   # gewichtete Fehler-Summe
+      my $w_sum      = 0;                                                                                   # Gewicht-Summe
           
       for my $i (0 .. $#test_inputs) {
           my $prediction = $ann->run ($test_inputs[$i]);
@@ -24514,7 +24560,7 @@ sub aiFannTrain {
 
           my $err_norm = $prediction->[0] - $target->[0];
           my $err2     = $err_norm * $err_norm;                                                            
-          $sum_sq     += $err2;                                                                            # Grundlage für MSE/RMSE im Normraum                                       
+          $sum_sq     += $err2;                                                                             # Grundlage für MSE/RMSE im Normraum                                       
           
           push @targetvals,      $target->[0]; 
           push @predictvals, $prediction->[0];
@@ -24522,7 +24568,7 @@ sub aiFannTrain {
           my $diff_norm = abs ( $prediction->[0] - $target->[0] );                                          # BitFail prüfen (Toleranz $bit_fail_limit im Normalisierungsbereich)
           $bit_fail_val++ if($diff_norm > $bit_fail_limit);
           
-          ### NEW: Weighted-RMSE-Proxy sammeln ###
+          # --- Weighted-RMSE-Proxy sammeln
           push @err_norm_sq, $err2;
           my $w      = $target->[0];                                                                        # Gewichtung nach Zielwertgröße (normiert), 0..1 -> perfekt geeignet
           $w_sum    += $w;                                                                                  # Clipping erst NACH der Schleife (braucht Median), hier nur Rohwerte sammeln
@@ -24684,8 +24730,8 @@ sub aiFannTrain {
            );
   }
   
-  # Bester Snapshot -> Validierung und Kennzahlen berechnen
-  ###########################################################
+  # --- Bester Snapshot -> Validierung und Kennzahlen berechnen
+  ###############################################################
   my $sum_sq  = 0;                                                                          # für MSE/RMSE (normalisiert)
   my $sum_z   = 0;
   my $bitfail = 0;
@@ -24693,8 +24739,9 @@ sub aiFannTrain {
   my $ss_res  = 0;
   my $sum_err = 0;
   
-  my @abs_errors;                                                                           # für MAE und MedAE (denormalisiert)
   my @pct_errors;                                                                           # für MAPE und MdAPE (denormalisiert)
+  my @targets;
+  my @preds;
   
   if ($debug =~ /aiProcess/xs) {
       Log3 ($name, 1, "$name DEBUG> Run Validation Test with ".((1-$training_portion) * 100)."% of Input data ...");
@@ -24707,13 +24754,14 @@ sub aiFannTrain {
       my $err_norm = $prediction_norm - $target_norm;                                       # Fehler im Normalisierungsraum
       $sum_sq     += $err_norm**2;                                                          # für MSE im Normalisierungsraum
     
-      my $prediction = _aiFannDenormMinMaxValue ($prediction_norm, $minval, $maxval);       # Für MAE/MAPE/R² weiterhin denormalisieren
       my $target     = _aiFannDenormMinMaxValue ($target_norm,     $minval, $maxval);
+      my $prediction = _aiFannDenormMinMaxValue ($prediction_norm, $minval, $maxval);       # Für MAE/MAPE/R² weiterhin denormalisieren
 
-      $sum_err += ($prediction - $target);
-      my $pterr = $prediction - $target;
-      
-      push @abs_errors, abs ($pterr);                                                       # Fehler sammeln (denormalisiert)
+      $sum_err  += ($target - $prediction);
+      my $pterr  = $target - $prediction;
+
+      push @targets, $target;
+      push @preds,   $prediction;      
       push @pct_errors, abs ($pterr / ($target || 1)) * 100;                                # Prozentfehler (denormalisiert)
 
       $sum_z  += $target;
@@ -24722,21 +24770,26 @@ sub aiFannTrain {
       my $diff_norm = abs ($prediction_norm - $target_norm);
       $bitfail++ if($diff_norm > $bit_fail_limit);                                          # BitFail basiert auf normalisierten Werten
   }
-
-  my $mean_error    = $sum_err / scalar (@test_inputs);                                     # Bias (systematischer Fehler) Originalskala
-  my $n             = scalar (@test_inputs);
-  my $mae           = sum (@abs_errors) / $n;                                               # MAE (Durchschnitt) Originalskala
-  my @sorted_abs    = sort { $a <=> $b } @abs_errors;                                          
-  my $medae         = medianArray (\@sorted_abs);                                           # MedAE (Median) Originalskala
-
-  my $mape          = sum (@pct_errors) / $n;                                               # MAPE (Durchschnitt) %
-  my @sorted_pct    = sort { $a <=> $b } @pct_errors;                                          
-  my $mdape         = medianArray (\@sorted_pct);                                           # MdAPE (Median) %
   
+  my $metrics        = _aiFannSlopeBias (\@targets, \@preds);                               # Modell-Slope und Modell-Bias auf denormalisierten Werten
+  my $model_slope    = $metrics->{slope_regres};
+  my $model_bias     = $metrics->{bias_regres};
+  
+  my $err_metrics    = _aiFannErrorMetrics (\@targets, \@preds);                            # Fehlermetriken in Originalskala (denormalisiert)
+  my $mae            = $err_metrics->{mae};                                                 # MAE (Durchschnitt) Originalskala
+  my $rmse           = $err_metrics->{rmse};                                                # RMSE auf Originalskala (z.B. Wh)
+  my $rmse_rel       = $err_metrics->{rmse_rel};                                            # relative RMSE in %
+  my $medae          = $err_metrics->{medae};                                               # MedAE (Median) Originalskala
+  my $mape           = $err_metrics->{mape};                                                # MAPE (Durchschnitt) %
+  my $mdape          = $err_metrics->{mdape};                                               # MdAPE (Median) %
+  my $target_median  = $err_metrics->{tgt_median};
+  my $abs_errors_ref = $err_metrics->{abs_error_ref};                
+  my @abs_errors     = @$abs_errors_ref;
+                                                                                                                                 
   my $sum_sq_denorm = 0;
-  $sum_sq_denorm   += $_**2 for @abs_errors;
-  my $rmse          = sqrt ($sum_sq_denorm / $n);                                           # RMSE auf Originalskala (z.B. Wh)
+  $sum_sq_denorm   += $_**2 for @abs_errors; 
   
+  my $n             = scalar (@test_inputs);
   my $mse_val       = $sum_sq / $n;                                                         # MSE im Normalisierungsraum
   my $mean_z        = $sum_z / $n;
   
@@ -24748,15 +24801,10 @@ sub aiFannTrain {
   }
   
   my $r2 = 1 - ($ss_res / ($ss_tot || 1));                                                  # R² auf Originalskala
+
   
   # Zielgrößen relative RMSE / weighted RMSE / + Textbewertung
-  ##############################################################
-  # relative RMSE 
-  my @targets_wh    = map { _aiFannDenormMinMaxValue ($_->[0], $minval, $maxval) } @test_targets;
-  my $target_median = medianArray (\@targets_wh); 
-  my $rmse_rel      = round0 ($rmse / $target_median * 100);                                # relative RMSE in %
-  
-  # weighted RMSE und RMSE relative
+  ############################################################## 
   my @weighted_sq;
   my @weights;
   my $clip = 2 * $mae;                                                                      # Clipping-Schwelle basierend auf MAE, Huber-artig, robust
@@ -24785,27 +24833,8 @@ sub aiFannTrain {
       : $weighted_rmse_rel < 120 ? "weak"                                                   # noch ok
       :                            "very bad";                                              # kritisch
 
-  # Bester Snapshot ->  Modell-Slope und Modell-Bias auf denormalisierten Werten
-  #################################################################################
-  my @targets;
-  my @preds;
-
-  for my $i (0 .. $#test_inputs) {
-      my $target_norm     = $test_targets[$i]->[0];
-      my $prediction_norm = $ann->run($test_inputs[$i])->[0];
-
-      my $target     = _aiFannDenormMinMaxValue ($target_norm,     $minval, $maxval);
-      my $prediction = _aiFannDenormMinMaxValue ($prediction_norm, $minval, $maxval);
-
-      push @targets, $target;
-      push @preds,   $prediction;
-  }
-
-  my ($model_slope, $model_bias) = _aiFannSlopeBias (\@targets, \@preds);
-
-
   
-  # Validation Mittelwert und Standardabweichung berechnen
+  # Validation Mittelwert und Standardabweichung im Normraum berechnen
   ########################################################################
   # Windows prüft nur die Phase, die wirklich relevant ist -> ob das 
   # Modell am Ende stabil war.
@@ -24828,7 +24857,7 @@ sub aiFannTrain {
   
   # Rauschwertermittlung und Bit-Fail-Limit-Empfehlung
   ######################################################
-  my ($noise_flag, $bitfail_suggestion) = _aiFannDetectNoiseLevel (\@targets_wh, $mae, $target_median);
+  my ($noise_flag, $bitfail_suggestion) = _aiFannDetectNoiseLevel (\@targets, $mae, $target_median);
   
   # Retry-Indikator ausführen
   #############################
@@ -24840,7 +24869,6 @@ sub aiFannTrain {
                                                  valmean        => $val_mean, 
                                                  mae            => $mae,
                                                  abserref       => \@abs_errors, 
-                                                 mean_error     => $mean_error,
                                                  test_input_num => scalar (@test_inputs),
                                                  slope          => $model_slope,
                                                  bias           => $model_bias,
@@ -25107,7 +25135,6 @@ sub _aiFannRetrainIndicator {
   my $rmse_rel       = $paref->{rmse_rel};                                  # weighted RMSE_rel
   my $mae            = $paref->{mae};
   my $abserref       = $paref->{abserref};
-  my $mean_error     = $paref->{mean_error};
   my $test_input_num = $paref->{test_input_num};
   my $model_slope    = $paref->{slope};
   my $model_bias     = $paref->{bias};
@@ -25187,9 +25214,7 @@ sub _aiFannRetrainIndicator {
                                     || $model_slope     < $lim_slope_min
                                     || $model_slope     > $lim_slope_max
                                     || abs($model_bias) > $lim_bias
-                                    || ($rmse_rel       > $lim_rmse_rel 
-                                        && ($p95_error  > $lim_p95_error 
-                                        ||  $p99_error  > $lim_p99_error))
+                                    || ($rmse_rel       > $lim_rmse_rel && ($p95_error > $lim_p95_error ||  $p99_error  > $lim_p99_error))
                                  );
 
   
@@ -25816,9 +25841,9 @@ sub aiFannDetectDrift {
   my $liyear  = int ($latest_idx / 1000000);
   my $limonth = sprintf "%02d", int (($latest_idx % 1000000) / 10000);
   my $liday   = sprintf "%02d", int (($latest_idx % 10000) / 100);
-  my $lihour  = sprintf "%02d", int ($latest_idx % 100);
+  my $lihour  = sprintf "%02d", (int ($latest_idx  % 100) - 1);
 
-  my $litimestamp = timestringToTimestamp ("$liyear-$limonth-$liday $lihour:00:00");           
+  my $litimestamp = timestringToTimestamp ("$liyear-$limonth-$liday $lihour:00:00"); 
   my $train_ts    = CircularVal ($name, 99, $fanntyp.'NNTrainLastFinishTs', $litimestamp);
   my $age_hours   = round0 (($litimestamp - $train_ts) / 3600);
   $age_hours      = 0 if($age_hours < 0);
@@ -25837,10 +25862,10 @@ sub aiFannDetectDrift {
       my $year  = int ($idx / 1000000);
       my $month = sprintf "%02d", int (($idx % 1000000) / 10000);
       my $day   = sprintf "%02d", int (($idx % 10000) / 100);
-      my $hour  = sprintf "%02d", int ($idx % 100);
+      my $hour  = sprintf "%02d", (int ($idx % 100) -1);
 
       my $ts = timestringToTimestamp ("$year-$month-$day $hour:00:00");
-      $ts >= $train_ts;
+      $ts   >= $train_ts;
   } @indices;
 
   if (@post_train_idx < 24) {
@@ -25851,7 +25876,7 @@ sub aiFannDetectDrift {
       
   my @tail_idx = @post_train_idx[-$window .. -1];
 
-  my (@targets, @preds, @abs_errors);
+  my (@targets, @preds);
   my (@slope_list, @bias_live_list);
   
   my $mae_model = AiNeuralVal ($name, $fanntyp, 'Mae',                  1);
@@ -25870,7 +25895,6 @@ sub aiFannDetectDrift {
 
       push @targets,    $a;
       push @preds,      $p;
-      push @abs_errors, abs ($a - $p);
       push @slope_list, ($p / $a) if($a != 0);
 
       my $bias_hour = $a - $p;                                                      # real - Prognose !
@@ -25900,16 +25924,20 @@ sub aiFannDetectDrift {
   my $bias_var_norm = $ref_mae > 0 ? $bias_var / ($ref_mae ** 2) : $bias_var;
 
 
-  # --- Basis-Metriken ---
-  my $n_err         = @abs_errors || return;
-  my $mae_live      = sum  (@abs_errors) / $n_err;
-  my $rmse_live     = sqrt (sum(map { $_**2 } @abs_errors) / $n_err);
-  my $median        = medianArray (\@targets) || 1;
-  my $rmse_rel_live = ($rmse_live / $median) * 100;
-  my $drift_score   = $mae_live / $ref_mae;
+  # --- Basis-Fehlermetriken ---
+  my $err_metrics    = _aiFannErrorMetrics (\@targets, \@preds);                   # Fehlermetriken in Originalskala (denormalisiert)
+  my $mae_live       = $err_metrics->{mae};                                        # MAE (Durchschnitt) Originalskala
+  my $rmse_live      = $err_metrics->{rmse};                                       # RMSE auf Originalskala (z.B. Wh)
+  my $rmse_rel_live  = $err_metrics->{rmse_rel};                                   # relative RMSE in %
+  my $median         = $err_metrics->{tgt_median};
+  my $abs_errors_ref = $err_metrics->{abs_error_ref};
+  
+  my $drift_score = $mae_live / $ref_mae;
 
   # --- Slope/Bias Live ---
-  my ($slope_live, $bias_live) = _aiFannSlopeBias (\@targets, \@preds);
+  my $metrics     = _aiFannSlopeBias (\@targets, \@preds);                         # Regression - Slope und Bias auf denormalisierten Werten
+  my $slope_live  = $metrics->{slope_regres};
+  my $bias_live   = $metrics->{bias_regres};
 
   my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',              500);  
   my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope',               1);
@@ -26091,7 +26119,8 @@ return $flag;
 }
 
 ###########################################################################
-#       Slope und Bias berechnen
+#       Slope und Regressions‑Bias (Model Bias) berechnen
+#       -> Modellstruktur
 ###########################################################################
 sub _aiFannSlopeBias {
   my ($targets_ref, $preds_ref) = @_;
@@ -26100,7 +26129,10 @@ sub _aiFannSlopeBias {
   my @preds   = @$preds_ref;
 
   my $n = @targets;
-  return (0, 0) if($n < 2);                                     # zu wenige Daten für Regression
+  return {
+      slope_regres => 1,            
+      bias_regres  => 0,
+  } if($n < 2);                                             # zu wenige Daten für Regression
 
   my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);
 
@@ -26121,7 +26153,100 @@ sub _aiFannSlopeBias {
 
   my $bias  = ($sum_y - $slope * $sum_x) / $n;
 
-return ($slope, $bias);
+  return {
+      slope_regres => $slope,            
+      bias_regres  => $bias,
+  };      
+}
+
+###########################################################################
+#    MAE, RMSE, RMSErel, MAPE, MdAPE, Median, AbsErrors-Liste, Fehler‑Bias 
+#    berechnen (alles auf Originalskala)
+#    -> Fehler-Metriken
+###########################################################################
+sub _aiFannErrorMetrics {
+  my ($targets_ref, $preds_ref) = @_;
+
+  my @targets = @$targets_ref;
+  my @preds   = @$preds_ref;
+
+  my (@abs_errors, @pct_errors);
+  my @bias_list;                                                      # signed errors (target - prediction)
+  my ($sum_abs, $sum_sq, $sum_bias, $sum_abs_bias) = (0,0,0,0);
+
+  my $tgt_median = medianArray($targets_ref) || 1;                    # Median für RMSErel
+
+  for my $i (0 .. $#targets) {
+      my $a = $targets[$i];
+      my $p = $preds[$i];
+
+      my $bias = $a - $p;                                             # signed error (Bias-Semantik)
+      my $err  = abs ($bias);                                         # absolute error
+
+      push @bias_list,  $bias;
+      push @abs_errors, $err;
+      
+      my $pct = $a ? abs($bias / $a) * 100 : 0;                       # Prozentfehler (MAPE-Basis)
+      push @pct_errors, $pct;
+
+      $sum_bias     += $bias;
+      $sum_abs_bias += abs($bias);
+      $sum_abs      += $err;
+      $sum_sq       += $err * $err;
+  }
+
+  my $n_err = @abs_errors;
+  
+  return {
+      mae            => 0,
+      rmse           => 0,
+      rmse_rel       => 0,
+      medae          => 0,
+      mape           => 0,
+      mdape          => 0,
+      tgt_median     => 1,
+      abs_error_ref  => [],
+      pct_errors_ref => [],
+      bias_mean      => 0,
+      bias_median    => 0,
+      bias_abs_mean  => 0,
+      bias_abs_median=> 0,
+  } if $n_err < 1;
+
+  # Grundmetriken
+  my $mae      = $sum_abs / $n_err;
+  my $rmse     = sqrt ($sum_sq / $n_err);
+  my $rmse_rel = ($rmse / $tgt_median) * 100;
+  
+  # Median Absolute Error (MedAE)
+  my $medae = medianArray (\@abs_errors);
+  my $mape  = sum (@pct_errors) / $n_err;
+  my $mdape = medianArray (\@pct_errors);
+
+  # Bias-Metriken
+  my $bias_mean       = $sum_bias / $n_err;
+  my $bias_abs_mean   = $sum_abs_bias / $n_err;
+
+  my @abs_bias        = map { abs($_) } @bias_list;
+  my $bias_median     = medianArray (\@bias_list);
+  my $bias_abs_median = medianArray (\@abs_bias);
+
+  return {
+      mae             => $mae,                                      # MAE (Durchschnitt) Originalskala
+      rmse            => $rmse,                                     # RMSE auf Originalskala (z.B. Wh)
+      rmse_rel        => $rmse_rel,                                 # relativer RMSE in %
+      medae           => $medae,                                    # Median Absolute Error – robuster Median der absoluten Fehler
+      mape            => $mape,                                     # Mean Absolute Percentage Error – durchschnittlicher prozentualer Fehler bezogen auf den Zielwert.
+      mdape           => $mdape,                                    # Median Absolute Percentage Error – medianer prozentualer Fehler.                           
+      tgt_median      => $tgt_median,                               # Median der Zielwertgrößen
+      abs_error_ref   => \@abs_errors,                              # Liste absoluter Fehler
+      pct_errors_ref  => \@pct_errors,                              # Liste der absoluten prozentualen Fehler pro Sample
+            
+      bias_mean       => $bias_mean,                                # Durchschnittlicher Bias (signed)
+      bias_median     => $bias_median,                              # Median-Bias (signed)
+      bias_abs_mean   => $bias_abs_mean,                            # Durchschnittlicher absoluter Bias
+      bias_abs_median => $bias_abs_median,                          # Median absoluter Bias
+  };
 }
 
 ###########################################################################
@@ -29348,18 +29473,25 @@ return ($tm, $tmdef, $realtm, $tmfull);
 }
 
 ################################################################
-#  einen Zeitstring YYYY-MM-TT hh:mm:ss in einen Unix
-#  Timestamp umwandeln
+#  einen Zeitstring YYYY-MM-DD hh:mm:ss oder YYYY-MM-DDThh:mm:ss
+#  in einen Unix Timestamp umwandeln
 ################################################################
 sub timestringToTimestamp {
-  my $tstring = shift;
+  my $tstring = shift // return;
 
-  my($y, $mo, $d, $h, $m, $s) = $tstring =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;
-  return if(!$mo || !$y);
+  $tstring = trim ($tstring);                         # Whitespace entfernen
 
-  my $timestamp = fhemTimeLocal($s, $m, $h, $d, $mo-1, $y-1900);
+  my ($y, $mo, $d, $h, $m, $s) = $tstring =~ /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/;
 
-return $timestamp;
+  return if(!defined $y);                             # kein gültiges Format
+
+  return if $mo < 1 || $mo > 12;                      # Monat/Tag/Std/Min/Sek prüfen
+  return if $d  < 1 || $d  > 31;
+  return if $h  > 23;
+  return if $m  > 59;
+  return if $s  > 59;
+
+return fhemTimeLocal ($s, $m, $h, $d, $mo-1, $y-1900);
 }
 
 ################################################################
@@ -34577,6 +34709,12 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td><b>own</b>    - User zone (see <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>)                               </td></tr>
             <tr><td>                            </td><td><b>status</b> - Status information area                                                                                                   </td></tr>
             <tr><td>                            </td><td>                                                                                                                                          </td></tr>
+            <tr><td> <b>headerShowEnv</b>       </td><td>Select the environmental values to display in the header section of the graph. The selected options are separated by commas.              </td></tr>
+            <tr><td>                            </td><td>The environment variables are set using the <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment attribute.                    </td></tr>
+			<tr><td>                            </td><td><b>outsideTemp</b> - the current outdoor temperature                                                                                      </td></tr>
+            <tr><td>                            </td><td><b>presence</b>    - presence status                                                                                                      </td></tr>
+            <tr><td>                            </td><td><b>windSpeed</b>   - the current wind speed                                                                                               </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>hourStyle</b>           </td><td>Format of the time in the bar chart.                                                                                                      </td></tr>
             <tr><td>                            </td><td><b>not set</b> - only hours without minutes (default)                                                                                     </td></tr>
             <tr><td>                            </td><td><b>:00</b>     - Hours and minutes in two digits, e.g. 10:00                                                                              </td></tr>
@@ -34612,7 +34750,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=1:top,2:bottom
+         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=1:top,2:bottom headerShowEnv=outsideTemp,presence
        </ul>
 
        </li>
@@ -37577,6 +37715,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td><b>own</b>    - Nutzerzone (siehe <a href="#SolarForecast-attr-graphicHeaderOwnspec">graphicHeaderOwnspec</a>)                  </td></tr>
             <tr><td>                            </td><td><b>status</b> - Bereich der Statusinformationen                                                                                 </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
+            <tr><td> <b>headerShowEnv</b>       </td><td>Auswahl der anzuzeigenden Umgebungswerte im Grafik Kopfbereich. Die gewählten Optionen werden durch Komma getrennt angegeben.   </td></tr>
+            <tr><td>                            </td><td>Die Einrichtung der Umgebungswerte erfolgt mit Attribut <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment</a>.    </td></tr>
+			<tr><td>                            </td><td><b>outsideTemp</b> - die aktuelle Außentemperatur                                                                               </td></tr>
+            <tr><td>                            </td><td><b>presence</b>    - den Anwesenheitsstatus                                                                                     </td></tr>
+            <tr><td>                            </td><td><b>windSpeed</b>   - die aktuelle Windgeschwindigkeit                                                                           </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>hourStyle</b>           </td><td>Format der Zeitangabe in der Balkengrafik.                                                                                      </td></tr>
             <tr><td>                            </td><td><b>nicht gesetzt</b> - nur Stundenangabe ohne Minuten (default)                                                                 </td></tr>
             <tr><td>                            </td><td><b>:00</b>           - Stunden sowie Minuten zweistellig, z.B. 10:00                                                            </td></tr>
@@ -37612,7 +37756,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=1:top,2:bottom beamHeightlevel=1:260,2:80,3:400
+         attr &lt;name&gt; graphicControl beamWidth=45 headerDetail=co,pv energyUnit=kWh hourCount=10 layoutType=diff hourStyle=:00 scaleMode=1:log,2:lin,3:log showDiff=1:top,2:bottom beamHeightlevel=1:260,2:80,3:400 headerShowEnv=outsideTemp,presence
        </ul>
 
        </li>
