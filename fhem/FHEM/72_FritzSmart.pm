@@ -19540,7 +19540,8 @@ sub Fritz_Helper_reformat
    <br>
    Es muss zwingend das Attribut boxUser nach der Definition des Device gesetzt werden.
    <br><br>
-   <a name="Fritzdefine"></a>
+
+   <a name="FritzSmartdefine"></a>
    <b>Define</b>
    <ul>
       <br>
