@@ -105,7 +105,7 @@ sub Value($);
 sub WriteStatefile();
 sub XmlEscape($);
 sub addEvent($$;$);
-sub addToDevAttrList($$;$);
+sub addToDevAttrList($$;$$);
 sub applyGlobalAttrFromEnv();
 sub delFromDevAttrList($$);
 sub addToAttrList($;$);
@@ -400,8 +400,8 @@ my @attrList = qw(
   timestamp-on-change-reading
 );
 $readingFnAttributes = join(" ", @attrList);
-my %attrSource = map { s/:.*//; $_ => "framework" } @attrList;
-map { $attrSource{$_} = "framework" } qw(
+my %attrSource = map { s/:.*//; $_ => {m=>"framework"} } @attrList;
+map { $attrSource{$_} = {m=>"framework"} } qw(
   ignore
   disable
   disabledForIntervals
@@ -2880,7 +2880,7 @@ getAllAttr($;$$)
     $list .= " " if($list);
     $list .= $v;
     map { s/:.*//; 
-          $typeHash->{$_} = $attrSource{$_} ? $attrSource{$_} : $type }
+          $typeHash->{$_} = $attrSource{$_} ? $attrSource{$_}{m} : $type }
         split(" ",$v) if($typeHash);
   };
 
@@ -3221,7 +3221,8 @@ CommandAttr($$)
       $attrVal = 5   if($attrName eq "verbose");
     }
     $defs{$sdev}->{CL} = $cl;
-    $ret = CallFn($sdev, "AttrFn", "set", $sdev, $attrName, $attrVal);
+    my $ci = $attrSource{$attrName}{ci} ? $attrSource{$attrName}{ci} : undef;
+    $ret = CallFn($ci || $sdev, "AttrFn", "set", $sdev, $attrName, $attrVal);
     delete($defs{$sdev}->{CL});
     if($ret) {
       push @rets, $ret;
@@ -4393,9 +4394,9 @@ AddDuplicate($$)
 # Add an attribute to the userattr list, if not yet present
 # module is the source, needed when searching for help
 sub
-addToDevAttrList($$;$)
+addToDevAttrList($$;$$)
 {
-  my ($dev,$arg,$module) = @_;
+  my ($dev,$arg,$module,$checkInstance) = @_;
 
   my $ua = $attr{$dev}{userattr};
   $ua = "" if(!$ua);
@@ -4403,7 +4404,10 @@ addToDevAttrList($$;$)
              grep { " $AttrList " !~ m/ $_ / }
              split(" ", "$ua $arg");
   $attr{$dev}{userattr} = join(" ", sort keys %hash);
-  map { s/:.*//; $attrSource{$_} = $module; } split(" ", $arg) if($module);
+  map { s/:.*//;
+        $attrSource{$_}{m} = $module;
+        $attrSource{$_}{ci} = $checkInstance if($checkInstance);
+      } split(" ", $arg) if($module);
 }
 
 # The counterpart: delete it.
