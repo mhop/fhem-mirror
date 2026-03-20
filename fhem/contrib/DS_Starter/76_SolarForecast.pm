@@ -163,11 +163,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.4.0"  => "19.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
+  "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
                            "extended/refactored: writeCacheToFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
-                           "new key graphicControl->headerShowEnv, _saveEnergyConsumption: implemntation of MAXCONLIMIT ",
+                           "new key graphicControl->headerShowEnv, _saveEnergyConsumption: implemntation of MAXCONLIMIT ".
+                           "new key plantControl->conEnergyHourLimit ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
   "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
                            "_transferAPIRadiationValues: fix round0 ",
@@ -348,41 +349,8 @@ my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
 ## Konstanten
 ######################
 use constant {
-  INFINITE       => ~0 >> 1,                                                        # "Unendlich"
-  LPOOLLENLIM    => 140,                                                            # Breitenbegrenzung der Ausgabe von List Pooldaten
-  KJ2KWH         => 0.0002777777778,                                                # Umrechnungsfaktor kJ in kWh
-  KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
-  WH2KJ          => 3.6,                                                            # Umrechnungsfaktor Wh in kJ
-  PI             => 3.141592653589793,                                              # die Konstante π 
-  DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
-  INPUTSIZE      => 10,                                                             # default Breite eines Textfeldes in graphicHeaderOwnspec
-  DEFMAXVAR      => 0.75,                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
-  DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
-  SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
-  SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß und anderen
-  CONDAYSLIDEMAX => 30,                                                             # max. Anzahl der Arrayelemente im Register pvCircular -> con_all / gcons_a -> <Tag>
-  WHISTREPEAT    => 851,                                                            # Wiederholungsintervall Cache File Daten schreiben
-  EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen für verbraucherspezifische Energiestück Ermittlung (EnergyPieces)
-  EPIECMAXOPHRS  => 10,                                                             # max. Anzahl ununterbrochene Betriebsstunden für Verbraucher ohne Cycle Switch (EnergyPieces)
-  
-  MAXWEATHERDEV  => 3,                                                              # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
-  MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
-  MAXCONSUMER    => 20,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
-  MAXPRODUCER    => 3,                                                              # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-  MAXINVERTER    => 5,                                                              # maximale Anzahl der möglichen Inverter
-  MAXBEAMLEVEL   => 3,                                                              # maximale Anzahl der Balkengrafik Ebenen
-
-  MAXSOCDEF      => 95,                                                             # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
-  CARECYCLEDEF   => 20,                                                             # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
-  BATSOCCHGDAY   => 5,                                                              # Batterie: prozentuale SoC Anpassung pro Tag
-  PERCCONINSOC   => 0.75,                                                           # Batterie SoC-Management: Anteilsfaktor für Verbrauch
-  STOREFFDEF     => 87,                                                             # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
-  
-  GMFBLTO        => 30,                                                             # Timeout Aholen Message File aus GIT
-  GMFILEREPEAT   => 3600,                                                           # Base Wiederholungsuntervall Abholen Message File aus GIT
-  GMFILERANDOM   => 10800,                                                          # Random AddOn zu GMFILEREPEAT
-  IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
-
+  ACTCOLDEF      => 'orange',                                                       # default Färbung Icon wenn aktiv
+  ACTCOLINVBAT   => '#00e000',                                                      # default Färbung aktiver Batterie-Wechselrichter ohne Solarzellen
   AINUMTREES     => 10,                                                             # Anzahl der Entscheidungsbäume im Ensemble
   AITRBLTO       => 7200,                                                           # KI DecTree Training BlockingCall Timeout
   AIASPEAKSFAC   => 1.1,                                                            # Sicherheitsaufschlag auf installiertes PV Peak
@@ -396,99 +364,139 @@ use constant {
   AIACCUPLIM     => 150,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
-
-  HPCOMFTEMP     => 20,                                                             # Wärmepumpe Solltemperatur / Komforttemperatur
-
-  MAXNEXTHOURS   => 71,                                                             # max. Anzahl Stunden der Wertebasis (Start mit 0 -> 72h) z.B. in Nexthours
-  MAXNEXTDAYS    => 2,                                                              # max. Anzahl volle Tage in NextHours (Start mit 0 -> 3d)
-  MAXCONLIMIT    => 100000,                                                         # oberes Limit stündlicher Energieverbrauch des Hauses (Wh)
-  DWDFCDAYSMIN   => 2,                                                              # Mindestwert Attr 'forecastDays' im DWD-Device
-  SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
-  FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
-  OMETEOREPDEF   => 900,                                                            # default Abrufintervall Open-Meteo API (s)
-  VRMAPIREPDEF   => 300,                                                            # default Abrufintervall Victron VRM API Forecast
-  SOLCMAXREQDEF  => 50,                                                             # max. täglich mögliche Requests SolCast API
-  OMETMAXREQ     => 8000,                                                           # Beschränkung auf max. mögliche Requests Open-Meteo API
-  LEADTIME       => 3600,                                                           # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
-  LAGTIME        => 1800,                                                           # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
   APITIMEOUT     => 30,                                                             # default Timeout HTTP API-Call
-
-  PRDEF          => 0.9,                                                            # default Performance Ratio (PR)
-  SFTYMARGIN_20  => 20,                                                             # Sicherheitszuschlag 20%
-  SFTYMARGIN_50  => 50,                                                             # Sicherheitszuschlag 50%
-  OTPDEADBAND    => 10.0,                                                           # Smoother Standard OTP Power Schwellenwert für Änderungen
-  OTPALPHA       => 1.0,                                                            # Smoother Standard OTP Power Alpha default
-  TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
-  TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
-  TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
-
-  LOGDELAY       => 600,                                                            # Verzögerungszeit zwischen zwei Logausgaben mit identischen Inhalt
-  DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
+  
+  BATSOCCHGDAY   => 5,                                                              # Batterie: prozentuale SoC Anpassung pro Tag
+  BEAMWIDTH      => 20,                                                             # default Balkenbreite
+  BHEIGHTLEVEL   => 200,                                                            # default Multiplikator zur Festlegung der maximalen Balkenhöhe
+  B1COLDEF       => 'FFAC63',                                                       # default Farbe Beam 1
+  B1FONTCOLDEF   => '0D0D0D',                                                       # default Schriftfarbe Beam 1
+  B2COLDEF       => 'C4C4A7',                                                       # default Farbe Beam 2
+  B2FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 2
+  B3COLDEF       => 'BED6C0',                                                       # default Farbe Beam 3
+  B3FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 3
+  B4COLDEF       => 'DBDBD0',                                                       # default Farbe Beam 4
+  B4FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 4
+  B5COLDEF       => 'A3C8FF',                                                       # default Farbe Beam 5
+  B5FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 5
+  B6COLDEF       => 'ABABAB',                                                       # default Farbe Beam 6
+  B6FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 6
+  BICONDEF       => 'measure_battery_75',                                           # default Batterie-Icon
+  BICCOLRCDDEF   => 'grey',                                                         # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
+  BICCOLNRCDDEF  => '#cccccc',                                                      # default Batterie-Icon Färbung bei fehlender Ladefreigabe
+  BCHGICONCOLDEF => 'darkorange',                                                   # default 'Aufladen' Batterie-Icon Färbung
+  BDCHICONCOLDEF => '#b32400',                                                                              # default 'Entladen' Batterie-Icon Färbung
+  BPATH          => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                   # Basispfad Abruf contrib SolarForecast Files
+  BGHPATH        => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',     # Basispfad GitHub SolarForecast Files
+  
   CONSFCLDAYS    => 60,                                                             # die Stundenwerte der letzten CONSFCLDAYS Tage zur Kalkulation der Verbrauchvorhersage einbezogen
+  CONDAYSLIDEMAX => 30,                                                             # max. Anzahl der Arrayelemente im Register pvCircular -> con_all / gcons_a -> <Tag>
+  CARECYCLEDEF   => 20,                                                             # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
+  CAICONDEF      => 'clock@gold',                                                   # default consumerAdviceIcon
+  CICONDEF       => 'light_light_dim_100',                                          # default Consumer-Icon
+  CICONCOLACT    => 'darkorange',                                                   # default Consumer-Icon aktiv Färbung
+  CICONCOLINACT  => 'grey',                                                         # default Consumer-Icon inaktiv Färbung
+  CFILE          => 'controls_solarforecast.txt',                                   # Controlfile Update FTUI-Files
+  
+  DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
+  DEFMAXVAR      => 0.75,                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
+  DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
+  DWDFCDAYSMIN   => 2,                                                              # Mindestwert Attr 'forecastDays' im DWD-Device
+  DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
   DEFCTYPE       => 'other',                                                        # default Verbrauchertyp
   DEFCMODE       => 'can',                                                          # default Planungsmode der Verbraucher
   DEFPOPERCENT   => 1.0,                                                            # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
   DEFHYST        => 0,                                                              # default Hysterese
+  
+  EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen für verbraucherspezifische Energiestück Ermittlung (EnergyPieces)
+  EPIECMAXOPHRS  => 10,                                                             # max. Anzahl ununterbrochene Betriebsstunden für Verbraucher ohne Cycle Switch (EnergyPieces)
+  
+  FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
+  FLOWGSIZEDEF   => 400,                                                            # default flowGraphicSize
+  FGCDDEF        => 130,                                                            # Abstand Verbrauchericons zueinander
+  
+  GMFBLTO        => 30,                                                             # Timeout Aholen Message File aus GIT
+  GMFILEREPEAT   => 3600,                                                           # Base Wiederholungsuntervall Abholen Message File aus GIT
+  GMFILERANDOM   => 10800,                                                          # Random AddOn zu GMFILEREPEAT
+  GENICONDEF     => 'solar',                                                        # default Generator (z.B. Strings) Icon
+  GENCOLACT      => 'darkorange',                                                   # default Generator-Icon aktiv Färbung
+  GENCOLINACT    => 'grey',                                                         # default Generator-Icon inaktiv Färbung
+  
+  HPCOMFTEMP     => 20,                                                             # Wärmepumpe Solltemperatur / Komforttemperatur
+  HISTHOURDEF    => 2,                                                              # default Anzeige vorangegangene Stunden
+  HOURCOUNT      => 24,                                                             # default Stundenbalken in Grafik
+  HOMEICONDEF    => 'control_building_control@grey',                                # default Home-Icon
+  
+  INFINITE       => ~0 >> 1,                                                        # "Unendlich"
+  INPUTSIZE      => 10,                                                             # default Breite eines Textfeldes in graphicHeaderOwnspec
+  IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
+  INPUTROWSHIFT  => 150,                                                            # Flußgrafik: Verschiebung bei Anzeige Solarzellen/Input-Zeile
+  INVICONDEF     => 'weather_sun',                                                  # default Inverter-icon
+  INACTCOLDEF    => 'grey',                                                         # default Färbung Icon wenn inaktiv
+  
+  KJ2KWH         => 0.0002777777778,                                                # Umrechnungsfaktor kJ in kWh
+  KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
+  
+  LPOOLLENLIM    => 140,                                                            # Breitenbegrenzung der Ausgabe von List Pooldaten
+  LEADTIME       => 3600,                                                           # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
+  LAGTIME        => 1800,                                                           # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
+  LOGDELAY       => 600,                                                            # Verzögerungszeit zwischen zwei Logausgaben mit identischen Inhalt
+  LOCALE_TIME    => setlocale (POSIX::LC_TIME),                                     # installierte locale abfragen
+  
+  MAXWEATHERDEV  => 3,                                                              # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
+  MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
+  MAXCONSUMER    => 20,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
+  MAXPRODUCER    => 3,                                                              # maximale Anzahl der möglichen anderen Produzenten (Attribut)
+  MAXINVERTER    => 5,                                                              # maximale Anzahl der möglichen Inverter
+  MAXBEAMLEVEL   => 3,                                                              # maximale Anzahl der Balkengrafik Ebenen
+  MAXNEXTHOURS   => 71,                                                             # max. Anzahl Stunden der Wertebasis (Start mit 0 -> 72h) z.B. in Nexthours
+  MAXNEXTDAYS    => 2,                                                              # max. Anzahl volle Tage in NextHours (Start mit 0 -> 3d)
+  MAXCONLIMIT    => 100000,                                                         # oberes Limit stündlicher Energieverbrauch des Hauses (Wh)
+  MAXSOCDEF      => 95,                                                             # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
+  MOONICONDEF    => 2,                                                              # default Mond-Phase (aus %hmoon)
+  MOONCOLDEF     => 'lightblue',                                                    # default Mond Färbung
+  MSGFILETEST    => 'controls_solarforecast_messages_test.txt',                     # TEST Input-File Notification System
+  MSGFILEPROD    => 'controls_solarforecast_messages_prod.txt',                     # PRODUKTIVES Input-File Notification System
+  
+  NODEICONDEF    => 'virtualbox',                                                   # default Knoten-Icon
+  
+  OMETEOREPDEF   => 900,                                                            # default Abrufintervall Open-Meteo API (s)
+  OMETMAXREQ     => 8000,                                                           # Beschränkung auf max. mögliche Requests Open-Meteo API
+  OTPDEADBAND    => 10.0,                                                           # Smoother Standard OTP Power Schwellenwert für Änderungen
+  OTPALPHA       => 1.0,                                                            # Smoother Standard OTP Power Alpha default
+  
+  PI             => 3.141592653589793,                                              # die Konstante π
+  PERCCONINSOC   => 0.75,                                                           # Batterie SoC-Management: Anteilsfaktor für Verbrauch
+  PRDEF          => 0.9,                                                            # default Performance Ratio (PR)
+  PRDCRROWSHIFT  => 100,                                                            # Flußgrafik: Verschiebung bei Anzeige Producer/Inverter-Zeile
+  PRODICONDEF    => 'sani_garden_pump',                                             # default Producer-Icon
+  PGHPATH        => '',                                                             # GitHub Post Pfad
+  PPATH          => '?format=txt',                                                  # Download Format
 
-  CAICONDEF       => 'clock@gold',                                                  # default consumerAdviceIcon
-  FLOWGSIZEDEF    => 400,                                                           # default flowGraphicSize
-  HISTHOURDEF     => 2,                                                             # default Anzeige vorangegangene Stunden
-  WTHCOLDDEF      => 'C7C979',                                                      # Wetter Icon Tag default Farbe
-  WTHCOLNDEF      => 'C7C7C7',                                                      # Wetter Icon Nacht default Farbe
-  BEAMWIDTH       => 20,                                                            # default Balkenbreite
-  HOURCOUNT       => 24,                                                            # default Stundenbalken in Grafik
-  SPACESIZE       => 24,                                                            # default Platz in px über oder unter den Balken
-  BHEIGHTLEVEL    => 200,                                                           # default Multiplikator zur Festlegung der maximalen Balkenhöhe
-  B1COLDEF        => 'FFAC63',                                                      # default Farbe Beam 1
-  B1FONTCOLDEF    => '0D0D0D',                                                      # default Schriftfarbe Beam 1
-  B2COLDEF        => 'C4C4A7',                                                      # default Farbe Beam 2
-  B2FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 2
-  B3COLDEF        => 'BED6C0',                                                      # default Farbe Beam 3
-  B3FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 3
-  B4COLDEF        => 'DBDBD0',                                                      # default Farbe Beam 4
-  B4FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 4
-  B5COLDEF        => 'A3C8FF',                                                      # default Farbe Beam 5
-  B5FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 5
-  B6COLDEF        => 'ABABAB',                                                      # default Farbe Beam 6
-  B6FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 6
-  FGCDDEF         => 130,                                                           # Abstand Verbrauchericons zueinander
-
-  STROKCOLSTDDEF  => 'darkorange',                                                  # Flußgrafik: Standardfarbe aktive normale Kette
-  STROKCOLSIGDEF  => 'red',                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
-  STROKCOLINADEF  => 'gray',                                                        # Flußgrafik: Standardfarbe inaktive Kette
-  STROKWIDTHDEF   => 25,                                                            # Flußgrafik: Standard Breite der Kette
-  STROKCMRREDLIM  => 400,                                                           # Flußgrafik: Consumerpower ab der dynamische Laufkette rot gefärbt wird
-  INPUTROWSHIFT   => 150,                                                           # Flußgrafik: Verschiebung bei Anzeige Solarzellen/Input-Zeile
-  PRDCRROWSHIFT   => 100,                                                           # Flußgrafik: Verschiebung bei Anzeige Producer/Inverter-Zeile
-  PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
-  GENICONDEF      => 'solar',                                                       # default Generator (z.B. Strings) Icon
-  GENCOLACT       => 'darkorange',                                                  # default Generator-Icon aktiv Färbung
-  GENCOLINACT     => 'grey',                                                        # default Generator-Icon inaktiv Färbung
-  CICONDEF        => 'light_light_dim_100',                                         # default Consumer-Icon
-  CICONCOLACT     => 'darkorange',                                                  # default Consumer-Icon aktiv Färbung
-  CICONCOLINACT   => 'grey',                                                        # default Consumer-Icon inaktiv Färbung
-  BICONDEF        => 'measure_battery_75',                                          # default Batterie-Icon
-  BICCOLRCDDEF    => 'grey',                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
-  BICCOLNRCDDEF   => '#cccccc',                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
-  BCHGICONCOLDEF  => 'darkorange',                                                  # default 'Aufladen' Batterie-Icon Färbung
-  BDCHICONCOLDEF  => '#b32400',                                                     # default 'Entladen' Batterie-Icon Färbung
-  HOMEICONDEF     => 'control_building_control@grey',                               # default Home-Icon
-  NODEICONDEF     => 'virtualbox',                                                  # default Knoten-Icon
-  INVICONDEF      => 'weather_sun',                                                 # default Inverter-icon
-  MOONICONDEF     => 2,                                                             # default Mond-Phase (aus %hmoon)
-  MOONCOLDEF      => 'lightblue',                                                   # default Mond Färbung
-  ACTCOLDEF       => 'orange',                                                      # default Färbung Icon wenn aktiv
-  ACTCOLINVBAT    => '#00e000',                                                     # default Färbung aktiver Batterie-Wechselrichter ohne Solarzellen
-  INACTCOLDEF     => 'grey',                                                        # default Färbung Icon wenn inaktiv
-  LOCALE_TIME     => setlocale (POSIX::LC_TIME),                                    # installierte locale abfragen
-
-  BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                 # Basispfad Abruf contrib SolarForecast Files
-  PPATH           => '?format=txt',                                                                        # Download Format
-  CFILE           => 'controls_solarforecast.txt',                                                         # Controlfile Update FTUI-Files
-  BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',   # Basispfad GitHub SolarForecast Files
-  PGHPATH         => '',                                                                                   # GitHub Post Pfad
-  MSGFILETEST     => 'controls_solarforecast_messages_test.txt',                                           # TEST Input-File Notification System
-  MSGFILEPROD     => 'controls_solarforecast_messages_prod.txt',                                           # PRODUKTIVES Input-File Notification System
+  STOREFFDEF     => 87,                                                             # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
+  SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
+  SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß und anderen
+  SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
+  SOLCMAXREQDEF  => 50,                                                             # max. täglich mögliche Requests SolCast API
+  SFTYMARGIN_20  => 20,                                                             # Sicherheitszuschlag 20%
+  SFTYMARGIN_50  => 50,                                                             # Sicherheitszuschlag 50%
+  SPACESIZE      => 24,                                                             # default Platz in px über oder unter den Balken
+  STROKCOLSTDDEF => 'darkorange',                                                   # Flußgrafik: Standardfarbe aktive normale Kette
+  STROKCOLSIGDEF => 'red',                                                          # Flußgrafik: Standardfarbe aktive Signal-Kette
+  STROKCOLINADEF => 'gray',                                                         # Flußgrafik: Standardfarbe inaktive Kette
+  STROKWIDTHDEF  => 25,                                                             # Flußgrafik: Standard Breite der Kette
+  STROKCMRREDLIM => 400,                                                            # Flußgrafik: Consumerpower ab der dynamische Laufkette rot gefärbt wird
+  
+  TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
+  TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
+  TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
+  
+  VRMAPIREPDEF   => 300,                                                            # default Abrufintervall Victron VRM API Forecast
+  
+  WH2KJ          => 3.6,                                                            # Umrechnungsfaktor Wh in kJ
+  WHISTREPEAT    => 851,                                                            # Wiederholungsintervall Cache File Daten schreiben 
+  WTHCOLDDEF     => 'C7C979',                                                       # Wetter Icon Tag default Farbe
+  WTHCOLNDEF     => 'C7C7C7',                                                       # Wetter Icon Nacht default Farbe 
 };
 
 my $messagefile = MSGFILEPROD;
@@ -7913,6 +7921,7 @@ sub _attrplantControl {                  ## no critic "not used"
       consForecastInPlanning    => { comp => '(0|1)',                                             act => 0 },
       cycleInterval             => { comp => '\d+',                                               act => 1 },
       feedinPowerLimit          => { comp => '\d+',                                               act => 0 },
+      conEnergyHourLimit        => { comp => '\d+',                                               act => 0 },
       genPVdeviation            => { comp => '^(?:daily|continuously)(?::(?:default|reverse))?$', act => 1 },
       genPVforecastsToEvent     => { comp => '(adapt4(?:f)?Steps)',                               act => 0 },
       reductionState            => { comp => '[^\s]+:[^\s]+:[^\s]+',                              act => 1 },
@@ -17643,7 +17652,7 @@ sub _saveEnergyConsumption {
   my $debug = $paref->{debug};
 
   my $hod     = sprintf "%02d", ($chour + 1);
-  my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$hod.'_PVreal',          0);   # Reading enthält die Summe aller Inverterdevices
+  my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$hod.'_PVreal',          0);       # Reading enthält die Summe aller Inverterdevices
   my $gfeedin = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridFeedIn',      0);
   my $gcon    = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridConsumption', 0);
 
@@ -17658,23 +17667,24 @@ sub _saveEnergyConsumption {
 
   my $ppreal = 0;
 
-  for my $prn (1..MAXPRODUCER) {                                               # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
+  for my $prn (1..MAXPRODUCER) {                                                    # V1.32.0 : Erzeugung sonstiger Producer (01..03) hinzufügen
       $prn     = sprintf "%02d", $prn;
       $ppreal += ReadingsNum ($name, 'Today_Hour'.$hod.'_PPreal_'.$prn, 0);
   }
 
   my $dowrite = 0;
   my $con     = $pvrl + $ppreal - $gfeedin + $gcon - $batin + $batout;
+  my $conlim  = CurrentVal ($name, 'conEnergyHourLimit', MAXCONLIMIT);              # Verbrauchslimit p. Stunde
   
-  if ($con >= 0 && $con < MAXCONLIMIT) {
+  if ($con >= 0 && $con < $conlim) {
       $dowrite = 1;
   }
   
-  if ($con >= MAXCONLIMIT) {
-      Log3 ($name, 1, "$name - WARNING - day=$day, hod=$hod - Energy consumption of $con Wh is higher than limit of ".MAXCONLIMIT." Wh and is not saved.");
+  if ($con >= $conlim) {
+      Log3 ($name, 1, "$name - WARNING - day=$day, hod=$hod - Energy consumption of $con Wh is higher than limit of $conlim Wh and is not saved.");
   }
 
-  if (int $paref->{minute} > 30 && $con < 0) {                                  # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
+  if (int $paref->{minute} > 30 && $con < 0) {                                      # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
       $dowrite = 0;
       my $vl   = 2;
       my $pre  = '- WARNING -';
@@ -34987,6 +34997,10 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>Consumers with the <b>must</b> mode do not observe the priority charging of the battery.                                                                        </td></tr>
             <tr><td>                                  </td><td>Value: <b>Integer 0..100</b>, default: 0                                                                                                                        </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>conEnergyHourLimit</b>        </td><td>Limitierung des maximal möglichen Energieverbrauches im Hausnetz pro Stunde (Wh).                                                                               </td></tr>
+            <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                               </td></tr>
+            <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                          </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast.                                                          </td></tr>
             <tr><td>                                  </td><td>Otherwise, all weekdays are used equally for the calculation.                                                                                                   </td></tr>
             <tr><td>                                  </td><td>Value: <b>0|1</b>, default: 0                                                                                                                                   </td></tr>
@@ -37723,7 +37737,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>headerShowEnv</b>       </td><td>Auswahl der anzuzeigenden Umgebungswerte im Grafik Kopfbereich. Die gewählten Optionen werden durch Komma getrennt angegeben.   </td></tr>
             <tr><td>                            </td><td>Die Einrichtung der Umgebungswerte erfolgt mit Attribut <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment</a>.    </td></tr>
 			<tr><td>                            </td><td><b>outsideTemp</b> - die aktuelle Außentemperatur                                                                               </td></tr>
-            <tr><td>                            </td><td><b>presence</b>    - den Anwesenheitsstatus                                                                                     </td></tr>
+            <tr><td>                            </td><td><b>presence</b>    - der Anwesenheitsstatus                                                                                     </td></tr>
             <tr><td>                            </td><td><b>windSpeed</b>   - die aktuelle Windgeschwindigkeit                                                                           </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>hourStyle</b>           </td><td>Format der Zeitangabe in der Balkengrafik.                                                                                      </td></tr>
@@ -37990,6 +38004,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batteryPreferredCharge</b>    </td><td>Verbraucher mit dem Mode <b>can</b> werden erst dann eingeschaltet, wenn die angegebene Batterieladung (%) erreicht ist.                          </td></tr>
             <tr><td>                                  </td><td>Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht.                                                               </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl 0..100</b>, default: 0                                                                                                          </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>conEnergyHourLimit</b>        </td><td>Limitierung des maximal möglichen Energieverbrauches im Hausnetz pro Stunde (Wh).                                                                 </td></tr>
+            <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                 </td></tr>
+            <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen.                                            </td></tr>
             <tr><td>                                  </td><td>Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet.                                                                   </td></tr>
