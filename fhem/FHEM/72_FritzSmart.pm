@@ -88,7 +88,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.03.20";
+our $ModulVersion = "26.03.20a";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -147,7 +147,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$);
 sub Fritz_Readout_Run_Web_TR064($$$$);
 sub Fritz_Readout_Response($$$@);
 sub Fritz_Readout_Done($);
-sub Fritz_Readout_Process($$);
+sub Fritz_Readout_Process($$@);
 sub Fritz_Readout_Aborted($);
 sub Fritz_Readout_Add_Reading($$$$@);
 sub Fritz_Readout_Format($$$);
@@ -6955,7 +6955,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
      eval {
        foreach my $key (keys %$views) {
-         Fritz_Log $hash, 3, "Kid Profiles: " . $key;
+         Fritz_Log $hash, 4, "Kid Profiles: " . $key;
 
          my $kProfile = $resultData->{data}->{kidProfiles}->{$key}{Name} . " [" . $resultData->{data}->{kidProfiles}->{$key}{Id} ."]";
 
@@ -9000,7 +9000,7 @@ sub Fritz_Readout_Done($)
 
   $string2 = decode_base64($string2);
 
-  Fritz_Readout_Process ($hash, $string2);
+  Fritz_Readout_Process ($hash, $string2, 0);
 
   if ($hash->{helper}{runFN} eq "Fritz::Fritz_Readout_API_Check") {
     $hash->{fhem}{readOutState} = !main::AttrVal($name, "disable", 0);
@@ -9011,9 +9011,9 @@ sub Fritz_Readout_Done($)
 } # end Fritz_Readout_Done
 
 ###############################################################################
-sub Fritz_Readout_Process($$)
+sub Fritz_Readout_Process($$@)
 {
-   my ($hash, $string) = @_;
+   my ($hash, $string, $setget) = @_;
  # Fatal Error: no hash parameter handed over
    unless (defined $hash) {
       main::Log 1, "Fatal Error - Fritz_Readout_Process: no hash parameter handed over";
@@ -9022,7 +9022,8 @@ sub Fritz_Readout_Process($$)
 
    my $startTime  = time();
    my $name       = $hash->{NAME};
-   my $newState = "WLAN: n/a";
+   my $newState   = "WLAN: n/a";
+   $setget      ||= 0;
 
    if (substr($string, -1) eq "|") {
      $string .= "&#eof";
@@ -9215,10 +9216,6 @@ sub Fritz_Readout_Process($$)
                   ."enableXtamInfo:0,1 "
                   ."enableSIP:0,1 "
 
-#                 ."SHInfoExtTables:0,1 "
-#                  ."SHInfoExtEnable:0,1 "
-#                  ."SHInfoExtInterval:15,30,45,60,120 "
-#                  ."SHInfoExtReadings:multiple-strict,shdevice??_RXItem?? "
                   ."enableSmartHome:off,all,group,device "
                   ."enableReadingsFilter:multiple-strict,"
                                 ."dectID_alarmRingTone,dectID_custRingTone,dectID_device,dectID_fwVersion,dectID_intern,dectID_intRingTone,"
@@ -9291,48 +9288,51 @@ sub Fritz_Readout_Process($$)
      }
    }
 
-   my @wNames = split(" ", $hash->{fhem}{multiple_wlan}{names});
-
-   for( my $i = 0; $i < @wNames; $i++) {
-
-     $wNames[$i]  = "box_wlanBand_" . substr($wNames[$i], 4) . "GHz";
-     $wNames[$i] .= "_active" if ($hash->{fhem}{fwVersion} >= 750);
-
-     if ( defined $values{"$wNames[$i]"} ) {
-       $newState = "WLAN: off";
-       if( $values{"$wNames[$i]"} =~ /on|true/xms ) {
-         $newState = "WLAN: on";
-
-         if(defined $values{box_guestWlan} && $values{box_guestWlan}) {
-           $newState .=" gWLAN: " .$values{box_guestWlan} ;
-           $newState .=" (Remain: " .$values{box_guestWlanRemain}. " min)" if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
-         } else {
-           $newState .=" gWLAN: n/a"
-         }
-         last;
-       }
-     }
-   }
-
-   main::readingsBulkUpdate( $hash, "state", $newState);
-   Fritz_Log $hash, 4, "SET state = '$newState'";
-
    my $TR064_chg = 0;
 
-   # adapt TR064-Mode
-   if ( defined $values{box_tr064} ) {
-     if ( $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
-       Fritz_Log $hash, 4, "TR-064 is switched off";
-       delete $hash->{SECPORT};
-       $hash->{TR064} = 0;
-       $TR064_chg = 1;
+   if($setget == 0) {
+
+     my @wNames = split(" ", $hash->{fhem}{multiple_wlan}{names});
+
+     for( my $i = 0; $i < @wNames; $i++) {
+
+       $wNames[$i]  = "box_wlanBand_" . substr($wNames[$i], 4) . "GHz";
+       $wNames[$i] .= "_active" if ($hash->{fhem}{fwVersion} >= 750);
+
+       if ( defined $values{"$wNames[$i]"} ) {
+         $newState = "WLAN: off";
+         if( $values{"$wNames[$i]"} =~ /on|true/xms ) {
+           $newState = "WLAN: on";
+
+           if(defined $values{box_guestWlan} && $values{box_guestWlan}) {
+             $newState .=" gWLAN: " .$values{box_guestWlan} ;
+             $newState .=" (Remain: " .$values{box_guestWlanRemain}. " min)" if $values{box_guestWlan} eq "on" && $values{box_guestWlanRemain} > 0;
+           } else {
+             $newState .=" gWLAN: n/a"
+           }
+           last;
+         }
+       }
      }
-     elsif ( $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
-       Fritz_Log $hash, 4, "TR-064 is switched on";
-       my $tr064Port = Fritz_init_TR064 ($hash, $hash->{HOST});
-       $hash->{SECPORT} = $tr064Port if $tr064Port;
-       $hash->{TR064} = 1;
-       $TR064_chg = 1;
+
+     main::readingsBulkUpdate( $hash, "state", $newState);
+     Fritz_Log $hash, 4, "SET state = '$newState'";
+
+     # adapt TR064-Mode
+     if ( defined $values{box_tr064} ) {
+       if ( $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
+         Fritz_Log $hash, 4, "TR-064 is switched off";
+         delete $hash->{SECPORT};
+         $hash->{TR064} = 0;
+         $TR064_chg = 1;
+       }
+       elsif ( $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
+         Fritz_Log $hash, 4, "TR-064 is switched on";
+         my $tr064Port = Fritz_init_TR064 ($hash, $hash->{HOST});
+         $hash->{SECPORT} = $tr064Port if $tr064Port;
+         $hash->{TR064} = 1;
+         $TR064_chg = 1;
+       }
      }
    }
 
@@ -9755,7 +9755,7 @@ sub Fritz_Readout_SetGet_Done($)
    if ( $success !~ /1|2|3/ )
    {
       Fritz_Log $hash, 1, "" . $result;
-      Fritz_Readout_Process ( $hash, "Error|" . $result );
+      Fritz_Readout_Process ( $hash, "Error|" . $result, 1 );
    }
    # alles ok. Es wird keine weitere Bearbeitung benötigt
    elsif ( $success == 1 )
@@ -9765,16 +9765,19 @@ sub Fritz_Readout_SetGet_Done($)
    # alles ok und es müssen noch Readings verarbeitet werden
    elsif  ($success == 2 )
    {
+
       $result = decode_base64($result);
 
-      Fritz_Readout_Process ( $hash, $result );
+      Fritz_Log $hash, 4, "Nachverarbeitung:\n" . $result;
+
+      Fritz_Readout_Process ( $hash, $result, 1 );
    }
    # internes Fritz-Device Log: alles ok und es findet noch eine Nachverarbeitung durch eine sub in einer 99_...pm statt.
    elsif  ($success == 3 )
    {
       my ($resultOut, $cmd, $logJSON) = split("\\|", $result, 3);
       $result = decode_base64($resultOut);
-      Fritz_Readout_Process ( $hash, $result );
+      Fritz_Readout_Process ( $hash, $result, 1 );
 
       Fritz_Log $hash, 5, "fritzLog to Sub: $cmd \n" . $logJSON;
 
@@ -9785,13 +9788,13 @@ sub Fritz_Readout_SetGet_Done($)
 
       Fritz_Log $hash, 5, "Decode JSON string: " . ref($jsonResult);
 
-      my $returnStr = eval { myUtilsFritzLogExPost ($hash, $cmd, $jsonResult); };
+      my $returnStr = eval { main::myUtilsFritzLogExPost ($hash, $cmd, $jsonResult); };
 
       if ($@) {
         Fritz_Log $hash, 2, "fritzLogExPost: " . $@;
-        main::readingsSingleUpdate($hash, "retStat_fritzLogExPost", "->ERROR: " . $@, 1);
+        main::readingsSingleUpdate($hash, "retStat_fritzExPost", "->ERROR: " . $@, 1);
       } else {
-        main::readingsSingleUpdate($hash, "retStat_fritzLogExPost", $returnStr, 1);
+        main::readingsSingleUpdate($hash, "retStat_fritzExPost", $returnStr, 1);
       }
    }
 
@@ -15137,7 +15140,7 @@ sub Fritz_Get_Fritz_Log_Info_nonBlk($)
        $returnCase = 3;
      } else {
 
-       my $returnExPost = eval { myUtilsFritzLogExPostnb ($hash, $val[1], $result); };
+       my $returnExPost = eval { main::myUtilsFritzLogExPostnb ($hash, $val[1], $result); };
 
        if ($@) {
          Fritz_Log $hash, 2, "fritzLogExPost: " . $@;
@@ -18252,8 +18255,8 @@ sub Fritz_Helper_reformat
 <a name="FritzSmart"></a>
 <h3>FritzSmart</h3>
 <div>
-   Controls some features of a FRITZ!BOX router or Fritz!Repeater. Connected Fritz!Fon's (MT-F, MT-D, C3, C4, C5) can be used as
-   signaling devices. MP3 files and Text2Speech can be played as ring tone or when calling phones.
+   Controls some features of a FRITZ!BOX router, Fritz!Repeater, FritzSamrt Devices. Connected Fritz!Fon's (MT-F, MT-D, C3, C4, C5) can be used as
+   signaling devices.
    <br>
    For detail instructions, look at and please maintain the <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a>.
    <br><br>
@@ -19526,19 +19529,19 @@ sub Fritz_Helper_reformat
 <a name="FritzSmart"></a>
 <h3>FritzSmart</h3>
 <div>
-   Steuert gewisse Funktionen eines FRITZ!BOX Routers. Verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) k&ouml;nnen als Signalger&auml;te genutzt werden. MP3-Dateien und Text (Text2Speech) k&ouml;nnen als Klingelton oder einem angerufenen Telefon abgespielt werden.
+   Erfasst und steuert Funktionen eines FRITZ!BOX Routers, FritzSmart Geräten und verbundene Fritz!Fon's (MT-F, MT-D, C3, C4) können als Signalgeräte genutzt werden.
    <br>
-   F&uuml;r detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und erg&auml;nzen.
+   Für detailierte Anleitungen bitte die <a href="http://www.fhemwiki.de/wiki/FRITZBOX"><b>FHEM-Wiki</b></a> konsultieren und ergänzen.
    <br><br>
-   Die Steuerung erfolgt teilweise &uuml;ber die offizielle TR-064-Schnittstelle und teilweise &uuml;ber undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern.<br>
+   Die Steuerung erfolgt teilweise über die offizielle TR-064-Schnittstelle und teilweise über undokumentierte Schnittstellen zwischen Webinterface und Firmware Kern.<br>
    <br>
-   Das Modul wurde auf der FRITZ!BOX 7590, 7490 und dem FRITZ!WLAN Repeater 1750E mit Fritz!OS 7.50 und h&ouml;her getestet.
+   Das Modul wurde auf der FRITZ!BOX 7272, 7490, 7590 und FRITZ!WLAN Repeatern getestet.
    <br>
    Bitte auch die anderen FRITZ!BOX-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
-   <i>Das Modul nutzt das Perlmodule 'JSON::XS', 'LWP', 'SOAP::Lite' f&uuml;r den Fernzugriff.</i>
+   <i>Das Modul nutzt das Perlmodule 'JSON', 'LWP', 'SOAP::Lite' für den Fernzugriff.</i>
    <br>
-   Es muss zwingend das Attribut boxUser nach der Definition des Device gesetzt werden.
+   Abhängig vom Fritz Device und der FritzOS Version ist das Attribut boxUser und ein ggf. ein Passwort über set &lt;name&gt; passwort zu setzen.
    <br><br>
 
    <a name="FritzSmartdefine"></a>
@@ -19547,7 +19550,7 @@ sub Fritz_Helper_reformat
       <br>
       <code>define &lt;name&gt; FritzSmart &lt;host&gt;</code>
       <br>
-      Der Parameter <i>host</i> ist die Web-Adresse (Name oder IP) der FRITZ!BOX / Repeater.
+      Der Parameter <i>host</i> ist die Web-Adresse (Name oder IP) der FRITZ!BOX / FritzRepeater.
       <br><br>
       Beispiel: <code>define Fritzbox FritzSmart fritz.box</code>
       <br><br>
@@ -19581,18 +19584,18 @@ sub Fritz_Helper_reformat
            fhem('set FritzBox blockIncomingPhoneCall tmp nightBlocking 012345678 home ' .  strftime("%Y-%m-%d", localtime(time + DAYSECONDS)) . 'T06:00:00', 1);;\
          }
          </code></dt><br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_blockIncomingPhoneCall<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_blockIncomingPhoneCall<br>
       </li><br>
 
       <li><a name="call"></a>
          <dt><code>set &lt;name&gt; call &lt;number&gt; [duration]</code></dt>
          <br>
-         Ruft f&uuml;r 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1). Wenn der Angerufene abnimmt, h&ouml;rt er die Wartemusik.
+         Ruft für 'Dauer' Sekunden (Standard 60 s) die angegebene Telefonnummer von einem internen Telefonanschluss an (Standard ist 1). Wenn der Angerufene abnimmt, hört er die Wartemusik.
          Der interne Telefonanschluss klingelt ebenfalls.
          <br>
          Das Klingeln erfolgt über die Wählhilfe, die über "Telefonie/Anrufe/Wählhilfe" aktiviert werden muss.<br>
          Eventuell muss über die Weboberfläche der Fritz!Box ein anderer Port eingestellt werden. Der aktuelle steht in "box_stdDialPort".<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_ring<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_ring<br>
       </li><br>
 
       <li><a name="checkAPIs"></a>
@@ -19606,9 +19609,9 @@ sub Fritz_Helper_reformat
       <li><a name="chgProfile"></a>
          <dt><code>set &lt;name&gt; chgProfile &lt;number&gt; &lt;filtprof<i>n</i>&gt;</code></dt><br>
          &lt;number&gt; ist die ID des landevice<i>n..n</i> oder dessen MAC <br>
-         &auml;ndert das Profile filtprof mit der Nummer 1..n des Netzger&auml;ts.<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_chgProfile <br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her. <br>
+         ändert das Profile filtprof mit der Nummer 1..n des Netzgeräts.<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_chgProfile <br>
+         Benötigt FRITZ!OS 7.21 oder höher. <br>
       </li><br>
 
       <li><a name="dect"></a>
@@ -19616,7 +19619,7 @@ sub Fritz_Helper_reformat
          <br>
          Schaltet die DECT-Basis der Box an oder aus.
          <br>
-         Ben&ouml;tigt mindestens FRITZ!OS 7.21
+         Benötigt mindestens FRITZ!OS 7.21
       </li><br>
 
       <li><a name="dectRing"></a>
@@ -19642,27 +19645,27 @@ sub Fritz_Helper_reformat
       <li><a name="dectRingblock"></a>
          <dt><code>set &lt;name&gt; dectRingblock &lt;dect&lt;nn&gt;&gt; &lt;on|off&gt;</code></dt>
          <br>
-         Aktiviert / Deaktiviert die Klingelsperre f&uuml;r das DECT-Telefon mit der ID dect<n>. Die ID kann der Readingliste
+         Aktiviert / Deaktiviert die Klingelsperre für das DECT-Telefon mit der ID dect<n>. Die ID kann der Readingliste
          des &lt;name&gt; Device entnommen werden.<br><br>
           <code>set &lt;name&gt; dectRingblock &lt;dect&lt;nn&gt;&gt; &lt;days&gt; &lt;hh:mm-hh:mm&gt; [lmode:on|off] [emode:on|off]</code><br><br>
-         Aktiviert / Deaktiviert die Klingelsperre f&uuml;r das DECT-Telefon mit der ID dect<n> f&uuml;r Zeitr&auml;ume:<br>
+         Aktiviert / Deaktiviert die Klingelsperre für das DECT-Telefon mit der ID dect<n> für Zeiträume:<br>
          &lt;hh:mm-hh:mm&gt; = Uhrzeit_von bis Uhrzeit_bis<br>
-         &lt;days&gt; = wd f&uuml;r Werktags, ed f&uuml;r Jeden Tag, we f&uuml;r Wochenende<br>
-         lmode:on|off = lmode definiert die Sperre. Bei off ist sie aus, au&szlig;er f&uuml;r den angegebenen Zeitraum.<br>
-                                                    Bei on ist die Sperre an, au&szlig;er f&uuml;r den angegebenen Zeitraum<br>
+         &lt;days&gt; = wd für Werktags, ed für Jeden Tag, we für Wochenende<br>
+         lmode:on|off = lmode definiert die Sperre. Bei off ist sie aus, außer für den angegebenen Zeitraum.<br>
+                                                    Bei on ist die Sperre an, außer für den angegebenen Zeitraum<br>
          emode:on|off = emode schaltet Events bei gesetzter Klingelsperre ein/aus. Siehe hierzu die FRITZ!BOX Dokumentation<br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+         Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
       <li><a name="diversity"></a>
          <dt><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code></dt>
          <br>
-         Schaltet die Rufumleitung (Nummer 1, 2 ...) f&uuml;r einzelne Rufnummern an oder aus.
+         Schaltet die Rufumleitung (Nummer 1, 2 ...) für einzelne Rufnummern an oder aus.
          <br>
-         Achtung! Es lassen sich nur Rufumleitungen f&uuml;r einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abh&auml;ngigkeit von der anrufenden Nummer schalten.
-         Es muss also ein <i>diversity</i>-Ger&auml;tewert geben.
+         Achtung! Es lassen sich nur Rufumleitungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten.
+         Es muss also einen <i>diversity</i>-Gerätewert geben.
          <br>
-         Ben&ouml;tigt die API: TR064 (>=6.50).
+         Benötigt die API: TR064 (>=6.50).
       </li><br>
 
       <li><a name="enableVPNshare"></a>
@@ -19670,8 +19673,8 @@ sub Fritz_Helper_reformat
          <br>
          &lt;number&gt; ist die Nummer des Readings vpn<i>n..n</i>_user.. oder _box <br>
          Schaltet das VPN share mit der Nummer nn an oder aus.<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_enableVPNshare <br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_enableVPNshare <br>
+         Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
       <li><a name="energyMode"></a>
@@ -19680,15 +19683,15 @@ sub Fritz_Helper_reformat
          Ändert den Energiemodus der FRITZ!Box. &lt;default&gt; verwendet einen ausgewogenen Modus bei optimaler Leistung.<br>
          Die wichtigsten Energiesparfunktionen sind bereits aktiv.<br>
          &lt;eco&gt; verringert den Stromverbrauch.<br>
-         Ben&ouml;tigt FRITZ!OS 7.50 oder h&ouml;her.
+         Benötigt FRITZ!OS 7.50 oder höher.
       </li><br>
 
       <li><a name="guestWlan"></a>
          <dt><code>set &lt;name&gt; guestWlan &lt;on|off&gt;</code></dt>
          <br>
-         Schaltet das G&auml;ste-WLAN an oder aus. Das G&auml;ste-Passwort muss gesetzt sein.<br>
+         Schaltet das Gäste-WLAN an oder aus. Das Gäste-Passwort muss gesetzt sein.<br>
          Wenn notwendig wird auch das normale WLAN angeschaltet.<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_SetGet_nonBlocking<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_SetGet_nonBlocking<br>
       </li><br>
 
       <li><a name="inActive"></a>
@@ -19706,7 +19709,7 @@ sub Fritz_Helper_reformat
          &lt;led:<on|off&gt; schaltet die LED's ein oder aus.<br>
          &lt;bright:1..3&gt; reguliert die Helligkeit der LED's von 1=schwach, 2=mittel bis 3=sehr hell.<br>
          &lt;env:on|off&gt; schaltet Regelung der Helligkeit in abhängigkeit der Umgebungshelligkeit an oder aus.<br><br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.<br><br>
+         Benötigt FRITZ!OS 7.21 oder höher.<br><br>
          Als besonderer Parameter ist <code>set &lt;name&gt; ledSetting &lt;notifyoff:notify_ID&gt;</code> hinzugekommen.<br>
          Hiermit kann die rote Info-LED der FritzBox, die besondere Betriebszustände signalisiert, resetet werden.
       </li><br>
@@ -19718,8 +19721,8 @@ sub Fritz_Helper_reformat
          &lt;status:&gt; schaltet das Profil aus (never) oder ein (unlimited)<br>
          &lt;bpjm:&gt; schaltet den Jugendschutz ein/aus<br>
          Die Parameter &lt;status:&gt; / &lt;bpjm:&gt; können einzeln oder gemeinsam angegeben werden.<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_lockFilterProfile<br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_lockFilterProfile<br>
+         Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
       <li><a name="lockLandevice"></a>
@@ -19731,17 +19734,17 @@ sub Fritz_Helper_reformat
          <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt&gt; OS7</code></dt>
          <br>
          &lt;number&gt; ist die ID des landevice<i>n..n</i><br>
-         Schaltet das Blockieren des Netzger&auml;t on(blocked), off(unlimited) oder rt(realtime).<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_lockLandevice <br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+         Schaltet das Blockieren des Netzgerät on(blocked), off(unlimited) oder rt(realtime).<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_lockLandevice <br>
+         Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
       <li><a name="macFilter"></a>
          <dt><code>set &lt;name&gt; macFilter &lt;on|off&gt;</code></dt>
          <br>
-         Schaltet den MAC Filter an oder aus. In der FRITZ!BOX unter "neue WLAN Ger&auml;te zulassen/sperren<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_macFilter <br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+         Schaltet den MAC Filter an oder aus. In der FRITZ!BOX unter "neue WLAN Geräte zulassen/sperren<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_macFilter <br>
+         Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
       <li><a name="phoneBookEntry"></a>
@@ -19757,21 +19760,21 @@ sub Fritz_Helper_reformat
       <li><a name="password"></a>
          <dt><code>set &lt;name&gt; password &lt;password&gt;</code></dt>
          <br>
-         Speichert das Passwort f&uuml;r den Fernzugriff.
+         Speichert das Passwort für den Fernzugriff.
       </li><br>
 
       <li><a name="reboot"></a>
          <dt><code>set &lt;name&gt; reboot &lt;Minuten&gt;</code></dt>
          <br>
-         Startet die FRITZ!BOX in &lt;Minuten&gt; neu. Wird dieses 'set' ausgef&uuml;hrt, so wird ein einmaliges 'at' im Raum 'Unsorted' erzeugt,
-         &uuml;ber das dann der Reboot ausgef&uuml;hrt wird. Das neue 'at' hat den Devicenamen: act_Reboot_&lt;Name FB Device&gt;.
+         Startet die FRITZ!BOX in &lt;Minuten&gt; neu. Wird dieses 'set' ausgeführt, so wird ein einmaliges 'at' im Raum 'Unsorted' erzeugt,
+         über das dann der Reboot ausgeführt wird. Das neue 'at' hat den Devicenamen: act_Reboot_&lt;Name FB Device&gt;.
       </li><br>
 
       <li><a name="rescanWLANneighbors"></a>
          <dt><code>set &lt;name&gt; rescanWLANneighbors</code></dt>
          <br>
-         L&ouml;st eine Scan der WLAN Umgebung aus.
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_rescanWLANneighbors<br>
+         Löst eine Scan der WLAN Umgebung aus.
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_rescanWLANneighbors<br>
       </li><br>
 
       <li><a name="ring"></a>
@@ -19781,17 +19784,17 @@ sub Fritz_Helper_reformat
          <dd>
          <code>set &lt;name&gt; ring 611,612 5</code>
          <br>
-         L&auml;sst die internen Nummern f&uuml;r "Dauer" Sekunden und (auf Fritz!Fons) mit dem übergebenen "ring tone" lingeln.
+         Lässt die internen Nummern für "Dauer" Sekunden und (auf Fritz!Fons) mit dem übergebenen "ring tone" lingeln.
          <br>
-         Mehrere interne Nummern m&uuml;ssen durch ein Komma (ohne Leerzeichen) getrennt werden.
+         Mehrere interne Nummern müssen durch ein Komma (ohne Leerzeichen) getrennt werden.
          <br>
-         Standard-Dauer ist 5 Sekunden. Es kann aber zu Verz&ouml;gerungen in der FRITZ!BOX kommen. Standard-Klingelton ist der interne Klingelton des Ger&auml;tes.
-         Der Klingelton wird f&uuml;r Rundrufe (9 oder 50) ignoriert.
+         Standard-Dauer ist 5 Sekunden. Es kann aber zu Verzögerungen in der FRITZ!BOX kommen. Standard-Klingelton ist der interne Klingelton des Gerätes.
+         Der Klingelton wird für Rundrufe (9 oder 50) ignoriert.
          <br>
-         Wenn der Anruf angenommen wird, h&ouml;rt der Angerufene die Wartemusik (music on hold).
+         Wenn der Anruf angenommen wird, hört der Angerufene die Wartemusik (music on hold).
          <br>
          Je nach Fritz!OS kann das beschriebene Verhalten abweichen.</dd>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_ring<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_ring<br>
       </li><br>
 
       <li><a name="smartHome"></a>
@@ -19852,8 +19855,8 @@ sub Fritz_Helper_reformat
       <li><a name="switchIPv4DNS"></a>
          <dt><code>set &lt;name&gt; switchIPv4DNS &lt;provider|other&gt;</code></dt>
          <br>
-         &Auml;ndert den IPv4 DNS auf Internetanbieter oder einem alternativen DNS (sofern in der FRITZ!BOX hinterlegt).<br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+         ändert den IPv4 DNS auf Internetanbieter oder einem alternativen DNS (sofern in der FRITZ!BOX hinterlegt).<br>
+         Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
       <li><a name="tam"></a>
@@ -19865,7 +19868,7 @@ sub Fritz_Helper_reformat
       <li><a name="update"></a>
          <dt><code>set &lt;name&gt; update</code></dt>
          <br>
-         Startet eine Aktualisierung der Ger&auml;te Readings.
+         Startet eine Aktualisierung der Geräte Readings.
       </li><br>
 
       <li><a name="wakeUpCall"></a>
@@ -19881,28 +19884,28 @@ sub Fritz_Helper_reformat
          <br>
          Wird im Reading <b>dect</b><i>n</i> or <b>fon</b><i>n</i> "redundant name in FB" angezeigt, dann kann der Device Name nicht genutzt werden..
          <br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+         Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
       <li><a name="wlan"></a>
          <dt><code>set &lt;name&gt; wlan &lt;on|off&gt;</code></dt>
          <br>
          Schaltet WLAN an oder aus.<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_SetGet_nonBlocking<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_SetGet_nonBlocking<br>
       </li><br>
 
       <li><a name="wlan2.4"></a>
          <dt><code>set &lt;name&gt; wlan2.4 &lt;on|off&gt;</code></dt>
          <br>
          Schaltet WLAN 2.4 GHz an oder aus.<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_SetGet_nonBlocking<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_SetGet_nonBlocking<br>
       </li><br>
 
       <li><a name="wlan5"></a>
          <dt><code>set &lt;name&gt; wlan5 &lt;on|off&gt;</code></dt>
          <br>
          Schaltet WLAN 5 GHz an oder aus.<br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_SetGet_nonBlocking<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_SetGet_nonBlocking<br>
       </li><br>
 
       <li><a name="wlanLogExtended"></a>
@@ -19910,7 +19913,7 @@ sub Fritz_Helper_reformat
          <br>
          Schaltet "Auch An- und Abmeldungen und erweiterte WLAN-Informationen protokollieren" an oder aus.
          <br>
-         Die Ausf&uuml;hrung erfolgt non Blocking. Die R&uuml;ckmeldung erfolgt im Reading: retStat_wlanLogExtended<br>
+         Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_wlanLogExtended<br>
       </li><br>
 
       <li><a name="wlanGuestParams"></a>
@@ -19948,23 +19951,23 @@ sub Fritz_Helper_reformat
          <br><br>
          <dt><code>get &lt;name&gt; fritzLog &lt;hash&gt; &lt;all | sys | wlan | usb | net | fon&gt; [on|off]</code></dt>
          <br>
-         &lt;hash&gt; leitet das Ergebnis als Standard an eine Funktion (non blocking) myUtilsFritzLogExPostnb($hash, $filter, $result) f&uuml;r eigene Verarbeitung weiter.
+         &lt;hash&gt; leitet das Ergebnis als Standard an eine Funktion (non blocking) myUtilsFritzLogExPostnb($hash, $filter, $result) für eigene Verarbeitung weiter.
          <br>
-         &lt;hash&gt; &lt;off&gt; leitet das Ergebnis an eine Funktion (blocking) myUtilsFritzLogExPost($hash, $filter, $result) f&uuml;r eigene Verarbeitung weiter.
+         &lt;hash&gt; &lt;off&gt; leitet das Ergebnis an eine Funktion (blocking) myUtilsFritzLogExPost($hash, $filter, $result) für eigene Verarbeitung weiter.
          <br>
          wobei:
          <br>
          $hash -> Fhem Device hash,<br>
-         $filter -> gew&auml;hlter Log Filter,<br>
-         $result -> R&uuml;ckgabe der data.lua Abfrage im JSON Format.<br>
+         $filter -> gewählter Log Filter,<br>
+         $result -> Rückgabe der data.lua Abfrage im JSON Format.<br>
          <br><br>
-         &lt;all | sys | wlan | usb | net | fon&gt; &uuml;ber diese Parameter erfolgt die Filterung der Log-Informationen.
+         &lt;all | sys | wlan | usb | net | fon&gt; über diese Parameter erfolgt die Filterung der Log-Informationen.
          <br><br>
          [on|off] gibt bei Parameter &lt;hash&gt; an, ob die Weiterverarbeitung blocking [off] oder non blocking [on] (default) erfolgt.
          <br><br>
-	  Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+	  Benötigt FRITZ!OS 7.21 oder höher.
          <br><br>
-         R&uuml;ckmeldung in den Readings:<br>
+         Rückmeldung in den Readings:<br>
          retStat_fritzLogExPost = Status des Funktionsaufrufes myUtilsFritzLogExPostnb / myUtilsFritzLogExPost<br>
          retStat_fritzLogInfo = Status der Log Informations Abfrage.
          <br>
@@ -19973,7 +19976,7 @@ sub Fritz_Helper_reformat
       <li><a name="javaScript"></a>
          <dt><code>get &lt;name&gt; javaScript [json] &lt;Command&gt;</code></dt>
          <br>
-         F&uuml;hrt Komandos &uuml;ber die RESTfull API der Fritz!BOX aus. <br>
+         Führt Komandos über die RESTfull API der Fritz!BOX aus. <br>
          Optional kann als erster Parameter json angegeben werden. Es wir dann für weitere Verarbeitungen das Ergebnis als JSON zurück gegeben.
       </li><br>
 
@@ -19981,14 +19984,14 @@ sub Fritz_Helper_reformat
          <dt><code>get &lt;name&gt; lanDeviceInfo &lt;number&gt;</code></dt>
          <br>
          &lt;number&gt; ist die ID des landevice<i>n..n</i> oder dessen MAC
-         Zeigt Informationen &uuml;ber das Netzwerkger&auml;t an.<br>
+         Zeigt Informationen über das Netzwerkgerät an.<br>
          Bei vorhandener Kindersicherung, nur dann wird gemessen, wird zusätzlich folgendes ausgegeben:<br>
          USEABLE: Zuteilung in Sekunden<br>
          UNSPENT: nicht genutzt in Sekunden<br>
          PERCENT: in Prozent<br>
          USED: genutzt in Sekunden<br>
          USEDSTR: zeigt die genutzte Zeit in hh:mm vom Kontingent hh:mm<br>
-	 Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.
+	 Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
       <li><a name="loadSupportData"></a>
@@ -20048,8 +20051,8 @@ sub Fritz_Helper_reformat
       <li><a name="luaInfo"></a>
          <dt><code>get &lt;name&gt; luaInfo &lt;landevices|ledSettings|smartHomeDevices|smartHomeAutomation|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation&gt;</code></dt>
          <br>
-         Ben&ouml;tigt FRITZ!OS 7.21 oder h&ouml;her.<br>
-         lanDevices -> Generiert eine Liste der aktiven und inaktiven Netzwerkger&auml;te.<br>
+         Benötigt FRITZ!OS 7.21 oder höher.<br>
+         lanDevices -> Generiert eine Liste der aktiven und inaktiven Netzwerkgeräte.<br>
          ledSettings -> Generiert eine Liste der LED Einstellungen mit einem Hinweis welche set ... ledSetting möglich sind.<br>
          smartHomeDevices -> Generiert eine Liste SmartHome Geräte und gespeicherten Gerätedefinitionen (Zeitschaltung, Tmperaturen, ...).<br>
          smartHomeAutomation -> Generiert eine Liste SmartHome Automatisierungen. Benötigt Fritz!OS 8.00 oder höher<br>
@@ -20057,7 +20060,7 @@ sub Fritz_Helper_reformat
          globalFilters -> Zeigt den Status (on|off) der globalen Filter: globalFilterNetbios, globalFilterSmtp, globalFilterStealth, globalFilterTeredo, globalFilterWpad<br>
          kidProfiles -> Generiert eine Liste der Zugangsprofile.<br>
          userInfos -> Generiert eine Liste der FRITZ!BOX Benutzer.<br>
-         wlanNeighborhood -> Generiert eine Liste der WLAN Nachbarschaftsger&auml;te.<br>
+         wlanNeighborhood -> Generiert eine Liste der WLAN Nachbarschaftsgeräte.<br>
          mobileInfo -> Informationen über Mobilfunk.<br>
          docsisInformation -> Zeigt Informationen zu DOCSIS an (nur Cable).<br>
       </li><br>
@@ -20099,7 +20102,7 @@ sub Fritz_Helper_reformat
       <li><a name="tr064ServiceList"></a>
          <dt><code>get &lt;name&gt; tr064ServiceList &lt;tr64|igd&gt;</code></dt>
          <br>
-         Zeigt die Liste der TR-064-Dienste/Aktionen, beschrieben unter tr64desc.xml bzw. idgdesc.xml, die auf dem Ger&auml;t erlaubt sind.
+         Zeigt die Liste der TR-064-Dienste/Aktionen, beschrieben unter tr64desc.xml bzw. idgdesc.xml, die auf dem Gerät erlaubt sind.
       </li><br>
    </ul>
 
@@ -20110,7 +20113,7 @@ sub Fritz_Helper_reformat
       <li><a name="INTERVAL"></a>
          <dt><code>attr &lt;name&gt; INTERVAL &lt;seconds&gt;</code></dt>
          <br>
-         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste m&ouml;gliche Wert ist 60 (Sekunden).
+         Abfrage-Interval. Standard ist 300 (Sekunden). Der kleinste mögliche Wert ist 60 (Sekunden).
       </li><br>
 
       <li><a name="verbose"></a>
@@ -20172,8 +20175,8 @@ sub Fritz_Helper_reformat
          <code>name,[uid],(connection: speed, rssi)</code><br><br>
 
          Wird der Parameter <code>_noDefInf_</code> gesetzt, die Reihenfolge ind der Liste spielt hier keine Rolle, dann werden nicht vorhandene Werte der Netzwerkverbindung
-         mit noConnectInfo (LAN oder WLAN nicht verf&uuml;gbar) und noSpeedInfo (Geschwindigkeit nicht verf&uuml;gbar) angezeigt.<br><br>
-         &Uuml;ber das freie Eingabefeld k&ouml;nnen eigene Text oder Zeichen hinzugef&uuml;gt und zwischen die festen Paramter eingeordnet werden.<br>
+         mit noConnectInfo (LAN oder WLAN nicht verfügbar) und noSpeedInfo (Geschwindigkeit nicht verfügbar) angezeigt.<br><br>
+         über das freie Eingabefeld können eigene Text oder Zeichen hinzugefügt und zwischen die festen Paramter eingeordnet werden.<br>
          Hierbei gibt es folgende spezielle Texte:<br>
          <code>space</code> => wird zu einem Leerzeichen.<br>
          <code>comma</code> => wird zu einem Komma.<br>
@@ -20181,14 +20184,14 @@ sub Fritz_Helper_reformat
          Beispiele:<br>
          <code>_default_commaspace</code> => wird zu einem Komma gefolgt von einem Leerzeichen als Trenner.<br>
          <code>_default_space:space</code> => wird zu einem einem Leerzeichen:Leerzeichen als Trenner.<br>
-         Es werden nicht alle m&ouml;glichen "unsinnigen" Kombinationen abgefangen. Es kann also auch mal schief gehen.
+         Es werden nicht alle möglichen "unsinnigen" Kombinationen abgefangen. Es kann also auch mal schief gehen.
          <br>
       </li><br>
 
       <li><a name="disableBoxReadings"></a>
          <dt><code>attr &lt;name&gt; disableBoxReadings &lt;liste&gt;</code></dt>
          <br>
-         Abw&auml;hlen einzelner box_ Readings.<br>
+         Abwählen einzelner box_ Readings.<br>
       </li><br>
 
       <li><a name="enableBoxReadings"></a>
@@ -20218,13 +20221,13 @@ sub Fritz_Helper_reformat
       <li><a name="disableDectInfo"></a>
          <dt><code>attr &lt;name&gt; disableDectInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die &Uuml;bernahme von Dect Informationen aus/ein.
+         Schaltet die übernahme von Dect Informationen aus/ein.
       </li><br>
 
       <li><a name="disableFonInfo"></a>
          <dt><code>attr &lt;name&gt; disableFonInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die &Uuml;bernahme von Telefon Informationen aus/ein.
+         Schaltet die übernahme von Telefon Informationen aus/ein.
       </li><br>
 
       <li><a name="disableHostIPv4check"></a>
@@ -20236,13 +20239,13 @@ sub Fritz_Helper_reformat
       <li><a name="disableTableFormat"></a>
          <dt><code>attr &lt;name&gt; disableTableFormat &lt;border(8),cellspacing(10),cellpadding(20)&gt;</code></dt>
          <br>
-         Deaktiviert Parameter f&uuml;r die Formatierung der Tabelle.
+         Deaktiviert Parameter für die Formatierung der Tabelle.
       </li><br>
 
       <li><a name="enableAlarmInfo"></a>
          <dt><code>attr &lt;name&gt; enableAlarmInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die &Uuml;bernahme von Alarm Informationen aus/ein.
+         Schaltet die übernahme von Alarm Informationen aus/ein.
       </li><br>
 
       <li><a name="enableCallRedi"></a>
@@ -20270,14 +20273,14 @@ sub Fritz_Helper_reformat
       <li><a name="enableDocsisInfo"></a>
          <dt><code>attr &lt;name&gt; enableDocsisInfo &lt;0 | 1&gt;</code></dt> 
          <br>
-         Schaltet die &Uuml;bernahme von docsis Informationen als Reading aus/ein.<br>
+         Schaltet die übernahme von docsis Informationen als Reading aus/ein.<br>
          Nur verfügbar für FritzBox Cable.
       </li><br>
 
       <li><a name="enableKidProfiles"></a>
          <dt><code>attr &lt;name&gt; enableKidProfiles &lt;0 | 1&gt;</code></dt> 
          <br>
-         Schaltet die &Uuml;bernahme von Kid-Profilen als Reading aus/ein.
+         Schaltet die übernahme von Kid-Profilen als Reading aus/ein.
       </li><br>
 
       <li><a name="enableMobileInfo"></a>
@@ -20285,7 +20288,7 @@ sub Fritz_Helper_reformat
          <br><br>
          ! Experimentel !
          <br><br>
-         Schaltet die &Uuml;bernahme von USB Mobile Ger&auml;ten als Reading aus/ein.
+         Schaltet die übernahme von USB Mobile Geräten als Reading aus/ein.
          <br>
          Benötigt Fritz!OS 7.50 oder höher.
       </li><br>
@@ -20293,44 +20296,44 @@ sub Fritz_Helper_reformat
       <li><a name="enablePassivLanDevices"></a>
          <dt><code>attr &lt;name&gt; enablePassivLanDevices &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die &Uuml;bernahme von passiven Netzwerkger&auml;ten als Reading aus/ein.
+         Schaltet die übernahme von passiven Netzwerkgeräten als Reading aus/ein.
       </li><br>
 
       <li><a name="enablePhoneBookInfo"></a>
          <dt><code>attr &lt;name&gt; enablePoneBookInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die &Uuml;bernahme Telefonbuch Informationen aus/ein.
+         Schaltet die übernahme Telefonbuch Informationen aus/ein.
       </li><br>
 
       <li><a name="enableReadingsFilter"></a>
          <dt><code>attr &lt;name&gt; enableReadingsFilter &lt;liste&gt;</code></dt>
          <br>
-         Aktiviert Filter für die &Uuml;bernahme von Readings (SmartHome, Dect). Ein Readings, dass dem Filter entspricht wird <br>
+         Aktiviert Filter für die übernahme von Readings (SmartHome, Dect). Ein Readings, dass dem Filter entspricht wird <br>
          um einen Punkt als erstes Zeichen ergänzt. Somit erscheint das Reading nicht im Web-Frontend, ist aber über ReadingsVal erreichbar. 
       </li><br>
 
       <li><a name="enableSIP"></a>
          <dt><code>attr &lt;name&gt; enableSIP &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die &Uuml;bernahme von SIP's als Reading aus/ein.
+         Schaltet die übernahme von SIP's als Reading aus/ein.
       </li><br>
 
       <li><a name="enableSmartHome"></a>
          <dt><code>attr &lt;name&gt; enableSmartHome &lt;off | all | group | device&gt;</code></dt>
          <br>
-         Aktiviert die &Uuml;bernahme von SmartHome Daten als Readings.
+         Aktiviert die übernahme von SmartHome Daten als Readings.
       </li><br>
 
       <li><a name="enableUserInfo"></a>
          <dt><code>attr &lt;name&gt; enableUserInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die &Uuml;bernahme von Benutzer Informationen aus/ein.
+         Schaltet die übernahme von Benutzer Informationen aus/ein.
       </li><br>
 
       <li><a name="enableVPNShares"></a>
          <dt><code>attr &lt;name&gt; enableVPNShares &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die &Uuml;bernahme von VPN Shares als Reading aus/ein.
+         Schaltet die übernahme von VPN Shares als Reading aus/ein.
       </li><br>
 
       <li><a name="enableWLANneighbors"></a>
@@ -20386,7 +20389,7 @@ sub Fritz_Helper_reformat
       <li><a name="wlanNeighborsPrefix"></a>
          <dt><code>attr &lt;name&gt; wlanNeighborsPrefix &lt;prefix&gt;</code></dt>
          <br>
-         Definiert einen Pr&auml;fix f&uuml;r den Reading Namen der WLAN Nachbarschaftsger&auml;te, der aus der MAC Adresse gebildet wird. Der default Pr&auml;fix ist nbh_.
+         Definiert einen Präfix für den Reading Namen der WLAN Nachbarschaftsgeräte, der aus der MAC Adresse gebildet wird. Der default Präfix ist nbh_.
       </li><br>
 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -20409,17 +20412,17 @@ sub Fritz_Helper_reformat
       <li><b>box_fwVersion</b> - Firmware-Version der Box, wenn veraltet dann wird '(old)' angehangen</li>
       <li><b>box_ipv4_Extern</b> - Internet IPv4 der FRITZ!BOX</li>
       <li><b>box_ipv6_Extern</b> - Internet IPv6 der FRITZ!BOX</li>
-      <li><b>box_ipv6_Prefix</b> - Internet IPv6 Prefix der FRITZ!BOX f&uuml;r das LAN/WLAN</li>
+      <li><b>box_ipv6_Prefix</b> - Internet IPv6 Prefix der FRITZ!BOX für das LAN/WLAN</li>
       <li><b>box_last_auth_err</b> - letzter Anmeldungsfehler</li>
       <li><b>box_mac_Address</b> - MAC Adresse</li>
-      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-GerÃ¤te beschr&auml;nken)</li>
+      <li><b>box_macFilter_active</b> - Status des WLAN MAC-Filter (WLAN-Zugang auf die bekannten WLAN-GerÃ¤te beschränken)</li>
       <li><b>box_meshRole</b> - ab Version 07.21 wird die Mesh Rolle (master, slave) angezeigt.</li>
       <li><b>box_model</b> - FRITZ!BOX-Modell</li>
       <li><b>box_moh</b> - Wartemusik-Einstellung</li>
       <li><b>box_connect</b> - Verbindungsstatus: Unconfigured, Connecting, Authenticating, Connected, PendingDisconnect, Disconnecting, Disconnected</li>
       <li><b>box_last_connect_err</b> - letzter Verbindungsfehler</li>
-      <li><b>box_upnp</b> - Status der Anwendungsschnittstelle UPNP (wird auch von diesem Modul ben&ouml;tigt)</li>
-      <li><b>box_upnp_control_activated</b> - Status Kontrolle &uuml;ber UPNP</li>
+      <li><b>box_upnp</b> - Status der Anwendungsschnittstelle UPNP (wird auch von diesem Modul benötigt)</li>
+      <li><b>box_upnp_control_activated</b> - Status Kontrolle über UPNP</li>
       <li><b>box_uptime</b> - Laufzeit seit letztem Neustart</li>
       <li><b>box_uptimeConnect</b> - Verbindungsdauer seit letztem Neuverbinden</li>
       <li><b>box_DSL_Act</b> - DSL: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
@@ -20430,10 +20433,10 @@ sub Fritz_Helper_reformat
       <li><b>box_rateDown</b> - Download-Geschwindigkeit des letzten Intervals in kByte/s</li>
       <li><b>box_rateUp</b> - Upload-Geschwindigkeit des letzten Intervals in kByte/s</li>
       <li><b>box_sys_LogNewest</b> - aktuellstes Systemereignis: ID Datum Zeit </li>
-      <li><b>box_stdDialPort</b> - Anschluss der ger&auml;teseitig von der W&auml;hlhilfe genutzt wird</li>
-      <li><b>box_tr064</b> - Status der Anwendungsschnittstelle TR-064 (wird auch von diesem Modul ben&ouml;tigt)</li>
+      <li><b>box_stdDialPort</b> - Anschluss der geräteseitig von der Wählhilfe genutzt wird</li>
+      <li><b>box_tr064</b> - Status der Anwendungsschnittstelle TR-064 (wird auch von diesem Modul benötigt)</li>
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
-      <li><b>box_wlan_Count</b> - Anzahl der Ger&auml;te die &uuml;ber WLAN verbunden sind</li>
+      <li><b>box_wlan_Count</b> - Anzahl der Geräte die über WLAN verbunden sind</li>
       <li><b>box_wlan_Active</b> - Akteuller Status des WLAN</li>
       <li><b>box_wlanBand_cnt</b> - Anzahl der Wlan Bänder</li>
       <li><b>box_wlanBand_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN. Kleiner Fritz!OS 7.50</li>
@@ -20465,9 +20468,9 @@ sub Fritz_Helper_reformat
       <li><b>box_globalFilterWpad</b> - Aktueller Status: WPAD-Filter aktiv</li>
       <br>
       <li><b>box_guestWlan...</b>Readings Gäste WLAN. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
-      <li><b>box_guestWlan</b> - Aktueller Status des G&auml;ste-WLAN</li>
-      <li><b>box_guestWlanCount</b> - Anzahl der Ger&auml;te die &uuml;ber das G&auml;ste-WLAN verbunden sind</li>
-      <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des G&auml;ste-WLAN</li>
+      <li><b>box_guestWlan</b> - Aktueller Status des Gäste-WLAN</li>
+      <li><b>box_guestWlanCount</b> - Anzahl der Geräte die über das Gäste-WLAN verbunden sind</li>
+      <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des Gäste-WLAN</li>
       <li><b>box_guestWlan_SSID</b> - Name (SSID) des Gäste-WLAN</li>
       <li><b>box_guestWlan_defPubSSID</b> - Standard öffentlicher Name (SSID) des Gäste-WLAN</li>
       <li><b>box_guestWlan_defPrivSSID</b> - Standard privater Name (SSID) des Gäste-WLAN</li>
@@ -20585,7 +20588,7 @@ sub Fritz_Helper_reformat
 
       <br>
       <li><b>dect</b><i>n</i> - Name des DECT Telefons <i>n</i></li>
-      <li><b>dect</b><i>n</i><b>_alarmRingTone</b> - Klingelton beim Wecken &uuml;ber das DECT Telefon <i>n</i></li>
+      <li><b>dect</b><i>n</i><b>_alarmRingTone</b> - Klingelton beim Wecken über das DECT Telefon <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_custRingTone</b> - Benutzerspezifischer Klingelton des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_device</b> - Interne Device Nummer des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_fwVersion</b> - Firmware-Version des DECT Telefons <i>n</i></li>
@@ -20593,7 +20596,7 @@ sub Fritz_Helper_reformat
       <li><b>dect</b><i>n</i><b>_intRingTone</b> - Interner Klingelton des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_manufacturer</b> - Hersteller des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_model</b> - Modell des DECT Telefons <i>n</i></li>
-      <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Bei aktiver Klingelsperre keine Ereignisse signalisieren f&uuml;r das DECT Telefon <i>n</i></li>
+      <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Bei aktiver Klingelsperre keine Ereignisse signalisieren für das DECT Telefon <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_radio</b> - aktueller Internet-Radio-Klingelton des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_NoRingTime</b> - Klingelsperren des DECT Telefons <i>n</i></li>
       <br>
@@ -20609,29 +20612,29 @@ sub Fritz_Helper_reformat
       <li><b>fon_phoneBook_</b><i>n</i> - Name of the phone book <i>n</i></li>
       <li><b>fon_phoneBook_URL_</b><i>n</i> - URL to the phone book <i>n</i></li>
       <br>
-      <li><b>gsm_internet</b> - Internetverbindung errichtet &uuml;ber Mobilfunk-Stick </li>
-      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalst&auml;rke (0-100)</li>
+      <li><b>gsm_internet</b> - Internetverbindung errichtet über Mobilfunk-Stick </li>
+      <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalstärke (0-100)</li>
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
-      <li><b>gsm_technology</b> - GSM-Technologie, die f&uuml;r die Daten&uuml;bertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
+      <li><b>gsm_technology</b> - GSM-Technologie, die für die Datenübertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
       <br>
       <li><b>matter_</b><i>...</i><b>_node</b> - matter node (SmartGateWay oder FB mit Matter).</li>
       <li><b>matter_</b><i>...</i><b>_vendor</b> - matter vendor/fabric (SmartGateWay oder FB mit Matter).</li>
       <br>
       <li><b>mobileInfo_</b><i>...</i> - Mobilfunk Readings (USB-Mobilfunk-Stick oder FritzBox LTE).</li>
       <br>
-      <li><b>mac_</b><i>nn_nn_nn_nn_nn_nn</i> - MAC Adresse und Name eines aktiven Netzwerk-Ger&auml;tes.<br>
+      <li><b>mac_</b><i>nn_nn_nn_nn_nn_nn</i> - MAC Adresse und Name eines aktiven Netzwerk-Gerätes.<br>
       Wird keine MAC-Adresse bereit gestellt,z.B. Switch oder VPN, dann wird anstatt der MAC-Adresse die Fritz-Device DeviceID genommen.<br>
-      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsst&auml;rke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.<br>
-      Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive: IP-Adresse" bzw "inactiv: DeviceID" wenn keine IP-Adresse zur Verfügung steht<br>
-      und werden beim n&auml;chsten Update gel&ouml;scht.</li>
+      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsstärke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.<br>
+      Inaktive oder entfernte Geräte erhalten zuerst den Werte "inactive: IP-Adresse" bzw "inactiv: DeviceID" wenn keine IP-Adresse zur Verfügung steht<br>
+      und werden beim nächsten Update gelöscht.</li>
       <br>
-      <li><b>ip_</b><i>nnn.nnn.nnn.nnn</i> - IP-Adresse und Name eines aktiven Netzwerk-Ger&auml;tes.<br>
-      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsst&auml;rke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.<br>
-      Inaktive oder entfernte Ger&auml;te erhalten zuerst den Wert "inactive: DeviceID" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
+      <li><b>ip_</b><i>nnn.nnn.nnn.nnn</i> - IP-Adresse und Name eines aktiven Netzwerk-Gerätes.<br>
+      Bei einer WLAN-Verbindung wird "WLAN" und (von der Box gesehen) die Sende- und Empfangsgeschwindigkeit und die Empfangsstärke angehangen. Bei einer LAN-Verbindung wird der LAN-Port und die LAN-Geschwindigkeit angehangen. Gast-Verbindungen werden mit "gWLAN" oder "gLAN" gekennzeichnet.<br>
+      Inaktive oder entfernte Geräte erhalten zuerst den Wert "inactive: DeviceID" und werden beim nächsten Update gelöscht.</li>
       <br>
-      <li><b>nbh_</b><i>nn_nn_nn_nn_nn_nn</i> - MAC-Adresse und Name eines aktiven WAN-Ger&auml;tes.<br>
+      <li><b>nbh_</b><i>nn_nn_nn_nn_nn_nn</i> - MAC-Adresse und Name eines aktiven WAN-Gerätes.<br>
       Es wird die SSID, der Kanal und das Frequenzband angezeigt.<br>
-      Inaktive oder entfernte Ger&auml;te erhalten zuerst den Werte "inactive" und werden beim n&auml;chsten Update gel&ouml;scht.</li>
+      Inaktive oder entfernte Geräte erhalten zuerst den Werte "inactive" und werden beim nächsten Update gelöscht.</li>
       <br>
       <li><b>radio</b><i>nn</i> - Name der Internetradiostation <i>01</i></li>
       <br>
@@ -20640,7 +20643,7 @@ sub Fritz_Helper_reformat
       <li><b>tam</b><i>n</i><b>_oldMsg</b> - Anzahl alter Nachrichten auf dem Anrufbeantworter <i>n</i></li>
       <li><b>tam</b><i>n</i><b>_state</b> - Aktueller Status des Anrufbeantworters <i>n</i></li>
       <br>
-      <li><b>user</b><i>nn</i> - Name von Nutzer/IP <i>n</i> f&uuml;r den eine Zugangsbeschr&auml;nkung (Kindersicherung) eingerichtet ist</li>
+      <li><b>user</b><i>nn</i> - Name von Nutzer/IP <i>n</i> für den eine Zugangsbeschränkung (Kindersicherung) eingerichtet ist</li>
       <li><b>user</b><i>nn</i>_thisMonthTime - Internetnutzung des Nutzers/IP <i>n</i> im aktuellen Monat (Kindersicherung)</li>
       <li><b>user</b><i>nn</i>_todaySeconds - heutige Internetnutzung des Nutzers/IP <i>n</i> in Sekunden (Kindersicherung)</li>
       <li><b>user</b><i>nn</i>_todayTime - heutige Internetnutzung des Nutzers/IP <i>n</i> (Kindersicherung)</li>
@@ -20726,30 +20729,30 @@ sub Fritz_Helper_reformat
    <b>Ereignis-Codes</b>
    <ul><br>
        <li><b>1</b> IGMPv3 multicast router n.n.n.n active</li>
-      <li><b>11</b> DSL ist verf&uuml;gbar (DSL-Synchronisierung besteht mit n/n kbit/s).</li>
+      <li><b>11</b> DSL ist verfügbar (DSL-Synchronisierung besteht mit n/n kbit/s).</li>
       <li><b>12</b> DSL-Synchronisierung beginnt (Training).</li>
       <li><b>14</b> Mobilfunkmodem initialisiert.</li>
       <li><b>23</b> Internetverbindung wurde getrennt.</li>
       <li><b>24</b> Internetverbindung wurde erfolgreich hergestellt. IP-Adresse: ..., DNS-Server: ... und ..., Gateway: ..., Breitband-PoP: ..., LineID:...</li>
       <li><b>25</b> Internetverbindung IPv6 wurde erfolgreich hergestellt. IP-Adresse: ...:...:...:...:...:...:...:...</li>
       <li><b>26</b> Internetverbindung wurde getrennt.</li>
-      <li><b>27</b> IPv6-Pr&auml;fix wurde erfolgreich bezogen. Neues Pr&auml;fix: ....:....:....:....:/nn</li>
-      <li><b>28</b> Internetverbindung IPv6 wurde getrennt, Pr&auml;fix nicht mehr g&uuml;ltig.</li>
+      <li><b>27</b> IPv6-Präfix wurde erfolgreich bezogen. Neues Präfix: ....:....:....:....:/nn</li>
+      <li><b>28</b> Internetverbindung IPv6 wurde getrennt, Präfix nicht mehr gültig.</li>
       <br>
       <li><b>71</b> Anmeldung der Internetrufnummer &lt;Nummer&gt; war nicht erfolgreich. Ursache: DNS-Fehler.</li>
-      <li><b>73</b> Anmeldung der Internetrufnummer &lt;Nummer&gt; war nicht erfolgreich. Ursache: Gegenstelle antwortet nicht. Zeit&uuml;berschreitung.</li>
+      <li><b>73</b> Anmeldung der Internetrufnummer &lt;Nummer&gt; war nicht erfolgreich. Ursache: Gegenstelle antwortet nicht. Zeitüberschreitung.</li>
       <li><b>85</b> Die Internetverbindung wird kurz unterbrochen, um der Zwangstrennung durch den Anbieter zuvorzukommen.</li>
       <br>
-     <li><b>119</b> Information des Anbieters &uuml;ber die Geschwindigkeit des Internetzugangs (verf&uuml;gbare Bitrate): nnnn/nnnn kbit/s</li>
-     <li><b>131</b> USB-Ger&auml;t ..., Klasse 'USB 2.0 (hi-speed) storage', angesteckt</li>
-     <li><b>132</b> USB-Ger&auml;t ... abgezogen</li>
-     <li><b>134</b> Es wurde ein nicht unterst&uuml;tzes USB-Ger&auml;t angeschlossen</li>
+     <li><b>119</b> Information des Anbieters über die Geschwindigkeit des Internetzugangs (verfügbare Bitrate): nnnn/nnnn kbit/s</li>
+     <li><b>131</b> USB-Gerät ..., Klasse 'USB 2.0 (hi-speed) storage', angesteckt</li>
+     <li><b>132</b> USB-Gerät ... abgezogen</li>
+     <li><b>134</b> Es wurde ein nicht unterstützes USB-Gerät angeschlossen</li>
      <li><b>140</b> Der USB-Speicher ... wurde eingebunden.</li>
      <li><b>141</b> Der USB-Speicher ... wurde entfernt.</li>
      <li><b>189</b> Die Rufnummer &lt;Nummer&gt; ist seit mehr als einer Stunde nicht verfügbar.</li>
      <br>
-     <li><b>201</b> Es liegt keine St&ouml;rung der Telefonie mehr vor. Alle Rufnummern sind ab sofort wieder verf&uuml;gbar.</li>
-     <li><b>205</b> Anmeldung f&uuml;r IP-Telefonieger&auml;t "Telefonie-Ger&auml;t" von IP-Adresse ... nicht erfolgreich.</li>
+     <li><b>201</b> Es liegt keine Störung der Telefonie mehr vor. Alle Rufnummern sind ab sofort wieder verfügbar.</li>
+     <li><b>205</b> Anmeldung für IP-Telefoniegerät "Telefonie-Gerät" von IP-Adresse ... nicht erfolgreich.</li>
      <li><b>267</b> Integrierter Faxempfang wurde aktiviert auf USB-Speicher 'xxx'.</li>
      <br>
      <li><b>401</b> SIP_UNAUTHORIZED, Beschreibung steht in der Hilfe (Webinterface)</li>
@@ -20762,43 +20765,44 @@ sub Fritz_Helper_reformat
      <li><b>484</b> SIP_ADDRESS_INCOMPLETE, Beschreibung steht in der Hilfe (Webinterface)</li>
      <li><b>485</b> SIP_AMBIGUOUS, Beschreibung steht in der Hilfe (Webinterface)</li>
      <br>
-     <li><b>486</b> SIP_BUSY_HERE, Ziel besetzt (vermutlich auch andere Gr&uuml;nde bei der Gegenstelle)</li>
+     <li><b>486</b> SIP_BUSY_HERE, Ziel besetzt (vermutlich auch andere Gründe bei der Gegenstelle)</li>
      <li><b>487</b> SIP_REQUEST_TERMINATED, Anrufversuch beendet (Gegenstelle nahm nach ca. 30 Sek. nicht ab)</li>
      <br>
-     <li><b>500</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von von IP-Adresse ...</li>
-     <li><b>501</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse ... gescheitert (falsches Kennwort).</li>
-     <li><b>502</b> Die FRITZ!Box-Einstellungen wurden &uuml;ber die Benutzeroberfl&auml;che ge&auml;ndert.</li>
-     <li><b>503</b> Anmeldung an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse yy gescheitert (ung&uuml;ltige Sitzungskennung). Zur Sicherheit werden</li>
-     <li><b>504</b> Anmeldung des Benutzers FhemUser an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse ...</li>
-     <li><b>505</b> Anmeldung des Benutzers xx an der FRITZ!Box-Benutzeroberfl&auml;che von IP-Adresse yy gescheitert (falsches Kennwort)</li>
+     <li><b>500</b> Anmeldung an der FRITZ!Box-Benutzeroberfläche von von IP-Adresse ...</li>
+     <li><b>501</b> Anmeldung an der FRITZ!Box-Benutzeroberfläche von IP-Adresse ... gescheitert (falsches Kennwort).</li>
+     <li><b>502</b> Die FRITZ!Box-Einstellungen wurden über die Benutzeroberfläche geändert.</li>
+     <li><b>503</b> Anmeldung an der FRITZ!Box-Benutzeroberfläche von IP-Adresse yy gescheitert (ungültige Sitzungskennung). Zur Sicherheit werden</li>
+     <li><b>504</b> Anmeldung des Benutzers FhemUser an der FRITZ!Box-Benutzeroberfläche von IP-Adresse ...</li>
+     <li><b>505</b> Anmeldung des Benutzers xx an der FRITZ!Box-Benutzeroberfläche von IP-Adresse yy gescheitert (falsches Kennwort)</li>
      <li><b>506</b> Anmeldung einer App des Benutzers FhemUser von IP-Adresse</li>
      <li><b>510</b> Anmeldung einer App mit unbekanntem Anmeldenamen von IP-Adresse ... gescheitert.</li>
      <br>
-     <li><b>689</b> WLAN-Anmeldung ist gescheitert : Die MAC-Adresse des WLAN-Ger&auml;ts ist gesperrt. MAC-Adresse</li>
+     <li><b>689</b> WLAN-Anmeldung ist gescheitert : Die MAC-Adresse des WLAN-Geräts ist gesperrt. MAC-Adresse</li>
      <li><b>692</b> WLAN-Anmeldung ist gescheitert : Verbindungsaufbau fehlgeschlagen. MAC-Adresse</li>
-     <li><b>705</b> WLAN-Ger&auml;t Anmeldung gescheitert (5 GHz): ung&uuml;ltiger WLAN-Schl&uuml;ssel. MAC-Adresse</li>
-     <li><b>706</b> [...] WLAN-Ger&auml;t Anmeldung am Gastzugang gescheitert (n,n GHz): ung&uuml;ltiger WLAN-Schl&uuml;ssel. MAC-Adresse: nn:nn:nn:nn:nn:nn.</li>
-     <li><b>748</b> [...] WLAN-Ger&auml;t angemeldet (n,n GHz), nn Mbit/s, PC-..., IP ..., MAC ... .</li>
-     <li><b>752</b> [...] WLAN-Ger&auml;t hat sich abgemeldet (n,n GHz), PC-..., IP ..., MAC ....</li>
-     <li><b>754</b> [...] WLAN-Ger&auml;t wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .</li>
-     <li><b>756</b> WLAN-Ger&auml;t hat sich neu angemeldet (n,n GHz), nn Mbit/s, Ger&auml;t, IP ..., MAC ....</li>
-     <li><b>782</b> WLAN-Anmeldung ist gescheitert : Die erneute Anmeldung ist aufgrund aktiver "Unterst&uuml;tzung f&uuml;r gesch&uuml;tzte Anmeldungen von WLAN-Ger&auml;ten (PMF)</li>
-     <li><b>786</b> 5-GHz-Band für [Anzahl] Min. nicht nutzbar wegen Pr&uuml;fung auf bevorrechtigten Nutzer (z. B. Radar) auf dem gew&auml;hlten Kanal (Frequenz [GHz])</li>
-     <li><b>790</b> Radar wurde auf Kanal [Nummer] (Frequenz [Ziffer] GHz) erkannt, automatischer Kanalwechsel wegen bevorrechtigtem Benutzer ausgef&uuml;hrt</li>
+     <li><b>705</b> WLAN-Gerät Anmeldung gescheitert (5 GHz): ungültiger WLAN-Schlüssel. MAC-Adresse</li>
+     <li><b>706</b> [...] WLAN-Gerät Anmeldung am Gastzugang gescheitert (n,n GHz): ungültiger WLAN-Schlüssel. MAC-Adresse: nn:nn:nn:nn:nn:nn.</li>
+     <li><b>748</b> [...] WLAN-Gerät angemeldet (n,n GHz), nn Mbit/s, PC-..., IP ..., MAC ... .</li>
+     <li><b>752</b> [...] WLAN-Gerät hat sich abgemeldet (n,n GHz), PC-..., IP ..., MAC ....</li>
+     <li><b>754</b> [...] WLAN-Gerät wurde abgemeldet (.,. GHz), PC-..., IP ..., MAC ... .</li>
+     <li><b>756</b> WLAN-Gerät hat sich neu angemeldet (n,n GHz), nn Mbit/s, Gerät, IP ..., MAC ....</li>
+     <li><b>782</b> WLAN-Anmeldung ist gescheitert : Die erneute Anmeldung ist aufgrund aktiver "Unterstützung für geschützte Anmeldungen von WLAN-Geräten (PMF)</li>
+     <li><b>786</b> 5-GHz-Band für [Anzahl] Min. nicht nutzbar wegen Prüfung auf bevorrechtigten Nutzer (z. B. Radar) auf dem gewählten Kanal (Frequenz [GHz])</li>
+     <li><b>790</b> Radar wurde auf Kanal [Nummer] (Frequenz [Ziffer] GHz) erkannt, automatischer Kanalwechsel wegen bevorrechtigtem Benutzer ausgeführt</li>
      <li><b>801</b> Die FRITZ!Box ist seit mehr als einer Stunde nicht mehr mit dem Internet verbunden.</li>
      <li><b>801</b> Die FRITZ!Box ist seit mehr als einer Stunde nicht mehr mit dem Internet verbunden. Auch die Telefonie ist nicht oder nur eingeschränkt verfügbar.</li>
      <br>
     <li><b>2104</b> Die Systemzeit wurde erfolgreich aktualisiert von Zeitserver nnn.nnn.nnn.nnn .</li>
      <br>
-    <li><b>2364</b> Ein neues Ger&auml;t wurde an der FRITZ!Box angemeldet (Schnurlostelefon)</li>
-    <li><b>2358</b> Einstellungen wurden gesichert. Diese &auml;nderung erfolgte von Ihrem Heimnetzger&auml;t ... (IP-Adresse: ...)</li>
-    <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschl&uuml;sselten DNS-Servern.</li>
-    <li><b>2383</b> Es wurde erfolgreich eine Verbindung - samt vollst&auml;ndiger Validierung - zu den verschl&uuml;sselten DNS-Servern aufgebaut.</li>
-    <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschl&uuml;sselten DNS-Servern.</li>
+    <li><b>2364</b> Ein neues Gerät wurde an der FRITZ!Box angemeldet (Schnurlostelefon)</li>
+    <li><b>2358</b> Einstellungen wurden gesichert. Diese änderung erfolgte von Ihrem Heimnetzgerät ... (IP-Adresse: ...)</li>
+    <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschlüsselten DNS-Servern.</li>
+    <li><b>2383</b> Es wurde erfolgreich eine Verbindung - samt vollständiger Validierung - zu den verschlüsselten DNS-Servern aufgebaut.</li>
+    <li><b>2380</b> Es besteht keine Verbindung mehr zu den verschlüsselten DNS-Servern.</li>
     <li><b>3330</b> Verbindung zum Online-Speicher hergestellt.</li>
    </ul>
    <br>
 </div>
+
 =end html_DE
 
 =cut--
