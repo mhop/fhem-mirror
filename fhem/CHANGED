@@ -1,6 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
- - bugfix: 72_FritzSmart: Typo in commandRef
+ - bugfix: 72_FritzSmart: Typo in commandRef, Fehlerkorrektur
  - bugfix: 72_FritzSmart: Warning in Log Auswertung
  - new: 72_FritzSmart: Umgestellt aud Perl Package Technologie.
                        Fehlerkorrekturen aus altem Modul 72_FRITZBOX
