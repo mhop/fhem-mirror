@@ -591,14 +591,18 @@ HttpUtils_Connect2($)
       $hash->{conn}->blocking(1);
       $usingSSL = 1;
 
-      if($hash->{hu_proxy}) {   # can block!
+      if($hash->{hu_proxy}) {
         my $pw = AttrVal("global", "proxyAuth", "");
         $pw = "Proxy-Authorization: Basic $pw\r\n" if($pw);
         my $hdr = "CONNECT $hash->{host}:$hash->{hu_port} HTTP/1.0\r\n".
                   "User-Agent: fhem\r\n$pw\r\n";
         syswrite $hash->{conn}, $hdr;
-        my $buf;
-        my $len = sysread($hash->{conn},$buf,65536);
+
+        my ($buf, $len, $rin) = ("", 0, '');
+        vec($rin, $hash->{conn}->fileno(), 1) = 1;
+        my $nfound = select($rin, undef, undef, $hash->{timeout}); #blocking
+        $len = sysread($hash->{conn},$buf,65536) if($nfound > 0);
+
         if(!defined($len) || $len <= 0 || $buf !~ m/HTTP.*200/) {
           HttpUtils_Close($hash);
           return "Proxy denied CONNECT";
