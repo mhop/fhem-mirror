@@ -88,7 +88,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.03.18";
+our $ModulVersion = "26.03.20";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -1077,19 +1077,21 @@ sub Fritz_Log($$$)
    my $xline       = ( caller(0) )[2];
 
    my $xsubroutine = ( caller(1) )[3];
+
+   # main::Log3 $hash, 3, $xsubroutine;
+
    my $sub         = ( split( ':', $xsubroutine ) )[2];
 
-   $sub = "Fritz_Get_supportData" if $sub eq "__ANON__";
-
    if ( defined $sub ) {
+     $sub = "Fritz_Get_supportData" if $sub eq "__ANON__";
      my $setSubVerbose4 = main::AttrVal( $instName, "setSubVerbose4", "" );
      if ($sub =~ /^$setSubVerbose4$/) {
        $loglevel = 2;
      }
      $sub =~ s/Fritz_//;
+   } else {
+     $sub = $xsubroutine;
    }
-
-   $sub ||= 'no-subroutine-specified';
 
    my $avmModel = main::InternalVal($instName, "MODEL", defined $instHash->{boxModel} ? $instHash->{boxModel} : "0000");
    $avmModel = $1 if $avmModel =~ m/(\d+)/;
@@ -6953,7 +6955,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
      eval {
        foreach my $key (keys %$views) {
-         Fritz_Log $hash, 4, "Kid Profiles: " . $key;
+         Fritz_Log $hash, 3, "Kid Profiles: " . $key;
 
          my $kProfile = $resultData->{data}->{kidProfiles}->{$key}{Name} . " [" . $resultData->{data}->{kidProfiles}->{$key}{Id} ."]";
 
@@ -11183,7 +11185,7 @@ sub Fritz_Set_change_Profile($)
 
    eval {
      foreach my $key (keys %$views) {
-       Fritz_Log $hash, 4, "Kid Profiles: ".$key;
+       Fritz_Log $hash, 4, "Kid Profiles: " .$key;
        if ($result->{data}->{kidProfiles}->{$key}{Id} eq $val[1]) {
          $ProfileOK = "true";
          last;
