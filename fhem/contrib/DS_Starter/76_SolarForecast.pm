@@ -29222,7 +29222,7 @@ sub checkPlantConfig {
 
   if (!$rdcs) {
       $result->{'Plant Control'}{state}   = $info;
-      $result->{'Plant Control'}{result} .= qq{It may be useful setting 'plantControl->reductionState'. <br>};
+      $result->{'Plant Control'}{result} .= qq{It may be useful setting <br>'plantControl->reductionState'. <br>};
       $result->{'Plant Control'}{note}   .= qq{The 'reductionState' parameter informs $name whether the PV system is down-regulated. (see Command Reference) <br>};
       # $result->{'Plant Control'}{note}   .= qq{(see <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a>) <br>};
       $result->{'Plant Control'}{info}    = 1;
@@ -29230,7 +29230,7 @@ sub checkPlantConfig {
 
   if (!$fipl && isBatteryUsed ($name)) {
       $result->{'Plant Control'}{state}   = $info;
-      $result->{'Plant Control'}{result} .= qq{It may be useful setting 'plantControl->feedinPowerLimit' if Batteries are installed. <br>};
+      $result->{'Plant Control'}{result} .= qq{It may be useful setting <br>'plantControl->feedinPowerLimit' if Batteries are installed. <br>};
       $result->{'Plant Control'}{note}   .= qq{The 'feedinPowerLimit' parameter is helpful in conjunction with the 'ctrlBatSocManagementXX' attribute to prevent a possible curtailment of the PV system and to make optimum use of the yield if battery(ies) are used. <br>};
       $result->{'Plant Control'}{note}   .= qq{(see this <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#PV-Prognose_und_Verbrauch_optimierte_Beladungssteuerung_unter_Ber%C3%BCcksichtigung_einer_Wirkleistungsbegrenzung' target='_blank'>section</a> in the german Wiki) <br>};
       $result->{'Plant Control'}{info}    = 1;
