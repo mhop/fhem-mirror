@@ -9622,7 +9622,7 @@ sub periodicWriteMemcache {
   Log3 ($name, 4, "$name - The working memory >circular, pvhist, solcastapi, statusapi, weatherapi< has been saved to persistance");
 
   if ($bckp) {
-      my $tstr = (timestampToTimestring (0))[2];
+      my $tstr = (timestampToTimestring (time))[2];
       $tstr    =~ s/[-: ]/_/g;
 
       writeCacheToFile ($hash, 'circular',  $pvccache.$name.'_'.$tstr);        # Cache File PV Circular Sicherung schreiben
