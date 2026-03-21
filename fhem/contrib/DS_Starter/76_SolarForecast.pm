@@ -163,6 +163,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.5.0"  => "21.03.2026  new key plantControl->consForecastBase ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -7912,6 +7913,8 @@ sub _attrplantControl {                  ## no critic "not used"
   my $aName = $paref->{aName};
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
+  
+  my $cforegex = '((?:[1-9]|1\d|2[0-4])->(?:[^\s]+:[^\s]+:\d+|\d+))(?:,\s*(?:[1-9]|1\d|2[0-4])->(?:[^\s]+:[^\s]+:\d+|\d+))*';
 
   my $valid = {
       backupFilesKeep           => { comp => '\d+',                                               act => 0 },
@@ -7925,6 +7928,7 @@ sub _attrplantControl {                  ## no critic "not used"
       genPVdeviation            => { comp => '^(?:daily|continuously)(?::(?:default|reverse))?$', act => 1 },
       genPVforecastsToEvent     => { comp => '(adapt4(?:f)?Steps)',                               act => 0 },
       reductionState            => { comp => '[^\s]+:[^\s]+:[^\s]+',                              act => 1 },
+      consForecastBase          => { comp => $cforegex,                                           act => 1 },
       showLink                  => { comp => '(0|1)',                                             act => 0 },
   };
 
@@ -8975,6 +8979,28 @@ sub __attrKeyAction {
               if (!defined $hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
           }
       }
+      
+      if ($init_done && $akey eq 'consForecastBase') {
+          my $cfbase  = CurrentVal  ($name, 'consForecastBase', '');
+          my ($a, $h) = parseParams ($cfbase, ',', '', '->');
+          
+          for my $hnum (keys %{$h}) {                                
+              my ($cfodev, $cford, $def) = split ":", $h->{$hnum}; 
+              
+              if ($cfodev && $cford) {                                                  # Auswertung Device/Reading Kombi
+                  ($err) = isDeviceValid ( { name   => $name,
+                                             obj    => $cfodev,
+                                             method => 'string',
+                                           }
+                                         );                                          
+              }
+  
+              if ($err) {
+                  delete $data{$name}{current}{$akey};
+                  return $err;
+              }             
+          }          
+      }
 
       if ($init_done && $akey eq 'reductionState') {
           my $rdcinfo = CurrentVal ($name, 'reductionState', '');
@@ -9622,7 +9648,7 @@ sub periodicWriteMemcache {
   Log3 ($name, 4, "$name - The working memory >circular, pvhist, solcastapi, statusapi, weatherapi< has been saved to persistance");
 
   if ($bckp) {
-      my $tstr = (timestampToTimestring (0))[2];
+      my $tstr = (timestampToTimestring (time))[2];
       $tstr    =~ s/[-: ]/_/g;
 
       writeCacheToFile ($hash, 'circular',  $pvccache.$name.'_'.$tstr);        # Cache File PV Circular Sicherung schreiben
@@ -16794,63 +16820,76 @@ sub _calcConsForecast_legacy {
   ###################################################################
   debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next 24 Hours ###################");
         
-  for my $nh (sort keys %{$data{$name}{nexthours}}) {
-      my $isToday = NexthoursVal ($name, $nh, 'today',         0); 
-      my $hod     = NexthoursVal ($name, $nh, 'hourofday', undef);                                                      # Stunde des Tages vom NextHours Key (01,02,...24) 
-      
-      my $num = int ((split 'NextHour', $nh)[1]);
+  for my $nh (sort keys %{ $data{$name}{nexthours} }) {
+      my $isToday = NexthoursVal ($name, $nh, 'today', 0);
+      my $hod     = NexthoursVal ($name, $nh, 'hourofday', undef);
+      my $nhn     = (split 'NextHour', $nh)[1];
+      my $u       = $usage->{nxt}{$hod};                                            # Kurzreferenz
       
       my ($msg1, $msg2, $msg3, $msg4) = ('', '', '', '');
-     
-      if (defined $usage->{nxt}{$hod}{histnum}) {                                                                       # historische Stundenverbräuche exkludieren
-          my $exhcon                = $usage->{nxt}{$hod}{histcon} / $usage->{nxt}{$hod}{histnum};                      # durchschnittlichen Verbrauchswert
-          $usage->{nxt}{$hod}{con} -= $exhcon;
-          
+
+      if (defined $u->{histnum}) {                                                  # historische Stundenverbräuche exkludieren
+          my $exhcon = $u->{histcon} / $u->{histnum};                               # durchschnittlichen Verbrauchswert
+          $u->{con} -= $exhcon;
+
           $exhcon = round0 ($exhcon);
-          $msg1   = "EXCLUDE hist $exhcon Wh (entities=$usage->{nxt}{$hod}{histnum}), ";
+          $msg1   = "EXCLUDE hist $exhcon Wh (entities=$u->{histnum}), ";
       }
 
-      $usage->{nxt}{$hod}{conex} = $usage->{nxt}{$hod}{con};
-      
+      $u->{conex} = $u->{con};                                                      # Ausgangswert sichern (vor Plan-Inklusion)
 
-      if (defined $usage->{nxt}{$hod}{plannum}) {                                                                       # geplante Stundenverbräuche inkludieren
-          my $inhcon                = $usage->{nxt}{$hod}{plancon} / $usage->{nxt}{$hod}{plannum};
-          $usage->{nxt}{$hod}{con} += $inhcon;
-          
-          $inhcon = round0 ($inhcon);
-          $msg2   = "INCLUDE planned $inhcon Wh (entities=$usage->{nxt}{$hod}{plannum}), "; 
+      if (defined $u->{plannum}) {                                                  # Geplante Verbräuche INKLUDIEREN
+          my $inhcon = $u->{plancon} / $u->{plannum};
+          $u->{con} += $inhcon;
+
+          $inhcon = round0($inhcon);
+          $msg2   = "INCLUDE planned $inhcon Wh (entities=$u->{plannum}), ";
       }
-      
-      $usage->{nxt}{$hod}{con} = round0 ($usage->{nxt}{$hod}{con}) if(defined $usage->{nxt}{$hod}{con});
-           
-      debugLog ($paref, 'consumption_long', "num=$num, isToday=$isToday, hod=$hod, ".$msg1.$msg2."SUMMARY -> estimated CON: ".(defined $usage->{nxt}{$hod}{con} ? $usage->{nxt}{$hod}{con}.' Wh' : 'undef'));
-  
-      
-      ## Ergebnisse speichern
-      #######################
-      next if(!defined $usage->{nxt}{$hod}{con});                                                            
-      
-      $usage->{nxt}{$hod}{conex} = $usage->{nxt}{$hod}{con} if(!defined $usage->{nxt}{$hod}{conex});
-      
-      my $con   = round0 ($usage->{nxt}{$hod}{con});                                                                    # prognostizierter Verbrauch
-      my $conex = round0 ($usage->{nxt}{$hod}{conex});  
-      
-      $data{$name}{nexthours}{$nh}{confcEx}  = $conex;
-      $data{$name}{nexthours}{$nh}{confc}    = $con;                                   
-      $data{$name}{nexthours}{$nh}{conlegfc} = $con;
-      
-      $msg3 = "STORE NextHour -> confc=$con Wh, confcEx=$conex Wh";
 
-      if ($isToday) {                                                                                                   # nur Werte des aktuellen Tags speichern
-          $data{$name}{circular}{$hod}{confc} = $usage->{nxt}{$hod}{con};
-          
-          writeToHistory ( { paref => $paref, key => 'confc',    val => $con, day => $day, hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'conlegfc', val => $con, day => $day, hour => $hod } );
+      $u->{con} = round0($u->{con}) if defined $u->{con};                           # Finalen Verbrauch runden
 
-          $msg4 = " ,STORE pvCircular/pvHistory -> confc=$con Wh";
-      }  
-      
-      debugLog ($paref, 'saveData2Cache|consumption_long', "num=$num, isToday=$isToday, hod=$hod, $msg3".$msg4);
+      debugLog ($paref, 
+               'consumption_long',
+               "NH=$nhn, isToday=$isToday, hod=$hod, ${msg1}${msg2}SUMMARY -> estimated CON: "
+               . (defined $u->{con} ? "$u->{con} Wh" : 'undef')
+               );
+
+      next if(!defined $u->{con});                                                  # Wenn kein Verbrauch → weiter
+
+      $u->{conex} //= $u->{con};                                                    # falls conex noch undef → setzen
+
+      # --- Consumption Base berücksichtigen
+      my $confc   = __considerConsBase { name      => $name,                        # prognostizierter Verbrauch mit Con-Base
+                                         confc_raw => round0 ($u->{con}), 
+                                         hod       => $hod, 
+                                         debug     => $paref->{debug},
+                                       };
+                                       
+      my $confcex = __considerConsBase { name      => $name,                        # prognostizierter Verbrauch mit excluded Verbraucher & Con-Base
+                                         confc_raw => round0 ($u->{conex}), 
+                                         hod       => $hod, 
+                                         debug     => $paref->{debug},
+                                       };
+
+      # --- Ergebnisse in nexthours speichern
+      my $nhref = $data{$name}{nexthours}{$nh};
+      $nhref->{confcEx}  = $confcex;
+      $nhref->{confc}    = $confc;
+      $nhref->{conlegfc} = $confc;
+
+      $msg3 = "STORE NextHour$nhn -> confc=$confc Wh, confcEx=$confcex Wh";
+
+      # --- nur heutige Werte in circular/history speichern
+      if ($isToday) {
+          $data{$name}{circular}{$hod}{confc} = $confc;
+
+          writeToHistory ({ paref => $paref, key => 'confc',    val => $confc, day => $day, hour => $hod });
+          writeToHistory ({ paref => $paref, key => 'conlegfc', val => $confc, day => $day, hour => $hod });
+
+          $msg4 = " ,STORE pvCircular/pvHistory -> confc=$confc Wh";
+      }
+
+      debugLog ($paref, 'saveData2Cache', "isToday=$isToday, hod=$hod, $msg3$msg4");
   }
   
   debugLog ($paref, 'consumption_long', "################### ENDE Consumption forecast ###################");  
@@ -17067,6 +17106,66 @@ sub __exincl_from_pvHistory {
 
 return ($tomexnum, $tomex);
 }
+
+################################################################
+#   Consumption Forecast Base ermitteln und die 
+#   Verbrauchsvorhersage mit dem ermittelten Wert korrigieren
+################################################################    
+sub __considerConsBase {
+  my $paref     = shift;
+  my $name      = $paref->{name};
+  my $confc_raw = $paref->{confc_raw};
+  my $hod       = $paref->{hod};
+  my $debug     = $paref->{debug};
+
+  my $cfbase = CurrentVal ($name, 'consForecastBase', undef);
+  return $confc_raw if(!defined $cfbase);
+  
+  my ($a, $h) = parseParams ($cfbase, ',', '', '->');
+  
+  my ($base_val, $def);
+  my ($cfodev, $cford) = ('','');
+  
+  my $confc = $confc_raw;
+  
+  for my $hnum (keys %{$h}) {
+      my $basehod = sprintf "%02d", trim ($hnum);
+      next if(int($basehod) != int($hod));
+      
+      ($cfodev, $cford, $def) = split ":", $h->{$hnum}; 
+      
+      if ($cfodev && $cford) {                                                  # Auswertung Device/Reading Kombi
+          my ($err) = isDeviceValid { name   => $name,
+                                      obj    => $cfodev,
+                                      method => 'string',
+                                    }; 
+          if ($err) {
+              Log3 ($name, 1, "$name - WARNING - The Device '$cfodev' is invalid. Check attribute 'plantControl->consForecastBase'.");
+              return $confc_raw;
+          }
+          
+          $base_val = round0 (ReadingsNum ($cfodev, $cford, $def));
+      }
+      else {
+          $base_val = $h->{$hnum};                                              # festen Base-Wert verwenden
+      }
+
+      if ($debug =~ /consumption/) {
+          if ($cfodev && $cford) {
+              Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - use device:reading combination $cfodev:$cford -> got value=$base_val Wh");      
+          }
+          else {
+              Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - use given value=$base_val Wh");
+          }
+      } 
+
+      $confc = defined $base_val && $base_val > $confc_raw ? $base_val : $confc_raw;
+  
+      Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - original confc=$confc_raw recalculated to value=$confc Wh") if ($debug =~ /consumption/);  
+  }
+  
+return $confc;
+} 
 
 ################################################################
 #     Schwellenwerte für Trigger auswerten und signalisieren
@@ -18912,7 +19011,9 @@ sub _graphicHeader {
                       ? FW_makeImage ('weather_wind_speed_ms@#884400')
                       : $wind_fast >= 17.2
                       ? FW_makeImage ('weather_wind_speed_ms@#555500')
-                      : FW_makeImage ('weather_wind_speed_ms@#007700');
+                      : $wind_fast >= 0.3
+                      ? FW_makeImage ('weather_wind_speed_ms@#337700')
+                      : FW_makeImage ('weather_wind_no_wind@#007700');
                       
 
       ## Autokorrektur-Icon
@@ -24748,11 +24849,7 @@ sub aiFannTrain {
   # --- Bester Snapshot -> Validierung und Kennzahlen berechnen
   ###############################################################
   my $sum_sq  = 0;                                                                          # für MSE/RMSE (normalisiert)
-  my $sum_z   = 0;
   my $bitfail = 0;
-  my $ss_tot  = 0;
-  my $ss_res  = 0;
-  my $sum_err = 0;
   
   my @pct_errors;                                                                           # für MAPE und MdAPE (denormalisiert)
   my @targets;
@@ -24765,6 +24862,9 @@ sub aiFannTrain {
   for my $i (0 .. $#test_inputs) {                                                          # erste Schleife: Fehler sammeln
       my $prediction_norm = $ann->run ($test_inputs[$i])->[0];                              # Netz liefert Arrayref
       my $target_norm     = $test_targets[$i]->[0];                                         # Ziel ebenfalls Arrayref
+      
+      my $diff_norm = abs ($prediction_norm - $target_norm);
+      $bitfail++ if($diff_norm > $bit_fail_limit);                                          # BitFail basiert auf normalisierten Werten
  
       my $err_norm = $prediction_norm - $target_norm;                                       # Fehler im Normalisierungsraum
       $sum_sq     += $err_norm**2;                                                          # für MSE im Normalisierungsraum
@@ -24772,18 +24872,8 @@ sub aiFannTrain {
       my $target     = _aiFannDenormMinMaxValue ($target_norm,     $minval, $maxval);
       my $prediction = _aiFannDenormMinMaxValue ($prediction_norm, $minval, $maxval);       # Für MAE/MAPE/R² weiterhin denormalisieren
 
-      $sum_err  += ($target - $prediction);
-      my $pterr  = $target - $prediction;
-
       push @targets, $target;
       push @preds,   $prediction;      
-      push @pct_errors, abs ($pterr / ($target || 1)) * 100;                                # Prozentfehler (denormalisiert)
-
-      $sum_z  += $target;
-      $ss_res += ($target - $prediction)**2;                                                # Residual Sum of Squares - Summe der quadrierten Abweichungen
-
-      my $diff_norm = abs ($prediction_norm - $target_norm);
-      $bitfail++ if($diff_norm > $bit_fail_limit);                                          # BitFail basiert auf normalisierten Werten
   }
   
   my $metrics        = _aiFannSlopeBias (\@targets, \@preds);                               # Modell-Slope und Modell-Bias auf denormalisierten Werten
@@ -24800,55 +24890,21 @@ sub aiFannTrain {
   my $target_median  = $err_metrics->{tgt_median};
   my $abs_errors_ref = $err_metrics->{abs_error_ref};                
   my @abs_errors     = @$abs_errors_ref;
-                                                                                                                                 
-  my $sum_sq_denorm = 0;
-  $sum_sq_denorm   += $_**2 for @abs_errors; 
   
   my $n             = scalar (@test_inputs);
   my $mse_val       = $sum_sq / $n;                                                         # MSE im Normalisierungsraum
-  my $mean_z        = $sum_z / $n;
-  
-  for my $i (0 .. $#test_inputs) {                                                          # zweite Schleife für R² (denormalisiert)
-      my $target_norm = $test_targets[$i]->[0];
-      my $target      = _aiFannDenormMinMaxValue ($target_norm, $minval, $maxval);
 
-      $ss_tot += ($target - $mean_z)**2;                                                    # Total Sum of Squares - Gesamtstreuung der Zielwerte um ihren Mittelwert
-  }
-  
-  my $r2 = 1 - ($ss_res / ($ss_tot || 1));                                                  # R² auf Originalskala
+  my $r2 = _aiFannR2 (\@targets, \@preds);                                                  # Bestimmtheitsmaß R² berechnen (Originalskala)
 
   
-  # Zielgrößen relative RMSE / weighted RMSE / + Textbewertung
-  ############################################################## 
-  my @weighted_sq;
-  my @weights;
-  my $clip = 2 * $mae;                                                                      # Clipping-Schwelle basierend auf MAE, Huber-artig, robust
+  # --- Zielgrößen relative RMSE / weighted RMSE / + Textbewertung
+  ################################################################## 
+  my $wrmse_ref            = _aiFannWeightedRmse (\@targets, \@abs_errors, $mae, $maxval, $target_median);
+  my $weighted_rmse        = $wrmse_ref->{weighted_rmse};
+  my $weighted_rmse_rel    = $wrmse_ref->{weighted_rmse_rel}; 
+  my $weighted_rmse_rating = $wrmse_ref->{rating};                                          # Textbewertung
 
-  for my $i (0 .. $#abs_errors) {
-      my $abs = $abs_errors[$i];
 
-      my $err_clipped = $abs > $clip ? $clip : $abs;                                        # Clipping
-
-      my $target_norm = $test_targets[$i]->[0];
-      my $target      = _aiFannDenormMinMaxValue ($target_norm, $minval, $maxval);          # Zielwert denormalisieren
-
-      my $w = ($target > 0) ? ($target / $maxval) : 0.1;                                    # Gewichtung nach Zielwertgröße
-
-      push @weights,     $w;
-      push @weighted_sq, $w * ($err_clipped ** 2);
-  }
-
-  my $weighted_rmse     = sqrt ((sum (@weighted_sq)) / (sum (@weights) || 1));
-  my $weighted_rmse_rel = round0 (($weighted_rmse / $target_median) * 100);
-
-  my $weighted_rmse_rating =
-        $weighted_rmse_rel < 20  ? "excellent"                                              # extrem selten, aber möglich
-      : $weighted_rmse_rel < 40  ? "good"                                                   # sehr gut
-      : $weighted_rmse_rel < 70  ? "acceptable"                                             # normal
-      : $weighted_rmse_rel < 120 ? "weak"                                                   # noch ok
-      :                            "very bad";                                              # kritisch
-
-  
   # Validation Mittelwert und Standardabweichung im Normraum berechnen
   ########################################################################
   # Windows prüft nur die Phase, die wirklich relevant ist -> ob das 
@@ -26261,6 +26317,80 @@ sub _aiFannErrorMetrics {
       bias_median     => $bias_median,                              # Median-Bias (signed)
       bias_abs_mean   => $bias_abs_mean,                            # Durchschnittlicher absoluter Bias
       bias_abs_median => $bias_abs_median,                          # Median absoluter Bias
+  };
+}
+
+###########################################################################
+#   Bestimmtheitsmaß R² berechnen (Originalskala)
+#   targets_ref : Arrayref der realen Zielwerte
+#   preds_ref   : Arrayref der Vorhersagewerte
+#   Gibt R² zurück ->
+#   (1 = perfekt, 0 = kein Erklärungswert, < 0 = schlechter als Mittelwert)
+###########################################################################
+sub _aiFannR2 {
+  my ($targets_ref, $preds_ref) = @_;
+
+  my @targets = @$targets_ref;
+  my @preds   = @$preds_ref;
+  my $n       = scalar @targets;
+
+  return 0 if($n < 2);
+
+  my $mean = (sum @targets) / $n;
+
+  my ($ss_res, $ss_tot) = (0, 0);
+
+  for my $i (0 .. $#targets) {
+      $ss_res += ($targets[$i] - $preds[$i]) ** 2;              # Residual Sum of Squares
+      $ss_tot += ($targets[$i] - $mean)      ** 2;              # Total Sum of Squares - Gesamtstreuung der Zielwerte um ihren Mittelwert
+  }
+  
+  my $r2 = 1 - ($ss_res / ($ss_tot || 1));                      # R² auf Originalskala
+
+return $r2;
+}
+
+###########################################################################
+#   Gewichteten RMSE berechnen (Huber-artiges Clipping, MAE-basiert)
+#   targets_ref    : Arrayref der realen Zielwerte (Originalskala)
+#   abs_errors_ref : Arrayref der absoluten Fehler
+#   mae            : MAE (Clipping-Basis: 2 * mae)
+#   maxval         : Maximalwert zur Gewichtsnormierung
+#   tgt_median     : Median der Zielwerte (für rmse_rel)
+###########################################################################
+sub _aiFannWeightedRmse {
+  my ($targets_ref, $abs_errors_ref, $mae, $maxval, $tgt_median) = @_;
+
+  my @targets    = @$targets_ref;
+  my @abs_errors = @$abs_errors_ref;
+
+  my $clip = 2 * $mae;                                                              # Clipping-Schwelle basierend auf MAE, Huber-artig, robust
+
+  my (@weighted_sq, @weights);
+
+  for my $i (0 .. $#abs_errors) {
+      my $abs         = $abs_errors[$i];
+      my $err_clipped = $abs > $clip ? $clip : $abs;                                # Clipping
+
+      my $w = ($targets[$i] > 0) ? ($targets[$i] / $maxval) : 0.1;
+
+      push @weights,     $w;
+      push @weighted_sq, $w * ($err_clipped ** 2);
+  }
+
+  my $weighted_rmse     = sqrt ((sum @weighted_sq) / (sum(@weights) || 1));
+  my $weighted_rmse_rel = round0 (($weighted_rmse / ($tgt_median || 1)) * 100);
+
+  my $rating =   $weighted_rmse_rel < 20  ? 'excellent'                             # extrem selten, aber möglich
+               : $weighted_rmse_rel < 40  ? 'good'                                  # sehr gut
+               : $weighted_rmse_rel < 70  ? 'acceptable'                            # normal
+               : $weighted_rmse_rel < 120 ? 'weak'                                  # noch ok
+               :                            'very bad';                             # kritisch
+
+  return {
+      weighted_rmse     => $weighted_rmse,
+      weighted_rmse_rel => $weighted_rmse_rel,
+      rating            => $rating,
   };
 }
 
@@ -34728,7 +34858,7 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td>The environment variables are set using the <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment attribute.                    </td></tr>
 			<tr><td>                            </td><td><b>outsideTemp</b> - the current outdoor temperature                                                                                      </td></tr>
             <tr><td>                            </td><td><b>presence</b>    - presence status                                                                                                      </td></tr>
-            <tr><td>                            </td><td><b>windSpeed</b>   - the current wind speed                                                                                               </td></tr>
+            <tr><td>                            </td><td><b>windSpeed</b>   - the current wind speed (smoothed)                                                                                    </td></tr>
             <tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>hourStyle</b>           </td><td>Format of the time in the bar chart.                                                                                                      </td></tr>
             <tr><td>                            </td><td><b>not set</b> - only hours without minutes (default)                                                                                     </td></tr>
@@ -35001,6 +35131,13 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                               </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                          </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>consForecastBase</b>          </td><td>The consumption forecast will be increased to at least the specified base value. Higher consumption forecasts remain unaffected.                                </td></tr>
+            <tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1–24).                                                                                       </td></tr>
+			<tr><td>                                  </td><td>The syntax is '&lt;hod&gt;->&lt;value&gt;,&lt;hod&gt;->&lt;value&gt;,...'. The &lt;value&gt; can be specified as:                                               </td></tr>
+            <tr><td>                                  </td><td><b>&lt;Integer&gt;</b> - a fixed base value, e.g. '2–500'                                                                                                       </td></tr>
+            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. 11->Dev:Rdg:200, returns the base as an integer. '200' is the default value in case of an error.   </td></tr>
+            <tr><td>                                  </td><td><b>Note:</b> The base is only effective within the context of the consumption forecast component without AI.                                                    </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast.                                                          </td></tr>
             <tr><td>                                  </td><td>Otherwise, all weekdays are used equally for the calculation.                                                                                                   </td></tr>
             <tr><td>                                  </td><td>Value: <b>0|1</b>, default: 0                                                                                                                                   </td></tr>
@@ -35061,7 +35198,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650
        </ul>
 
        </li>
@@ -37738,7 +37875,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td>Die Einrichtung der Umgebungswerte erfolgt mit Attribut <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment</a>.    </td></tr>
 			<tr><td>                            </td><td><b>outsideTemp</b> - die aktuelle Außentemperatur                                                                               </td></tr>
             <tr><td>                            </td><td><b>presence</b>    - der Anwesenheitsstatus                                                                                     </td></tr>
-            <tr><td>                            </td><td><b>windSpeed</b>   - die aktuelle Windgeschwindigkeit                                                                           </td></tr>
+            <tr><td>                            </td><td><b>windSpeed</b>   - die aktuelle Windgeschwindigkeit (geglätted)                                                               </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>hourStyle</b>           </td><td>Format der Zeitangabe in der Balkengrafik.                                                                                      </td></tr>
             <tr><td>                            </td><td><b>nicht gesetzt</b> - nur Stundenangabe ohne Minuten (default)                                                                 </td></tr>
@@ -38009,6 +38146,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                 </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>consForecastBase</b>          </td><td>Die Verbrauchsprognose erhöht sich mindestens auf den angegebenen Basiswert. Höhere Verbrauchsprognosen bleiben unberührt.                        </td></tr>
+            <tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat definierbar.                                                                          </td></tr>
+			<tr><td>                                  </td><td>Die Syntax ist '&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...'. Der &lt;Wert&gt; kann angegeben werden mit:                             </td></tr>
+            <tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Base-Wert, z.B. '2->500'                                                                                     </td></tr>
+            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. 11->Dev:Rdg:200, liefert die Base als Ganzzahl. '200' ist der Ersatzwert bei Fehler. </td></tr>
+            <tr><td>                                  </td><td><b>Hinweis:</b> Die Base ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                         </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen.                                            </td></tr>
             <tr><td>                                  </td><td>Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet.                                                                   </td></tr>
             <tr><td>                                  </td><td>Wert: <b>0|1</b>, default: 0                                                                                                                      </td></tr>
@@ -38069,7 +38213,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650
        </ul>
 
        </li>
