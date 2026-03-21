@@ -3221,7 +3221,7 @@ CommandAttr($$)
       $attrVal = 5   if($attrName eq "verbose");
     }
     $defs{$sdev}->{CL} = $cl;
-    my $ci = $attrSource{$attrName}{ci} ? $attrSource{$attrName}{ci} : undef;
+    my $ci = $attrSource{$attrName} ? $attrSource{$attrName}{ci} : undef;
     $ret = CallFn($ci || $sdev, "AttrFn", "set", $sdev, $attrName, $attrVal);
     delete($defs{$sdev}->{CL});
     if($ret) {
