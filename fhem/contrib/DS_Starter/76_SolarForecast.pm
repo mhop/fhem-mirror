@@ -16859,17 +16859,17 @@ sub _calcConsForecast_legacy {
       $u->{conex} //= $u->{con};                                                    # falls conex noch undef → setzen
 
       # --- Consumption Base berücksichtigen
-      my $confc   = __considerConsBase { name      => $name,                        # prognostizierter Verbrauch mit Con-Base
+      my $confc   = __considerConsBase ({ name      => $name,                       # prognostizierter Verbrauch mit Con-Base
                                          confc_raw => round0 ($u->{con}), 
                                          hod       => $hod, 
                                          debug     => $paref->{debug},
-                                       };
+                                       });
                                        
-      my $confcex = __considerConsBase { name      => $name,                        # prognostizierter Verbrauch mit excluded Verbraucher & Con-Base
+      my $confcex = __considerConsBase ({ name      => $name,                       # prognostizierter Verbrauch mit excluded Verbraucher & Con-Base
                                          confc_raw => round0 ($u->{conex}), 
                                          hod       => $hod, 
                                          debug     => $paref->{debug},
-                                       };
+                                       });
 
       # --- Ergebnisse in nexthours speichern
       my $nhref = $data{$name}{nexthours}{$nh};
