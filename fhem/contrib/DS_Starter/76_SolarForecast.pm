@@ -163,7 +163,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.0"  => "21.03.2026  new key plantControl->consForecastBase ",
+  "2.5.0"  => "21.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -28641,6 +28641,7 @@ sub checkPlantConfig {
   
   my $result = {                                                                                    # Ergebnishash
       'String Configuration'  => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
+      'String Inverter Map'   => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Weather Properties'    => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'Common Settings'       => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
       'FTUI Widget Files'     => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
@@ -28710,6 +28711,23 @@ sub checkPlantConfig {
   if (!$result->{'String Configuration'}{fault} && !$result->{'String Configuration'}{warn}) {
       $result->{'String Configuration'}{result} = $hqtxt{fulfd}{$lang};
   }
+  
+  ## Check String - Inverter Mapping
+  ####################################
+  $err = _checkStringToInverterMap ($name);
+  
+  if ($err) {
+      $result->{'String Inverter Map'}{state}  = $nok;
+      $result->{'String Inverter Map'}{result} = $err;
+      $result->{'String Inverter Map'}{note}  .= qq{Correct the string assignments in all relevant inverter attributes. <br>};
+      $result->{'String Inverter Map'}{fault}  = 1;
+  }
+  
+  if (!$result->{'String Inverter Map'}{fault} && !$result->{'String Inverter Map'}{warn}) {
+      $result->{'String Inverter Map'}{result} = $hqtxt{fulfd}{$lang};
+      $result->{'String Inverter Map'}{note}  .= qq{All string mappings are unique. <br>};
+  }
+  
   
   ## Check FANN AI
   ##################
@@ -29339,6 +29357,47 @@ sub checkPlantConfig {
 
 return $out;
 }
+
+################################################################
+#  Plausibilitätsprüfung Zuordnung Strings zu Invertern 
+################################################################
+sub _checkStringToInverterMap {
+  my ($name) = @_;
+
+  my %string_owner;                                                                 # stringname -> inverter-id
+  my @errors;
+  my $err;
+  my $errmsg = '';
+
+  for my $in (1..MAXINVERTER) {
+      $in    = sprintf "%02d", $in;
+      ($err) = isDeviceValid ( { name => $name, obj => 'setupInverterDev'.$in, method => 'attr' } );
+      next if($err);
+      
+      my $istring = InverterVal ($name, $in, 'istrings', 'none');
+
+      my @strings = map { s/^\s+|\s+$//g; $_; } split /\s*,\s*/, $istring;          # Strings splitten, trimmen, normalisieren
+
+      for my $s (@strings) {
+          next if $s eq 'none';                                                     # Regel 'none' ist mehrfach erlaubt
+
+          if (exists $string_owner{$s}) {                                           # Regel 'String darf maximal nur einen WR zugeordnet sein' verletzt
+              push @errors, 
+                 "The string ‘$s’ is used multiple times: WR $string_owner{$s} and WR $in";
+          } 
+          else {                                                                    # String erstmalig zugeordnet
+              $string_owner{$s} = $in;
+          }
+      }
+  }
+
+  if (@errors) {
+      $errmsg  = "ERROR in string mapping: <br>";
+      $errmsg .= " - $_ <br>" for @errors;
+  } 
+
+return $errmsg;
+} 
 
 #####################################################################
 #  Ermittelt den PV Überschuß nach verschiedenen Verfahren
