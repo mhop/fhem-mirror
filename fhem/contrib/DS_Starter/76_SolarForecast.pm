@@ -29383,15 +29383,16 @@ sub _checkStringToInverterMap {
 
           if (exists $string_owner{$s}) {                                           # Regel 'String darf maximal nur einen WR zugeordnet sein' verletzt
               push @errors, 
-                 "The string ‘$s’ is used multiple times: WR $string_owner{$s} and WR $in";
+                 "The string $s is used multiple times: WR $string_owner{$s} and WR $in";
           } 
           else {                                                                    # String erstmalig zugeordnet
-              $string_owner{$s} = $in;
+              $string_owner{$s} = $in;         
           }
       }
   }
 
   if (@errors) {
+      $_       = decode ("latin1", $_) for @errors;                                 # Strings korrekt von Latin-1 nach UTF-8 decodieren
       $errmsg  = "ERROR in string mapping: <br>";
       $errmsg .= " - $_ <br>" for @errors;
   } 
