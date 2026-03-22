@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 89_FULLY: add some options, intented for use in js/VoiceCommands
  - feature: 76_SolarForecast: Version 2.4.0
  - bugfix: 72_FritzSmart: Typo in commandRef, Fehlerkorrektur
  - bugfix: 72_FritzSmart: Warning in Log Auswertung
