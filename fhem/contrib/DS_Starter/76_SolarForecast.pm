@@ -163,7 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.0"  => "21.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ",
+  "2.5.0"  => "22.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
+                           "edit comref, expand consForecastBase for groups e.g. 3-9 ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -308,14 +309,6 @@ my %vNotesIntern = (
                            "correction of inverter x-start, ".
                            "isConsumerLogOn: bugfix Threshold value detection if threshold value specification above 1% of power ",
   "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
-  "1.52.0" => "11.05.2025  An inverter string must not be named 'none', setupInverterDevXX: 'strings=none' is added ".
-                           "valInverter: add isource, new keys: ac2dc, dc2ac, _flowGraphic: add battery inverter type ".
-                           "and extensive adjustments, new sub removeMinMaxArray, ___ownSpecGetFWwidget: bugfix with state-Reading ".
-                           "flowGraphicControl: new key showGenerators, code cleaning ",
-  "1.51.8" => "02.05.2025  _specialActivities: delete overhanging days at the change of month ".
-                           "Bugfix: https://forum.fhem.de/index.php?msg=1340666 ",
-  "1.51.7" => "01.05.2025  __createAdditionalEvents: optimized for SVG 'steps', new key plantControl->genPVforecastsToEvent ".
-                           "__aiAddRawData: add gcons, _listDataPoolCircular: add gcons_a ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -7914,7 +7907,7 @@ sub _attrplantControl {                  ## no critic "not used"
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
   
-  my $cforegex = '((?:[1-9]|1\d|2[0-4])->(?:[^\s]+:[^\s]+:\d+|\d+))(?:,\s*(?:[1-9]|1\d|2[0-4])->(?:[^\s]+:[^\s]+:\d+|\d+))*';
+  my $cforegex = '((?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))(?:,\s*(?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))*';
 
   my $valid = {
       backupFilesKeep           => { comp => '\d+',                                               act => 0 },
@@ -17127,11 +17120,28 @@ sub __considerConsBase {
   my ($cfodev, $cford) = ('','');
   
   my $confc = $confc_raw;
+  $hod      = int($hod);
   
   for my $hnum (keys %{$h}) {
-      my $basehod = sprintf "%02d", trim ($hnum);
-      next if(int($basehod) != int($hod));
+      my $basehod = trim ($hnum);
+
+      $basehod =~ /(\d+(?:-\d+)?)/;                                             # auflösen einfache Ziffer (7) oder Bereich (2-5)
+      my $spec = $1;
+
+      my @all_idx;
       
+      if ($spec =~ /^(\d+)-(\d+)$/) {
+          my ($start, $end) = ($1, $2);
+          push @all_idx, ($start .. $end);
+      } 
+      else {
+          push @all_idx, $spec;
+      }     
+      
+      unless (grep { $_ == $hod } @all_idx) {                                   # Vergleich
+          next;   
+      }
+   
       ($cfodev, $cford, $def) = split ":", $h->{$hnum}; 
       
       if ($cfodev && $cford) {                                                  # Auswertung Device/Reading Kombi
@@ -35192,10 +35202,10 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                                   </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>consForecastBase</b>          </td><td>The consumption forecast will be increased to at least the specified base value. Higher consumption forecasts remain unaffected.                                         </td></tr>
-            <tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1–24).                                                                                                </td></tr>
+            <tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1–24) or as a group of hours (e.g., 5–9).                                                             </td></tr>
 			<tr><td>                                  </td><td>The syntax is '&lt;hod&gt;->&lt;value&gt;,&lt;hod&gt;->&lt;value&gt;,...'. The &lt;value&gt; can be specified as:                                                        </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Integer&gt;</b> - a fixed base value, e.g. '2–500'                                                                                                                </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. 11->Dev:Rdg:200, returns the base as an integer. '200' is the default value in case of an error.            </td></tr>
+            <tr><td>                                  </td><td><b>&lt;Integer&gt;</b> - a fixed base value, e.g. '2–500' or '3-9->650'                                                                                                  </td></tr>
+            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. '11->Dev:Rdg:200' or '6-11->Dev:Rdg:200', returns the base as an integer. '200' is the default value.       </td></tr>
             <tr><td>                                  </td><td><b>Note:</b> The base is only effective within the context of the consumption forecast component without AI.                                                             </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast.                                                                   </td></tr>
@@ -38206,10 +38216,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                               </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>consForecastBase</b>          </td><td>Die Verbrauchsprognose wird mindestens auf den angegebenen Basiswert erhöht. Höhere Verbrauchsprognosen bleiben unberührt.                                           </td></tr>
-            <tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat definierbar.                                                                                             </td></tr>
+            <tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat oder als Stundengruppe (z.B. 5-9) definierbar.                                                           </td></tr>
 			<tr><td>                                  </td><td>Die Syntax ist '&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...'. Der &lt;Wert&gt; kann angegeben werden mit:                                                </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Base-Wert, z.B. '2->500'                                                                                                        </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. 11->Dev:Rdg:200, liefert die Base als Ganzzahl. '200' ist der Ersatzwert bei Fehler.                    </td></tr>
+            <tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Base-Wert, z.B. '2->500' oder '3-9->650'                                                                                        </td></tr>
+            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. '11->Dev:Rdg:200' oder '6-11->Dev:Rdg:200', liefert die Base als Ganzzahl. '200' ist der Ersatzwert.    </td></tr>
             <tr><td>                                  </td><td><b>Hinweis:</b> Die Base ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen.                                                               </td></tr>
