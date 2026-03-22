@@ -37,7 +37,7 @@ use JSON ();
 use Encode;
 use HttpUtils;
 use utf8;
-use List::Util 1.45 qw(max min uniq shuffle);
+use List::Util 1.45 qw(max min uniq shuffle any);
 use Scalar::Util qw(looks_like_number);
 use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
@@ -100,6 +100,7 @@ my $languagevars = {
     'NoActiveMediaDevice' => "Sorry no active playback device.",
     'NoMediaChannelFound' => "Sorry but requested channel seems not to exist.",
     'DefaultConfirmation' => "OK",
+    'DefaultConfirmationClosure' => "OK",
     'DefaultConfirmationBack' => "So once more.",
     'DefaultConfirmationTimeout' => "Sorry, too late to confirm.",
     'DefaultCancelConfirmation' => "Thanks, aborted.",
@@ -293,6 +294,7 @@ BEGIN {
 my @topics = qw(
     hermes/intent/+
     hermes/dialogueManager/sessionStarted
+    hermes/dialogueManager/sessionQueued
     hermes/dialogueManager/sessionEnded
     hermes/nlu/intentNotRecognized
     hermes/hotword/+/detected
@@ -893,7 +895,6 @@ sub configure_DialogManager {
     my $toDisable = shift // [qw(ConfirmAction CancelAction Choice ChoiceRoom ChoiceDevice)];
     my $enable    = shift // q{false};
     my $timer     = shift;
-    my $retArr    = shift;
 
     #option to delay execution to make reconfiguration last action after everything else has been done and published.
     if ( defined $timer ) {
@@ -944,8 +945,6 @@ hermes/dialogueManager/configure (JSON)
         my $disable = {intentId => "$id", enable => "$enable"};
         push @disabled, $disable;
     }
-
-    return \@disabled if $retArr;
 
     my $sendData = {
         siteId  => $siteId,
@@ -1073,6 +1072,7 @@ sub _analyze_rhassypAttr {
             next if !$val;
             for my $rooms (@rooms) {
                 push @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}}, $device if !grep { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}};
+				#any { $_ eq $scalar } @array;
             }
             $hash->{helper}{devicemap}{devices}{$device}{$item}{$key} = $val;
         }
@@ -1293,14 +1293,21 @@ sub _analyze_genDevType {
             SetOnOff => { SetOnOff => {cmdOff => 'dim 0', type => 'SetOnOff', cmdOn => "dim $maxval"} },
             SetNumeric => { setTarget => { cmd => 'dim', currentVal => 'state', maxVal => $maxval, minVal => '0', step => '11', type => 'setTarget'} }
             };
-        }
-
+        }															  
         elsif ( $allset =~ m{\bpct([\b:\s]|\Z)}xms ) {
             $currentMapping = { 
             GetNumeric => { 'pct' => {currentVal => 'pct', type => 'setTarget'} },
             GetOnOff => { GetOnOff => {currentVal=>'pct', valueOn=>'100' } },
             SetOnOff => { SetOnOff => {cmdOff => 'pct 0', type => 'SetOnOff', cmdOn => 'pct 100'} },
             SetNumeric => { setTarget => { cmd => 'pct', currentVal => 'pct', maxVal => '100', minVal => '0', step => '13', type => 'setTarget'} }
+            };
+        }
+        elsif ( $allset =~ m{\bpos([\b:\s]|\Z)}xms ) { # works at least for Dooya, see https://forum.fhem.de/index.php?msg=1325575
+            $currentMapping = { 
+            GetNumeric => { 'pos' => {currentVal => 'position', type => 'setTarget'} },
+            GetOnOff => { GetOnOff => {currentVal=>'position', valueOn=>'100' } },
+            SetOnOff => { SetOnOff => {cmdOff => 'off', type => 'SetOnOff', cmdOn => 'on'} },
+            SetNumeric => { setTarget => { cmd => 'pos', currentVal => 'position', maxVal => '100', minVal => '0', step => '10', type => 'setTarget'} }
             };
         } else {
             my ($on, $off) = _getGenericOnOff($allset);
@@ -1554,7 +1561,7 @@ sub initialize_msgDialog {
     for my $line (split m{\n}x, $attrVal) {
         next if !length $line;
         my ($keywd, $values) = split m{=}x, $line, 2;
-        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|querymark|sessionTimeout\z}xms ) {
+        if ( $keywd =~ m{\Aallowed|msgCommand|hello|goodbye|sessionTimeout\z}xms ) {
             $hash->{helper}->{msgDialog}->{config}->{$keywd} = trim($values);
             next;
         }
@@ -1573,7 +1580,6 @@ sub initialize_msgDialog {
     $hash->{helper}->{msgDialog}->{config}->{close}      //= q{close};
     $hash->{helper}->{msgDialog}->{config}->{hello}      //= q{Hi $you! What can I do for you?|at your service|There you go again!};
     $hash->{helper}->{msgDialog}->{config}->{goodbye}    //= q{Till next time.|Bye|CU|Cheers!|so long};
-    $hash->{helper}->{msgDialog}->{config}->{querymark}  //= q{this is a feminine request};
     $hash->{helper}->{msgDialog}->{config}->{sessionTimeout} //= $hash->{sessionTimeout} // _getDialogueTimeout($hash);
 
     my $msgConfig  = $modules{msgConfig}{defptr}{NAME};
@@ -1696,7 +1702,7 @@ sub RHASSPY_DialogTimeout {
 
     deleteSingleRegIntTimer($identity, $hash, 1);
 
-    respond( $hash, $data, getResponse( $hash, defined $data->{SilentClosure} ? 'SilentClosure' : 'DefaultConfirmationTimeout' ) );
+    respond( $hash, $data, getResponse( $hash, defined $data->{silentClosure} ? 'SilentClosure' : 'DefaultConfirmationTimeout' ) );
     delete $hash->{helper}{'.delayed'}{$identity};
 
     return;
@@ -1754,6 +1760,44 @@ sub setDialogTimeout {
 #    delete $hash->{'.toTrigger'};
 
 #    return $toTrigger;
+}
+
+sub _get_sessionIntentFilter {
+    my $hash         = shift // return;
+    my $intents      = shift;
+    my $enableCancel = shift;
+
+    my @sessionIntents;
+    my $id = qq($hash->{LANGUAGE}.$hash->{fhemId}:);
+    
+    if ( !$intents ) {
+        my @allIntents = split m{,}xm, ReadingsVal( $hash->{NAME}, 'intents', '' );
+        for (@allIntents) {
+            next if $_ =~ m{ConfirmAction|CancelAction|Choice|ChoiceRoom|ChoiceDevice} && !defined $intents;
+            push @sessionIntents, $_ if
+                !defined $hash->{helper}->{tweaks} ||
+                !defined $hash->{helper}{tweaks}->{intentFilter} ||
+                !defined $hash->{helper}{tweaks}->{intentFilter}->{$_} ||
+                defined $hash->{helper}{tweaks}->{intentFilter}->{$_} && $hash->{helper}{tweaks}->{intentFilter}->{$_} eq 'true';
+        }
+    }
+
+    push @sessionIntents, "${id}CancelAction" if $enableCancel;
+
+    my @addIntents;
+    if ( ref $intents eq 'ARRAY' ) {
+        @addIntents = @{$intents};
+    } else {
+        @addIntents = split m{,}xm, $intents if defined $intents && $intents ne 'all';
+    }
+    for (@addIntents) {
+        if ( $_ =~ m{\a${id}} ) {
+            push @sessionIntents, $_;
+        } else {
+            push @sessionIntents, "${id}$_";
+        }
+    }
+    return \@sessionIntents;
 }
 
 sub get_unique {
@@ -2789,11 +2833,18 @@ sub parseJSONPayload {
     if ( !eval { $decoded  = JSON->new->decode($json) ; 1 } ) {
         return Log3($hash->{NAME}, 1, "JSON decoding error: $@");
     }
-
+    my $customData; # may be nested JSON -> decode and attach to $data
+    if ( defined $decoded->{customData} ) {
+        if ( !eval { $customData = JSON->new->decode($decoded->{customData}) ; 1} ) {
+            $data->{customData} = $decoded->{customData} ;
+        }else{
+            $data->{customData} = $customData;
+        }
+    }
     # Standard-Keys auslesen
     ($data->{intent} = $decoded->{intent}{intentName}) =~ s{\A.*.:}{}x if exists $decoded->{intent}{intentName};
     $data->{confidence} = $decoded->{intent}{confidenceScore} // 0.75;
-    for my $key (qw(sessionId siteId input rawInput customData lang)) {
+    for my $key (qw(sessionId siteId input rawInput lang)) { #customData is treated before
         $data->{$key} = $decoded->{$key} if exists $decoded->{$key};
     }
 
@@ -2994,8 +3045,36 @@ sub activateVoiceInput {
     my $siteId  = $h->{siteId}  // shift @{$anon} // $base;
     my $hotword = $h->{hotword} // shift @{$anon} // $h->{modelId} // "$hash->{LANGUAGE}$hash->{fhemId}";
     my $modelId = $h->{modelId} // shift @{$anon} // "$hash->{LANGUAGE}$hash->{fhemId}";
+    my $sendData;
+    my $json;
 
-    my $sendData =  {
+    #use startSession mechanism, see https://rhasspy.readthedocs.io/en/latest/reference/#dialoguemanager_startsession
+    if ( defined $h->{text} ) {
+        delete $h->{intentFilter} if $h->{intentFilter} eq 'null';
+        my $topic = $h->{topic} // q{startSession};
+        if ( $h->{text} ) {
+            $sendData = {
+                init => {
+                    type     => $h->{type} // 'action',
+                    text     => $h->{text},
+                    canBeEnqueued => $h->{canBeEnqueued} // 'true',
+                    intentFilter            => $h->{intentFilter} //  _get_sessionIntentFilter($hash, undef, 1 ),
+                    sendIntentNotRecognized => $h->{sendIntentNotRecognized} // 'true'
+                }
+            };
+        } else {
+            $topic = q{continueSession};
+            $sendData->{sessionId} = $h->{sessionId};
+        }
+        $sendData->{siteId} = $siteId;
+        $sendData->{customData} = $h->{customData} // "$hash->{LANGUAGE}.$hash->{fhemId}";
+        $json = _toCleanJSON($sendData);
+
+        return IOWrite($hash, 'publish', qq{hermes/dialogueManager/$topic $json});
+    }
+
+    #use default hotword mechanism
+    $sendData =  {
         modelId             => $modelId,
         modelVersion        => '',
         modelType           => 'personal',
@@ -3005,7 +3084,7 @@ sub activateVoiceInput {
         sendAudioCaptured   => 'null',
         customEntities      => 'null'
     };
-    my $json = _toCleanJSON($sendData);
+    $json = _toCleanJSON($sendData);
     return IOWrite($hash, 'publish', qq{hermes/hotword/$hotword/detected $json});
 }
 
@@ -3346,16 +3425,24 @@ sub RHASSPY_SpeechDialogTimeout {
     return SpeechDialog_close($hash, $identity);
 }
 
-sub RHASSPY_reopenVoiceInput_timeout {
+sub RHASSPY_reActivateVoiceInput_timeout {
     my $fnHash = shift // return;
     my $hash = $fnHash->{HASH} // $fnHash;
     return if !defined $hash;
     my $identity = $fnHash->{MODIFIER};
     deleteSingleRegIntTimer($identity, $hash, 1);
-    Log3($hash, 5, "RHASSPY_reopenVoiceInput_timeout called with $identity");
-    #Beta-User: incomplete, closing voice input is still missing!
-    #Here we might have to delete any remaining data from a "continuous" session....
+    Log3($hash, 5, "RHASSPY_reActivateVoiceInput_timeout called with $identity");
 
+    my $sendData = {
+	    sessionId   => $identity,
+		customData  => 'reActivateVoiceInput_timeout'
+		
+	};
+    my $json = _toCleanJSON($sendData);
+
+    IOWrite($hash, 'publish', qq{hermes/dialogueManager/endSession $json});
+    Log3($hash, 5, "published " . qq{hermes/dialogueManager/endSession $json});
+    
     return;
 }
 
@@ -3514,7 +3601,7 @@ sub analyzeMQTTmessage {
     my $siteId    = $data->{siteId};
     my $mute = 0;
     if (!defined $data->{requestType}) {
-    	$data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
+        $data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
     }
 
     if (defined $siteId) {
@@ -3522,7 +3609,7 @@ sub analyzeMQTTmessage {
         $mute = ReadingsNum($hash->{NAME},"mute_$reading",0);
     }
 
-    # Hotword detection
+    # dialogue manager related
     if ($topic =~ m{\Ahermes/dialogueManager}x) {
         my $room = getRoomName($hash, $data);
 
@@ -3536,6 +3623,18 @@ sub analyzeMQTTmessage {
 
         if ( $topic =~ m{sessionStarted}x ) {
             readingsSingleUpdate($hash, "listening_" . makeReadingName($room), 1, 1);
+            if ( defined $data->{customData} &&  ref $data->{customData} eq 'HASH' && (
+                # defined $data->{customData}->{SilentClosure} || #disabled on GV proposal 
+                defined $data->{customData}->{reActivateVoiceInput} ) ) { # GV: ich würde vorschlagen, dass der sessionTomeout nicht mehr in SilentClosure stehen kann (Beta-User: Grund noch unklar)
+                my $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
+                #$delay = $data->{customData}->{SilentClosure} if defined $data->{customData}->{SilentClosure} && looks_like_number($data->{customData}->{SilentClosure});
+                $delay = $data->{customData}->{reActivateVoiceInput} if 
+                    #!defined $data->{customData}->{SilentClosure} &&
+                    defined $data->{customData}->{reActivateVoiceInput} && looks_like_number($data->{customData}->{reActivateVoiceInput} && $data->{customData}->{reActivateVoiceInput} > 0);
+                resetRegIntTimer( $data->{sessionId}, time + $delay, \&RHASSPY_reActivateVoiceInput_timeout, $hash );
+            }
+        } elsif ( $topic =~ m{sessionQueued}x ) {
+            #Beta-User: This would be the place to update timeout for the "continuous session"/
         } elsif ( $topic =~ m{sessionEnded}x ) {
             readingsSingleUpdate($hash, 'listening_' . makeReadingName($room), 0, 1);
             my $identity = qq($data->{sessionId});
@@ -3560,7 +3659,7 @@ sub analyzeMQTTmessage {
         my $ret = handleHotwordGlobal($hash, $active ? 'on' : 'off', $data, $active ? 'on' : 'off') // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
         for (@candidates) {
-           push @updatedList, $_ if $defs{$_} && $_ ne $name;
+            push @updatedList, $_ if $defs{$_} && $_ ne $name;
         }
         return \@updatedList;
     }
@@ -3592,13 +3691,13 @@ sub analyzeMQTTmessage {
         return if !$hash->{handleHotword} && !defined $hash->{helper}{hotwords};
         my $ret = handleHotwordDetection($hash, $hotword, $data) // q{};
         my @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
-		for (@candidates) {
-			push @updatedList, $_ if $defs{$_} && $_ ne $name;
+        for (@candidates) {
+            push @updatedList, $_ if $defs{$_} && $_ ne $name;
         }
-        $ret = handleHotwordGlobal($hash, $hotword, $data, 'detected');
+        $ret = handleHotwordGlobal($hash, $hotword, $data, 'detected') // q{};
         @candidates = ref $ret eq 'ARRAY' ? $ret : split m{,}x, $ret;
-		for (@candidates) {
-			push @updatedList, $_ if $defs{$_} && $_ ne $name; 
+        for (@candidates) {
+            push @updatedList, $_ if $defs{$_} && $_ ne $name;
         }
         return \@updatedList;
     }
@@ -3614,9 +3713,7 @@ sub analyzeMQTTmessage {
     }
 
     if ($mute) {
-        #$data->{requestType} = $message =~ m{${fhemId}.textCommand}x ? 'text' : 'voice';
-        respond( $hash, $data, getResponse( $hash, 'SilentClosure' ), 'endSession', 0 );
-        #Beta-User: Da fehlt mir der Soll-Ablauf für das "room-listening"-Reading; das wird ja über einen anderen Topic abgewickelt
+        respond( $hash, $data, 'SilentClosure', 'endSession', 0 );
         return \@updatedList;
     }
     
@@ -3672,11 +3769,11 @@ sub respond {
     my $delay    = shift;
 
     $response = q{} if $response eq 'SilentClosure'; 
-
+	
     my $contByDelay = $delay // $topic ne 'endSession';
     #$delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
-    if ( defined $hash->{helper}->{lng}->{$data->{sessionId}} ) {
+    if ( $response && ref $response eq 'SCALAR' && defined $hash->{helper}->{lng}->{$data->{sessionId}} ) {
         $response .= " $hash->{helper}->{lng}->{$data->{sessionId}}->{post}" if defined $hash->{helper}->{lng}->{$data->{sessionId}}->{post};
         $response = "$hash->{helper}->{lng}->{$data->{sessionId}}->{pre} $response" if defined $hash->{helper}->{lng}->{$data->{sessionId}}->{pre};
         delete $hash->{helper}->{lng}->{$data->{sessionId}};
@@ -3691,6 +3788,8 @@ sub respond {
 
     my $type      = $data->{requestType} // return; #voice or text
 
+    delete $response->{text} if ref $response eq 'HASH' && $response->{text} eq 'SilentClosure';
+
     my $sendData;
 
     for my $key (qw(sessionId siteId customData lang)) {
@@ -3703,27 +3802,23 @@ sub respond {
             $sendData->{$key} = $response->{$key};
         }
     } elsif ( $topic eq 'continueSession' ) {
-        $sendData->{text} = $response;
+        $sendData->{text} = $response if $response;
         $sendData->{intentFilter} = 'null';
     } elsif ( $delay ) {
-        $sendData->{text} = $response;
+        $sendData->{text} = $response if $response;
         $topic = q{continueSession};
-		my $toDisable = $data->{intentFilter} // [qw(ConfirmAction Choice ChoiceRoom ChoiceDevice)];
-		$toDisable = split m{,}xms, $toDisable if ref $toDisable ne 'ARRAY';
-        my @ca_strings = configure_DialogManager($hash,$data->{siteId}, $toDisable, 'false', undef, 1 );
-        $sendData->{intentFilter} = [@ca_strings];
+        my $toEnable = $data->{intentFilter};
+        $sendData->{intentFilter} = _get_sessionIntentFilter($hash, $toEnable, 1 ),
     } else {
-        $sendData->{text} = $response;
+        $sendData->{text} = $response if $response;
         $sendData->{intentFilter} = 'null';
     }
 
-    my $json = _toCleanJSON($sendData);
+    my $json = _toCleanJSON($sendData); #Beta-User pure toJSON() produces other errors!
     $response = $response->{text} if ref $response eq 'HASH' && defined $response->{text};
     $response = $response->{response} if ref $response eq 'HASH' && defined $response->{response};
     readingsBeginUpdate($hash);
-    $type eq 'voice' ?
-        readingsBulkUpdate($hash, 'voiceResponse', $response)
-      : readingsBulkUpdate($hash, 'textResponse', $response);
+    readingsBulkUpdate($hash, "${type}Response", $response);
     readingsBulkUpdate($hash, 'responseType', $type);
     readingsEndUpdate($hash,1);
     Log3($hash, 5, "Response is: $response");
@@ -3745,13 +3840,18 @@ sub respond {
     Log3($hash, 5, "published " . qq{hermes/dialogueManager/$topic $json});
     
     #new reopen or sessionTimeout variant: Close the old session and reopen a new one:
-    if ( $topic ne 'continueSession' && $type eq 'voice' && ( defined $data->{reopenVoiceInput} || defined $hash->{sessionTimeout} ) ) {
-        activateVoiceInput($hash,[$data->{siteId}]);
+    if ( $topic ne 'continueSession' && $type eq 'voice' && !defined $data->{closeSession} && ( defined $data->{reActivateVoiceInput} || defined $hash->{sessionTimeout} ) ) {
+
+=pod 
         $delay = ReadingsNum($name, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout} // _getDialogueTimeout($hash));
-        $delay = $data->{SilentClosure}    if  defined $data->{SilentClosure} && looks_like_number($data->{SilentClosure});
-        $delay = $data->{reopenVoiceInput} if !defined $data->{SilentClosure} && defined $data->{reopenVoiceInput} && looks_like_number($data->{reopenVoiceInput} && $data->{reopenVoiceInput} > 0);
-        #Beta-User: timeout function needs review, esp. in case if we store any session data
-        resetRegIntTimer( 'testmode_end', time + $delay, \&RHASSPY_reopenVoiceInput_timeout, $hash );
+        $delay = $data->{silentClosure}    if  defined $data->{silentClosure} && looks_like_number($data->{silentClosure});
+        $delay = $data->{reActivateVoiceInput} if !defined $data->{silentClosure} && defined $data->{reActivateVoiceInput} && looks_like_number($data->{reActivateVoiceInput} && $data->{reActivateVoiceInput} > 0);
+=cut
+        delete $sendData->{customData};
+        delete $data->{customData}->{customData} if ref $data->{customData}  eq 'HASH' && defined $data->{customData}->{customData};
+        $sendData->{text}       = getResponse($hash, 'ContinueSession');
+        $sendData->{customData} = toJSON($data); #seems, we need "incorrect" doubled JSON, see https://forum.fhem.de/index.php?msg=1324631
+        activateVoiceInput($hash,[$data->{siteId}],$sendData);
     }
 
     my $secondAudio = ReadingsVal($name, "siteId2doubleSpeak_$data->{siteId}",undef) // return [$name];
@@ -4503,7 +4603,7 @@ sub handleIntentSetTimedOnOff {
 
     # Mapping found?
     return $hash->{NAME} if !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetTimedOnOff', $device );
-    my $cmdOn  = $mapping->{cmdOn} // 'on';
+    my $cmdOn  = $mapping->{cmdOn} // 'on'; #Beta-User: might need review, as e.g. "Aus-for-timer" most likely will not work...
     my $cmdOff = $mapping->{cmdOff} // 'off';
     my $cmd = $value eq 'on' ? $cmdOn : $cmdOff;
     $cmd .= "-for-timer";
@@ -4781,7 +4881,12 @@ sub handleIntentSetNumeric {
     }
     
     # Mapping and device found -> execute command
-    my $cmd     = $mapping->{cmd} // return defined $data->{'.inBulk'} ? undef : respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
+	my $cmd;        
+    #if ( ! defined $mapping->{$change} ) { # @@@
+    #if ( !defined $change || !defined $mapping->{$change} ) { # @@@
+
+        $cmd     = $mapping->{cmd} // return defined $data->{'.inBulk'} ? undef : respond( $hash, $data, getResponse( $hash, 'NoMappingFound' ) );
+    #}  Beta-User: not yet activated, we have to check first if bulk actions work as desired and all "strange" $change values will not lead to confusing results.
     my $part    = $mapping->{part};
     my $minVal  = $mapping->{minVal};
     my $maxVal  = $mapping->{maxVal};
@@ -4857,16 +4962,16 @@ sub handleIntentSetNumeric {
     if ( !defined $data->{'.inBulk'} ) {
         $data->{Value} //= $newVal;
         $data->{Type}  //= $type;
-        delete $data->{Change} if defined $data->{Change} && $data->{Change} ne 'cmdStop';
+        delete $data->{Change} if defined $change && ($change !~ m{\Acmd.+}x || ! defined $mapping->{$change});
     }
     #check if confirmation is required
     return $hash->{NAME} if !defined $data->{'.inBulk'} && !$data->{Confirmation} && getNeedsConfirmation( $hash, $data, 'SetNumeric', $device );
 
     # execute Cmd
-    !defined $change || $change ne 'cmdStop' || !defined $mapping->{cmdStop} 
+    !defined $change || $change !~ m{\Acmd.+}x
             ? !defined $useMap ? analyzeAndRunCmd($hash, $device, $cmd, $newVal)
                                : analyzeAndRunCmd($hash, $device, $useMap)
-            : analyzeAndRunCmd($hash, $device, $mapping->{cmdStop});
+            : analyzeAndRunCmd($hash, $device, $mapping->{$change});
 
     #venetian blind special
     my $specials = $hash->{helper}{devicemap}{devices}{$device}{venetian_specials};
@@ -5708,6 +5813,25 @@ sub handleIntentNotRecognized {
     my $data = shift // return;
 
     Log3( $hash, 5, "[$hash->{NAME}] handleIntentNotRecognized called, input is $data->{input}" );
+
+    my $response;
+   
+    # Teil 1: Umgang mit "silence", also gar kein {input}
+    # Klären:
+    # a) (https://forum.fhem.de/index.php?msg=1326892): müssen wir zwingend immer den intentFilter mit angeben?
+    #b) brauchen wir eine Unterscheidungen nach "unmittelbar" nach (nur) dem Wakeword (b1), einer "echten Sitzung" (Info oder Bestätigung nachgefordert, b2), oder einfach einer "weiterlaufenden" Sitzung (b3, nach (z.B.) reActivateVoiceInput)
+       
+    if ( !$data->{input} ) { # just listened to "noise" or silence
+        $data->{requestType} //= 'voice'; # we need "voice" to make sure we reopen the microphone if session is voice type
+        $response = {
+            text => 'SilentClosure',
+            sendIntentNotRecognized => 'true',
+            customData => $data->{customData}
+        };
+        return respond( $hash, $data, $response);  # continue session silently
+    } # Ende Teil 1
+   
+#text-basierte Dialoge, nicht unser aktuelles Thema
     my $identity = qq($data->{sessionId});
     my $siteId = $hash->{siteId};
     my $msgdev = (split m{_${siteId}_}x, $identity,3)[0];
@@ -5716,29 +5840,50 @@ sub handleIntentNotRecognized {
         $data->{text} = getResponse( $hash, 'NoIntentRecognized' );
         return handleTtsMsgDialog($hash,$data);
     }
+# Ende text-basierte Dialoge
 
     #return $hash->{NAME} if !$hash->{experimental};
 
+
     my $data_old = $hash->{helper}{'.delayed'}->{$identity};
 
+    # Teil 2: {input} ist da, es wurde also (vermutlich) was gesagt, aber der input wurde nicht als Intent erkannt (z.B. falscher Filter?)
+
+
+    # Teil 2a - wir sind in einer neuen (2a1) oder "weiterlaufenden", aber "sauberen" Sitzung (z.B. nach reActivateVoiceInput, 2a2)
     if ( !defined $data_old ) {
+       
+        # user-definierte Sonderbehandlung hat Vorrang und ist abschließend!
         return handleCustomIntent($hash, 'intentNotRecognized', $data) if defined $hash->{helper}{custom} && defined $hash->{helper}{custom}{intentNotRecognized};
+       
+       
         my $entry = qq([$data->{siteId}] $data->{input});
         readingsSingleUpdate($hash, 'intentNotRecognized', $entry, 1);
-        $data->{requestType} = 'text';
+        if ( defined $hash->{sessionTimeout} ) { #this might be the place to extend for "getOption" keys
+            $data->{requestType} //= 'voice'; # we need "voice" to make sure we reopen the microphone if session is voice type
+            $response = {
+                text => getResponse( $hash, 'RetryIntent'),
+                sendIntentNotRecognized => 'true',
+                customData => $data->{customData}
+            };
+            return respond( $hash, $data, $response);  # continue listening, as $response is HASH type
+           
+        }
+       
+        $data->{requestType} //= 'text';
         return respond( $hash, $data, getResponse( $hash, 'NoIntentRecognized' ));
     }
-
-    $data->{requestType} //= $data_old->{requestType} // 'voice';                                                                                           # required, otherwise session open but no voice input possible
-    my $response = getResponse( $hash, 'RetryIntent');                                                                         # get retry response
-    my $reaction = { 
-        text => $response,
+   
+    # Teil 2b - irgendwas hat mit der weiteren Eingabe nicht geklappt (könnte v.a. auch ein ganz anderer Satz gewesen sein - es ist häufig (choice!) nur ein sehr eingeschränkter intentFilter aktiv!)
+    #$data_old is given, continue dialogue
+    $data->{requestType} //= $data_old->{requestType} // 'voice'; # required, otherwise session open but no voice input possible
+    $response = {
+        text => getResponse( $hash, 'RetryIntent'),
         sendIntentNotRecognized => 'true',
         customData => $data->{customData}
     };
-    respond( $hash, $data, $reaction);                                                                                         # keep session open and continue listening
+    respond( $hash, $data, $response); # keep session open and continue listening
     return $hash->{NAME};
-
 
 =pod
     return if !defined $data->{input} || length($data->{input}) < 12; #Beta-User: silence chuncks or single words, might later be configurable
@@ -5763,14 +5908,21 @@ sub handleIntentCancelAction {
 
     my $identity = qq($data->{sessionId});
     my $data_old = $hash->{helper}{'.delayed'}->{$identity};
-    if ( !defined $data_old || defined $data->{resetInput}) {
+    if ( ( !defined $data_old && ref $data->{customData} ne 'HASH' && !defined $data->{closeSession} ) || defined $data->{resetInput}) {
         respond( $hash, $data, getResponse( $hash, 'SilentClosure' ), undef, 0 );
         return configure_DialogManager( $hash, $data->{siteId}, undef, undef, 1 ); #global intent filter seems to be not working!
     }
 
     deleteSingleRegIntTimer($identity, $hash);
     delete $hash->{helper}{'.delayed'}->{$identity};
-    respond( $hash, $data, getResponse( $hash, 'DefaultCancelConfirmation' ), undef, 0 );
+    my $response = getResponse( $hash, 'DefaultCancelConfirmation' );
+
+    #Beta-User: Here we need additional Code for handling "shut up" cases in continuous sessions
+    if ( defined $data->{closeSession} ) {
+        $response = getResponse( $hash, 'DefaultConfirmationClosure' );
+    }
+
+    respond( $hash, $data, $response, undef, 0 );
 
     return $hash->{NAME};
 }
@@ -6216,7 +6368,7 @@ Instead i have to check whether the next message is a repeat.
 <h3>RHASSPY</h3>
 <p>This module receives, processes and executes voice commands coming from <a href="https://rhasspy.readthedocs.io/en/latest/">Rhasspy voice assistent</a>.</p>
 
-<p><b>General Remarks:</b><br>
+<p><b>General Remarks:</b><br></p>
 <ul>
 <li>
 <a id="RHASSPY-dialoguemanagement"></a>For dialogues, RHASSPY relies on the mechanisms as described in <a href="https://rhasspy.readthedocs.io/en/latest/reference/#dialogue-manager">Rhasspy Dialogue Manager documentation</a>.<br>
@@ -6265,8 +6417,10 @@ So all parameters in define should be provided in the <i>key=value</i> form. In 
   <a id="RHASSPY-noChangeover"></a>
   <li><b>noChangeover</b>: By default, RHASSPY will first try to execute the intent as handed over by Rhasspy. In case there's no strict match, RHASSPY then will do a check, if the single device intent could be executed as group intent (vice versa; to do this, the {Group} key value will be used as {Device} key). Setting this key to '1' will completely prevent this check, '2' will stop changeover from single device intent to respective group intent, but allow to switch from group to single device.</li>
   <li><b>handleHotword</b>: Trigger Reading <i>hotword</i> in case of a hotword is detected. See attribute <a href="#RHASSPY-attr-rhasspyHotwords">rhasspyHotwords</a> for further reference.</li>
+  <a id="RHASSPY-Babble"></a>
   <li><b>Babble</b>: <a href="#RHASSPY-experimental"><b>experimental!</b></a> Points to a <a href="#Babble ">Babble</a> device. Atm. only used in case if text input from an <a href="#AMADCommBridge">AMADCommBridge</a> is processed, see <a href="#RHASSPY-attr-rhasspySpeechDialog">rhasspySpeechDialog</a> for details.</li>
   <li><b>encoding</b>: <b>most likely deprecated!</b> May be helpfull in case you experience problems in conversion between RHASSPY (module) and Rhasspy (service). Example: <code>encoding=cp-1252</code>. Do not set this unless you experience encoding problems!</li>
+  <a id="RHASSPY-sessionTimeout"></a>
   <li><b>sessionTimeout</b> <a href="#RHASSPY-experimental"><b>experimental!</b></a> timout limit in seconds. By default, RHASSPY will close a sessions immediately once a command could be executed. Setting a timeout will keep session open until timeout expires. NOTE: Setting this key may result in confusing behaviour. Atm not recommended for regular useage, <b>testing only!</b> May require some non-default settings on the Rhasspy side to prevent endless self triggering. Note: In case of Kaldi, you may have to set a longer default there as well.</li>
   <li><b>autoTraining</b>: deactivated by setting the timeout (in seconds) to "0", default is "60". If not set to "0", RHASSPY will try to catch all actions wrt. to changes in attributes that may contain any content relevant for Rhasspy's training. In case if, training will be initiated after timeout hast passed since last action; see also <a href="#RHASSPY-set-update">update devicemap</a> command.</li>
 </ul>
@@ -6282,7 +6436,7 @@ attr rhasspyMQTT2 subscriptions setByTheProgram</code></p>
 </li>
 <li><b>Extended version</b> - Rhasspy running on remote machine using an external MQTT server on a third machine with non-default port, MQTT2_CLIENT is also used by MQTT_GENERIC_BRIDGE and MQTT2_DEVICE, hotword events shall be generated:
 </p>
-<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:1884<br>
+<p><code>defmod rhasspyMQTT2 MQTT2_CLIENT 192.168.1.122:1884<br></p>
 attr rhasspyMQTT2 clientOrder RHASSPY MQTT_GENERIC_BRIDGE MQTT2_DEVICE<br>
 attr rhasspyMQTT2 subscriptions hermes/intent/+ hermes/dialogueManager/sessionStarted hermes/dialogueManager/sessionEnded hermes/nlu/intentNotRecognized hermes/hotword/+/detected hermes/hotword/toggleOn hermes/hotword/toggleOff hermes/tts/say &lt;additional subscriptions for other MQTT-Modules&gt;
 <p>define Rhasspy RHASSPY baseUrl=http://192.168.1.210:12101 defaultRoom="Büro Lisa" language=de devspec=genericDeviceType=.+,device_a1,device_xy handleHotword=1</code></p>
@@ -6480,12 +6634,12 @@ After changing something relevant within FHEM for either the data structure in</
     <li>If HASH type data (or $response in ARRAY) is returned to continue a session, make sure to hand over all relevant elements, including especially <i>customData</i> for referencing and <i>intentFilter</i> if you want to restrict possible intents. It's recommended to always also activate <i>CancelAction</i> to allow user to actively exit the dialogue, or activate something that could hand over a <i>resetInput</i> key.
     </li>
     </ul>
-    <br>See also <a href="#RHASSPY-additional-files">additionals files</a> for further examples on this.</p>
+    <br>See also  <a href="#RHASSPY-dialogues"><b>dialogues</b></a> and <a href="#RHASSPY-additional-files">additionals files</a> for further examples on this.</p>
   </li>
 
   <li>
     <a id="RHASSPY-attr-rhasspyShortcuts"></a><b>rhasspyShortcuts</b>
-    <p>Define custom sentences without editing Rhasspys sentences.ini<br>
+    <p>Define custom sentences without editing Rhasspys <i>sentences.ini</i><br>
     The shortcuts are uploaded to Rhasspy when using the updateSlots set-command.<br>
     One shortcut per line, syntax is either a simple and an extended version.</p>
     <p>Examples:</p>
@@ -6560,32 +6714,32 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
             ( let it be | oh no | cancel | cancellation ){Mode:Cancel}
             </code><br>
         </p>
-      </li>
+      </li></p>
       <a id="RHASSPY-attr-rhasspyTweaks-confirmIntentResponses"></a>
       <li><b>confirmIntentResponses</b>
-        <p>By default, the answer/confirmation request will be some kind of echo to the originally spoken sentence ($rawInput as stated by <i>DefaultConfirmationRequestRawInput</i> key in <i>responses</i>). You may change this for each intent specified using $target, ($rawInput) and $Value als parameters.<br>
+        <p>By default, the answer/confirmation request will be some kind of echo to the originally spoken sentence ($rawInput as stated by <i>DefaultConfirmationRequestRawInput</i> key in <i>responses</i>). You may change this for each intent specified using $target, ($rawInput) and $Value als parameters.<br></p>
         Example: <p><code>confirmIntentResponses=SetOnOffGroup="really switch group $target $Value" SetOnOff="confirm setting $target $Value" </code></p>
-        <i>$Value</i> may be translated with defaults from a <i>words</i> key in languageFile, for more options on <i>$Value</i> and/or more specific settings in single devices see also <i>confirmValueMap</i> key in <a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a>.</p>
+        <i>$Value</i> may be translated with defaults from a <i>words</i> key in languageFile, for more options on <i>$Value</i> and/or more specific settings in single devices see also <i>confirmValueMap</i> key in <a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a>.
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-ignoreKeywords"></a>
       <li><b>ignoreKeywords</b>
-        <p>You may have also some technically motivated settings in the attributes RHASSPY uses to generate slots, e.g. <i>MQTT, alexa, homebridge</i> or <i>googleassistant</i> in <i>room</i> attribute. The key-value pairs will sort the given <i>value</i> out while generating the content for the respective <i>slot</i> for <i>key</i> (atm. only <i>rooms</i> and <i>group</i> are supported). <i>value</i> will be treated as (case-insensitive) regex with need to exact match.<br>
-        Example: <p><code>ignoreKeywords=room=MQTT|alexa|homebridge|googleassistant|logics-.*</code>
+        <p>You may have also some technically motivated settings in the attributes RHASSPY uses to generate slots, e.g. <i>MQTT, alexa, homebridge</i> or <i>googleassistant</i> in <i>room</i> attribute. The key-value pairs will sort the given <i>value</i> out while generating the content for the respective <i>slot</i> for <i>key</i> (atm. only <i>rooms</i> and <i>group</i> are supported). <i>value</i> will be treated as (case-insensitive) regex with need to exact match.<br></p>
+        Example: <p><code>ignoreKeywords=room=MQTT|alexa|homebridge|googleassistant|logics-.*</code></p>
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-gdt2groups"></a>
       <li><b>gdt2groups</b>
-        <p>You may want to assign some default groupnames to all devices with the same genericDeviceType without repeating it in all single devices.<br>
-        Example: <p><code>gdt2groups= blind=rollläden,rollladen thermostat=heizkörper light=lichter,leuchten</code>
+        <p>You may want to assign some default groupnames to all devices with the same genericDeviceType without repeating it in all single devices.<br></p>
+        Example: <p><code>gdt2groups= blind=rollläden,rollladen thermostat=heizkörper light=lichter,leuchten</code></p>
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-mappingOverwrite"></a>
       <li><b>mappingOverwrite</b>
         <p>If set, any value set in rhasspyMapping attribute will delete all content detected by automated mapping analysis (default: only overwrite keys set in devices rhasspyMapping attributes.</p>
-        <p>Example: <p><code>mappingOverwrite=1</code></p>
+        <p>Example: <p><code>mappingOverwrite=1</code></p></p>
       </li>
       <a id="RHASSPY-attr-rhasspyTweaks-extrarooms"></a>
       <li><b>extrarooms</b>
-        <p>You may want to add more rooms to what Rhasspy can recognize as room. Using this key, the comma-separated items will be sent as rooms for preparing the room and mainrooms slots.<br>
-        Example: <p><code>extrarooms= barn,music collection,cooking recipies</code><br>
+        <p>You may want to add more rooms to what Rhasspy can recognize as room. Using this key, the comma-separated items will be sent as rooms for preparing the room and mainrooms slots.<br></p>
+        Example: <p><code>extrarooms= barn,music collection,cooking recipies</code><br></p>
         Note: Only do this in case you really know what you are doing! Additional rooms only may be usefull in case you have some external application knowing what to do with info assinged to these rooms!
       </li>
       <li><b>updateSlots</b>
@@ -6625,7 +6779,6 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         <li><i>hello</i> and <i>goodbye</i> are texts to be sent when opening or exiting a dialogue</li>
         <li><i>msgCommand</i> the fhem-command to be used to send messages to the messenger service.</li>
         <li><i>siteId</i> the siteId to be used by this RHASSPY instance to identify it as satellite in the Rhasspy ecosystem</li>
-        <li><i>querymark</i> Text pattern that shall be used to distinguish the queries done in intent MsgDialog from others (for the future: will be added to all requests towards Rhasspy intent recognition system automatically; not functional atm.)</li>
         <br>
       </ul>
   </li>
@@ -6636,7 +6789,7 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
   <li>
     <a id="RHASSPY-attr-rhasspySpeechDialog"></a><b>rhasspySpeechDialog</b>
     <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
-    <p>Optionally, you may want not to use the internal speach-to-text and text-to-speach engines provided by Rhasspy (for one or several siteId's), but provide simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a> <br>Note: Needs some <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy!</p>
+    <p>Optionally, you may want not to use the internal speach-to-text and text-to-speach engines provided by Rhasspy (for one or several siteId's), but provide simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a>.<br>Note: Needs some <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy!</p>
     Keys that may be set in this attribute:
      <ul>
         <li><i>allowed</i> A list of <a href="#AMADDevice">AMADDevice</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
@@ -6752,7 +6905,7 @@ yellow=rgb FFFF00</code></p>
       </li>
       <li><b>venetianBlind</b>
         <p><code>attr blind1 rhasspySpecials venetianBlind:setter=dim device=blind1_slats stopCommand="set blind1_slats dim [blind1_slats:dim]"</code></p>
-        <p>Explanation (one of the two arguments is mandatory):
+        <p>Explanation (one of the two arguments is mandatory):</p>
         <ul>
           <li><b>setter</b> is the set command to control slat angle, e.g. <i>positionSlat</i> for CUL_HM or older ZWave type devices</li>
           <li><b>device</b> is needed if the slat command has to be issued towards a different device (applies e.g. to newer ZWave type devices)</li>
@@ -6768,7 +6921,7 @@ yellow=rgb FFFF00</code></p>
       </li>
       <li><b>colorTempMap</b>
         <p>Allows mapping of values from the <i>Colortemp</i> key to individual commands.</p>
-        Works similar to colorCommandMap</p>
+        Works similar to colorCommandMap
       </li>
       <li><b>colorForceHue2rgb</b>
         <p>Defaults to "0". If set, a rgb command will be issued, even if the device is capable to handle hue commands.</p>
@@ -6793,7 +6946,7 @@ yellow=rgb FFFF00</code></p>
       </li>
       <li><b>scenes</b>
         <p><code>attr lamp1 rhasspySpecials scenes:scene2="Kino zu zweit" scene3=Musik scene1=none scene4=none</code></p>
-        <p>Explanation:
+        <p>Explanation:</p>
         <p>If set, the value (e.g. "Kino zu zweit") provided will be sent to Rhasspy instead of the <i>tech names</i> (e.g. "scene2", derived from available setters). Value <i>none</i> will delete the scene from the internal list, setting the combination <i>all=none</i> will exclude the entire device from beeing recognized for SetScene, <i>rest=none</i> will only include the labeled scenes. These values finally will be what's expected to be spoken to identificate a specific scene.</p>
       </li>
       <li><b>blacklistIntents</b>
@@ -6813,7 +6966,7 @@ yellow=rgb FFFF00</code></p>
 <a id="RHASSPY-intents"></a>
 <h4>Intents</h4>
 <p>The following intents are directly implemented in RHASSPY code. Note: In case you hand over a key named "resetInput", no specific intent handler will be called, but the respective satellite will be activated and reset to it's default intentFilter.</p>
-<p>The keywords used by these intents (in sentences.ini) are as follows:
+<p>The keywords used by these intents (in <i>sentences.ini</i>) are as follows:</p>
 <ul>
   <li>Shortcuts</li> (keywords as required by user code)
   <li>SetOnOff</li>
@@ -6860,17 +7013,84 @@ yellow=rgb FFFF00</code></p>
   Required tags to set a timer: at least one of {Hour}, {Hourabs}, {Min} or {Sec}. {Label} and {Room} are optional to distinguish between different timers. If {Hourabs} is provided, all timer info will be regarded as absolute time of day info, otherwise everything is calculated using a "from now" logic.
   <li>GetTimer</li> (Outdated, use generic "Timer" instead!) Get timer info as mentionned in <i>Timer</i>, key {GetTimer} is not explicitely required.
   <li>ConfirmAction</li>
-  {Mode} with value 'OK'. All other calls will be interpreted as CancelAction intent call.
-  <li>CancelAction</li>Hand over a {Mode} key is recommended.
+  {Mode} with value 'OK'. All other calls will be interpreted as <i>CancelAction</i> intent call.
+  <a id="RHASSPY-intent-cancelAction"></a>
+  <li>CancelAction</li>Hand over a {Mode} key is recommended. Including a {closeSession} key will force the deactivation of the used voice input device (see <a href="#RHASSPY-dialogues"><b>dialogues</b></a>).
   <li>Choice</li>One or more of {Room}, {Device} or {Scene}
   <li>ChoiceRoom</li> {Room} NOTE: Useage of generic "Choice" intent instead is highly recommended!
   <li>ChoiceDevice</li> {Device} NOTE: Useage of generic "Choice" intent instead is highly recommended!
-  <li>ReSpeak</li>
+  <li>ReSpeak</li><br>
+  Additionaly, you may use some additional keys to influence (voice) dialogue behaviour, see <a href="#RHASSPY-dialogues"><b>dialogues</b></a>.
+</ul>
+<a id="RHASSPY-dialogues"></a>
+<h4>Dialogues</h4>
+<p><b>Note:</b> This is an experimental feature and may be subject to changes!<br></p>
+The following keys may be used to control interaction with Rhasspy, especially to "contiunue" or explicitly close a session when using voice input.<br>
+Any key may origine either from <i>sentences.ini</i>, (<a href="#RHASSPY-attr-rhasspySpecials">rhasspySpecials</a> or <a href="#RHASSPY-attr-rhasspyTweaks">rhasspyTweaks</a> to be implemented and documented! Logic in "conflicting" situations may follow the rule: sentence.ini has highest prio, then specials, tweak least).
+
+<ul>
+    <li>reActivateVoiceInput</li> Will issue an <a href="#RHASSPY-set-activateVoiceInput">activateVoiceInput</a> command following the given plus the <i>ContinueSession</i> responses, without need of speaking the hotword again. The new session (controled by FHEM) will kept open for the number (in seconds) provided by the key (or by default <a href="#RHASSPY-sessionTimeout">sessionTimeout</a> settings) and finally closed silently after the timeout has passed without new command. Note: For longer timeouts, this may need additional (timeout) configuration on the Rhasspy side as well and has some limitations, see https://forum.fhem.de/index.php?msg=1322331 for details.<br>
+    Example: For opening blinds, just add <i>[]{reActivateVoiceInput:40}</i> at the end of the respective entry in <i>sentences.ini</i> e.g. to allow direct "stop" commands.
+    <br>When using this feature, the <i><a href="#RHASSPY-intent-cancelAction">CancelAction</a></i> intent will be activated to allow forced session closure (see below).
+    <li>closeSession</li> Will force the voice input to be closed (has higher priority than reActivateVoiceInput).<br>
+    Example for <i>CancelAction</i> intent: <code>(goodbye | shut up){closeSession}</code>.
+
+<!-- 
+    <li>noch zu bearbeiten bzw. zu klären</li>, https://forum.fhem.de/index.php?msg=1325607:
+
+<i>Wenn ein Kommando nicht verstanden wurde, wird die Session beendet - außer man kombiniert mit der wie bitte? Funktion.
+Szenario: Wenn man ohne erneutes Wake-Word noch andere Kommandos geben will.
+Zusätzlich: Es wurde die responseId ContinueSession in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "Sonst noch was?" einstellen kann.
+
+    retryInput = true              -> wie bitte? Funktion
+
+Einstellung: in der Rhasspy Konfiguration am Ende eines sentence[]{retryInput=true}[/b] anhängen (gilt dann nur für dieses Kommando).
+Besser Alternativ: in FHEM rhasspyTweaks die Zeile retryInput=all=true (gilt immer). Statt all sind auch andere Bedingungen einstellbar.
+bewirkt, dass wenn ein Kommando nicht verstanden wurde, statt der Standardansage die Ansage wie bitte? und der Dialog offen bleibt, damit man das fehlerhafte Kommando ohne erneutes Wake-Word korrigieren kann. Die Dauer, die der Dialog offen bleibt wird von dem Timeout bestimmt, der beim Start einer Session gesetzt wurde und verlängert sich durch wie bitte? nicht.
+Zusätzlich: Es wurde die responseId RetryInput in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "wie bitte?" einstellen kann.
+
+    noResponse = true:             -> Standard Antwort eines Intent unterdrücken, nur sinnvoll, wenn reActivateVoiceInput oder retryInput aktiv ist.
+
+bewirkt, dass nach Abarbeitung eines Intent keine Ansage erfolgt.
+Einstellung: in der Rhasspy Konfiguration am Ende des betreffenden sentence für etwas höher, leiser, heller ... noch []{noResponse:true} anhängen.
+Szenario Bei einer Steuerung von Lampen oder Rollläden können so Kommandos wie 'etwas heller' oder 'etwas runter' / 'Stop' ggf. mehrfach hintereinander gegeben werden, ohne dass man auf das Ende einer Ansage warten muss. Wenn diese Art Kommandos gegeben werden, sieht/hört man ja das Ergebnis.
+
+    closeSession                      ->sei still Funktion, nur sinnvoll, wenn reActivateVoiceInput oder retryInput aktiv ist.
+
+Einstellen: in der Rhasspy Konfiguration einen weiteren sentence z.B. (fertig|sei still){closeSession:true} unter CancelAction einfügen.
+Funktionserweiterung für CancelAction bewirkt, dass die laufende Session mit einer anderen Ansage (responseId closeSession) beendet wird.
+Szenario: es ist gerade eine Session offen z.B. durch reActivateVoiceInput und das Telefon klingelt. Rhasspy hört dann gerade auf ein Kommando und wird ständig dazwichen reden, während man sich unterhält. Mit dem Kommando 'sei still' kann man Rhasspy zum schweigen bringen als Antwort erhält man nicht das unpassende 'habe abgebrochen' sondern z.B. ein kurzes 'OK'
+Zusätzlich: Es wurde die responseId CloseSession in der rhassp-de.cfg hinzugefügt, unter der man Alternativen für den Text "OK" einstellen kann.
+
+    resetInput                      -> Alles auf Anfang
+
+Einstellen:  in der Rhasspy Konfiguration den sentence Wake-Word{resetInput} bei irgend einem Intent einfügen.
+bewirkt, dass sofort eine neue Session gestartet wird. Man vermeidet ein "Das habe ich nicht verstanden" oder "wie bitte", wenn man während einer laufenden Session versehentlich das Wake-Word spricht.
+Szenario: es ist gerade eine Session offen z.B. durch reActivateVoiceInput und das Wake-Word wird gesprochen. Wegen der offenen Sesssion ist z.B. Porcupine nicht aktiv und Rhasspy würde vergeblich versuchen einen passenden Intent zu finden. Durch resetInput kann man sein Wake-Word bei einem Intent unterbringen und Rhasspy versteht das Wake-Word als Kommando. Damit gibt es kein IntentNotRecognized mehr. Intern wird der betreffende Intent dann nicht ausgeführt, und statt dessen - wie man ja nach einem Wake-Word erwartet - eine Neue Session gestartet.
+
+    silentClosure = true          -> Session Ende erfolgt ohne Ansage
+
+Einstellung: In Einem hash als return eines CustomIntent übergeben.
+Hauptsächlich gedacht für CustomIntents.
+Wenn ein CustomIntent eine Session für eine angegebene Zeit offen hält, wird am Ende der Session die Standard Antwort unterdrückt.
+Zusätzlich: es wurde die responseId SilentClosure eingeführt, die man auch als response übergeben kann und eine stille Ausführung eines Kommandos bewirkt.
+ToDo: Ggf. ohne Parameter als Standard festlegen.
+
+Allgemein:
+Alle obigen Einstellungen, die in rhasspyTweaks möglich sind, können auch als Device Einstellung unter rhasspySpecials vorgenommen werden und gelten dann nur für dieses Device. Bitte das nötige Specials-Format beachten: die Tweaks Einstellung retryInput=all=true muss bei Specials retryInput:all=true geschrieben werden (der ':'). Specials sind vorrangig vor Tweaks.
+Bei der Einstellung unter rhasspyTweaks können statt all Bedingungen wie SetOnOff angegeben werden, auch kombiniert in der Form SetOnOff|SetNumeric wober die betreffende Einstellung nur für die Intents SetOnOff, bzw. SetOnOff oder SetNumeric gilt.
+Mögliche Bedingungen (derzeit) sind: Intent, Group, gdt, Type, Name, Device, Room
+Beispiel:
+reActivateVoiceInput=light=15 -> sonst noch was? für 15 Sekunden gilt nur, wenn die Geräte deren attr GenericDeviceType light ist.
+Oder:
+reActivateVoiceInput=SetOnOff=32 Lampen|Rollläden=25 -> für Intent SetOnOff gilt sonst noch was? für 32 Sekunden, ansonsten für die Gruppen Lampen und Rolläden eben 25 Sekunden.
+Die erste Bedingung (von links nach rechts), die zutrifft, bestimmt die Zeiteinstellung.</i>
+-->
 </ul>
 
 <a id="RHASSPY-readings"></a>
 <h4>Readings</h4>
-<p>There are some readings you may find usefull to tweak some aspects of RHASSPY's logics:
+<p>There are some readings you may find usefull to tweak some aspects of RHASSPY's logics:</p>
 <ul>
   <li>siteId2room_&lt;siteId&gt;</li>
   Typically, RHASSPY derives room info from the name of the siteId. So naming a satellite <i>bedroom</i> will let RHASSPY assign this satellite to the same room, using the group sheme is also supported, e.g. <i>kitchen.front</i> will refer to <i>kitchen</i> as room (if not explicitly given). <br>
