@@ -1,6 +1,6 @@
-REV 30997
+REV 31006
 DIR unused
-UPD 2026-03-21_07:45:03 454873 ./CHANGED
+UPD 2026-03-23_07:45:03 454950 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
 UPD 2026-03-19_07:45:03 47821 ./MAINTAINER.txt
 UPD 2026-01-30_07:45:03 47178 ./configDB.pm
@@ -73,7 +73,7 @@ UPD 2025-11-28_07:45:03 64158 FHEM/10_MYSENSORS_DEVICE.pm
 UPD 2021-09-01_07:45:03 21540 FHEM/10_NeuronPin.pm
 UPD 2018-03-28_07:45:02 33933 FHEM/10_OWServer.pm
 UPD 2019-06-03_07:45:02 103261 FHEM/10_RESIDENTS.pm
-UPD 2024-10-29_07:45:03 306842 FHEM/10_RHASSPY.pm
+UPD 2026-03-23_07:45:03 321995 FHEM/10_RHASSPY.pm
 UPD 2026-01-18_07:45:10 27248 FHEM/10_SD_GT.pm
 UPD 2024-04-15_07:45:02 68840 FHEM/10_SOMFY.pm
 UPD 2020-09-20_07:45:03 8181 FHEM/10_SchellenbergHandle.pm
@@ -453,7 +453,7 @@ UPD 2022-03-09_07:45:03 22906 FHEM/88_xs1Dev.pm
 UPD 2022-03-31_07:45:02 29550 FHEM/89_AndroidDB.pm
 UPD 2022-03-31_07:45:02 15486 FHEM/89_AndroidDBHost.pm
 UPD 2021-10-08_07:45:09 132761 FHEM/89_ESPEInk.pm
-UPD 2026-02-27_07:45:03 41724 FHEM/89_FULLY.pm
+UPD 2026-03-23_07:45:03 42007 FHEM/89_FULLY.pm
 UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2019-05-27_07:45:02 53160 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
@@ -766,12 +766,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2026-03-21_07:45:11 5519036 docs/commandref.html
+UPD 2026-03-23_07:45:10 5526682 docs/commandref.html
 UPD 2026-03-21_07:45:15 3520424 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-03-22_07:45:16 329324 docs/commandref_modular.html
-UPD 2026-03-22_07:45:18 341168 docs/commandref_modular_DE.html
+UPD 2026-03-23_07:45:15 329408 docs/commandref_modular.html
+UPD 2026-03-23_07:45:17 341252 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -1406,6 +1406,7 @@ UPD 2017-11-14_07:45:02 6536 www/images/fhemSVG/building_carport_light.svg
 UPD 2017-11-14_07:45:02 7727 www/images/fhemSVG/building_carport_socket.svg
 UPD 2017-11-14_07:45:02 3710 www/images/fhemSVG/building_outside.svg
 UPD 2015-07-28_14:05:32 2546 www/images/fhemSVG/building_security.svg
+UPD 2026-03-23_07:45:03 1444 www/images/fhemSVG/bus.svg
 UPD 2015-08-14_07:45:11 2737 www/images/fhemSVG/car.svg
 UPD 2021-09-12_07:45:03 3074 www/images/fhemSVG/car_in.svg
 UPD 2021-09-12_07:45:03 17328 www/images/fhemSVG/car_out.svg
@@ -1888,6 +1889,7 @@ UPD 2020-07-26_07:45:03 1681 www/images/fhemSVG/tradfri_remote.svg
 UPD 2023-10-24_07:45:02 2786 www/images/fhemSVG/traffic_congestion1.svg
 UPD 2023-10-24_07:45:02 4819 www/images/fhemSVG/traffic_congestion2.svg
 UPD 2023-10-24_07:45:02 6134 www/images/fhemSVG/traffic_congestion3.svg
+UPD 2026-03-23_07:45:03 779 www/images/fhemSVG/tram.svg
 UPD 2020-02-29_07:45:03 2705 www/images/fhemSVG/tuer_fenster_kontakt.svg
 UPD 2019-12-12_07:45:03 3216 www/images/fhemSVG/tuer_fenster_kontakt_closed.svg
 UPD 2019-12-12_07:45:03 3318 www/images/fhemSVG/tuer_fenster_kontakt_opened.svg
@@ -2382,6 +2384,7 @@ UPD 2015-07-28_14:05:33 3712 www/images/openautomation/time_timer.svg
 UPD 2015-07-28_14:05:33 1505 www/images/openautomation/user_available.svg
 UPD 2015-07-28_14:05:33 1923 www/images/openautomation/user_away.svg
 UPD 2015-07-28_14:05:33 2171 www/images/openautomation/user_ext_away.svg
+UPD 2026-03-23_07:45:03 1717 www/images/openautomation/user_n_a.svg
 UPD 2015-07-28_14:05:33 2415 www/images/openautomation/vent_ambient_air.svg
 UPD 2015-07-28_14:05:33 3499 www/images/openautomation/vent_bypass.svg
 UPD 2015-07-28_14:05:33 2458 www/images/openautomation/vent_exhaust_air.svg
@@ -2441,7 +2444,10 @@ UPD 2015-07-28_14:05:33 1732 www/images/openautomation/weather_wind_directions_s
 UPD 2015-07-28_14:05:33 1875 www/images/openautomation/weather_wind_directions_se.svg
 UPD 2015-07-28_14:05:33 1824 www/images/openautomation/weather_wind_directions_sw.svg
 UPD 2015-07-28_14:05:33 1728 www/images/openautomation/weather_wind_directions_w.svg
+UPD 2026-03-23_07:45:03 1068 www/images/openautomation/weather_wind_no_wind.svg
 UPD 2015-07-28_14:05:33 2221 www/images/openautomation/weather_wind_speed.svg
+UPD 2026-03-23_07:45:03 2007 www/images/openautomation/weather_wind_speed_bft.svg
+UPD 2026-03-23_07:45:03 1965 www/images/openautomation/weather_wind_speed_ms.svg
 UPD 2015-07-28_14:05:33 3958 www/images/openautomation/weather_winter.svg
 UPD 2021-01-03_07:45:02 4834 www/images/openautomation/xbox.svg
 UPD 2020-10-05_07:45:02 3810 www/images/openautomation/zisterne_00.svg
