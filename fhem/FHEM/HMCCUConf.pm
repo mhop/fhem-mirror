@@ -2216,22 +2216,30 @@ string chnid;
 string sDPId;
 string sDevName;
 string sDevList = "\$list";
+! *** For testing of this script on CCU replace the previous line by the following line
+!string sDevList = dom.GetObject(ID_DEVICES).EnumUsedIDs();
 integer c = 0;
 foreach (sDevName, sDevList.Split(",")) {
+! *** For testing of this script on CCU replace the previous line by the following line
+! foreach (sDevName, sDevList) {
   object odev = (dom.GetObject(ID_DEVICES)).Get(sDevName);
   if (odev) {
     foreach (chnid, odev.Channels()) {
-	   object ochn = dom.GetObject(chnid);
+      object ochn = dom.GetObject(chnid);
       if (ochn) {
-		  foreach(sDPId, ochn.DPs()) {
-		    object oDP = dom.GetObject(sDPId);
+        foreach(sDPId, ochn.DPs()) {
+          object oDP = dom.GetObject(sDPId);
           if (oDP) {
-            if (OPERATION_READ & oDP.Operations()) {
+            if ((OPERATION_READ & oDP.Operations()) && (!oDP.Name().Contains("INSTALL_TEST"))) {
               if (oDP.TypeName() == "HSSDP") {
                 WriteLine (ochn.Name() # "=" # oDP.Name() # "=" # oDP.\$ccuget());
+                ! *** For testing of this script on CCU replace the previous line by the following line
+                ! WriteLine (ochn.Name() # "=" # oDP.Name() # "=" # oDP.Value());
               }
               else {
                 WriteLine (ochn.Name() # "=sysvar.link." # oDP.Name() # "=" # oDP.\$ccuget());
+                ! *** For testing of this script on CCU replace the previous line by the following line
+                ! WriteLine (ochn.Name() # "=sysvar.link." # oDP.Name() # "=" # oDP.Value());
               }
               c = c+1;
             }
