@@ -67,9 +67,9 @@ sub FULLY_Initialize
     $hash->{FW_detailFn} = "FULLY_Detail";
 
     $hash->{AttrList} = "pingBeforeCmd:0,1,2 pollInterval:slider,10,10,86400 requestTimeout:slider,1,1,20 repeatCommand:0,1,2 " .
-        "disable:0,1 expert:0,1 waitAfterPing:0,1,2 updateAfterCommand:0,1 " .
+        "disable:0,1 expert:0,1 waitAfterPing:0,1,2 updateAfterCommand:0,1 STTprocessor " .
         $readingFnAttributes;
-	return;
+    return;
 }
 
 ######################################################################
@@ -176,6 +176,11 @@ sub FULLY_Attr
                 FULLY_Log ($hash, 2, "Device deactivated");
             }
         }
+        elsif ($attrname eq 'STTprocessor') {
+            return "No Babble or RHASSPY device available with name $attrval!" if $init_done && InternalVal($attrval,'TYPE','none') !~ m{Babble|RHASSPY}xms;
+        }
+
+
     }
     elsif ($cmd eq 'del') {
         if ($attrname eq 'pollInterval') {
@@ -325,19 +330,27 @@ sub FULLY_Set {
         "foreground"      => "toForeground"
     );
 
-    return "FULLY: Unknown argument $opt, choose one of ".$options
+    return "FULLY: Unknown argument $opt, choose one of $options"
         if $opt eq '?';
 
-    if ($opt eq 'gotSTT') {
-        my $FHEMWEB_ID = shift @arr;
-        if ( looks_like_number($FHEMWEB_ID) ) {
-            $hash->{FW_ID} = $FHEMWEB_ID;
+    if ($opt eq 'STTinput') {
+        my $FHEMWEB_ID = pop @arr;
+        if ( $FHEMWEB_ID =~ m{\[(\d+\.\d+)\]}xms ) {
+            $hash->{FW_ID} = $1;
         } else {
-            unshift @arr, $FHEMWEB_ID;
+            push @arr, $FHEMWEB_ID;
         }
         my $text = join q{ }, @arr;
         readingsSingleUpdate ($hash, 'STT', $text, 1);
-        return;
+        my $processor = AttrVal($name,'STTprocessor',undef) // return;
+        return AnalyzePerlCommand( undef, Babble_DoIt($processor,$text) ) if InternalVal($processor,'TYPE','none') eq 'Babble'; # check if undef is ok, as we could perform a fhemweb authorisation!
+        return RHASSPY::SpeechDialog_STT($defs{$processor}, $name, $text);
+    }
+
+    if ($opt eq 'STTresponse') {
+        my $text = join q{ }, @arr;
+        readingsSingleUpdate ($hash, 'STTresponse', $text, 1);
+        $opt = 'speak';            #atm, we just forward the provided response to the speak routine...
     }
     if ($opt eq 'host') {
         my $host = shift @arr // return;
@@ -358,7 +371,7 @@ sub FULLY_Set {
         if !exists $hash->{fully}{password} && $opt ne 'authentication';
 
     my $expert = AttrVal ($name, 'expert', 0);
-    $options .= " setStringSetting setBooleanSetting" if $expert;
+    $options .= ' setStringSetting setBooleanSetting' if $expert;
     my $updateAfterCommand = AttrVal ($name, 'updateAfterCommand', 0);
 
     if (exists ($cmds{$opt})) {
@@ -384,7 +397,7 @@ sub FULLY_Set {
 
         return 'Password for FULLY authentication stored';
     }
-    if ($opt eq 'on-for-timer') {
+    elsif ($opt eq 'on-for-timer') {
         my $par = shift @arr // 'forever';
 
         if ($par eq 'forever') {
@@ -510,7 +523,7 @@ sub FULLY_Set {
         push (@p, { "key" => "$key", "value" => "$value" });
     }
     else {
-        return "FULLY: Unknown argument $opt, choose one of ".$options;
+        return "FULLY: Unknown argument $opt, choose one of $options";
     }
 
     # Execute command requests
