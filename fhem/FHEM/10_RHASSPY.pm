@@ -3472,6 +3472,22 @@ sub SpeechDialog_sayFinish{
     return 1;
 }
 
+sub SpeechDialog_STT {
+    my $hash    = shift // return;
+    my $client  = shift // return;
+    my $msgtext = shift // return;
+    
+    my $name = $hash->{NAME} // return;
+    Log3($name, 4 , qq($name received $msgtext from $client (SpeechDialog_STT called) ));
+    my $tocheck = $hash->{helper}->{SpeechDialog}->{config}->{filterFromBabble};
+    if ( $tocheck ) {
+        return AnalyzePerlCommand( undef, Babble_DoIt($hash->{Babble},$msgtext) ) if $msgtext !~ m{\A[\b]*$tocheck[\b]*\z}ix;
+        $msgtext =~ s{\A[\b]*$tocheck}{}ix;
+    }
+    return SpeechDialog_progress($hash, $client, $msgtext) if defined $hash->{helper}{SpeechDialog}->{$client} && defined $hash->{helper}{SpeechDialog}->{$client}->{data}; #session already opened!
+    return SpeechDialog_open($hash, $client, $msgtext);
+}
+
 sub SpeechDialog_close {
     my $hash     = shift // return;
     my $device   = shift // return;
@@ -3547,6 +3563,8 @@ sub SpeechDialog_respond {
 
     my $msgCommand = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{ttsCommand};
     $msgCommand //= 'set $DEVICE ttsMsg $message' if InternalVal($device, 'TYPE', '') eq 'AMADDevice';
+    $msgCommand //= 'set $DEVICE STTresponse $message' if InternalVal($device, 'TYPE', '') eq 'FULLY';
+    
     return if !$msgCommand;
     my %specials = (
          '$DEVICE'  => $device,
@@ -3554,7 +3572,7 @@ sub SpeechDialog_respond {
          '$NAME'  => $hash->{NAME}
         );
     $msgCommand  = EvalSpecials($msgCommand, %specials);
-    AnalyzeCommandChain($hash, $msgCommand);
+    AnalyzeCommandChain($hash, $msgCommand);                                                     # for FHEMWEB input, we might check authorisation!
     if ( $keepopen ) {
         my $tout = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
         $tout //= _getDialogueTimeout($hash) if !$cntByDelay;
