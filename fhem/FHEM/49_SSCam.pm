@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       49_SSCam.pm
 #
-#       (c) 2015-2025 by Heiko Maaz
+#       (c) 2015-2026 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to operate Cameras defined in Synology Surveillance Station 7.0 or higher.
@@ -192,6 +192,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "9.12.12"=> "24.03.2026  set verifiedversion to 9.9.9 ",
   "9.12.11"=> "11.09.2025  set verifiedversion to 9.2.4 ",
   "9.12.10"=> "20.07.2025  remove unnecessary debugactivetoken info ",
   "9.12.9" => "20.05.2025  change cleanData ",
@@ -726,7 +727,7 @@ my $defSlim           = 3;                                 # default Anzahl der 
 my $defColumns        = 3;                                 # default Anzahl der Spalten einer snapGallery
 my $sgnum             = '1,2,3,4,5,6,7,8,9,10';            # mögliche Anzahl der abzurufenden Schnappschüsse mit snapGallery
 my $sgbdef            = 0;                                 # default value Attr snapGalleryBoost
-my $verifiedversion   = '9.2.4';                           # getestete SVS-Version
+my $verifiedversion   = '9.9.9';                           # kompatible SVS-Version
 my $valZoom           = '.++,+,stop,-,--.';                # Inhalt des Setters "setZoom"
 my $shutdownInProcess = 0;                                 # Statusbit shutdown
 my $todef             = 20;                                # httptimeout default Wert
