@@ -186,22 +186,53 @@ $(document).ready(function() {
 	};
 	
 
-	var mobiletoggle = function () {
-		if($('body').hasClass("colortoggle")){}else{
-			var counter=0;
-			$( ".colorpicker_widget, .slider_widget" ).each(function(){
-				$( '<div id="toggle_colorpicker'+counter+'" onclick="togglecolorpicker('+counter+')" style="display: table-cell;vertical-align: middle;"><svg class="icon control_plus" data-txt="control_plus" id="colorplus'+counter+'" version="1.0" xmlns="http://www.w3.org/2000/svg" width="468pt" height="474pt" viewBox="0 0 468 474" preserveAspectRatio="xMidYMid meet"> <metadata> Created by potrace 1.8, written by Peter Selinger 2001-2007 </metadata> <g transform="translate(0,474) scale(0.200000,-0.200000)" stroke="none"> <path d="M1002 2354 c-18 -9 -43 -31 -55 -48 -22 -31 -22 -35 -25 -458 l-3 -428 -397 0 c-444 0 -443 0 -490 -70 -22 -33 -23 -42 -20 -177 l3 -143 38 -37 37 -38 415 -3 415 -3 0 -422 c0 -403 1 -423 20 -455 37 -61 70 -72 210 -72 150 0 182 12 218 80 22 44 22 49 22 457 l0 413 424 0 c422 0 423 0 456 23 57 39 70 76 70 206 0 143 -19 192 -84 222 -38 17 -73 19 -453 19 l-413 0 0 418 c0 459 0 460 -63 506 -25 18 -45 21 -160 24 -107 2 -138 -1 -165 -14z m258 -599 l0 -475 470 0 470 0 0 -100 0 -100 -475 0 -475 0 0 -475 0 -476 -97 3 -98 3 0 473 0 472 -457 0 -458 0 0 100 0 100 457 2 458 3 -4 473 -3 472 106 0 106 0 0 -475z"></path> </g> </svg><svg class="icon control_minus" id="colorminus'+counter+'" data-txt="control_minus" version="1.0" xmlns="http://www.w3.org/2000/svg" width="468pt" height="95pt" viewBox="0 0 468 95" preserveAspectRatio="xMidYMid meet"> <metadata> Created by potrace 1.8, written by Peter Selinger 2001-2007 </metadata> <g transform="translate(0,95) scale(0.196639,-0.196639)" stroke="none"> <path d="M85 460 c-11 -4 -33 -22 -50 -40 -30 -31 -30 -31 -33 -168 -3 -163 7 -193 79 -230 l44 -22 1077 2 1077 3 28 21 c57 43 68 76 68 214 0 141 -11 176 -68 210 -31 19 -58 20 -1117 19 -597 0 -1094 -4 -1105 -9z m2155 -220 l0 -100 -1055 0 -1055 0 0 93 c0 52 3 97 7 100 3 4 478 7 1055 7 l1048 0 0 -100z"></path> </g> </svg></div>' ).insertBefore( $(this) );
-				$(this).parent().css("white-space", "nowrap");
-				$(this).parent().css("display", "table");
-				$(this).attr('id', 'colorpicker'+counter);
-				$(this).hide();
-				$('#colorminus'+counter).hide();
-				counter++;
-			});
-			$('body').addClass("colortoggle");
-		}
-	};
+        var mobiletoggle = function () {
+            if ($('body').hasClass("colortoggle")) return;
 
+            $(".colorpicker_widget, .slider_widget").each(function () {
+                var widget = $(this);
+
+                // new table-cell over button + widget
+                var wrapper = $('<div style="display: table; white-space: nowrap;"></div>')
+                widget.before(wrapper); // wrapper insert before widget
+                wrapper.append(widget); // move widget inside wrapper
+
+                // toggle button Plus/Minus SVG
+                var toggle = $(
+                    '<div class="toggle-btn" style="display: table-cell; vertical-align: middle; cursor:pointer;">' +
+
+                    // Plus Icon
+                    '<svg class="icon control_plus" viewBox="0 0 468 474" width="24" height="24">' +
+                    '<g transform="translate(0,474) scale(0.200000,-0.200000)" stroke="none">' +
+                    '<path d="M1002 2354 c-18 -9 -43 -31 -55 -48 -22 -31 -22 -35 -25 -458 l-3 -428 -397 0 c-444 0 -443 0 -490 -70 -22 -33 -23 -42 -20 -177 l3 -143 38 -37 37 -38 415 -3 415 -3 0 -422 c0 -403 1 -423 20 -455 37 -61 70 -72 210 -72 150 0 182 12 218 80 22 44 22 49 22 457 l0 413 424 0 c422 0 423 0 456 23 57 39 70 76 70 206 0 143 -19 192 -84 222 -38 17 -73 19 -453 19 l-413 0 0 418 c0 459 0 460 -63 506 -25 18 -45 21 -160 24 -107 2 -138 -1 -165 -14z m258 -599 l0 -475 470 0 470 0 0 -100 0 -100 -475 0 -475 0 0 -475 0 -476 -97 3 -98 3 0 473 0 472 -457 0 -458 0 0 100 0 100 457 2 458 3 -4 473 -3 472 106 0 106 0 0 -475z"/>' +
+                    '</g>' +
+                    '</svg>' +
+
+                    // Minus Icon (hidden)
+                    '<svg class="icon control_minus" viewBox="0 0 468 95" width="24" height="24" style="display:none;">' +
+                    '<g transform="translate(0,95) scale(0.196639,-0.196639)" stroke="none">' +
+                    '<path d="M85 460 c-11 -4 -33 -22 -50 -40 -30 -31 -30 -31 -33 -168 -3 -163 7 -193 79 -230 l44 -22 1077 2 1077 3 28 21 c57 43 68 76 68 214 0 141 -11 176 -68 210 -31 19 -58 20 -1117 19 -597 0 -1094 -4 -1105 -9z m2155 -220 l0 -100 -1055 0 -1055 0 0 93 c0 52 3 97 7 100 3 4 478 7 1055 7 l1048 0 0 -100z"/>' +
+                    '</g>' +
+                    '</svg>' +
+
+                    '</div>'
+                );
+
+                wrapper.prepend(toggle);
+
+                // widged initial hidden
+                widget.hide();
+
+                // click handler
+                toggle.on("click", function () {
+                    widget.slideToggle(200);
+                    $(this).find(".control_plus").toggle();
+                    $(this).find(".control_minus").toggle();
+                });
+            });
+
+            $('body').addClass("colortoggle");
+        };
 
 
 	
@@ -269,7 +300,7 @@ $(document).ready(function() {
 			calccolumns();
 		}
 		if (spaltensumme < 200) {
-			//mobiletoggle();
+			mobiletoggle();
 			resetcolumns();
 			calccolumns();
 		}
@@ -294,15 +325,5 @@ function triggerResize() {
 	window.dispatchEvent(new Event('resize'));
 }
 
-function togglecolorpicker(counter) {
-	$('#colorpicker'+counter).toggle('fast');
-	$('#colorminus'+counter).toggle();
-	$('#colorplus'+counter).toggle();
-}
-function togglecolorpickerct(counter) {
-	$('#colorpicker_ct_mired'+counter).toggle('fast');
-	$('#colorctminus'+counter).toggle();
-	$('#colorctplus'+counter).toggle();
-}
-
 window.addEventListener("load",triggerResize,false);
+log("LOADING");
