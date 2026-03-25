@@ -1,9 +1,9 @@
 ﻿##########################################################################################################
-# $Id: 93_DbRep.pm 30057 2025-06-21 09:26:27Z DS_Starter $
+# $Id: 93_DbRep.pm 30153 2025-07-27 15:36:37Z DS_Starter $
 ##########################################################################################################
 #       93_DbRep.pm
 #
-#       (c) 2016-2025 by Heiko Maaz
+#       (c) 2016-2026 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module can be used to select and report content of databases written by 93_DbLog module
@@ -58,6 +58,7 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.54.20" => "25.03.2026  consider attr limit lines for output in all relevant *_Done Subs ",
   "8.54.19" => "27.07.2025  DbReadingsVal: Code change Forum:https://forum.fhem.de/index.php?msg=1345204, remove obsolete att allowDeletion ".
                             "new sub DbRep_convert2oneLine: attr device/reading can now be entered in multiple lines ",
   "8.54.18" => "21.06.2025  DbRep_reduceLog: fix bug in INCLUDE Regex, forum:#141912.0 ",
@@ -3748,10 +3749,7 @@ sub DbRep_avervalDone {
   my $gtsstr     = $a[7] ? decode_base64($a[7]) : '';
   my $gtsreached = $a[8];
 
-  my $hash       = $defs{$name};
-  my $ndp        = AttrVal ($name, "numDecimalPlaces", $dbrep_defdecplaces);
-
-  my $reading_runtime_string;
+  my $hash = $defs{$name};
 
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
 
@@ -3766,16 +3764,18 @@ sub DbRep_avervalDone {
 
       return;
   }
-
+  
   my ($rt,$brt) = split ",", $bt;
+  my $acf       = AttrVal ($name, 'averageCalcForm', 'avgArithmeticMean');
+  my $ndp       = AttrVal ($name, 'numDecimalPlaces', $dbrep_defdecplaces);
+  my $limit     = AttrVal ($name, 'limit', 1000);
+  
   $device       =~ s/[^A-Za-z\/\d_\.-]/\//g;
   $reading      =~ s/[^A-Za-z\/\d_\.-]/\//g;
 
   no warnings 'uninitialized';
 
-  my $acf = AttrVal($name, "averageCalcForm", "avgArithmeticMean");
-
-  if($acf eq "avgArithmeticMean") {
+  if ($acf eq "avgArithmeticMean") {
       $acf = "AM"
   }
   elsif ($acf =~ /avgDailyMeanGWS/) {
@@ -3785,9 +3785,12 @@ sub DbRep_avervalDone {
       $acf = "TWM";
   }
 
-  readingsBeginUpdate($hash);                                                 # Readings für Grünlandtemperatursumme
+  my @agts = split("\\|", $gtsstr);  
+  my @arr  = split "\\|", $arrstr; 
+  my $narr = scalar @arr;
 
-  my @agts = split("\\|", $gtsstr);
+  # --- Readings für Grünlandtemperatursumme  
+  readingsBeginUpdate ($hash);                                                 
 
   for my $gts (@agts) {
       my @ay                = split "#", $gts;
@@ -3805,13 +3808,15 @@ sub DbRep_avervalDone {
 
   ReadingsBulkUpdateValue ($hash, "reachedGTSthreshold", $gtsreached) if($gtsreached);
 
-  my @arr = split "\\|", $arrstr;
-
-  for my $row (@arr) {
-      my @a                = split "#", $row;
-      my $runtime_string   = $a[0];
-      my $c                = $a[1];
-      my $rsf              = $a[2]."__";
+  # --- Readings Average
+  my $nr = 0;
+  my $reading_runtime_string;
+  
+  for my $row (@arr) {      
+      my @a              = split "#", $row;
+      my $runtime_string = $a[0];
+      my $c              = $a[1];
+      my $rsf            = $a[2]."__";
 
       if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$runtime_string;
@@ -3823,20 +3828,35 @@ sub DbRep_avervalDone {
           $reading_runtime_string = $rsf.$ds.$rds."AVG".$acf."__".$runtime_string;
       }
 
-      if($acf eq "DMGWS") {
+      if ($acf eq "DMGWS") {
           ReadingsBulkUpdateValue ($hash, $reading_runtime_string, looks_like_number $c ? sprintf "%.1f",$c : $c);
       }
       else {
           ReadingsBulkUpdateValue ($hash, $reading_runtime_string, looks_like_number $c ? sprintf "%.${ndp}f", $c : "-");
       }
+      
+      $nr++;
+      last if($nr >= $limit);
   }
 
-  ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
+  my $sfx = AttrVal ('global', 'language', 'EN');
+  $sfx    = $sfx eq 'EN' ? '' : "_$sfx";
+  
+  ReadingsBulkUpdateValue ($hash, 'db_lines_processed', $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTime  ($hash, $brt, $rt);
-  readingsEndUpdate       ($hash, 1);
+  
+  if ($narr-$limit > 0) {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$limit of $narr");
+      ReadingsBulkUpdateValue ($hash, 'state', "<html>done - Warning: rows to be displayed exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>");
+  }
+  else {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$narr of $narr"); 
+  }
+  
+  readingsEndUpdate  ($hash, 1);
 
-  DbRep_afterproc         ($hash, $hash->{LASTCMD});                         # Befehl nach Procedure ausführen incl. state
-  DbRep_nextMultiCmd      ($name);                                           # nächstes multiCmd ausführen falls gesetzt
+  DbRep_afterproc    ($hash, $hash->{LASTCMD});                                 # Befehl nach Procedure ausführen incl. state
+  DbRep_nextMultiCmd ($name);                                                   # nächstes multiCmd ausführen falls gesetzt
 
 return;
 }
@@ -3953,9 +3973,7 @@ sub DbRep_countDone {
   my $bt         = $a[4];
   my $table      = $a[5];
 
-  my $hash       = $defs{$name};
-
-  my $reading_runtime_string;
+  my $hash = $defs{$name};
 
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
 
@@ -3978,9 +3996,17 @@ sub DbRep_countDone {
 
   no warnings 'uninitialized';
 
+  my @arr   = split("\\|", $arrstr);
+  my $narr  = scalar @arr;
+  my $limit = AttrVal ($name, "limit", 1000);
+  my $sfx   = AttrVal ('global', 'language', 'EN');
+  $sfx      = $sfx eq 'EN' ? '' : "_$sfx";
+  my $nr    = 0;
+  
+  my $reading_runtime_string;
+  
   readingsBeginUpdate ($hash);
-
-  my @arr = split("\\|", $arrstr);
+  
   for my $row (@arr) {
       my @a              = split("#", $row);
       my $runtime_string = $a[0];
@@ -4006,9 +4032,21 @@ sub DbRep_countDone {
       }
 
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c ? $c : "-");
+  
+      $nr++;
+      last if($nr >= $limit);
   }
 
   ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+
+  if ($narr-$limit > 0) {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$limit of $narr");
+      ReadingsBulkUpdateValue ($hash, 'state', "<html>done - Warning: rows to be displayed exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>");
+  }
+  else {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$narr of $narr"); 
+  }
+  
   readingsEndUpdate       ($hash, 1);
 
   DbRep_afterproc         ($hash, $hash->{LASTCMD});                           # Befehl nach Procedure ausführen incl. state
@@ -4190,10 +4228,7 @@ sub DbRep_maxvalDone {
   my $bt        = $a[5];
   my $irowdone  = $a[6];
 
-  my $ndp       = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
   my $hash      = $defs{$name};
-
-  my ($reading_runtime_string);
 
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
 
@@ -4209,10 +4244,18 @@ sub DbRep_maxvalDone {
       return;
   }
 
-  $device       =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  $reading      =~ s/[^A-Za-z\/\d_\.-]/\//g;
   my ($rt,$brt) = split ",", $bt;
   my %rh        = split "§", $rowlist;
+  
+  my $narr      = scalar  (keys(%rh));
+  my $ndp       = AttrVal ($name, "numDecimalPlaces", $dbrep_defdecplaces);  
+  my $limit     = AttrVal ($name, "limit", 1000);
+  my $sfx       = AttrVal ('global', 'language', 'EN');
+  $sfx          = $sfx eq 'EN' ? '' : "_$sfx";
+  my $nr        = 0;
+  
+  $device       =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  $reading      =~ s/[^A-Za-z\/\d_\.-]/\//g;
 
   Log3 ($name, 5, "DbRep $name - result of maxValue calculation after decoding:");
 
@@ -4220,16 +4263,17 @@ sub DbRep_maxvalDone {
       Log3 ($name, 5, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key});
   }
 
+  no warnings 'uninitialized';
+  my ($reading_runtime_string);
+
   readingsBeginUpdate($hash);
 
-  no warnings 'uninitialized';
-
   for my $key (sort(keys(%rh))) {
-      my @k   = split("\\|",$rh{$key});
+      my @k   = split ("\\|", $rh{$key});
       my $rsf = "";
       $rsf    = $k[2]."__" if($k[2]);
 
-      if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
+      if (AttrVal ($hash->{NAME}, "readingNameMap", "")) {
           $reading_runtime_string = $rsf.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
       }
       else {
@@ -4238,13 +4282,26 @@ sub DbRep_maxvalDone {
           $rds          = $reading."__" if ($reading);
           $reading_runtime_string = $rsf.$ds.$rds."MAX__".$k[0];
       }
+      
       my $rv = $k[1];
 
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, defined $rv ? sprintf "%.${ndp}f",$rv : "-");
+      
+      $nr++;
+      last if($nr >= $limit);
   }
 
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB|deleteOther/);
   ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+
+  if ($narr-$limit > 0) {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$limit of $narr");
+      ReadingsBulkUpdateValue ($hash, 'state', "<html>done - Warning: rows to be displayed exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>");
+  }
+  else {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$narr of $narr"); 
+  }
+
   readingsEndUpdate       ($hash, 1);
 
   DbRep_afterproc         ($hash, $hash->{LASTCMD});                         # Befehl nach Procedure ausführen incl. state
@@ -4441,11 +4498,19 @@ sub DbRep_minvalDone {
 
   my ($rt,$brt) = split ",", $bt;
   my %rh        = split "§", $rowlist;
-  my $ndp       = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
+  
+  my $narr      = scalar  (keys(%rh));
+  my $ndp       = AttrVal ($name, "numDecimalPlaces", $dbrep_defdecplaces);
+  my $limit     = AttrVal ($name, "limit", 1000);
+  my $sfx       = AttrVal ('global', 'language', 'EN');
+  $sfx          = $sfx eq 'EN' ? '' : "_$sfx";
+  my $nr        = 0;
+  
   $device       =~ s/[^A-Za-z\/\d_\.-]/\//g;
   $reading      =~ s/[^A-Za-z\/\d_\.-]/\//g;
 
   Log3 ($name, 5, "DbRep $name - result of minValue calculation after decoding:");
+  
   for my $key (sort(keys(%rh))) {
       Log3 ($name, 5, "DbRep $name - runtimestring Key: $key, value: ".$rh{$key});
   }
@@ -4454,10 +4519,10 @@ sub DbRep_minvalDone {
 
   my $reading_runtime_string;
 
-  readingsBeginUpdate($hash);
+  readingsBeginUpdate ($hash);
 
   for my $key (sort(keys(%rh))) {
-      my @k   = split("\\|",$rh{$key});
+      my @k   = split ("\\|", $rh{$key});
       my $rsf = "";
       $rsf    = $k[2]."__" if($k[2]);
 
@@ -4473,10 +4538,22 @@ sub DbRep_minvalDone {
       my $rv = $k[1];
 
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, defined($rv) ? sprintf("%.${ndp}f",$rv) : "-");
+  
+      $nr++;
+      last if($nr >= $limit);  
   }
 
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB|deleteOther/);
   ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  
+  if ($narr-$limit > 0) {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$limit of $narr");
+      ReadingsBulkUpdateValue ($hash, 'state', "<html>done - Warning: rows to be displayed exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>");
+  }
+  else {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$narr of $narr"); 
+  }
+
   readingsEndUpdate       ($hash, 1);
 
   DbRep_afterproc         ($hash, $hash->{LASTCMD});                         # Befehl nach Procedure ausführen incl. state
@@ -4784,11 +4861,8 @@ sub DbRep_diffvalDone {
   my $irowdone   = $a[8];
 
   my $hash          = $defs{$name};
-  my $ndp           = AttrVal ($name, "numDecimalPlaces", $dbrep_defdecplaces);
   my $difflimit     = AttrVal ($name, 'diffAccept', 20);                               # legt fest, bis zu welchem Wert Differenzen akzeptiert werden (Ausreißer eliminieren)
   my ($sign, $dlim) = DbRep_ExplodeDiffAcc ($difflimit);
-
-  my $reading_runtime_string;
 
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
 
@@ -4804,18 +4878,17 @@ sub DbRep_diffvalDone {
       return;
   }
 
-  my ($rt,$brt) = split ",", $bt;
-  $device       =~ s/[^A-Za-z\/\d_\.-]/\//g;
-  $reading      =~ s/[^A-Za-z\/\d_\.-]/\//g;
-
   no warnings 'uninitialized';
 
   $rowsrej =~ s/_/ /g;
+  
   Log3 ($name, 2, "DbRep $name -> data ignored while calc diffValue due to threshold overrun (diffAccept = $difflimit): \n$rowsrej")
            if($rowsrej);
+  
   $rowsrej =~ s/\n/ \|\| /g;
 
-  my %ncp  = split("§", $ncpslist);
+  my %ncp = split ("§", $ncpslist);
+  my $reading_runtime_string;
   my $ncpstr;
 
   if (%ncp) {
@@ -4824,18 +4897,29 @@ sub DbRep_diffvalDone {
       }
   }
 
-  my %rh = split("§", $rowlist);
+  my ($rt,$brt) = split ",", $bt;
+  my %rh        = split ("§", $rowlist);
+  
+  my $narr      = scalar  (keys(%rh));   
+  my $ndp       = AttrVal ($name, "numDecimalPlaces", $dbrep_defdecplaces); 
+  my $limit     = AttrVal ($name, "limit", 1000);
+  my $sfx       = AttrVal ('global', 'language', 'EN');
+  $sfx          = $sfx eq 'EN' ? '' : "_$sfx";
+  my $nr        = 0; 
+  
+  $device      =~ s/[^A-Za-z\/\d_\.-]/\//g;
+  $reading     =~ s/[^A-Za-z\/\d_\.-]/\//g;
 
   readingsBeginUpdate($hash);
 
   for my $key (sort(keys(%rh))) {
-      my $valid = 0;                                                                   # Datensatz hat kein Ergebnis als default
-      my @k     = split("\\|",$rh{$key});
-      $valid    = 1 if($k[2] =~ /(\d{4})-(\d{2})-(\d{2})_(\d{2}):(\d{2}):(\d{2})/x);   # Datensatz hat einen Wert wenn kompletter Timestamp ist enthalten
+      my $valid = 0;                                                                    # Datensatz hat kein Ergebnis als default
+      my @k     = split ("\\|", $rh{$key});
+      $valid    = 1 if($k[2] =~ /(\d{4})-(\d{2})-(\d{2})_(\d{2}):(\d{2}):(\d{2})/x);    # Datensatz hat einen Wert wenn kompletter Timestamp ist enthalten
       my $rts   = $k[2]."__";
-      $rts      =~ s/:/-/g;                                                 # substituieren unsupported characters -> siehe fhem.pl
+      $rts      =~ s/:/-/g;                                                             # substituieren unsupported characters -> siehe fhem.pl
 
-      if (AttrVal($hash->{NAME}, "readingNameMap", "")) {
+      if (AttrVal($name, 'readingNameMap', '')) {
           $reading_runtime_string = $rts.AttrVal($hash->{NAME}, "readingNameMap", "")."__".$k[0];
       }
       else {
@@ -4847,7 +4931,10 @@ sub DbRep_diffvalDone {
 
       my $rv = $k[1];
 
-      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, (!$valid ? "-" : defined $rv ? sprintf "%.${ndp}f", $rv : "-"));
+      ReadingsBulkUpdateValue ($hash, $reading_runtime_string, (!$valid ? '-' : defined $rv ? sprintf "%.${ndp}f", $rv : '-'));
+      
+      $nr++;
+      last if($nr >= $limit);  
   }
 
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone)                   if($hash->{LASTCMD} =~ /writeToDB/);
@@ -4856,10 +4943,19 @@ sub DbRep_diffvalDone {
   ReadingsBulkUpdateValue ($hash, "state", qq{WARNING - see readings 'less_data_in_period' or 'diff_overrun_limit_XX'})
                                                                                      if($ncpstr||$rowsrej);
   ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+  
+  if ($narr-$limit > 0) {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$limit of $narr");
+      ReadingsBulkUpdateValue ($hash, 'state', "<html>done - Warning: rows to be displayed exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>");
+  }
+  else {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$narr of $narr"); 
+  }
+  
   readingsEndUpdate       ($hash, 1);
 
-  DbRep_afterproc         ($hash, $hash->{LASTCMD});                         # Befehl nach Procedure ausführen incl. state
-  DbRep_nextMultiCmd      ($name);                                           # nächstes multiCmd ausführen falls gesetzt
+  DbRep_afterproc         ($hash, $hash->{LASTCMD});                                    # Befehl nach Procedure ausführen incl. state
+  DbRep_nextMultiCmd      ($name);                                                      # nächstes multiCmd ausführen falls gesetzt
 
 return;
 }
@@ -4997,7 +5093,15 @@ sub DbRep_sumvalDone {
   }
 
   my ($rt,$brt) = split ",", $bt;
-  my $ndp       = AttrVal($name, "numDecimalPlaces", $dbrep_defdecplaces);
+  my @arr       = split("\\|", $arrstr);
+  
+  my $narr      = scalar  (@arr);
+  my $ndp       = AttrVal ($name, 'numDecimalPlaces', $dbrep_defdecplaces);
+  my $limit     = AttrVal ($name, 'limit', 1000);
+  my $sfx       = AttrVal ('global', 'language', 'EN');
+  $sfx          = $sfx eq 'EN' ? '' : "_$sfx";
+  my $nr        = 0;
+  
   $device       =~ s/[^A-Za-z\/\d_\.-]/\//g;
   $reading      =~ s/[^A-Za-z\/\d_\.-]/\//g;
 
@@ -5007,10 +5111,8 @@ sub DbRep_sumvalDone {
 
   readingsBeginUpdate ($hash);
 
-  my @arr = split("\\|", $arrstr);
-
   for my $row (@arr) {
-      my @a              = split("#", $row);
+      my @a              = split ("#", $row);
       my $runtime_string = $a[0];
       my $c              = $a[1] // "";
       my $rsf            = $a[2]."__";
@@ -5026,10 +5128,22 @@ sub DbRep_sumvalDone {
       }
 
       ReadingsBulkUpdateValue ($hash, $reading_runtime_string, $c ne "" ? sprintf "%.${ndp}f", $c : "-");
+  
+      $nr++;
+      last if($nr >= $limit);  
   }
 
   ReadingsBulkUpdateValue ($hash, "db_lines_processed", $irowdone) if($hash->{LASTCMD} =~ /writeToDB/);
   ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+
+  if ($narr-$limit > 0) {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$limit of $narr");
+      ReadingsBulkUpdateValue ($hash, 'state', "<html>done - Warning: rows to be displayed exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>");
+  }
+  else {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$narr of $narr"); 
+  }
+
   readingsEndUpdate       ($hash, 1);
 
   DbRep_afterproc         ($hash, $hash->{LASTCMD});                         # Befehl nach Procedure ausführen incl. state
@@ -5789,24 +5903,24 @@ sub DbRep_fetchrows {
   my $fetchroute           = AttrVal($name, "fetchRoute", "descent");
   $fetchroute              = $fetchroute eq "descent" ? "DESC" : "ASC";
 
-  my ($sth,$sql,$rowlist,$nrows);
+  my ($sth,$sql,$rowlist);
 
   my $bst = [gettimeofday];                                                           # Background-Startzeit
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, 0);
   return "$name|$err" if ($err);
 
-  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                            # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
+  my ($IsTimeSet,$IsAggrSet) = DbRep_checktimeaggr($hash);                              # ist Zeiteingrenzung und/oder Aggregation gesetzt ? (wenn ja -> "?" in SQL sonst undef)
   Log3 ($name, 5, "DbRep $name - IsTimeSet: $IsTimeSet, IsAggrSet: $IsAggrSet");
 
-  if ($IsTimeSet) {                                                                   # SQL zusammenstellen für DB-Abfrage
-      $sql = DbRep_createSelectSql($hash, $table, "DEVICE,READING,TIMESTAMP,VALUE,UNIT", $device, $reading, $runtime_string_first, $runtime_string_next, "ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
+  if ($IsTimeSet) {                                                                     # SQL zusammenstellen für DB-Abfrage
+      $sql = DbRep_createSelectSql($hash, $table, "DEVICE,READING,TIMESTAMP,VALUE,UNIT", $device, $reading, $runtime_string_first, $runtime_string_next, "ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit + 1));
   }
   else {
-      $sql = DbRep_createSelectSql($hash, $table, "DEVICE,READING,TIMESTAMP,VALUE,UNIT", $device, $reading, undef, undef, "ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit+1));
+      $sql = DbRep_createSelectSql($hash, $table, "DEVICE,READING,TIMESTAMP,VALUE,UNIT", $device, $reading, undef, undef, "ORDER BY TIMESTAMP $fetchroute LIMIT ".($limit + 1));
   }
 
-  my $st = [gettimeofday];                                                           # SQL-Startzeit
+  my $st = [gettimeofday];                                                              # SQL-Startzeit
 
   ($err, $sth) = DbRep_prepareExecuteQuery ($name, $dbh, $sql);
   return "$name|$err" if ($err);
@@ -5817,10 +5931,10 @@ sub DbRep_fetchrows {
 
   use warnings;
 
-  $nrows = $#row_array+1;                                                            # Anzahl der Ergebniselemente
-  pop @row_array if($nrows > $limit);                                                # das zuviel selektierte Element wegpoppen wenn Limit überschritten
+  my $narr = scalar (@row_array);                                                       # Anzahl der Ergebniselemente
+  pop @row_array if($narr > $limit);                                                    # das zuviel selektierte Element wegpoppen wenn Limit überschritten
 
-  s/\|/_E#S#C_/g for @row_array;                                                     # escape Pipe "|"
+  s/\|/_E#S#C_/g for @row_array;                                                        # escape Pipe "|"
 
   if ($utf8 && $dbmodel ne "SQLITE") {
       $rowlist = Encode::encode_utf8(join('|', @row_array));
@@ -5831,16 +5945,16 @@ sub DbRep_fetchrows {
 
   Log3 ($name, 5, "DbRep $name -> row result list:\n$rowlist");
 
-  my $rt = tv_interval($st);                                                         # SQL-Laufzeit ermitteln
+  my $rt = tv_interval($st);                                                            # SQL-Laufzeit ermitteln
 
   DbRep_clearConn ($dbh, $sth);
 
-  $rowlist = encode_base64($rowlist,"");                                             # Daten müssen als Einzeiler zurückgegeben werden
-  my $brt  = tv_interval($bst);                                                      # Background-Laufzeit ermitteln
+  $rowlist = encode_base64($rowlist,"");                                                # Daten müssen als Einzeiler zurückgegeben werden
+  my $brt  = tv_interval($bst);                                                         # Background-Laufzeit ermitteln
   $rt      = $rt.",".$brt;
   $err     = q{};
 
-return "$name|$err|$rowlist|$rt|$nrows";
+return "$name|$err|$rowlist|$rt|$narr";
 }
 
 ####################################################################################################
@@ -5853,7 +5967,7 @@ sub DbRep_fetchrowsDone {
   my $err        = $a[1] ? decode_base64($a[1]) : '';
   my $rowlist    = $a[2] ? decode_base64($a[2]) : '';
   my $bt         = $a[3];
-  my $nrows      = $a[4];
+  my $narr       = $a[4];
 
   my $hash       = $defs{$name};
 
@@ -5871,35 +5985,37 @@ sub DbRep_fetchrowsDone {
       return;
   }
 
-  my ($rt,$brt) = split ",", $bt;
-  my $reading   = AttrVal($name, "reading",        '');
-  my $limit     = AttrVal($name, "limit",        1000);
-  my $fvfn      = AttrVal($name, "fetchValueFn",   '');
+  my ($rt,$brt) = split   (",", $bt);
+  my $reading   = AttrVal ($name, 'reading',        '');
+  my $limit     = AttrVal ($name, 'limit',        1000);
+  my $fvfn      = AttrVal ($name, 'fetchValueFn',   '');
+  my $sfx       = AttrVal ('global', 'language',  'EN');
+  $sfx          = $sfx eq 'EN' ? '' : "_$sfx";
 
   my $color     = "<html><span style=\"color: #".AttrVal($name, "fetchMarkDuplicates", "000000").";\">";  # Highlighting doppelter DB-Einträge
   $color        =~ s/#// if($color =~ /red|blue|brown|green|orange/);
   my $ecolor    = "</span></html>";                                                                       # Ende Highlighting
 
-  my @row;
   my $reading_runtime_string;
 
-  my @row_array = split("\\|", $rowlist);
-  s/_E#S#C_/\|/g for @row_array;                               # escaped Pipe return to "|"
+  my @arr = split ("\\|", $rowlist);
+  s/_E#S#C_/\|/g for @arr;                                                      # escaped Pipe return to "|"
 
-  Log3 ($name, 5, "DbRep $name - row_array decoded:\n @row_array");
+  Log3 ($name, 5, "DbRep $name - row_array decoded:\n @arr");
 
-  readingsBeginUpdate($hash);
   my ($orow,$nrow,$oval,$nval);
-  my $dz  = 1;                                                 # Index des Vorkommens im Selektionsarray
-  my $zs  = "";                                                # Zusatz wenn device + Reading + Timestamp von folgenden DS gleich ist UND Value unterschiedlich
-  my $zsz = 1;                                                 # Zusatzzähler
+  my $dz  = 1;                                                                  # Index des Vorkommens im Selektionsarray
+  my $zs  = '';                                                                 # Zusatz wenn device + Reading + Timestamp von folgenden DS gleich ist UND Value unterschiedlich
+  my $zsz = 1;                                                                  # Zusatzzähler
 
-  for my $row (@row_array) {
+  readingsBeginUpdate ($hash);
+  
+  for my $row (@arr) {
       chomp $row;
       my @a   = split("_ESC_", $row, 6);
       my $dev = $a[0];
       my $rea = $a[1];
-      $a[3]   =~ s/:/-/g;                                      # substituieren unsupported characters ":" -> siehe fhem.pl
+      $a[3]   =~ s/:/-/g;                                                       # substituieren unsupported characters ":" -> siehe fhem.pl
       my $ts  = $a[2]."_".$a[3];
       my $val = $a[4];
       my $unt = $a[5];
@@ -5914,7 +6030,7 @@ sub DbRep_fetchrowsDone {
               $zs = "";
               $zsz = 1;
           }
-          else {                                                # wenn device + Reading + Timestamp gleich ist UND Value unterschiedlich -> dann Zusatz an Reading hängen
+          else {                                                                # wenn device + Reading + Timestamp gleich ist UND Value unterschiedlich -> dann Zusatz an Reading hängen
               if(($orow eq $nrow) && ($oval ne $val)) {
                   $zs = "_".$zsz;
                   $zsz++;
@@ -5966,17 +6082,18 @@ sub DbRep_fetchrowsDone {
 
       ReadingsBulkUpdateValue($hash, $reading_runtime_string, $val);
   }
-  my $sfx = AttrVal("global", "language", "EN");
-  $sfx    = $sfx eq "EN" ? "" : "_$sfx";
 
-  ReadingsBulkUpdateValue ($hash, "number_fetched_rows", ($nrows>$limit) ? $nrows-1 : $nrows);
+  ReadingsBulkUpdateValue ($hash, "number_fetched_rows", ($narr > $limit) ? $narr-1 : $narr);
   ReadingsBulkUpdateTime  ($hash, $brt, $rt);
-  ReadingsBulkUpdateValue ($hash, "state",
-      "<html>done - Warning: present rows exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>") if($nrows-$limit>0);
-  readingsEndUpdate($hash, 1);
+  
+  if ($narr-$limit > 0) {
+      ReadingsBulkUpdateValue ($hash, 'state', "<html>done - Warning: rows to be displayed exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>");
+  }
+  
+  readingsEndUpdate  ($hash, 1);
 
-  DbRep_afterproc         ($hash, $hash->{LASTCMD});                     # Befehl nach Procedure ausführen incl. state
-  DbRep_nextMultiCmd      ($name);                                       # nächstes multiCmd ausführen falls gesetzt
+  DbRep_afterproc    ($hash, $hash->{LASTCMD});                                         # Befehl nach Procedure ausführen incl. state
+  DbRep_nextMultiCmd ($name);                                                           # nächstes multiCmd ausführen falls gesetzt
 
 return;
 }
@@ -7680,30 +7797,50 @@ sub DbRep_dbmeta_Done {
       return;
   }
 
-  my ($rt,$brt) = split ",", $bt;
-
   no warnings 'uninitialized';
+  
+  my ($rt,$brt) = split (",", $bt);
+  my @arr       = split ("§", $rowlist);
+  
+  my $narr      = scalar  (@arr);
+  my $limit     = AttrVal ($name, 'limit', 1000);
+  my $sfx       = AttrVal ('global', 'language', 'EN');
+  $sfx          = $sfx eq 'EN' ? '' : "_$sfx";
+  my $nr        = 0;
+  
+  my $pre       =   $opt eq 'dbvars'    ? 'VAR_' 
+                  : $opt eq 'dbstatus'  ? 'STAT_'
+                  : $opt eq 'tableinfo' ? 'INFO_'
+                  : '';
+  
+  Log3 ($name, 5, "DbRep $name - SQL result decoded: \n@arr") if(@arr);
 
-  readingsBeginUpdate($hash);
-
-  my @row_array = split("§", $rowlist);
-
-  Log3 ($name, 5, "DbRep $name - SQL result decoded: \n@row_array") if(@row_array);
-
-  my $pre = "";
-  $pre    = "VAR_"  if($opt eq "dbvars");
-  $pre    = "STAT_" if($opt eq "dbstatus");
-  $pre    = "INFO_" if($opt eq "tableinfo");
-
-  for my $row (@row_array) {
-      my @va = split " ", $row, 2;
+  readingsBeginUpdate ($hash);
+  
+  for my $row (@arr) {
+      my @va = split (" ", $row, 2);
       my $k = $va[0];
       my $v = $va[1];
+      
       ReadingsBulkUpdateValue ($hash, $pre.$k, $v);
+  
+      $nr++;
+      last if($nr >= $limit);    
   }
 
-  ReadingsBulkUpdateTimeState ($hash, $brt, $rt, "done");
-  readingsEndUpdate           ($hash, 1);
+  ReadingsBulkUpdateTime  ($hash, $brt, $rt);
+ 
+  if ($narr-$limit > 0) {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$limit of $narr");
+      ReadingsBulkUpdateValue ($hash, 'state', "<html>done - Warning: rows to be displayed exceed specified limit, adjust attribute <a href='https://fhem.de/commandref${sfx}.html#DbRep-attr-limit' target='_blank'>limit</a></html>");
+  } 
+  else {
+      ReadingsBulkUpdateValue ($hash, 'number_rows_displayed', "$narr of $narr"); 
+  }
+  
+  readingsEndUpdate ($hash, 1);
+  
+  DbRep_afterproc   ($hash, $hash->{LASTCMD});                              # Befehl nach Procedure ausführen incl. state
 
 return;
 }
@@ -14532,12 +14669,12 @@ sub DbRep_setVersionInfo {
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {
       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{SMAPortal}{META}}
-      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 30057 2025-06-21 09:26:27Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                                                             # {x_version} ( nur gesetzt wenn $Id: 93_DbRep.pm 30153 2025-07-27 15:36:37Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1.1.1/$v/g;
       } else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 30057 2025-06-21 09:26:27Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                                                                # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbRep.pm 30153 2025-07-27 15:36:37Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -17230,11 +17367,9 @@ sub bdump {
   <li><b>ftpTimeout </b>      - timeout of FTP-connection in seconds (default: 30). </li> <br>
 
   <a id="DbRep-attr-limit"></a>
-  <li><b>limit </b>           - limits the number of selected datasets by the "fetchrows", or the shown datasets of "delSeqDoublets adviceDelete",
-                                "delSeqDoublets adviceRemain" commands (default: 1000).
-                                This limitation should prevent the browser session from overload and
-                                avoids FHEMWEB from blocking. Please change the attribut according your requirements or change the
-                                selection criteria (decrease evaluation period). </li> <br>
+  <li><b>limit </b>           - Limits the number of records selected or displayed by “fetchrows” (default 1000).
+                                This restriction is intended to prevent the browser session from becoming overloaded and
+                                FHEMWEB from freezing. </li> <br>
 
   <a id="DbRep-attr-numDecimalPlaces"></a>
   <li><b>numDecimalPlaces </b>  - Sets the number of decimal places for readings with numeric results. <br>
@@ -20395,11 +20530,9 @@ sub bdump {
   <li><b>ftpTimeout </b>      - Timeout für eine FTP-Verbindung in Sekunden (default: 30). </li> <br>
 
   <a id="DbRep-attr-limit"></a>
-  <li><b>limit </b>           - begrenzt die Anzahl der resultierenden Datensätze im select-Statement von "fetchrows", bzw. der anzuzeigenden Datensätze
-                                der Kommandos "delSeqDoublets adviceDelete", "delSeqDoublets adviceRemain" (default 1000).
+  <li><b>limit </b>           - Begrenzt die Anzahl der mit "fetchrows" selektierten bzw. anzuzeigenden Datensätze (default 1000).
                                 Diese Limitierung soll eine Überlastung der Browsersession und ein
-                                blockieren von FHEMWEB verhindern. Bei Bedarf entsprechend ändern bzw. die
-                                Selektionskriterien (Zeitraum der Auswertung) anpassen. </li> <br>
+                                blockieren von FHEMWEB verhindern. </li> <br>
 
   <a id="DbRep-attr-numDecimalPlaces"></a>
   <li><b>numDecimalPlaces </b>  - Legt die Anzahl der Nachkommastellen bei Readings mit numerischen Ergebnissen fest. <br>
