@@ -591,7 +591,8 @@ HttpUtils_Connect2($)
       $hash->{conn}->blocking(1);
       $usingSSL = 1;
 
-      if($hash->{hu_proxy}) {
+      if($hash->{hu_proxy} && $hash->{hu_proxy} < 2) {
+        $hash->{hu_proxy} = 2;
         my $pw = AttrVal("global", "proxyAuth", "");
         $pw = "Proxy-Authorization: Basic $pw\r\n" if($pw);
         my $hdr = "CONNECT $hash->{host}:$hash->{hu_port} HTTP/1.0\r\n".
@@ -599,13 +600,37 @@ HttpUtils_Connect2($)
         syswrite $hash->{conn}, $hdr;
 
         my ($buf, $len, $rin) = ("", 0, '');
-        vec($rin, $hash->{conn}->fileno(), 1) = 1;
-        my $nfound = select($rin, undef, undef, $hash->{timeout}); #blocking
-        $len = sysread($hash->{conn},$buf,65536) if($nfound > 0);
 
-        if(!defined($len) || $len <= 0 || $buf !~ m/HTTP.*200/) {
-          HttpUtils_Close($hash);
-          return "Proxy denied CONNECT";
+        if($hash->{callback}) {
+          $hash->{FD} = $hash->{conn}->fileno();
+          $selectlist{$hash} = $hash;
+          my %timerHash = (hash=>$hash, sts=>$selectTimestamp,msg=>"proxyConn");
+          InternalTimer(gettimeofday()+$hash->{timeout},
+                            "HttpUtils_TimeoutErr", \%timerHash);
+          $hash->{directReadFn} = sub() {
+            delete($hash->{FD});
+            delete($hash->{directReadFn});
+            delete($selectlist{$hash});
+            RemoveInternalTimer(\%timerHash);
+            my $buf;
+            my $len = sysread($hash->{conn},$buf,65536);
+            if(!defined($len) || $len <= 0 || $buf !~ m/HTTP.*200/) {
+              HttpUtils_Close($hash);
+              $hash->{callback}($hash, "Empty answer for procyConn", "");
+            }
+            HttpUtils_Connect2($hash);
+          };
+          return;
+
+        } else {
+          vec($rin, $hash->{conn}->fileno(), 1) = 1;
+          my $nfound = select($rin, undef, undef, $hash->{timeout}); #blocking
+          $len = sysread($hash->{conn},$buf,65536) if($nfound > 0);
+
+          if(!defined($len) || $len <= 0 || $buf !~ m/HTTP.*200/) {
+            HttpUtils_Close($hash);
+            return "Proxy denied CONNECT";
+          }
         }
       }
 
