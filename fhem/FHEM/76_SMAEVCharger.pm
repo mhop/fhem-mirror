@@ -124,7 +124,8 @@ my %reading_codes = (
 	"WPA2-MIXED" => "3398",
 	"intelligente Ladung" => "4950",
 	"Ladesperre" => "5171",
-	"Ladefreigabe" => "5172"
+	"Ladefreigabe" => "5172",
+        "Ladestation gesperrt" => "5169"
 	);
 
 ###############################################################
@@ -865,8 +866,12 @@ sub SMAEVCharger_handledata($$$)
 	foreach my $item ( @$json )
 	{
 		my $val = SMAEVCharger_getReadableCode($item->{"values"}->[0]->{"value"});
-		
-		#old readingsBulkUpdate($hash, $readings->{$item->{"channelId"}} , $val);
+                my $val = ( substr($livedata->{$item->{"channelId"}},0,6) eq "Status" or            #Does the readingname begin with substring "Status" or
+                            $livedata->{$item->{"channelId"}} eq "Schalterstellung_Drehschalter" )? #    is "Schalterstellung_Drehschalter"
+                          SMAEVCharger_getReadableCode($item->{"values"}->[0]->{"value"}):          #...get human readable codes
+                          $item->{"values"}->[0]->{"value"};                                        #...otherwise take the value as is - especially the energy and power data
+
+                #old readingsBulkUpdate($hash, $readings->{$item->{"channelId"}} , $val);
 		readingsBulkUpdate($hash, $livedata->{$item->{"channelId"}} , $val);
 		
 		if(defined($livedata->{$item->{"channelId"}}))
