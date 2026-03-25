@@ -163,8 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.0"  => "22.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
-                           "edit comref, expand consForecastBase for groups e.g. 3-9 ",
+  "2.5.0"  => "25.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
+                           "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -6781,6 +6781,7 @@ sub __getaiFannState {            ## no critic "not used"
   $bias_recal  = round0 ($bias_recal)  if($bias_recal  ne '-');
   $slope_recal = round1 ($slope_recal) if($slope_recal ne '-');
   $pvmaxlim    = round0 ($pvmaxlim)    if($pvmaxlim    ne '?');
+  $bfsug       = round2 ($bfsug)       if($bfsug       ne '-');
   
   my $tgt      = '';
   my $headline = '';
@@ -11068,7 +11069,7 @@ sub _specialActivities {
 
   ## Task 1
   ###########
-  if ($chour == 0) {
+  if ($chour == 0) {      
       if (!defined $hash->{HELPER}{T1RUN}) {
           $hash->{HELPER}{T1RUN} = 1;
 
@@ -11239,8 +11240,8 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 6 started");
 
-          aiDelRawData     ($paref);                                                           # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
-          aiManageInstance ($paref);                                                           # AI PV-Forecast füllen, trainieren und sichern
+          aiDelRawData     ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
+          aiManageInstance ($paref);                                                            # AI PV-Forecast füllen, trainieren und sichern
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 6 finished");
       }
@@ -11251,7 +11252,7 @@ sub _specialActivities {
   
   ## Task 7
   ###########
-  my ($aiconpd, $aiconhr)      = split ":", CurrentVal ($name, 'aiConTrainStart', '7:3');       # Periode (in Tagen):Stunde f. Start Training KI Consumption 
+  my ($aiconpd, $aiconhr) = split ":", CurrentVal ($name, 'aiConTrainStart', '7:3');            # Periode (in Tagen):Stunde f. Start Training KI Consumption 
   
   if ($chour == $aiconhr && $minute >= 20) {
       if (!defined $hash->{HELPER}{T7RUN}) {
@@ -11472,6 +11473,7 @@ sub _transferWeatherValues {
       my $wcc       = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{neff};              # Effektive Wolkendecke
       my $windspeed = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{windspeed};         # Windgeschwindigkeit in m/s -> Großwetterlage / Trend
       my $wind_fast = $windspeed;                                                           # Windgeschwindigkeit in m/s -> kurzfristige Wolkenbewegung
+      my $wind_slow = $windspeed;                                                           # Trend
       my $rr1c      = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{rr1c};              # Gesamtniederschlag (1-stündig) letzte 1 Stunde
       my $temp      = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{ttt};               # Außentemperatur
       my $don       = $data{$name}{weatherdata}{"fc${fd}_${fh}"}{merge}{don};               # Tag/Nacht-Grenze
@@ -11481,7 +11483,7 @@ sub _transferWeatherValues {
           debugLog ($paref, 'collectData_long', "Adjust cloud cover ratio (wcc) due to significant weather (ww) - ww: $wid -> wcc: $wcc");
       }
       
-      if ($num == 0) {                                                                      # aktuelle Außentemperatur
+      if ($num == 0) {                                                                      # aktuelle Stunde
           my $peh = __parseAttrEnvironment ($name);                                         # Parsed Hash
           
           # --- Temperarurmesser verarbeiten
@@ -11508,7 +11510,7 @@ sub _transferWeatherValues {
                   
                   debugLog ($paref, 'collectData|collectData_long', "collect Wind measurement data  - device: $winddev =>");
                   
-                  ($windspeed, $wind_fast) = __smoothWind ($paref);
+                  ($wind_slow, $wind_fast) = __smoothWind ($paref);
                   
                   delete $paref->{hod};
                   delete $paref->{windsp};
@@ -11517,12 +11519,13 @@ sub _transferWeatherValues {
           }
           
           $data{$name}{current}{outsideTemp} = round1 ($temp);
+          $data{$name}{current}{windspeed}   = round1 ($windspeed);
       }
 
       my $nhtstr                                       = 'NextHour'.(sprintf "%02d", $num);
       $data{$name}{nexthours}{$nhtstr}{weatherid}      = $wid;
       $data{$name}{nexthours}{$nhtstr}{wcc}            = $wcc;
-      $data{$name}{nexthours}{$nhtstr}{windspeed}      = $windspeed;
+      $data{$name}{nexthours}{$nhtstr}{windspeed}      = $wind_slow;
       $data{$name}{nexthours}{$nhtstr}{windspeed_fast} = $wind_fast;
       $data{$name}{nexthours}{$nhtstr}{rr1c}           = $rr1c;
       $data{$name}{nexthours}{$nhtstr}{rainrange}      = $rr1c;
@@ -11532,7 +11535,7 @@ sub _transferWeatherValues {
       if ($num < 23 && $fh < 24) {                                                             # Ringspeicher Weather Forum: https://forum.fhem.de/index.php/topic,117864.msg1139251.html#msg1139251
           $data{$name}{circular}{$hod}{weatherid}      = $wid;
           $data{$name}{circular}{$hod}{weathertxt}     = $wwd;
-          $data{$name}{circular}{$hod}{windspeed}      = $windspeed;
+          $data{$name}{circular}{$hod}{windspeed}      = $wind_slow;
           $data{$name}{circular}{$hod}{windspeed_fast} = $wind_fast;
           $data{$name}{circular}{$hod}{wcc}            = $wcc;
           $data{$name}{circular}{$hod}{rr1c}           = $rr1c;
@@ -11542,7 +11545,7 @@ sub _transferWeatherValues {
       if ($fd == 0) {                                                                           # Weather in pvHistory speichern
           writeToHistory ( { paref => $paref, key => 'weatherid',         val => $wid,       day => $day, hour => $hod } );
           writeToHistory ( { paref => $paref, key => 'weathercloudcover', val => $wcc // 0,  day => $day, hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'windspeed',         val => $windspeed, day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'windspeed',         val => $wind_slow, day => $day, hour => $hod } );
           writeToHistory ( { paref => $paref, key => 'windspeed_fast',    val => $wind_fast, day => $day, hour => $hod } );
           writeToHistory ( { paref => $paref, key => 'rr1c',              val => $rr1c,      day => $day, hour => $hod } );
           writeToHistory ( { paref => $paref, key => 'temperature',       val => $temp,      day => $day, hour => $hod } );
@@ -13163,10 +13166,10 @@ sub _transferEnvironmentValues {
   
   my $peh = __parseAttrEnvironment ($name);                                                         # Parsed Hash
   return if(!$peh);
-  
-  my $presence_weighted;
-           
+             
   ## --- Anwesenheit auswerten
+  my $presence_weighted;
+   
   if (defined $peh->{presenceDev}) {
       my $presenceDev = $peh->{presenceDev};
       my $presenceRdg = $peh->{presenceRdg};
@@ -13175,6 +13178,8 @@ sub _transferEnvironmentValues {
       my $prestring      = ReadingsVal ($presenceDev, $presenceRdg, 0);
       my $presence       = $prestring =~ m/^$presenceRgx$/x ? 1 : 0;
       $presence_weighted = $presence;
+      
+      $data{$name}{current}{presence} = $presence;
       
       my $last_check    = CircularVal ($name, 99, 'last_transfer',   $t);
       my $accum_seconds = CircularVal ($name, 99, 'accum_presence_seconds', 0);
@@ -13640,7 +13645,6 @@ sub _batChargeMgmt {
           next;
       }
 
-      my $maxfctim    = timestringToTimestamp (ReadingsVal ($name, 'Today_MaxPVforecastTime', '')) // $t;
       my $rodpvfc     = ReadingsNum ($name, 'RestOfDayPVforecast',           0);                   # PV Prognose Rest des Tages
       my $tompvfc     = ReadingsNum ($name, 'Tomorrow_PVforecast',           0);                   # PV Prognose nächster Tag
       my $tomconfc    = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast',  0);                   # Verbrauchsprognose nächster Tag
@@ -19002,7 +19006,7 @@ sub _graphicHeader {
       
       my $dt       = timestringsFromOffset ($paref->{t}, 0);
       my $hod      = sprintf "%02d", ($dt->{hour} + 1);
-      my $presence = CircularVal ($name, $hod, 'presence', undef);                                      # Anwesenheit
+      my $presence = CurrentVal ($name, 'presence', undef);                                             # Anwesenheit                 
       
       my $presimg  = !defined $presence                         
                      ? FW_makeImage ('user_unknown@grey')
@@ -19010,18 +19014,18 @@ sub _graphicHeader {
                      ? FW_makeImage ('user_available')
                      : FW_makeImage ('user_n_a@grey');
 
-      my $wind_fast = NexthoursVal ($name, 'NextHour00', 'windspeed_fast', undef);                      # Wind
-      $wind_fast    = round1 ($wind_fast) if(defined $wind_fast);
+      my $windspeed = CurrentVal ($name, 'windspeed', undef);                                           # Wind        
+      $windspeed    = round1 ($windspeed) if(defined $windspeed);
                      
-      my $windimg   = !defined $wind_fast                         
+      my $windimg   = !defined $windspeed                         
                       ? FW_makeImage ('weather_wind_speed_ms@grey')
-                      : $wind_fast >= 24.5
+                      : $windspeed >= 24.5
                       ? FW_makeImage ('weather_wind_speed_ms@#ee5500')
-                      : $wind_fast >= 20.8
+                      : $windspeed >= 20.8
                       ? FW_makeImage ('weather_wind_speed_ms@#884400')
-                      : $wind_fast >= 17.2
+                      : $windspeed >= 17.2
                       ? FW_makeImage ('weather_wind_speed_ms@#555500')
-                      : $wind_fast >= 0.3
+                      : $windspeed >= 0.3
                       ? FW_makeImage ('weather_wind_speed_ms@#337700')
                       : FW_makeImage ('weather_wind_no_wind@#007700');
                       
@@ -19231,7 +19235,7 @@ sub _graphicHeader {
       $ydayConDvtn    =~ s/\./,/;
       $ydayConDvtn    =~ s/,0//;
 
-      my $dcontxt     = 'CO '.$hqtxt{dvtn}{$lang}.'&nbsp;';
+      my $dcontxt     = 'CON '.$hqtxt{dvtn}{$lang}.'&nbsp;';
       my $tdaycontxt  = $hqtxt{ctnsly}{$lang}.':&nbsp;'."<b>".$tdayConDvtn."</b>";
       my $ydaycontxt  = $hqtxt{yday}{$lang}.':&nbsp;'."<b>".$ydayConDvtn."</b>";
 
@@ -19259,7 +19263,7 @@ sub _graphicHeader {
       my @parts1;
 
       push @parts1, [ $presimg, 3 ]                    if(grep /^presence$/,    @$sa);              # Anwesenheitssymbol  
-      push @parts1, [ $windimg, 1 ], [ $wind_fast, 1 ] if(grep /^windSpeed$/,   @$sa);              # Windanzeige  
+      push @parts1, [ $windimg, 1 ], [ $windspeed, 1 ] if(grep /^windSpeed$/,   @$sa);              # Windanzeige  
       push @parts1, [ $tempimg, 0 ], [ $temptxt,   3 ] if(grep /^outsideTemp$/, @$sa);              # Außentemperatur
       
       push @parts1,
