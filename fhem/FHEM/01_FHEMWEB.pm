@@ -196,6 +196,7 @@ FHEMWEB_Initialize($)
     plotEmbed:2,1,0
     plotsize
     plotWeekStartDay:0,1,2,3,4,5,6
+    publicHostnames
     redirectCmds:0,1
     redirectTo
     refresh
@@ -889,6 +890,12 @@ FW_answerCall($)
     }
     $iconPath =~ m/(.*)\.([^.]*)/;
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
+
+  } elsif($arg =~ m,^$FW_ME/cert.pem$,) {
+     my $fname = AttrVal("global", "modpath", ".")."/".
+              AttrVal($FW_wname, "sslCertPrefix", "certs/server-cert.pem");
+     return FW_serveSpecial($2, $3, $1, 0)
+                if($fname =~ m,^(.*)/(.*cert).(pem)$,)
 
   } elsif($dir1 && !$data{FWEXT}{"/$dir1"}) {
     my $dir = "$dir1$dirN";
@@ -2876,7 +2883,20 @@ FW_Attr(@)
   my $retMsg;
 
   if($type eq "set" && $attrName eq "HTTPS" && $param[0]) {
-    InternalTimer(1, "TcpServer_SetSSL", $hash, 0); # Wait for sslCertPrefix
+    InternalTimer(1, sub(){
+      TcpServer_SetSSL($hash),
+      my $cp = AttrVal("global", "modpath", ".")."/".
+               AttrVal($devName, "sslCertPrefix", "certs/server-");
+      if(-r "${cp}cert.pem") {
+        $FW_ME = "/" . AttrVal($devName, "webname", "fhem");
+        readingsSingleUpdate($hash, "publicCertificate",
+          "<html><a href='$FW_ME/cert.pem'>cert.pem</a></html>", 0);
+      }
+    }, $hash, 0);
+  }
+
+  if($type eq "set" && $attrName eq "publicHostnames" && $init_done) {
+    InternalTimer(1, sub(){ TcpServer_CreateCert($devName); }, $hash, 0);
   }
 
   if($type eq "set") { # Converting styles
@@ -4330,6 +4350,16 @@ FW_log($$)
         0 is Sunday, 1 is Monday, etc.<br>
     </li><br>
 
+    <a id="FHEMWEB-attr-publicHostnames"></a>
+    <li>publicHostnames<br>
+        Comma separated list of hostnames and/or IPv4 or IPV6 adresses.
+        When setting it, a new certificate will be generated, and the public
+        part will be downloadable from the publicCertficate reading.
+        Note: you have to set HTTPS separately, and after setting this
+        attribute a FHEM restart is necessary.
+        <br>
+    </li><br>
+
     <a id="FHEMWEB-attr-redirectCmds"></a>
     <li>redirectCmds<br>
         Clear the browser URL window after issuing the command by redirecting
@@ -5207,6 +5237,17 @@ FW_log($$)
     <li>plotWeekStartDay<br>
         Starte das Plot in der Wochen-Ansicht mit diesem Tag.
         0 ist Sonntag, 1 ist Montag, usw.
+    </li><br>
+
+    <a id="FHEMWEB-attr-publicHostnames"></a>
+    <li>publicHostnames<br>
+        Komma separierte Liste von Rechnernamen und/oder IPv4 oder IPv6
+        Adressen. Beim Setzen wird ein neues Zertifikat f&uuml;r diese Instanz
+        generiert, und der &ouml;ffentliche Teil kann unter dem Reading
+        publicCertificate heruntergeladen werden.
+        Achtung: das HTTPS Attribut mu&szlig; separat gesetzt werden, und nach
+        Erstellen des Zertifikats mu&szlig; FHEM neu gestartet werden.
+        <br>
     </li><br>
 
     <a id="FHEMWEB-attr-redirectCmds"></a>

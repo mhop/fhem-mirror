@@ -25,7 +25,7 @@ use vars qw(%ext2MIMEType);
   png   image/png
   svg   image/svg+xml
   txt   text/plain
-
+  pem   application/x-pem-file
 };
 
 my $HU_use_zlib;

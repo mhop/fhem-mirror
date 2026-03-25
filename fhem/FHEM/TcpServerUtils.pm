@@ -365,6 +365,66 @@ TcpServer_Accept($$)
 }
 
 sub
+TcpServer_CreateCert($)
+{
+  my ($name) = @_; 
+
+  my $cp = AttrVal("global", "modpath", ".")."/".
+           AttrVal($name, "sslCertPrefix", "certs/server-");
+
+  Log 1, "$name: creating server certificate";
+  if($cp =~ m,^(.*)/(.*?), && ! -d $1 && !mkdir($1)) {
+    my $msg = "$name: failed to create $1: $!";
+    Log 1, $msg;
+    return $msg;
+  }
+
+  if(!open(FH,">${cp}certreq.txt")) {
+    my $msg = "$name: failed to create ${cp}certreq.txt: $!";
+    Log 1, $msg;
+    return $msg;
+  }
+  my $hostname = `hostname`;
+  chomp($hostname);
+  my @hArr = split(",", AttrVal($name, "publicHostnames",
+                                       "localhost,$hostname,127.0.0.1,::1"));
+  my @dns;
+  foreach my $hn (@hArr) {
+    if($hn =~ m/^\d+\.\d+\.\d+\.\d+$/ || $hn =~ m/:/) {
+      push(@dns, "IP.".($#dns+2)."=$hn");
+    } else {
+      push(@dns, "DNS.".($#dns+2)."=$hn");
+    }
+  }
+  my $san = join("\n", @dns);
+
+  print FH << "EOF";
+[ req ]
+prompt = no
+distinguished_name = dn
+x509_extensions = ext
+[ dn ]
+CN = $hostname
+O = FHEM
+OU = $name
+[ ext ]
+basicConstraints=CA:TRUE
+extendedKeyUsage = serverAuth
+subjectAltName=\@san
+[san]
+$san
+EOF
+  close(FH);
+
+  my $cmd = "openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 ".
+            "-config ${cp}certreq.txt -out ${cp}cert.pem -keyout ${cp}key.pem";
+  Log 1, "Executing $cmd";
+  `$cmd`;
+  unlink("${cp}certreq.txt");
+  return undef;
+}
+
+sub
 TcpServer_SetSSL($)
 {
   my ($hash) = @_; 
@@ -379,49 +439,10 @@ TcpServer_SetSSL($)
   my $cp = AttrVal("global", "modpath", ".")."/".
            AttrVal($name, "sslCertPrefix", "certs/server-");
   if(! -r "${cp}key.pem") {
-
-    Log 1, "$name: Server certificate missing, trying to create one";
-    if($cp =~ m,^(.*)/(.*?), && ! -d $1 && !mkdir($1)) {
-      Log 1, "$name: failed to create $1: $!, falling back to HTTP";
+    if(TcpServer_CreateCert($name)) {
+      Log 1, "$name: falling back to HTTP";
       return;
     }
-
-    if(!open(FH,">certreq.txt")) {
-      Log 1, "$name: failed to create certreq.txt: $!, falling back to HTTP";
-      return;
-    }
-    my $hostname = `hostname`;
-    chomp($hostname);
-    print FH << "EOF";
-[ req ]
-prompt = no
-distinguished_name = dn
-x509_extensions = ext
-
-[ dn ]
-CN = $hostname
-O = FHEM
-OU = localhost
-
-[ ext ]
-basicConstraints=CA:TRUE
-extendedKeyUsage = serverAuth
-subjectAltName=\@san
-
-[san]
-DNS.1=localhost
-DNS.2=$hostname
-IP.1=127.0.0.1
-IP.2=::1
-EOF
-
-    close(FH);
-
-    my $cmd = "openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 ".
-                "-config certreq.txt -out ${cp}cert.pem -keyout ${cp}key.pem";
-    Log 1, "Executing $cmd";
-    `$cmd`;
-    unlink("certreq.txt");
   }
   $hash->{SSL} = 1;
 }
