@@ -1608,8 +1608,8 @@ current_level:fc_max1.* {\
 \
 ## Aufteilung 25% / 50% / 25%\
   my $class =\
-    $fc_avg <= $fc_min + $range *0.25 ? "GÜNSTG" :\
-    $fc_avg >= $fc_min + $range *0.75 ? "NORMAL"  :\
+    $current <= $fc_min + $range *0.25 ? "GÜNSTG" :\
+    $current >= $fc_min + $range *0.75 ? "NORMAL"  :\
                                         "TEUER";;\
 \
 ## Aufteilung in Drittel\
