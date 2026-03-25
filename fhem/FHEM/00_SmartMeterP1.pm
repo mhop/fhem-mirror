@@ -37,6 +37,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use Data::Dumper;
 use DBI;
+use DevIo;
 
 sub SmartMeterP1_Attr(@);
 sub SmartMeterP1_ParseTelegramLine($$$@);
@@ -48,8 +49,6 @@ sub
 SmartMeterP1_Initialize($)
 {
   my ($hash) = @_;
-
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}  = "SmartMeterP1_Read";
@@ -296,6 +295,22 @@ SmartMeterP1_ParseTelegramLine($$$@)
 	$hash->{TelegramTime} = ConvertTelegramTime($attributes[0]);
 	readingsSingleUpdate($hash,"TelegramTime",$hash->{TelegramTime},1);
   }
+  elsif ($obis_ref eq "0-0:96.1.1") {
+	# Meter identifier
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"MeterIdentifier", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"MeterIdentifier",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:1.8.0") {
+	# Meter reading electricity delivered to client 0,001 kWh
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityDelivered", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityDelivered",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
   elsif ($obis_ref eq "1-0:1.8.1") {
 	# Meter reading electricity delivered to client low Tariff in 0,001 kWh
 	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
@@ -310,6 +325,14 @@ SmartMeterP1_ParseTelegramLine($$$@)
 	my $tmp = ReadingsVal($name,"ElectricityDeliveredNormalTariff", "-");
 	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
 	readingsSingleUpdate($hash,"ElectricityDeliveredNormalTariff",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:2.8.0") {
+	# Meter reading electricity delivered by client in 0,001 kWh
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityProduced", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityProduced",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
 	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
   }
   elsif ($obis_ref eq "1-0:2.8.1") {
@@ -342,6 +365,110 @@ SmartMeterP1_ParseTelegramLine($$$@)
 	my $tmp = ReadingsVal($name,"ElectricityPowerProduced", "-");
 	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
 	readingsSingleUpdate($hash,"ElectricityPowerProduced",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:21.7.0") {
+	# Actual electricity power delivered (+P) in 1 Watt resolution L1
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityPowerDeliveredL1", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityPowerDeliveredL1",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:41.7.0") {
+	# Actual electricity power delivered (+P) in 1 Watt resolution L2
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityPowerDeliveredL2", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityPowerDeliveredL2",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:61.7.0") {
+	# Actual electricity power delivered (+P) in 1 Watt resolution L3
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityPowerDeliveredL3", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityPowerDeliveredL3",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:22.7.0") {
+	# Actual electricity power received (-P) in 1 Watt resolution L1
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityPowerProducedL1", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityPowerProducedL1",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:42.7.0") {
+	# Actual electricity power received (-P) in 1 Watt resolution L2
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityPowerProducedL2", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityPowerProducedL2",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:62.7.0") {
+	# Actual electricity power received (-P) in 1 Watt resolution L3
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityPowerProducedL3", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityPowerProducedL3",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:31.7.0") {
+	# Actual electricity current (I) in 10 mA resolution L1
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityCurrentL1", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityCurrentL1",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:51.7.0") {
+	# Actual electricity current (I) in 10 mA resolution L2
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityCurrentL2", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityCurrentL2",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:71.7.0") {
+	# Actual electricity current (I) in 10 mA resolution L3
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityCurrentL3", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityCurrentL3",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:32.7.0") {
+	# Actual electricity voltage (V) in 10 mV resolution L1
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityVoltageL1", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityVoltageL1",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:52.7.0") {
+	# Actual electricity voltage (V) in 10 mV resolution L2
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityVoltageL2", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityVoltageL2",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-0:72.7.0") {
+	# Actual electricity voltage (V) in 10 mV resolution L3
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityVoltageL3", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityVoltageL3",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  elsif ($obis_ref eq "1-3:0.2.8") {
+	# Actual electricity frequency (f) in 1 Hz resolution
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,"ElectricityFrequency", "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,"ElectricityFrequency",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
 	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
   }
   elsif ($obis_ref eq "0-0:17.0.0") {
@@ -411,6 +538,14 @@ SmartMeterP1_ParseTelegramLine($$$@)
 	my $tmp = ReadingsVal($name,"ValvePositionGas", "-");
 	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
 	readingsSingleUpdate($hash,"ValvePositionGas",$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
+  }
+  if ($obis_ref) {
+	# store all values also as obis ref (especially the unknown ones)
+	$hash->{".updateTimestamp"} = $hash->{TelegramTime};
+	my $tmp = ReadingsVal($name,$obis_ref, "-");
+	$attributes[0] = RemoveUnitSeparator($name, $attributes[0]);
+	readingsSingleUpdate($hash,$obis_ref,$attributes[0],1) if (($tmp eq "-") || ($tmp ne $attributes[0]));
 	SmartMeterP1_Write2DB($hash,$name,$obis_ref,$hash->{TelegramTime},$attributes[0]) if (($tmp eq "-") || ($tmp ne $attributes[0]));
   }
 }
