@@ -891,11 +891,11 @@ FW_answerCall($)
     $iconPath =~ m/(.*)\.([^.]*)/;
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
 
-  } elsif($arg =~ m,^$FW_ME/cert.pem$,) {
+  } elsif($arg =~ m,^$FW_ME/ca.pem$,) {
      my $fname = AttrVal("global", "modpath", ".")."/".
-              AttrVal($FW_wname, "sslCertPrefix", "certs/server-cert.pem");
+              AttrVal($FW_wname, "sslCertPrefix", "certs/server-")."ca.pem";
      return FW_serveSpecial($2, $3, $1, 0)
-                if($fname =~ m,^(.*)/(.*cert).(pem)$,)
+                if($fname =~ m,^(.*)/(.*ca).(pem)$,)
 
   } elsif($dir1 && !$data{FWEXT}{"/$dir1"}) {
     my $dir = "$dir1$dirN";
@@ -2887,10 +2887,10 @@ FW_Attr(@)
       TcpServer_SetSSL($hash),
       my $cp = AttrVal("global", "modpath", ".")."/".
                AttrVal($devName, "sslCertPrefix", "certs/server-");
-      if(-r "${cp}cert.pem") {
+      if(-r "${cp}ca.pem") {
         $FW_ME = "/" . AttrVal($devName, "webname", "fhem");
-        readingsSingleUpdate($hash, "publicCertificate",
-          "<html><a href='$FW_ME/cert.pem'>cert.pem</a></html>", 0);
+        readingsSingleUpdate($hash, "publicCaCertificate",
+          "<html><a href='$FW_ME/ca.pem'>ca.pem</a></html>", 0);
       }
     }, $hash, 0);
   }
@@ -4353,8 +4353,8 @@ FW_log($$)
     <a id="FHEMWEB-attr-publicHostnames"></a>
     <li>publicHostnames<br>
         Comma separated list of hostnames and/or IPv4 or IPV6 adresses.
-        When setting it, a new certificate will be generated, and the public
-        part will be downloadable from the publicCertficate reading.
+        When setting it, a new certificate will be generated, and the CA
+        certificate will be downloadable from the publicCaCertficate reading.
         Note: you have to set HTTPS separately, and after setting this
         attribute a FHEM restart is necessary.
         <br>
@@ -5243,8 +5243,8 @@ FW_log($$)
     <li>publicHostnames<br>
         Komma separierte Liste von Rechnernamen und/oder IPv4 oder IPv6
         Adressen. Beim Setzen wird ein neues Zertifikat f&uuml;r diese Instanz
-        generiert, und der &ouml;ffentliche Teil kann unter dem Reading
-        publicCertificate heruntergeladen werden.
+        generiert, und das CA Zertifikat kann unter dem Reading
+        publicCaCertificate heruntergeladen werden.
         Achtung: das HTTPS Attribut mu&szlig; separat gesetzt werden, und nach
         Erstellen des Zertifikats mu&szlig; FHEM neu gestartet werden.
         <br>

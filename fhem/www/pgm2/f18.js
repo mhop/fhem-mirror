@@ -87,6 +87,9 @@ $(document).ready(function(){
   f18_setWrapColumns();
   f18_setFixedInput();
   f18_setWidePortrait();
+  if(typeof fully !== 'undefined')
+    FW_cmd(FW_root + "?cmd=set TYPE=FULLY:FILTER=deviceid="+
+           fully.getDeviceId()+" host "+fully.getHostname()+"&XHR=1");
 });
 
 function
@@ -178,9 +181,15 @@ f18_stt()
       {text:"Abort", click:function(){ $(this).dialog("close"); }}
     ],
     close:function(){
-      if(doSend && txt)
+      if(doSend && txt) {
+         if(typeof fully !== 'undefined')
+           FW_cmd(FW_root + "?cmd=set TYPE=FULLY:FILTER=deviceid=" +
+                  fully.getDeviceId()+" STTinput "+encodeURIComponent(txt)+
+                  " ["+$("body").attr("fw_id")+"]&XHR=1");
+  
         FW_cmd(FW_root+"?cmd=setreading "+$("body").attr("data-webName")+
                " STT "+encodeURIComponent(txt)+"&XHR=1");
+      }
       stt.stop();
       $(div).remove();
     }

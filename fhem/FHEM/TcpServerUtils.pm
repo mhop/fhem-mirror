@@ -379,11 +379,6 @@ TcpServer_CreateCert($)
     return $msg;
   }
 
-  if(!open(FH,">${cp}certreq.txt")) {
-    my $msg = "$name: failed to create ${cp}certreq.txt: $!";
-    Log 1, $msg;
-    return $msg;
-  }
   my $hostname = `hostname`;
   chomp($hostname);
   my @hArr = split(",", AttrVal($name, "publicHostnames",
@@ -398,6 +393,11 @@ TcpServer_CreateCert($)
   }
   my $san = join("\n", @dns);
 
+  if(!open(FH,">${cp}certreq.txt")) {
+    my $msg = "$name: failed to create ${cp}certreq.txt: $!";
+    Log 1, $msg;
+    return $msg;
+  }
   print FH << "EOF";
 [ req ]
 prompt = no
@@ -408,7 +408,6 @@ CN = $hostname
 O = FHEM
 OU = $name
 [ ext ]
-basicConstraints=CA:TRUE
 extendedKeyUsage = serverAuth
 subjectAltName=\@san
 [san]
@@ -416,11 +415,30 @@ $san
 EOF
   close(FH);
 
-  my $cmd = "openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 ".
-            "-config ${cp}certreq.txt -out ${cp}cert.pem -keyout ${cp}key.pem";
-  Log 1, "Executing $cmd";
+  my $cmd;
+  if(! -r "${cp}ca.key") {
+    $cmd = "openssl genrsa -out ${cp}ca.key 2048";
+    Log 1, "Creating the ca key with: $cmd";
+    `$cmd`;
+
+    $cmd = "openssl req -new -x509 -sha256 -days 3650 ".
+                  "-subj /CN=FHEM -key ${cp}ca.key -out ${cp}ca.pem";
+    Log 1, "Self-signing the ca certificate with: $cmd";
+    `$cmd`;
+  }
+
+  $cmd = "openssl req -new -nodes -out ${cp}cert.csr ".
+                "-config ${cp}certreq.txt > ${cp}key.pem";
+  Log 1, "Creating the certificate request with: $cmd";
   `$cmd`;
-  unlink("${cp}certreq.txt");
+
+  $cmd = "openssl x509 -req -days 3650 ".
+            "-CA ${cp}ca.pem -CAkey ${cp}ca.key -CAcreateserial ".
+            "-extfile ${cp}certreq.txt -extensions ext ".
+            "-in ${cp}cert.csr -out ${cp}cert.pem";
+  Log 1, "Signing the request with: $cmd";
+  `$cmd`;
+
   return undef;
 }
 
