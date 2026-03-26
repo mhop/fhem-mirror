@@ -163,8 +163,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.0"  => "25.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
-                           "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ",
+  "2.5.0"  => "26.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
+                           "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
+                           "checkPlantConfig: check con in aiRawData ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -11510,7 +11511,7 @@ sub _transferWeatherValues {
                   
                   debugLog ($paref, 'collectData|collectData_long', "collect Wind measurement data  - device: $winddev =>");
                   
-                  ($wind_slow, $wind_fast) = __smoothWind ($paref);
+                  ($windspeed, $wind_slow, $wind_fast) = __smoothWind ($paref);
                   
                   delete $paref->{hod};
                   delete $paref->{windsp};
@@ -11587,7 +11588,7 @@ sub __smoothWind {
   
   debugLog ($paref, 'collectData|collectData_long', "Smooth Wind data - value=$windsp m/s, last=$prev_slow, last_fast=$prev_fast -> smoothed=$smooth_slow, smoothed_fast=$smooth_fast");
 
-return ($smooth_slow, $smooth_fast);
+return ($windsp, $smooth_slow, $smooth_fast);
 }
 
 ################################################################
@@ -15322,6 +15323,7 @@ sub ___csmSpecificEpieces {
                0;
                
   my $curr_epiecHour  = ConsumerVal ($name, $c, 'epiecHour', 0);
+  my $conlim          = CurrentVal  ($name, 'conEnergyHourLimit', MAXCONLIMIT);                                         # Verbrauchslimit p. Stunde
   my $hourSinceSwitch = int (($t - ConsumerVal ($name, $c, 'epiecSwitchTime', $t)) / 3600) + 1;                         # aktuelle Betriebsstunde ermitteln
   
   debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - time since last Switch Off (tsloff): $tsloff seconds});
@@ -15343,13 +15345,13 @@ sub ___csmSpecificEpieces {
       }
       
       $epiecActive     = ConsumerVal ($name, $c, 'epiecActive', 0);
-      $ecycle          = 'epiecHist_'.$epiecActive;                                                                     # Zyklusnummer für Namen
+      $ecycle          = 'epiecHist_'.$epiecActive;                                                                     # Namengenerierung mit Zyklusnummer
       $epiecHist_hours = 'epiecHist_'.$epiecActive.'_hours';
 
       debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - current cycle number (ecycle): $ecycle});
       debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - current operating hour after switch on or cycle switch: $hourSinceSwitch});
 
-      if ($curr_epiecHour != $hourSinceSwitch) {                                                                         # Betriebsstundenwechsel ? Differenz von etot noch auf die vorherige Betriebsstunde anrechnen
+      if ($curr_epiecHour != $hourSinceSwitch) {                                                                        # Betriebsstundenwechsel ? Differenz von etot noch auf die vorherige Betriebsstunde anrechnen
           my $epiecHour_last = $hourSinceSwitch - 1;
 
           $data{$name}{consumers}{$c}{$ecycle}{$epiecHour_last} = round2 ($etot - ConsumerVal ($name, $c, 'epiecStartEtotal', 0)) if($hourSinceSwitch > 1);
@@ -15357,26 +15359,28 @@ sub ___csmSpecificEpieces {
 
           debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Operating hours change - new etotal (epiecStartEtotal): $etot});
       }
-
+      
+      # --- Energieverbrauch ediff speichern 
       my $ediff                                              = $etot - ConsumerVal ($name, $c, "epiecStartEtotal", 0);
-      $ediff                                                 = round2 ($ediff);
+      $ediff                                                 = min ($ediff, $conlim);                                   # Begrenzung nach oben
+      $ediff                                                 = round2 ( max (0, $ediff));                               # Begrenzung nach unten
       $data{$name}{consumers}{$c}{$ecycle}{$hourSinceSwitch} = $ediff;
       $data{$name}{consumers}{$c}{epiecHour}                 = $hourSinceSwitch;
-      $data{$name}{consumers}{$c}{$epiecHist_hours}          = $ediff > 0.0 ? $hourSinceSwitch : $hourSinceSwitch - 1;   # Stunde akzeptieren wenn mehr als 1 Wh verbraucht
+      $data{$name}{consumers}{$c}{$epiecHist_hours}          = $ediff > 0.0 ? $hourSinceSwitch : $hourSinceSwitch - 1;  # Stunde akzeptieren wenn mehr als 1 Wh verbraucht
 
       debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - energy consumption in operating hour $hourSinceSwitch (ediff): $ediff Wh});
   }
-  else {                                                                                                                 # neuen epiec-Zyklus starten: nach OFF >= X Sekunden oder mehr als EPIECMAXOPHRS ununterbrochenen Betriebsstunden
+  else {                                                                                                                # neuen epiec-Zyklus starten: nach OFF >= X Sekunden oder mehr als EPIECMAXOPHRS ununterbrochenen Betriebsstunden
       if ($curr_epiecHour > 0) {
           my $operhours = 0;
 
-          for my $h (1..EPIECMAXCYCLES) {                                                                                # durchschnittliche Betriebsstunden über alle epieces ermitteln
+          for my $h (1..EPIECMAXCYCLES) {                                                                               # durchschnittliche Betriebsstunden über alle epieces ermitteln
               $operhours += ConsumerVal ($name, $c, 'epiecHist_'.$h.'_hours', 0);
           }
 
           my $avghours                                = ceil ($operhours / EPIECMAXCYCLES);
-          $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                                       # durchschnittliche Betriebsstunden pro Zyklus
-          delete $data{$name}{consumers}{$c}{epiecAVG};                                                                  # Durchschnitt für epics neu ermitteln
+          $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                                      # durchschnittliche Betriebsstunden pro Zyklus
+          delete $data{$name}{consumers}{$c}{epiecAVG};                                                                 # Durchschnitt für epics neu ermitteln
 
           for my $hour (1..$avghours) {                                                                      
               my $hoursE = 0;
@@ -19014,10 +19018,10 @@ sub _graphicHeader {
                      ? FW_makeImage ('user_available')
                      : FW_makeImage ('user_n_a@grey');
 
-      my $windspeed = CurrentVal ($name, 'windspeed', undef);                                           # Wind        
+      my $windspeed = CurrentVal ($name, 'windspeed', '');                                              # Wind        
       $windspeed    = round1 ($windspeed) if(defined $windspeed);
                      
-      my $windimg   = !defined $windspeed                         
+      my $windimg   = !$windspeed                       
                       ? FW_makeImage ('weather_wind_speed_ms@grey')
                       : $windspeed >= 24.5
                       ? FW_makeImage ('weather_wind_speed_ms@#ee5500')
@@ -29203,30 +29207,50 @@ sub checkPlantConfig {
 
   ## Datenspeicher Check
   ########################
-  my $confault = 0;
-
+  my $conpvhfault = 0;
+  my $conairfault = 0;
+  my $conlim      = CurrentVal ($name, 'conEnergyHourLimit', MAXCONLIMIT);                                  # Verbrauchslimit p. Stunde
+  
   for my $dy (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
       for my $hh (sort{$a<=>$b} keys %{$data{$name}{pvhist}{$dy}}) {
-          my $hcon = HistoryVal ($name, $dy, $hh, 'con', 0);                                        # historische Verbrauchswerte
+          my $hcon = HistoryVal ($name, $dy, $hh, 'con', 0);                                                # historische Verbrauchswerte
 
-          if ($hcon < 0) {                                                                          # V1.45.7
-              $confault++;
-              Log3 ($name, 1, "$name - WARNING - The stored Energy consumption of day/hour $dy/$hh is negative. This appears to be an error. The incorrect value can be deleted with 'set $name reset consumptionHistory $dy $hh'.");
+          if ($hcon < 0 || $hcon > $conlim) {                                                                              
+              $conpvhfault++;
+              Log3 ($name, 1, "$name - WARNING - The stored Energy con=$hcon of day/hour $dy/$hh in pvHistory is faulty. The incorrect value can be deleted with 'set $name reset consumptionHistory $dy $hh'.");
           }
       }
   }
+  
+  for my $aidx (sort{$a<=>$b} keys %{$data{$name}{aidectree}{airaw}}) {
+          my $aicon = $data{$name}{aidectree}{airaw}{$aidx}{con} // 0;                                      # historische Verbrauchswerte
+          
+          if ($aicon < 0 || $aicon > $conlim) {                                                                        
+              $conairfault++;
+              Log3 ($name, 1, "$name - WARNING - The stored Energy con=$aicon of index=$aidx in aiRawData is faulty. The incorrect value can be deleted with 'set $name reset aiData delValue=con==$aicon'.");
+          }
+  }
 
-  if ($confault) {
+  if ($conpvhfault) {
       $result->{'Data Memory'}{state}   = $warn;
-      $result->{'Data Memory'}{result} .= qq{There may be '$confault' incorrect value(s) in the 'con' key of the pvHistory Storage. <br>};
-      $result->{'Data Memory'}{note}   .= qq{See Logfile for detailed information and how these value(s) could be corrected. <br>};
+      $result->{'Data Memory'}{result} .= qq{There are '$conpvhfault' incorrect value(s) in the 'con' key of the pvHistory Storage. <br>}; 
       $result->{'Data Memory'}{warn}    = 1;
+  }
+  
+  if ($conairfault) {
+      $result->{'Data Memory'}{state}   = $warn;
+      $result->{'Data Memory'}{result} .= qq{There are '$conairfault' incorrect value(s) in the 'con' key of the aiRawData Storage. <br>};
+      $result->{'Data Memory'}{warn}    = 1;
+  }
+  
+  if ($conpvhfault || $conairfault) {
+      $result->{'Data Memory'}{note}   .= qq{See Logfile for detailed information and how these value(s) could be corrected. <br>};
   }
 
   if (!$result->{'Data Memory'}{info} && !$result->{'Data Memory'}{warn} && !$result->{'Data Memory'}{fault}) {
        $result->{'Data Memory'}{result} .= $hqtxt{fulfd}{$lang}.'<br>';
        $result->{'Data Memory'}{note}   .= qq{<br>checked Data Memory: <br>};
-       $result->{'Data Memory'}{note}   .= qq{pvHistory key 'con' <br>};
+       $result->{'Data Memory'}{note}   .= qq{pvHistory key 'con', aiRawData key 'con' <br>};
   }
 
   ## Plant Control Check
