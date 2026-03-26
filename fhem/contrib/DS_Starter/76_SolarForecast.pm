@@ -29213,6 +29213,7 @@ sub checkPlantConfig {
   
   for my $dy (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {
       for my $hh (sort{$a<=>$b} keys %{$data{$name}{pvhist}{$dy}}) {
+          next if($hh == 99);
           my $hcon = HistoryVal ($name, $dy, $hh, 'con', 0);                                                # historische Verbrauchswerte
 
           if ($hcon < 0 || $hcon > $conlim) {                                                                              
