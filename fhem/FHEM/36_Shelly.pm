@@ -188,6 +188,7 @@
 # 6.05.7    add attribute 'updateDelay', fix timing of updates
 # 6.05.8    fix: downgrade perl-version, get properties
 # 6.05.9    fix: error in command for Light devices, new internals ID, GEN
+# 6.05.10   add: Shelly Pro 1 UL
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -210,7 +211,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.9 13.03.2026";
+my $version = "6.05.10 26.03.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -220,6 +221,8 @@ my %shelly_firmware = (  # latest known versions  # as of 29.08.2024
     "gen1"        => "1.14.0",   # v1.14.1-rc1
     "shelly4"     => "1.6.6",
     "gen2"        => "1.7.4",    # some have 1.7.1 as latest fw
+    "gen3"        => "1.7.4",
+    "gen4"        => "1.7.4",
     "walldisplay" => "2.3.6"
     );
 
@@ -382,13 +385,15 @@ my %shelly_vendor_ids = (
     "S4SW-001P8EU"    => [ 4, "shellyplus1pm",  "Shelly 1PM Mini Gen4",    0x1031],   # added 03/2025
     "S4EM-001PXCEU16" => [ 4, "shellyemmini",   "Shelly EM Mini Gen4",     0x1033,    'EM1'],   # added 03/2025
     ## 2nd Gen PRO devices
-    "SPSW-001XE16EU"  => [ 2, "shellypro1",     "Shelly Pro 1"],      ## not listed by KB
+    "SPSW-001XE15UL"  => [ 2, "shellypro1",     "Shelly Pro 1 (UL)"],      ## added 03/2026
+    "SPSW-001XE16EU"  => [ 2, "shellypro1",     "Shelly Pro 1"],           ## v.0 not listed by KB
     "SPSW-201XE16EU"  => [ 2, "shellypro1",     "Shelly Pro 1 v.1"],
-    "SPSW-001PE16EU"  => [ 2, "shellypro1pm",   "Shelly Pro 1PM"],    ## not listed by KB
+    "SPSW-201PE15UL"  => [ 2, "shellypro1pm",   "Shelly Pro 1PM (UL)"],    ## added 03/2026
+    "SPSW-001PE16EU"  => [ 2, "shellypro1pm",   "Shelly Pro 1PM"],         ## v.0 not listed by KB
     "SPSW-201PE16EU"  => [ 2, "shellypro1pm",   "Shelly Pro 1PM v.1"],
-    "SPSW-002XE16EU"  => [ 2, "shellypro2",     "Shelly Pro 2"],      ## not listed by KB
+    "SPSW-002XE16EU"  => [ 2, "shellypro2",     "Shelly Pro 2"],           ## not listed by KB
     "SPSW-202XE16EU"  => [ 2, "shellypro2",     "Shelly Pro 2 v.1"],
-    "SPSW-002PE16EU"  => [ 2, "shellypro2pm",   "Shelly Pro 2PM"],    ## not listed by KB
+    "SPSW-002PE16EU"  => [ 2, "shellypro2pm",   "Shelly Pro 2PM"],         ## not listed by KB
     "SPSW-202PE16EU"  => [ 2, "shellypro2pm",   "Shelly Pro 2PM v.1"],
     "SPSH-002PE16EU"  => [ 2, "shellyprodual",  "Shelly Pro Dual Cover/Shutter PM"],
     "SPCC-001PE10EU"  => [ 2, "shellyplus010v", "Shelly Pro Dimmer 0/1-10V PM",   0x2011],    # addes 03/2025  <<< 1V base not supported here
@@ -1272,7 +1277,8 @@ sub Shelly_getModel {
   if( defined($auth) ){
      my ($err, $pw) = getKeyValue("SHELLY_PASSWORD_$name");
      my $shellyuser = AttrVal($name,"shellyuser",undef);
-     $shellyuser = "admin" if( $shelly_models{$model}[4]>0 );
+ #   $shellyuser = "admin" if( $shelly_models{$model}[4]>0 );
+     $shellyuser = "admin" if( $hash->{GEN}>1 );
      if( $auth==1 ){
          if( !defined($shellyuser) ){
              $login="ERROR";
@@ -1280,7 +1286,8 @@ sub Shelly_getModel {
          }elsif( !$pw ){
              $login="ERROR";
              Shelly_error_handling($hash,"Shelly_getModel","password required",1);
-         }elsif( $shelly_models{$model}[4]>=1 ){
+     #   }elsif( $shelly_models{$model}[4]>=1 ){
+         }elsif( $hash->{GEN}>1 ){ # Gen2+
              $login = "password";
          }else{ # Gen1
              $login = "username:password";
@@ -1294,7 +1301,7 @@ sub Shelly_getModel {
          
   delete($hash->{helper}{Sets}); # build up the sets-dropdown with next refresh
 
-  if( $param->{cmd} eq "/shelly" && $shelly_models{$model}[8]>1  && $shelly_models{$model}[4]==0 && !defined($mode) ){
+  if( $param->{cmd} eq "/shelly" && $shelly_models{$model}[8]>1  && $hash->{GEN}==1 && !defined($mode) ){
         # searching for 'mode' of multimode Gen1 devices, eg. ShellyRGBW
         Log 1,"[Shelly_getModel] searching for mode of $name";
         Shelly_HttpRequest($hash,"/settings","","Shelly_getModel" );
@@ -1321,14 +1328,13 @@ sub Shelly_getProperties {
   my $model = AttrVal($name,"model","generic");
   my $mode  = AttrVal($name,"mode","");
   
-  Shelly_HttpRequest($hash,"/shelly","","Shelly_getModel" )
+  $hash->{GEN}=substr(ReadingsVal($name,'model_family',0),-1);  # last element of string: 1,2,3,4
+  $hash->{ID} =ReadingsVal($name,'model_ID','./.')
                                             if( !defined($hash->{ID}) );
   
   my @Keys=( 'relay','roller','light','cct','color','input','button','meters','em1' ); # ordered, don't use: keys %URLnamespaces
 
   my @chnls=@{$shelly_models{$model}};   # extract the array of 'model' out of the hash 
-  $hash->{props}{gen} = $chnls[4];
-  my $Gen = $hash->{props}{gen}==0?'1':'2+';
   if( $opt==1 || !defined($hash->{props}{relay}) ){
      Log3 $name,4,"[Shelly_getProperties] processing properties of device $name "; #4
     
@@ -1397,9 +1403,8 @@ sub Shelly_getProperties {
   }
   if( $opt == 1 ){
      my $channels;
-     my $msg="[Shelly_getProperties] device $name has properties in use:"; 
-   #  $msg .= "\nGeneration: ".$hash->{props}{gen}." -> Gen_$Gen";
-     $msg .= "\nGeneration: Gen_$Gen";
+     my $msg="[Shelly_getProperties] device $name has properties in use:";
+     $msg .= "\nGeneration: Gen".$hash->{GEN};
      $msg .= "\nModel-ID:   ".($hash->{ID}//'-');
      $msg .= "\nModel:      ".$model;
      $msg .= "\nMode:       ".$mode."  available: ".$chnls[8]   if( $chnls[8] > 0 );
@@ -1409,7 +1414,7 @@ sub Shelly_getProperties {
         $msg .="\n-$comp: $channels"  if( $channels );
      }
      $msg .="\nworking namespace = ".$hash->{props}{namespace};
-     $msg .=", URL keyword is = ".$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen}?1:0 ];
+     $msg .=", URL keyword is = ".$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{GEN}>1?1:0 ];
      Log3 $name,4,$msg;  #4
      return $msg; 
   }
@@ -2531,11 +2536,12 @@ sub Shelly_Set ($@) {
      $isWhat=$2;    
      readingsBeginUpdate($hash); 
     
-     sub SUBS{ #name,chnl,channels 
-       my $name=$_[0];
+     sub SUBS{ #name,chnl,channels #-------------------------------------------------------------------
+       my $hash=$_[0];
        my $chnl=$_[1];
        my $channels=$_[2];
        my $err;
+       my $name=$hash->{NAME};
        if( $channels<1 ){
           $err="command not allowed/no channels of this type ($channels)";
        }elsif( !defined($chnl) ){
@@ -2546,7 +2552,7 @@ sub Shelly_Set ($@) {
              if( !defined($chnl) ){          
                  $err="channel missing or defchannel not set for multichannel device ($channels channels)";
              }else{
-                 Log 3,"Shelly_Set: using channel <$chnl> as given by defchannel";
+                 Log 3,"[Shelly_Set:SUBS] $name: using channel <$chnl> as given by defchannel";
              }
           }
        }elsif( defined($chnl) ){
@@ -2556,40 +2562,41 @@ sub Shelly_Set ($@) {
              $channels --;
              $err="Channel <$chnl> is too high (channels 0...$channels available)";
           }elsif( $channels==1 ){ # channel not necessary
-             Log 3,"Shelly_Set: Warning: Channel <$chnl> is ignored for single-channel devices";
+             Log 3,"[Shelly_Set:SUBS] $name: Warning: Channel <$chnl> is ignored for single-channel devices";
              return( "",undef );
           }
        }
-       if( defined($err) ){ 
-         #  Shelly_error_handling($hash,"Shelly_Set:out",$err,1);
+       if( defined($err) ){
+           $err = $hash->{NAME}. ": $err";
+           Shelly_error_handling($hash,"Shelly_Set:SUBSe",$err,1);
            return undef,$err;
        }
        return( "_$chnl",undef );
-     }#end SUBS
+     }#end SUBS  #-------------------------------------------------------------------
     
  
      if( $cmd =~ /^(out)_(on|off)$/ ){
          $channels = maxNum($shelly_models{$model}[0],$shelly_models{$model}[2]); # device has one or more relay or dimmer - channels
      
-  ###      $value = AttrVal($name,"defchannel",undef)  if( !defined($value) );
+  ###      $value = AttrVal($name,"defchannel",undef)  if( !defined($value) );    # sub Shelly_error_handling(
          
-         ($subs,$err) = SUBS($name,$value,$channels);
-         if($err){Shelly_error_handling($hash,"Shelly_Set:out",$err,1);return $err;}
+         ($subs,$err) = SUBS($hash,$value,$channels);
+         if($err){Shelly_error_handling($hash,"Shelly_Set:$cmd",$err,1);return $err;}
          # write relay reading for all relay devices 
          readingsBulkUpdateMonitored($hash,"relay$subs",$isWhat) if( $shelly_models{$model}[0] > 0 );
          # write state-reading unless we have a multichannel relay device
          readingsBulkUpdateMonitored($hash,"state$subs",$isWhat)  unless( $shelly_models{$model}[0] > 1 );
 
      }elsif( $cmd =~ /^(button|input)_(on|off)$/ ){    # devices with an input-terminal
-         ($subs,$err) = SUBS($name,$value,abs($shelly_models{$model}[5]));
-         if($err){Shelly_error_handling($hash,"Shelly_Set:input",$err,1);return $err;}
+         ($subs,$err) = SUBS($hash,$value,abs($shelly_models{$model}[5]));
+         if($err){Shelly_error_handling($hash,"Shelly_Set:$cmd",$err,1);return $err;}
          readingsBulkUpdateMonitored($hash, "$1$subs", $isWhat, 1 );
                ##    # experimental 
                ##    my $OnOffCnt = ReadingsVal( $name,"input$subs\_cnt", 0 );
                ##    readingsBulkUpdateMonitored($hash, "input$subs\_cnt", $OnOffCnt++, 1 );
      }elsif( $cmd =~ /^(single|double|triple|short|long)_push$/ ){
-         ($subs,$err) = SUBS($name,$value,$shelly_models{$model}[5]);
-         if($err){Shelly_error_handling($hash,"Shelly_Set:input",$err,1);return $err;}
+         ($subs,$err) = SUBS($hash,$value,$shelly_models{$model}[5]);
+         if($err){Shelly_error_handling($hash,"Shelly_Set:$cmd",$err,1);return $err;}
          readingsBulkUpdateMonitored($hash, "input$subs", "ON", 1 );
          readingsBulkUpdateMonitored($hash, "input$subs\_action", $cmd, 1 );
          readingsBulkUpdateMonitored($hash, "input$subs\_actionS",$fhem_events{$cmd}, 1 );
@@ -2940,15 +2947,15 @@ my $cmd_orig=$cmd;
 
     Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd";#4
    # Log3 $name,0,"[Shelly_Set] $name ".$hash->{props}{namespace}."  ".($hash->{props}{gen}?1:0);
-    my $comp = $URLnamespaces{ $hash->{props}{namespace} }[ ($hash->{props}{gen}?1:0) ];
-    if( $hash->{props}{gen}>=1 ){ #Gen2+
+    my $comp = $URLnamespaces{ $hash->{props}{namespace} }[ ($hash->{GEN}>1?1:0) ];
+    if( $hash->{GEN}>1 ){ #Gen2+
         # translate Gen1-commands to Gen2
         $cmd =~ s/\?/\&/g;
         $cmd =~ s/turn=on/on=true/;
         $cmd =~ s/turn=off/on=false/;
         $cmd =~ s/timer/toggle_after/;
         $cmd =~ s/transition/transition_duration/;
-        #  $comp=$URLnamespaces{ $hash->{props}{namespace} }[ $hash->{props}{gen} ];
+        #  $comp=$URLnamespaces{ $hash->{propGENs}{namespace} }[ $hash->{props}{gen} ];
         Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd";#4
         $comp .= "W"  if( $mode eq "rgbw" );   # url keyword
         Shelly_HttpRequest($hash,"/rpc/$comp.Set","?id=$channel$cmd","Shelly_response","onoff"); #RONOFF
@@ -3178,7 +3185,8 @@ my $cmd_orig=$cmd;
     my $CMD2;
     my $gen;
     if( $shelly_models{$model}[4]>=1 ){
-            # Gen2
+            # Gen2  
+        # translate Gen1-commands to Gen2
             $cmd =~ s/\?go=stop/Cover.Stop/;
             $cmd =~ s/\?go=open/Cover.Open/;
             $cmd =~ s/\?go=close/Cover.Close/;
@@ -3717,13 +3725,13 @@ my $cmd_orig=$cmd;
           return "No actions on device $name" if( $3 == 0 );
           # check if identifier is given 
           if( $action_id eq "" ){
-              return "$name: None or wrong identifier of action given"  unless( $actioncmd eq "update" && $hash->{props}{gen}==0 );
-          }elsif( $action_id !~ /^[a-z_]+url$/ && $hash->{props}{gen}==0 ){  # matching name of action
+              return "$name: None or wrong identifier of action given"  unless( $actioncmd eq "update" && $hash->{GEN}==1 );
+          }elsif( $action_id !~ /^[a-z_]+url$/ && $hash->{GEN}==1 ){  # matching name of action
                                #/(btn_|out_|long|short|push_|report_|ext_|temp_|hum_|over_|under_|on_|off_|url)*/ ){ 
               return "$name: Parameter \'$action_id\' is not valid, shall be of type \'out_on_url\'";
           }elsif( $action_id =~ /^(info|own|all)$/ ){
               return "$name: Parameter \'$action_id\' not supported anymore";
-          }elsif( $action_id =~ /\D/ && $hash->{props}{gen}>=1 ){ # has non-digits, or minus-sign
+          }elsif( $action_id =~ /\D/ && $hash->{GEN}>1 ){ # has non-digits, or minus-sign
               return "$name: Parameter is negative or not numerical";
         #  }else{  
         #      return "$name: Parameter \'$action_id\' is not valid";
@@ -4131,47 +4139,19 @@ sub Shelly_status1G {
   Shelly_readingsBulkUpdate($hash,"uptime",$jhash->{uptime},"time=5");
 
   #- checking firmware and if updates are available
-  my $hasupdate = $jhash->{update}{has_update};
-  my $updatestatus=$jhash->{update}{status};     # values of <ip>/ota call are: unknown, idle, pending, updating
-  ##my $firmware_  = $jhash->{update}{old_version};
-  ##my $betafw    = $jhash->{update}{beta_version};
-  ##$firmware_     =~ /.*\/(v[0-9.]+(-rc\d|-\d|)).*/;  # catching v1.12.1 or v1.12-1 or v1.12.1-rc1
-  ##$firmware_     = $1 if( length($1)>5 ); # very old versions don't start with v...
-
-  my $firmware = $jhash->{update}{old_version};
-  readingsBulkUpdateIfChanged($hash,"firmware_ID",$firmware);   # long version   find same in /settings call as {fw} 
-  
-  my $update = $jhash->{update}{new_version};
-  $update = "none" if( $update eq $firmware );
-  
-  my $upd_beta = $jhash->{update}{beta_version};
-  $upd_beta = "none"  if( !defined($upd_beta) || $upd_beta eq $firmware );
-  
-  my ($firmware_curr,$fwtxt,$icon)=Shelly_firmwarecheck($hash,
-             $jhash->{update}{old_version},
-             $update,
-             $upd_beta
+  Shelly_firmwarecheck($hash,
+             $jhash->{update}{old_version},             # current fw
+             $jhash->{update}{new_version},             # update version, is always given and maybe same as current
+             $jhash->{update}{beta_version}//'none'     # beta version
              ); 
-  readingsBulkUpdateIfChanged($hash,"firmware_current",$firmware_curr);  # eg. v1.14.0
-  readingsBulkUpdateIfChanged($hash,"firmware_updText",$fwtxt);
-  readingsBulkUpdateIfChanged($hash,"firmware_updIcon",$icon);
-  ##readingsBulkUpdateIfChanged($hash,"firmware_beta",$upd_beta)   if( $upd_beta ne "none" );
+  readingsBulkUpdateIfChanged($hash,"firmware_ID",$jhash->{update}{old_version});   # long version   find same in /settings call as {fw} 
+  fhem("deletereading $name firmware",1)  if( defined(ReadingsVal($name,'firmware',undef)) );  # reading is deprecated
   
-  #write out deprecated reading 'firmware'
-  $firmware = $firmware_curr;
-  if( $hasupdate ){
-     my $newfw  = $jhash->{'update'}{'new_version'};
-     $newfw     =~ /.*\/(v[0-9.]+(-rc\d|)).*/;
-     $newfw     = $1;
-     $firmware .= "(update needed to $newfw)";
-  }
-  ##readingsBulkUpdateIfChanged($hash,"firmware",$firmware);  ## deprecated
-  
-
+  my $updatestatus=$jhash->{update}{status};     # values of <ip>/ota call are: unknown, idle, pending, updating
   if( $updatestatus ne "idle" ){
     readingsBulkUpdateIfChanged($hash,"update_status",$updatestatus);
   }else{
-    fhem("deletereading $name update_status");
+    fhem("deletereading $name update_status",1);
   }
 
   #- cloud
@@ -4765,17 +4745,12 @@ sub Shelly_status2G {
   ### check only if valid data is given
   if(defined( $jhash->{sys}{uptime}) ){  # uptime is always given
     my $firmware = ReadingsVal($name,"firmware_current",undef);
-    if( defined($firmware) ){  
-      my ($fwtxt,$icon);
-      my $update = $jhash->{sys}{available_updates}{stable}{version}//"none";
-      my $upd_beta= $jhash->{sys}{available_updates}{beta}{version}//"none";
-      ($firmware,$fwtxt,$icon)=Shelly_firmwarecheck($hash,
+    if( defined($firmware) ){ 
+      Shelly_firmwarecheck($hash,
                $firmware,      # current fw
-               $update,        # update version
-               $upd_beta       # beta version
+               $jhash->{sys}{available_updates}{stable}{version}//"none",    # update version
+               $jhash->{sys}{available_updates}{beta}{version}//"none"       # beta version
                ); 
-      readingsBulkUpdateIfChanged($hash,"firmware_updText",$fwtxt);
-      readingsBulkUpdateIfChanged($hash,"firmware_updIcon",$icon);
     }
   }else{
       readingsBulkUpdateIfChanged($hash,"/_device_not_found",time() );
@@ -5586,8 +5561,8 @@ sub Shelly_settings2G {
        my $model_id = $jhash->{model};  # vendor id
        readingsBulkUpdateIfChanged($hash,"model_ID",$model_id);
 
-       my $firmware_id   = $jhash->{fw_id};  #eg "20241011-114455/1.4.4-g7d3b567"
-       readingsBulkUpdateIfChanged($hash,"firmware_ID",$firmware_id);       
+      ## my $firmware_id   = $jhash->{fw_id};  #eg "20241011-114455/1.4.4-g7d3b567"
+       readingsBulkUpdateIfChanged($hash,"firmware_ID",$jhash->{fw_id});       #eg "20241011-114455/1.4.4-g7d3b567"
        
        my $fw_shelly  = $jhash->{ver};   # the firmware information stored in the Shelly
 
@@ -7440,16 +7415,25 @@ sub Shelly_actionWebhook ($@) {
 } #end Shelly_actionWebhook()
 
 
+########################################################################################
+# Shelly_firmwarecheck   ---   checking if current firmware is up to date
+#   Parameter: $hash,
+#              current fw
+#              update version  or  'none'
+#              beta version  or  'none' 
+########################################################################################
 sub Shelly_firmwarecheck {
-  ############ checking if current firmware is up to date
   my ($hash,$firmware,$update,$beta) = @_;
+  $update = "none" if( $update eq $firmware );
+  $beta = "none"  if( $beta eq $firmware );
+  
   my $name=$hash->{NAME};
   my $model = AttrVal($name,"model","generic");
-  Log3 $name,5,"[Shelly_firmwarecheck] $name: current=$firmware update=".($update?$update:"-")." beta=$beta";#5
-  my (@num_fw,@num_upd,$firmwareV,$updateV);
+  Log3 $name,5,"[Shelly_firmwarecheck] $name: current=$firmware update=$update beta=$beta";#5
+  Shelly_getProperties($hash) if( !$hash->{GEN} );
   my $txt ="-";
   my $icon="/";
-  my $gen=($hash->{props}{gen}==0?"gen1":"gen2");
+  my $gen='gen'.$hash->{GEN};
 
   #-- we don't have info about an update (really no update,  no internet)
   if( !defined($update) ){  #gen2 only
@@ -7467,7 +7451,7 @@ sub Shelly_firmwarecheck {
           $icon= "D";
       }
       if( defined($beta) && $beta ne "none" ){
-          $txt .= ", check for new beta-version "; 
+          $txt .= ", check for new beta-version"; 
       }
       
   #-- we have a non-beta existing fw and no update / gen1
@@ -7475,23 +7459,25 @@ sub Shelly_firmwarecheck {
       $update = $model =~ /shelly4/ ? $shelly_firmware{shelly4} : $shelly_firmware{$gen};
       ($firmware,$update,$txt,$icon) = cmpVersions( $firmware,$update ); ## "0.0.0"
       if( defined($beta) && $beta ne "none" ){
-          $txt = "check for beta-version ";  
+          $txt = "check for beta-version";  
           $icon= "B";
       }
       
   #-- we have an update ...
   }elsif( $update ne "none" ){
       ($firmware,$update,$txt,$icon) = cmpVersions( $firmware,$update );
-      
       $txt .= ", check for beta-version"  if( $beta ne "none" );
   }
-  Log3 $name,5,"[Shelly_firmwarecheck] $name: $firmware - $txt - $icon"; #5
-  return ($firmware,$txt,$icon);
+  Log3 $name,5,"[Shelly_firmwarecheck] $name: $firmware - $txt - $icon"; #5 
+  readingsBulkUpdateIfChanged($hash,"firmware_current",$firmware);  # eg. v1.14.0
+  readingsBulkUpdateIfChanged($hash,"firmware_updText",$txt);
+  readingsBulkUpdateIfChanged($hash,"firmware_updIcon",$icon);
 } #end Shelly_firmwarecheck
 
 
 sub cmpVersions {
-    my ($firmware,$update)=@_;
+    my $firmware =  shift @_ ;
+    my $update   = (shift @_) // '0.0.0';
     my (@oldN,@newN,$icon,$txt);
     $firmware =~ /v?(\d+)\.(\d+)\.?(\d+)?(-((rc)|(beta))\d+)?/;
     $oldN[1]=($1 // 0);
