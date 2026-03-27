@@ -23417,7 +23417,6 @@ sub aiFannCreateConTrainData {
   my $shuffle_period    = CurrentVal ($name, 'aiConShufflePeriod',        10);            # bei shuffle_mode -> alle X Epochen Trainingsdaten AI::FANN intern neu mischen
   my $bit_fail_limit    = CurrentVal ($name, 'aiConBitFailLimit',       0.35);            # Bit-Fail Limit
   my $haf               = CurrentVal ($name, 'aiConActFunc',       'SIGMOID');            # Hidden Activation Function
-  my $comftemp          = CurrentVal ($name, 'comforttemp',       HPCOMFTEMP);            # Comport-Temp des Gebäudes
   my $oaf               = 'LINEAR';                                                       # Output Activation Function 
   my $mse_error         = 0.001;                                                          # gewünschter Fehler (MSE-Schwelle)
   my $range             = _aiFannAfNormRange ($haf);
@@ -23469,7 +23468,8 @@ sub aiFannCreateConTrainData {
       my $sunaz     = $rec->{sunaz};
       my $sunalt    = $rec->{sunalt};
       my $rr1c      = $rec->{rr1c};
-      my $con       = $rec->{con};
+      my $con       = $rec->{con};   
+      my $comftemp  = $rec->{comforttemp} // HPCOMFTEMP;                                # Comport-Temp des Gebäudes
       my $pvrl      = clampValue ($rec->{pvrl} // 0, 0, $pv_max_limit);
       my $wcc       = clampValue ($rec->{wcc}, 0, 100);
       my $temp      = clampValue ($rec->{temp}, -40, 40);
@@ -25402,7 +25402,6 @@ sub aiFannGetConResult {
   my $alpha      = CurrentVal  ($name, 'aiConAlpha', 1);                                        # Steuerung Hybridmodell
   my $oaf        = 'LINEAR';                                                                    # Output Activation Function
   my $range      = _aiFannAfNormRange ($haf);
-  my $comftemp   = CurrentVal ($name, 'comforttemp', HPCOMFTEMP);                               # Comport-Temp des Gebäudes
   
   ## letzte reale Zielwerte / Temperaturen für Regression lesen
   ###############################################################
@@ -25453,7 +25452,7 @@ sub aiFannGetConResult {
       my $pv           = NexthoursVal ($name, $nhstr, 'pvfc',            0);                        # Erstatzwert für pvrl
       my $holiday      = NexthoursVal ($name, $nhstr, 'holiday',         0);                        # holiday undefiniert -> 0 
       
-      my ($pv_prev);
+      my ($pv_prev, $comftemp);
       
       if (!$num) {                                                                                  # das ist die aktuelle laufende Stunde                                                             
           my $hits   = timestringToTimestamp ($starttime);
@@ -25462,8 +25461,9 @@ sub aiFannGetConResult {
           my $hiday  = $dt->{day};
           my $hihod  = sprintf "%02d", int ($hihour) + 1;
           
-          $pv_prev   = HistoryVal ($name, $hiday, $hihod, 'pvrl', 0);                               # num 0 -> reale PV der Vorgängerstunde 
-          $presence  = HistoryVal ($name, $day, $hod, 'presence', 1);                               # Wenn keine Presence-Erfassung -> Anwesenheit annehmen
+          $pv_prev   = HistoryVal  ($name, $hiday, $hihod, 'pvrl', 0);                              # num 0 -> reale PV der Vorgängerstunde 
+          $presence  = HistoryVal  ($name, $day, $hod, 'presence', 1);                              # Wenn keine Presence-Erfassung -> Anwesenheit annehmen
+          $comftemp  = CircularVal ($name, $hod, 'comforttemp', HPCOMFTEMP);                        # Comport-Temp des Gebäudes
       }
       else {
           my $lhstr = 'NextHour'.(sprintf "%02d", $num-1);
