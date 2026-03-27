@@ -25380,7 +25380,7 @@ sub aiFannGetConResult {
   my $debug   = $paref->{debug};
   my $fanntyp = 'con';                                                                          # FANN Verwendungsart 'consumption' Prognose                   
   
-  my ($msg, $presence);
+  my ($msg, $presence, $comftemp);
   
   debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
   $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
@@ -25452,7 +25452,7 @@ sub aiFannGetConResult {
       my $pv           = NexthoursVal ($name, $nhstr, 'pvfc',            0);                        # Erstatzwert für pvrl
       my $holiday      = NexthoursVal ($name, $nhstr, 'holiday',         0);                        # holiday undefiniert -> 0 
       
-      my ($pv_prev, $comftemp);
+      my ($pv_prev);
       
       if (!$num) {                                                                                  # das ist die aktuelle laufende Stunde                                                             
           my $hits   = timestringToTimestamp ($starttime);
