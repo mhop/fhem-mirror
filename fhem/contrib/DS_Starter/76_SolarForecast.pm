@@ -166,7 +166,7 @@ my %vNotesIntern = (
   "2.5.0"  => "27.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
                            "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
                            "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
-                           "aiFannDetectDrift: new drift weighting ",
+                           "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -10521,9 +10521,6 @@ sub centralTask {
   #    delete $data{$name}{circular}{$hodc};
   #}
 
-  #delete $data{$name}{circular}{'99'}{neuralNetConRuntimeTrain};         # 23.12.
-  #delete $data{$name}{circular}{'99'}{neuralNetConTrainLastFinishTs};    # 23.12.
-
   #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
   #my $gco = AttrVal ($name, 'graphicControl', '');
 
@@ -10534,11 +10531,19 @@ sub centralTask {
   #}
   
   delete $data{$name}{circular}{99}{last_presence_check};                # 08.03.2026
-
-  #for my $bn (1..MAXBATTERIES) {                                        # 02.10.
-  #    $bn = sprintf "%02d", $bn;
-  #    readingsDelete ($hash, 'Battery_ChargeRecommended_'.$bn);
-  #}
+  
+  for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {             # 27.03.
+      my $bla = AttrVal ($name, "consumer$c", undef);
+    
+      if (defined $bla) {
+          my ($a, $h) = parseParams ($bla);
+          
+          if (defined $h->{comforttemp}) {         
+              _setattrKeyVal ( { name => $name, opt => 'attrKeyVal', arg => "plantControl comforttemp=$h->{comforttemp}" } );
+              last;
+          }
+      }
+  }
   
   ##########################################################################################################################
 
@@ -13156,6 +13161,7 @@ sub _transferEnvironmentValues {
   my $minute = $paref->{minute};
   
   my $peh = __parseAttrEnvironment ($name);                                                         # Parsed Hash
+  my $err;
   #return if(!$peh);
              
   # --- Anwesenheit auswerten
@@ -13198,13 +13204,35 @@ sub _transferEnvironmentValues {
   }
   
   # --- Komforttemperatur auslesen
-  my $comforttemp = CurrentVal ($name, 'comforttemp', HPCOMFTEMP);                                     
+  my $cft  = CurrentVal ($name, 'comforttemp', HPCOMFTEMP); 
+  my $doct = 0;
+  my $comforttemp;
+  
+  if (isNumeric ($cft)) {
+      $comforttemp = $cft;
+      $doct = 1;
+  }
+  else {
+      my ($dv, $rd) = split ':', $cft;
+      ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+      
+      if (!$err) {
+          my $val = ReadingsVal ($dv, $rd, '');
+          
+          if (isNumeric ($val)) {
+              $comforttemp = $val;
+              $doct = 1;
+          }
+      }
+  }   
   
   my $hod = sprintf "%02d", ($chour + 1);  
 
   # --- Werte speichern
-  $data{$name}{circular}{$hod}{comforttemp} = $comforttemp;
-  writeToHistory ( { paref => $paref, key => 'comforttemp', val => $comforttemp, day => $day, hour => $hod } );
+  if ($doct) {
+      $data{$name}{circular}{$hod}{comforttemp} = $comforttemp;
+      writeToHistory ( { paref => $paref, key => 'comforttemp', val => $comforttemp, day => $day, hour => $hod } );
+  }
   
   if (defined $presence_weighted) {
       $data{$name}{circular}{$hod}{presence} = $presence_weighted;
