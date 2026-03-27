@@ -64,7 +64,7 @@ FHEM/10_CUL_HM.pm            martinp876           HomeMatic
 FHEM/10_CUL_IR.pm            odroegehorn          SlowRF
 FHEM/10_DUOFERNSTICK.pm      telekatz             Sonstige Systeme
 FHEM/10_EnOcean.pm           klaus-schauer        EnOcean
-FHEM/10_EQ3BT.pm             dominikkarall        Sonstige Systeme
+FHEM/10_EQ3BT.pm             rudolfkoenig/orphan  Sonstige Systeme
 FHEM/10_FBDECT.pm            rudolfkoenig         FRITZ!Box
 FHEM/10_FRM.pm               jensb                Sonstige Systeme
 FHEM/10_FS20.pm              rudolfkoenig         SlowRF
@@ -503,7 +503,7 @@ FHEM/98_ArduCounter.pm       StefanStrobel        Sonstiges
 FHEM/98_autocreate.pm        rudolfkoenig         Automatisierung
 FHEM/98_average.pm           rudolfkoenig         Automatisierung
 FHEM/98_backup.pm            CoolTux              Sonstiges
-FHEM/98_BOSEST.pm            dominikkarall        Multimedia
+FHEM/98_BOSEST.pm            rudolfkoenig/orphan  Multimedia
 FHEM/98_cloneDummy.pm        Joachim              Automatisierung
 FHEM/98_cmdalias.pm          rudolfkoenig         Automatisierung
 FHEM/98_ComfoAir.pm          StefanStrobel        Sonstiges
@@ -514,7 +514,7 @@ FHEM/98_CDCOpenData.pm       JoWiemann            Regenmenge aus DWD-Radolan Dat
 FHEM/98_CULflash.pm          rudolfkoenig         Sonstiges
 FHEM/98_CustomReadings.pm    HCS                  Unterstützende Dienste
 FHEM/98_dewpoint.pm          hotbso               Automatisierung
-FHEM/98_DLNARenderer.pm      dominikkarall        Multimedia
+FHEM/98_DLNARenderer.pm      rudolfkoenig/orphan  Multimedia
 FHEM/98_DOIF.pm              damian-s             Automatisierung/DOIF
 FHEM/98_DOIFtools.pm         Ellert               Automatisierung/DOIF https://forum.fhem.de/index.php/topic,63938.0.html
 FHEM/98_Dooya.pm             Jarnsen/ralf9/darkmission        Sonstige Systeme
@@ -530,7 +530,7 @@ FHEM/98_FReplacer.pm         StefanStrobel        Sonstiges
 FHEM/98_GAEBUS.pm            jamesgo              Heizungssteuerung/Raumklima
 FHEM/98_GEOFANCY.pm          rudolfkoenig/orphan  Unterstützende Dienste
 FHEM/98_GoogleAuth.pm        betateilchen         Sonstiges
-FHEM/98_GOOGLECAST.pm        dominikkarall        Multimedia
+FHEM/98_GOOGLECAST.pm        rudolfkoenig/orphan  Multimedia
 FHEM/98_help.pm              betateilchen         Sonstiges
 FHEM/98_HMinfo.pm            martinp876           HomeMatic
 FHEM/98_HMtemplate.pm        martinp876           HomeMatic
