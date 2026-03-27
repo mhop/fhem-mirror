@@ -189,6 +189,7 @@
 # 6.05.8    fix: downgrade perl-version, get properties
 # 6.05.9    fix: error in command for Light devices, new internals ID, GEN
 # 6.05.10   add: Shelly Pro 1 UL
+# 6.05.11   fix: ID of Shelly Pro 1 UL
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -211,7 +212,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.10 26.03.2026";
+my $version = "6.05.11 27.03.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -4816,17 +4817,18 @@ sub Shelly_status2G {
   #Inputs in button-mode (Taster) CANNOT be read out!
   #Inputs of cover devices are strongly attached to the device.
   $channels = $chnls[5]; # number of inputs
+          my $VERBu=($model eq 'shellyplusuni'?3:5);#Debug "$name = $VERBu $channels";
   if( $channels>0 ){
-    Log3 $name,5,"[Shelly_status2G:input] Processing $channels input states for device $name ($model)";
+    Log3 $name,$VERBu,"[Shelly_status2G:input] Processing $channels input states for device $name ($model)";
 
     for($channel=0; $channel<$channels; $channel++){
-        Log3 $name,5,"[Shelly_status2G:input] Processing state of input $channel for device $name";
+        Log3 $name,$VERBu,"[Shelly_status2G:input] Processing state of input $channel for device $name";
         $id = $jhash->{"input:$channel"}{id};
         $subs = ($channels == 1) ? "" : "_".$channel;
         $ison = defined($jhash->{"input:$channel"}{state})?$jhash->{"input:$channel"}{state}:"unknown";
         $ison =~ s/0|(false)/off/;
         $ison =~ s/1|(true)/on/;
-        readingsBulkUpdateMonitored($hash,"input".$subs,$ison);
+        readingsBulkUpdateMonitored($hash,"input".$subs,$ison); # function
     }
     if( $model eq "shellyplusuni" ){
         # has input:2 as counter
@@ -5419,8 +5421,9 @@ sub Shelly_settings2G {
                 $subs = $shelly_models{$model}[1]==1?"":"_$i";
                 readingsBulkUpdateIfChanged($hash,"output$subs\_mode",$output_mode);
             }
-            $c++;            
-            Log3 $name,6,"[Shelly_settings2G:config:inputs] $name is of profile=$profile and input-mode=$in_mode";
+            $c++;  
+          my $VERBu=($model eq 'shellyplusuni'?3:5);         
+            Log3 $name,$VERBu,"[Shelly_settings2G:config:inputs] $name is of profile=$profile and input-mode=$in_mode";
           }
    
           my ($i_start,$input,$enable,$invert);
