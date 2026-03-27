@@ -165,7 +165,8 @@ BEGIN {
 my %vNotesIntern = (
   "2.5.0"  => "27.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
                            "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
-                           "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ",
+                           "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
+                           "aiFannDetectDrift: new drift weighting ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -25257,12 +25258,7 @@ sub _aiFannRetrainIndicator {
   $score = 0   if $score < 0;
   $score = 100 if $score > 100;
   $score = round0 ($score);
-  
-  my $ampel =  $score >= 75 ? 'green'
-             : $score >= 60 ? 'yellow'
-             :                'red';
-
-  
+    
   # Bewertungstext
   my $quality = "ok";
   
@@ -25281,6 +25277,9 @@ sub _aiFannRetrainIndicator {
                                     || ($rmse_rel       > $lim_rmse_rel && ($p95_error > $lim_p95_error ||  $p99_error  > $lim_p99_error))
                                  );
 
+  my $ampel =   $quality eq 'Retrain'    ? 'red' 
+              : $quality eq 'Borderline' ? 'yellow'
+              : 'green';
   
   if ($debug =~ /aiProcess/xs) {
       $mse_train      = round6 ($mse_train);
@@ -26040,31 +26039,26 @@ sub aiFannDetectDrift {
   my $peak_ratio = $peak_active / $n_tgt;
 
   # --- Ampel-Logik (modellskaliert) ---
+
+  my $slope_penalty = $slope_rel_drift < 0.3                                    # Quadratisch mit Schwellwert
+                    ? min (2.0, $slope_rel_drift)                               # kleine Abweichung → linear
+                    : min (2.0, $slope_rel_drift + $slope_rel_drift ** 2);      # große Abweichung → quadratisch
+  
+  my $slope_boost = ($slope_rel_drift > 0.4) ? 0.25 : 0.0;                      # Slope-Booster: greift wenn slope_rel_drift > 0.4  (entspricht slope_live < 0.6)
+  
   my $drift_index = 
       0.40 * min (3.0, $drift_score)     +                                      # stärkster Indikator
       0.30 * min (3.0, $rmse_rel_ratio)  +                                      # Peaks / Fehlerexplosionen
-      0.20 * min (2.0, $slope_rel_drift) +                                      # echte Dynamikdrift
-      0.10 * min (2.0, $bias_drift_norm);                                       # additive Verschiebung
+      0.20 * min (2.0, $slope_penalty)   +                                      # echte Dynamikdrift
+      0.10 * min (2.0, $bias_drift_norm) +                                      # additive Verschiebung
+      $slope_boost;                                                             # additiver Booster ab slope_live < 0.6
 
-  if ($drift_index > 3.2) {
-      $flag = 'severe';
-  } 
-  elsif ($drift_index > 2.3) {
-      $flag = 'moderate';
-  }
-  elsif ($drift_index > 1.5) {
-      $flag = 'mild';
-  }
-  elsif ($drift_index > 1.1) {
-      $flag = 'low';
-  }
-  elsif ($drift_index > 1.02) {
-      $flag = 'very_low';
-  }
-  else {
-      $flag = 'stable';
-  }
-
+  if    ($drift_index > 3.0)  { $flag = 'severe'   } 
+  elsif ($drift_index > 2.0)  { $flag = 'moderate' }
+  elsif ($drift_index > 1.5)  { $flag = 'mild'     }
+  elsif ($drift_index > 1.1)  { $flag = 'low'      }
+  elsif ($drift_index > 1.02) { $flag = 'very_low' }
+  else                        { $flag = 'stable'   }
 
   # --- Ergebnisse speichern ---
   $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = round2 ($bias_drift);
