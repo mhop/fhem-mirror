@@ -163,9 +163,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.0"  => "26.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
+  "2.5.0"  => "27.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
                            "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
-                           "checkPlantConfig: check con in aiRawData ",
+                           "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -417,7 +417,7 @@ use constant {
   GENCOLACT      => 'darkorange',                                                   # default Generator-Icon aktiv Färbung
   GENCOLINACT    => 'grey',                                                         # default Generator-Icon inaktiv Färbung
   
-  HPCOMFTEMP     => 20,                                                             # Wärmepumpe Solltemperatur / Komforttemperatur
+  HPCOMFTEMP     => 21,                                                             # Wärmepumpe/Klimagerät Solltemperatur / Komforttemperatur
   HISTHOURDEF    => 2,                                                              # default Anzeige vorangegangene Stunden
   HOURCOUNT      => 24,                                                             # default Stundenbalken in Grafik
   HOMEICONDEF    => 'control_building_control@grey',                                # default Home-Icon
@@ -1592,6 +1592,7 @@ my %hfspvh = (
   con               => { fn => \&_storeVal, storname => 'con',            validkey => undef,    fpar => 'comp99' },    # realer Hausverbrauch Energie
   pvrl              => { fn => \&_storeVal, storname => 'pvrl',           validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag PV
   plantderated      => { fn => \&_storeVal, storname => 'plantderated',   validkey => undef,    fpar => undef    },    # Abregelungsstatus der Anlage
+  comforttemp       => { fn => \&_storeVal, storname => 'comforttemp',    validkey => undef,    fpar => undef    },    # Komforttemperatur des Gebäudes
 );
 
   for my $in (1..MAXINVERTER) {
@@ -6745,15 +6746,17 @@ sub __getaiFannState {            ## no critic "not used"
   my $bflim    = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   '-');                       # Bit_Fail_Limit aktuell
   my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');                       # Bit_Fail_Limit Empfehlung
   
-  my $drift_score   = AiNeuralVal ($name, $fanntyp, 'DriftScore',         '-'); 
-  my $drift_rmserel = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio',  '-');  
-  my $drift_slope   = AiNeuralVal ($name, $fanntyp, 'DriftSlope',         '-'); 
-  my $drift_bias    = AiNeuralVal ($name, $fanntyp, 'DriftBias',          '-'); 
-  my $drift_flag    = AiNeuralVal ($name, $fanntyp, 'DriftFlag',          '-');
-  my $bias_recal    = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',       '-');                              
-  my $slope_recal   = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope',      '-');  
-  my $model_age     = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',      '-');
-  my $last_recaltm  = AiNeuralVal ($name, $fanntyp, 'DriftLastRecalTime', '-'); 
+  my $drift_score     = AiNeuralVal ($name, $fanntyp, 'DriftScore',         '-'); 
+  my $drift_index     = AiNeuralVal ($name, $fanntyp, 'DriftIndex',         '-');
+  my $drift_rmserel   = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio',  '-');  
+  my $drift_slope     = AiNeuralVal ($name, $fanntyp, 'DriftSlope',         '-'); 
+  my $drift_bias      = AiNeuralVal ($name, $fanntyp, 'DriftBias',          '-'); 
+  my $drift_bias_live = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive',      '-');  
+  my $drift_flag      = AiNeuralVal ($name, $fanntyp, 'DriftFlag',          '-');
+  my $bias_recal      = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',       '-');
+  my $slope_recal     = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope',      '-');  
+  my $model_age       = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',      '-');
+  my $last_recaltm    = AiNeuralVal ($name, $fanntyp, 'DriftLastRecalTime', '-'); 
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6851,7 +6854,9 @@ sub __getaiFannState {            ## no critic "not used"
   $drift    .= "<b>Drift Score:</b> $drift_score"."\n";
   $drift    .= "<b>Drift RMSE ratio:</b> $drift_rmserel"."\n";
   $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
-  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";    
+  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";                                                                                                   # wie weit es vom kalibrierten Referenzniveau abgedriftet ist
+  $drift    .= "<b>Drift Bias Live:</b> $drift_bias_live"."\n";                                                                                         # zeigt wie stark das Modell aktuell daneben liegt
+  $drift    .= "<b>Drift Index:</b> $drift_index"."\n";  
   $drift    .= "<b>".$hqtxt{drfrat}{$lang}.":</b> $drift_flag"."\n";                                                                                    # Drift Bewertung
   $drift    .= "<b>Slope recalibrated:</b> $slope_recal"."\n";                                                                                          # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
   $drift    .= "<b>Bias recalibrated:</b> $bias_recal"."\n";                                                                                            # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
@@ -7411,7 +7416,6 @@ sub _attrconsumer {                      ## no critic "not used"
       noshow        => { comp => '',                                must => 0, act => 0 },
       exconfc       => { comp => '[012]',                           must => 0, act => 0 },
       pvshare       => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
-      comforttemp   => { comp => '.*',                              must => 0, act => 1 },
   };
 
   if ($cmd eq 'set') {
@@ -7925,6 +7929,7 @@ sub _attrplantControl {                  ## no critic "not used"
       reductionState            => { comp => '[^\s]+:[^\s]+:[^\s]+',                              act => 1 },
       consForecastBase          => { comp => $cforegex,                                           act => 1 },
       showLink                  => { comp => '(0|1)',                                             act => 0 },
+      comforttemp               => { comp => '.*',                                                act => 1 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -8938,13 +8943,13 @@ sub __attrKeyAction {
 
       if ($akey eq 'capacity') {
           if (!isNumeric ($akeyval)) {
-              return qq{The value of key '$akey' must be numeric. Please consider the commandref.};
+              return qq{The value '$akey=$akeyval' must be numeric. Please consider the commandref.};
           }
       }
 
       if ($akey eq 'limit') {
           if (!isNumeric ($akeyval) || $akeyval < 0 || $akeyval > 100) {
-              return qq{The value of key '$akey' is not valid. Please consider the commandref.};
+              return qq{The value '$akey=$akeyval' is not valid. Please consider the commandref.};
           }
       }
 
@@ -8970,7 +8975,7 @@ sub __attrKeyAction {
       
       if ($init_done && $akey eq 'aiConProfile') {
           if ($akeyval =~ /heatpump/xs) {
-              my ($hp, $comftemp) = isHeatPumpUsed ($name);                                                         # Consumer Nummer , Solltemp falls WP verwendet
+              my $hp = isHeatPumpUsed ($name);                                                          # Consumer Nummer , Solltemp falls WP verwendet
               if (!defined $hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
           }
       }
@@ -8982,7 +8987,7 @@ sub __attrKeyAction {
           for my $hnum (keys %{$h}) {                                
               my ($cfodev, $cford, $def) = split ":", $h->{$hnum}; 
               
-              if ($cfodev && $cford) {                                                  # Auswertung Device/Reading Kombi
+              if ($cfodev && $cford) {                                                                  # Auswertung Device/Reading Kombi
                   ($err) = isDeviceValid ( { name   => $name,
                                              obj    => $cfodev,
                                              method => 'string',
@@ -9069,7 +9074,7 @@ sub __attrKeyAction {
       
           # --- Checks Consumer Typ Wärmepumpe
           if ($akeyval eq 'heatpump') {
-              my ($hp) = isHeatPumpUsed ($name);                                                       
+              my $hp = isHeatPumpUsed ($name);                                                       
               
               if (defined $hp && $aName ne 'consumer'.$hp) {                                           # andere "heatpump" bereits definiert? -> kann nur eine WP geben
                   return qq{A 'heatpump' type consumer ($hp) has already been defined.};
@@ -9081,15 +9086,11 @@ sub __attrKeyAction {
               
               if (!defined $pphash->{etotal} || !defined $pphash->{pcurr} || !defined $pphash->{swstate}) {
                   return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate' and 'pcurr' to be defined.};
-              }
-
-              if (!defined $pphash->{comforttemp}) {
-                  return qq{The consumer type 'heatpump' needs the key 'comforttemp' to be defined.};
               }        
           }
       }
       
-      if ($akey eq 'aliasshort') {                                                                  # Kurzalias
+      if ($akey eq 'aliasshort') {                                                                      # Kurzalias
           if (strlength ($akeyval) > 10) {
               return "The short alias '$akeyval' longer than allowed. See command reference.";
           }
@@ -9249,8 +9250,12 @@ sub __attrKeyAction {
       }
       
       if ($akey eq 'comforttemp') {          
-          if (isNumeric ($akeyval) && $akeyval =~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
-              return $err;
+          if (isNumeric ($akeyval)) {
+              if ($akeyval =~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
+                  return;
+              }
+              
+              return "The value '$akey=$akeyval' is not within a valid range. Please consider the commandref.";
           }
           else {
               my ($dv, $rd) = split ':', $akeyval;
@@ -10923,16 +10928,6 @@ sub _collectAllRegConsumers {
               $setshift  *= 60 if(defined $setshift  && isNumeric($setshift));
           }
       }
-      
-      my ($comforttemp, $comforttempdev, $comforttemprdg);
-      if (exists $hc->{comforttemp}) {
-          if (isNumeric ($hc->{comforttemp}) && $hc->{comforttemp} =~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
-              $comforttemp = $hc->{comforttemp};
-          }
-          else {
-              ($comforttempdev, $comforttemprdg) = split ':', $hc->{comforttemp};           
-          }        
-      }
 
       my $clt;
       if (exists $hc->{locktime}) {
@@ -10941,10 +10936,7 @@ sub _collectAllRegConsumers {
 
       delete $data{$name}{consumers}{$c}{sunriseshift};
       delete $data{$name}{consumers}{$c}{sunsetshift};
-      delete $data{$name}{consumers}{$c}{icon};
-      delete $data{$name}{consumers}{$c}{comforttempdev}; 
-      delete $data{$name}{consumers}{$c}{comforttemprdg}; 
-      delete $data{$name}{consumers}{$c}{comforttemp};      
+      delete $data{$name}{consumers}{$c}{icon};   
 
 
       my $rauto = $hc->{auto} // q{};
@@ -10997,10 +10989,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{hysteresis}        = $hyst;                                               # Hysterese
       $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift          if(defined $riseshift);          # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
       $data{$name}{consumers}{$c}{sunsetshift}       = $setshift           if(defined $setshift);           # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
-      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}         if(defined $hc->{icon});         # Icon für den Verbraucher
-      $data{$name}{consumers}{$c}{comforttempdev}    = $comforttempdev     if(defined $comforttempdev);     # Device für HP-Solltemperatur
-      $data{$name}{consumers}{$c}{comforttemprdg}    = $comforttemprdg     if(defined $comforttemprdg);     # Reading für HP-Solltemperatur
-      $data{$name}{consumers}{$c}{comforttemp}       = $comforttemp        if(defined $comforttemp);        # Solltemperatur für Wärmepumpen-Consumer  
+      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}         if(defined $hc->{icon});         # Icon für den Verbraucher 
   }
 
   $data{$name}{current}{consumerCollected} = 1;
@@ -13166,9 +13155,9 @@ sub _transferEnvironmentValues {
   my $minute = $paref->{minute};
   
   my $peh = __parseAttrEnvironment ($name);                                                         # Parsed Hash
-  return if(!$peh);
+  #return if(!$peh);
              
-  ## --- Anwesenheit auswerten
+  # --- Anwesenheit auswerten
   my $presence_weighted;
    
   if (defined $peh->{presenceDev}) {
@@ -13207,9 +13196,15 @@ sub _transferEnvironmentValues {
       }  
   }
   
-  my $hod = sprintf "%02d", ($chour + 1);                                                 
+  # --- Komforttemperatur auslesen
+  my $comforttemp = CurrentVal ($name, 'comforttemp', HPCOMFTEMP);                                     
+  
+  my $hod = sprintf "%02d", ($chour + 1);  
 
   # --- Werte speichern
+  $data{$name}{circular}{$hod}{comforttemp} = $comforttemp;
+  writeToHistory ( { paref => $paref, key => 'comforttemp', val => $comforttemp, day => $day, hour => $hod } );
+  
   if (defined $presence_weighted) {
       $data{$name}{circular}{$hod}{presence} = $presence_weighted;
       writeToHistory ( { paref => $paref, key => 'presence', val => $presence_weighted, day => $day, hour => $hod } );
@@ -15000,24 +14995,7 @@ sub _manageConsumerData {
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
       $paref->{consumer} = $c;
       my $consumer       = ConsumerVal ($name, $c, 'name',  '');
-      my $alias          = ConsumerVal ($name, $c, 'alias', '');
-      
-      ## Comforttemperatur bei HP-Consumer auslesen
-      my $cftdev = ConsumerVal ($name, $c, "comforttempdev", '');
-      my $cftrdg = ConsumerVal ($name, $c, "comforttemprdg", '');
-      
-      if ($cftdev && $cftrdg) {
-          my $comforttemp = ReadingsNum ($cftdev, $cftrdg,            ''); 
-
-          if (isNumeric ($comforttemp) && $comforttemp =~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
-              $data{$name}{consumers}{$c}{comforttemp} = $comforttemp;
-          }
-          else {
-              delete $data{$name}{consumers}{$c}{comforttemp};
-              my $msg = "consumer $c -> got invalid value=$comforttemp from device=$cftdev, reading=$cftrdg. Check key 'comforttemp'.";          
-              Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));          
-          }
-      }      
+      my $alias          = ConsumerVal ($name, $c, 'alias', '');     
 
       ## aktuelle Leistung auslesen
       ##############################
@@ -23171,7 +23149,6 @@ sub __aiAddRawData {
   my $dosave = 0;
   $day       = $yday     if(defined $yday);                                                             # der vergangene Tag soll verarbeitet werden
   $dayname   = $ydayname if(defined $ydayname);                                                         # Name des Vortages
-  my ($hp)   = isHeatPumpUsed ($name);                                                                  # WP-Consumer Nummer falls WP verwendet
 
   for my $pvd (sort keys %{$data{$name}{pvhist}}) {
       next if(!$pvd);
@@ -23193,29 +23170,29 @@ sub __aiAddRawData {
           
           my $ridx      = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
 
-          my $temp      = HistoryVal ($name, $pvd, $hod, 'temp',           undef);
-          my $presence  = HistoryVal ($name, $pvd, $hod, 'presence',       undef);
-          my $sunalt    = HistoryVal ($name, $pvd, $hod, 'sunalt',             0);
-          my $sunaz     = HistoryVal ($name, $pvd, $hod, 'sunaz',              0);
-          my $con       = HistoryVal ($name, $pvd, $hod, 'con',            undef);
-          my $conaifc   = HistoryVal ($name, $pvd, $hod, 'conaifc',        undef);
-          my $gcons     = HistoryVal ($name, $pvd, $hod, 'gcons',          undef);
-          my $wcc       = HistoryVal ($name, $pvd, $hod, 'wcc',            undef);
-          my $wid       = HistoryVal ($name, $pvd, $hod, 'weatherid',      undef);                      # Wetter ID
-          my $rr1c      = HistoryVal ($name, $pvd, $hod, 'rr1c',           undef);
-          my $rad1h     = HistoryVal ($name, $pvd, $hod, 'rad1h',          undef);
-          my $pvrlvd    = HistoryVal ($name, $pvd, $hod, 'pvrlvd',             1);                      # PV Generation valide?
-          my $pvrl      = HistoryVal ($name, $pvd, $hod, 'pvrl',           undef);
-          my $socwhsum  = HistoryVal ($name, $pvd, $hod, 'socwhsum',       undef);                      # erreichter SoC total (Wh)
-          my $windspeed = HistoryVal ($name, $pvd, $hod, 'windspeed',      undef);                      # Windgeschwindigkeit in m/s -> Großwetterlage / Trend
-          my $wind_fast = HistoryVal ($name, $pvd, $hod, 'windspeed_fast', undef);
-          
-          $minutes_on_wp = HistoryVal ($name, $pvd, $hod, 'minutescsm'.$hp, undef) if(defined $hp);     # Aktivminuten der Wärmepumpe falls vorhanden
+          my $temp      = HistoryVal ($name, $pvd, $hod, 'temp',             undef);
+          my $presence  = HistoryVal ($name, $pvd, $hod, 'presence',         undef);
+          my $sunalt    = HistoryVal ($name, $pvd, $hod, 'sunalt',               0);
+          my $sunaz     = HistoryVal ($name, $pvd, $hod, 'sunaz',                0);
+          my $con       = HistoryVal ($name, $pvd, $hod, 'con',              undef);
+          my $conaifc   = HistoryVal ($name, $pvd, $hod, 'conaifc',          undef);
+          my $gcons     = HistoryVal ($name, $pvd, $hod, 'gcons',            undef);
+          my $wcc       = HistoryVal ($name, $pvd, $hod, 'wcc',              undef);
+          my $wid       = HistoryVal ($name, $pvd, $hod, 'weatherid',        undef);                    # Wetter ID
+          my $rr1c      = HistoryVal ($name, $pvd, $hod, 'rr1c',             undef);
+          my $rad1h     = HistoryVal ($name, $pvd, $hod, 'rad1h',            undef);
+          my $pvrlvd    = HistoryVal ($name, $pvd, $hod, 'pvrlvd',               1);                    # PV Generation valide?
+          my $pvrl      = HistoryVal ($name, $pvd, $hod, 'pvrl',             undef);
+          my $socwhsum  = HistoryVal ($name, $pvd, $hod, 'socwhsum',         undef);                    # erreichter SoC total (Wh)
+          my $windspeed = HistoryVal ($name, $pvd, $hod, 'windspeed',        undef);                    # Windgeschwindigkeit in m/s -> Großwetterlage / Trend
+          my $wind_fast = HistoryVal ($name, $pvd, $hod, 'windspeed_fast',   undef);
+          my $comftemp  = HistoryVal ($name, $pvd, $hod, 'comforttemp', HPCOMFTEMP);                    # Komforttemperatur des Gebäudes   
           
           $data{$name}{aidectree}{airaw}{$ridx}{sunalt}         = $sunalt;
           $data{$name}{aidectree}{airaw}{$ridx}{sunaz}          = $sunaz;
           $data{$name}{aidectree}{airaw}{$ridx}{dayname}        = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}            = $hod;
+          $data{$name}{aidectree}{airaw}{$ridx}{comforttemp}    = $comftemp;
           $data{$name}{aidectree}{airaw}{$ridx}{socwhsum}       = $socwhsum                        if(defined $socwhsum);
           $data{$name}{aidectree}{airaw}{$ridx}{temp}           = round1 ($temp)                   if(defined $temp);
           $data{$name}{aidectree}{airaw}{$ridx}{con}            = $con                             if(defined $con     && $con     >= 0);
@@ -23226,7 +23203,6 @@ sub __aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{rr1c}           = $rr1c                            if(defined $rr1c);
           $data{$name}{aidectree}{airaw}{$ridx}{rad1h}          = $rad1h                           if(defined $rad1h && $rad1h >  0);
           $data{$name}{aidectree}{airaw}{$ridx}{pvrl}           = $pvrl                            if(defined $pvrl  && $pvrl  >= 0);
-          $data{$name}{aidectree}{airaw}{$ridx}{minutes_wp}     = $minutes_on_wp                   if(defined $minutes_on_wp);
           $data{$name}{aidectree}{airaw}{$ridx}{presence}       = $presence                        if(defined $presence);
           $data{$name}{aidectree}{airaw}{$ridx}{holiday}        = $holiday                         if(defined $holiday);
           $data{$name}{aidectree}{airaw}{$ridx}{windspeed}      = $windspeed                       if(defined $windspeed);
@@ -23412,14 +23388,13 @@ sub aiFannCreateConTrainData {
   my $shuffle_period    = CurrentVal ($name, 'aiConShufflePeriod',        10);            # bei shuffle_mode -> alle X Epochen Trainingsdaten AI::FANN intern neu mischen
   my $bit_fail_limit    = CurrentVal ($name, 'aiConBitFailLimit',       0.35);            # Bit-Fail Limit
   my $haf               = CurrentVal ($name, 'aiConActFunc',       'SIGMOID');            # Hidden Activation Function
+  my $comftemp          = CurrentVal ($name, 'comforttemp',       HPCOMFTEMP);            # Comport-Temp des Gebäudes
   my $oaf               = 'LINEAR';                                                       # Output Activation Function 
   my $mse_error         = 0.001;                                                          # gewünschter Fehler (MSE-Schwelle)
   my $range             = _aiFannAfNormRange ($haf);
   my $fanntyp           = 'con';                                                          # FANN Verwendungsart 'consumption' Prognose
   
-  my $pvrl_prev         = 0;                                                              # virtueller Startwert PV real vor ersten Wert                                                 
-  my ($hp, $comftemp)   = isHeatPumpUsed ($name);                                         # Consumer Nummer , Solltemp falls WP verwendet
-  $comftemp           //= HPCOMFTEMP;                                                     # Solltemperatur WP-Heizung
+  my $pvrl_prev         = 0;                                                              # virtueller Startwert PV real vor ersten Wert                                                
   
   # Rohdaten in Reihenfolge extrahieren und vorbereiten
   #######################################################  
@@ -24214,10 +24189,10 @@ return $sigs;
 sub _aiSelectRegistryVersion {                                        
   my ($name) = @_;
 
-  my ($c, $ct) = isHeatPumpUsed ($name);
+  my $hp = isHeatPumpUsed ($name);
  
  # defaults
-  my $frvdef = defined $c 
+  my $frvdef = defined $hp 
                ? 'v1_heatpump_pv'                                           # Haushalt mit Wärmepumpe + PV
                : 'v1_common_pv';                                            # Standardhaushalt + PV
             
@@ -24228,7 +24203,7 @@ sub _aiSelectRegistryVersion {
       $frv = $frvdef;
   }
   
-  $frv = $frvdef if($frv =~ /heatpump/xs && !defined $c);                   # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
+  $frv = $frvdef if($frv =~ /heatpump/xs && !defined $hp);                  # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
       
 return $frv;
 }
@@ -25393,15 +25368,14 @@ sub aiFannGetConResult {
       return $msg;
   }
   
-  $pv_max_limit         = $pv_max_limit * AIASPEAKSFAC;                                         # Peak Sicherheitsaufschlag
+  $pv_max_limit  = $pv_max_limit * AIASPEAKSFAC;                                                # Peak Sicherheitsaufschlag
   
-  my $cst               = [gettimeofday];                                                       # Startzeit
-  my $haf               = AiNeuralVal ($name, 'con', 'HiddActFunc', 'SIGMOID');                 # Hidden Activation Function
-  my $alpha             = CurrentVal  ($name, 'aiConAlpha', 1);                                 # Steuerung Hybridmodell
-  my $oaf               = 'LINEAR';                                                             # Output Activation Function
-  my $range             = _aiFannAfNormRange ($haf);
-  my ($hp, $comftemp)   = isHeatPumpUsed ($name);                                               # Consumer Nummer , Solltemp falls WP verwendet
-  $comftemp           //= HPCOMFTEMP;                                                           # Solltemperatur WP-Heizung
+  my $cst        = [gettimeofday];                                                              # Startzeit
+  my $haf        = AiNeuralVal ($name, 'con', 'HiddActFunc', 'SIGMOID');                        # Hidden Activation Function
+  my $alpha      = CurrentVal  ($name, 'aiConAlpha', 1);                                        # Steuerung Hybridmodell
+  my $oaf        = 'LINEAR';                                                                    # Output Activation Function
+  my $range      = _aiFannAfNormRange ($haf);
+  my $comftemp   = CurrentVal ($name, 'comforttemp', HPCOMFTEMP);                               # Comport-Temp des Gebäudes
   
   ## letzte reale Zielwerte / Temperaturen für Regression lesen
   ###############################################################
@@ -26067,9 +26041,9 @@ sub aiFannDetectDrift {
 
   # --- Ampel-Logik (modellskaliert) ---
   my $drift_index = 
-      0.45 * min (3.0, $drift_score)     +                                      # stärkster Indikator
+      0.40 * min (3.0, $drift_score)     +                                      # stärkster Indikator
       0.30 * min (3.0, $rmse_rel_ratio)  +                                      # Peaks / Fehlerexplosionen
-      0.15 * min (2.0, $slope_rel_drift) +                                      # echte Dynamikdrift
+      0.20 * min (2.0, $slope_rel_drift) +                                      # echte Dynamikdrift
       0.10 * min (2.0, $bias_drift_norm);                                       # additive Verschiebung
 
   if ($drift_index > 3.2) {
@@ -26094,6 +26068,7 @@ sub aiFannDetectDrift {
 
   # --- Ergebnisse speichern ---
   $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = round2 ($bias_drift);
+  $data{$name}{neuralnet}{$fanntyp}{DriftIndex}        = round2 ($drift_index);
   $data{$name}{neuralnet}{$fanntyp}{DriftSlope}        = round3 ($slope_drift);
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);
   $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = round2 ($drift_score);
@@ -27639,7 +27614,8 @@ sub _listDataPoolPvHist {
           my $socwhsum     = HistoryVal ($name, $day, $key, 'socwhsum',       '-');
           my $pd           = HistoryVal ($name, $day, $key, 'plantderated',   '-');
           my $presence     = HistoryVal ($name, $day, $key, 'presence',       '-');  
-          my $holiday      = HistoryVal ($name, $day, $key, 'holiday',        '-');
+          my $holiday      = HistoryVal ($name, $day, $key, 'holiday',        '-');     
+          my $comforttemp  = HistoryVal ($name, $day, $key, 'comforttemp',    '-');
 
           if ($export eq 'csv') {
               $hexp->{$day}{$key}{PVreal}              = $pvrl;
@@ -27672,6 +27648,7 @@ sub _listDataPoolPvHist {
               $hexp->{$day}{$key}{BatteryProgSocWhSum} = $socprogwhsum;
               $hexp->{$day}{$key}{PlantDerated}        = $pd;
               $hexp->{$day}{$key}{Presence}            = $presence;
+              $hexp->{$day}{$key}{ComfortTemp}         = $comforttemp;
               $hexp->{$day}{$key}{Holiday}             = $holiday;
           }
 
@@ -27812,6 +27789,7 @@ sub _listDataPoolPvHist {
               $ret .= "rr1c: $rr1c, ";
               $ret .= "pvcorrf: $pvcorrf ";
               $ret .= "temp: $temp, ";
+              $ret .= "comforttemp: $comforttemp, ";
               $ret .= "presence: $presence ";             
           }
           
@@ -28017,6 +27995,7 @@ sub _listDataPoolCircular {
       my $pvcorrf    = CircularVal ($name, $idx, 'pvcorrf',        '-');
       my $quality    = CircularVal ($name, $idx, 'quality',        '-');
       my $presence   = CircularVal ($name, $idx, 'presence',       '-');
+      my $comftemp   = CircularVal ($name, $idx, 'comforttemp',    '-');
 
       my $pvcf = _ldchash2val ( {pool => $h, idx => $idx, key => 'pvcorrf', cval => $pvcorrf} );
       my $cfq  = _ldchash2val ( {pool => $h, idx => $idx, key => 'quality', cval => $quality} );
@@ -28092,7 +28071,7 @@ sub _listDataPoolCircular {
           $sq .= "\n      $bin";
           $sq .= "\n      $bout";
           $sq .= "\n      confc: $confc, gcons: $gcons, gfeedin: $gfeedin, wcc: $wcc, rr1c: $rr1c";
-          $sq .= "\n      temp: $temp, windspeed: $windspeed, windspeed_fast: $wind_fast, presence: $presence, wid: $wid, wtxt: $wtxt";
+          $sq .= "\n      temp: $temp, comforttemp: $comftemp, windspeed: $windspeed, windspeed_fast: $wind_fast, presence: $presence, wid: $wid, wtxt: $wtxt";
           $sq .= "\n      $prdl";
           $sq .= "\n      pvcorrf: $pvcf";
           $sq .= "\n      quality: $cfq";
@@ -28461,7 +28440,7 @@ sub _listDataPoolAiRawData {
       my $conaifc       = AiRawdataVal ($name, $idx, 'conaifc',        '-');
       my $gcons         = AiRawdataVal ($name, $idx, 'gcons',          '-');
       my $socwhsum      = AiRawdataVal ($name, $idx, 'socwhsum',       '-');
-      my $minutes_on_wp = AiRawdataVal ($name, $idx, 'minutes_wp',     '-');
+      my $comforttemp   = AiRawdataVal ($name, $idx, 'comforttemp',     '-');
       my $presence      = AiRawdataVal ($name, $idx, 'presence',       '-');    
       my $holiday       = AiRawdataVal ($name, $idx, 'holiday',        '-'); 
       my $windspeed     = AiRawdataVal ($name, $idx, 'windspeed',      '-');
@@ -28482,7 +28461,7 @@ sub _listDataPoolAiRawData {
       $sq .= "$idx => hod: $hod, dayname: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, weatherid: $wid, ";
       $sq .= "rr1c: $rr1c, temp: $temp, socwhsum: $socwhsum ";
       $sq .= "\n              ";
-      $sq .= "windspeed: $windspeed, windspeed_fast: $wind_fast, pvrl: $pvrl, pvrlvd: $pvrlvd, minutes_wp: $minutes_on_wp, ";
+      $sq .= "windspeed: $windspeed, windspeed_fast: $wind_fast, pvrl: $pvrl, pvrlvd: $pvrlvd, comforttemp: $comforttemp, ";
       $sq .= "conaifc: $conaifc, con: $con, gcons: $gcons, ";
       $sq .= "presence: $presence, holiday: $holiday ";
        
@@ -30945,13 +30924,10 @@ return $holiday;
 ################################################################
 sub isHeatPumpUsed {
   my $name = shift;
-
-  my $ct;
   
-  my $c = CurrentVal  ($name, 'heatpumpInstalled', undef);
-  $ct   = ConsumerVal ($name, $c, 'comforttemp',   undef) if(defined $c);
+  my $hp = CurrentVal ($name, 'heatpumpInstalled', undef);  
   
-return ($c, $ct);
+return $hp;
 }
 
 ################################################################
@@ -33710,9 +33686,10 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batsocXX</b>       </td><td>real State of charge SOC (%) of battery XX at the end of the hour                                                        </td></tr>
             <tr><td> <b>batmaxsocXX</b>    </td><td>Maximum SOC (%) achieved by battery XX on the day                                                                        </td></tr>
             <tr><td> <b>batsetsocXX</b>    </td><td>Optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>
+            <tr><td> <b>comforttemp</b>    </td><td>set comfort temperature for the building in °C                                                                           </td></tr>
             <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                                         </td></tr>
             <tr><td> <b>conaifc</b>        </td><td>energy consumption predicted by AI (Wh)                                                                                  </td></tr>
-            <tr><td> <b>conbiascorr</b>     </td><td>combined bias and drift correction included in the AI consumption forecast (Wh)        </td></tr>
+            <tr><td> <b>conbiascorr</b>    </td><td>combined bias and drift correction included in the AI consumption forecast (Wh)                                          </td></tr>
             <tr><td> <b>conlegfc</b>       </td><td>conventional energy consumption forecast without AI (Wh)                                                                 </td></tr>
             <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
             <tr><td> <b>conprice</b>       </td><td>Price for the purchase of one kWh. The currency of the price is defined in the setupMeterDev.                            </td></tr>
@@ -33777,7 +33754,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batouttotXX</b>            </td><td>total energy drawn from the battery XX (Wh)                                                                           </td></tr>
             <tr><td> <b>batintotXX</b>             </td><td>current total energy charged into the battery XX (Wh)                                                                 </td></tr>
             <tr><td> <b>careCycleViolationXX</b>   </td><td>Time stamp of the defined careCycle cycle being exceeded for battery XX                                               </td></tr>
-            <tr><td> <b>confc</b>                  </td><td>expected energy consumption (Wh) of the house on the current day                                                      </td></tr>
+            <tr><td> <b>comforttemp</b>            </td><td>set comfort temperature for the building in °C                                                                        </td></tr>
+            <tr><td> <b>confc</b>                  </td><td>expected energy consumption (Wh)                                                                                      </td></tr>
             <tr><td> <b>con_quantile30</b>         </td><td>30% quantile of energy consumption (Wh) for the last available days in pvHistory                                      </td></tr>
             <tr><td> <b>con_quantile90</b>         </td><td>90% quantile of energy consumption (Wh) for the last available days in pvHistory                                      </td></tr>
             <tr><td> <b>con_all</b>                </td><td>an array of values of the house consumption (Wh) on certain days of the selected hour                                 </td></tr>
@@ -34444,11 +34422,6 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-            <tr><td> <b>comforttemp</b>    </td><td>Target temperature (comfort temperature) in the interior spaces in °C. (mandatory field)                                                           </td></tr>
-            <tr><td>                       </td><td>The value can be set permanently or supplied by a &lt;Device&gt;:&lt;Reading&gt; combination:                                                      </td></tr>                
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - The device/reading combination provides the temperature.                                                   </td></tr>
-            <tr><td>                       </td><td>Value range: <b>-40..40</b>                                                                                                                        </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>&lt;Reading&gt;:&lt;Unit&gt; (Wh/kWh) of the consumer device that provides the total amount of energy consumed. (mandatory field)                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>&lt;Reading&gt;:&lt;Unit&gt; (W/kW) that provides the current energy consumption. (mandatory field)                                                </td></tr>
@@ -34471,7 +34444,7 @@ to ensure that the system configuration is correct.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@ed type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                              <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                           <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1 spignorecond=SolCast:Current_PV:{($VALUE)=split/\s/,$VALUE;$VALUE>10?1:0;}          <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39 surpmeth=median_10                                                                                                      <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39 surpmeth=median_10                                                                                        <br>
        </ul>
        </li>
        <br>
@@ -35225,6 +35198,11 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batteryPreferredCharge</b>    </td><td>Consumers with the <b>can</b> mode are only switched on when the specified battery charge (%) is reached.                                                                </td></tr>
             <tr><td>                                  </td><td>Consumers with the <b>must</b> mode do not observe the priority charging of the battery.                                                                                 </td></tr>
             <tr><td>                                  </td><td>Value: <b>Integer 0..100</b>, default: 0                                                                                                                                 </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+            <tr><td> <b>comforttemp</b>               </td><td>Target temperature (comfort temperature) in the interior spaces in °C.                                                                                                   </td></tr>
+            <tr><td>                                  </td><td>The value can be set permanently or supplied by a &lt;Device&gt;:&lt;Reading&gt; combination:                                                                            </td></tr>                
+            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - The device/reading combination provides the temperature.                                                                         </td></tr>
+            <tr><td>                                  </td><td>Value range: <b>-40..40</b>, default: 21                                                                                                                                 </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>conEnergyHourLimit</b>        </td><td>Limitierung des maximal möglichen Energieverbrauches im Hausnetz pro Stunde (Wh).                                                                                        </td></tr>
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                                        </td></tr>
@@ -36724,14 +36702,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batsocXX</b>        </td><td>realer Ladezustand SOC (%) der Batterie XX am Ende der Stunde                                          </td></tr>
             <tr><td> <b>batmaxsocXX</b>     </td><td>maximal erreichter SOC (%) der Batterie XX an dem Tag                                                  </td></tr>
             <tr><td> <b>batsetsocXX</b>     </td><td>optimaler SOC Sollwert (%) der Batterie XX für den Tag                                                 </td></tr>
-            <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total von ConsumerXX                                                                  </td></tr>
-            <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)            </td></tr>
+            <tr><td> <b>comforttemp</b>     </td><td>eingestellte Komforttemperatur des Gebäudes in °C                                                      </td></tr>
             <tr><td> <b>confc</b>           </td><td>erwarteter Energieverbrauch (Wh)                                                                       </td></tr>
             <tr><td> <b>conaifc</b>         </td><td>durch KI prognostizierter Energieverbrauch (Wh)                                                        </td></tr>
             <tr><td> <b>conbiascorr</b>     </td><td>in der KI Verbrauchsprognose enthaltene kombinierte Bias- und Driftkorrektur (Wh)                      </td></tr>
             <tr><td> <b>conlegfc</b>        </td><td>herkömmlich ohne KI prognostizierter Energieverbrauch (Wh)                                             </td></tr>
             <tr><td> <b>con</b>             </td><td>realer Energieverbrauch (Wh) des Hauses                                                                </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.                 </td></tr>
+            <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total von ConsumerXX                                                                  </td></tr>
+            <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)            </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                          </td></tr>
             <tr><td> <b>dayname</b>         </td><td>Kurzname des Tages (locale-abhängig)                                                                   </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                                   </td></tr>
@@ -36792,7 +36771,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batouttotXX</b>            </td><td>aktuell total aus der Batterie XX entnommene Energie (Wh)                                                                 </td></tr>
             <tr><td> <b>batintotXX</b>             </td><td>aktuell total in die Batterie XX geladene Energie (Wh)                                                                    </td></tr>
             <tr><td> <b>careCycleViolationXX</b>   </td><td>Zeitstempel der Überschreitung des definierten careCycle-Zyklus von Batterie XX                                           </td></tr>
-            <tr><td> <b>confc</b>                  </td><td>erwarteter Energieverbrauch (Wh) des Hauses am aktuellen Tag                                                              </td></tr> 
+            <tr><td> <b>comforttemp</b>            </td><td>eingestellte Komforttemperatur des Gebäudes in °C                                                                         </td></tr>
+            <tr><td> <b>confc</b>                  </td><td>erwarteter Energieverbrauch (Wh)                                                                                          </td></tr> 
             <tr><td> <b>con_quantile30</b>         </td><td>30%-Quantil des Energieverbrauchs (Wh) der letzten verfügbaren Tage in pvHistory                                          </td></tr>
             <tr><td> <b>con_quantile90</b>         </td><td>90%-Quantil des Energieverbrauchs (Wh) der letzten verfügbaren Tage in pvHistory                                          </td></tr>
             <tr><td> <b>con_all</b>                </td><td>ein Array aus Werten des Hausverbrauches (Wh) an bestimmten Tagen der ausgewählten Stunde                                 </td></tr>
@@ -37459,11 +37439,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-            <tr><td> <b>comforttemp</b>    </td><td>Solltemperatur (Komforttemperatur) in den Innenräumen in °C (Pflichtangabe).                                                                       </td></tr>
-            <tr><td>                       </td><td>Der Wert kann fest gesetzt oder durch eine &lt;Device&gt;:&lt;Reading&gt;-Kombination geliefert werden:                                            </td></tr>                
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert die Temperatur                                                      </td></tr>
-            <tr><td>                       </td><td>Wertebereich: <b>-40..40</b>                                                                                                                       </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>&lt;Reading&gt;:&lt;Einheit&gt; (Wh/kWh) des Consumer Device, welches die Summe der verbrauchten Energie liefert. (Pflichtangabe)                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>&lt;Reading&gt;:&lt;Einheit&gt; (W/kW) welches den aktuellen Energieverbrauch liefert. (Pflichtangabe)                                             </td></tr>
@@ -37486,7 +37461,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <b>attr &lt;name&gt; consumer04</b> Shelly.shellyplug3 icon=scene_microwave_oven@red type=heater power=2000 mode=must notbefore=07 mintime=600 on=on off=off etotal=relay_0_energy_Wh:Wh pcurr=relay_0_power:W auto=automatic interruptable=eg.wz.wandthermostat:diff-temp:(22)(\.[2-9])|([2-9][3-9])(\.[0-9]):0.2                             <br>
          <b>attr &lt;name&gt; consumer05</b> Shelly.shellyplug4 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=7 notafter=20:10 auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath interruptable=1                                                                                                           <br>
          <b>attr &lt;name&gt; consumer06</b> Shelly.shellyplug5 icon=sani_buffer_electric_heater_side type=heater mode=must power=1000 notbefore=07:20 notafter={return'20:05'} auto=automatic pcurr=actpow:W on=on off=off mintime=SunPath:60:-120 interruptable=1 spignorecond=SolCast:Current_PV:{($VALUE)=split/\s/,$VALUE;$VALUE>10?1:0;}          <br>
-         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39 surpmeth=median_10                                                                                                         <br>
+         <b>attr &lt;name&gt; consumer07</b> SolCastDummy icon=sani_buffer_electric_heater_side type=heater mode=can power=600 auto=automatic pcurr=actpow:W on=on off=off mintime=15 asynchron=1 locktime=300:1200 interruptable=1 noshow=39 surpmeth=median_10                                                                                        <br>
        </ul>
        </li>
        <br>
@@ -38239,6 +38214,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batteryPreferredCharge</b>    </td><td>Verbraucher mit dem Mode <b>can</b> werden erst dann eingeschaltet, wenn die angegebene Batterieladung (%) erreicht ist.                                             </td></tr>
             <tr><td>                                  </td><td>Verbraucher mit dem Mode <b>must</b> beachten die Vorrangladung der Batterie nicht.                                                                                  </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl 0..100</b>, default: 0                                                                                                                             </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+            <tr><td> <b>comforttemp</b>               </td><td>Solltemperatur (Komforttemperatur) in den Innenräumen in °C.                                                                                                         </td></tr>
+            <tr><td>                                  </td><td>Der Wert kann fest gesetzt oder durch eine &lt;Device&gt;:&lt;Reading&gt;-Kombination geliefert werden:                                                              </td></tr>                
+            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert die Temperatur                                                                        </td></tr>
+            <tr><td>                                  </td><td>Wertebereich: <b>-40..40</b>, default: 21                                                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>conEnergyHourLimit</b>        </td><td>Limitierung des maximal möglichen Energieverbrauches im Hausnetz pro Stunde (Wh).                                                                                    </td></tr>
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                                    </td></tr>
