@@ -87,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "28.03.24";
+our $ModulVersion = "28.03.26";
 our $missingModul = "";
 our $missingXML = "";
 
