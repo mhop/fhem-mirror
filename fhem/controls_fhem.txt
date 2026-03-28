@@ -1,8 +1,8 @@
-REV 31028
+REV 31037
 DIR unused
 UPD 2026-03-25_07:45:13 455093 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2026-03-26_07:45:04 47888 ./MAINTAINER.txt
+UPD 2026-03-28_07:45:04 47888 ./MAINTAINER.txt
 UPD 2026-01-30_07:45:03 47178 ./configDB.pm
 UPD 2023-05-29_07:45:03 21936 ./fhem.cfg.demo
 UPD 2026-03-22_07:45:18 175848 ./fhem.pl
@@ -201,7 +201,7 @@ UPD 2020-04-14_07:45:03 33518 FHEM/36_LaCrosseGateway.pm
 UPD 2019-07-01_07:45:03 7519 FHEM/36_Level.pm
 UPD 2016-08-23_07:45:12 9997 FHEM/36_PCA301.pm
 UPD 2019-01-06_07:45:02 17434 FHEM/36_PrecipitationSensor.pm
-UPD 2026-03-27_07:45:03 462403 FHEM/36_Shelly.pm
+UPD 2026-03-28_07:45:04 462607 FHEM/36_Shelly.pm
 UPD 2023-09-19_07:45:03 46853 FHEM/36_ShellyMonitor.pm
 UPD 2020-03-09_07:45:03 71778 FHEM/36_Vallox.pm
 UPD 2021-11-02_07:45:02 29717 FHEM/36_WMBUS.pm
@@ -770,8 +770,8 @@ UPD 2026-03-27_07:45:10 5527125 docs/commandref.html
 UPD 2026-03-27_07:45:14 3520943 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-03-27_07:45:16 329437 docs/commandref_modular.html
-UPD 2026-03-27_07:45:17 341281 docs/commandref_modular_DE.html
+UPD 2026-03-28_07:45:17 329437 docs/commandref_modular.html
+UPD 2026-03-28_07:45:18 341281 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2521,7 +2521,7 @@ UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2024-10-27_07:45:03 5964 www/pgm2/defaultCommon.css
 UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
-UPD 2026-03-27_07:45:03 35966 www/pgm2/f18.js
+UPD 2026-03-28_07:45:04 35996 www/pgm2/f18.js
 UPD 2026-03-15_07:45:03 10225 www/pgm2/f18style.css
 UPD 2026-01-04_07:45:04 1302 www/pgm2/fbtam.js
 UPD 2023-03-18_07:45:02 8651 www/pgm2/fhemdoc_modular.js
