@@ -1,4 +1,4 @@
-// Prerequisites: npm install express webpush bodyparser
+// Prerequisites: npm install express web-push body-parser
 // Starting it: node webpush.js > webpush.log
 
 let email = 'mailto:admin@fhem.local';
