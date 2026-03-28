@@ -3,13 +3,12 @@
 #
 #  72_FritzSmart.pm
 #
-#  (c) 2014 Torsten Poitzsch
-#  (c) 2014-2020 tupol http://forum.fhem.de/index.php?action=profile;u=5432
-#  (c) 2021-2024 jowiemann https://forum.fhem.de/index.php?action=profile
+#  (Maintainer) 2014 Torsten Poitzsch
+#  (Maintainer) 2014-2020 tupol http://forum.fhem.de/index.php?action=profile;u=5432
+#  (Maintainer) 2021-... jowiemann https://forum.fhem.de/index.php?action=profile
 #
 #  Setting the offset of the Fritz!Dect radiator controller is based on preliminary
 #  work by Tobias (https://forum.fhem.de/index.php?action=profile;u=53943)
-#
 #
 #  This module handles the Fritz FritzBox, FritzRepeater, FritzSmart-Devices
 #
@@ -88,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.03.20a";
+our $ModulVersion = "28.03.24";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -99,7 +98,7 @@ our $need_comma;
 our $element_string;
 our $crlf = 1;
 
-our $fullHASH = 1;
+our $fullHASH = 0;
 
 eval "use URI::Escape;1"    or $missingModul .= "URI::Escape ";
 eval "use MIME::Base64;1"   or $missingModul .= "MIME::Base64 ";
@@ -111,6 +110,7 @@ eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
 
 eval "use URI::Escape;1"    or $missingModul .= "URI::Escape ";
 eval "use SOAP::Lite;1"     or $missingModul .= "Soap::Lite ";       # sudo apt-get install libsoap-lite-perl
+eval "use XML::Simple;1"    or $missingModul .= "XML::Simple ";
 
 # $Data::Dumper::Terse = 1;
 # $Data::Dumper::Purity = 1;
@@ -220,6 +220,7 @@ sub Fritz_Phonebook_parse($$$$);
 sub Fritz_Phonebook_Number_normalize($$);
 
 sub Fritz_Helper_retMsg($$;@);
+sub Fritz_Helper_TR064_ErrMsg($$;@);
 sub Fritz_Helper_html2txt($);
 sub Fritz_Helper_store_Password($$);
 sub Fritz_Helper_read_Password($);
@@ -227,14 +228,6 @@ sub Fritz_Helper_Url_Regex;
 sub Fritz_Helper_Dumper($$;@);
 # sub Fritz_Helper_Json2HTML($);
 sub Fritz_Helper_encode_json;
-
-sub Fritz_Helper_XMLin;
-sub Fritz_Helper_XMLinArray;
-sub Fritz_Helper_removeComments;
-sub Fritz_Helper_simplify;
-sub Fritz_Helper_insertbranch;
-sub Fritz_Helper_removeAfA;
-sub Fritz_Helper_reformat;
 
 our %IGD064   = (
         WANCommonInterfaceConfig1  => { service => "WANCommonInterfaceConfig:1",
@@ -275,22 +268,28 @@ our %IGD064   = (
                                         igd     => 1}
 );
 
-
-
 our %TR064   = (
         DeviceInfo                 => { service => "DeviceInfo:1",
                                         control => "deviceinfo",
                                         action  => "GetInfo",
                                         igd     => 0},
+        DialHangup                 => { service => "X_VoIP:1",
+                                        control => "x_voip",
+                                        action  => "X_AVM-DE_DialHangup",
+                                        igd     => 0},
         Hosts                      => { service => "Hosts:1",
                                         control => "hosts",
                                         action  => "X_AVM-DE_GetInfo",
                                         igd     => 0},
-        LANConfigSecurity          => { service => "LANEthernetInterfaceConfig:1",
+        LANEthernetInterfaceConfig => { service => "LANEthernetInterfaceConfig:1",
                                         control => "lanethernetifcfg",
                                         action  => "GetInfo",
                                         igd     => 0},
-        LANEthernetInterfaceConfig => { service => "LANConfigSecurity:1",
+     LANEthernetInterfaceStatistic => { service => "LANEthernetInterfaceConfig:1",
+                                        control => "lanethernetifcfg",
+                                        action  => "GetStatistics",
+                                        igd     => 0},
+        LANConfigSecurity          => { service => "LANConfigSecurity:1",
                                         control => "lanconfigsecurity",
                                         action  => "GetInfo",
                                         igd     => 0},
@@ -305,6 +304,10 @@ our %TR064   = (
         MyFritz                    => { service => "X_AVM-DE_MyFritz:1",
                                         control => "x_myfritz",
                                         action  => "GetInfo",
+                                        igd     => 0},
+        OnTelGetDECTHandsetList    => { service => "X_AVM-DE_OnTel:1",
+                                        control => "x_contact",
+                                        action  => "GetDECTHandsetList",
                                         igd     => 0},
         OnTelGetPhonebook          => { service => "X_AVM-DE_OnTel:1",
                                         control => "x_contact",
@@ -434,14 +437,13 @@ our %TR064   = (
 #get Fritz tr064command DeviceInfo:1                 deviceinfo       GetInfo
 #get Fritz tr064command X_VoIP:1                     x_voip           X_AVM-DE_GetPhonePort   NewIndex 1
 #get Fritz tr064command X_VoIP:1                     x_voip           X_AVM-DE_DialNumber     NewX_AVM-DE_PhoneNumber **612
-#get Fritz tr064command X_VoIP:1                     x_voip           X_AVM-DE_DialHangup
+#get Fritz tr064command WLANConfiguration:1          wlanconfig1      X_AVM-DE_GetWLANExtInfo
+#get Fritz tr064command WLANConfiguration:2          wlanconfig2      X_AVM-DE_GetWLANExtInfo
 #get Fritz tr064command WLANConfiguration:3          wlanconfig3      X_AVM-DE_GetWLANExtInfo
-#get Fritz tr064command X_AVM-DE_OnTel:1             x_contact        GetDECTHandsetList
 #get Fritz tr064command X_AVM-DE_OnTel:1             x_contact        GetDECTHandsetInfo      NewDectID 1
 #get Fritz tr064command X_AVM-DE_TAM:1               x_tam GetInfo    NewIndex 0
 #get Fritz tr064command X_AVM-DE_TAM:1               x_tam SetEnable  NewIndex 0              NewEnable 0
 #get Fritz tr064command InternetGatewayDevice:1      deviceinfo       GetInfo
-#get Fritz tr064command LANEthernetInterfaceConfig:1 lanethernetifcfg GetStatistics
 
 our %JavaScript = (
         aura                  => { 800 => "generic?ui=aura",
@@ -1050,7 +1052,7 @@ sub Fritz_Initialize_Modul($)
                                 ."Fritz_init_TR064,Fritz_open_Web_Connection,Fritz_call_Lua_Query,Fritz_call_LuaData,Fritz_write_javaScript,Fritz_call_javaScript,"
                                 ."Fritz_Helper_make_TableRow,Fritz_Helper_process_JSON,Fritz_Helper_analyse_Lua_Result,Fritz_Phonebook_readRemote,Fritz_Phonebook_parse,"
                                 ."Fritz_Phonebook_Number_normalize,Fritz_Helper_retMsg,Fritz_Helper_html2txt,Fritz_Helper_store_Password,Fritz_Helper_read_Password,Fritz_Helper_Url_Regex,"
-                                ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,Fritz_Helper_XMLin,Fritz_Helper_XMLinArray,Fritz_Helper_removeComments,Fritz_Helper_simplify,Fritz_Helper_insertbranch,"
+                                ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,Fritz_Helper_TR064_ErrMsg,"
                                 ."Fritz_Helper_removeAfA,Fritz_Helper_reformat "
                 .$readingFnAttributes;
 
@@ -1093,7 +1095,7 @@ sub Fritz_Log($$$)
      $sub = $xsubroutine;
    }
 
-   my $avmModel = main::InternalVal($instName, "MODEL", defined $instHash->{boxModel} ? $instHash->{boxModel} : "0000");
+   my $avmModel = main::InternalVal($instName, "MODEL", exists($instHash->{boxModel}) ? $instHash->{boxModel} : "0000");
    $avmModel = $1 if $avmModel =~ m/(\d+)/;
 
    my $fwV = main::ReadingsVal($instName, "box_fwVersion", "none");
@@ -2039,7 +2041,7 @@ sub Fritz_Attr_Modul($@)
                             ."Fritz_init_TR064,Fritz_open_Web_Connection,Fritz_call_Lua_Query,Fritz_call_LuaData,Fritz_write_javaScript,Fritz_call_javaScript,"
                             ."Fritz_Helper_make_TableRow,Fritz_Helper_process_JSON,Fritz_Helper_analyse_Lua_Result,Fritz_Phonebook_readRemote,Fritz_Phonebook_parse,"
                             ."Fritz_Phonebook_Number_normalize,Fritz_Helper_retMsg,Fritz_Helper_html2txt,Fritz_Helper_store_Password,Fritz_Helper_read_Password,Fritz_Helper_Url_Regex,"
-                            ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,Fritz_Helper_XMLin,Fritz_Helper_XMLinArray,Fritz_Helper_removeComments,Fritz_Helper_simplify,Fritz_Helper_insertbranch,"
+                            ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,Fritz_Helper_TR064_ErrMsg,"
                             ."Fritz_Helper_removeAfA,Fritz_Helper_reformat";
 
        my @aPara = split(",", $aVal);
@@ -3164,11 +3166,13 @@ sub Fritz_Set_Modul($$@)
          $state =~ s/off/0/;
 
          if ( $hash->{TR064} == 1 ) { #tr064
-           my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetDeflectionEnable", "NewDeflectionId", $val[0] - 1, "NewEnable", $state] );
+           my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetDeflectionEnable", "NewDeflectionId", $val[0], "NewEnable", $state] );
            my $tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-           if ($tr064Result->{"X_AVM-DE_OnTel:1"}->{SetDeflectionEnable}->{Error}->{ErrLevel}) {
-             return "ERROR: 'set ... diversity '" . $tr064Result->{"X_AVM-DE_OnTel:1"}->{SetDeflectionEnable}->{Error}->{response_error};
+           if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+             Fritz_Log $hash, 2, "'set ... diversity ': ". Dumper($tr064Result->{Error});
+             $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
+             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
            }
 
            if (defined($tr064Result->{"X_AVM-DE_OnTel:1"}->{SetDeflectionEnable}->{Status_line})) {
@@ -3176,13 +3180,14 @@ sub Fritz_Set_Modul($$@)
                main::readingsSingleUpdate($hash, "diversity" .$val[0]. "_state", $val[1], 1) if defined $hash->{READINGS}{"diversity" .$val[0]};
                main::readingsSingleUpdate($hash, "callRedi" .$val[0]. "_state", $val[1], 1) if defined $hash->{READINGS}{"callRedi" .$val[0]};
              } else {
-               return "ERROR: 'set ... diversity '" . $tr064Result->{"X_AVM-DE_OnTel:1"}->{SetDeflectionEnable}->{Status_line};
+               $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
+               return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
              }
            }
          }
          else {
-           Fritz_Log $hash, 2, "'set ... diversity' is not supported by the limited interfaces of your Fritz!Box firmware.";
-           return "ERROR: 'set ... diversity' is not supported by the limited interfaces of your Fritz!Box firmware.";
+           $retMsg = "ERROR: 'set ... diversity' is not supported by the limited interfaces of your Fritz!Box firmware.";
+           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
          return undef;
@@ -3275,10 +3280,13 @@ sub Fritz_Set_Modul($$@)
      } # end energymode
 
      elsif ( lc $cmd eq 'guestwlan') {
+
        if (int @val == 1 && $val[0] =~ /^(on|off)$/) {
+
          push @cmdBuffer, "guestwlan " . join(" ", @val);
          $retMsg = Fritz_Readout_SetGet_Start $hash->{helper}{TimerCmd};
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
        }
 
        $retMsg = "ERROR: wrong parameter: " . ($val[0] ? (int(@val) == 1 ? $val[0] : "too much Paramters. Use on|off." ) : "Parameter missing. Use on|off");
@@ -3612,14 +3620,14 @@ sub Fritz_Set_Modul($$@)
 
          Fritz_Log $hash, 5, "pBE: read Phonebooks -> \n" . Fritz_Helper_Dumper($hash, $tr064Result);
 
-         if ($tr064Result->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{Error}->{ErrLevel}) {
-           $retMsg = "ERROR: identifying phonebooks via TR-064:" . Fritz_Helper_Dumper($hash, $tr064Result);
+         if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+           $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          } else {
 
-           if (defined($tr064Result->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{Status_line})) {
-             if (defined $tr064Result->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{data}->{NewPhonebookList}) {
-               my $PhoneIDs = $tr064Result->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{data}->{NewPhonebookList};
+           if (exists($tr064Result->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{Status_line})) {
+             if (exists $tr064Result->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{NewPhonebookList}) {
+               my $PhoneIDs = $tr064Result->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{NewPhonebookList};
 
                if( $uniqueID !~ /[$PhoneIDs]/) {
                  $retMsg = "ERROR: wrong phonebook ID: $uniqueID in ID's $PhoneIDs";
@@ -3752,9 +3760,7 @@ sub Fritz_Set_Modul($$@)
 
          # my $xmlUniqueID = $val[0] eq "chg"? '<uniqueid>' . $uniqueEntryID . '</uniqueid>' : "";
 
-         my $para  = '<Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">'
-                   . '<?xml version="1.0" encoding="utf-8"?>'
-                   . '<contact>'
+         my $para  = '<contact>'
                    .   '<category>' . $val[2] . '</category>'
                    .   '<person>'
                    .     '<realName>' . $entryName . '</realName>'
@@ -3765,19 +3771,19 @@ sub Fritz_Set_Modul($$@)
                  #  .   $xmlUniqueID
                    . '</contact>';
 
-         my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetPhonebookEntryUID", "NewPhonebookID", $uniqueID, "NewPhonebookEntryData"] );
-         my $tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray, $para);
+         my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetPhonebookEntryUID", "NewPhonebookID", $uniqueID, "NewPhonebookEntryData", $para] );
+         my $tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
          Fritz_Log $hash, 4, "pBE: write PhonebookEntry -> \n" . Fritz_Helper_Dumper($hash, $tr064Result);
 
-         if ($tr064Result->{"X_AVM-DE_OnTel:1"}->{SetPhonebookEntryUID}->{Error}->{ErrLevel}) {
-           $retMsg = "ERROR: identifying phonebooks via TR-064:" . Fritz_Helper_Dumper($hash, $tr064Result);
+         if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+           $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          } else {
 
-           if (defined($tr064Result->{"X_AVM-DE_OnTel:1"}->{SetPhonebookEntryUID}->{Status_line})) {
-             if (defined $tr064Result->{"X_AVM-DE_OnTel:1"}->{SetPhonebookEntryUID}->{data}->{NewPhonebookEntryUniqueID}) {
-               my $EntryID = $tr064Result->{"X_AVM-DE_OnTel:1"}->{SetPhonebookEntryUID}->{data}->{NewPhonebookEntryUniqueID};
+           if (exists($tr064Result->{"X_AVM-DE_OnTel:1"}->{SetPhonebookEntryUID}->{Status_line})) {
+             if (exists$tr064Result->{"X_AVM-DE_OnTel:1"}->{SetPhonebookEntryUID}->{NewPhonebookEntryUniqueID}) {
+               my $EntryID = $tr064Result->{"X_AVM-DE_OnTel:1"}->{SetPhonebookEntryUID}->{NewPhonebookEntryUniqueID};
                $retMsg = "set new phonebook entry: $entryName with NewPhonebookEntryUniqueID: $EntryID";
                return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
              } else {
@@ -3812,8 +3818,8 @@ sub Fritz_Set_Modul($$@)
          my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "DeletePhonebookEntryUID", "NewPhonebookID", $uniqueID, "NewPhonebookEntryUniqueID", $uniqueEntryID] );
          my $tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
  
-         if ($tr064Result->{"X_AVM-DE_OnTel:1"}->{DeletePhonebookEntryUID}->{Error}->{ErrLevel}) {
-           $retMsg = "ERROR: identifying phonebooks via TR-064:" . Fritz_Helper_Dumper($hash, $tr064Result);
+         if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+           $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          } else {
 
@@ -4087,8 +4093,8 @@ sub Fritz_Set_Modul($$@)
            my @tr064CmdArray = (["X_AVM-DE_TAM:1", "x_tam", "SetEnable", "NewIndex", $val[0] , "NewEnable", $state]);
            my $tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-           if ($tr064Result->{"X_AVM-DE_TAM:1"}->{SetEnable}->{Error}->{ErrLevel}) {
-             $retMsg = "ERROR: identifying phonebooks via TR-064:" . Fritz_Helper_Dumper($hash, $tr064Result);
+           if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+             $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
              return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
            } else {
 
@@ -4445,7 +4451,7 @@ sub Fritz_Get_Modul($@)
 
        Fritz_Log $hash, 4, "result luaFunction: \n" . $tmp;
 
-       my $outhash = Fritz_Helper_XMLin($tmp, StrictMode => 0, KeyAttr => []);
+       my $outhash = XMLin($tmp, StrictMode => 0, KeyAttr => []);
 
        return $returnStr . Fritz_Helper_encode_json($outhash);
 
@@ -4686,12 +4692,15 @@ sub Fritz_Get_Modul($@)
        my @tr064CmdArray = ( \@val );
        my $tr064Result = Fritz_SOAP_Request( $hash, $igd, \@tr064CmdArray );
 
-       if ($tr064Result->{"$val[0]"}->{$val[2]}->{Error}->{ErrLevel}) {
-         $retMsg = "ERROR:\n" . Fritz_Helper_Dumper($hash, $tr064Result);
+
+       if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+
+         $returnStr .= Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
+
        } else {
-         $retMsg = Fritz_Helper_Dumper($hash, $tr064Result);
+
+         $returnStr .= Fritz_Helper_Dumper($hash, $tr064Result);
        }
-       $returnStr .= $retMsg;
 
        return $returnStr;
 
@@ -4716,8 +4725,8 @@ sub Fritz_Get_Modul($@)
 
        my $tr064Result = Fritz_SOAP_Request($hash, $control_url, $service_type, $service_command);
 
-       if ($tr064Result->{$service_command}->{Error}) {
-         $retMsg = "ERROR: " . Fritz_Helper_Dumper($hash, $tr064Result);
+       if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+         $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
        } else {
          $retMsg = Fritz_Helper_Dumper($hash, $tr064Result);
        }
@@ -7353,7 +7362,11 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
              for(my $i = 0; $i <= $nbViews - 1; $i++) {
                my $id = $resultData->{data}->{devices}->[$i]->{id};
                Fritz_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id,                      $resultData->{data}->{devices}->[$i]->{displayName};
-               Fritz_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_uid",             $resultData->{data}->{devices}->[$i]->{uid};
+               if( defined ($resultData->{data}->{devices}->[$i]->{uid})) {
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_uid",           $resultData->{data}->{devices}->[$i]->{uid};
+               } else {
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_uid",           $resultData->{data}->{devices}->[$i]->{id};
+               }
                Fritz_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_device",          $resultData->{data}->{devices}->[$i]->{id};
                Fritz_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_type",            $resultData->{data}->{devices}->[$i]->{type};
                Fritz_Readout_Add_Reading $hash, $roReadings, "shdevice" . $id . "_category",        $resultData->{data}->{devices}->[$i]->{category};
@@ -7464,7 +7477,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
            my $outhash;
 
            eval {
-             $outhash = Fritz_Helper_XMLin($XMLtmp, StrictMode => 0, KeyAttr => []);
+             $outhash = XMLin($XMLtmp, StrictMode => 0, KeyAttr => []);
            };
            if ($@) {
              Fritz_Log $hash, 3, "ERROR: SmartHome - getting XML data: $SmartHome";
@@ -7556,7 +7569,6 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
        Fritz_Log $hash, 4, "phone redirections - start getting data";
 
-       # xhr 1 lang de page callRedi xhrId all
        @webCmdArray = ();
        push @webCmdArray, "xhr"         => "1";
        push @webCmdArray, "lang"        => "de";
@@ -7592,174 +7604,182 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
      }
 
      #-------------------------------------------------------------------------------------
-     # extended tam information
+     # Start FritzOS >= 700
 
-     # xhr 1 lang de page edit_tam TamNr 0
-
-     if ( ($hash->{fhem}{fwVersion} >= 700) && main::AttrVal($name, "enableXtamInfo", 0 ) ) {
-
-       Fritz_Log $hash, 4, "xTAM Information - start getting data";
-
-       my $tamNr;
-
-
-       for ($tamNr = 0; $tamNr <= 9; $tamNr++) {
-
-         my $tam = "tam" . $tamNr;
-         if (defined $hash->{READINGS}{$tam}{VAL}) {
-
-           @webCmdArray = ();
-           push @webCmdArray, "xhr"         => "1";
-           push @webCmdArray, "lang"        => "de";
-           push @webCmdArray, "page"        => "edit_tam";
-           push @webCmdArray, "TamNr"       => $tamNr;
-
-           $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
-
-           # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
-           return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
-
-           $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
-
-           if ($resultData->{data}->{tamoptions}->{num_selection}) {
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_selection",       $resultData->{data}->{tamoptions}->{num_selection};
-             if ($resultData->{data}->{tamoptions}->{num_selection} eq "sel_nums") {
-               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",          $resultData->{data}->{tamoptions}->{num_List};
-             } else {
-               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",            "";
-             }
-           } else {
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_selection",       "";
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",            "";
-           }
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_send",          $resultData->{data}->{tamoptions}->{email_send};
-           Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_send_del_call", $resultData->{data}->{tamoptions}->{email_send_del_call};
-           if ($resultData->{data}->{tamoptions}->{email_addr}) {
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_addr",          $resultData->{data}->{tamoptions}->{email_addr};
-           } else {
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_addr",          "";
-           }
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_mail_type",       $resultData->{data}->{tamoptions}->{mail_type};
-
-           if ($resultData->{data}->{tamoptions}->{usb_usage} eq "on") {
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage",           $resultData->{data}->{tamoptions}->{usb_usage};
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage_path",      $resultData->{data}->{tamoptions}->{usb_usage_path};
-           } else {
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage",           "";
-             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage_path",      "";
-           }
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_use_remote",          $resultData->{data}->{tamoptions}->{use_remote};
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_call_delay",          $resultData->{data}->{tamoptions}->{call_delay};
-
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_rec_len",             $resultData->{data}->{tamoptions}->{rec_len};
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_operation_mode",      $resultData->{data}->{tamoptions}->{operation_mode};
-
-           Fritz_Log $hash, 4, "xTAM Information - end getting data";
-         }
-       }
-     } else {
+     if ( $hash->{fhem}{fwVersion} < 700 ) {
 
        Fritz_Log $hash, 4, "wrong Fritz!OS for xTAM Information: $hash->{fhem}{fwVersionStr}" if main::AttrVal($name, "enableXtamInfo", 0);
+       Fritz_Log $hash, 4, "wrong Fritz!OS for USB Information: $hash->{fhem}{fwVersionStr}" if $enableBoxReading =~ /box_usb/;
 
-     }
+     } else {
 
+       #-------------------------------------------------------------------------------------
+       # extended tam information
 
-     #-------------------------------------------------------------------------------------
-     # USB Storage
+       # xhr 1 lang de page edit_tam TamNr 0
 
-     # xhr 1 lang de page usbOv xhrId all
+       if ( main::AttrVal($name, "enableXtamInfo", 0 )) {
+         Fritz_Log $hash, 4, "xTAM Information - start getting data";
 
-     if ( ($hash->{fhem}{fwVersion} >= 700) && ($enableBoxReading =~ /box_usb/) ) {
+         my $tamNr;
 
-       Fritz_Log $hash, 4, "USB Information - start getting data";
+         for ($tamNr = 0; $tamNr <= 9; $tamNr++) {
 
-       @webCmdArray = ();
-       push @webCmdArray, "xhr"         => "1";
-       push @webCmdArray, "lang"        => "de";
-       push @webCmdArray, "page"        => "usbOv";
-       push @webCmdArray, "xhrId"       => "all";
+           my $tam = "tam" . $tamNr;
+           if (defined $hash->{READINGS}{$tam}{VAL}) {
 
-       $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
+             @webCmdArray = ();
+             push @webCmdArray, "xhr"         => "1";
+             push @webCmdArray, "lang"        => "de";
+             push @webCmdArray, "page"        => "edit_tam";
+             push @webCmdArray, "TamNr"       => $tamNr;
 
-       # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
-       return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+             $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
 
-       $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+             # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+             return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
 
-       #  $resultData->{data}->{usbOverview}->{isFTPStorageEnabled} = 0   unless $resultData->{data}->{usbOverview}->{isFTPStorageEnabled};
-       #  $resultData->{data}->{usbOverview}->{isFTPServerEnabled} = 0    unless $resultData->{data}->{usbOverview}->{isFTPServerEnabled};
-       #  $resultData->{data}->{usbOverview}->{isNASEnabled} = 0          unless $resultData->{data}->{usbOverview}->{isNASEnabled};
-       #  $resultData->{data}->{usbOverview}->{isSMBv1Enabled} = 0        unless $resultData->{data}->{usbOverview}->{isSMBv1Enabled};
-       #  $resultData->{data}->{usbOverview}->{isWebdavEnabled} = 0       unless $resultData->{data}->{usbOverview}->{isWebdavEnabled};
-       #  $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled} = 0 unless $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled};
+             $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
 
-       #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_activ",    $resultData->{data}->{usbOverview}->{isFTPStorageEnabled} * 1, "onoff";
-       #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_enabled",  $resultData->{data}->{usbOverview}->{isFTPServerEnabled} * 1, "onoff";
-       #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_NAS_enabled",  $resultData->{data}->{usbOverview}->{isNASEnabled} * 1, "onoff";
-       #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_SMB_enabled",  $resultData->{data}->{usbOverview}->{isSMBv1Enabled} * 1, "onoff";
-       #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_webDav",       $resultData->{data}->{usbOverview}->{isWebdavEnabled} * 1, "onoff";
-       #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_autoIndex",    $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled} * 1, "onoff";
-       #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_indexStatus",  $resultData->{data}->{usbOverview}->{indexingStatus};
+             if ($resultData->{data}->{tamoptions}->{num_selection}) {
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_selection",       $resultData->{data}->{tamoptions}->{num_selection};
+               if ($resultData->{data}->{tamoptions}->{num_selection} eq "sel_nums") {
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",          $resultData->{data}->{tamoptions}->{num_List};
+               } else {
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",            "";
+               }
+             } else {
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_selection",       "";
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_list",            "";
+             }
 
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_activ",    $resultData->{data}->{usbOverview}->{isFTPStorageEnabled}, "onoff";
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_enabled",  $resultData->{data}->{usbOverview}->{isFTPServerEnabled}, "onoff";
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_NAS_enabled",  $resultData->{data}->{usbOverview}->{isNASEnabled}, "onoff";
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_SMB_enabled",  $resultData->{data}->{usbOverview}->{isSMBv1Enabled}, "onoff";
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_webDav",       $resultData->{data}->{usbOverview}->{isWebdavEnabled}, "onoff";
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_autoIndex",    $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled}, "onoff";
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_indexStatus",  $resultData->{data}->{usbOverview}->{indexingStatus};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_send",          $resultData->{data}->{tamoptions}->{email_send};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_send_del_call", $resultData->{data}->{tamoptions}->{email_send_del_call};
+             if ($resultData->{data}->{tamoptions}->{email_addr}) {
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_addr",          $resultData->{data}->{tamoptions}->{email_addr};
+             } else {
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_email_addr",          "";
+             }
 
-       $nbViews = 0;
-       if (defined $resultData->{data}->{usbOverview}->{devices}) {
-         $views = $resultData->{data}->{usbOverview}->{devices};
-         $nbViews = scalar @$views;
-       }
+             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_mail_type",       $resultData->{data}->{tamoptions}->{mail_type};
 
-       if ($nbViews > 0) {
-         my $i = 0;
-         eval {
-           for( $i = 0; $i <= $nbViews - 1; $i++) {
+             if ($resultData->{data}->{tamoptions}->{usb_usage} eq "on") {
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage",           $resultData->{data}->{tamoptions}->{usb_usage};
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage_path",      $resultData->{data}->{tamoptions}->{usb_usage_path};
+             } else {
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage",           "";
+               Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_usb_usage_path",      "";
+             }
 
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devID",           $resultData->{data}->{usbOverview}->{devices}->[$i]->{id};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devType",         $resultData->{data}->{usbOverview}->{devices}->[$i]->{deviceType};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devName",         $resultData->{data}->{usbOverview}->{devices}->[$i]->{deviceName};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStatus",       $resultData->{data}->{usbOverview}->{devices}->[$i]->{storageStatus};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devConType",      $resultData->{data}->{usbOverview}->{devices}->[$i]->{connectionType};
-           #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devEject",        $resultData->{data}->{usbOverview}->{devices}->[$i]->{isEjectable} * 1, "onoff";
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devEject",        $resultData->{data}->{usbOverview}->{devices}->[$i]->{isEjectable}, "onoff";
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStorageUsed",  $resultData->{data}->{usbOverview}->{devices}->[$i]->{partitions}->[0]->{usedStorageInBytes};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStorageTotal", $resultData->{data}->{usbOverview}->{devices}->[$i]->{partitions}->[0]->{totalStorageInBytes};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_use_remote",          $resultData->{data}->{tamoptions}->{use_remote};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_call_delay",          $resultData->{data}->{tamoptions}->{call_delay};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_rec_len",             $resultData->{data}->{tamoptions}->{rec_len};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_operation_mode",      $resultData->{data}->{tamoptions}->{operation_mode};
 
            }
          }
 
+         Fritz_Log $hash, 4, "xTAM Information - end getting data";
        }
 
-       Fritz_Log $hash, 4, "USB Information - end getting data";
-     } else {
+       #-------------------------------------------------------------------------------------
+       # USB Storage
 
-       Fritz_Log $hash, 4, "wrong Fritz!OS for USB Information: $hash->{fhem}{fwVersionStr}" if $enableBoxReading =~ /box_usb/;
+       # xhr 1 lang de page usbOv xhrId all
 
+       if ( $enableBoxReading =~ /box_usb/ ) {
+
+         Fritz_Log $hash, 4, "USB Information - start getting data";
+
+         @webCmdArray = ();
+         push @webCmdArray, "xhr"         => "1";
+         push @webCmdArray, "lang"        => "de";
+         push @webCmdArray, "page"        => "usbOv";
+         push @webCmdArray, "xhrId"       => "all";
+
+         $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
+
+         # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+         return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+         $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+
+         #  $resultData->{data}->{usbOverview}->{isFTPStorageEnabled} = 0   unless $resultData->{data}->{usbOverview}->{isFTPStorageEnabled};
+         #  $resultData->{data}->{usbOverview}->{isFTPServerEnabled} = 0    unless $resultData->{data}->{usbOverview}->{isFTPServerEnabled};
+         #  $resultData->{data}->{usbOverview}->{isNASEnabled} = 0          unless $resultData->{data}->{usbOverview}->{isNASEnabled};
+         #  $resultData->{data}->{usbOverview}->{isSMBv1Enabled} = 0        unless $resultData->{data}->{usbOverview}->{isSMBv1Enabled};
+         #  $resultData->{data}->{usbOverview}->{isWebdavEnabled} = 0       unless $resultData->{data}->{usbOverview}->{isWebdavEnabled};
+         #  $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled} = 0 unless $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled};
+
+         #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_activ",    $resultData->{data}->{usbOverview}->{isFTPStorageEnabled} * 1, "onoff";
+         #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_enabled",  $resultData->{data}->{usbOverview}->{isFTPServerEnabled} * 1, "onoff";
+         #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_NAS_enabled",  $resultData->{data}->{usbOverview}->{isNASEnabled} * 1, "onoff";
+         #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_SMB_enabled",  $resultData->{data}->{usbOverview}->{isSMBv1Enabled} * 1, "onoff";
+         #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_webDav",       $resultData->{data}->{usbOverview}->{isWebdavEnabled} * 1, "onoff";
+         #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_autoIndex",    $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled} * 1, "onoff";
+         #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_indexStatus",  $resultData->{data}->{usbOverview}->{indexingStatus};
+
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_activ",    $resultData->{data}->{usbOverview}->{isFTPStorageEnabled}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_FTP_enabled",  $resultData->{data}->{usbOverview}->{isFTPServerEnabled}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_NAS_enabled",  $resultData->{data}->{usbOverview}->{isNASEnabled}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_SMB_enabled",  $resultData->{data}->{usbOverview}->{isSMBv1Enabled}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_webDav",       $resultData->{data}->{usbOverview}->{isWebdavEnabled}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_autoIndex",    $resultData->{data}->{usbOverview}->{isAutoIndexingEnabled}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_indexStatus",  $resultData->{data}->{usbOverview}->{indexingStatus};
+
+         $nbViews = 0;
+         if (defined $resultData->{data}->{usbOverview}->{devices}) {
+           $views = $resultData->{data}->{usbOverview}->{devices};
+           $nbViews = scalar @$views;
+         }
+
+         if ($nbViews > 0) {
+           my $i = 0;
+           eval {
+             for( $i = 0; $i <= $nbViews - 1; $i++) {
+
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devID",           $resultData->{data}->{usbOverview}->{devices}->[$i]->{id};
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devType",         $resultData->{data}->{usbOverview}->{devices}->[$i]->{deviceType};
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devName",         $resultData->{data}->{usbOverview}->{devices}->[$i]->{deviceName};
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStatus",       $resultData->{data}->{usbOverview}->{devices}->[$i]->{storageStatus};
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devConType",      $resultData->{data}->{usbOverview}->{devices}->[$i]->{connectionType};
+               #  Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devEject",        $resultData->{data}->{usbOverview}->{devices}->[$i]->{isEjectable} * 1, "onoff";
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devEject",        $resultData->{data}->{usbOverview}->{devices}->[$i]->{isEjectable}, "onoff";
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStorageUsed",  $resultData->{data}->{usbOverview}->{devices}->[$i]->{partitions}->[0]->{usedStorageInBytes};
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_usb_${i}_devStorageTotal", $resultData->{data}->{usbOverview}->{devices}->[$i]->{partitions}->[0]->{totalStorageInBytes};
+
+             }
+           };
+           if ($@) {
+             Fritz_Log $hash, 2, "USB Information, invalid Reading. error:$@";
+           }
+         }
+
+         Fritz_Log $hash, 4, "USB Information - end getting data";
+       }
      }
+     # End FritzOS >= 700
 
      #-------------------------------------------------------------------------------------
-     # INET Monitor
+     # Start FritzOS >= 731
 
-     # xhr 1 lang de page netMoni xhrId all
-     # xhr 1 lang de page dnsSrv xhrId all
+     if ( $hash->{fhem}{fwVersion} < 731 ) {
 
-     if ( ($hash->{fhem}{fwVersion} >= 731) ) {
+       Fritz_Log $hash, 4, "wrong Fritz!OS for active DNS servers: $hash->{fhem}{fwVersionStr}" if $enableBoxReading =~ /box_dns/;
+       Fritz_Log $hash, 4, "wrong Fritz!OS for net Monitor: $hash->{fhem}{fwVersionStr}";
+
+     } else {
+
+       #-------------------------------------------------------------------------------------
+       # DNS Server
+
+       # xhr 1 lang de page dnsSrv xhrId all
 
        my $getDNSInfo = $enableBoxReading =~ /box_dns/;
-       Fritz_Log $hash, 4, "DNS Info - start getting data";
 
        if($getDNSInfo) {
+
+         Fritz_Log $hash, 4, "DNS Info - start getting data";
 
          @webCmdArray = ();
          push @webCmdArray, "xhr"         => "1";
@@ -7789,7 +7809,15 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
              Fritz_Readout_Add_Reading $hash, $roReadings, "box_dns_Srv2_user_IPv6", $resultData->{data}->{vars}->{ipv6}->{seconddns}->{value};
            }
          }
+         Fritz_Log $hash, 4, "DNS Info - end getting data";
+
        }
+
+       #-------------------------------------------------------------------------------------
+       # INET Monitor
+
+       # xhr 1 lang de page netMoni xhrId all
+       Fritz_Log $hash, 4, "net Monitor - start getting data";
 
        @webCmdArray = ();
        push @webCmdArray, "xhr"         => "1";
@@ -7856,15 +7884,18 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
                }
              }
            } # end for
-         } # end eval
+         }; # end eval
+
+         if ($@) {
+           Fritz_Log $hash, 2, "net Monitor, invalid Reading. error:$@";
+         }
+
        } # end if
 
-       Fritz_Log $hash, 4, "DNS Info - end getting data";
-     } else {
-
-       Fritz_Log $hash, 4, "wrong Fritz!OS for active DNS servers: $hash->{fhem}{fwVersionStr}" if $enableBoxReading =~ /box_dns/;
+       Fritz_Log $hash, 4, "net Monitor - end getting data";
 
      }
+     # End FritzOS >= 731
 
      #-------------------------------------------------------------------------------------
      # FON log
@@ -7918,7 +7949,11 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
      }
 
      #-------------------------------------------------------------------------------------
-     if ( $hash->{fhem}{fwVersion} >= 721 ) {
+     if ( $hash->{fhem}{fwVersion} < 721 ) {
+
+       Fritz_Log $hash, 4, "globalFilter/energyStatus not available for $hash->{fhem}{fwVersion}";
+
+     } else {
 
        #-------------------------------------------------------------------------------------
        # get list of global filters
@@ -7999,21 +8034,22 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
        } #  end getting energy status
 
-     } else {
-       Fritz_Log $hash, 4, "globalFilter/energyStatus not available for $hash->{fhem}{fwVersion}";
      }
 
      #-------------------------------------------------------------------------------------
      # USB Mobilfunk-Modem Konfiguration
 
-     # xhr 1 lang de page mobile 
+     # xhr 1 lang de page mobile xhrId all 
      # xhrId modemSettings useajax 1
 
      if ( main::AttrVal($name, "enableMobileInfo", 0) ) {
 
-       if ( $hash->{fhem}{fwVersion} >= 750 ) {
+       if ( $hash->{fhem}{fwVersion} < 750 ) {
 
-         Fritz_Log $hash, 4, "MobileInfo - start getting data";
+         Fritz_Log $hash, 4, "MobileInfo - getting data.lua, wrong Fritz!OS $hash->{fhem}{fwVersionStr}";
+
+       } else {
+         Fritz_Log $hash, 4, "MobileInfo - start getting data.lua";
 
          @webCmdArray = ();
          push @webCmdArray, "xhr"         => "1";
@@ -8029,21 +8065,18 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
          $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
 
          eval {
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_simOk",                 $resultData->{data}->{simOk}, "onoff"
-                                                                   if $resultData->{data}->{simOk};
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_activation",                   $resultData->{data}->{activation}
-                                                                   if $resultData->{data}->{activation};
-
-           if ($resultData->{data}->{fallback}) {
+           if (defined($resultData->{data}->{fallback})) {
              Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_fallback_possible",   $resultData->{data}->{fallback}->{possible}, "onoff"
                                                                    if $resultData->{data}->{fallback}->{possible};
 
              Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_fallback_enableable", $resultData->{data}->{fallback}->{enableable}, "onoff"
                                                                    if $resultData->{data}->{fallback}->{enableable};
+
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_fallback_canBeEnabled", $resultData->{data}->{fallback}->{canBeEnabled}, "onoff"
+                                                                   if $resultData->{data}->{fallback}->{canBeEnabled};
            }
 
-           if ($resultData->{data}->{config}) {
+           if (defined($resultData->{data}->{config})) {
              Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_config_dsl",   $resultData->{data}->{config}->{dsl}
                                                                    if $resultData->{data}->{config}->{dsl};
 
@@ -8055,7 +8088,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
            }
 
-           if ($resultData->{data}->{connection}) {
+           if (defined($resultData->{data}->{connection})) {
              Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_conn_operator", $resultData->{data}->{connection}->{operator}
                                                                    if $resultData->{data}->{connection}->{operator};
 
@@ -8069,40 +8102,54 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
                                                                    if $resultData->{data}->{connection}->{accessTechnology};
            }
 
+           if (defined($resultData->{data}->{compatibilityMode})) {
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_compatibilityMode_enabled", $resultData->{data}->{compatibilityMode}->{enabled}, "onoff"
+                                                                   if $resultData->{data}->{compatibilityMode}->{enabled};
+
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_compatibilityMode_enableable", $resultData->{data}->{compatibilityMode}->{enableable}, "onoff"
+                                                                   if $resultData->{data}->{compatibilityMode}->{enableable};
+
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_compatibilityMode_canBeEnabled", $resultData->{data}->{compatibilityMode}->{canBeEnabled}, "onoff"
+                                                                   if $resultData->{data}->{compatibilityMode}->{canBeEnabled};
+           }
+
+           if (defined($resultData->{data}->{progress})) {
+
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_progress_refreshNeeded", $resultData->{data}->{progress}->{refreshNeeded}, "onoff"
+                                                                   if $resultData->{data}->{progress}->{refreshNeeded};
+
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_progress_error",         $resultData->{data}->{progress}->{error}
+                                                                   if $resultData->{data}->{progress}->{error};
+           }
+
+           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_simOk",          $resultData->{data}->{simOk}, "onoff"
+                                                                   if $resultData->{data}->{simOk};
+
+           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_activation",     $resultData->{data}->{activation}
+                                                                   if $resultData->{data}->{activation};
+
            Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_voipOverMobile", $resultData->{data}->{voipOverMobile}, "onoff"
                                                                    if $resultData->{data}->{voipOverMobile};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_wds", $resultData->{data}->{wds}, "onoff"
+           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_wds",            $resultData->{data}->{wds}, "onoff"
                                                                    if $resultData->{data}->{wds};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_progress_refreshNeeded", $resultData->{data}->{progress}->{refreshNeeded}, "onoff"
-                                                                   if $resultData->{data}->{progress}->{refreshNeeded};
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_progress_error", $resultData->{data}->{progress}->{error}
-                                                                   if $resultData->{data}->{progress}->{error};
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_ipclient",               $resultData->{data}->{ipclient}, "onoff"
+           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_ipclient",       $resultData->{data}->{ipclient}, "onoff"
                                                                    if $resultData->{data}->{ipclient};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_sipNumberCount",         "";
+           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_sipNumberCount", "";
 
-#           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_sipNumberCount", $resultData->{data}->{sipNumberCount}
-#                                                                   if $resultData->{data}->{sipNumberCount};
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_compatibilityMode_enabled", $resultData->{data}->{compatibilityMode}->{enabled}, "onoff"
-                                                                   if $resultData->{data}->{compatibilityMode}->{enabled};
-
-           Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_compatibilityMode_enableable", $resultData->{data}->{compatibilityMode}->{enableable}, "onoff"
-                                                                   if $resultData->{data}->{compatibilityMode}->{enableable};
+#          Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_sipNumberCount", $resultData->{data}->{sipNumberCount}
+#                                                                  if $resultData->{data}->{sipNumberCount};
 
            Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_capabilities", $resultData->{data}->{capabilities}->{voice}, "onoff"
                                                                    if $resultData->{data}->{capabilities}->{voice};
          };
 
-         Fritz_Log $hash, 4, "MobileInfo - end getting data";
-
-       } else {
-         Fritz_Log $hash, 4, "wrong Fritz!OS for usb mobile: $hash->{fhem}{fwVersionStr}";
+         if ($@) {
+           Fritz_Log $hash, 2, "MobileInfo - getting data.lua, invalid Reading. error:$@";
+         }
+         Fritz_Log $hash, 4, "MobileInfo - end getting data.lua";
        }
 
      } # end, USB Mobilfunk-Modem Konfiguration
@@ -8430,7 +8477,6 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
    my $strCurl;
    my @tr064CmdArray;
-   my @tr064Result;
    my $tr064NewResult;
 
    if ($avmModel =~ "Box") {
@@ -8442,17 +8488,17 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
        @tr064CmdArray = (["X_AVM-DE_UPnP:1", "x_upnp", "GetInfo"]);
        $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-       if ($tr064NewResult->{"X_AVM-DE_UPnP:1"}->{GetInfo}->{Error}->{ErrLevel}) {
+       if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
          Fritz_Log $hash, 2, "UPNP GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
        } else {
 
-         if (defined($tr064NewResult->{"X_AVM-DE_UPnP:1"}->{GetInfo}->{Status_line})) {
+         if (exists($tr064NewResult->{"X_AVM-DE_UPnP:1"}->{GetInfo}->{Status_line})) {
            Fritz_Log $hash, 5, "UPNP GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_upnp", $tr064NewResult->{"X_AVM-DE_UPnP:1"}->{GetInfo}->{data}->{NewEnable}, "onoff";
-           Fritz_Readout_Add_Reading $hash, $roReadings, "->UPNP",   $tr064NewResult->{"X_AVM-DE_UPnP:1"}->{GetInfo}->{data}->{NewEnable};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_upnp", $tr064NewResult->{"X_AVM-DE_UPnP:1"}->{GetInfo}->{NewEnable}, "onoff";
+           Fritz_Readout_Add_Reading $hash, $roReadings, "->UPNP",   $tr064NewResult->{"X_AVM-DE_UPnP:1"}->{GetInfo}->{NewEnable};
          }
   
        }
@@ -8469,16 +8515,16 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
        @tr064CmdArray = (["X_AVM-DE_Auth:1", "x_auth", "GetInfo"]);
        $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-       if ($tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetInfo}->{Error}->{ErrLevel}) {
+       if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
          Fritz_Log $hash, 2, "X_AVM-DE_Auth GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
        } else {
 
-         if (defined($tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetInfo}->{Status_line})) {
+         if (exists($tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetInfo}->{Status_line})) {
            Fritz_Log $hash, 5, "X_AVM-DE_Auth GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_2FAInfo", $tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetInfo}->{data}->{NewEnable}, "onoff";
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_2FAInfo", $tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetInfo}->{NewEnable}, "onoff";
          }
   
        }
@@ -8486,17 +8532,17 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
        @tr064CmdArray = (["X_AVM-DE_Auth:1", "x_auth", "GetState"]);
        $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-       if ($tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetState}->{Error}->{ErrLevel}) {
+       if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
          $strCurl = Fritz_Helper_Dumper($hash, $tr064NewResult);
          Fritz_Log $hash, 2, "X_AVM-DE_Auth GetState -> \n" . $strCurl;
 
        } else {
 
-         if (defined($tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetState}->{Status_line})) {
+         if (exists($tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetState}->{Status_line})) {
            Fritz_Log $hash, 5, "X_AVM-DE_Auth GetState -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_2FAState", $tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetState}->{data}->{NewState};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_2FAState", $tr064NewResult->{"X_AVM-DE_Auth:1"}->{GetState}->{NewState};
          }
   
        }
@@ -8524,80 +8570,78 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
          @tr064CmdArray = (["X_AVM-DE_WANMobileConnection:1", "x_wanmobileconn", "GetInfoEx"]);
          $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-         if ($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx}->{Error}->{ErrLevel}) {
+         if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
            Fritz_Log $hash, 2, "Mobile GetInfoEx -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
          } else {
 
-           if (defined($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx}->{Status_line})) {
+           if (exists($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx}->{Status_line})) {
 
              Fritz_Log $hash, 5, "Mobile GetInfoEx -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-             if (defined $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx}->{data}->{NewCellList}) {
-               my $data = $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx}->{data}->{NewCellList};
-               $data =~ s/&lt;/</isg;
-               $data =~ s/&gt;/>/isg;
+             my $data = $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx};
 
-               Fritz_Log $hash, 4, "Data Mobile GetInfoEx (NewCellList): \n" . $data;
+             if (defined($data->{NewCellList}->{CellList})) {
 
-               while( $data =~ /<Cell>(.*?)<\/Cell>/isg ) {
-                 my $cellList = $1;
- 
-                 Fritz_Log $hash, 4, "Data Mobile GetInfoEx (Cell): \n" . $1;
-                
-                 my $Index      = $1 if $cellList =~ m/<Index>(.*?)<\/Index>/is;
-                 my $Connected  = $1 if $cellList =~ m/<Connected>(.*?)<\/Connected>/is;
-                 my $CellType   = $1 if $cellList =~ m/<CellType>(.*?)<\/CellType>/is;
-                 my $PLMN       = $1 if $cellList =~ m/<PLMN>(.*?)<\/PLMN>/is;
-                 my $Provider   = $1 if $cellList =~ m/<Provider>(.*?)<\/Provider>/is;
-                 my $TAC        = $1 if $cellList =~ m/<TAC>(.*?)<\/TAC>/is;
-                 my $PhysicalId = $1 if $cellList =~ m/<PhysicalId>(.*?)<\/PhysicalId>/is;
-                 my $Distance   = $1 if $cellList =~ m/<Distance>(.*?)<\/Distance>/is;
-                 my $Rssi       = $1 if $cellList =~ m/<Rssi>(.*?)<\/Rssi>/is;
-                 my $Rsrq       = $1 if $cellList =~ m/<Rsrq>(.*?)<\/Rsrq>/is;
-                 my $RSRP       = $1 if $cellList =~ m/<RSRP>(.*?)<\/RSRP>/is;
-                 my $Cellid     = $1 if $cellList =~ m/<Cellid>(.*?)<\/Cellid>/is;
- 
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_Connected", $Connected;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_CellType", $CellType;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_PLMN", $PLMN;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_Provider", $Provider;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_TAC", $TAC;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_PhysicalId", $PhysicalId;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_Distance", $Distance;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_Rssi", $Rssi;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_Rsrq", $Rsrq;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_RSRP", $RSRP;
-                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo" . $Index ."_Cellid", $Cellid;
+               my $cData = $data->{NewCellList}->{CellList}->{Cell};
+
+               if (ref($cData) eq "ARRAY") {
+                 my $nbViews = scalar @$cData;
+
+                 if ($nbViews > 0) {
+                   for(my $j = 0; $j <= $nbViews - 1; $j++) {
+                     my $idn = $cData->[$j]->{Index};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Connected",  $cData->[$j]->{Connected};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_CellType",   $cData->[$j]->{CellType};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_PLMN",       $cData->[$j]->{PLMN};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Provider",   $cData->[$j]->{Provider};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_TAC",        $cData->[$j]->{TAC};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_PhysicalId", $cData->[$j]->{PhysicalId};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Distance",   $cData->[$j]->{Distance};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Rssi",       $cData->[$j]->{Rssi};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Rsrq",       $cData->[$j]->{Rsrq};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_RSRP",       $cData->[$j]->{RSRP};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Cellid",     $cData->[$j]->{Cellid};
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Index",      $cData->[$j]->{Index};
+                   }
+                 }
+               } else {
+                 my $idn = $cData->{Index};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Connected",  $cData->{Connected};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_CellType",   $cData->{CellType};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_PLMN",       $cData->{PLMN};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Provider",   $cData->{Provider};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_TAC",        $cData->{TAC};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_PhysicalId", $cData->{PhysicalId};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Distance",   $cData->{Distance};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Rssi",       $cData->{Rssi};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Rsrq",       $cData->{Rsrq};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_RSRP",       $cData->{RSRP};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Cellid",     $cData->{Cellid};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo${idn}_Index",      $cData->{Index};
                }
-
+             } else {
+               # "Nothing";
              }
 
-             my $data = $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx}->{data};
-
              Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_SerialNumber",            $data->{NewSerialNumber};
-
-             # $data->{NewEnableVoIPPDN};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PPPUsername",             $data->{NewEnableVoIPPDN}->{NewPPPUsername};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PPPUsernameVoIP",         $data->{NewEnableVoIPPDN}->{NewPPPUsernameVoIP};
-
-             # $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_SoftwareVersion",         $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewSoftwareVersion};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PPPAuthProtocolVoIP",     $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewPPPAuthProtocolVoIP};
-
-             # $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PDN2_MTU",                $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewPDN2_MTU};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PDN1_MTU",                $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewPDN1_MTU};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_IMSI",                    $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewIMSI};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_APN_VoIP",                $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewAPN_VoIP};
-
-             # $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewAPN};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_CurrentAccessTechnology", $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewAPN}->{NewCurrentAccessTechnology};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Roaming",                 $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewAPN}->{NewRoaming};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_SignalRSRP0",             $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewAPN}->{NewSignalRSRP0};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_SignalRSRP1",             $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewAPN}->{NewSignalRSRP1};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_NewCellList",             $data->{NewEnableVoIPPDN}->{NewPPPAuthProtocol}->{NewUptime}->{NewAPN}->{NewCellList};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_VoIPPDN",                 $data->{NewEnableVoIPPDN};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PPPUsername",             $data->{NewPPPUsername};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PPPUsernameVoIP",         $data->{NewPPPUsernameVoIP};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PPPAuthProtocol",         $data->{NewPPPAuthProtocol};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_SoftwareVersion",         $data->{NewSoftwareVersion};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PPPAuthProtocolVoIP",     $data->{NewPPPAuthProtocolVoIP};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Uptime",                  $data->{NewUptime};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PDN2_MTU",                $data->{NewPDN2_MTU};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PDN1_MTU",                $data->{NewPDN1_MTU};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_IMSI",                    $data->{NewIMSI};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_APN_VoIP",                $data->{NewAPN_VoIP};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_APN",                     $data->{NewAPN};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_CurrentAccessTechnology", $data->{NewCurrentAccessTechnology};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Roaming",                 $data->{NewRoaming};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_SignalRSRP0",             $data->{NewSignalRSRP0};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_SignalRSRP1",             $data->{NewSignalRSRP1};
            }
           
          }
@@ -8605,7 +8649,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
          @tr064CmdArray = (["X_AVM-DE_WANMobileConnection:1", "x_wanmobileconn", "GetInfo"]);
          $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-         if ($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{Error}->{ErrLevel}) {
+         if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
            Fritz_Log $hash, 2, "Mobile GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
@@ -8613,12 +8657,12 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
            Fritz_Log $hash, 5, "Mobile GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-           if (defined($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{Status_line})) {
+           if (exists($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{Status_line})) {
 
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PINFailureCount", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{data}->{NewPINFailureCount};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PUKFailureCount", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{data}->{NewPUKFailureCount};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Enabled",         $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{data}->{NewEnabled};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Status",          $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{data}->{NewStatus};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PINFailureCount", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{NewPINFailureCount};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PUKFailureCount", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{NewPUKFailureCount};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Enabled",         $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{NewEnabled};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Status",          $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{NewStatus};
            }
           
          }
@@ -8626,7 +8670,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
          @tr064CmdArray = (["X_AVM-DE_WANMobileConnection:1", "x_wanmobileconn", "GetBandCapabilities"]);
          $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-         if ($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{Error}->{ErrLevel}) {
+         if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
            Fritz_Log $hash, 2, "Mobile GetBandCapabilities -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
@@ -8634,11 +8678,11 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
            Fritz_Log $hash, 5, "Mobile GetBandCapabilities -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-           if (defined($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{Status_line})) {
+           if (exists($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{Status_line})) {
 
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_CapabilitiesLTE",   $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{data}->{NewBandCapabilitiesLTE};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Capabilities5GSA",  $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{data}->{NewBandCapabilities5GSA};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Capabilities5GNSA", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{data}->{NewBandCapabilities5GNSA};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_CapabilitiesLTE",   $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{NewBandCapabilitiesLTE};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Capabilities5GSA",  $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{NewBandCapabilities5GSA};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_Capabilities5GNSA", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{NewBandCapabilities5GNSA};
   
            }
           
@@ -8647,7 +8691,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
          @tr064CmdArray = (["X_AVM-DE_WANMobileConnection:1", "x_wanmobileconn", "GetAccessTechnology"]);
          $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-         if ($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{Error}->{ErrLevel}) {
+         if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
            Fritz_Log $hash, 2, "Mobile GetAccessTechnology -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
@@ -8655,11 +8699,11 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
            Fritz_Log $hash, 5, "Mobile GetAccessTechnology -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-           if (defined($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{Status_line})) {
+           if (exists($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{Status_line})) {
 
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_CurrentAccessTechnology",  $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{data}->{NewCurrentAccessTechnology};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PossibleAccessTechnology", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{data}->{NewPossibleAccessTechnology};
-             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_AccessTechnology",         $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{data}->{NewAccessTechnology};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_CurrentAccessTechnology",  $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{NewCurrentAccessTechnology};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_PossibleAccessTechnology", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{NewPossibleAccessTechnology};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "mobileInfo_AccessTechnology",         $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{NewAccessTechnology};
   
            }
           
@@ -8685,7 +8729,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
        @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "GetPhonebookList"] );
        $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-       if ($tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{Error}->{ErrLevel}) {
+       if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
          Fritz_Log $hash, 2, "GetPhonebookList -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
@@ -8693,13 +8737,13 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
          Fritz_Log $hash, 5, "GetPhonebookList -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-         if (defined($tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{Status_line})) {
+         if (exists($tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{Status_line})) {
 
-           if (defined $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{data}->{NewPhonebookList}) {
+           if (exists $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{NewPhonebookList}) {
 
-             Fritz_Readout_Add_Reading $hash, $roReadings, "fon_phoneBook_IDs", $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{data}->{NewPhonebookList};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "fon_phoneBook_IDs", $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{NewPhonebookList};
 
-             my @phonebooks = split(",", $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{data}->{NewPhonebookList});
+             my @phonebooks = split(",", $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebookList}->{NewPhonebookList});
 
              foreach (@phonebooks) {
 
@@ -8709,7 +8753,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
                @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "GetPhonebook", "NewPhonebookID", $item_id] );
                $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-               if ($tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{Error}->{ErrLevel}) {
+               if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
                  Fritz_Log $hash, 2, "GetPhonebook -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
@@ -8717,13 +8761,13 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
                  Fritz_Log $hash, 5, "GetPhonebook -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-                 if (defined($tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{Status_line})) {
+                 if (exists($tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{Status_line})) {
 
-                   if (defined $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{data}->{NewPhonebookName}) {
-                     Fritz_Readout_Add_Reading $hash, $roReadings, "fon_phoneBook_$item_id", $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{data}->{NewPhonebookName};
+                   if (exists $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{NewPhonebookName}) {
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "fon_phoneBook_$item_id", $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{NewPhonebookName};
                    }
-                   if (defined $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{data}->{NewPhonebookURL}) {
-                     Fritz_Readout_Add_Reading $hash, $roReadings, "fon_phoneBook_URL_$item_id", $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{data}->{NewPhonebookURL};
+                   if (exists $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{NewPhonebookURL}) {
+                     Fritz_Readout_Add_Reading $hash, $roReadings, "fon_phoneBook_URL_$item_id", $tr064NewResult->{"X_AVM-DE_OnTel:1"}->{GetPhonebook}->{NewPhonebookURL};
                    }
                  }
                }
@@ -8754,7 +8798,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
          @tr064CmdArray = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
          $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-         if ($tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{Error}->{ErrLevel}) {
+         if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
            Fritz_Log $hash, 2, "VDSL up/down rate GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
@@ -8762,11 +8806,11 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
            Fritz_Log $hash, 5, "VDSL up/down rate GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-           if (defined($tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{Status_line})) {
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_vdsl_downStreamRate",    $tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{data}->{NewDownstreamCurrRate} / 1000;
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_vdsl_downStreamMaxRate", $tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{data}->{NewDownstreamMaxRate} / 1000;
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_vdsl_upStreamRate",      $tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{data}->{NewUpstreamCurrRate} / 1000;
-             Fritz_Readout_Add_Reading $hash, $roReadings, "box_vdsl_upStreamMaxRate",   $tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{data}->{NewUpstreamMaxRate} / 1000;
+           if (exists($tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{Status_line})) {
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_vdsl_downStreamRate",    $tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{NewDownstreamCurrRate} / 1000;
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_vdsl_downStreamMaxRate", $tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{NewDownstreamMaxRate} / 1000;
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_vdsl_upStreamRate",      $tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{NewUpstreamCurrRate} / 1000;
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_vdsl_upStreamMaxRate",   $tr064NewResult->{"WANDSLInterfaceConfig:1"}->{GetInfo}->{NewUpstreamMaxRate} / 1000;
            }
          }
        }
@@ -8808,7 +8852,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
        @tr064CmdArray = ([$trService, $wanConnection, "GetInfo"]);
        $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-       if ($tr064NewResult->{"$trService"}->{GetInfo}->{Error}->{ErrLevel}) {
+       if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
 
          Fritz_Log $hash, 2, "$wanConnection GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
@@ -8816,34 +8860,34 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
          Fritz_Log $hash, 5, "$wanConnection GetInfo -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-         if (defined($tr064NewResult->{"$trService"}->{GetInfo}->{Status_line})) {
+         if (exists($tr064NewResult->{"$trService"}->{GetInfo}->{Status_line})) {
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_name",               $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewName}
-                                                                                if $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewName};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_name",               $tr064NewResult->{"$trService"}->{GetInfo}->{NewName}
+                                                                                if exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewName};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_IPv4_Extern",        $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewExternalIPAddress}
-                                                                                if $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewExternalIPAddress};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_IPv4_Extern",        $tr064NewResult->{"$trService"}->{GetInfo}->{NewExternalIPAddress}
+                                                                                if exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewExternalIPAddress};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_connection_Type",    $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewConnectionType}
-                                                                                if $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewConnectionType};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_connection_Type",    $tr064NewResult->{"$trService"}->{GetInfo}->{NewConnectionType}
+                                                                                if exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewConnectionType};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_connect",            $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewConnectionStatus}
-                                                                                if $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewConnectionStatus};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_connect",            $tr064NewResult->{"$trService"}->{GetInfo}->{NewConnectionStatus}
+                                                                                if exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewConnectionStatus};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_last_connect_err",   $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewLastConnectionError}
-                                                                                if $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewLastConnectionError};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_last_connect_err",   $tr064NewResult->{"$trService"}->{GetInfo}->{NewLastConnectionError}
+                                                                                if exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewLastConnectionError};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_last_auth_err",      $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewLastAuthErrorInfo}
-                                                                                if $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewLastAuthErrorInfo};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_last_auth_err",      $tr064NewResult->{"$trService"}->{GetInfo}->{NewLastAuthErrorInfo}
+                                                                                if exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewLastAuthErrorInfo};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_mac_Address",        $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewMACAddress}
-                                                                                if $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewMACAddress};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_mac_Address",        $tr064NewResult->{"$trService"}->{GetInfo}->{NewMACAddress}
+                                                                                if exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewMACAddress};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_connection_Trigger", $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewConnectionTrigger}
-                                                                                if $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewConnectionTrigger};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "box_" .$conn[$i]. "_connection_Trigger", $tr064NewResult->{"$trService"}->{GetInfo}->{NewConnectionTrigger}
+                                                                                if exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewConnectionTrigger};
 
-           if ($tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewUptime}) {
-             $strCurl = $tr064NewResult->{"$trService"}->{GetInfo}->{data}->{NewUptime};
+           if (exists $tr064NewResult->{"$trService"}->{GetInfo}->{NewUptime}) {
+             $strCurl = $tr064NewResult->{"$trService"}->{GetInfo}->{NewUptime};
              $Sek  = $strCurl;
              $Tag  = int($Sek/86400);
              $Std  = int(($Sek/3600)-(24*$Tag));
@@ -9250,7 +9294,7 @@ sub Fritz_Readout_Process($$@)
                                   ."Fritz_init_TR064,Fritz_open_Web_Connection,Fritz_call_Lua_Query,Fritz_call_LuaData,Fritz_write_javaScript,Fritz_call_javaScript,"
                                   ."Fritz_Helper_make_TableRow,Fritz_Helper_process_JSON,Fritz_Helper_analyse_Lua_Result,Fritz_Phonebook_readRemote,Fritz_Phonebook_parse,"
                                   ."Fritz_Phonebook_Number_normalize,Fritz_Helper_retMsg,Fritz_Helper_html2txt,Fritz_Helper_store_Password,Fritz_Helper_read_Password,Fritz_Helper_Url_Regex,"
-                                  ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,Fritz_Helper_XMLin,Fritz_Helper_XMLinArray,Fritz_Helper_removeComments,Fritz_Helper_simplify,Fritz_Helper_insertbranch,"
+                                  ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,"
                                   ."Fritz_Helper_removeAfA,Fritz_Helper_reformat "
                   .$readingFnAttributes;
 
@@ -10142,14 +10186,14 @@ sub Fritz_Readout_API_Check($)
              my @tr064CmdArray = (["WANCommonInterfaceConfig:1", "wancommonifconfig1", "GetCommonLinkProperties"]);
              my $tr064Result = Fritz_SOAP_Request( $hash, 0, \@tr064CmdArray );
 
-             if ($tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{Error}->{ErrLevel}) {
+             if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
                Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
                Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
              } else {
                Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
 
-               if ($tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{data}) {
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", $tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{data}->{NewWANAccessType};
+               if (exists $tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}) {
+                 Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", $tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{NewWANAccessType};
                } else {
                  Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
                }
@@ -10209,7 +10253,7 @@ sub Fritz_Readout_API_Check($)
              Fritz_Log $hash, 4, "ApiCheck tr064MultResult\n" . Dumper($tr064Result);
 
              for my $i (0 .. $#tr064MultKeyArray) {
-               if ($tr064Result->{$tr064MultKeyArray[$i][1]}->{$tr064MultKeyArray[$i][2]}->{Error}->{ErrLevel}) {
+               if (exists($tr064Result->{Error}->{$tr064MultKeyArray[$i][1]}->{$tr064MultKeyArray[$i][2]}->{ErrLevel}) ) {
                  Fritz_Log $hash, 4, "$tr064MultKeyArray[$i][0] = $tr064MultKeyArray[$i][1]: not Ok";
                  Fritz_Readout_Add_Reading $hash, \@roReadings, "TR064control->" . $tr064MultKeyArray[$i][0] . "->active", 0;
                  $stat = -1;
@@ -10253,7 +10297,7 @@ sub Fritz_Readout_API_Check($)
              Fritz_Log $hash, 4, "ApiCheck trIGDMultCmdArray\n" . Dumper($igd064Result);
 
              for my $i (0 .. $#trIGDMultKeyArray) {
-               if ($igd064Result->{$trIGDMultKeyArray[$i][1]}->{$trIGDMultKeyArray[$i][2]}->{Error}->{ErrLevel}) {
+               if (exists($igd064Result->{Error}->{$trIGDMultKeyArray[$i][1]}->{$trIGDMultKeyArray[$i][2]}->{ErrLevel}) ) {
                  Fritz_Log $hash, 4, "$trIGDMultKeyArray[$i][0] = $trIGDMultKeyArray[$i][1]: not Ok";
                  Fritz_Readout_Add_Reading $hash, \@roReadings, "IGDcontrol->" . $trIGDMultKeyArray[$i][0] . "->active", 0;
                  $stat = -1;
@@ -12025,7 +12069,7 @@ sub Fritz_Set_call_Phone($)
    Fritz_Log $hash, 4, "set $name " . join(" ", @val);
 
    my @roReadings;
-   my @tr064Result;
+   my $tr064NewResult;
    my @tr064CallArray;
    my $duration = 60;
 
@@ -12056,13 +12100,12 @@ sub Fritz_Set_call_Phone($)
    @tr064CallArray = ();
    push @tr064CallArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", $extNo . "#"];
 
-#   @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CallArray);
-   @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CallArray);
+   $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CallArray);
 
-   if ($tr064Result[0]->{"X_AVM-DE_DialNumber"}->{Error}) {
-     Fritz_Log $hash, 2, "(set call): " . $tr064Result[0]->{"X_AVM-DE_DialNumber"}->{Error};
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "(set call): " . $tr064Result[0]->{"X_AVM-DE_DialNumber"}->{Error};
-     return $name."|2|Error (set call): " . $tr064Result[0]->{Error};
+   if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+     Fritz_Log $hash, 2, "(set call): " . Dumper($tr064NewResult->{Error});
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "(set call): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error}, 1);
+     return $name."|2|Error (set call): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error});
    }
 
    Fritz_Log $hash, 4, "waiting";
@@ -12073,13 +12116,12 @@ sub Fritz_Set_call_Phone($)
    @tr064CallArray = ();
    push @tr064CallArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
 
-#   @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CallArray);
-   @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CallArray);
+   $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CallArray);
 
-   if ($tr064Result[0]->{"X_AVM-DE_DialHangup"}->{Error}) {
-     Fritz_Log $hash, 2, "(set call): " . $tr064Result[0]->{"X_AVM-DE_DialHangup"}->{Error};
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "(set call): " . $tr064Result[0]->{"X_AVM-DE_DialHangup"}->{Error};
-     return $name."|2|Error (set call): " . $tr064Result[0]->{Error};
+   if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+     Fritz_Log $hash, 2, "(set call): " . Dumper ($tr064NewResult->{Error});
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "(set call): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error}, 1);
+     return $name."|2|Error (set call): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error});
    }
 
    Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "call done: " . $extNo . " duration: " . $duration;
@@ -12122,17 +12164,15 @@ sub Fritz_Set_GuestWlan_OnOff($)
 
      my $gWlanNo = $hash->{fhem}{multiple_wlan}{cnt} + 1; # + 1 is the quest wlan. See also TR064 reference
      push @tr064CmdArray, ["WLANConfiguration:" . $gWlanNo, "wlanconfig" . $gWlanNo, "SetEnable", "NewEnable", $state];
+     my $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-#     my @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-     my @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
-
-     if( $tr064Result[0]->{SetEnable}->{Error}) {
+     if( exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
        my $msg = "set guestWlan: TR064 error switching guestWlan: $val[0]";
        Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
-       Fritz_Log $hash, 2, $msg . " - " . $tr064Result[0]->{SetEnable}->{Error};
+       Fritz_Log $hash, 2, $msg . " - " . Dumper($tr064NewResult->{Error});
      } else {
 
-       Fritz_Log $hash, 4, "switch GuestWLAN: " . $tr064Result[0];
+       Fritz_Log $hash, 5, "switch GuestWLAN: \n" . Fritz_Helper_Dumper($hash, \$tr064NewResult, 5);
 
        # reread WLAN-Status
        my $queryStr = "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
@@ -12153,8 +12193,8 @@ sub Fritz_Set_GuestWlan_OnOff($)
 
          if ($hash->{fhem}{fwVersion} < 750) {
            Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_5GHz", $result->{box_wlan_5GHz}, "onoff";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_cnt", ($result->{box_wlan_5GHz} ? 2 : 1);
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_5GHz",   $result->{box_wlan_5GHz}, "onoff";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_cnt",   ($result->{box_wlan_5GHz} ? 2 : 1);
          }
 
          Fritz_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan",        $result->{box_guestWlan}, "onoff";
@@ -12207,7 +12247,7 @@ sub Fritz_Set_GuestWlan_OnOff($)
                $bandName    =~ s/24/2.4/;
                $bandName    =~ s/ghz/GHz/;
 
-               Fritz_Readout_Add_Reading $hash, \@roReadings, $bandName . "_active", $result->{data}->{$bandOrg}->{active}, "onoff";
+               Fritz_Readout_Add_Reading $hash, \@roReadings, $bandName . "_active",  $result->{data}->{$bandOrg}->{active}, "onoff";
                Fritz_Readout_Add_Reading $hash, \@roReadings, $bandName . "_useable", $result->{data}->{$bandOrg}->{useable}, "yesno";
 
              }
@@ -12256,21 +12296,20 @@ sub Fritz_Set_Wlan_OnOff($)
      }
 
      Fritz_Log $hash, 4, "TR-064 Command";
-#     my @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-     my @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+     my $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-     if( $tr064Result[0]->{SetEnable}->{Error}) {
+     if( exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
        my $msg = "set $cmd: TR064 error switching $cmd: $val[0]";
        Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
-       Fritz_Log $hash, 2, $msg . " - " . $tr064Result[0]->{SetEnable}->{Error};
+       Fritz_Log $hash, 2, $msg . " - " . Dumper ($tr064NewResult->{Error});
      } else {
 
-       Fritz_Log $hash, 4, "switch WLAN: " . $tr064Result[0];
+       Fritz_Log $hash, 4, "switch WLAN: " . Dumper($tr064NewResult);
 
        # Read WLAN-Status
        my $queryStr = "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
        $queryStr   .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
-       $queryStr   .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # GÃ¤ste WLAN
+       $queryStr   .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # Gäste WLAN
        $queryStr   .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
        $queryStr   .= "&box_macFilter_active=wlan:settings/is_macfilter_active";
 
@@ -12426,7 +12465,7 @@ sub Fritz_Set_ring_Phone($)
    my $hash = $defs{$name};
 
    my @roReadings;
-   my @tr064Result;
+   my $tr064NewResult;
    my $curCallerName;
    my @tr064CmdArray;
    my $duration = -1;
@@ -12470,22 +12509,26 @@ sub Fritz_Set_ring_Phone($)
    # get port name
    @tr064CmdArray = ();
    push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_GetPhonePort", "NewIndex", "1"];
-#   @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-   @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+   $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-   if ($tr064Result[0]->{"X_AVM-DE_GetPhonePort"}->{Error}) {
-     Fritz_Log $hash, 2, "(set ring phonePort): " . $tr064Result[0]->{"X_AVM-DE_GetPhonePort"}->{Error};
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "phonePort: " . $tr064Result[0]->{"X_AVM-DE_GetPhonePort"}->{Error};
-     return $name."|2|Error (set ring phonePort): ".$tr064Result[0]->{"X_AVM-DE_GetPhonePort"}->{Error};
+   if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+     Fritz_Log $hash, 2, "(set ring phonePort): " . Dumper($tr064NewResult->{Error});
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "phonePort: " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error}, 1);
+     return $name."|2|Error (set ring phonePort): ".Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error});
    }
 
-   my $portName = $tr064Result[0]->{'X_AVM-DE_GetPhonePortResponse'}->{'NewX_AVM-DE_PhoneName'};
+   my $portName = $tr064NewResult->{"X_VoIP:1"}->{"X_AVM-DE_GetPhonePort"}->{'NewX_AVM-DE_PhoneName'};
    # set click to dial
    @tr064CmdArray = ();
    if ($portName) {
      push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialSetConfig", "NewX_AVM-DE_PhoneName", $portName];
-#     @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-     @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+     $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+
+     if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+       Fritz_Log $hash, 2, "(set ring): " . Dumper($tr064NewResult->{Error});
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "ring: " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error}, 1);
+       return $name."|2|Error (set ring): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error});
+     }
      Fritz_Log $hash, 4, "Switch ClickToDial on, set ring port '$portName'";
    }
 
@@ -12496,13 +12539,12 @@ sub Fritz_Set_ring_Phone($)
 
    @tr064CmdArray = ();
    push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", "**".$intNo."#"];
-#   @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-   @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+   $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-   if ($tr064Result[0]->{"X_AVM-DE_DialNumber"}->{Error}) {
-     Fritz_Log $hash, 2, "(set ring): " . $tr064Result[0]->{Error};
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "ring: " . $tr064Result[0]->{"X_AVM-DE_DialNumber"}->{Error};
-     return $name."|2|Error (set ring): " . $tr064Result[0]->{"X_AVM-DE_DialNumber"}->{Error};
+   if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+     Fritz_Log $hash, 2, "(set ring): " . Dumper($tr064NewResult->{Error});
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "ring: " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error}, 1);
+     return $name."|2|Error (set ring): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error});
    }
 
    sleep 5        if $duration <= 0; # always wait before reseting everything
@@ -12510,15 +12552,14 @@ sub Fritz_Set_ring_Phone($)
 
    unless ( $duration == 0 || $duration == -1 ) {
       @tr064CmdArray = ();
+
       push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialHangup"];
-#      @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray ) if $hash->{SECPORT};
+      $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray) if $hash->{SECPORT};
 
-      @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray) if $hash->{SECPORT};
-
-      if ($tr064Result[0]->{"X_AVM-DE_DialHangup"}->{Error}) {
-        Fritz_Log $hash, 2, "(set ring hangUp): " . $tr064Result[0]->{"X_AVM-DE_DialHangup"}->{Error};
-        Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "hangUp: " . $tr064Result[0]->{"X_AVM-DE_DialHangup"}->{Error};
-        return $name."|2|Error (set ring): " . $tr064Result[0]->{"X_AVM-DE_DialHangup"}->{Error};
+      if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+        Fritz_Log $hash, 2, "(set ring hangUp): " . Dumper($tr064NewResult->{Error});
+        Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "hangUp: " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error}, 1);
+        return $name."|2|Error (set ring): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error});
       }
    }
 
@@ -12586,18 +12627,20 @@ sub Fritz_Get_MobileInfo($) {
    $returnStr .= "</tr>\n";
 
    
-   $returnStr .= Fritz_Helper_make_TableRow($hash, "SIM status",        $result->{data}->{simOk}, "onoff");
-   $returnStr .= Fritz_Helper_make_TableRow($hash, "Activation status", $result->{data}->{activation});
+   $returnStr .= Fritz_Helper_make_TableRow($hash, "SIM status",        ($result->{data}->{simOk} ? "active" : "inactive"));
+   $returnStr .= Fritz_Helper_make_TableRow($hash, "Activation status",  $result->{data}->{activation});
 
    if ($result->{data}->{fallback}) {
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "Fallback possible",   $result->{data}->{fallback}->{possible}, "onoff");
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "Fallback enableable", $result->{data}->{fallback}->{enableable});
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "Fallback possible",     ($result->{data}->{fallback}->{possible} ? "yes" : "no"));
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "Fallback enableable",   ($result->{data}->{fallback}->{enableable} ? "yes" : "no"));
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "Fallback canBeEnabled", ($result->{data}->{fallback}->{canBeEnabled} ? "yes" : "no"));
+
    }
 
    if ($result->{data}->{config}) {
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "Config DSL"  , ($result->{data}->{config}->{dsl} ? "on" : "off"));
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "Config FIBER", ($result->{data}->{config}->{fiber} ? "on" : "off"));
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "Config CABLE", ($result->{data}->{config}->{cable} ? "on" : "off"));
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "Config DSL"  , ($result->{data}->{config}->{dsl} ? "yes" : "no"));
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "Config FIBER", ($result->{data}->{config}->{fiber} ? "yes" : "no"));
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "Config CABLE", ($result->{data}->{config}->{cable} ? "yes" : "no"));
    }
 
    if ($result->{data}->{connection}) {
@@ -12607,14 +12650,15 @@ sub Fritz_Get_MobileInfo($) {
      $returnStr .= Fritz_Helper_make_TableRow($hash, "Connection accessTechnology", $result->{data}->{connection}->{accessTechnology});
    }
 
-   if ($result->{data}->{progress}) {
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "Progress refreshNeeded", $result->{data}->{progress}->{refreshNeeded});
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "Progress error"        , $result->{data}->{progress}->{error});
+   if ($result->{data}->{compatibilityMode}) {
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "compatibilityMode enabled"   ,   ($result->{data}->{compatibilityMode}->{enabled} ? "yes" : "no"));
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "compatibilityMode enableable",   ($result->{data}->{compatibilityMode}->{enableable} ? "yes" : "no"));
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "compatibilityMode canBeEnabled", ($result->{data}->{compatibilityMode}->{canBeEnabled} ? "yes" : "no"));
    }
 
-   if ($result->{data}->{compatibilityMode}) {
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "compatibilityMode enabled"   , ($result->{data}->{compatibilityMode}->{enabled} ? "on" : "off"));
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "compatibilityMode enableable", ($result->{data}->{compatibilityMode}->{enableable} ? "on" : "off"));
+   if ($result->{data}->{progress}) {
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "Progress refreshNeeded", ($result->{data}->{progress}->{refreshNeeded} ? "yes" : "no"));
+     $returnStr .= Fritz_Helper_make_TableRow($hash, "Progress error"        ,  $result->{data}->{progress}->{error});
    }
 
    if ($result->{data}->{voipOverMobile}) {
@@ -12631,10 +12675,6 @@ sub Fritz_Get_MobileInfo($) {
 
    if ($result->{data}->{capabilities}) {
      $returnStr .= Fritz_Helper_make_TableRow($hash, "Capabilities voice", ($result->{data}->{capabilities}->{voice} ? "on" : "off"));
-   }
-
-   if ($result->{data}->{activation}) {
-     $returnStr .= Fritz_Helper_make_TableRow($hash, "activation", $result->{data}->{activation});
    }
 
    if ($result->{data}->{sipNumberCount}) {
@@ -12659,106 +12699,108 @@ sub Fritz_Get_MobileInfo($) {
 
      my $strCurl;
      my @tr064CmdArray;
-     my @tr064Result;
+     my $tr064NewResult;
 
      @tr064CmdArray = (["X_AVM-DE_WANMobileConnection:1", "x_wanmobileconn", "GetInfoEx"]);
 
-#     @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-     @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+     $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-     if ($tr064Result[0]->{GetInfoEx}->{Error}) {
-       $strCurl = Fritz_Helper_Dumper($hash, \@tr064Result);
-       Fritz_Log $hash, 2, "Mobile GetInfoEX -> \n" . $strCurl;
+     if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+
+       Fritz_Log $hash, 2, "Mobile GetInfoEx -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult);
 
      } else {
 
-       Fritz_Log $hash, 5, "Mobile GetInfoEx -> \n" . Fritz_Helper_Dumper($hash, \@tr064Result, 5);
+       if (exists($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx}->{Status_line})) {
 
-       if ($tr064Result[0]->{GetInfoExResponse}) {
+         Fritz_Log $hash, 5, "Mobile GetInfoEx -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
 
-         if (defined $tr064Result[0]->{GetInfoExResponse}->{NewCellList}) {
-           my $data = $tr064Result[0]->{GetInfoExResponse}->{NewCellList};
-           $data =~ s/&lt;/</isg;
-           $data =~ s/&gt;/>/isg;
+         my $data = $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx};
 
-           Fritz_Log $hash, 5, "Data Mobile GetInfoEx (NewCellList): \n" . $data;
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "SerialNumber",             $data->{NewSerialNumber});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "VoIPPDN",                 ($data->{NewEnableVoIPPDN} ? "on" : "off"));
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PPPUsername",              $data->{NewPPPUsername});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PPPUsernameVoIP",          $data->{NewPPPUsernameVoIP});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PPPAuthProtocol",          $data->{NewPPPAuthProtocol});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "SoftwareVersion",          $data->{NewSoftwareVersion});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PPPAuthProtocolVoIP",      $data->{NewPPPAuthProtocolVoIP});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "Uptime",                   $data->{NewUptime});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PDN2_MTU",                ($data->{NewPDN2_MTU} ? "on" : "off"));
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PDN1_MTU",                ($data->{NewPDN1_MTU} ? "on" : "off"));
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "IMSI",                     $data->{NewIMSI});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "APN_VoIP",                 $data->{NewAPN_VoIP});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "APN",                      $data->{NewAPN});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "CurrentAccessTechnology",  $data->{NewCurrentAccessTechnology});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "Roaming",                 ($data->{NewRoaming} ? "on" : "off"));
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "SignalRSRP0",              $data->{NewSignalRSRP0});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "SignalRSRP1",              $data->{NewSignalRSRP1});
 
-           while( $data =~ /<Cell>(.*?)<\/Cell>/isg ) {
-             my $cellList = $1;
- 
-             Fritz_Log $hash, 5, "Data Mobile GetInfoEx (Cell): \n" . $1;
-                
-             my $Index      = $1 if $cellList =~ m/<Index>(.*?)<\/Index>/is;
-             my $Connected  = $1 if $cellList =~ m/<Connected>(.*?)<\/Connected>/is;
-             my $CellType   = $1 if $cellList =~ m/<CellType>(.*?)<\/CellType>/is;
-             my $PLMN       = $1 if $cellList =~ m/<PLMN>(.*?)<\/PLMN>/is;
-             my $Provider   = $1 if $cellList =~ m/<Provider>(.*?)<\/Provider>/is;
-             my $TAC        = $1 if $cellList =~ m/<TAC>(.*?)<\/TAC>/is;
-             my $PhysicalId = $1 if $cellList =~ m/<PhysicalId>(.*?)<\/PhysicalId>/is;
-             my $Distance   = $1 if $cellList =~ m/<Distance>(.*?)<\/Distance>/is;
-             my $Rssi       = $1 if $cellList =~ m/<Rssi>(.*?)<\/Rssi>/is;
-             my $Rsrq       = $1 if $cellList =~ m/<Rsrq>(.*?)<\/Rsrq>/is;
-             my $RSRP       = $1 if $cellList =~ m/<RSRP>(.*?)<\/RSRP>/is;
-             my $Cellid     = $1 if $cellList =~ m/<Cellid>(.*?)<\/Cellid>/is;
- 
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "Connected_$Index",  $Connected);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "CellType_$Index",   $CellType);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "PLMN_$Index",       $PLMN);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "Provider_$Index",   $Provider);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "TAC_$Index",        $TAC);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "PhysicalId_$Index", $PhysicalId);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "Distance_$Index",   $Distance);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "Rssi_$Index",       $Rssi);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "Rsrq_$Index",       $Rsrq);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "RSRP_$Index",       $RSRP);
-             $returnStr .= Fritz_Helper_make_TableRow($hash, "Cellid_$Index",     $Cellid);
+         if (defined($data->{NewCellList}->{CellList})) {
 
+           my $cData = $data->{NewCellList}->{CellList}->{Cell};
+
+           if (ref($cData) eq "ARRAY") {
+             my $nbViews = scalar @$cData;
+
+             if ($nbViews > 0) {
+               for(my $j = 0; $j <= $nbViews - 1; $j++) {
+                 my $Index = $cData->[$j]->{Index};
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "emptyRow");
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "Connected_$Index",  $cData->[$j]->{Connected});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "CellType_$Index",   $cData->[$j]->{CellType});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "PLMN_$Index",       $cData->[$j]->{PLMN});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "Provider_$Index",   $cData->[$j]->{Provider});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "TAC_$Index",        $cData->[$j]->{TAC});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "PhysicalId_$Index", $cData->[$j]->{PhysicalId});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "Distance_$Index",   $cData->[$j]->{Distance});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "Rssi_$Index",       $cData->[$j]->{Rssi});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "Rsrq_$Index",       $cData->[$j]->{Rsrq});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "RSRP_$Index",       $cData->[$j]->{RSRP});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "Cellid_$Index",     $cData->[$j]->{Cellid});
+                 $returnStr .= Fritz_Helper_make_TableRow($hash, "Index_$Index",      $cData->[$j]->{Index});
+               }
+             }
+           } else {
+             my $Index = $cData->{Index};
              $returnStr .= Fritz_Helper_make_TableRow($hash, "emptyRow");
-
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "Connected_$Index",  $cData->{Connected});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "CellType_$Index",   $cData->{CellType});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "PLMN_$Index",       $cData->{PLMN});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "Provider_$Index",   $cData->{Provider});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "TAC_$Index",        $cData->{TAC});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "PhysicalId_$Index", $cData->{PhysicalId});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "Distance_$Index",   $cData->{Distance});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "Rssi_$Index",       $cData->{Rssi});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "Rsrq_$Index",       $cData->{Rsrq});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "RSRP_$Index",       $cData->{RSRP});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "Cellid_$Index",     $cData->{Cellid});
+             $returnStr .= Fritz_Helper_make_TableRow($hash, "Index_$Index",      $cData->{Index});
            }
-
+         } else {
+           # "Nothing";
          }
-
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "PPPUsername",             $tr064Result[0]->{GetInfoExResponse}->{NewPPPUsername});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "PDN2_MTU",                $tr064Result[0]->{GetInfoExResponse}->{NewPDN2_MTU});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "APN",                     $tr064Result[0]->{GetInfoExResponse}->{NewAPN});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "SoftwareVersion",         $tr064Result[0]->{GetInfoExResponse}->{NewSoftwareVersion});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "Roaming",                 $tr064Result[0]->{GetInfoExResponse}->{NewRoaming});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "PDN1_MTU",                $tr064Result[0]->{GetInfoExResponse}->{NewPDN1_MTU});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "IMSI",                    $tr064Result[0]->{GetInfoExResponse}->{NewIMSI});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "SignalRSRP1",             $tr064Result[0]->{GetInfoExResponse}->{NewSignalRSRP1});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "CurrentAccessTechnology", $tr064Result[0]->{GetInfoExResponse}->{NewCurrentAccessTechnology});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "PPPUsernameVoIP",         $tr064Result[0]->{GetInfoExResponse}->{NewPPPUsernameVoIP});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "EnableVoIPPDN",           $tr064Result[0]->{GetInfoExResponse}->{NewEnableVoIPPDN});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "APN_VoIP",                $tr064Result[0]->{GetInfoExResponse}->{NewAPN_VoIP});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "Uptime",                  $tr064Result[0]->{GetInfoExResponse}->{NewUptime});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "SignalRSRP0",             $tr064Result[0]->{GetInfoExResponse}->{NewSignalRSRP0});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "SerialNumber",            $tr064Result[0]->{GetInfoExResponse}->{NewSerialNumber});
-
        }
-        
      }
 
      @tr064CmdArray = (["X_AVM-DE_WANMobileConnection:1", "x_wanmobileconn", "GetInfo"]);
 
-#     @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-     @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+     $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-     if ($tr064Result[0]->{GetInfo}->{Error}) {
-       $strCurl = Fritz_Helper_Dumper($hash, \@tr064Result);
+     if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+       $strCurl = Fritz_Helper_Dumper($hash, \$tr064NewResult);
        Fritz_Log $hash, 2, "Mobile GetInfo -> \n" . $strCurl;
      } else {
 
-       Fritz_Log $hash, 5, "Mobile GetInfo -> \n" . Fritz_Helper_Dumper($hash, \@tr064Result, 5);
+       Fritz_Log $hash, 5, "Mobile GetInfo -> \n" . Fritz_Helper_Dumper($hash, \$tr064NewResult, 5);
 
-       if ($tr064Result[0]->{GetInfoResponse}) {
+       if (exists $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}) {
 
          $returnStr .= Fritz_Helper_make_TableRow($hash, "emptyRow");
 
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "PINFailureCount", $tr064Result[0]->{GetInfoResponse}->{NewPINFailureCount});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "PUKFailureCount", $tr064Result[0]->{GetInfoResponse}->{NewPUKFailureCount});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "Enabled",         $tr064Result[0]->{GetInfoResponse}->{NewEnabled});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "Status",          $tr064Result[0]->{GetInfoResponse}->{NewStatus});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PINFailureCount",  $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{NewPINFailureCount});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PUKFailureCount",  $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{NewPUKFailureCount});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "Enabled",         ($tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{NewEnabled} ? "on" : "off"));
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "Status",           $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfo}->{NewStatus});
   
        }
           
@@ -12766,23 +12808,22 @@ sub Fritz_Get_MobileInfo($) {
 
      @tr064CmdArray = (["X_AVM-DE_WANMobileConnection:1", "x_wanmobileconn", "GetBandCapabilities"]);
 
-#     @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-     @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+     $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-     if ($tr064Result[0]->{GetBandCapabilities}->{Error}) {
-       $strCurl = Fritz_Helper_Dumper($hash, \@tr064Result);
+     if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+       $strCurl = Fritz_Helper_Dumper($hash, \$tr064NewResult);
        Fritz_Log $hash, 2, "Mobile GetInfo -> \n" . $strCurl;
      } else {
 
-       Fritz_Log $hash, 5, "Mobile GetInfo -> \n" . Fritz_Helper_Dumper($hash, \@tr064Result, 5);
+       Fritz_Log $hash, 5, "Mobile GetInfo -> \n" . Fritz_Helper_Dumper($hash, \$tr064NewResult, 5);
 
-       if ($tr064Result[0]->{GetInfoResponse}) {
+       if (exists $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}) {
 
          $returnStr .= Fritz_Helper_make_TableRow($hash, "emptyRow");
 
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "CapabilitiesLTE",   $tr064Result[0]->{GetInfoResponse}->{NewBandCapabilitiesLTE});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "Capabilities5GSA",  $tr064Result[0]->{GetInfoResponse}->{NewBandCapabilities5GSA});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "Capabilities5GNSA", $tr064Result[0]->{GetInfoResponse}->{NewBandCapabilities5GNSA});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "CapabilitiesLTE",   $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{NewBandCapabilitiesLTE});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "Capabilities5GSA",  $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{NewBandCapabilities5GSA});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "Capabilities5GNSA", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetBandCapabilities}->{NewBandCapabilities5GNSA});
   
        }
           
@@ -12790,23 +12831,22 @@ sub Fritz_Get_MobileInfo($) {
 
      @tr064CmdArray = (["X_AVM-DE_WANMobileConnection:1", "x_wanmobileconn", "GetAccessTechnology"]);
 
-#     @tr064Result = Fritz_call_TR064_Cmd( $hash, 0, \@tr064CmdArray );
-     @tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+     $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-     if ($tr064Result[0]->{GetAccessTechnology}->{Error}) {
-       $strCurl = Fritz_Helper_Dumper($hash, \@tr064Result);
+     if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+       $strCurl = Fritz_Helper_Dumper($hash, \$tr064NewResult);
        Fritz_Log $hash, 2, "Mobile GetInfo -> \n" . $strCurl;
      } else {
 
-       Fritz_Log $hash, 5, "Mobile GetInfo -> \n" . Fritz_Helper_Dumper($hash, \@tr064Result, 5);
+       Fritz_Log $hash, 5, "Mobile GetInfo -> \n" . Fritz_Helper_Dumper($hash, \$tr064NewResult, 5);
 
-       if ($tr064Result[0]->{GetInfoResponse}) {
+       if (exists $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}) {
 
          $returnStr .= Fritz_Helper_make_TableRow($hash, "emptyRow");
 
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "CurrentAccessTechnology",  $tr064Result[0]->{GetInfoResponse}->{NewCurrentAccessTechnology});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "PossibleAccessTechnology", $tr064Result[0]->{GetInfoResponse}->{NewPossibleAccessTechnology});
-         $returnStr .= Fritz_Helper_make_TableRow($hash, "AccessTechnology",         $tr064Result[0]->{GetInfoResponse}->{NewAccessTechnology});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "CurrentAccessTechnology",  $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{NewCurrentAccessTechnology});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "PossibleAccessTechnology", $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{NewPossibleAccessTechnology});
+         $returnStr .= Fritz_Helper_make_TableRow($hash, "AccessTechnology",         $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetAccessTechnology}->{NewAccessTechnology});
   
        }
           
@@ -15440,33 +15480,6 @@ sub Fritz_Get_Lua_Kids($$@)
 
 # Execute a Command via SOAP Request
 #################################################
-#param="<s:$par></s:$par>"
-#
-#$VAR1 = {
-#          'GetPhonebookResponse' => {
-#                                      'NewPhonebookExtraID' => '',
-#                                      'NewPhonebookName' => 'Telefonbuch',
-#                                      'NewPhonebookURL' => 'https://192.168.0.1:49443/phonebook.lua?sid=3bcefc420931397f&pbid=0'
-#                                    }
-#        };
-#
-#
-#$VAR1 = {
-#          's:Envelope' => {
-#                            's:encodingStyle' => 'http://schemas.xmlsoap.org/soap/encoding/',
-#                            'xmlns:s' => 'http://schemas.xmlsoap.org/soap/envelope/',
-#                            's:Body' => {
-#                                          'u:GetPhonebookResponse' => {
-#                                                                        'NewPhonebookName' => 'Telefonbuch',
-#                                                                        'NewPhonebookURL' => undef,
-#                                                                        'xmlns:u' => 'urn:dslforum-org:service:X_AVM-DE_OnTel:1',
-#                                                                        'NewPhonebookExtraID' => undef
-#                                                                      }
-#                                        }
-#                          },
-#          'version' => '1.0'
-#        };
-#
 #     if (!defined $init_request) {
 #       $init_request = <<EOD;
 #          <?xml version="1.0" encoding="utf-8"?>
@@ -15509,7 +15522,7 @@ sub Fritz_SOAP_Request($$$;@)
 
    unless ($port) {
      Fritz_Log $hash, 2, "TR064 not used. No security port defined.";
-     %retHash = ( "Error" => "TR064 not available. No security port defined", "ErrLevel" => "1" ) ;
+     $retHash{Error} = ( {"detail" => "TR064 not available. No security port defined", "ErrLevel" => "1"} ) ;
      return \%retHash;
    }
 
@@ -15519,19 +15532,13 @@ sub Fritz_SOAP_Request($$$;@)
    $UserAgentParaP  = Fritz_Helper_read_Password($hash) unless defined $UserAgentParaP;
    unless (defined $UserAgentParaP) {
       Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
-      %retHash = ( "Error" => "No password set", "ResetSID" => "1", "SOAP_Request" => "Error" ) ;
+      $retHash{Error} = ( {"detail" => "No password set", "ResetSID" => "1", "ErrLevel" => "2"} ) ;
       return \%retHash;
    }
 
    # disable SSL checks. No signed certificate!
    $ENV{'PERL_LWP_SSL_VERIFY_HOSTNAME'} = 0;
    $ENV{HTTPS_DEBUG} = 1;
- 
-   # Discover Service Parameters
-#   my $ua = UserAgentClient->new;
-
-#   $ua->default_headers;
-#   $ua->ssl_opts( verify_hostname => 0 ,SSL_verify_mode => 0x00);
  
    my $host = $hash->{HOST};
    my @retArray;
@@ -15553,6 +15560,8 @@ sub Fritz_SOAP_Request($$$;@)
 
      my @soapParams;
      my $request = $init_request;
+
+     Fritz_Log $hash, 2, "init_request: $init_request" if $init_request;
 
      if ($igd) {
        $encodingStyle = '"http://schemas.xmlsoap.org/soap/encoding/" xmlns:s="http://www.w3.org/2003/05/soap-envelope"';
@@ -15606,47 +15615,73 @@ sub Fritz_SOAP_Request($$$;@)
 
      Fritz_Log $hash, 4, "$control_url -> XML_Envelope: \n" . $request;
 
+     # $host = "192.168.0.2" if $host eq "192.168.0.1";
+
      my $init_url    = "https://$host:$port/$control_url";
      my $service_cmd = "u:" .$service_command. "Response";
      my $func        = $igd ? "IGD" : "TR064";
 
      my $respData = eval { $ua->post($init_url, Content_Type => 'text/xml; charset=utf-8', Content => $request) };
 
-     Fritz_Log $hash, 4, "after eval: \n" . Dumper($respData->decoded_content);
+     Fritz_Log $hash, 5, "respData:\n" . Dumper($respData);
 
      if ($@) {
 
        Fritz_Log $hash, 4, "$service response error: " . $@;
-       $retHash{$service}{$service_command} = ({Error => {"response_error" => $@, "ErrLevel" => "1"}} ) ;
+       $retHash{Error}{$service} = ({$service_command => {"response_error" => $@, "response_code" => "unknown", "ErrLevel" => "3"}} ) ;
+       $UserAgentParaP = undef;
+       $UserAgentParaU = undef;
+       return \%retHash;
 
      } else {
 
-       if( !defined($respData) ) { # Transport-Error
+       if( !defined($respData) || (($respData->code() !~ /200/) && ($respData->message() ne "Internal Server Error")) ) { # Transport-Error
 
-         Fritz_Log $hash, 4, "$service response error: no data";
-         $retHash{$service}{$service_command} = ({Error => {"response_error" => "no data", "ErrLevel" => "2"}} ) ;
+         Fritz_Log $hash, 4, "$service response error: no data - net error : $respData->code : $respData->message";
+         $retHash{Error}{$service}{$service_command}{response_code}  = "http-code:" . $respData->code();
+         $retHash{Error}{$service}{$service_command}{response_error} = $respData->message;
+         $retHash{Error}{$service}{$service_command}{ErrLevel} = "4";
+
+         Fritz_Log $hash, 5, "retHash:\n" . Dumper(\%retHash);
+
+         $UserAgentParaP = undef;
+         $UserAgentParaU = undef;
+         return \%retHash;
 
        } else {
 
          if (!$respData->is_success) {
 
-           my $outHash = Fritz_Helper_XMLin($respData->decoded_content, StrictMode => 0, KeyAttr => []);
+           my $outHash = XMLin($respData->decoded_content, StrictMode => 0, KeyAttr => []);
            Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS:\n" . Dumper($outHash);
 
-           if(defined($outHash->{'s:Envelope'}->{'s:Body'}->{'s:Fault'})) {
-             $retHash{$service}{$service_command}{Error} = $outHash->{'s:Envelope'}->{'s:Body'}->{'s:Fault'};
-             $retHash{$service}{$service_command}{Error}{response_error} = $respData->status_line;
-             $retHash{$service}{$service_command}{Error}{ErrLevel} = "3";
+           if(exists($outHash->{'s:Body'}->{'s:Fault'})) {
+             $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:Fault'};
+           } else {
+             Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS: unhandled error";
            }
 
+           $retHash{Error}{$service}{$service_command}{response_error} = $respData->status_line;
+           $retHash{Error}{$service}{$service_command}{response_code}  = "http-code:" . $respData->code();
+           $retHash{Error}{$service}{$service_command}{ErrLevel} = "5";
+
          } else {
+           # there are some unusefull characters in $respData->decoded_content
+           my $decContent = $respData->decoded_content;
+              $decContent =~ s/&lt;CellList.*?&gt;\n/\<CellList \/\>/isg;
+#              $decContent =~ s/&lt;(.*?)&gt;\n/\<$1\>/isg;
 
-           my $outhash = Fritz_Helper_XMLin($respData->decoded_content, StrictMode => 0, KeyAttr => []);
-           Fritz_Log $hash, 4, "XML_RESPONSE_SUCCESS:\n" . Dumper($outhash);
+           Fritz_Log $hash, 4, "XML_RESPONSE_SUCCESS:\n" . Dumper($decContent);
 
-           if(defined($outhash->{'s:Envelope'}->{'s:Body'}->{$service_cmd})) {
-             $retHash{$service}{$service_command}{data} = $outhash->{'s:Envelope'}->{'s:Body'}->{$service_cmd};
+           my $outHash = XMLin($decContent, StrictMode => 0, KeyAttr => [], SuppressEmpty => undef);
+           Fritz_Log $hash, 4, "XML_RESPONSE_SUCCESS:\n" . Dumper($outHash);
+
+           if(defined($outHash->{'s:Body'}->{$service_cmd})) {
+             $retHash{$service}{$service_command} = $outHash->{'s:Body'}->{$service_cmd};
              $retHash{$service}{$service_command}{Status_line} = $respData->status_line;
+           } else {
+             $retHash{Error}{$service}{$service_command}{response_error} = $respData->status_line;
+             $retHash{Error}{$service}{$service_command}{ErrLevel} = "6";
            }
 
            Fritz_Log $hash, 4, "$service_cmd:\n" . Dumper(%retHash);
@@ -15661,9 +15696,8 @@ sub Fritz_SOAP_Request($$$;@)
 
    $UserAgentParaP = undef;
    $UserAgentParaU = undef;
-#   $ua             = undef;
 
-   # Fritz_Log $hash, 3, "retHash:\n" . Dumper(\%retHash);
+   Fritz_Log $hash, 4, "retHash:\n" . Dumper(\%retHash);
 
    return \%retHash;
 
@@ -17470,7 +17504,7 @@ sub Fritz_Phonebook_readRemote($$)
 
     Fritz_Log $name, 4, "get export for phonebook: $phonebookId";
 
-    my ($err, $phonebook) = HttpUtils_BlockingGet($param);
+    my ($err, $phonebook) = main::HttpUtils_BlockingGet($param);
 
     Fritz_Log $name, 5, "received http response code ".$param->{code} if(exists($param->{code}));
 
@@ -17796,6 +17830,52 @@ sub Fritz_Helper_Url_Regex {
 } # end Fritz_Helper_Url_Regex
 
 ###############################################################################
+# Erstellt Text aus TR064 Error Message
+#
+sub Fritz_Helper_TR064_ErrMsg($$;@) {
+
+  my ( $hash, $errHash, $msgDepth ) = @_;
+
+  my $name    = $hash->{NAME};
+  $msgDepth ||= 0;  
+  my $retMsg  = "ERROR:";
+
+  if (ref($errHash) ne "HASH") {
+
+    $retMsg .= Fritz_Helper_Dumper($hash, \$errHash);
+
+  } else {
+
+    foreach( keys%$errHash ) {
+
+      $retMsg .= "$_:";
+
+      if(ref(%$errHash{$_}) eq 'HASH') {
+
+        foreach my $inner_key (keys%{%$errHash{$_}})    { 
+
+          $retMsg .= " -> $inner_key ErrLevel: $errHash->{$_}->{$inner_key}->{ErrLevel} - ";
+          
+          if ($msgDepth == 0 ) {
+            if ( exists($errHash->{$_}->{$inner_key}->{faultstring}) ) {
+              $retMsg .= "$errHash->{$_}->{$inner_key}->{detail}->{$errHash->{$_}->{$inner_key}->{faultstring}}->{errorDescription}"; 
+              $retMsg .= "- errorCode: $errHash->{$_}->{$inner_key}->{detail}->{$errHash->{$_}->{$inner_key}->{faultstring}}->{errorCode}\n"; 
+            } elsif ( exists($errHash->{$_}->{$inner_key}->{response_code}) ) {
+              $retMsg .= "$errHash->{$_}->{$inner_key}->{response_code} - $errHash->{$_}->{$inner_key}->{response_error}\n"; 
+            }
+          }
+        }
+
+      } else {
+        $retMsg .= " $errHash->{$_} - ";
+      }
+    }
+  }
+  
+  return $retMsg;
+}
+
+###############################################################################
 # Prüft auf unblessed reference und ruft Dumper nur bei entsprechendem LogLevel auf
 #
 sub Fritz_Helper_Dumper($$;@) {
@@ -17836,412 +17916,6 @@ sub Fritz_Helper_Dumper($$;@) {
 
    return $retValue;
 } # end Fritz_Helper_Dumper
-
-###############################################################################
-# https://github.com/meirm/xml2hash/tree/master
-
-sub Fritz_Helper_XMLin
-{
-
-  my($in)=@_;
-
-  $in =~s /\n//g;
-  $in =~s /<!--.*?-->//g;
-  $in =~s />\s*</>\n</g;
-
-  my @lines = split("\n",$in);
-  my $hash  = Fritz_Helper_XMLinArray(@lines);
-  my @root  = keys %{$hash};
-
-  return \%{$hash->{$root[0]}};
-}
-
-sub Fritz_Helper_XMLinArray
-{
-
-  my @lines;
-  my %hash;
-
-  @lines = @_;
-  @lines = &Fritz_Helper_reformat(@lines);
-
-  &Fritz_Helper_removeComments(\@lines);
-
-  &Fritz_Helper_insertbranch(\%hash, \@lines) while @lines;
-
-  &Fritz_Helper_simplify(\%hash);
-
-  return \%hash;
-}
-
-sub Fritz_Helper_removeComments
-{
-
-  my ($lineref) = @_;
-  my $in        = 0;
-
-  foreach(@{$lineref}){
-
-    if(m/<!--/){
-      $in = 1;
-    }
-
-    if (m/-->/){
-      $in = 0;
-      $_  = "";
-    }	
-
-    $_ = "" if $in == 1;
-  }
-}
-
-sub Fritz_Helper_simplify
-{
-
-  my($hashref) = @_;
-  
-  if (ref($hashref) =~  m/^(HASH|ARRAY)$/){
-  
-    foreach (keys %{$hashref}){
-      if (ref($hashref->{$_}) eq 'ARRAY'){
-
-        if (@{$hashref->{$_}} == 1){
-          $hashref->{$_}=$hashref->{$_}[0];
-
-          if (ref($hashref->{$_}) =~  m/^(HASH|ARRAY)$/){
-            &Fritz_Helper_simplify(\%{$hashref->{$_}});
-          }
-        } else {
-
-          foreach(@{$hashref->{$_}}){
-            if (ref($_) =~  m/^(HASH|ARRAY)$/) {
-              &Fritz_Helper_simplify($_);
-            }
-          }
-        }
-      } else {
-        if (ref($hashref->{$_}) eq 'HASH'){
-          &Fritz_Helper_simplify(\%{$hashref->{$_}});
-        }
-      }
-    }
-  }
-}
-
-sub Fritz_Helper_insertbranch
-{
-
-  my($hashref, $linesref) = @_;
-
-  my $keyline = shift @{$linesref};
-
-  return if $keyline =~ m/^\s*$/;
-
-  while ($keyline =~ m#<(.*)>(.*)</\1>#){
-    push @{$hashref->{$1}},$2;
-
-    return unless @{$linesref};
-
-    $keyline = shift @{$linesref};
-  }
-
-   while (defined ($keyline) && $keyline =~ m#<([^/]+)>#){
-     my $key = $1;
-     my (@temparray) = &Fritz_Helper_removeAfA($key, $linesref);
-     push @{$hashref->{$key}}, undef;
-     &Fritz_Helper_insertbranch(\%{$hashref->{$key}[-1]}, \@temparray) while @temparray;
-
-     return unless @{$linesref};
-     $keyline = shift @{$linesref};
-  }
-}
-
-sub Fritz_Helper_removeAfA
-{
-
-  my($key, $linesref) = @_;
-  my @temparray;
-
-  while(@{$linesref}){
-    $_=shift @{$linesref};
-
-    return @temparray if m#</$key>#;
-
-    push @temparray,$_;
-  }
-  return @temparray; 
-}
-
-sub Fritz_Helper_reformat
-{
-
-  my(@lineref) = @_;
-  my @lines;
-
-  foreach (@lineref){
-    chomp;
-    s/^\s*(.*?)\s*$/$1/;
-
-    next if m/^\s*$/;
-
-    if (($_ !~ m#</#) && (m#<(.*?)\s+(.*)>#)){
-      my $key    = $1;
-      my $params = $2;
-      push @lines, "<$key>";
-
-      while ($params=~ s/\s*(.*?)\s*=\s*"(.*?)"\s*//){
-        push @lines, "<$1>$2</$1>";
-      }
-
-      next;
-    } elsif (m#<(.*)\s(.*)>(.*)</\1>#){
-      push @lines, "<$1>", "<content>$3</content>";
-      my $key    = $1;
-      my $params = $2;
-
-      while ($params =~ s/\s*(.*?)\s*=\s*"(.*?)"\s*//){
-        push @lines,"<$1>$2</$1>";
-      }
-
-      push @lines,"</$key>";
-
-      next;
-    }
-    push @lines,$_;
-  }
-  return @lines;
-}
-
-# https://github.com/meirm/xml2hash/tree/master
-###############################################################################
-
-###############################################################################
-# This example Perl script demonstrates converting arbitrary JSON             #
-# to HTML using JSON::Parse and HTML::Make                                    #
-# Regular expression for URL validation in Perl                               #
-#                                                                             #
-# https://www.lemoda.net/perl/json-to-html/index.html                         #
-###############################################################################
-# html xhr 1 lang de page mobile xhrId all
-# 
-# sub Fritz_Helper_Json2HTML($) {
-#   binmode STDOUT, ":encoding(utf8)";
-# 
-#   my ($input) = @_;
-# 
-#   my $element;
-#   if (ref $input eq 'ARRAY') {
-# 
-#     $element = HTML::Make->new ('ol');
-# 
-#     for my $k (@$input) {
-#       my $li = $element->push ('li');
-#       $li->push (Fritz_Helper_Json2HTML ($k));
-#     }
-# 
-#   } elsif (ref $input eq 'HASH') {
-# 
-#     $element = HTML::Make->new ('table');
-# 
-#     for my $k (sort keys %$input) {
-#       my $tr = $element->push ('tr');
-#       $tr->push ('th', text => $k);
-#       my $td = $tr->push ('td');
-#       $td->push (Fritz_Helper_Json2HTML ($input->{$k}));
-#     }
-# 
-#   } else {
-#     $element = HTML::Make->new ('span', text => $input);
-#   }
-#   
-#   return $element->text();
-# 
-# } # end Fritz_Helper_Json2HTML
-#
-###############################################################################
-
-###############################################################################
-#sub isnum ($) {
-#    return 0 if $_[0] eq '';
-#    $_[0] ^ $_[0] ? 0 : 1
-#}
-#
-
-###############################################################################
-# Help do the pretty printing to ident text with spaces
-# https://services.packetizer.com/code/xml2json/xml2json
-#
-#       # Parse the XML document
-#       use XML::Parser;
-#
-#       my $parser = XML::Parser->new(ErrorContext => 2);
-#       $parser->setHandlers(Init  => \&init_handler,
-#                         Final => \&final_handler,
-#                         Start => \&start_handler,
-#                         End   => \&end_handler,
-#                         Char  => \&char_handler);
-#
-#       eval { $parser->parse($tmp); };
-#       if ($@) {
-#         $returnStr .= $tmp;
-#       } else {
-#         $json_doc =~ s/\n//g;
-#         $result = Fritz_Helper_process_JSON($hash, $json_doc, "12345678", undef, 0);
-#         return Dumper $result;
-#         $returnStr .= $json_doc;
-#       }
-#
-#sub json_indent_string
-#{
-#    # How many levels to indent?
-#    my $indent_string = "";
-#    for(my $i = 0; $i < $json_level; $i++)
-#    {
-#        $indent_string .= "    ";
-#    }
-#
-#    return $indent_string;
-#}
-
-# Escape strings as per json.org
-#sub json_char_escape
-#{
-#    my $string = shift;
-#
-#    $string =~ s/\\/\\\\/g;
-#    $string =~ s/"/\\"/g;
-#    #$string =~ s/\b/\\b/g;  # Says json.org.  What character is \b?
-#                             # Does not map to Perl
-#    $string =~ s/\f/\\f/g;   # Valid in XML 1.1
-#    $string =~ s/\n/\\n/g;
-#    $string =~ s/\r/\\r/g;
-#    $string =~ s/\t/\\t/g;
-#    $string =~ s/([^ -~])/sprintf("\\u%04X", ord($1))/eg;
-#
-#    return $string;
-#}
-#
-# Handle start of the document
-#sub init_handler
-#{
-#    $json_doc = "{\n";
-#    $json_level = 1;
-#    @json_stack = ();
-#    $need_comma = 0;
-#}
-#
-# Handle the end of the document
-#sub final_handler
-#{
-#    $json_doc .= "\n" if $crlf;
-#    $json_doc .= "}";
-#    $json_doc .= "\n" if $crlf;
-#}
-#
-# XML Parsing call-back routines
-#sub start_handler
-#{
-#    my($expat, $element, %attrs) = @_;
-#    my $i;
-#
-#    # Do we need a comma to separate?
-#    if ($need_comma)
-#    {
-#        $json_doc .= ",";
-#        $json_doc .= "\n" if $crlf;
-#    }
-#    elsif ($json_level > 1)
-#    {
-#        $json_doc .= "\n" if $crlf;
-#    }
-#
-#    # Append the element block start
-#    $json_doc .= json_indent_string() . '"' . $element . '" : {';
-#    $json_level++;
-#
-#    $i = 0;
-#    while( my ($key, $value) = each(%attrs) )
-#    {
-#        if ($i)
-#        {
-#            $json_doc .= ",";
-#            $json_doc .= "\n" if $crlf;
-#        }
-#        else
-#        {
-#            $json_doc .= "\n" if $crlf;
-#            $i = 1;
-#        }
-#        $key = json_char_escape($key);
-#        $json_doc .= json_indent_string() . '"' . $key . '" : "' .
-#                     $value . '"';
-#    }
-#
-#    if ($i)
-#    {
-#        $need_comma = 1;
-#    }
-#    else
-#    {
-#        $need_comma = 0;
-#    }
-#
-#    $element_string = "";
-#
-#    push(@json_stack, $need_comma);
-#}
-#
-#sub char_handler
-#{
-#    my ($expat, $chardata) = @_;
-#
-#    $element_string .= $chardata;
-#}
-#
-#sub end_handler
-#{
-#    my ($expat, $element) = @_;
-#
-#    # Do we need a comma?
-#    $need_comma = pop(@json_stack);
-#
-#    # Remove any leading or tailing whitespace on element string
-#    $element_string =~ s/^[ \t\r\n]*//;
-#    $element_string =~ s/[ \t\r\n]*$//;
-#
-#    # Escape certain characters
-#    $element_string = json_char_escape($element_string);
-#
-#    if (length($element_string) > 0)
-#    {
-#        # If we need a comma, insert one
-#        if ($need_comma) 
-#        {
-#            $json_doc .= ",";
-#            $json_doc .= "\n" if $crlf;
-#        }
-#        else
-#        {
-#            $json_doc .= "\n" if $crlf;
-#        }
-#
-#        $json_doc .= json_indent_string() . '"value" : "' .
-#                     $element_string . '"';
-#        $json_doc .= "\n" if $crlf;
-#    }
-#    else
-#    {
-#        $json_doc .= "\n" if $crlf;
-#    }
-#
-#    # End of element
-#    $element_string = "";
-#    $json_level--;
-#    $json_doc .= json_indent_string() . "}";
-#    $need_comma = 1;
-#}
-# Help do the pretty printing to ident text with spaces
-###############################################################################
 
 1;
 
@@ -18390,7 +18064,7 @@ sub Fritz_Helper_reformat
       <li><a name="diversity"></a>
          <dt><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code></dt>
          <br>
-         Switches the call diversity number (1, 2 ...) on or off.
+         Switches the call diversity number (0,1,2 ...) on or off.
          A call diversity for an incoming number has to be created with the FRITZ!BOX web interface. Requires TR064 (>=6.50).
          <br>
          Note! Only a diversity for a concret home number and <u>without</u> filter for the calling number can be set. Hence, an approbriate <i>diversity</i>-reading must exist.
@@ -19660,7 +19334,7 @@ sub Fritz_Helper_reformat
       <li><a name="diversity"></a>
          <dt><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code></dt>
          <br>
-         Schaltet die Rufumleitung (Nummer 1, 2 ...) für einzelne Rufnummern an oder aus.
+         Schaltet die Rufumleitung (Nummer 0,1,2 ...) für einzelne Rufnummern an oder aus.
          <br>
          Achtung! Es lassen sich nur Rufumleitungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten.
          Es muss also einen <i>diversity</i>-Gerätewert geben.
