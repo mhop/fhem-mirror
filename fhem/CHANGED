@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix: 72_FritzSmart: Fehlerkorrekturen
  - change: 49_SSCam: set compatibility for latest surveillance station version
  - change:  88_HMCCU: Fixed unreachable devices after CCU start
  - feature: 89_FULLY: add some options, intented for use in js/VoiceCommands
