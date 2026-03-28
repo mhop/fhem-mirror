@@ -200,7 +200,6 @@ FHEMWEB_Initialize($)
     redirectCmds:0,1
     redirectTo
     refresh
-    rescueDialog:1,0
     reverseLogs:0,1
     roomIcons:textField-long
     showUsedFiles:0,1
@@ -215,6 +214,7 @@ FHEMWEB_Initialize($)
     touchpad:unused
     viewport
     webname
+    webPushPort
   );
   use warnings 'qw';
   $hash->{AttrList} = join(" ", @attrList);
@@ -1265,6 +1265,7 @@ FW_dataAttr()
     return "data-$p='$val' ";
   }
 
+  my $wpk = ReadingsVal($FW_wname, ".webpushKeys", "");
   return
     ($FW_needIsDay ? 'data-isDay="'.(isday()?1:0).'"' : '') .
     addParam($FW_wname, "jsLog", 0).
@@ -1275,6 +1276,7 @@ FW_dataAttr()
     addParam($FW_wname, "hiddenroom", "").
     addParam($FW_wname, "htmlInEventMonitor", 0). #139453
     addParam("global",  "language", "EN").
+    "data-wpk='".($wpk =~ m/"publicKey":"([^"]+)"/ ? $1 : "")."' ".
     "data-availableJs='$FW_fhemwebjs' ".
     "data-webName='$FW_wname' ";
 }
@@ -1816,23 +1818,6 @@ FW_roomOverview($)
     my $fn = pop @l;
     splice @list, 4,0, ('Logfile',
                       "$FW_ME/FileLog_logWrapper?dev=$lfn&type=text&file=$fn");
-  }
-
-  if(AttrVal($FW_wname, 'rescueDialog', undef)) {
-    my $pid = $defs{$FW_wname}{rescuePID};
-    $pid = 0 if(!$pid || !kill(0,$pid));
-    my $key="";
-
-    if(!-r "certs/fhemrescue.pub") {
-      mkdir("certs");
-      `ssh-keygen -N "" -t ed25519 -f certs/fhemrescue`;
-    }
-    if(open(my $fh, "certs/fhemrescue.pub")) {
-      $key =  <$fh>;
-      close($fh);
-    }
-    splice @list, @list-2,0, ('Rescue',
-                      "javascript:FW_rescueClient(\"$pid\",\"$key\")");
   }
 
   my @me = split(",", AttrVal($FW_wname, "menuEntries", ""));
@@ -2965,10 +2950,55 @@ FW_Attr(@)
   }
 
   if($attrName eq "styleData" && $type eq "set") {
-     $FW_needIsDay = ($param[0] =~ m/dayNightActive.*true/);
+    $FW_needIsDay = ($param[0] =~ m/dayNightActive.*true/);
+  }
+
+  if($attrName eq "webPushPort" && $type eq "set") {
+    InternalTimer(0, sub(){
+      my $url = "http://localhost:$param[0]/vapid-key";
+      HttpUtils_NonblockingGet({ url=>$url, 
+        data=>ReadingsVal($devName, ".webpushKeys", "{}"),
+        header=>"Content-Type: application/json",
+        callback => sub($$$){
+          return Log3 $FW_wname, 1, "$url: $_[1]" if($_[1]);
+          $_[2] =~ s/,/, /; # For the display
+          readingsSingleUpdate($hash, ".webpushKeys", $_[2], 0);
+          Log3 $FW_wname, 3, "$devName .webpushKeys updated";
+        }});
+      $url = "http://localhost:$param[0]/subscriptions";
+      HttpUtils_NonblockingGet({ url=>$url, 
+        data=>"[".ReadingsVal($devName, ".webpushSubscriptions", "")."]",
+        header=>"Content-Type: application/json",
+        callback => sub($$$){ Log3 $FW_wname, 1, "$url: $_[1]" if($_[1]) }});
+    }, 0,0);
   }
 
   return $retMsg;
+}
+
+# Called from f18.js directly
+sub
+FW_webPushSubscription($$$)
+{
+  my ($dev, $mode, $subscr) = @_;
+  my $sList = ReadingsVal($dev, ".webpushSubscriptions", "");
+  if($mode eq "add") {
+    return if(index($sList, $subscr) >=0);
+    $subscr = "$sList,$subscr" if($sList);
+  } elsif($mode eq "del") {
+    my $p = index($sList,$subscr);
+    if($p >=0 ) {
+      $subscr = substr($sList,0,$p).substr($sList,$p+length($subscr));
+      $subscr =~ s/(^,|,$)//;
+      $subscr =~ s/,,/,/;
+    }
+  }
+  readingsSingleUpdate($defs{$dev}, ".webpushSubscriptions", $subscr, 0);
+  my $url="http://localhost:".AttrVal($dev,"webPushPort",3000)."/subscriptions";
+  HttpUtils_NonblockingGet({ url=>$url, data=>"[$subscr]",
+    header=>"Content-Type: application/json",
+    callback => sub($$$){ Log3 $FW_wname, 1, "$url: $_[1]" if($_[1]) }});
+  WriteStatefile();
 }
 
 
@@ -3525,12 +3555,9 @@ FW_Set($@)
   my ($hash, @a) = @_;
   my %cmd = ("clearSvgCache" => ":noArg",
              "reopen" => ":noArg",
+             "pushNotify" => "",
              "rereadicons" => ":noArg");
-
-  if(AttrVal($hash->{NAME}, "rescueDialog", "")) {
-    $cmd{"rescueStart"} = "";
-    $cmd{"rescueTerminate"} = ":noArg";
-  }
+  my $name = $hash->{NAME};
 
   return "no set value specified" if(@a < 2);
   return ("Unknown argument $a[1], choose one of ".
@@ -3561,35 +3588,20 @@ FW_Set($@)
     my ($port, $global) = split("[ \t]+", $hash->{DEF});
     my $ret = TcpServer_Open($hash, $port, $global);
     return $ret if($ret);
-    TcpServer_SetSSL($hash) if(AttrVal($hash->{NAME}, "SSL", 0));
+    TcpServer_SetSSL($hash) if(AttrVal($name, "SSL", 0));
     return undef;
   }
 
-  if($a[1] eq "rescueStart") {
-    return "error: rescueStart needs two arguments: host and port"
-      if(!$a[2] || !$a[3] || $a[3] !~ m/[0-9]{1,5}/ || $a[3] > 65536);
-    return "error: rescue process is running with PID $hash->{rescuePID}"
-      if($hash->{rescuePID} && kill(0, $hash->{rescuePID}));
-    return "error: certificate certs/fhemrescue is not available"
-      if(! -r "certs/fhemrescue");
-    $hash->{rescuePID} = fhemFork();
-    return "error: cannot fork rescue pid\n"
-      if($hash->{rescuePID} == -1);
-    return undef if($hash->{rescuePID}); # Parent
-    my $cmd = "ssh ".
-              "-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null ".
-              "-N -R0.0.0.0:18083:localhost:$hash->{PORT} -i certs/fhemrescue ".
-              "-p$a[3] fhemrescue\@$a[2]";
+  if($a[1] eq "pushNotify") {
+    my $wpp = AttrVal($name, "webPushPort", 0);
+    return "No webPushPort is set" if(!$wpp);
 
-    Log3 $hash, 2, "Starting $cmd";
-    exec("exec $cmd");
-  }
-
-  if($a[1] eq "rescueTerminate") {
-    return "error: nothing to terminate"
-      if(!$hash->{rescuePID});
-    kill(15, $hash->{rescuePID});
-    delete($hash->{rescuePID});
+    my $txt = join(" ", @a[2..$#a]);
+    HttpUtils_NonblockingGet({ url=>"http://localhost:$wpp/notify",
+      data=>"{\"title\":\"FHEM\", \"body\":\"$txt\"}",
+      header=>"Content-Type: application/json",
+      callback => sub($$$){ }});
+    return undef;
   }
 
   return undef;
@@ -3791,6 +3803,11 @@ FW_log($$)
     <li>clearSvgCache<br>
       delete all files found in the www/SVGcache directory, which is used to
       cache SVG data, if the SVGcache attribute is set.
+      </li>
+    <a id="FHEMWEB-set-pushNotify"></a>
+    <li>pushNotify<br>
+      send a message via Push Notification to the client. The attribute
+      webPushPort must be set.
       </li>
     <a id="FHEMWEB-set-reopen"></a>
     <li>reopen<br>
@@ -4386,48 +4403,6 @@ FW_log($$)
         seconds).
         </li><br>
 
-    <a id="FHEMWEB-attr-rescueDialog"></a>
-    <li>rescueDialog<br>
-        If set, show a Rescue link in the menu. The goal is to be able to get
-        help from someone with more knowlege (rescuer), who is then able to
-        remote control this installation.<br>
-        After opening the dialog, a key is shown, which is to be sent to the
-        rescuer. After the rescuer installed the key (see below), the
-        connection can be established, by entering the adress of the
-        rescuers server.<br><br>
-
-        <b>TODO for the rescuer:</b>
-        <ul>
-          <li>Forward a public IP/PORT combination to your SSH server.</li>
-          <li>create a fhemrescue user on this server, and store the key from
-             the client:<br>
-            <ul><code>
-            useradd -d /tmp -s /bin/false fhemrescue<br>
-            echo "KEY_FROM_THE_CLIENT" > /etc/sshd/fhemrescue.auth<br>
-            chown fhemrescue:fhemrescue /etc/sshd/fhemrescue.auth<br>
-            chmod 600 /etc/sshd/fhemrescue.auth
-            </code></ul>
-            </li>
-          <li>Append to /etc/ssh/sshd_config:<br>
-            <ul><code>
-              Match User fhemrescue<br>
-              <ul>
-                AllowTcpForwarding remote<br>
-                PermitTTY no<br>
-                GatewayPorts yes<br>
-                ForceCommand /bin/false<br>
-                AuthorizedKeysFile /etc/ssh/fhemrescue.auth<br>
-              </ul>
-            </code></ul>
-            </li>
-          <li>Restart sshd, e.g. with systemctl restart sshd
-            </li>
-          <li>Tell the client your public IP/PORT.</li>
-          <li>After the client started the connection in the rescue dialog, you
-          can access the clients FHEM via your host, port 18083.</li>
-        </ul>
-        </li><br>
-
     <a id="FHEMWEB-attr-reverseLogs"></a>
     <li>reverseLogs<br>
         Display the lines from the logfile in a reversed order, newest on the
@@ -4601,6 +4576,15 @@ FW_log($$)
         i.e the default http address is http://localhost:8083/fhem
         </li><br>
 
+    <a id="FHEMWEB-attr-webPushPort"></a>
+    <li>webPushPort<br>
+        Port of the WEB push Server (see contrib/webpush/webpush.js), which is
+        sending notifications to the client over the corresponding browser
+        server. Prerequisite is HTTPS with a valid certificate (see
+        publicHostnames) and the activation of WebPush in "Select style"/f18.
+        Sending message is done via "set WEBNAME pushNotify ... ".
+        </li><br>
+
     <a id="FHEMWEB-attr-widgetOverride"></a>
     <li>widgetOverride<br>
         Space separated list of name:modifier pairs, to override the widget
@@ -4655,6 +4639,11 @@ FW_log($$)
       Im Verzeichnis www/SVGcache werden SVG Daten zwischengespeichert, wenn
       das Attribut SVGcache gesetzt ist.  Mit diesem Befehl leeren Sie diesen
       Zwischenspeicher.
+      </li>
+    <a id="FHEMWEB-set-pushNotify"></a>
+    <li>pushNotify<br>
+      sendet eine Nachricht an alle verbundenen Clients. Das Attribut
+      webPushPort ist eine Voraussetzung.
       </li>
     <a id="FHEMWEB-set-reopen"></a>
     <li>reopen<br>
@@ -5274,53 +5263,6 @@ FW_log($$)
         Refresh, z.B. nach 5 Sekunden.
         </li><br>
 
-    <a id="FHEMWEB-attr-rescueDialog"></a>
-    <li>rescueDialog<br>
-        Falls gesetzt, im Menue wird ein Rescue Link angezeigt. Das Ziel ist
-        von jemanden mit mehr Wissen (Retter) Hilfe zu bekommen, indem er die
-        lokale FHEM-Installation fernsteuert.<br>
-        Nach &ouml;ffnen des Dialogs wird ein Schl&uuml;ssel angezeigt, was dem
-        Retter zu schicken ist. Nachdem er diesen Schl&uuml;ssel bei sich
-        installiert hat, muss seine Adresse (Host und Port) im Dialog
-        eingetragen werden. Danach kann er die Verbindung fernsteuern.
-        <br><br>
-
-        <b>TODO f&uuml;r den Retter:</b>
-        <ul>
-          <li>eine &ouml;ffentliche IP/PORT Kombination zum eigenen SSH Server
-              weiterleiten.</li>
-
-          <li>einen fhemrescue Benutzer auf diesem Server anlegen, und den
-              Schl&uuml;ssel vom Hilfesuchenden eintragen:<br>
-            <ul><code>
-            useradd -d /tmp -s /bin/false fhemrescue<br>
-            echo "KEY_FROM_THE_CLIENT" > /etc/sshd/fhemrescue.auth<br>
-            chown fhemrescue:fhemrescue /etc/sshd/fhemrescue.auth<br>
-            chmod 600 /etc/sshd/fhemrescue.auth
-            </code></ul>
-            </li>
-          <li>Zu /etc/ssh/sshd_config Folgendes hinzuf&uuml;gen:<br>
-            <ul><code>
-              Match User fhemrescue<br>
-              <ul>
-                AllowTcpForwarding remote<br>
-                PermitTTY no<br>
-                GatewayPorts yes<br>
-                ForceCommand /bin/false<br>
-                AuthorizedKeysFile /etc/ssh/fhemrescue.auth<br>
-              </ul>
-            </code></ul>
-            </li>
-          <li>sshd neu starten, z.Bsp. mit systemctl restart sshd
-            </li>
-          <li>Dem Hilfesuchenden die &ouml;ffentliche IP/PORT Kombination
-            mitteilen.</li>
-          <li>Nachdem der Hilfesuchende diese Daten eingegeben hat, und die
-            Verbindung gestartet hat, kann die Remote-FHEM-Installation ueber
-            den eigenen SSH-Server, Port 1803 erreicht wedern.</li>
-        </ul>
-        </li><br>
-
     <a id="FHEMWEB-attr-reverseLogs"></a>
     <li>reverseLogs<br>
         Damit wird das Logfile umsortiert, die neuesten Eintr&auml;ge stehen
@@ -5488,6 +5430,15 @@ FW_log($$)
     <li>webname<br>
         Der Pfad nach http://hostname:port/ . Standard ist fhem,
         so ist die Standard HTTP Adresse http://localhost:8083/fhem
+        </li><br>
+
+    <a id="FHEMWEB-attr-webPushPort"></a>
+    <li>webPushPort<br>
+        Port des WEB push Servers (siehe contrib/webpush/webpush.js), was
+        Benachrichtigungen an dem Client sendet. Voraussetzung ist HTTPS mit
+        g&uuml;ltiges Zertifikat (siehe publicHostnames) und das Aktivieren von
+        WebPush im "Select style"/f18.
+        Nachrichten werden mit "set WEBNAME pushNotify ... " gesendet.
         </li><br>
 
     <a id="FHEMWEB-attr-widgetOverride"></a>

@@ -978,7 +978,6 @@ HttpUtils_ParseAnswer($)
     $hash->{conn}->close();
     undef $hash->{conn};
   }
-
   if(!$hash->{buf} && !$hash->{httpheader}) {
     # Server answer: Keep-Alive: timeout=2, max=200
     if($hash->{keepalive} && $hash->{hu_filecount}) {

@@ -5,6 +5,7 @@ FW_version["f18.js"] = "$Id$";
 // Known bugs: AbsSize is wrong for ColorSlider
 var f18_attr={}, f18_sd, f18_icon={}, f18_room, f18_grid=20, f18_margin=10;
 var f18_small = (screen.width < 600 || screen.height < 600); // #139782
+var f18_webName, f18_swReg;
 var f18_cols = {
   "default":{ bg:     "FFFFE7", fg:    "000000", link:   "278727", 
               evenrow:"F8F8E0", oddrow:"F0F0D8", header: "E0E0C8",
@@ -22,6 +23,7 @@ $(window).resize(f18_resize);
 $(document).ready(function(){
   f18_room  = $("div#content").attr("room");
   f18_isday = $("body").attr("data-isDay") == 1 ? 1 : 0;
+  f18_webName = $("body").attr("data-webName");
   f18_sd = $("body").attr("data-styleData");
   if(f18_sd) {
     eval("f18_sd="+f18_sd);
@@ -90,6 +92,8 @@ $(document).ready(function(){
   if(typeof fully !== 'undefined')
     FW_cmd(FW_root + "?cmd=set TYPE=FULLY:FILTER=deviceid="+
            fully.getDeviceId()+" host "+fully.getHostname()+"&XHR=1");
+  if(localStorage.getItem("serviceWorker") == "true")
+    f18_serviceWorkerRegister(false);
 });
 
 function
@@ -187,7 +191,7 @@ f18_stt()
                   fully.getDeviceId()+" STTinput "+encodeURIComponent(txt)+
                   " ["+$("body").attr("fw_id")+"]&XHR=1");
   
-        FW_cmd(FW_root+"?cmd=setreading "+$("body").attr("data-webName")+
+        FW_cmd(FW_root+"?cmd=setreading "+f18_webName+
                " STT "+encodeURIComponent(txt)+"&XHR=1");
       }
       stt.stop();
@@ -195,6 +199,74 @@ f18_stt()
     }
   });
 
+}
+
+
+function
+f18_serviceWorkerRegister(verbose)
+{
+  f18_swReg = undefined;
+  log("Registering serviceWorker");
+  navigator.serviceWorker
+    .register(location.pathname+"/pgm2/f18_sw.js")
+    .then(function(reg) {
+      f18_swReg = reg;
+      log("serviceWorker registered");
+      if(verbose)
+        FW_okDialog("ServiceWorker registered");
+
+      setTimeout(function(){
+        var wpk = $("body").attr("data-wpk");
+        var lwpk = localStorage.getItem("wpk");
+        if(wpk && lwpk != wpk) {
+          log("Subscribe with publicVapidKey");
+          reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: wpk,
+          })
+          .then(function(subscr){
+            var sj = JSON.stringify(subscr);
+            log("Subscription:"+sj);
+            localStorage.setItem("wpk", sj);
+            FW_cmd(FW_root+"?cmd={FW_webPushSubscription('"+f18_webName+
+                    "','add','"+sj+"')}&XHR=1");
+          })
+          .catch(function(err) {
+            FW_okDialog("pushNotification "+err);
+          });
+        }
+        navigator.serviceWorker.addEventListener('message', function(event) {
+          console.log(event.data);
+        });
+      },1000);
+    })
+    .catch(function(err) {
+      f18_setAttr("serviceWorker", false);
+      FW_okDialog("ServiceWorker register:"+err);
+    });
+}
+
+function
+f18_swToggle()
+{
+  if(!(navigator.serviceWorker && location.protocol == 'https:')) {
+    localStorage.setItem("serviceWorker", false);
+    return FW_okDialog("This function is only available over secure https");
+  }
+  
+  let sw = localStorage.getItem("serviceWorker");
+  if(f18_swReg && sw != 'true') {
+    f18_swReg.unregister().then(function(){
+      var sj = localStorage.getItem("wpk");
+      FW_cmd(FW_root+"?cmd={FW_webPushSubscription('"+f18_webName+
+                    "','del','"+sj+"')}&XHR=1");
+      localStorage.removeItem("wpk");
+      FW_okDialog("ServiceWorker deregistered");
+    });
+    return;
+  }
+  if(!f18_swReg && sw == 'true')
+    f18_serviceWorkerRegister(true);
 }
 
 function
@@ -245,8 +317,10 @@ f18_special()
 {
   var row, room='all', appendTo;
 
-  var attr = function(attrName, inRoom)
+  var attr = function(attrName, inRoom, isLs)
   { 
+    if(isLs)
+      return localStorage.getItem(attrName) == 'true';
     if(inRoom && room != "all") {
       var val = f18_attr["Room."+room+"."+attrName];
       if(val != undefined)
@@ -255,8 +329,12 @@ f18_special()
     return f18_attr[attrName];
   };
 
-  var setAttr = function(attrName, attrVal, inRoom)
+  var setAttr = function(attrName, attrVal, inRoom, isLs)
   { 
+    if(isLs) {
+      localStorage.setItem(attrName, attrVal);
+      return;
+    }
     if(inRoom && room != "all")
       attrName = "Room."+room+"."+attrName;
     f18_setAttr(attrName, attrVal);
@@ -272,14 +350,14 @@ f18_special()
               "</tr>");
   };
 
-  var addHider = function(name, inRoom, desc, fn)
+  var addHider = function(name, inRoom, desc, fn, isLs)
   {
     addRow(name, desc, "<input type='checkbox'>");
     $(appendTo+" tr.ar_"+name+" input")
-      .prop("checked", attr(name, inRoom))
+      .prop("checked", attr(name, inRoom, isLs))
       .click(function(){
         var c = $(this).is(":checked");
-        setAttr(name, c, inRoom);
+        setAttr(name, c, inRoom, isLs);
         if(fn)
           fn(c);
       });
@@ -330,6 +408,7 @@ f18_special()
     $("tr#f18rs").append("<table id='f18ts' class='block wide'></table>");
     appendTo = "table#f18ts";
 
+    addHider("serviceWorker", true, "WebPush", f18_swToggle, true);
     addHider("rightMenu", false, "MenuBtn right<br>on small screen",f18_resize);
     addHider("savePinChanges", false, "Save pin changes");
     addHider("showDragger", false, "Dragging active", function(c){
@@ -370,8 +449,7 @@ f18_special()
               $("head").append("<style id='fhemweb_css'>\n</style>");
             var txt = $("#f18_cssEd").val();
             $("head #fhemweb_css").html(txt);
-            var wn = $("body").attr("data-webName");
-            FW_cmd(FW_root+"?cmd=attr "+wn+" Css "+
+            FW_cmd(FW_root+"?cmd=attr "+f18_webName+" Css "+
                    encodeURIComponent(txt.replace(/;/g,";;"))+"&XHR=1");
             $(this).dialog('close');
           }}]
@@ -815,8 +893,7 @@ f18_setAttr(name, value, dontSave)
   if(dontSave)
     return;
 
-  var wn = $("body").attr("data-webName");
-  FW_cmd(FW_root+"?cmd=attr "+wn+" styleData "+
+  FW_cmd(FW_root+"?cmd=attr "+f18_webName+" styleData "+
          encodeURIComponent(JSON.stringify(f18_sd, undefined, 1))+"&XHR=1");
   // for commandref background coloring
   localStorage.setItem("styleData", JSON.stringify(f18_sd.f18));
