@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 93_DbRep: consider attr limit for output in all relevant command
  - bugfix: 72_FritzSmart: Fehlerkorrekturen
  - change: 49_SSCam: set compatibility for latest surveillance station version
  - change:  88_HMCCU: Fixed unreachable devices after CCU start
