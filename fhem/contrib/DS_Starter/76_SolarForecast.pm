@@ -167,7 +167,8 @@ my %vNotesIntern = (
                            "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
                            "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
                            "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ".
-                           "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ",
+                           "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ".
+                           "new key aiControl->aiConAbsOversample ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -7852,6 +7853,7 @@ sub _attraiControl {                     ## no critic "not used"
       aiConSteepness     => { comp => '(0\.[1-9]|1\.[0-5])',                                       act => 0 },
       aiConAlpha         => { comp => '(0(?:\.\d+)?|1)',                                           act => 0 },
       aiConProfile       => { comp => "($rvreg)",                                                  act => 1 },
+      aiConAbsOversample => { comp => '0\.(?:[0-4]\d|50?)',                                        act => 0 },      
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -24253,7 +24255,7 @@ return $frv;
 # Oversampling: Abwesenheits-Datensätze so oft wiederholen,
 # dass sie einen konfigurierbaren Anteil am Trainingsset
 # erreichen. Ziel-Anteil z.B. 15% = 0.15
-# Wertebereich aiConAbsenceTargetRatio: 0.0 .. 0.99
+# Wertebereich aiConAbsOversample: 0.0 .. 0.50
 ###########################################################################
 sub _aiFannOversampling {
   my $paref              = shift;
@@ -24263,7 +24265,7 @@ sub _aiFannOversampling {
   my $targetsnorm_ref    = $paref->{targetsnorm_ref};
   my $presencevalues_ref = $paref->{presencevalues_ref};
   
-  my $absence_target_ratio = CurrentVal ($name, 'aiConAbsenceTargetRatio', 0.0);                           # Ziel-Anteil 0.0..1.0
+  my $absence_oversample = CurrentVal ($name, 'aiConAbsOversample', 0.0); 
 
   my @absence_idx = grep { 
       my $pres_idx = $_ + $splice_len;                                                                      # $_ + $splice_len bildet den (post-splice) Trainingsindex zurück auf den (pre-splice) @presence_values-Index ab, da splice die ersten $splice_len Elemente aus @training_data entfernt hat, aber @presence_values noch unverändert ist
@@ -24276,8 +24278,8 @@ sub _aiFannOversampling {
 
   my (@extra_data, @extra_targets);
 
-  if ($n_absent > 0 && $absence_target_ratio > 0 && $absence_target_ratio < 1.0) {                          # Wieviele Abwesenheitssätze werden insgesamt benötigt?, Ziel-Anteil p: p = n_absent_total / (n_present + n_absent_total)  => n_absent_total = n_present * p / (1 - p)
-      my $n_absent_target = int ($n_present * $absence_target_ratio / (1.0 - $absence_target_ratio));
+  if ($n_absent > 0 && $absence_oversample > 0 && $absence_oversample < 1.0) {                              # Wieviele Abwesenheitssätze werden insgesamt benötigt?, Ziel-Anteil p: p = n_absent_total / (n_present + n_absent_total)  => n_absent_total = n_present * p / (1 - p)
+      my $n_absent_target = int ($n_present * $absence_oversample / (1.0 - $absence_oversample));
       my $n_extra         = $n_absent_target - $n_absent;                                                   # nur die fehlenden hinzufügen
 
       if ($n_extra > 0) {
@@ -24303,7 +24305,7 @@ sub _aiFannOversampling {
               "AI FANN - Absence oversampling: original=%d absent, target_ratio=%.0f%%, needed=%d, added=%d. ".
               "New total=%d records (absent share=%.1f%%)",
               $n_absent,
-              $absence_target_ratio * 100,
+              $absence_oversample * 100,
               $n_absent_target,
               $added,
               $n_total_new,
@@ -24314,7 +24316,7 @@ sub _aiFannOversampling {
           debugLog ($paref, 'aiProcess', sprintf (
               "AI FANN - Absence oversampling not needed: current share=%.1f%% >= target=%.0f%%",
               100 * $n_absent / $n_total,
-              $absence_target_ratio * 100,
+              $absence_oversample * 100,
           ));
       }
   }
@@ -34199,6 +34201,13 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td>The information is provided in the format &lt;period&gt;:&lt;hour&gt;.                                                                                       </td></tr>
             <tr><td>                          </td><td>value range:<b> &lt;1..90&gt;:&lt;1..23&gt; </b>, default: 7:3  (Training starts every 7 days at 3 a.m.)                                                     </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConAbsOversample</b></td><td>This parameter controls the extent to which absences (presence=0) are artificially added to the training dataset in order to achieve a more                  </td></tr>
+            <tr><td>                          </td><td>balanced ratio between presence and absence. This value specifies the desired proportion of missing samples in the final training set.                       </td></tr>
+            <tr><td>                          </td><td><ul> * 0.00 – 0.05 (0–5 %)   - minimal / no oversampling, for models that already handle missing values well </ul>                                           </td></tr>
+            <tr><td>                          </td><td><ul> * 0.10 – 0.20 (10–20 %) - moderate amplification, a good balance between clarity and natural sound </ul>                                                </td></tr>
+            <tr><td>                          </td><td><ul> * 0.25 – 0.40 (25–40 %) - Heavy oversampling, particularly for highly skewed datasets with very few missing values, can be excessive! </ul>             </td></tr>
+            <tr><td>                          </td><td>value range:<b> &lt;0..0.50&gt; </b>, default: 0                                                                                                             </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>            
             <tr><td> <b>aiConActFunc</b>      </td><td>Selection of the activation function for the hidden layers.                                                                                                  </td></tr>
             <tr><td>                          </td><td><ul> * SIGMOID - typical for increases in consumption that reach saturation point (e.g., more devices -> more consumption) </ul>                             </td></tr>
             <tr><td>                          </td><td><ul> * SIGMOID_SYMMETRIC - good for deviations from a normal state (e.g., temperature deviation -> more or less consumption) </ul>                           </td></tr>
@@ -37214,10 +37223,17 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td>Die Angabe erfolgt in der Form &lt;Periode&gt;:&lt;Stunde&gt;                                                                                                </td></tr>
             <tr><td>                          </td><td>Wertebereich:<b> &lt;1..90&gt;:&lt;1..23&gt; </b>, default: 7:3  (Start Training alle 7 Tage um 3 Uhr)                                                       </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConAbsOversample</b></td><td>Dieser Parameter steuert, wie stark Abwesenheiten (presence=0) im Trainingsdatensatz künstlich ergänzt werden, um ein ausgewogeneres Verhältnis              </td></tr>
+            <tr><td>                          </td><td>zwischen Anwesenheit und Abwesenheit zu erreichen. Der Wert gibt den gewünschten Anteil der Abwesenheits‑Samples im finalen Trainingsset an.                 </td></tr>
+            <tr><td>                          </td><td><ul> * 0.00 – 0.05 (0–5 %)   - minimal / kein Oversampling, für Modelle die bereits gut mit Abwesenheiten umgehen </ul>                                      </td></tr>
+            <tr><td>                          </td><td><ul> * 0.10 – 0.20 (10–20 %) - moderate Verstärkung, gute Balance zwischen Repräsentation und Natürlichkeit </ul>                                            </td></tr>
+            <tr><td>                          </td><td><ul> * 0.25 – 0.40 (25–40 %) - starkes Oversampling, für sehr unausgewogene Datensätze mit extrem wenigen Abwesenheiten, kann übertreiben! </ul>             </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> &lt;0..0.50&gt; </b>, default: 0                                                                                                            </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>            
             <tr><td> <b>aiConActFunc</b>      </td><td>Auswahl der Aktivierungsfunktion für die Hidden Layer.                                                                                                       </td></tr>
             <tr><td>                          </td><td><ul> * SIGMOID - typisch bei Verbrauchsanstiegen, die eine Sättigung erreichen (z.B. mehr Geräte -> mehr Verbrauch) </ul>                                    </td></tr>
             <tr><td>                          </td><td><ul> * SIGMOID_SYMMETRIC - gut bei Abweichungen um einen Normalzustand (z.B. Temperaturabweichung -> mehr oder weniger Verbrauch) </ul>                      </td></tr>
-            <tr><td>                          </td><td><ul> * GAUSSIAN - gut für Peak-Effekte, die bei einem bestimmten Wert maximal sind (z.B. optimale Außentemperatur -> maximaler Verbrauch) </ul>               </td></tr>
+            <tr><td>                          </td><td><ul> * GAUSSIAN - gut für Peak-Effekte, die bei einem bestimmten Wert maximal sind (z.B. optimale Außentemperatur -> maximaler Verbrauch) </ul>              </td></tr>
             <tr><td>                          </td><td><ul> * GAUSSIAN_SYMMETRIC - wie GAUSSIAN, aber symmetrisch um einen Mittelpunkt (z.B. Komforttemperatur – zu kalt oder zu warm-> höherer Verbrauch) </ul>    </td></tr>
             <tr><td>                          </td><td><ul> * ELLIOT - für positive Effekte, die weich ansteigen, aber weniger stark gesättigt werden als bei Sigmoid </ul>                                         </td></tr>
             <tr><td>                          </td><td><ul> * ELLIOT_SYMMETRIC - wie SIGMOID_SYMMETRIC, Effekte die sanft symmetrisch verlaufen (z.B. Temperaturen die den Verbrauch leicht ohne starke Spitzen erhöhen)</ul> </td></tr>
