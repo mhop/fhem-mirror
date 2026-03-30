@@ -163,10 +163,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.0"  => "27.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
+  "2.5.0"  => "30.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
                            "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
                            "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
-                           "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ",
+                           "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ".
+                           "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -397,12 +398,13 @@ use constant {
   DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
   DEFMAXVAR      => 0.75,                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
   DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
-  DWDFCDAYSMIN   => 2,                                                              # Mindestwert Attr 'forecastDays' im DWD-Device
   DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
   DEFCTYPE       => 'other',                                                        # default Verbrauchertyp
   DEFCMODE       => 'can',                                                          # default Planungsmode der Verbraucher
   DEFPOPERCENT   => 1.0,                                                            # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
   DEFHYST        => 0,                                                              # default Hysterese
+  DRIFTHZN3TH    => 8,                                                              # Schwellenwert Stunden in DriftZone 3 - bei Erreichen/Überschreiten wird Rekalibrierung ausgeführt 
+  DWDFCDAYSMIN   => 2,                                                              # Mindestwert Attr 'forecastDays' im DWD-Device
   
   EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen für verbraucherspezifische Energiestück Ermittlung (EnergyPieces)
   EPIECMAXOPHRS  => 10,                                                             # max. Anzahl ununterbrochene Betriebsstunden für Verbraucher ohne Cycle Switch (EnergyPieces)
@@ -2714,7 +2716,7 @@ sub _setattrKeyVal {                         ## no critic "not used"
   #Log3 ($name, 1, "$name - Arg Orig: $arg");
 
   $arg =~ s/=\s*/=/g;                                                                    # V 1.59.6 wichtig für graphicHeaderOwnspec Behandlung einzelner Keys -> ersetze jedes = samt folgendem Leerraum durch ein reines =
-  $arg =~ s/^([^,]*)\s+/$1,/;                                                            # das erste auftretende Leerzeichen-Cluster durch ',' ersetzen, aber nur wenn es in dem String vor dem Leerzeichen-Cluster noch kein Komma gibt
+  #$arg =~ s/^([^,]*)\s+/$1,/;                                                            # das erste auftretende Leerzeichen-Cluster durch ',' ersetzen, aber nur wenn es in dem String vor dem Leerzeichen-Cluster noch kein Komma gibt
   $arg =~ s/^([^=]*?),/$1 /;
 
   #Log3 ($name, 1, "$name - Arg Substitute: $arg");
@@ -7417,6 +7419,7 @@ sub _attrconsumer {                      ## no critic "not used"
       noshow        => { comp => '',                                must => 0, act => 0 },
       exconfc       => { comp => '[012]',                           must => 0, act => 0 },
       pvshare       => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
+      comforttemp               => { comp => '.*',                                                act => 0 },
   };
 
   if ($cmd eq 'set') {
@@ -9005,7 +9008,7 @@ sub __attrKeyAction {
 
       if ($init_done && $akey eq 'reductionState') {
           my $rdcinfo = CurrentVal ($name, 'reductionState', '');
-          my ($rdcdev, $rdcrd, $code) = split ":", $rdcinfo;
+          my ($rdcdev, $rdcrd, $code) = split ":", $rdcinfo, 3;
 
           ($err) = isDeviceValid ( { name   => $name,
                                      obj    => $rdcdev,
@@ -9250,7 +9253,7 @@ sub __attrKeyAction {
           }
       }
       
-      if ($akey eq 'comforttemp') {          
+      if ($init_done && $akey eq 'comforttemp') {          
           if (isNumeric ($akeyval)) {
               if ($akeyval =~ /^-?(40(\.0+)?|[0-3]?\d(\.\d+)?)$/xs) {
                   return;
@@ -10532,13 +10535,21 @@ sub centralTask {
   
   delete $data{$name}{circular}{99}{last_presence_check};                # 08.03.2026
   
-  for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {             # 27.03.
+  for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {             # 29.03.
       my $bla = AttrVal ($name, "consumer$c", undef);
     
       if (defined $bla) {
           my ($a, $h) = parseParams ($bla);
-          
-          if (defined $h->{comforttemp}) {         
+                    
+          if (defined $h->{comforttemp}) {
+              my $newval = $a->[0].' ';              
+              $newval .= join ' ',
+                  map  { qq{$_=$h->{$_}} }
+                  grep { $_ ne 'comforttemp' }
+                  sort keys %{$h};
+              
+              ::CommandDeleteAttr (undef, "$name consumer$c");
+              _setattrKeyVal ( { name => $name, opt => 'attrKeyVal', arg => "consumer$c $newval"} );         
               _setattrKeyVal ( { name => $name, opt => 'attrKeyVal', arg => "plantControl comforttemp=$h->{comforttemp}" } );
               last;
           }
@@ -23764,25 +23775,25 @@ sub aiFannCreateConTrainData {
       }       
   }
 
-  
-  splice @training_data, 0, 6;                                            # sicherstellen, dass training_data > 6 Elemente trainiert wird
-  splice @targets_norm,  0, 6;                                            # weil training_data ab dem Index 6 startet 
-  
-  # Fehlerrückgabe
-  ##################  
-  if (!scalar @training_data || @training_data != @targets_norm) {
-      $serial = encode_base64 (Serialize ( { name                    => $name,
-                                             $fanntyp.'NNTrainstate' => "aiNeuroNetConTraining not performed due to no Raw data or num training data not equal num targets",
-                                           }
-                                         ), "");
 
-      return $serial;
-  }
+  # Finalisierungen
+  ###################
+  my $splice_len = 6;
   
-  #my $trainpo = join ", \n", @{$training_data[0]};
-  #debugLog ($paref, 'aiProcess', "AI FANN - First AI training dataset normalized: \n". $trainpo);
+  splice @training_data, 0, $splice_len;                                                                    # sicherstellen, dass training_data > 6 Elemente trainiert wird
+  splice @targets_norm,  0, $splice_len;                                                                    # weil training_data ab dem Index 6 startet 
+
+  # --- Oversampling Abwesenheits-Datensätze
+  _aiFannOversampling ( { name               => $name,
+                          debug              => $debug,
+                          splice_len         => $splice_len,
+                          traindata_ref      => \@training_data,
+                          targetsnorm_ref    => \@targets_norm,
+                          presencevalues_ref => \@presence_values,
+                        } 
+                      );
   
-  # Prüfung auf verbotene negative Daten im Trainingsset
+  # --- Prüfung auf verbotene negative Daten im Trainingsset
   for my $i (0 .. $#training_data) {
       my $row = $training_data[$i];
       
@@ -23794,6 +23805,7 @@ sub aiFannCreateConTrainData {
           }
       }
   }
+
 
   # Übergabe
   ############
@@ -24235,6 +24247,79 @@ sub _aiSelectRegistryVersion {
   $frv = $frvdef if($frv =~ /heatpump/xs && !defined $hp);                  # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
       
 return $frv;
+}
+
+###########################################################################
+# Oversampling: Abwesenheits-Datensätze so oft wiederholen,
+# dass sie einen konfigurierbaren Anteil am Trainingsset
+# erreichen. Ziel-Anteil z.B. 15% = 0.15
+# Wertebereich aiConAbsenceTargetRatio: 0.0 .. 0.99
+###########################################################################
+sub _aiFannOversampling {
+  my $paref              = shift;
+  my $name               = $paref->{name};
+  my $splice_len         = $paref->{splice_len} // 0;                                                       # Fallback auf 0 wenn nicht übergeben
+  my $traindata_ref      = $paref->{traindata_ref};
+  my $targetsnorm_ref    = $paref->{targetsnorm_ref};
+  my $presencevalues_ref = $paref->{presencevalues_ref};
+  
+  my $absence_target_ratio = CurrentVal ($name, 'aiConAbsenceTargetRatio', 0.0);                           # Ziel-Anteil 0.0..1.0
+
+  my @absence_idx = grep { 
+      my $pres_idx = $_ + $splice_len;                                                                      # $_ + $splice_len bildet den (post-splice) Trainingsindex zurück auf den (pre-splice) @presence_values-Index ab, da splice die ersten $splice_len Elemente aus @training_data entfernt hat, aber @presence_values noch unverändert ist
+      defined $presencevalues_ref->[$pres_idx] && $presencevalues_ref->[$pres_idx] == 0 
+  } 0 .. $#{$traindata_ref};
+
+  my $n_total   = scalar @{$traindata_ref};
+  my $n_absent  = scalar @absence_idx;
+  my $n_present = $n_total - $n_absent;
+
+  my (@extra_data, @extra_targets);
+
+  if ($n_absent > 0 && $absence_target_ratio > 0 && $absence_target_ratio < 1.0) {                          # Wieviele Abwesenheitssätze werden insgesamt benötigt?, Ziel-Anteil p: p = n_absent_total / (n_present + n_absent_total)  => n_absent_total = n_present * p / (1 - p)
+      my $n_absent_target = int ($n_present * $absence_target_ratio / (1.0 - $absence_target_ratio));
+      my $n_extra         = $n_absent_target - $n_absent;                                                   # nur die fehlenden hinzufügen
+
+      if ($n_extra > 0) {
+          my $weight_per_sample = int ($n_extra / $n_absent) + 1;                                           # gleichmäßig auf alle Abwesenheits-Sätze verteilen
+
+          my $added = 0;
+
+          OVERSAMPLE: for my $rep (1 .. $weight_per_sample) {                                               # benannte Loop
+              for my $i (@absence_idx) {
+                  last OVERSAMPLE if $added >= $n_extra;
+                  push @extra_data,    $traindata_ref->[$i];
+                  push @extra_targets, $targetsnorm_ref->[$i];
+                  $added++;
+              }
+          }
+
+          push @{$traindata_ref},   @extra_data;
+          push @{$targetsnorm_ref}, @extra_targets;
+          
+          my $n_total_new = scalar @{$traindata_ref};                                                       # nach dem push!
+
+          debugLog ($paref, 'aiProcess', sprintf (
+              "AI FANN - Absence oversampling: original=%d absent, target_ratio=%.0f%%, needed=%d, added=%d. ".
+              "New total=%d records (absent share=%.1f%%)",
+              $n_absent,
+              $absence_target_ratio * 100,
+              $n_absent_target,
+              $added,
+              $n_total_new,
+              100 * ($n_absent + $added) / $n_total_new,
+          ));
+      }
+      else {
+          debugLog ($paref, 'aiProcess', sprintf (
+              "AI FANN - Absence oversampling not needed: current share=%.1f%% >= target=%.0f%%",
+              100 * $n_absent / $n_total,
+              $absence_target_ratio * 100,
+          ));
+      }
+  }
+ 
+return; 
 }
 
 ################################################################
@@ -25912,7 +25997,7 @@ sub aiFannDetectDrift {
   my $window  = shift // 96;                                                             # Anzahl Stunden für Driftanalyse
 
   my @drift_kpis = qw (
-      DriftBias DriftSlope DriftBiasLive DriftRefMae
+      DriftBias DriftSlope DriftBiasLive DriftRefMae DriftIndex
       DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag
   );
 
@@ -26153,7 +26238,7 @@ sub aiFannDetectDrift {
                                              );
 
   if (!$block_reason) {                                                                             # Rekalibrierung
-      if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= 8) {                                 
+      if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= DRIFTHZN3TH) {                      # DRIFTHZN3TH => 8                                 
           my $new_bias  = $ref_bias + 0.7 * $bias_drift;
           my $new_slope = 1.0 + ($slope_live - 1.0) * 0.5;
           $new_slope    = max (0.85, min (1.15, $new_slope));
@@ -29722,15 +29807,17 @@ return ($tm, $tmdef, $realtm, $tmfull);
 #  in einen Unix Timestamp umwandeln
 ################################################################
 sub timestringToTimestamp {
-  my $tstring = shift // return;
+  my $tstring = shift;
 
-  $tstring = trim ($tstring);                         # Whitespace entfernen
+  return if(!$tstring);                                                             # abfangen undef oder leer
+  
+  $tstring = trim ($tstring);                                                       # Whitespace entfernen
 
   my ($y, $mo, $d, $h, $m, $s) = $tstring =~ /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/;
 
-  return if(!defined $y);                             # kein gültiges Format
+  return if(!defined $y);                                                           # kein gültiges Format
 
-  return if $mo < 1 || $mo > 12;                      # Monat/Tag/Std/Min/Sek prüfen
+  return if $mo < 1 || $mo > 12;                                                    # Monat/Tag/Std/Min/Sek prüfen
   return if $d  < 1 || $d  > 31;
   return if $h  > 23;
   return if $m  > 59;
@@ -30677,7 +30764,7 @@ sub isReductionState {
   my $rdcs = CurrentVal ($name, 'reductionState', '');
   return ($rdcstate, 'reductionState not set', '') if(!$rdcs);
 
-  my ($rdcdev, $rdcrd, $rdcrgx) = split ":", $rdcs;                      # $rdcdev / $rdcrd -> Device / Reading zur Lieferung des Abregelungsstatus
+  my ($rdcdev, $rdcrd, $rdcrgx) = split ":", $rdcs, 3;                      # $rdcdev / $rdcrd -> Device / Reading zur Lieferung des Abregelungsstatus
 
   my ($err) = isDeviceValid ( { name   => $name,
                                 obj    => $rdcdev,
@@ -30706,7 +30793,7 @@ sub isReductionState {
           $rdcstate  = 1;
       }
       else {
-          $info = qq{The value "$rdcval" resulted in 'false' after exec "$rdcrgx" \n};
+          $info = qq{The value "$rdcval" resulted in 'false' after exec "$rdcrgx"};
           $rdcstate = 0;
       }
   }
