@@ -87,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.03.30";
+our $ModulVersion = "26.03.30a";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -1563,7 +1563,7 @@ sub Fritz_Attr_Modul($@)
 
        if( exists($hash->{fhem}{intBoxUsers}) && $hash->{fhem}{intBoxUsers} ne "&lt;none&gt;" ) {
 
-         if ($aVal =~ /$hash->{fhem}{intBoxUsers}/) {
+         if ($hash->{fhem}{intBoxUsers} =~ /$aVal/) {
            delete $hash->{HINWEIS_BOXUSER} if(exists $hash->{HINWEIS_BOXUSER});
          } else {
            if($hash->{fhem}{intBoxUsers} eq '&lt;pWd&gt;') {
@@ -9965,13 +9965,16 @@ sub Fritz_Readout_API_Check($)
          if (ref($cData) eq "ARRAY") {
            my $nbViews = scalar @$cData;
            for(my $j = 0; $j <= $nbViews - 1; $j++) {
-             $bUsers .= $cData->[$j]->{value} . "|";
+             $bUsers .= $cData->[$j]->{value} . ";";
              if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
                Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
                $hash->{DEFAULT_USER} = $1;
              }
            }
-           chop($bUsers) if($nbViews != 0);
+           if($nbViews != 0) {
+             chop($bUsers) if($nbViews != 0);
+             $bUsers =~ s/&lt;pWd&gt;//;
+           }
          }
        }
 
