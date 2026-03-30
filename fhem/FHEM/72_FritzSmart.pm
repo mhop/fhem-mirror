@@ -87,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.03.28";
+our $ModulVersion = "26.03.30";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -100,7 +100,8 @@ our $crlf = 1;
 
 our $fullHASH = 0;
 
-eval "use URI::Escape;1"    or $missingModul .= "URI::Escape ";
+use FritzBoxUtils; ## only for web access login
+
 eval "use MIME::Base64;1"   or $missingModul .= "MIME::Base64 ";
 eval "use IO::Socket;1"     or $missingModul .= "IO::Socket ";
 eval "use Net::Ping;1"      or $missingModul .= "Net::Ping ";
@@ -109,7 +110,6 @@ eval "use JSON;1"           or $missingModul .= "JSON ";             # sudo apt-
 eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
 
 eval "use URI::Escape;1"    or $missingModul .= "URI::Escape ";
-eval "use SOAP::Lite;1"     or $missingModul .= "Soap::Lite ";       # sudo apt-get install libsoap-lite-perl
 eval "use XML::Simple;1"    or $missingModul .= "XML::Simple ";
 
 # $Data::Dumper::Terse = 1;
@@ -117,11 +117,10 @@ eval "use XML::Simple;1"    or $missingModul .= "XML::Simple ";
 # $Data::Dumper::Sortkeys = 1;
 eval "use Data::Dumper;1"   or $missingModul .= "Data::Dumper ";
 
+# eval "use SOAP::Lite;1"     or $missingModul .= "Soap::Lite ";       # sudo apt-get install libsoap-lite-perl
 #use JSON::Parse 'parse_json';
 #use HTML::Make;
 #binmode STDOUT, ":encoding(utf8)";
-
-use FritzBoxUtils; ## only for web access login
 
 sub Fritz_Initialize_Modul($);
 sub Fritz_Define_Modul($$);
@@ -276,6 +275,10 @@ our %TR064   = (
         DialHangup                 => { service => "X_VoIP:1",
                                         control => "x_voip",
                                         action  => "X_AVM-DE_DialHangup",
+                                        igd     => 0},
+        GetSecurityPort            => { service => "DeviceInfo:1",
+                                        control => "deviceinfo",
+                                        action  => "GetSecurityPort",
                                         igd     => 0},
         Hosts                      => { service => "Hosts:1",
                                         control => "hosts",
@@ -1368,6 +1371,7 @@ sub Fritz_Define_Modul($$)
    $hash->{fhem}{readOutState}     = 0;
    $hash->{fhem}{fwVersion}        = 0;
    $hash->{fhem}{fwVersionStr}     = 0.0;
+   $hash->{fhem}{intBoxUsers}      = "&lt;none&gt;";
 
    $hash->{fhem}{multiple_wlan}{cnt}   = 1;
    $hash->{fhem}{multiple_wlan}{names} = "wlan2.4";
@@ -1552,6 +1556,30 @@ sub Fritz_Attr_Modul($@)
    }
 
    my $URL_MATCH = Fritz_Helper_Url_Regex();
+
+   if ($aName eq "boxUser") {
+
+     if ($cmd eq "set") {
+
+       if( exists($hash->{fhem}{intBoxUsers}) && $hash->{fhem}{intBoxUsers} ne "&lt;none&gt;" ) {
+
+         if ($aVal =~ /$hash->{fhem}{intBoxUsers}/) {
+           delete $hash->{HINWEIS_BOXUSER} if(exists $hash->{HINWEIS_BOXUSER});
+         } else {
+           if($hash->{fhem}{intBoxUsers} eq '&lt;pWd&gt;') {
+             return "boxUser not supported by $avmModel";
+           } else {
+             return "no valid boxUser: $aVal not in user list ( $hash->{fhem}{intBoxUsers} ) for $avmModel";
+           }
+         }
+       } else {
+         delete $hash->{HINWEIS_BOXUSER} if(exists $hash->{HINWEIS_BOXUSER});
+       }       
+     }
+     if ($cmd eq "del") {
+       $hash->{HINWEIS_BOXUSER} = "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)";
+     }
+   }
 
    if ($aName eq "setgetTimeout") {
      if ($cmd eq "set") {
@@ -2205,7 +2233,7 @@ sub Fritz_Set_Modul($$@)
            $hash->{WEBCONNECT} = 1;
          }
 
-         $hash->{APICHECKED}         = 2; # basic check
+         $hash->{APICHECKED}         = 0; # basic check
          $hash->{CKECKAPI_TMOUT}     = 55;
          $hash->{fhem}{readOutState} = !main::AttrVal($name, "disable", 0);
          main::RemoveInternalTimer($hash->{helper}{TimerReadout});
@@ -3065,7 +3093,7 @@ sub Fritz_Set_Modul($$@)
          $end_hh   = substr($val[2], 6, 2);
          $end_mm   = substr($val[2], 9, 2);
          if ($end_hh eq "24") {
-           $end_mm = "24:00";
+           $end_mm = "00";
          }
          if ( int @val == 4 && ($val[3] =~ /^(lmode:on|lmode:off)$/ || $val[3] =~ /^(emode:on|emode:off)$/)) {
            $lm_OnOff = "1" if( $val[3] =~ /^lmode:on$/ );
@@ -5220,12 +5248,15 @@ sub Fritz_Readout_Start($)
    $hash->{SID_RENEW_ERR_CNT} =  $hash->{fhem}{sidErrCount} if defined $hash->{fhem}{sidErrCount};
    $hash->{SID_RENEW_CNT}     += $hash->{fhem}{sidNewCount} if defined $hash->{fhem}{sidNewCount};
 
-
    if( defined $hash->{fhem}{sidErrCount} && $hash->{fhem}{sidErrCount} < 0 ) {
       main::RemoveInternalTimer($hash->{helper}{TimerReadout});
 
-      main::readingsSingleUpdate( $hash, "state", "Attention - no Password and/or no User set. Please set the credentials", 1 );
-      Fritz_Log $hash, 2, "no Password set. Please set a Password with set password";
+      if(exists($hash->{HINWEIS_PERL})) {
+        main::readingsSingleUpdate( $hash, "state", "Attention - Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.", 1);
+      } else {
+        main::readingsSingleUpdate( $hash, "state", "Attention - no Password and/or no User set. Please set the credentials", 1 );
+        Fritz_Log $hash, 2, "no Password set. Please set a Password with set password";
+      }
 
       $hash->{fhem}{sidErrCount} = 0;
       return "ERROR: starting ReadOutTimer not possible: no Password .";
@@ -9306,8 +9337,8 @@ sub Fritz_Readout_Process($$@)
        $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
      }
 
-     # writing all other readings
-     if ($rName !~ /-<|->|box_fwUpdate|box_oem|readoutTime|Error/) {
+     if ($rName !~ /-\<|-\>|box_fwUpdate|readoutTime|Error/) {
+       # writing all other readings, except the disabled
        my $rFilter = $rName;
        $rFilter =~ s/[1-9]//g;
        if ($rValue ne "" && $rName !~ /$reading_list/) {
@@ -9860,39 +9891,116 @@ sub Fritz_Readout_API_Check($)
 {
    my ($name)     = @_;
    my $hash       = $defs{$name};
-   my $fritzShell = 0;
    my $content    = "";
    my $fwVersion  = "0.0.0.error";
    my $startTime  = time();
    my $apiError   = "";
    my $luaQueryOk = 0;
-   my $crdOK      = 0;
+   my $crdOK      = 1;
    my $tr064Port  = 0;
+   my $url;
    my @roReadings;
    my $response;
 
    my $host       = $hash->{HOST};
    my $myVerbose  = $hash->{APICHECKED} >= 0 ? 1 : 0;
-   my $boxUser    = main::AttrVal( $name, "boxUser", "" );
+   my $boxUser    = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
 
-   if ( $host =~ /undefined/ || $boxUser eq "") {
-     my $tmp = "";
-        $tmp = "Fritz-DeviceIP" if $host =~ /undefined/;
-        $tmp .= ", " if $host =~ /undefined/ && $boxUser eq "";
-        $tmp .= " boxUser (bei Repeatern, SmartFritz oder Fritz!OS < 7.25 nicht unbedingt notwendig)" if $boxUser eq "";
-        $tmp .= " nicht definiert. Bitte auch das Passwort mit <set $name password> setzen.";
+   # Check if perl modules for remote APIs exists
+   if ($missingModul) {
 
-     Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS_BOXUSER", $tmp);
+     Fritz_Log $hash, 3, "Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PERL", "Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
 
-     Fritz_Log $hash, 3, "" . $tmp;
+     Fritz_Readout_Add_Reading $hash, \@roReadings, ".calledFrom", "checkApis";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
+
+     $hash->{fhem}{sidTime} = 0;
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", (-1);
+
+     push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
+
+     my $returnStr = join('|', @roReadings );
+
+     return $name . "|" . encode_base64($returnStr,"");
+
    } else {
-     Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS_BOXUSER", "");
+     Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS_PERL", "");
    }
+   # End check if perl modules for remote APIs exists
 
-   unless (Fritz_Helper_read_Password($hash)) {
+   # Check for valid host definition
+   if (!defined($host)) {
+     Fritz_Log $hash, 2, "No valid Host defined.";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_HOST", "No Host defined.";
+     $crdOK = 0;
+
+   }
+   # End check for valid host definition
+
+   my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+
+   # Check for defined user in Fritz!Device
+   if ($crdOK) {
+     $url       = "http://" . $host;
+     $response  = $agent->get( $url );
+
+     my $user_content;
+     my $bUsers = '&lt;pWd&gt;';
+
+     if( $response->is_success && $response->content =~ /\<body\>(.*?)\<\/body\>/isg) {
+       # Log3 "FBUser", 3, "FBUser: \n" . $1;
+       my $mybody = $1;
+
+       if($mybody =~ /"activeUsers":(.*?);/isg) {
+         $user_content  = '{"pid":"loginPage","users":'. $1;
+         #Log3 "FBUser", 3, "FBUser: \n" . $user_content;
+
+         my $resultData = Fritz_Helper_process_JSON($defs{FB_Main}, $user_content, "", "");
+
+         my $cData = $resultData->{users};
+
+         if (ref($cData) eq "ARRAY") {
+           my $nbViews = scalar @$cData;
+           for(my $j = 0; $j <= $nbViews - 1; $j++) {
+             $bUsers .= $cData->[$j]->{value} . "|";
+             if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
+               Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
+               $hash->{DEFAULT_USER} = $1;
+             }
+           }
+           chop($bUsers) if($nbViews != 0);
+         }
+       }
+
+       $boxUser = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
+
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "$bUsers";
+       $hash->{fhem}{intBoxUsers} = $bUsers;
+     }
+   }
+   # End check for defined user in Fritz!Device
+
+   # Check for defined password
+   if (!Fritz_Helper_read_Password($hash)) {
      Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
 
+     if ($hash->{DEFAULT_USER}) {
+       Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS_BOXUSER", "using default boxUser: $hash->{DEFAULT_USER}");
+     } elsif ( $boxUser eq "" && $hash->{fhem}{intBoxUsers} ne "") {
+       Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)");
+     }
+
+     $crdOK = 0;
+
+   }
+   # End check for defined password
+
+   # Error handling if Password, boxUser or host not Ok
+   if ( !$crdOK) {
      push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
 
      Fritz_Readout_Add_Reading ($hash, \@roReadings, ".calledFrom", "checkApis");
@@ -9906,225 +10014,225 @@ sub Fritz_Readout_API_Check($)
 
      my $returnStr = join('|', @roReadings );
 
-     Fritz_Log $hash, 3, "Response -> " . $apiError;
-     Fritz_Log $hash, 4, "Captured " . @roReadings . " values";
      Fritz_Log $hash, 3, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
 
      return $name . "|" . encode_base64($returnStr,"");
 
    } else {
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "";
-     Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINWEIS_BOXUSER", "");
-     $crdOK = 1;
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER" , "" if ( $boxUser ne "");
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_HOST" , "";
    }
+   # end error handling if Passowr, boxUser or host not Ok
 
-# change host name if necessary
+   Fritz_Log $hash, 4, "boxUser is set to: $boxUser";
+
+   # change host name if necessary
    Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HOST", $host) if $host ne $hash->{HOST};
 
-# Check if perl modules for remote APIs exists
-   if ($missingModul) {
-      Fritz_Log $hash, 3, "Cannot check for box model and APIs webcm, luaQuery and TR064 because perl modul $missingModul is missing on this system.";
+   # Check for remote APIs
+   $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+
+   # Check if query.lua exists
+   $response = $agent->get( "http://".$host."/query.lua" );
+   $apiError = "luaQuery:" . $response->code;
+
+   if ($response->is_success) {
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
+     Fritz_Log $hash, 5-$myVerbose, "API luaQuery found (" . $response->code . ").";
+     $luaQueryOk = 1;
    }
-
-# Check for remote APIs
+   elsif ($response->code =~ /303|403|500/) {
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
+     Fritz_Log $hash, 4-$myVerbose, "API luaQuery call responded with: " . $response->status_line;
+     $luaQueryOk = 1;
+   }
    else {
-      my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-
-      # Check if query.lua exists
-      $response = $agent->get( "http://".$host."/query.lua" );
-
-      if ($response->is_success) {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
-         Fritz_Log $hash, 5-$myVerbose, "API luaQuery found (" . $response->code . ").";
-         $luaQueryOk = 1;
-      }
-      elsif ($response->code eq "403") {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 1;
-         Fritz_Log $hash, 4-$myVerbose, "API luaQuery call responded with: " . $response->status_line;
-         $luaQueryOk = 1;
-      }
-      elsif ($response->code eq "500") {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
-         Fritz_Log $hash, 4-$myVerbose, "API luaQuery call responded with: " . $response->status_line;
-      }
-      elsif ($response->code eq "303") {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
-         Fritz_Log $hash, 4-$myVerbose, "API luaQuery call responded with: " . $response->status_line;
-      }
-      else {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
-         Fritz_Log $hash, 4-$myVerbose, "API luaQuery does not exist (" . $response->status_line . ")";
-      }
-
-      $apiError = "luaQuery:" . $response->code;
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUAQUERY", 0;
+     Fritz_Log $hash, 4-$myVerbose, "API luaQuery does not exist (" . $response->status_line . ")";
+   }
+   # End check if query.lua exists
 
    # Check if data.lua exists
-      $response = $agent->get( "http://".$host."/data.lua" );
+   $response = $agent->get( "http://".$host."/data.lua" );
+   $apiError .= " luaData:" . $response->code;
 
-      if ($response->is_success) {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
-         Fritz_Log $hash, 5-$myVerbose, "API luaData found (" . $response->code . ").";
-         # xhr 1 lang de page netSet xhrId all
-      }
-      elsif ($response->code eq "403") {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
-         Fritz_Log $hash, 4-$myVerbose, "API luaData call responded with: " . $response->status_line;
-      }
-      elsif ($response->code eq "500") {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
-         Fritz_Log $hash, 4-$myVerbose, "API luaData call responded with: " . $response->status_line;
-      }
-      elsif ($response->code eq "303") {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
-         Fritz_Log $hash, 4-$myVerbose, "API luaData call responded with: " . $response->status_line;
-      }
-      else {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
-         Fritz_Log $hash, 4-$myVerbose, "API luaData does not exist (" . $response->status_line . ")";
-      }
-
-      $apiError .= " luaData:" . $response->code;
-      # push @roReadings, "RT_01_luaQuery", sprintf( "%.2f", time() - $startTime);
+   if ($response->is_success) {
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
+     Fritz_Log $hash, 5-$myVerbose, "API luaData found (" . $response->code . ").";
+     # xhr 1 lang de page netSet xhrId all
+   }
+   elsif ($response->code =~ /303|403|500/) {
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 1;
+     Fritz_Log $hash, 4-$myVerbose, "API luaData call responded with: " . $response->status_line;
+   }
+   else {
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->LUADATA", 0;
+     Fritz_Log $hash, 4-$myVerbose, "API luaData does not exist (" . $response->status_line . ")";
+   }
+   # end check if data.lua exists
 
    # Check if tr064 specification exists and determine TR064-Port
-      $response = $agent->get( "http://" .$host. ":49000/tr64desc.xml" );
+   $response = $agent->get( "http://" .$host. ":49000/tr64desc.xml" );
+   $apiError .= " TR064:" . $response->code;
 
-      if ($response->is_success) { #determine TR064-Port
-         $content   = $response->content;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
-         $hash->{TR064} = 1;
-         Fritz_Log $hash, 5-$myVerbose, "API TR-064 found.";
+   if ($response->is_success) { #determine TR064-Port
+     $content   = $response->content;
 
-         #Determine TR064-Port
-         $tr064Port = Fritz_init_TR064 ( $hash, $host );
-         if ($tr064Port) {
-            Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
-            $hash->{SECPORT} = $tr064Port;
-            Fritz_Log $hash, 5-$myVerbose, "TR-064-SecurePort is $tr064Port.";
+     # Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
+     if ($content =~ /\<modelName\>/) {
+       if ($content =~ /\<modelName\>(.*)\<\/modelName\>/) {
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
+         $hash->{boxModel} = $1;
+       }
+
+       Fritz_Log $hash, 5-$myVerbose, "TR064 returned: $content";
+
+       if ($content =~ /\<modelNumber\>(.*)\<\/modelNumber\>/) {
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", "$1");
+       }
+       if ($content =~ /\<Display\>(.*)\<\/Display\>/) {
+         $fwVersion = $1;
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1);
+       }
+
+     }
+
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
+     $hash->{TR064} = 1;
+     Fritz_Log $hash, 5-$myVerbose, "API TR-064 found.";
+
+     #Determine TR064-Port
+     $tr064Port = Fritz_init_TR064 ( $hash, $host );
+     if ($tr064Port) {
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
+       $hash->{SECPORT} = $tr064Port;
+       Fritz_Log $hash, 5-$myVerbose, "TR-064-SecurePort is $tr064Port.";
+     } else {
+       Fritz_Log $hash, 4-$myVerbose, "TR-064-SecurePort does not exist";
+     }
+
+   } else {
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
+     $hash->{TR064} = 0;
+     Fritz_Log $hash, 4-$myVerbose, "API TR-064 not available: " . $response->status_line if $response->code != 500;
+   }
+   # End check if tr064 specification exists and determine TR064-Port
+
+   # push @roReadings, "RT_02_TR064", sprintf( "%.2f", time() - $startTime);
+
+   if ( $fwVersion =~ /error/ && $response->code != 500 && $crdOK) {
+     # Ansonsten ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
+     Fritz_Log $hash, 4, "Read 'jason_boxinfo.xml' from " . $host;
+
+     $agent     = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+     $url       = "http://" . $host . "/jason_boxinfo.xml";
+     $response  = $agent->get( $url );
+     $apiError .= " boxModelJason:" . $response->code;
+
+     unless ($response->is_success) {
+
+       my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
+
+       if (! defined($Fritz_TR064pwd)) {
+         Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
+       } else {
+
+         Fritz_Log $hash, 4, "retry with password 'jason_boxinfo.xml' from " . $host;
+
+         my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+         my $req      = HTTP::Request->new( GET => "http://" . $host . "/jason_boxinfo.xml");
+            $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
+         $response    = $agentPW->request( $req );
+         $apiError .= " boxModelJason:" . $response->code;
+
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "";
+
+         unless ($response->is_success) {
+           Fritz_Log $hash, 2, "Password or User not correct. Please define the correct credentials.";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "Password or User not correct. Please define the correct credentials";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)";
          }
-         else {
-            Fritz_Log $hash, 4-$myVerbose, "TR-064-SecurePort does not exist";
-         }
+       }
+     }
 
-      }
-      else {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
-         $hash->{TR064} = 0;
-         Fritz_Log $hash, 4-$myVerbose, "API TR-064 not available: " . $response->status_line if $response->code != 500;
-      }
+     if ($response->is_success && $response->content =~ /<j:Name>/) {
+       $content = $response->content;
+       Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $content";
 
-      $apiError .= " TR064:" . $response->code;
-      # push @roReadings, "RT_02_TR064", sprintf( "%.2f", time() - $startTime);
+       if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
+         $hash->{boxModel} = $1;
+       }
+       Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
+       Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1) if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
+       $fwVersion = $1 if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
 
-      # Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
-      if ($response->is_success && $content =~ /<modelName>/) {
-        Fritz_Log $hash, 5-$myVerbose, "TR064 returned: $content";
+       Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $response->is_success with $content";
+     } else {
 
-        if ($content =~ /<modelName>(.*)<\/modelName>/) {
-          Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-          $hash->{boxModel} = $1;
-        }
-        Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<modelNumber>(.*)<\/modelNumber>/;
-        Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1) if $content =~ /<Display>(.*)<\/Display>/ ;
-        $fwVersion = $1 if $content =~ /<Display>(.*)<\/Display>/ ;
+       # Ansonsten ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
+       Fritz_Log $hash, 4, "retry with password 'cgi-bin/system_status' from " . $host;
 
-      }
+       $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+       $url = "http://".$host."/cgi-bin/system_status";
+       $response = $agent->get( $url );
+       $apiError .= " boxModelSystem:" . $response->code;
 
-      if ( $fwVersion =~ /error/ && $response->code != 500 && $crdOK) {
-        # Ansonsten ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo
-        Fritz_Log $hash, 4, "Read 'jason_boxinfo' from " . $host;
+       unless ($response->is_success) {
+         Fritz_Log $hash, 4, "read 'cgi-bin/system_status' from " . $host;
 
-        my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
-
-        if ($Fritz_TR064pwd) {
-
-          $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-          my $url   = "http://" . $host . "/jason_boxinfo.xml";
-          $response = $agent->get( $url );
-
-          unless ($response->is_success) {
-
-            Fritz_Log $hash, 4, "retry with password 'jason_boxinfo' from " . $host;
-
-            my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-            my $req      = HTTP::Request->new( GET => "http://" . $host . "/jason_boxinfo.xml");
-               $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
-            $response    = $agentPW->request( $req );
-          }
-
-          $content   = $response->content;
-          $apiError .= " boxModelJason:" . $response->code;
-
-          if ($response->is_success && $content =~ /<j:Name>/) {
-            Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo returned: $content";
-
-            if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
-              Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-              $hash->{boxModel} = $1;
-            }
-            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
-            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1) if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
-            $fwVersion = $1 if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
-
-          } else {
-            Fritz_Log $hash, 4-$myVerbose, "jason_boxinfo returned: $response->is_success with $content";
-
-            # Ansonsten ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
-            Fritz_Log $hash, 4, "retry with password 'cgi-bin/system_status' from " . $host;
-
-            $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-            $url = "http://".$host."/cgi-bin/system_status";
-            $response = $agent->get( $url );
-
-            unless ($response->is_success) {
-              Fritz_Log $hash, 4, "read 'cgi-bin/system_status' from " . $host;
+         my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
   
-              my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-              my $req      = HTTP::Request->new( GET => "http://" . $host . "/cgi-bin/system_status");
-                 $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
-              $response    = $agentPW->request( $req );
-            }
+         my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+         my $req      = HTTP::Request->new( GET => "http://" . $host . "/cgi-bin/system_status");
+            $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
+         $response    = $agentPW->request( $req );
+         $apiError .= " boxModelSystem:" . $response->code;
 
-            $apiError   .= " boxModelSystem:" . $response->code;
-            $content     = $response->content;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "";
 
-            Fritz_Log $hash, 5-$myVerbose, "system_status returned: $content";
+         unless ($response->is_success) {
+           Fritz_Log $hash, 2, "Password or User not correct. Please define the correct credentials.";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "Password or User not correct. Please define the correct credentials";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)";
+         }
+       }
 
-            if ($response->is_success) {
-              $content = $1 if $content =~ /<body>(.*)<\/body>/;
+       Fritz_Log $hash, 5-$myVerbose, "system_status returned: $content";
 
-              my @result = split /-/, $content;
-              # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
-              # FRITZ!Box 7590 (UI)-B-132811-010030-XXXXXX-XXXXXX-787902-1540750-101716-1und1
-              # 0 FritzBox-Modell
-              # 1 Annex/Erweiterte Kennzeichnung
-              # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
-              # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
-              # 4+5 Hashcode
-              # 6 Status
-              # 7 Firmwareversion
-              # 8 Sub-Version/Unterversion der Firmware
-              # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
+       if ($response->is_success && $response->content =~ /\<body\>(.*)\<\/body\>/) {
+         $content =~ /<body>(.*)<\/body>/;
 
-              Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-              $hash->{boxModel} = $result[0];
+         my @result = split /-/, $content;
+         # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
+         # FRITZ!Box 7590 (UI)-B-132811-010030-XXXXXX-XXXXXX-787902-1540750-101716-1und1
+         # 0 FritzBox-Modell
+         # 1 Annex/Erweiterte Kennzeichnung
+         # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
+         # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
+         # 4+5 Hashcode
+         # 6 Status
+         # 7 Firmwareversion
+         # 8 Sub-Version/Unterversion der Firmware
+         # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
 
-              my $FBOS = $result[7];
-              $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
-              Fritz_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $FBOS;
-              Fritz_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
-              $fwVersion = $result[7];
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+         $hash->{boxModel} = $result[0];
 
-            } else {
-              Fritz_Log $hash, 4-$myVerbose, "" . $response->status_line;
-            }
-          }
-          $Fritz_TR064pwd = undef;
-        } else {
-          Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
-          Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
-        }
-      }
+         my $FBOS = $result[7];
+         $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $FBOS;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+         $fwVersion = $result[7];
+
+       } else {
+         Fritz_Log $hash, 4-$myVerbose, "" . $response->status_line;
+       }
+     }
    }
 
    # push @roReadings, "RT_03_BoxModel", sprintf( "%.2f", time() - $startTime);
@@ -10250,7 +10358,7 @@ sub Fritz_Readout_API_Check($)
 
              my $tr064Result = Fritz_SOAP_Request( $hash, 0, \@tr064MultCmdArray );
 
-             Fritz_Log $hash, 4, "ApiCheck tr064MultResult\n" . Dumper($tr064Result);
+             Fritz_Log $hash, 4, "ApiCheck tr064MultResult\n" . Fritz_Helper_Dumper($hash, $tr064Result);
 
              for my $i (0 .. $#tr064MultKeyArray) {
                if (exists($tr064Result->{Error}->{$tr064MultKeyArray[$i][1]}->{$tr064MultKeyArray[$i][2]}->{ErrLevel}) ) {
@@ -10294,7 +10402,7 @@ sub Fritz_Readout_API_Check($)
 
              my $igd064Result = Fritz_SOAP_Request( $hash, 1, \@trIGDMultCmdArray );
 
-             Fritz_Log $hash, 4, "ApiCheck trIGDMultCmdArray\n" . Dumper($igd064Result);
+             Fritz_Log $hash, 4, "ApiCheck trIGDMultCmdArray\n" . Fritz_Helper_Dumper($hash, $igd064Result);
 
              for my $i (0 .. $#trIGDMultKeyArray) {
                if (exists($igd064Result->{Error}->{$trIGDMultKeyArray[$i][1]}->{$trIGDMultKeyArray[$i][2]}->{ErrLevel}) ) {
@@ -15527,9 +15635,9 @@ sub Fritz_SOAP_Request($$$;@)
    }
 
 # Get Password und User for TR064 access
-   $UserAgentParaU = main::AttrVal( $name, "boxUser", "dslf-config" );
-
+   $UserAgentParaU = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
    $UserAgentParaP  = Fritz_Helper_read_Password($hash) unless defined $UserAgentParaP;
+
    unless (defined $UserAgentParaP) {
       Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
       $retHash{Error} = ( {"detail" => "No password set", "ResetSID" => "1", "ErrLevel" => "2"} ) ;
@@ -15617,9 +15725,25 @@ sub Fritz_SOAP_Request($$$;@)
 
      # $host = "192.168.0.2" if $host eq "192.168.0.1";
 
-     my $init_url    = "https://$host:$port/$control_url";
+     my $init_url = "";
+     if ($service_command eq "GetSecurityPort") {
+       $init_url = "http://$host:49000/$control_url";
+     } else {
+       $init_url = "https://$host:$port/$control_url";
+     }
+
      my $service_cmd = "u:" .$service_command. "Response";
      my $func        = $igd ? "IGD" : "TR064";
+
+#     my $agentPW  =  LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 10);
+#        $agentPW->ssl_opts( verify_hostname => 0 ,SSL_verify_mode => 0x00);
+#        $agentPW->default_header( 'SOAPACTION' => "$service_type#$service_command" );
+#     my $req =  HTTP::Request->new( POST => $init_url);
+#        $req->authorization_basic( "$UserAgentParaU", "$UserAgentParaP" );
+#        $req->content_type( "text/xml; charset=utf-8" );
+#        $req->content( $request );
+#     my $response =  $agentPW->request( $req );
+#     Fritz_Log $hash, 3, "agentPW:\n" . Dumper($response);
 
      my $respData = eval { $ua->post($init_url, Content_Type => 'text/xml; charset=utf-8', Content => $request) };
 
@@ -15878,16 +16002,19 @@ sub Fritz_init_TR064 ($$)
 
 # Security Port anfordern
    Fritz_Log $hash, 4, "Open TR-064 connection and ask for security port";
-   my $s = SOAP::Lite
-      -> uri('urn:dslforum-org:service:DeviceInfo:1')
-      -> proxy('http://' . $host . ':49000/upnp/control/deviceinfo', timeout => 10 )
-      -> getSecurityPort();
 
-   Fritz_Log $hash, 5, "SecPort-String " . Fritz_Helper_Dumper($hash, $s, 5);
+   $hash->{SECPORT} = '49000';
+   my @tr064CmdArray = (["DeviceInfo:1", "deviceinfo", "GetSecurityPort"] );
+   my $tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+   delete ($hash->{SECPORT});
 
-   my $port = $s->result;
-   Fritz_Log $hash, 5, "SecPort-Result " . Fritz_Helper_Dumper($hash, $s->result, 5);
+   if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+     Fritz_Log $hash, 2, "SecPort-String " . Fritz_Helper_Dumper($hash, $tr064Result);
+     return undef;
+   }
 
+   my $port = $tr064Result->{"DeviceInfo:1"}->{GetSecurityPort}->{NewSecurityPort};
+ 
    unless( $port ) {
       Fritz_Log $hash, 2, "Could not get secure port: $!";
       return undef;
@@ -15974,7 +16101,7 @@ sub Fritz_open_Web_Connection ($)
    }
 
    my $avmModel = main::InternalVal($name, "MODEL", $hash->{boxModel});
-   my $user = main::AttrVal( $name, "boxUser", "" );
+   my $user = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
 
    Fritz_Log $hash, 4, "Fritz_Get_Lan_Device_Info (Fritz!OS: $hash->{fhem}{fwVersionStr}) ";
 
@@ -17940,8 +18067,18 @@ sub Fritz_Helper_Dumper($$;@) {
    <br>
    Check also the other FRITZ!BOX moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
-   <i>The modul uses the Perl modul 'JSON::XS', 'LWP', 'SOAP::Lite' for remote access.</i>
-   <br>
+   <i>The modul uses the Perl moduls<br>
+     <ul>
+       <dt>MIME::Base</dt>
+       <dt>IO::Socket</dt>
+       <dt>Net::Ping</dt>
+       <dt>JSON</dt>
+       <dt>LWP::UserAgent</dt>
+       <dt>URI::Escape</dt>
+       <dt>use XML::Simple</dt>
+       <dt>use Data::Dumper</dt>
+     </ul>
+   </i>
    It is recommendet to set the attribute boxUser after defining the device.
    <br><br>
 
@@ -17955,8 +18092,11 @@ sub Fritz_Helper_Dumper($$;@) {
       <br><br>
       Example: <code>define Fritzbox FritzSmart fritz.box</code>
       <br><br>
+      During the definition process, the system attempts to determine the defined users in the Fritz!Device, provided the device supports user management.<br>
+      These users are stored internally and used for validation when setting the `boxUser` attribute. As long as this attribute is not set,<br>
+      the default user `fritz...` is used. The determined default user is displayed in the `INTERNAL DEFAULT_USER` table.
+      <br><br>
    </ul>
-
    <a name="FritzSmartset"></a>
    <b>Set</b>
    <ul>
@@ -19213,8 +19353,18 @@ sub Fritz_Helper_Dumper($$;@) {
    <br>
    Bitte auch die anderen FRITZ!BOX-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
-   <i>Das Modul nutzt das Perlmodule 'JSON', 'LWP', 'SOAP::Lite' für den Fernzugriff.</i>
-   <br>
+   <i>Das Modul nutzt folgende Perlmodule:<br>
+     <ul>
+       <dt>MIME::Base</dt>
+       <dt>IO::Socket</dt>
+       <dt>Net::Ping</dt>
+       <dt>JSON</dt>
+       <dt>LWP::UserAgent</dt>
+       <dt>URI::Escape</dt>
+       <dt>use XML::Simple</dt>
+       <dt>use Data::Dumper</dt>
+     </ul>
+   </i>
    Abhängig vom Fritz Device und der FritzOS Version ist das Attribut boxUser und ein ggf. ein Passwort über set &lt;name&gt; passwort zu setzen.
    <br><br>
 
@@ -19228,6 +19378,9 @@ sub Fritz_Helper_Dumper($$;@) {
       <br><br>
       Beispiel: <code>define Fritzbox FritzSmart fritz.box</code>
       <br><br>
+      Während des Define wird versucht die definierten Benutzer im Fritz!Device, sofern das Device die Benutzerverwaltung unterstützt, zu ermitteln.<br>
+      Die Benutzer werden intern gespeichert und zur Validierung beim Setzen des Attributes boxUser herangezogen. Solange das Attribut nicht gesetzt ist<br>
+      wird der Standardbenutzer fritz.... genutzt. Der ermittelte Standardbenutzer wird im INTERNAL DEFAULT_USER angezeigt.<br><br>
    </ul>
 
    <a name="FritzSmartset"></a>
