@@ -4,6 +4,9 @@
 #   get command: http://<ip-addr>:<ip-port>/<apiName>/get?device=<devname>&action=<cmd>
 #   read reading: http://<ip-addr>:<ip-port>/<apiName>/read?device=<devname>&reading=<name>
 #   write reading: http://<ip-addr><ip-port>/<apiName>/write?device=<devname>&reading=<name>&value=<val>
+#   execute Command Expression: http://<ip-addr><ip-port>/<apiName>/exec?cmd=<cmd>
+#   execute Commandchain Expression: http://<ip-addr><ip-port>/<apiName>/exec?cmds=<cmdClain>
+#   execute Perl Expression: http://<ip-addr><ip-port>/<apiName>/exec?perl=<perlExpression>
 
 package main;
 use Encode qw(decode encode);
@@ -226,6 +229,37 @@ sub HTTPAPI_CGI {
       return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute device missing"))
     }
 
+  } elsif($request =~ m/^(\/$infix)\/(exec)\?(.*)$/) {
+    $link = $1;
+    $apiCmd = $2;
+    $apiCmdString = $3;
+
+    # url decoding
+    $request =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+    readingsSingleUpdate($defs{$name}, 'request', $request, 0);
+
+      my ($cmd, $exec, $ret);
+      if ($apiCmdString =~ /&(cmd|cmds|perl)(\=[^&]*)?(?=&|$)|^(cmd|cmds|perl)(\=[^&]*)?(&|$)/) {
+        $exec = $1 // $3; 
+        $cmd = substr(($2 // $4), 1);
+        # url decoding
+        $cmd =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+        if ($exec eq 'cmd') {
+          $ret = AnalyzeCommand($defs{$name}, $cmd);
+        } elsif ($exec eq 'cmds') {
+          $ret = AnalyzeCommandChain($defs{$name}, $cmd);
+        } elsif ($exec eq 'perl') {
+          $ret = AnalyzePerlCommand($defs{$name}, $cmd);
+        }
+        if ($ret) {
+          return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > $ret"))
+        } else {
+          return($hash, 200, 'close', "text/plain; charset=utf-8", encode($encoding, "$apiCmd?$exec=$cmd"))
+        }
+      } else {
+        return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute is wrong or missing"))
+      }
+
   } else {
     return HTTPAPI_CommandRef($hash);
   }
@@ -435,6 +469,22 @@ sub HTTPAPI_Undef {
   </ul>
   <br><br>
 
+  <a id="HTTPAPI-exec"></a>
+  <b>Exec</b>
+  <ul>
+    <li>API command line for executing Fhem or Perl commands<br>
+      Request:
+      <ul>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?cmd|cmds|perl=&lt;cmd&gt;</code><br>
+      </ul>
+      Response:
+      <ul>
+        <code>&lt;exec?cmd|cmds|perl&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
+      </ul>
+    </li>
+  </ul>
+  <br><br>
+
   <a id="HTTPAPI-events"></a>
   <b>Generated events</b>
   <ul>
@@ -489,13 +539,44 @@ sub HTTPAPI_Undef {
         <code>&lt;internal name&gt;=&lt;val&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
+    <li>API command line for execute Fhem command<br>
+      Request:
+      <ul>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?cmd=&lt;cmd&gt;</code><br>
+      </ul>
+      Response:
+      <ul>
+        <code>&lt;exec?cmd&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
+      </ul>
+    </li>
+    <li>API command line for execute Fhem commandchain<br>
+      Request:
+      <ul>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?cmds=&lt;cmd&gt;</code><br>
+      </ul>
+      Response:
+      <ul>
+        <code>&lt;exec?cmds&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
+      </ul>
+    </li>
+    <li>API command line for execute Perl commands<br>
+      Request:
+      <ul>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?perl=&lt;cmd&gt;</code><br>
+      </ul>
+      Response:
+      <ul>
+        <code>&lt;exec?perl&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
+      </ul>
+    </li>
   </ul>
   <br><br>
 
   <b>Usage information</b>
   <ul>
     <li>All links are relative to <code>http://&lt;ip-addr&gt;:&lt;port&gt;/</code>.</li>
-    <li>Commands are not executed if the disable or ignore attribute of the device is set. See also <a href="#HTTPAPI-attr-devicesCtrl">devicesCtrl</a>.</li>
+    <li>Get und Set commands are not executed if the disable or ignore attribute of the device is set. See also <a href="#HTTPAPI-attr-devicesCtrl">devicesCtrl</a>.</li>
+    <li>Ecex commands are not executed if the disable attribute is set or command execution and device modification are not authorized by the permissions control. See the `validFor` attribute of the `allowed` module for more information.</li>
     <li>The <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/</code> command displays the module-specific commandref.</li>
     <li>The response message is encoded to UTF-8.</li>
   </ul>
