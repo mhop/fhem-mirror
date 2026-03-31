@@ -87,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.03.30a";
+our $ModulVersion = "26.03.31";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -1072,8 +1072,9 @@ sub Fritz_Log($$$)
    my ( $hash, $loglevel, $text ) = @_;
 
    my $instHash = ( ref($hash) eq "HASH" ) ? $hash : $defs{$hash};
-   my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : $hash;
-   
+#   my $instName = ( ref($hash) eq "HASH" ) ? $instHash->{NAME} : $instHash;
+   my $instName = $instHash->{NAME};
+
    if ($instHash->{helper}{FhemLog3Std}) {
       main::Log3 $hash, $loglevel, $instName . ": " . $text;
       return undef;
@@ -9958,7 +9959,7 @@ sub Fritz_Readout_API_Check($)
          $user_content  = '{"pid":"loginPage","users":'. $1;
          #Log3 "FBUser", 3, "FBUser: \n" . $user_content;
 
-         my $resultData = Fritz_Helper_process_JSON($defs{FB_Main}, $user_content, "", "");
+         my $resultData = Fritz_Helper_process_JSON($hash, $user_content, "", "");
 
          my $cData = $resultData->{users};
 
