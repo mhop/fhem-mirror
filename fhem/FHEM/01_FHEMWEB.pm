@@ -2168,7 +2168,7 @@ FW_showRoom()
                encode_base64(&{$fn}($FW_wname,$d,$FW_room,\%extPage),'');
       }, undef, "FW_svgCollect");
       $svgDataUsed++;
-    } else {
+    } elsif(defined($fn)) {
       $res{$d} = &{$fn}($FW_wname,$d,$FW_room,\%extPage);
     }
     use strict "refs";
