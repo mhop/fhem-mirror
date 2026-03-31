@@ -7,7 +7,7 @@
   "icons": [
     {
       "src": "/fhem/icons/fhemicon_ios",
-      "sizes": "144x144",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ]
