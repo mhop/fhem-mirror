@@ -168,7 +168,7 @@ my %vNotesIntern = (
                            "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
                            "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ".
                            "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ".
-                           "new key aiControl->aiConAbsOversample ",
+                           "new key aiControl->aiConAbsOversample, new key hpcsm in pvHistory & aiRawData ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -1597,6 +1597,7 @@ my %hfspvh = (
   pvrl              => { fn => \&_storeVal, storname => 'pvrl',           validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag PV
   plantderated      => { fn => \&_storeVal, storname => 'plantderated',   validkey => undef,    fpar => undef    },    # Abregelungsstatus der Anlage
   comforttemp       => { fn => \&_storeVal, storname => 'comforttemp',    validkey => undef,    fpar => undef    },    # Komforttemperatur des Gebäudes
+  hpcsm             => { fn => \&_storeVal, storname => 'hpcsm',          validkey => undef,    fpar => undef    },    # Consumernummern installierter Wärmepumpen
 );
 
   for my $in (1..MAXINVERTER) {
@@ -6812,7 +6813,7 @@ sub __getaiFannState {            ## no critic "not used"
   # Modellparameter
   ###################  
   my $model = '<b>=== '.$hqtxt{nmdpar}{$lang}.' ===</b>'."\n\n";                                                                                        # Modellparameter
-  $model   .= "<b>".$hqtxt{nnmlim}{$lang}.":</b> PV=$pvmaxlim Wh, ".$tgt.": Min=$tgtmin Wh / Max=$tgtmax Wh"."\n";                                  # Normierungsgrenzen, Hausverbrauch/PV-Prognose
+  $model   .= "<b>".$hqtxt{nnmlim}{$lang}.":</b> PV=$pvmaxlim Wh, ".$tgt.": Min=$tgtmin Wh / Max=$tgtmax Wh"."\n";                                      # Normierungsgrenzen, Hausverbrauch/PV-Prognose
   $model   .= (encode("utf8", "<b>".$hqtxt{tradat}{$lang}.":</b> $dsnum ".$hqtxt{dtsets}{$lang}." (Training=$trdnum, Validation=$tednum)"))."\n";       # Trainingsdaten, Datensätze
   $model   .= "<b>".$hqtxt{archit}{$lang}.":</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";                                          # Architektur
   $model   .= "<b>".$hqtxt{hyppar}{$lang}.":</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim"."\n";                                   # Hyperparameter
@@ -6916,7 +6917,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', 'Der Wert wird in Wh angegeben und beschreibt die durchschnittliche Abweichung pro Stunde.'))."\n";
       $note .= $spc6.(encode('utf8', 'Die interne Bias‑Korrektur hebt oder senkt die Vorhersage entsprechend, jedoch nur'))."\n";
       $note .= $spc6.(encode('utf8', 'im Bereich der Grundlast, um Peaks nicht zu verfälschen.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Wenn eine Drift‑Rekalibrierung stattgefunden hat, ersetzt <b>Model Bias recalibrated</b> den ursprünglichen Model Bias als neue Basislinie.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Wenn eine Drift‑Rekalibrierung stattgefunden hat, ersetzt <b>Bias recalibrated</b> den ursprünglichen Model Bias als neue Basislinie.'))."\n";
       $note .= $spc6.(encode('utf8', 'Er repräsentiert den neu berechneten durchschnittlichen Modellfehler, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
       $note .= "\n";
       
@@ -7005,7 +7006,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', 'The value is given in Wh and describes the average deviation per hour.'))."\n";
       $note .= $spc6.(encode('utf8', 'The internal bias correction raises or lowers the prediction accordingly, but only'))."\n";
       $note .= $spc6.(encode('utf8', 'in the base load range so as not to distort peaks.'))."\n";
-      $note .= $spc6.(encode('utf8', 'When a drift recalibration has taken place, <b>Model Bias recalibrated</b> replaces the original model bias as the new baseline.'))."\n";
+      $note .= $spc6.(encode('utf8', 'When a drift recalibration has taken place, <b>Bias recalibrated</b> replaces the original model bias as the new baseline.'))."\n";
       $note .= $spc6.(encode('utf8', 'It represents the newly calculated average model error after longer-term drift has been detected and corrected.'))."\n";
       $note .= "\n";
       
@@ -10846,6 +10847,8 @@ sub _collectAllRegConsumers {
   return if(CurrentVal ($name, 'consumerCollected', 0));                                          # Abbruch wenn Consumer bereits gesammelt
 
   delete $data{$name}{current}{consumerdevs};
+  
+  my @hp;                                                                                         # Sammler Wärmepumpen-Consumer
 
   for my $c (1..MAXCONSUMER) {
       $c = sprintf "%02d", $c;
@@ -10963,7 +10966,7 @@ sub _collectAllRegConsumers {
       
       if ($ctype eq 'heatpump') {
           $hc->{mode} = 'must';
-          $data{$name}{current}{heatpumpInstalled} = $c;
+          push @hp, $c;
       }
 
       $data{$name}{consumers}{$c}{name}              = $consumer;                                           # Name des Verbrauchers (Device)
@@ -11010,7 +11013,10 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{sunsetshift}       = $setshift           if(defined $setshift);           # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
       $data{$name}{consumers}{$c}{icon}              = $hc->{icon}         if(defined $hc->{icon});         # Icon für den Verbraucher 
   }
-
+  
+  if (@hp) { $data{$name}{current}{heatpumpInstalled} = join ",", @hp; }                                    # mehrere Wärmepumpen möglich
+  else     { delete $data{$name}{current}{heatpumpInstalled};          }
+  
   $data{$name}{current}{consumerCollected} = 1;
 
   Log3 ($name, 4, "$name - INFO - all registered consumers collected");
@@ -15027,9 +15033,9 @@ sub _manageConsumerData {
   my $day     = $paref->{day};
 
   my $hash        = $defs{$name};
-  my $nhour       = $chour + 1;
+  my $hod         = sprintf "%02d", ($chour + 1);
   
-  $paref->{nhour} = sprintf "%02d", $nhour;
+  $paref->{nhour} = $hod;
   $paref->{nday}  = sprintf "%02d", $day;
 
   my $pcurrsum = 0;
@@ -15058,16 +15064,16 @@ sub _manageConsumerData {
 
       if ($etotread) {
           my $eu      = $u =~ /^kWh$/xi ? 1000 : 1;
-          my $etot    = ReadingsNum ($consumer, $etotread, 0) * $eu;                               # Summe Energieverbrauch des Verbrauchers
-          my $ehist   = HistoryVal  ($name, $day, sprintf("%02d",$nhour), "csmt${c}", undef);      # gespeicherter Totalverbrauch
-          $ethreshold = ConsumerVal ($name, $c, "energythreshold", 0);                             # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
+          my $etot    = ReadingsNum ($consumer, $etotread, 0) * $eu;                        # Summe Energieverbrauch des Verbrauchers
+          my $ehist   = HistoryVal  ($name, $day, $hod, "csmt${c}", undef);                 # gespeicherter Totalverbrauch
+          $ethreshold = ConsumerVal ($name, $c, "energythreshold", 0);                      # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
 
           ## aktuelle Leistung ermitteln wenn kein Reading d. aktuellen Leistung verfügbar
           ##################################################################################
           if (!$paread){
               my $timespan = $t    - ConsumerVal ($name, $c, "old_etottime",  $t);
               my $delta    = $etot - ConsumerVal ($name, $c, "old_etotal", $etot);
-              $pcurr       = round6 ($delta / 3600 * $timespan) if($delta);               # Einheitenformel beachten !!: W = Wh / (3600 * s)
+              $pcurr       = round6 ($delta / 3600 * $timespan) if($delta);                 # Einheitenformel beachten !!: W = Wh / (3600 * s)
 
               $data{$name}{consumers}{$c}{old_etotal}   = $etot;
               $data{$name}{consumers}{$c}{old_etottime} = $t;
@@ -15075,7 +15081,7 @@ sub _manageConsumerData {
 
           if (defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
               my $consumerco  = $etot - $ehist;
-              $consumerco    += HistoryVal ($name, $day, sprintf("%02d",$nhour), "csme${c}", 0);
+              $consumerco    += HistoryVal ($name, $day, $hod, "csme${c}", 0);
 
               if ($consumerco < 0) {                                                              
                   $consumerco = 0;
@@ -15139,7 +15145,7 @@ sub _manageConsumerData {
       my $dnum       = 0;
 
       for my $n (sort{$a<=>$b} keys %{$data{$name}{pvhist}}) {                                                 # Betriebszeit und gemessenen Verbrauch ermitteln
-          my $csme  = HistoryVal ($name, $n, 99, "csme${c}", 0);
+          my $csme  = HistoryVal ($name, $n, 99, "csme${c}",      0);
           my $hours = HistoryVal ($name, $n, 99, "hourscsme${c}", 0);
           next if(!$hours);
 
@@ -15165,8 +15171,9 @@ sub _manageConsumerData {
                     isConsumerPhysOff ($hash, $c) ? 'off' :
                     "unknown";
 
-      $data{$name}{consumers}{$c}{state}   = $costate;
+      $data{$name}{consumers}{$c}{state}          = $costate;
       my ($pstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
+      
       my ($iilt,$rlt) = isInLocktime ($paref);                                                                    # Sperrzeit Status ermitteln
       my $cplmode     = getConsumerPlanningMode ($hash, $c);                                                      # Planungsmode 'can' oder 'must'
       my $constate    = "name='$alias' state='$costate'";
@@ -15178,6 +15185,11 @@ sub _manageConsumerData {
       storeReading ("consumer${c}_planned_start", $starttime) if($starttime);                                     # Consumer Start geplant
       storeReading ("consumer${c}_planned_stop",  $stoptime)  if($stoptime);                                      # Consumer Stop geplant
   }
+  
+  ## vorhandene Consumernummern v. Wärmepumpen ermitteln und speichern
+  ######################################################################
+  my $hpcsm = isHeatPumpUsed ($name);
+  writeToHistory ( { paref => $paref, key => 'hpcsm', val => $hpcsm, day => $day, hour => $hod } ) if($hpcsm);
 
   $data{$name}{current}{dummyConsumption} = CurrentVal ($name, 'consumption', 0) - $pcurrsum;                     # aktueller Verbrauch - Summe aller ConsumerPower
 
@@ -23229,12 +23241,14 @@ sub __aiAddRawData {
           my $windspeed = HistoryVal ($name, $pvd, $hod, 'windspeed',        undef);                    # Windgeschwindigkeit in m/s -> Großwetterlage / Trend
           my $wind_fast = HistoryVal ($name, $pvd, $hod, 'windspeed_fast',   undef);
           my $comftemp  = HistoryVal ($name, $pvd, $hod, 'comforttemp', HPCOMFTEMP);                    # Komforttemperatur des Gebäudes   
+          my $hpcsm     = HistoryVal ($name, $pvd, $hod, 'hpcsm',            undef);                    # Nummern registrierter Wärmepumpen
           
           $data{$name}{aidectree}{airaw}{$ridx}{sunalt}         = $sunalt;
           $data{$name}{aidectree}{airaw}{$ridx}{sunaz}          = $sunaz;
           $data{$name}{aidectree}{airaw}{$ridx}{dayname}        = $dayname;
           $data{$name}{aidectree}{airaw}{$ridx}{hod}            = $hod;
           $data{$name}{aidectree}{airaw}{$ridx}{comforttemp}    = $comftemp;
+          $data{$name}{aidectree}{airaw}{$ridx}{pvrlvd}         = $pvrlvd;
           $data{$name}{aidectree}{airaw}{$ridx}{socwhsum}       = $socwhsum                        if(defined $socwhsum);
           $data{$name}{aidectree}{airaw}{$ridx}{temp}           = round1 ($temp)                   if(defined $temp);
           $data{$name}{aidectree}{airaw}{$ridx}{con}            = $con                             if(defined $con     && $con     >= 0);
@@ -23249,7 +23263,7 @@ sub __aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{holiday}        = $holiday                         if(defined $holiday);
           $data{$name}{aidectree}{airaw}{$ridx}{windspeed}      = $windspeed                       if(defined $windspeed);
           $data{$name}{aidectree}{airaw}{$ridx}{windspeed_fast} = $wind_fast                       if(defined $wind_fast);
-          $data{$name}{aidectree}{airaw}{$ridx}{pvrlvd}         = $pvrlvd;
+          $data{$name}{aidectree}{airaw}{$ridx}{hpcsm}          = $hpcsm                           if(defined $hpcsm);
 
           for my $c (1..MAXCONSUMER) {
               $c       = sprintf "%02d", $c;
@@ -26154,7 +26168,6 @@ sub aiFannDetectDrift {
   my $peak_ratio = $peak_active / $n_tgt;
 
   # --- Ampel-Logik (modellskaliert) ---
-
   my $slope_penalty = $slope_rel_drift < 0.3                                    # Quadratisch mit Schwellwert
                     ? min (2.0, $slope_rel_drift)                               # kleine Abweichung → linear
                     : min (2.0, $slope_rel_drift + $slope_rel_drift ** 2);      # große Abweichung → quadratisch
@@ -26241,9 +26254,19 @@ sub aiFannDetectDrift {
 
   if (!$block_reason) {                                                                             # Rekalibrierung
       if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= DRIFTHZN3TH) {                      # DRIFTHZN3TH => 8                                 
-          my $new_bias  = $ref_bias + 0.7 * $bias_drift;
-          my $new_slope = 1.0 + ($slope_live - 1.0) * 0.5;
-          $new_slope    = max (0.85, min (1.15, $new_slope));
+          #my $new_bias  = $ref_bias + 0.7 * $bias_drift;
+          # ---- Effektiver Bias-Drift: Kombination aus DriftBias und MAE-Drift
+          my $bias_drift_effective = 0.5 * $bias_drift + 0.5 * ($mae_live - $ref_mae);
+          $bias_drift_effective    = max(-2*$ref_mae, min(2*$ref_mae, $bias_drift_effective));      # Clamping gegen Überreaktionen
+          my $new_bias             = $ref_bias + 0.4 * $bias_drift_effective;                       # Sanfte Anpassung (40 % statt 70 %)        
+          
+          #my $new_slope = 1.0 + ($slope_live - 1.0) * 0.5;
+          #$new_slope    = max (0.85, min (1.15, $new_slope));
+          # --- Slope-Fehler relativ zur Referenz
+          my $slope_error           = $slope_live - $ref_slope;
+          my $slope_drift_effective = 0.6 * $slope_error + 0.4 * ($rmse_rel_ratio - 1.0) * 0.1;     # Effektiver Slope-Drift: Kombination aus Slope-Drift und RMSE-Drift
+          my $new_slope             = $ref_slope + $slope_drift_effective;                          # Neue Steigung
+          $new_slope                = max(0.85, min(1.15, $new_slope));                             # Clamping für Stabilität
      
           $data{$name}{neuralnet}{$fanntyp}{DriftRefBias}  = $new_bias;
           $data{$name}{neuralnet}{$fanntyp}{DriftRefSlope} = $new_slope;
@@ -27725,6 +27748,7 @@ sub _listDataPoolPvHist {
           my $presence     = HistoryVal ($name, $day, $key, 'presence',       '-');  
           my $holiday      = HistoryVal ($name, $day, $key, 'holiday',        '-');     
           my $comforttemp  = HistoryVal ($name, $day, $key, 'comforttemp',    '-');
+          my $hpcsm        = HistoryVal ($name, $day, $key, 'hpcsm',          '-');           
 
           if ($export eq 'csv') {
               $hexp->{$day}{$key}{PVreal}              = $pvrl;
@@ -27759,6 +27783,7 @@ sub _listDataPoolPvHist {
               $hexp->{$day}{$key}{Presence}            = $presence;
               $hexp->{$day}{$key}{ComfortTemp}         = $comforttemp;
               $hexp->{$day}{$key}{Holiday}             = $holiday;
+              $hexp->{$day}{$key}{HeatPumpNumber}      = $hpcsm;
           }
 
           my ($inve, $invl);
@@ -27899,7 +27924,9 @@ sub _listDataPoolPvHist {
               $ret .= "pvcorrf: $pvcorrf ";
               $ret .= "temp: $temp, ";
               $ret .= "comforttemp: $comforttemp, ";
-              $ret .= "presence: $presence ";             
+              $ret .= "presence: $presence ";
+              $ret .= "\n            ";
+              $ret .= "hpcsm: $hpcsm ";              
           }
           
           if ($key eq '99') {
@@ -28549,11 +28576,12 @@ sub _listDataPoolAiRawData {
       my $conaifc       = AiRawdataVal ($name, $idx, 'conaifc',        '-');
       my $gcons         = AiRawdataVal ($name, $idx, 'gcons',          '-');
       my $socwhsum      = AiRawdataVal ($name, $idx, 'socwhsum',       '-');
-      my $comforttemp   = AiRawdataVal ($name, $idx, 'comforttemp',     '-');
+      my $comforttemp   = AiRawdataVal ($name, $idx, 'comforttemp',    '-');
       my $presence      = AiRawdataVal ($name, $idx, 'presence',       '-');    
       my $holiday       = AiRawdataVal ($name, $idx, 'holiday',        '-'); 
       my $windspeed     = AiRawdataVal ($name, $idx, 'windspeed',      '-');
       my $wind_fast     = AiRawdataVal ($name, $idx, 'windspeed_fast', '-');
+      my $hpcsm         = AiRawdataVal ($name, $idx, 'hpcsm',          '-');
       
       my $csm;
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
@@ -28573,8 +28601,13 @@ sub _listDataPoolAiRawData {
       $sq .= "windspeed: $windspeed, windspeed_fast: $wind_fast, pvrl: $pvrl, pvrlvd: $pvrlvd, comforttemp: $comforttemp, ";
       $sq .= "conaifc: $conaifc, con: $con, gcons: $gcons, ";
       $sq .= "presence: $presence, holiday: $holiday ";
-       
-      if (defined $csm) { $sq .= "\n              "; $sq .= $csm; }
+      $sq .= "\n              "; 
+      $sq .= "hpcsm: $hpcsm";
+      
+      if (defined $csm) {
+          $sq .= ", ";
+          $sq .= $csm; 
+      }
   }
 
 return $sq;
@@ -33816,6 +33849,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>feedprice</b>      </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the setupMeterDev.                      </td></tr>
             <tr><td> <b>holiday</b>        </td><td>Vacation or holiday                                                                                                      </td></tr>
             <tr><td> <b>hourscsmeXX</b>    </td><td>total active hours of the day from ConsumerXX                                                                            </td></tr>
+            <tr><td> <b>hpcsm</b>          </td><td>Serial numbers of the registered heat pumps                                                                              </td></tr>
             <tr><td> <b>lcintimebatXX</b>  </td><td>the charge management for battery XX was activated (1 - Yes, 0 - No)                                                     </td></tr>
             <tr><td> <b>strategybatXX</b>  </td><td>the selected charging strategy                                                                                           </td></tr>
             <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                                           </td></tr>
@@ -34206,7 +34240,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * 0.00 – 0.05 (0–5%)   - minimal / no oversampling, for models that already handle missing values well </ul>                                            </td></tr>
             <tr><td>                          </td><td><ul> * 0.10 – 0.20 (10–20%) - moderate amplification, a good balance between clarity and natural sound </ul>                                                 </td></tr>
             <tr><td>                          </td><td><ul> * 0.25 – 0.40 (25–40%) - Heavy oversampling, particularly for highly skewed datasets with very few missing values, can be excessive! </ul>              </td></tr>
-            <tr><td>                          </td><td>value range:<b> &lt;0..0.50&gt; </b>, default: 0                                                                                                             </td></tr>
+            <tr><td>                          </td><td>value range:<b> 0 .. 0.50 </b>, default: 0                                                                                                                   </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>            
             <tr><td> <b>aiConActFunc</b>      </td><td>Selection of the activation function for the hidden layers.                                                                                                  </td></tr>
             <tr><td>                          </td><td><ul> * SIGMOID - typical for increases in consumption that reach saturation point (e.g., more devices -> more consumption) </ul>                             </td></tr>
@@ -36840,6 +36874,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>avgcycmntscsmXX</b> </td><td>durchschnittliche Dauer eines Einschaltzyklus des Tages von ConsumerXX in Minuten                      </td></tr>
             <tr><td> <b>holiday</b>         </td><td>Urlaub oder Feiertag                                                                                   </td></tr>
             <tr><td> <b>hourscsmeXX</b>     </td><td>Summe Aktivstunden des Tages von ConsumerXX                                                            </td></tr>
+            <tr><td> <b>hpcsm</b>           </td><td>Nummern der registrierten Wärmepumpen                                                                  </td></tr>
             <tr><td> <b>lcintimebatXX</b>   </td><td>das Lademanagement für Batterie XX war aktiviert (1 - Ja, 0 - Nein)                                    </td></tr>
             <tr><td> <b>strategybatXX</b>   </td><td>die gewählte Ladestrategie                                                                             </td></tr>
             <tr><td> <b>minutescsmXX</b>    </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                        </td></tr>
@@ -37228,7 +37263,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * 0.00 – 0.05 (0–5%)   - minimal / kein Oversampling, für Modelle die bereits gut mit Abwesenheiten umgehen </ul>                                       </td></tr>
             <tr><td>                          </td><td><ul> * 0.10 – 0.20 (10–20%) - moderate Verstärkung, gute Balance zwischen Repräsentation und Natürlichkeit </ul>                                             </td></tr>
             <tr><td>                          </td><td><ul> * 0.25 – 0.40 (25–40%) - starkes Oversampling, für sehr unausgewogene Datensätze mit extrem wenigen Abwesenheiten, kann übertreiben! </ul>              </td></tr>
-            <tr><td>                          </td><td>Wertebereich:<b> &lt;0..0.50&gt; </b>, default: 0                                                                                                            </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> 0 .. 0.50 </b>, default: 0                                                                                                                  </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>            
             <tr><td> <b>aiConActFunc</b>      </td><td>Auswahl der Aktivierungsfunktion für die Hidden Layer.                                                                                                       </td></tr>
             <tr><td>                          </td><td><ul> * SIGMOID - typisch bei Verbrauchsanstiegen, die eine Sättigung erreichen (z.B. mehr Geräte -> mehr Verbrauch) </ul>                                    </td></tr>
