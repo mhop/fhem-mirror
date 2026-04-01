@@ -110,7 +110,7 @@ sub HTTPAPI_CGI {
   my $link;
   return($hash, 503, 'close', "text/plain; charset=utf-8", encode($encoding, "error=503 Service Unavailable")) if(IsDisabled($name));
 
-  if($request =~ m/^(\/$infix)\/(set|get|read|readtimestamp|readinternal|write)\?(.*)$/) {
+  if($request =~ m/^(\/$infix)\/(set|get|read|readtimestamp|readinternal|write|trigger)\?(.*)$/) {
     $link = $1;
     $apiCmd = $2;
     $apiCmdString = $3;
@@ -169,15 +169,13 @@ sub HTTPAPI_CGI {
           } else {
             return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute reading or internal is missing"))
           }
-        } elsif ($apiCmd eq 'set') {
+        } elsif ($apiCmd eq 'set' || $apiCmd eq 'trigger') {
           my $setCmd;
           if ($apiCmdString =~ /&action(\=[^&]*)?(?=&|$)|^action(\=[^&]*)?(&|$)/) {
             $setCmd = substr(($1 // $2), 1);
             # url decoding
             $setCmd =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-            #my $ret = CommandSet(undef, "$fhemDevName $setCmd");
-            #my $ret = AnalyzeCommand($defs{$hash->{SNAME}}, "set $fhemDevName $setCmd");
-            my $ret = AnalyzeCommand($defs{$name}, "set $fhemDevName $setCmd");
+            my $ret = AnalyzeCommand($defs{$name}, "$apiCmd $fhemDevName $setCmd");
             if ($ret) {
               return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > $ret"))
             } else {
@@ -399,8 +397,8 @@ sub HTTPAPI_Undef {
 <a id="HTTPAPI"></a>
 <h3>HTTPAPI</h3>
 <ul>
-  HTTPAPI is a compact HTML API server that performs http requests to execute set and get commands
-  and reads and writes readings.<br><br>
+  HTTPAPI is a compact HTML API server that performs http requests to execute set, get and trigger commands,
+   reads and writes readings, querying internals and execute Fhem or Perl commands.<br><br>
 
   <a id="HTTPAPI-define"></a>
   <b>Define</b>
@@ -460,6 +458,22 @@ sub HTTPAPI_Undef {
       Request:
       <ul>
         <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/set?device=&lt;devname&gt;&action=&lt;cmd&gt;</code><br>
+      </ul>
+      Response:
+      <ul>
+        <code>&lt;device&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
+      </ul>
+    </li>
+  </ul>
+  <br><br>
+
+  <a id="HTTPAPI-trigger"></a>
+  <b>Trigger</b>
+  <ul>
+    <li>API command line for executing a trigger command<br>
+      Request:
+      <ul>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/trigger?device=&lt;devname&gt;&action=&lt;cmd&gt;</code><br>
       </ul>
       Response:
       <ul>
