@@ -15201,7 +15201,7 @@ sub _manageConsumerData {
       $pcurrsum      += $pcurr;
       $paref->{pcurr} = $pcurr;
 
-      __readBEVvalues         ($paref);                                                                        # BEV Consumer auslesen
+      __saveBEVvalues         ($paref);                                                                        # BEV Consumer auslesen
       __getAutomaticState     ($paref);                                                                        # Automatic Status des Consumers abfragen
       __calcEnergyPieces      ($paref);                                                                        # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
       __planInitialSwitchTime ($paref);                                                                        # Consumer Switch Zeiten planen
@@ -15282,7 +15282,7 @@ return;
 ################################################################
 #               BEV auslesen
 ################################################################
-sub __readBEVvalues {
+sub __saveBEVvalues {
   my $paref = shift;
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
