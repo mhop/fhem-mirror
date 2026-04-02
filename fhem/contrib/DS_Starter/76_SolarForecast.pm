@@ -163,12 +163,13 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.0"  => "30.03.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
+  "2.5.0"  => "02.04.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
                            "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
                            "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
                            "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ".
                            "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ".
-                           "new key aiControl->aiConAbsOversample, new key hpcsm in pvHistory & aiRawData ",
+                           "new key aiControl->aiConAbsOversample, new key hpcsm in pvHistory & aiRawData ".
+                           "new consumer type=bev ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -2595,7 +2596,6 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $cplmode = getConsumerPlanningMode ($hash, $c);                                         # Planungsmode 'can', 'must' oder 'mustNot'
 
   if ($ctype   eq 'noSchedule' || 
-      $ctype   eq 'heatpump'   ||
       $cplmode eq 'mostNot') {
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
@@ -7396,32 +7396,38 @@ sub _attrconsumer {                      ## no critic "not used"
   my $hash = $defs{$name};
 
   my $valid = {
-      aliasshort    => { comp => '.*',                              must => 0, act => 1 },
-      type          => { comp => '.*',                              must => 1, act => 1 },
-      power         => { comp => '[0-9]+',                          must => 1, act => 0 },
-      switchdev     => { comp => '.*',                              must => 0, act => 1 },
-      mode          => { comp => '.*',                              must => 0, act => 1 },
-      icon          => { comp => '',                                must => 0, act => 0 },
-      mintime       => { comp => '.*',                              must => 0, act => 1 },
-      on            => { comp => '',                                must => 0, act => 0 },
-      off           => { comp => '',                                must => 0, act => 0 },
-      swstate       => { comp => '.*',                              must => 0, act => 1 },
-      asynchron     => { comp => '[01]',                            must => 0, act => 0 },
-      notbefore     => { comp => '.*',                              must => 0, act => 1 },
-      notafter      => { comp => '.*',                              must => 0, act => 1 },
-      auto          => { comp => '',                                must => 0, act => 0 },
-      pcurr         => { comp => '.*',                              must => 0, act => 1 },
-      etotal        => { comp => '.*',                              must => 0, act => 1 },
-      swoncond      => { comp => '.*',                              must => 0, act => 1 },
-      swoffcond     => { comp => '.*',                              must => 0, act => 1 },
-      surpmeth      => { comp => '.*',                              must => 0, act => 1 },
-      spignorecond  => { comp => '.*',                              must => 0, act => 1 },
-      interruptable => { comp => '.*',                              must => 0, act => 1 },
-      locktime      => { comp => '[0-9]\d*(?::[0-9]\d*)?',          must => 0, act => 0 },
-      noshow        => { comp => '',                                must => 0, act => 0 },
-      exconfc       => { comp => '[012]',                           must => 0, act => 0 },
-      pvshare       => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
-      comforttemp               => { comp => '.*',                                                act => 0 },
+      aliasshort      => { comp => '.*',                              must => 0, act => 1 },
+      type            => { comp => '.*',                              must => 1, act => 1 },
+      power           => { comp => '[0-9]+',                          must => 1, act => 0 },
+      switchdev       => { comp => '.*',                              must => 0, act => 1 },
+      mode            => { comp => '.*',                              must => 0, act => 1 },
+      icon            => { comp => '',                                must => 0, act => 0 },
+      mintime         => { comp => '.*',                              must => 0, act => 1 },
+      on              => { comp => '',                                must => 0, act => 0 },
+      off             => { comp => '',                                must => 0, act => 0 },
+      swstate         => { comp => '.*',                              must => 0, act => 1 },
+      asynchron       => { comp => '[01]',                            must => 0, act => 0 },
+      notbefore       => { comp => '.*',                              must => 0, act => 1 },
+      notafter        => { comp => '.*',                              must => 0, act => 1 },
+      auto            => { comp => '',                                must => 0, act => 0 },
+      pcurr           => { comp => '.*',                              must => 0, act => 1 },
+      etotal          => { comp => '.*',                              must => 0, act => 1 },
+      swoncond        => { comp => '.*',                              must => 0, act => 1 },
+      swoffcond       => { comp => '.*',                              must => 0, act => 1 },
+      surpmeth        => { comp => '.*',                              must => 0, act => 1 },
+      spignorecond    => { comp => '.*',                              must => 0, act => 1 },
+      interruptable   => { comp => '.*',                              must => 0, act => 1 },
+      locktime        => { comp => '[0-9]\d*(?::[0-9]\d*)?',          must => 0, act => 0 },
+      noshow          => { comp => '',                                must => 0, act => 0 },
+      exconfc         => { comp => '[012]',                           must => 0, act => 0 },
+      pvshare         => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
+      
+      # --- nur für bev (musts in __attrKeyAction checken)
+      batCap          => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh))',  must => 0, act => 1 },
+      currSoC         => { comp => '(.*)',                                       must => 0, act => 1 },
+      targetSoC       => { comp => '(?:100|[1-9][0-9]?)',                        must => 0, act => 0 },
+      evid            => { comp => '(.*:.*)',                                    must => 0, act => 1 },
+      timeOfDeparture => { comp => '.*',                                         must => 0, act => 1 },
   };
 
   if ($cmd eq 'set') {
@@ -7449,6 +7455,7 @@ sub _attrconsumer {                      ## no critic "not used"
                   my $err = __attrKeyAction ( { name    => $name,                                                                               
                                                 aName   => $aName,
                                                 pphash  => $h,                                                  # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                dev     => $codev,
                                                 akey    => $key,
                                                 akeyval => $h->{$key},
                                                 cmd     => $cmd,
@@ -8593,7 +8600,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
       poutmax    => { comp => '\d+',                                          must => 0, act => 0 },
       intotal    => { comp => '.*',                                           must => 0, act => 0 },
       outtotal   => { comp => '.*',                                           must => 0, act => 0 },
-      cap        => { comp => '((?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh)$))', must => 1, act => 0 },
+      cap        => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh)$)',   must => 1, act => 0 },
       charge     => { comp => '.*',                                           must => 0, act => 0 },
       icon       => { comp => '.*',                                           must => 0, act => 0 },
       show       => { comp => '(?:[0-3](?::(?:top|bottom))?)',                must => 0, act => 0 },
@@ -8934,6 +8941,7 @@ sub __attrKeyAction {
   my $name    = $paref->{name};
   my $aName   = $paref->{aName};
   my $pphash  = $paref->{pphash};                                                                                   # parsed Param Hash: wichtig für Abhängigkeitsprüfungen
+  my $adev    = $paref->{dev};                                                                                      # Device aus Attribut falls gesetzt
   my $akey    = $paref->{akey};
   my $akeyval = $paref->{akeyval};
   my $cmd     = $paref->{cmd};
@@ -9078,12 +9086,34 @@ sub __attrKeyAction {
           if (!$alowt) {
               return "The consumer type '$akeyval' isn't allowed!";
           }
-      
-          # --- Checks Consumer Typ Wärmepumpe
+          
+          # --- Negativtest: diese Schlüssel dürfen nur bei type=bev vorkommen
+          if ($akeyval ne 'bev') {
+              my @dont = qw(batCap currSoC targetSoC evid timeOfDeparture);
+              my $chk  = 0;
+              
+              for my $k (@dont) {
+                  $chk = 1 if(exists $pphash->{$k});
+                  return qq{The key '$k' isn't allowed for consumer type=$akeyval.} if($chk);
+              }
+          }
+          
+          # --- Checks Consumer E-Auto / Wallbox
+          if ($akeyval eq 'bev') {
+              my @must = qw(batCap currSoC evid);                                                      # Pflichtschlüssel für bev
+              my $chk  = 1;
+              
+              for my $k (@must) {
+                  $chk = 0 if(!exists $pphash->{$k});
+                  return qq{The key '$k' is mandatory for the consumer type '$akeyval' and is currently not set.} if(!$chk);
+              }
+          }
+                
+          # --- Checks Consumer Wärmepumpe
           if ($akeyval eq 'heatpump') {
               my $hp = isHeatPumpUsed ($name);                                                       
               
-              if (defined $hp && $aName ne 'consumer'.$hp) {                                           # andere "heatpump" bereits definiert? -> kann nur eine WP geben
+              if (defined $hp && $aName ne 'consumer'.$hp) {                                           # andere heatpump bereits definiert? -> kann nur eine WP geben
                   return qq{A 'heatpump' type consumer ($hp) has already been defined.};
               }
               
@@ -9117,6 +9147,37 @@ sub __attrKeyAction {
           else {
               return "The mode '$akeyval' is not allowed!";
           }
+      }
+      
+      if ($akey =~ /^(?:batCap|currSoC)$/xs) {     
+          if (!isNumeric ($akeyval)) {   
+              my ($rdg, $unit) = split ':', $akeyval, 2;
+              ($err)          = isDeviceValid ( { name => $name, obj => $adev, method => 'string' } );
+              return $err if($err);
+
+              my $cval  = ReadingsNum ($adev, $rdg, '');
+              my $valid = 1;
+              
+              $valid = 0 if(!isNumeric ($cval));
+              $valid = 0 if(isNumeric ($cval)  &&
+                            $akey eq 'currSoC' && 
+                            ($cval < 0 || $cval > 100)
+                           );
+              
+              unless ($valid) {
+                  return "The device:reading '$adev:$rdg=$cval' is an invalid combination or doesn't deliver a valid numeric value";
+              }
+          }
+      }
+      
+      if ($akey eq 'evid') {
+          my ($rdg, $regex) = split ":", $akeyval, 2;
+
+          $err = checkRegex ($regex);
+          return "evid Regex check error: $err" if($err); 
+
+          ($err) = isDeviceValid ( { name => $name, obj => $adev, method => 'string' } );
+          return $err if($err);           
       }
       
       if ($akey eq 'surpmeth') {
@@ -10849,6 +10910,7 @@ sub _collectAllRegConsumers {
   delete $data{$name}{current}{consumerdevs};
   
   my @hp;                                                                                         # Sammler Wärmepumpen-Consumer
+  my @ev;                                                                                         # Sammler EV-Consumer
 
   for my $c (1..MAXCONSUMER) {
       $c = sprintf "%02d", $c;
@@ -10956,19 +11018,24 @@ sub _collectAllRegConsumers {
           $clt = $hc->{locktime};
       }  
 
-      delete $data{$name}{consumers}{$c}{sunriseshift};
-      delete $data{$name}{consumers}{$c}{sunsetshift};
-      delete $data{$name}{consumers}{$c}{icon};   
-
-
       my $rauto = $hc->{auto} // q{};
       my $ctype = $hc->{type} // DEFCTYPE;
       
       if ($ctype eq 'heatpump') {
-          $hc->{mode} = 'must';
+          $hc->{mode} = 'mustNot';
           push @hp, $c;
       }
+      
+      if ($ctype eq 'bev') {
+          $hc->{mode} = 'mustNot';
+          push @ev, $c;
+      }
+      
+      # --- Löschen relevanter Schlüssel
+      my @delkeys = qw (sunriseshift sunsetshift icon batCap currSoC targetSoC evid timeOfDeparture);
+      delete @{$data{$name}{consumers}{$c}}{@delkeys};
 
+      # --- Neuanlage Consumer Hash-Werte
       $data{$name}{consumers}{$c}{name}              = $consumer;                                           # Name des Verbrauchers (Device)
       $data{$name}{consumers}{$c}{alias}             = $alias;                                              # Alias des Verbrauchers (Device)
       $data{$name}{consumers}{$c}{aliasshort}        = $hc->{aliasshort}   // q{};                          # Kurzalias des Verbrauchers
@@ -11011,11 +11078,21 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{hysteresis}        = $hyst;                                               # Hysterese
       $data{$name}{consumers}{$c}{sunriseshift}      = $riseshift          if(defined $riseshift);          # Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
       $data{$name}{consumers}{$c}{sunsetshift}       = $setshift           if(defined $setshift);           # Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
-      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}         if(defined $hc->{icon});         # Icon für den Verbraucher 
+      $data{$name}{consumers}{$c}{icon}              = $hc->{icon}         if(defined $hc->{icon});         # Icon für den Verbraucher
+
+      # --- nur für bev
+      $data{$name}{consumers}{$c}{evid}              = $hc->{evid}         if(defined $hc->{evid}); 
+      $data{$name}{consumers}{$c}{batCap}            = $hc->{batCap}       if(defined $hc->{batCap});
+      $data{$name}{consumers}{$c}{currSoC}           = $hc->{currSoC}      if(defined $hc->{currSoC});
+      $data{$name}{consumers}{$c}{targetSoC}         = $hc->{targetSoC}    if(defined $hc->{targetSoC});    # optionale Angabe             
+      $data{$name}{consumers}{$c}{timeOfDeparture}   = q{}                 if(defined $hc->{bev});          # optionale Angabe     
   }
   
   if (@hp) { $data{$name}{current}{heatpumpInstalled} = join ",", @hp; }                                    # mehrere Wärmepumpen möglich
   else     { delete $data{$name}{current}{heatpumpInstalled};          }
+  
+  if (@ev) { $data{$name}{current}{bevInstalled} = join ",", @ev; }                                         # mehrere BEV möglich
+  else     { delete $data{$name}{current}{bevInstalled};          }
   
   $data{$name}{current}{consumerCollected} = 1;
 
@@ -15043,10 +15120,11 @@ sub _manageConsumerData {
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
       $paref->{consumer} = $c;
       my $consumer       = ConsumerVal ($name, $c, 'name',  '');
-      my $alias          = ConsumerVal ($name, $c, 'alias', '');     
+      my $alias          = ConsumerVal ($name, $c, 'alias', '');
+      my $ctype          = ConsumerVal ($name, $c, 'type',  '');         
 
-      ## aktuelle Leistung auslesen
-      ##############################
+      # --- aktuelle Leistung auslesen
+      ##################################
       my $paread = ConsumerVal ($name, $c, "rpcurr", '');
       my $up     = ConsumerVal ($name, $c, "upcurr", '');
       my $pcurr  = 0;
@@ -15056,8 +15134,8 @@ sub _manageConsumerData {
           $pcurr  = ReadingsNum ($consumer, $paread, 0) * $eup;
       }
 
-      ## Verbrauch auslesen + speichern
-      ###################################
+      # --- Verbrauch auslesen + speichern
+      ######################################
       my $ethreshold = 0;
       my $etotread   = ConsumerVal ($name, $c, "retotal", "");
       my $u          = ConsumerVal ($name, $c, "uetotal", "");
@@ -15068,8 +15146,8 @@ sub _manageConsumerData {
           my $ehist   = HistoryVal  ($name, $day, $hod, "csmt${c}", undef);                 # gespeicherter Totalverbrauch
           $ethreshold = ConsumerVal ($name, $c, "energythreshold", 0);                      # Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
 
-          ## aktuelle Leistung ermitteln wenn kein Reading d. aktuellen Leistung verfügbar
-          ##################################################################################
+          # --- aktuelle Leistung ermitteln wenn kein Reading d. aktuellen Leistung verfügbar
+          #####################################################################################
           if (!$paread){
               my $timespan = $t    - ConsumerVal ($name, $c, "old_etottime",  $t);
               my $delta    = $etot - ConsumerVal ($name, $c, "old_etotal", $etot);
@@ -15100,9 +15178,6 @@ sub _manageConsumerData {
               $paref->{hkey} = "csme${c}";
 
               setPVhistory ($paref);
-
-              delete $paref->{hkey};
-              delete $paref->{val};
           }
 
           $paref->{val}  = $etot;                                                               # Totalverbrauch des Verbrauchers
@@ -15126,6 +15201,7 @@ sub _manageConsumerData {
       $pcurrsum      += $pcurr;
       $paref->{pcurr} = $pcurr;
 
+      __readBEVvalues         ($paref);                                                                        # BEV Consumer auslesen
       __getAutomaticState     ($paref);                                                                        # Automatic Status des Consumers abfragen
       __calcEnergyPieces      ($paref);                                                                        # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
       __planInitialSwitchTime ($paref);                                                                        # Consumer Switch Zeiten planen
@@ -15137,9 +15213,11 @@ sub _manageConsumerData {
       __remainConsumerTime    ($paref);                                                                        # Restlaufzeit Verbraucher ermitteln
 
       delete $paref->{pcurr};
+      
 
-      ## Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
-      ################################################################
+
+      # --- Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
+      ###################################################################
       my $consumerco = 0;
       my $runhours   = 0;
       my $dnum       = 0;
@@ -15165,8 +15243,8 @@ sub _manageConsumerData {
           $data{$name}{consumers}{$c}{runtimeAvgDay} = round2 ($runhours / $dnum * 60);                         # Durchschnittslaufzeit am Tag in Minuten
       }
 
-      ## Consumer Schaltstatus und Schaltzeit für Readings ermitteln
-      ################################################################
+      # --- Consumer Schaltstatus und Schaltzeit für Readings ermitteln
+      ###################################################################
       my $costate = isConsumerPhysOn  ($hash, $c) ? 'on'  :
                     isConsumerPhysOff ($hash, $c) ? 'off' :
                     "unknown";
@@ -15186,8 +15264,9 @@ sub _manageConsumerData {
       storeReading ("consumer${c}_planned_stop",  $stoptime)  if($stoptime);                                      # Consumer Stop geplant
   }
   
-  ## vorhandene Consumernummern v. Wärmepumpen ermitteln und speichern
-  ######################################################################
+  
+  # --- vorhandene Consumernummern v. Wärmepumpen ermitteln und speichern
+  #########################################################################
   my $hpcsm = isHeatPumpUsed ($name);
   writeToHistory ( { paref => $paref, key => 'hpcsm', val => $hpcsm, day => $day, hour => $hod } ) if($hpcsm);
 
@@ -15196,6 +15275,81 @@ sub _manageConsumerData {
   delete $paref->{consumer};
   delete $paref->{nday};
   delete $paref->{nhour};
+
+return;
+}
+
+################################################################
+#               BEV auslesen
+################################################################
+sub __readBEVvalues {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+  
+  my $ctype = ConsumerVal ($name, $c, 'type', '');
+  return if($ctype ne 'bev');
+
+  my $consumer = ConsumerVal ($name, $c, 'name', '');
+  
+  # --- EV-id zur Aktivierung des Consumers
+  my ($rdg, $regex) = split ":", ConsumerVal ($name, $c, 'evid', ''), 2;                               # Reading & Vergleichsregex
+  my $evid          = ReadingsVal ($consumer, $rdg, undef);
+  
+                                                                                
+  my $evactive = !defined $evid                                                                        # evid mit Regex vergleichen 
+                 ? 0
+                 : $evid =~ m/^$regex$/x
+                 ? 1
+                 : 0;
+
+  debugLog ($paref, 'collectData', "BEV - id=$evid -> consumer=$c activated=$evactive");   
+
+  return if(!$evactive); 
+  
+  # --- Batteriekapazität
+  my $batCapVal;
+  my $batCap      = ConsumerVal ($name, $c, 'batCap', '');
+  my ($p1, $unit) = split ':', $batCap, 2;
+  $unit         //= 'Wh';
+  
+  if (!isNumeric ($p1)) {                                                                              # p1 ist ein Reading
+      my $bcval  = ReadingsNum ($consumer, $p1, undef); 
+      $batCapVal = $bcval if(isNumeric (defined $bcval));
+  }
+  else {
+      $batCapVal = $p1;                                                                                # direkte Angabe
+  }
+  
+  if (defined $batCapVal) {
+      $batCapVal                            = $batCapVal * ($unit =~ /^kWh$/xi ? 1000 : 1);            # BEV batCap in Wh
+      $data{$name}{current}{'batCapBev'.$c} = round0 ($batCapVal);
+  }
+
+  # --- aktueller SoC
+  my $currSoC = ConsumerVal ($name, $c, 'currSoC', ''  );
+  my $csocval = ReadingsNum ($consumer, $currSoC, undef);
+  
+  if (defined $csocval) { 
+      $paref->{val}  = round0 ($csocval);                                                              # BEV aktueller SoC
+      $paref->{hkey} = 'bevcsmSoC'.$c;
+      setPVhistory ($paref);            
+  }
+  
+  # --- targetSoC
+  my $tgtsocval = ConsumerVal ($name, $c, 'targetSoC', 80);
+  
+  if (defined $tgtsocval) { 
+      $paref->{val}  = round0 ($tgtsocval);                                                            # BEV Ziel-SoC
+      $paref->{hkey} = 'bevcsmTargSoC'.$c;
+      setPVhistory ($paref);              
+  } 
+
+  delete $paref->{hkey};
+  delete $paref->{val};
+  
+  debugLog ($paref, 'collectData', "BEV - id=$evid -> bevcsmSoC${c}=$csocval bevcsmTargSoC${c}=$tgtsocval ".
+                                    (defined $batCapVal ? "batCapBev${c}=$batCapVal" : "batCapBev${c}=undef") ); 
 
 return;
 }
@@ -15491,7 +15645,6 @@ sub __planInitialSwitchTime {
   my $ctype = ConsumerVal ($name, $c, 'type', DEFCTYPE);
   
   if ($ctype   eq 'noSchedule' ||
-      $ctype   eq 'heatpump'   ||
       $cplmode eq 'mustNot') {                                                                  # vom Consumertyp und Mode abhängige Planungsfreigabe
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
@@ -20781,8 +20934,6 @@ sub _beamGraphic {
 
   my $colspan = $maxhours + 2;
   my $m       = $paref->{modulo} % 2;
-  #$maxVal     = 1.1 if(!int $maxVal);                                                      # devision by zero & log(x) Problem
-  #$maxStVal   = 1.1 if(!int $maxStVal);                                                    # devision by zero Problem
 
   ## zusätzlicher Abstand vor der ersten Reihe
   ##############################################
@@ -20864,7 +21015,7 @@ sub _beamGraphic {
       }
 
       if ($lotype eq 'double') {
-          # he - freier der Raum über den Balken. spacesz wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen
+          # z1 - freier der Raum über den Balken. spacesz wird nicht verwendet, da bei diesem Typ keine Zahlen über den Balken stehen
           # z2 - primärer Balkenwert ggf. mit Icon
           # z3 - sekundärer Balkenwert, bei zu kleinem Wert wird der Platz komplett Zone 2 zugeschlagen und nicht angezeigt
           # z2 und z3 nach Bedarf tauschen, wenn sekundärer Balkenwert > primärer Balkenwert (außer bei 'staple')
@@ -20907,7 +21058,7 @@ sub _beamGraphic {
       }
 
       if ($lotype eq 'diff') {
-          # he - freier der Raum über den Balken , Zahl positiver Wert + spacesz
+          # z1 - freier der Raum über den Balken , Zahl positiver Wert + spacesz
           # z2 - positiver Balken inkl Icon
           # z3 - negativer Balken
           # z4 - Zahl negativer Wert + spacesz
@@ -23266,10 +23417,14 @@ sub __aiAddRawData {
           $data{$name}{aidectree}{airaw}{$ridx}{hpcsm}          = $hpcsm                           if(defined $hpcsm);
 
           for my $c (1..MAXCONSUMER) {
-              $c       = sprintf "%02d", $c;
-              my $csme = HistoryVal ($name, $pvd, $hod, 'csme'.$c, undef);
+              $c           = sprintf "%02d", $c;
+              my $csme     = HistoryVal ($name, $pvd, $hod, 'csme'.$c,          undef);
+              my $evsoc    = HistoryVal ($name, $pvd, $hod, 'bevcsmSoC'.$c,     undef);   
+              my $evtgtsoc = HistoryVal ($name, $pvd, $hod, 'bevcsmTargSoC'.$c, undef);
               
-              if (defined $csme) { $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c} = sprintf ("%.0f", $csme) }
+              if (defined $csme)     { $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c}          = round0 ($csme) } 
+              if (defined $evsoc)    { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmSoC'.$c}     = round0 ($evsoc) } 
+              if (defined $evtgtsoc) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmTargSoC'.$c} = round0 ($evtgtsoc) }               
           }
   
           $dosave++;
@@ -27491,6 +27646,10 @@ sub setPVhistory {
           $data{$name}{pvhist}{$nday}{99}{$hkey} = round2 ($sum);
       }
   }
+  
+  if ($hkey =~ /bevcsm(Targ)?SoC[0-9]+$/xs) {                                                       # BEV SoC
+      $data{$name}{pvhist}{$nday}{$nhour}{$hkey} = $val;
+  }
 
   if ($hkey =~ /minutescsm[0-9]+$/xs) {                                                             # Anzahl Aktivminuten des Verbrauchers
       $data{$name}{pvhist}{$nday}{$nhour}{$hkey} = $val;
@@ -27935,22 +28094,26 @@ sub _listDataPoolPvHist {
 
           my $csm;
           for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
-              $c       = sprintf "%02d", $c;
-              my $nl   = 0;
-              my $csmc = HistoryVal ($name, $day, $key, "cyclescsm${c}",      undef);
-              my $csmt = HistoryVal ($name, $day, $key, "csmt${c}",           undef);
-              my $csme = HistoryVal ($name, $day, $key, "csme${c}",           undef);
-              my $csmm = HistoryVal ($name, $day, $key, "minutescsm${c}",     undef);
-              my $csmh = HistoryVal ($name, $day, $key, "hourscsme${c}",      undef);
-              my $csma = HistoryVal ($name, $day, $key, "avgcycmntscsm${c}",  undef);
+              $c           = sprintf "%02d", $c;
+              my $nl       = 0;
+              my $csmc     = HistoryVal ($name, $day, $key, "cyclescsm${c}",      undef);
+              my $csmt     = HistoryVal ($name, $day, $key, "csmt${c}",           undef);
+              my $csme     = HistoryVal ($name, $day, $key, "csme${c}",           undef);
+              my $csmm     = HistoryVal ($name, $day, $key, "minutescsm${c}",     undef);
+              my $csmh     = HistoryVal ($name, $day, $key, "hourscsme${c}",      undef);
+              my $csma     = HistoryVal ($name, $day, $key, "avgcycmntscsm${c}",  undef);
+              my $evsoc    = HistoryVal ($name, $day, $key, "bevcsmSoC${c}",      undef);   
+              my $evtgtsoc = HistoryVal ($name, $day, $key, "bevcsmTargSoC${c}",  undef);
 
               if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc if(defined $csmc);
-                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt if(defined $csmt);
-                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme if(defined $csme);
-                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm if(defined $csmm);
-                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh if(defined $csmh);
-                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma if(defined $csma);
+                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc  if(defined $csmc);
+                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt  if(defined $csmt);
+                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme  if(defined $csme);
+                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm  if(defined $csmm);
+                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh  if(defined $csmh);
+                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma  if(defined $csma);
+                  $hexp->{$day}{$key}{"BEVcsmSoC${c}"}          = $evsoc if(defined $evsoc);
+                  $hexp->{$day}{$key}{"BEVcsmTargSoC${c}"}      = $evsoc if(defined $evtgtsoc);
               }
 
               if (defined $csmc) {
@@ -27987,6 +28150,18 @@ sub _listDataPoolPvHist {
                   $csm .= "avgcycmntscsm${c}: $csma";
                   $nl   = 1;
               }
+              
+              if (defined $evsoc) {
+                  $csm .= ", " if($nl);
+                  $csm .= "bevcsmSoC${c}: $evsoc";
+                  $nl   = 1;
+              }
+              
+              if (defined $evtgtsoc) {
+                  $csm .= ", " if($nl);
+                  $csm .= "bevcsmTargSoC${c}: $evtgtsoc";
+                  $nl   = 1;
+              }
 
               $csm .= "\n            " if($nl);
           }
@@ -28016,8 +28191,10 @@ sub _listDataPoolPvHist {
   }
 
   for my $idx (sort keys %{$h}) {
+      next if(!$idx);
       next if($par && $idx ne $par);
-      $sq .= $idx." => ".$sub->($idx)."\n";
+      my $content = $sub->($idx) // 'no content';
+      $sq .= $idx." => ".$content."\n";
   }
 
   if ($export eq 'csv') {
@@ -28585,12 +28762,24 @@ sub _listDataPoolAiRawData {
       
       my $csm;
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
-          $c       = sprintf "%02d", $c;
-          my $csme = AiRawdataVal ($name, $idx, 'csme'.$c, undef);
+          $c           = sprintf "%02d", $c;
+          my $csme     = AiRawdataVal ($name, $idx, 'csme'.$c,          undef);
+          my $evsoc    = AiRawdataVal ($name, $idx, 'bevcsmSoC'.$c,     undef);
+          my $evtgtsoc = AiRawdataVal ($name, $idx, 'bevcsmTargSoC'.$c, undef);
 
           if (defined $csme) {
               $csm .= ", " if($csm);
               $csm .= "csme${c}: $csme";
+          }
+          
+          if (defined $evsoc) {
+              $csm .= ", " if($csm);
+              $csm .= "bevcsmSoC${c}: $evsoc";
+          }
+          
+          if (defined $evtgtsoc) {
+              $csm .= ", " if($csm);
+              $csm .= "bevcsmTargSoC${c}: $evtgtsoc";
           }
       }
 
@@ -30808,7 +30997,7 @@ sub isReductionState {
                             );
 
   if ($err) {
-      $err = qq{ERROR - The device "$rdcdev" doesn't exist! Check the key plantControl->reductionState".};
+      $err = qq{$err. Check the key plantControl->reductionState".};
       return ($rdcstate, $info, $err);
   }
 
