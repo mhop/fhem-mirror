@@ -34756,7 +34756,7 @@ to ensure that the system configuration is correct.
          </ul>
        <br>
 
-       (*) The consumer type <b>heatpump</b> is always a <b>noSchedule</b> consumer, and there are other special features to note:
+       (*) The consumer type <b>heatpump</b> is always assigned <b>mode=mustNot</b>, and there are additional special considerations to keep in mind:
        <br>
        <br>
        
@@ -37781,7 +37781,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </ul>
        <br>
        
-       (*) Der Verbrauchertyp <b>heatpump</b> ist immer ein <b>noSchedule</b>-Verbraucher und es sind weitere Besonderheiten zu beachten: 
+       (*) Dem Verbrauchertyp <b>heatpump</b> wird immer <b>mode=mustNot</b> zugewiesen und es sind weitere Besonderheiten zu beachten: 
        <br>
        <br>
        
