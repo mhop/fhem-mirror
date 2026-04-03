@@ -87,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.03.31";
+our $ModulVersion = "26.04.03";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -786,8 +786,8 @@ our %LuaQueryCmd = (
 our %FB_Model = (
        '7690'        => { version => "8.22", date => "26.02.2026"},
        '7682'        => { version => "8.03", date => "21.01.2025"},
-       '7590 AX'     => { version => "8.20", date => "28.08.2025"},
-       '7590'        => { version => "8.20", date => "27.07.2025"},
+       '7590 AX'     => { version => "8.50", date => "26.03.2026"},
+       '7590'        => { version => "8.50", date => "26.03.2026"},
        '7583 VDSL'   => { version => "8.20", date => "28.08.2025"},
        '7583'        => { version => "8.20", date => "28.08.2025"},
        '7582'        => { version => "7.18", date => "19.08.2024"},
@@ -829,8 +829,8 @@ our %FB_Model = (
        '6810 LTE'    => { version => "6.35", date => "07.09.2023"},
        '6690 Cable'  => { version => "8.21", date => "01.12.2025"},
        '6670 Cable'  => { version => "8.21", date => "29.01.2026"},
-       '6660 Cable'  => { version => "8.21", date => "17.11.2025"},
-       '6591 Cable'  => { version => "8.21", date => "17.11.2025"},
+       '6660 Cable'  => { version => "8.25", date => "19.03.2026"},
+       '6591 Cable'  => { version => "8.25", date => "19.03.2026"},
        '6590 Cable'  => { version => "7.57", date => "04.09.2023"},
        '6490 Cable'  => { version => "7.57", date => "04.09.2023"},
        '6430 Cable'  => { version => "7.30", date => "04.09.2023"},
@@ -841,7 +841,7 @@ our %FB_Model = (
        '5530 Fiber'  => { version => "8.20", date => "03.09.2025"},
        '5491'        => { version => "7.31", date => "04.09.2023"},
        '5490'        => { version => "7.31", date => "04.09.2023"},
-       '4690'        => { version => "8.20", date => "26.02.2026"},
+       '4690'        => { version => "8.22", date => "26.02.2026"},
        '4060'        => { version => "8.02", date => "09.01.2025"},
        '4050'        => { version => "8.02", date => "02.02.2026"},
        '4040'        => { version => "8.02", date => "30.01.2025"},
@@ -4854,25 +4854,27 @@ sub Fritz_Get_Modul($@)
          $returnStr .= '<td colspan="4">API Call: ' . $val[0] . '</td>';
          $returnStr .= "</tr>\n";
          $returnStr .= "<tr>\n";
-         $returnStr .= "<td>Alias</td><td>Query</td><td>Available</td><td>Activated</td>\n";
+         $returnStr .= "<td>Alias</td><td>Available</td><td>Activated</td><td>Query</td>\n";
          $returnStr .= "</tr>\n";
 
          foreach my $key (sort { $a cmp $b } keys %{ $hash->{LuaQueryCmd} }) {
 
+           my $klickcmd = $command;
+
            if($hash->{LuaQueryCmd}{$key}{active}) {
-
-             my $klickcmd = $command;
-                $klickcmd =~ s/keyButton/$key/g;
-                $klickcmd =~ s/PERLcmd/get $name luaQuery $hash->{LuaQueryCmd}{$key}{cmd}/g;
-                $klickcmd =~ s/quittieren/$key/g;
-
-             $returnStr .= "<tr>\n";
-             $returnStr .= "<td>" .  $klickcmd . "</td>";
-             $returnStr .= "<td>" .  $hash->{LuaQueryCmd}{$key}{cmd} . "</td>";
-             $returnStr .= "<td>" . ($hash->{LuaQueryCmd}{$key}{active} ? "yes" : "no") . "</td>";
-             $returnStr .= "<td>" . ($hash->{LuaQueryCmd}{$key}{active} && $hash->{LuaQueryCmd}{$key}{AttrVal} ? "yes" : "no") . "</td>";
-             $returnStr .= "</tr>\n";
+             $klickcmd =~ s/keyButton/$key/g;
+             $klickcmd =~ s/PERLcmd/get $name luaQuery $hash->{LuaQueryCmd}{$key}{cmd}/g;
+             $klickcmd =~ s/quittieren/$key/g;
+           } else {
+             $klickcmd = "<s>" . $key . "</s>";
            }
+
+           $returnStr .= "<tr>\n";
+           $returnStr .= "<td>" .  $klickcmd . "</td>";
+           $returnStr .= "<td>" . ($hash->{LuaQueryCmd}{$key}{active} ? "yes" : "no") . "</td>";
+           $returnStr .= "<td>" . ($hash->{LuaQueryCmd}{$key}{active} && $hash->{LuaQueryCmd}{$key}{AttrVal} ? "yes" : "no") . "</td>";
+           $returnStr .= "<td>" .  $hash->{LuaQueryCmd}{$key}{cmd} . "</td>";
+           $returnStr .= "</tr>\n";
          }
        }
 
@@ -4883,7 +4885,7 @@ sub Fritz_Get_Modul($@)
            $returnStr .= '<td colspan="4">API Call: ' . $val[0] . ' for TR064</td>';
            $returnStr .= "</tr>\n";
            $returnStr .= "<tr>\n";
-           $returnStr .= "<td>Alias</td><td>Service</td><td>Control</td><td>Action</td><td>Available</td>\n";
+           $returnStr .= "<td>Alias</td><td>Available</td><td>Service</td><td>Control</td><td>Action</td>\n";
            $returnStr .= "</tr>\n";
 
            # get <name> tr064Command <service> <control> <action>
@@ -4904,10 +4906,10 @@ sub Fritz_Get_Modul($@)
              if ($hash->{TR064control}{$key}{active} >= 0) {
                $returnStr .= "<tr>\n";
                $returnStr .= "<td>" . $klickcmd . "</td>";
+               $returnStr .= "<td>" . ($hash->{TR064control}{$key}{active} ? "yes" : "no")  . "</td>";
                $returnStr .= "<td>" . $hash->{TR064control}{$key}{service} . "</td>";
                $returnStr .= "<td>" . $hash->{TR064control}{$key}{control} . "</td>";
                $returnStr .= "<td>" . $hash->{TR064control}{$key}{action}  . "</td>";
-               $returnStr .= "<td>" . ($hash->{TR064control}{$key}{active} ? "yes" : "no")  . "</td>";
                $returnStr .= "</tr>\n";
              }
            }
@@ -4919,7 +4921,7 @@ sub Fritz_Get_Modul($@)
            $returnStr .= '<td colspan="4">API Call: ' . $val[0] . ' for IGD</td>';
            $returnStr .= "</tr>\n";
            $returnStr .= "<tr>\n";
-           $returnStr .= "<td>Alias</td><td>Service</td><td>Control</td><td>Action</td><td>Available</td>\n";
+           $returnStr .= "<td>Alias</td><td>Available</td><td>Service</td><td>Control</td><td>Action</td>\n";
            $returnStr .= "</tr>\n";
 
            foreach my $key (sort { $a cmp $b } keys %{ $hash->{IGDcontrol} }) {
@@ -4939,10 +4941,10 @@ sub Fritz_Get_Modul($@)
              if ($hash->{IGDcontrol}{$key}{active} >= 0) {
                $returnStr .= "<tr>\n";
                $returnStr .= "<td>" . $klickcmd . "</td>";
+               $returnStr .= "<td>" . ($hash->{IGDcontrol}{$key}{active} == 1 ? "yes" : "no")  . "</td>";
                $returnStr .= "<td>" . $hash->{IGDcontrol}{$key}{service} . "</td>";
                $returnStr .= "<td>" . $hash->{IGDcontrol}{$key}{control} . "</td>";
                $returnStr .= "<td>" . $hash->{IGDcontrol}{$key}{action} . "</td>";
-               $returnStr .= "<td>" . ($hash->{IGDcontrol}{$key}{active} == 1 ? "yes" : "no")  . "</td>";
                $returnStr .= "</tr>\n";
              }
            }
@@ -7628,7 +7630,13 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
            Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_to",     $resultData->{data}->{rul_list}->[$i]->{to};
            Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_active", $resultData->{data}->{rul_list}->[$i]->{active};
            Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_numOut", $resultData->{data}->{rul_list}->[$i]->{num_out};
-
+           if($resultData->{data}->{rul_list}->[$i]->{type} eq "rul") {
+             Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_type", "forwarding";
+           } elsif($resultData->{data}->{rul_list}->[$i]->{type} eq "rub") {
+             Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_type", "handling";
+           } else {
+             Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_type", "unknown";
+           }
          }
        }
 
@@ -9966,10 +9974,12 @@ sub Fritz_Readout_API_Check($)
          if (ref($cData) eq "ARRAY") {
            my $nbViews = scalar @$cData;
            for(my $j = 0; $j <= $nbViews - 1; $j++) {
-             $bUsers .= $cData->[$j]->{value} . ";";
-             if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
-               Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
-               $hash->{DEFAULT_USER} = $1;
+             if (ref(@$cData[$j]) eq 'HASH') { # $hash_ref is reference to hash
+               $bUsers .= $cData->[$j]->{value} . ";";
+               if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
+                 Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
+                 $hash->{DEFAULT_USER} = $1;
+               }
              }
            }
            if($nbViews != 0) {
@@ -10467,24 +10477,24 @@ sub Fritz_Readout_API_Check($)
 
              foreach my $key (keys %{ $hash->{LuaQueryCmd} }) {
 
-               if((ref $response->{$key} ne 'ARRAY') && ref \$response->{$key} ne "SCALAR") {
+               if((ref $response->{$key} ne 'ARRAY') && ref \$response->{$key} ne "SCALAR" ) {
                  Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 2 not Ok";
 
                  Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQuery->" . $key . "->active", 0;
 
                } elsif(ref $response->{$key} eq 'ARRAY') {
                  my $views = $response->{$key};
-                 if(scalar(@$views) == 0) {
-                   Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 3 not Ok";
-                   Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
-                 } else {
+#                 if(scalar(@$views) == 0) {
+#                   Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 3 not Ok";
+#                   Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
+#                 } else {
                    Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: Ok";
                    Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 1;
-                 }
+#                 }
 
                } elsif ($response->{$key} eq "") {
-                 Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 4 not Ok";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
+#                 Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 4 not Ok";
+#                 Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
 
                } else {
                  Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: Ok";
@@ -15739,16 +15749,6 @@ sub Fritz_SOAP_Request($$$;@)
      my $service_cmd = "u:" .$service_command. "Response";
      my $func        = $igd ? "IGD" : "TR064";
 
-#     my $agentPW  =  LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, timeout => 10);
-#        $agentPW->ssl_opts( verify_hostname => 0 ,SSL_verify_mode => 0x00);
-#        $agentPW->default_header( 'SOAPACTION' => "$service_type#$service_command" );
-#     my $req =  HTTP::Request->new( POST => $init_url);
-#        $req->authorization_basic( "$UserAgentParaU", "$UserAgentParaP" );
-#        $req->content_type( "text/xml; charset=utf-8" );
-#        $req->content( $request );
-#     my $response =  $agentPW->request( $req );
-#     Fritz_Log $hash, 3, "agentPW:\n" . Dumper($response);
-
      my $respData = eval { $ua->post($init_url, Content_Type => 'text/xml; charset=utf-8', Content => $request) };
 
      Fritz_Log $hash, 5, "respData:\n" . Dumper($respData);
@@ -16216,7 +16216,17 @@ sub Fritz_call_Lua_Query($$@)
      );
    }
 
-   Fritz_Log $hash, 4, "Response: " . $response->content . "\n" . $response->content;
+   Fritz_Log $hash, 4, "Response: " . $response->status_line . "\n" . $response->content;
+
+   my $luaContent;
+      $luaContent = $response->content();
+
+   chop($luaContent);
+   chop($luaContent);
+
+   $luaContent .= ',"status_line":"' . $response->status_line .'"}';
+
+   Fritz_Log $hash, 4, "Response: " . $luaContent;
 
 
 #################
@@ -16231,7 +16241,8 @@ sub Fritz_call_Lua_Query($$@)
        Fritz_Log $hash, 2, "" . $response->status_line;
        return \%retHash;
      } else {
-       return Fritz_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+#       return Fritz_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+       return Fritz_Helper_process_JSON($hash, $luaContent, $result->{sid}, $charSet, $sidNew);
      }
 
    } else {
@@ -16794,20 +16805,21 @@ sub Fritz_call_LuaData($$$@)
 
       Fritz_Log $hash, 5, "Response Data: \n" . $1;
 
+      my $data_content;
+
+      $data_content = $1;
+
+      $data_content =~ s/\n//;
+
+      chop($data_content);
+      chop($data_content);
+
+      $data_content =~ s/data/"data"/;
+
       my $profile_content;
-
-      $profile_content = $1;
-
-      $profile_content =~ s/\n//;
-
-      chop($profile_content);
-      chop($profile_content);
-
-      $profile_content =~ s/data/"data"/;
-
       $profile_content  = '{"sid":"'.$result->{sid}.'",';
       $profile_content .= '"status":"' . $response->status_line . '",' if ($response->status_line && $response->status_line ne "");
-      $profile_content .= '"pid":"fonDevice",' . $profile_content;
+      $profile_content .= '"pid":"fonDevice",' . $data_content;
 
       Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
@@ -16895,7 +16907,7 @@ sub Fritz_call_LuaData($$$@)
 
    if (defined $resultJSON->{Error} && $resultJSON->{Error} =~ /no HASH\/ARRAY from JSON returned/ ) {
 
-     Fritz_Log $hash, 4, "Response Data: \n" . $data;
+     Fritz_Log $hash, 3, "Response Data: \n" . $data;
 
      my $isHTML = ($data =~ m/\<\DOCTYPE html\>/igs);
 
@@ -17418,7 +17430,7 @@ sub Fritz_Helper_process_JSON($$$@) {
        Fritz_Log $hash, 5, "JSON =>result: " . Fritz_Helper_Dumper($hash, \%ReturnHash, 5);
        return \%ReturnHash;
 
-     } elsif (!defined $jsonResult->{data} && !defined $jsonResult->{result}) {
+     } elsif (ref( $jsonResult->{data}) ne "HASH" && ref( $jsonResult->{result}) ne "HASH") {
        Fritz_Log $hash, 4, "JSON: no {data} or {result}";
        my %ReturnHash = (
            "sid"    => $sid,
@@ -17428,8 +17440,7 @@ sub Fritz_Helper_process_JSON($$$@) {
        $jsonResult = \%ReturnHash;
        Fritz_Log $hash, 5, "JSON =>data: " . Fritz_Helper_Dumper($hash, $jsonResult, 5);
        return $jsonResult;
-#       return \%ReturnHash;
-     
+
      } else {
        Fritz_Log $hash, 4, "JSON: Standard";
        $jsonResult->{sid}    = $sid;
@@ -18799,7 +18810,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="enableCallRedi"></a>
          <dt><code>attr &lt;name&gt; enableCallRedi &lt;0 | 1&gt;</code></dt>
          <br>
-         Switches the takeover of phone rederection informations off/on.
+         Switches the takeover of phone forwarding/handling informations off/on.
       </li><br>
 
       <li><a name="enablePhoneBookInfo"></a>
@@ -19076,20 +19087,24 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_vdsl_downStreamMaxRate</b> - Maximum downstream data rate (Mbps)</li>
       <li><b>box_vdsl_upStreamRate</b> - Current upstream data rate (Mbps)</li>
       <li><b>box_vdsl_upStreamMaxRate</b> - Maximum upstream data rate (Mbps)</li>
-      <br>enableCallRedi
+      <br>
+
       <li><b>alarm...</b>Alarm Readings. Available when the enableAlarmInfo attribute is enabled.</li>
-      <li><b>alarm</b><i>1</i> - Name of alarm <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_state</b> - Current status of alarm <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_target</b> - Internal number of alarm <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_time</b> - Wake-up time of alarm <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_wdays</b> - Weekdays of alarm <i>1</i></li>
+      <li><b>alarm</b><i>n</i> - Name of alarm <i>1</i></li>
+      <li><b>alarm</b><i>n</i><b>_state</b> - Current status of alarm <i>1</i></li>
+      <li><b>alarm</b><i>n</i><b>_target</b> - Internal number of alarm <i>1</i></li>
+      <li><b>alarm</b><i>n</i><b>_time</b> - Wake-up time of alarm <i>1</i></li>
+      <li><b>alarm</b><i>n</i><b>_wdays</b> - Weekdays of alarm <i>1</i></li>
       <br>
-      <li><b>callRedi...</b>Phone redection Readings. Available when the enableCallRedi attribute is enabled.</li>
-      <li><b>callRedi</b><i>1</i> - id of redection<i>1</i></li>
-      <li><b>callRedi</b><i>1</i><b>_active</b> - Current status of redection <i>1</i></li>
-      <li><b>callRedi</b><i>1</i><b>_from</b> - calling number that will be redected <i>1</i></li>
-      <li><b>callRedi</b><i>1</i><b>_to</b> - target of redection <i>1</i></li>
+
+      <li><b>callRedi...</b>Readings callRedi. Available when the enableCallRedi attribute is enabled.</li>
+      <li><b>callRedi</b><i>n</i> - ID of the call forwarding/handling system.<i>1</i></li>
+      <li><b>callRedi</b><i>n</i><b>_active</b> - Current status of the call forwarding/handling system.<i>1</i></li>
+      <li><b>callRedi</b><i>n</i><b>_from</b> - (Partial) number being forwarded/handled.<i>1</i></li>
+      <li><b>callRedi</b><i>n</i><b>_to</b> - Destination of the call forwarding/handling system.<i>1</i></li>
+      <li><b>callRedi</b><i>n</i><b>_type</b> - Type of call forwarding/handling.<i>1</i></li>
       <br>
+
       <li><b>kidprofile...</b>Readings kidprofile. Available when the enableKidProfiles attribute is enabled.</li>
       <li><b>kidprofile</b><i>n</i>Internet access profiles.</li>
       <br>
@@ -20082,7 +20097,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="enableCallRedi"></a>
          <dt><code>attr &lt;name&gt; enableCallRedi &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Übernahme von Rufumletungs-Informationen aus/ein.
+         Schaltet die Übernahme von Rufumleitungs/-behandlungs-Informationen aus/ein.
       </li><br>
 
       <li><a name="enableCPUInfo"></a>
@@ -20363,18 +20378,19 @@ sub Fritz_Helper_Dumper($$;@) {
       <br>
 
       <li><b>alarm...</b>Readings alarm. Verfügbar, wenn das Attribut enableAlarmInfo aktiviert ist</li>
-      <li><b>alarm</b><i>1</i> - Name des Weckrufs <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_state</b> - Aktueller Status des Weckrufs <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_target</b> - Interne Nummer des Weckrufs <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_time</b> - Weckzeit des Weckrufs <i>1</i></li>
-      <li><b>alarm</b><i>1</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>n</i> - Name des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>n</i><b>_state</b> - Aktueller Status des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>n</i><b>_target</b> - Interne Nummer des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>n</i><b>_time</b> - Weckzeit des Weckrufs <i>1</i></li>
+      <li><b>alarm</b><i>n</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
       <br>
 
-      <li><b>callRed...</b>Readings alarm. Verfügbar, wenn das Attribut enableCallRedi aktiviert ist</li>
-      <li><b>callRed</b><i>1</i> - ID der Rufumleitung <i>1</i></li>
-      <li><b>callRed</b><i>1</i><b>_active</b> - Aktueller Status der Rufumleitung <i>1</i></li>
-      <li><b>callRed</b><i>1</i><b>_from</b> - (Teil)Nummer die umgeleitet wird <i>1</i></li>
-      <li><b>callRed</b><i>1</i><b>_to</b> - Ziel der Rufumleitung <i>1</i></li>
+      <li><b>callRedi...</b>Readings callRedi. Verfügbar, wenn das Attribut enableCallRedi aktiviert ist</li>
+      <li><b>callRedi</b><i>n</i> - ID der Rufumleitung/-behandlung <i>1</i></li>
+      <li><b>callRedi</b><i>n</i><b>_active</b> - Aktueller Status der Rufumleitung/-behandlung <i>1</i></li>
+      <li><b>callRedi</b><i>n</i><b>_from</b> - (Teil)Nummer die umgeleitet/behandelt wird <i>1</i></li>
+      <li><b>callRedi</b><i>n</i><b>_to</b> - Ziel der Rufumleitung/-behandlung <i>1</i></li>
+      <li><b>callRedi</b><i>n</i><b>_type</b> - Typ der Rufumleitung/-behandlung <i>1</i></li>
       <br>
 
       <li><b>kidprofile...</b>Readings kidprofile. Verfügbar, wenn das Attribut enableKidProfiles aktiviert ist</li>
