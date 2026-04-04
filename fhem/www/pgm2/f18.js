@@ -152,17 +152,25 @@ f18_stt()
 
   var stt = new SpeechRecognition();
   stt.continuous = true;
+  stt.interimResults = true;
   stt.lang = $("body").attr("data-language") == "EN" ? "en-US":"de-DE";
 
   var doSend = false;
-  var txt;
+  var txt='';
 
   stt.onresult = function(e){
-    txt='';
-    for(var i1=0; i1<event.results.length; i1++)
-      txt += event.results[i1][0].transcript;
-    $("#f18_stt").html(txt);
+    var interim_txt='';
+    for(let r of e.results) {
+      if(r.isFinal) {
+        txt = r[0].transcript;
+        $("#f18_stt").html(txt);
+      } else {
+        interim_txt += r[0].transcript;
+        $("#f18_stt").html(interim_txt);
+      }
+    }
   };
+
   stt.onaudiostart = function(e){ $("#stt_state").html("Audio started") };
   stt.onaudioend   = function(e){ $("#stt_state").html("Audio stopped") };
   stt.onspeechstart= function(e){ $("#stt_state").html("Speech started") };
@@ -173,8 +181,10 @@ f18_stt()
 
   $("#FW_okDialog").remove();
   var div = $("<div id='FW_okDialog'>");
-  $(div).html('<div id="stt_state"></div><div id="f18_stt" '+
-              'style="min-height:200px;min-width:200px"></div>');
+  $(div).html(`<div id="stt_avl"></div>
+               <div id="stt_state"></div>
+               <div id="f18_stt" style="min-height:200px;min-width:200px">
+               </div>`);
   $("body").append(div);
   var oldPos = $("body").scrollTop();
   $(div).dialog({
@@ -186,19 +196,29 @@ f18_stt()
     ],
     close:function(){
       if(doSend && txt) {
-         if(typeof fully !== 'undefined')
+        var fw_id = $("body").attr("fw_id");
+        if(typeof fully !== 'undefined')
            FW_cmd(FW_root + "?cmd=set TYPE=FULLY:FILTER=deviceid=" +
                   fully.getDeviceId()+" STTinput "+encodeURIComponent(txt)+
-                  " ["+$("body").attr("fw_id")+"]&XHR=1");
+                  " ["+fw_id+"]&XHR=1");
   
-        FW_cmd(FW_root+"?cmd=setreading "+f18_webName+
-               " STT "+encodeURIComponent(txt)+"&XHR=1");
+        FW_cmd(`${FW_root}?cmd=setreading `+
+               `TYPE=FHEMWEB:FILTER=FW_ID=${fw_id}:FILTER=inform=.%2B `+
+               `STT ${encodeURIComponent(txt)}&XHR=1`);
       }
       stt.stop();
       $(div).remove();
     }
   });
+}
 
+function
+f18_speak(txt)
+{
+  let synth = window.speechSynthesis;
+  if(!synth)
+    return FW_okDialog("No speechSynthesis available");
+  speechSynthesis.speak(new SpeechSynthesisUtterance(txt));
 }
 
 
