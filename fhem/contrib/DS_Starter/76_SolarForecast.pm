@@ -15386,36 +15386,39 @@ sub __savePowerAndEnergy {
       }
 
       # --- Energieverbrauch ermitteln
-      if (defined $ehist && $etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
-          my $consumerco  = $etot - $ehist;
-          $consumerco    += HistoryVal ($name, $day, $hod, "csme${c}", 0);
+      if (defined $ehist) {                                                             # Stundenwechsel von vorn beginnen
+          if ($etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
+              my $consumerco  = $etot - $ehist;
+              #$consumerco    += HistoryVal ($name, $day, $hod, "csme${c}", 0);
 
-          if ($consumerco < 0) {                                                              
-              $consumerco = 0;
-              my $vl      = 3;
-              my $pre     = '- WARNING -';
+              if ($consumerco < 0) {                                                              
+                  $consumerco = 0;
+                  my $vl      = 3;
+                  my $pre     = '- WARNING -';
 
-              if ($paref->{debug} =~ /consumption/xs) {
-                  $vl  = 1;
-                  $pre = 'DEBUG> - WARNING -';
+                  if ($paref->{debug} =~ /consumption/xs) {
+                      $vl  = 1;
+                      $pre = 'DEBUG> - WARNING -';
+                  }
+
+                  Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$cname< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
               }
 
-              Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$cname< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
-          }
+              $paref->{val}  = round2 ($consumerco);                                            # Verbrauch des Consumers aktuelle Stunde
+              $paref->{hkey} = "csme${c}";
 
-          $paref->{val}  = round2 ($consumerco);                                            # Verbrauch des Consumers aktuelle Stunde
-          $paref->{hkey} = "csme${c}";
+              setPVhistory ($paref);
+          }
+      }
+      else {
+          $paref->{val}  = $etot;                                                               # Totalverbrauch des Verbrauchers
+          $paref->{hkey} = "csmt${c}";
 
           setPVhistory ($paref);
+
+          delete $paref->{hkey};
+          delete $paref->{val};
       }
-
-      $paref->{val}  = $etot;                                                               # Totalverbrauch des Verbrauchers
-      $paref->{hkey} = "csmt${c}";
-
-      setPVhistory ($paref);
-
-      delete $paref->{hkey};
-      delete $paref->{val};
   }
 
   if (!$etotread && !$pcread) {
