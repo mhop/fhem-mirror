@@ -15404,14 +15404,14 @@ sub __savePowerAndEnergy {
                   Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$cname< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
               }
 
-              $paref->{val}  = round2 ($consumerco);                                            # Verbrauch des Consumers aktuelle Stunde
+              $paref->{val}  = round2 ($consumerco);                                    # Verbrauch des Consumers aktuelle Stunde
               $paref->{hkey} = "csme${c}";
 
               setPVhistory ($paref);
           }
       }
       else {
-          $paref->{val}  = $etot;                                                               # Totalverbrauch des Verbrauchers
+          $paref->{val}  = $etot;                                                       # Totalverbrauch des Verbrauchers
           $paref->{hkey} = "csmt${c}";
 
           setPVhistory ($paref);
@@ -15486,10 +15486,11 @@ sub __calcEnergyPieces {
   
   my $hod   = sprintf "%02d", ($chour + 1);
 
-  my $etot = HistoryVal ($name, $paref->{day}, $hod, "csmt${c}", 0);
+  my $etot = HistoryVal ($name, $paref->{day}, $hod, "csmt${c}", 0);        # etotal zu Beginn der Stunde
+  my $ecur = HistoryVal ($name, $paref->{day}, $hod, "csme${c}", 0);        # Energie Stunde bis jetzt
 
   if ($etot) {
-      $paref->{etot} = $etot;
+      $paref->{etot} = $etot + $ecur;
       ___csmSpecificEpieces ($paref);
       delete $paref->{etot};
   }
@@ -34152,7 +34153,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>conlegfc</b>       </td><td>conventional energy consumption forecast without AI (Wh)                                                                 </td></tr>
             <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
             <tr><td> <b>conprice</b>       </td><td>Price for the purchase of one kWh. The currency of the price is defined in the setupMeterDev.                            </td></tr>
-            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption of ConsumerXX                                                                                   </td></tr>
+            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption by ConsumerXX at the start of the hour                                                          </td></tr>
             <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                             </td></tr>
             <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
             <tr><td> <b>dayname</b>        </td><td>short name of the day (locale-dependent)                                                                                 </td></tr>
@@ -37176,7 +37177,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>conlegfc</b>        </td><td>herkömmlich ohne KI prognostizierter Energieverbrauch (Wh)                                             </td></tr>
             <tr><td> <b>con</b>             </td><td>realer Energieverbrauch (Wh) des Hauses                                                                </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.                 </td></tr>
-            <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total von ConsumerXX                                                                  </td></tr>
+            <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total von ConsumerXX zum Beginn der Stunde                                            </td></tr>
             <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)            </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                          </td></tr>
             <tr><td> <b>dayname</b>         </td><td>Kurzname des Tages (locale-abhängig)                                                                   </td></tr>
