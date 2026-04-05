@@ -1511,13 +1511,15 @@ sub initialize_SpeechDialog {
 
         if ( $keywd =~ m{\Aallowed\z}xms ) {
             for my $amads (split m{[\b]*,[\b]*}x,$values) {
-                if ( InternalVal($amads,'TYPE','unknown') ne 'AMADDevice' ) {
-                    return "$amads is not an AMADDevice!" if $init_done;
-                    Log3($hash, 2, "[RHASSPY] $amads in rhasspySpeechDialog is not an AMADDevice!");
+                my $dtype = InternalVal($amads,'TYPE','unknown');
+                if ( $dtype ne 'AMADDevice' && $dtype ne 'ROOMMATE' ) {
+                    return "$amads is not an AMADDevice or ROOMMATE type device!" if $init_done;
+                    Log3($hash, 2, "[RHASSPY] $amads in rhasspySpeechDialog is not an AMADDevice or ROOMMATE!");
                 }
+                $hash->{helper}->{SpeechDialog}->{config}->{AMADCommBridge} = 1 if $dtype eq 'AMADDevice';
+                $hash->{helper}->{SpeechDialog}->{config}->{FHEMWEB} = 1        if $dtype eq 'ROOMMATE';
             }
             $hash->{helper}->{SpeechDialog}->{config}->{$keywd} = $values;
-            $hash->{helper}->{SpeechDialog}->{config}->{AMADCommBridge} = 1;
             disable_msgDialog( $hash, ReadingsVal($hash->{NAME}, 'enableMsgDialog', 1), 1 );
             next;
         }
@@ -1608,6 +1610,9 @@ sub disable_msgDialog {
     }
     if ( $enable ) { 
         $devsp = $devsp ? 'TYPE=(AMADCommBridge|AMADDevice|ROOMMATE|GUEST)' : 'TYPE=(ROOMMATE|GUEST)';
+        $devsp .= ',TYPE=FHEMWEB' if defined $hash->{helper}->{SpeechDialog} 
+                                     && defined $hash->{helper}->{SpeechDialog}->{config}
+                                     && defined $hash->{helper}->{SpeechDialog}->{config}->{FHEMWEB};
     }
     if ( $hash->{autoTraining} ) {
         $devsp .= ',global' if $devsp;
@@ -2932,7 +2937,8 @@ sub Notify {
 
     return notifySTT($hash, $dev_hash) if InternalVal($device,'TYPE', 'unknown') eq 'AMADCommBridge';
     return notifyAMADDev($hash, $dev_hash) if InternalVal($device,'TYPE', 'unknown') eq 'AMADDevice';
-
+    return notifySTT($hash, $dev_hash) if InternalVal($device,'TYPE', 'unknown') eq 'FHEMWEB';
+    
     if ( $device eq 'global' ) {
         return if !$hash->{autoTraining};
 
@@ -2986,10 +2992,12 @@ sub notifySTT {
     return if !@events;
 
     for my $event (@events){
-        next if $event !~ m{(?:receiveVoiceCommand):.(.+)}xms;
+        #still missing handling for speech-end events
+        next if $event !~ m{(?:receiveVoiceCommand|STT):.(.+)}xms;
         my $msgtext = trim($1);         ##no critic qw(Capture)
-        my $client = ReadingsVal($device,'receiveVoiceDevice',undef) // return;
-        return if $hash->{helper}->{SpeechDialog}->{config}->{allowed} !~ m{\b(?:$client|everyone)(?:\b|\z)}xms;
+        my $client = ReadingsVal($device,'receiveVoiceDevice', InternalVal($device,'TYPE','unknown') eq 'FHEMWEB' ? $device : undef) // return;
+        my $allowed = InternalVal($client,'AuthenticatedUser',$client);
+        return if $hash->{helper}->{SpeechDialog}->{config}->{allowed} !~ m{\b(?:$allowed|everyone)(?:\b|\z)}xms;
 
         Log3($name, 4 , qq($name received $msgtext from $client (triggered by $device) ));
 
@@ -3030,6 +3038,8 @@ sub notifyAMADDev{
 
     return;
 }
+
+
 
 sub activateVoiceInput {
     my $hash    = shift //return;
@@ -3434,10 +3444,9 @@ sub RHASSPY_reActivateVoiceInput_timeout {
     Log3($hash, 5, "RHASSPY_reActivateVoiceInput_timeout called with $identity");
 
     my $sendData = {
-	    sessionId   => $identity,
-		customData  => 'reActivateVoiceInput_timeout'
-		
-	};
+        sessionId   => $identity,
+        customData  => 'reActivateVoiceInput_timeout'
+    };
     my $json = _toCleanJSON($sendData);
 
     IOWrite($hash, 'publish', qq{hermes/dialogueManager/endSession $json});
@@ -3564,6 +3573,7 @@ sub SpeechDialog_respond {
     my $msgCommand = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{ttsCommand};
     $msgCommand //= 'set $DEVICE ttsMsg $message' if InternalVal($device, 'TYPE', '') eq 'AMADDevice';
     $msgCommand //= 'set $DEVICE STTresponse $message' if InternalVal($device, 'TYPE', '') eq 'FULLY';
+    $msgCommand //= q({ FW_AsyncOutput($defs{$DEVICE},'',qq/["#FHEMWEB:","f18_speak('$message')",""]/)}) if InternalVal($device, 'TYPE', '') eq 'FHEMWEB';
     
     return if !$msgCommand;
     my %specials = (
@@ -6801,19 +6811,20 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
       </ul>
   </li>
   <p><b>Remarks on rhasspySpeechDialog and Babble:</b><br><a id="RHASSPY-experimental"></a>
-    Interaction with Babble and AMAD.*-Devices is not approved to be properly working yet. Further tests
+    Interaction with Babble, AMAD.*- or FHEMWEB Devices is not approved to be properly working yet. Further tests
     may be needed and functionality may be subject to changes!
   </p>
   <li>
     <a id="RHASSPY-attr-rhasspySpeechDialog"></a><b>rhasspySpeechDialog</b>
     <a href="#RHASSPY-experimental"><b>experimental!</b></a> 
-    <p>Optionally, you may want not to use the internal speach-to-text and text-to-speach engines provided by Rhasspy (for one or several siteId's), but provide simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" is supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a>.<br>Note: Needs some <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy!</p>
+    <p>Optionally, you may want not to use the internal speach-to-text and text-to-speach engines provided by Rhasspy (for one or several siteId's), but provide simple text to be forwarded to Rhasspy for intent recognition. Atm. only "AMAD" and "FHEMWEB" TYPE devices are supported for this feature. For generic "msg" (and text messenger) support see <a href="#RHASSPY-attr-rhasspyMsgDialog">rhasspyMsgDialog</a>.<br>Note: Needs some <a href="#RHASSPY-siteId">additional configuration</a> in Rhasspy!</p>
     Keys that may be set in this attribute:
      <ul>
-        <li><i>allowed</i> A list of <a href="#AMADDevice">AMADDevice</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.</li>
+        <li><i>allowed</i> A list of <a href="#AMADDevice">AMADDevice</a> or <a href="#ROOMMATE">ROOMMATE</a> devices allowed to interact with RHASSPY (comma-separated device names). This ist the only <b>mandatory</b> key to be set.<br>
+        Note: For FHEMWEB interaction (atm. only using JavaScript functions provided by f18), you have to provide a ROOMMATE type device name here, secure the used <a href="#FHEMWEB">FHEMWEB</a> instance by an <a href="#allowed">allowed</a> device and use the ROOMMATE device name as username for <a href="#allowed-set-basicAuth">basicAuth</a> authorisation there!</li>
         <li><i>filterFromBabble</i> 
-        By default, all incoming messages from AMADDevice/AMADCommBridge will be forwarded to Rhasspy. For better interaction with <a href="#Babble ">Babble</a> you may opt to ignore all messages not matching the <i>filterFromBabble</i> by their starting words (case-agnostic, will be converted to a regex compatible notation). You additionally have to set a <i>Babble</i> key in <a href="#RHASSPY-define">DEF</a> pointing to the Babble device. All regular messages (start sequence not matching filter) then will be forwarded to Babble using <code>Babble_DoIt()</code> function.</li>
-        <li><i>&lt;allowed AMAD-device&gt;</i> A list of key=value pairs to tweak default behaviours:
+        By default, all incoming messages from AMADDevice/AMADCommBridge or FHEMWEB will be forwarded to Rhasspy. For better interaction with <a href="#Babble ">Babble</a> you may opt to ignore all messages not matching the <i>filterFromBabble</i> by their starting words (case-agnostic, will be converted to a regex compatible notation). You additionally have to set a <i>Babble</i> key in <a href="#RHASSPY-define">DEF</a> pointing to the Babble device. All regular messages (start sequence not matching filter) then will be forwarded to Babble using <code>Babble_DoIt()</code> function.</li>
+        <li><i>&lt;allowed AMAD-device/ROOMMATE&gt;</i> A list of key=value pairs to tweak default behaviours:
         <ul>
         <li><i>wakeword</i> If set, a wakeword detected message for this wakeword will lead to an 
          "activateVoiceInput" command towards this AMADDevice</li>
@@ -6822,8 +6833,11 @@ i="i am hungry" f="set Stove on" d="Stove" c="would you like roast pork"</code><
         </ul>
         </li>
       </ul>
-      Example:<br>
+      Examples:<br>
         <p><code>allowed=AMADDev_A <br>
+                 filterFromBabble=tell rhasspy <br>
+                 AMADDev_A=wakeword=alexa sessionTimeout=20</code></p>
+        <p><code>allowed=AMADDev_A,rr_Wife <br>
                  filterFromBabble=tell rhasspy <br>
                  AMADDev_A=wakeword=alexa sessionTimeout=20</code></p>
   </li>
