@@ -163,8 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.0"  => "04.04.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
-                           "edit comref, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
+  "2.5.0"  => "05.04.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
+                           "edit ComRef, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
                            "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
                            "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ".
                            "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ".
@@ -299,21 +299,6 @@ my %vNotesIntern = (
   "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
   "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
   "1.52.8" => "01.06.2025  _calcConsForecast_legacy: use avgArray if number included days <= number of days in pvHistory ",
-  "1.52.7" => "30.05.2025  _calcConsForecast_legacy: excludes/includes only if number included days <= number of days in pvHistory ",
-  "1.52.6" => "27.05.2025  verbose 3 for consumer switch log ",
-  "1.52.5" => "25.05.2025  edit commandref, _batChargeMgmt: add load management time slot, ctrlBatSocManagementXX: new key lcSlot ".
-                           "check attribute values for prohibited occurrence [...] Forum: https://forum.fhem.de/index.php?msg=1342147 ".
-                           "_flowGraphic: bugfix chain style in case of logical on/off Forum: https://forum.fhem.de/index.php?msg=1342122 ".
-                           "_attrBatteryDev: more checks (cap) ",
-  "1.52.4" => "20.05.2025  commandref edited, setupInverterDevXX: change pv to pvOut, new key pvIn ".
-                           "fix devision by zero -Forum: https://forum.fhem.de/index.php?msg=1341884, __calcFcQuality: minor code change ".
-                           "ctrlSpecialReadings: new Topic BatWeightedTotalSOC ",
-  "1.52.3" => "17.05.2025  _transferInverterValues: new property itype, graphicControl: new keys beamPaddingBottom, beamPaddingTop ".
-                           " setter attrKeyVal has dorp down list of all composite attributes ",
-  "1.52.2" => "14.05.2025  _flowGraphic: Discharge the battery directly into the household grid if no battery inverter is defined ".
-                           "correction of inverter x-start, ".
-                           "isConsumerLogOn: bugfix Threshold value detection if threshold value specification above 1% of power ",
-  "1.52.1" => "13.05.2025  _flowGraphic: hide inverter node if only one PV inverter and no battery is used ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
 
@@ -1571,48 +1556,48 @@ my %hcsr = (                                                                    
 # storname = Name des Elements in der pvHistory
 # fpar     = Parameter zur spezifischen Verwendung
 my %hfspvh = (
-  radiation         => { fn => \&_storeVal, storname => 'rad1h',          validkey => undef,    fpar => undef    },    # irradiation
-  DoN               => { fn => \&_storeVal, storname => 'DoN',            validkey => undef,    fpar => undef    },    # Tag 1 oder Nacht 0
-  holiday           => { fn => \&_storeVal, storname => 'holiday',        validkey => undef,    fpar => undef    },    # Urlaub, Feiertag
-  sunaz             => { fn => \&_storeVal, storname => 'sunaz',          validkey => undef,    fpar => undef    },    # Sonnenstand Azimuth
-  sunalt            => { fn => \&_storeVal, storname => 'sunalt',         validkey => undef,    fpar => undef    },    # Sonnenstand Altitude
-  etotal            => { fn => \&_storeVal, storname => 'etotal',         validkey => undef,    fpar => undef    },    # etotal des Wechselrichters
-  weatherid         => { fn => \&_storeVal, storname => 'weatherid',      validkey => undef,    fpar => undef    },    # Wetter ID
-  weathercloudcover => { fn => \&_storeVal, storname => 'wcc',            validkey => undef,    fpar => undef    },    # Wolkenbedeckung
-  windspeed         => { fn => \&_storeVal, storname => 'windspeed',      validkey => undef,    fpar => undef    },    # Windgeschwindigkeit in m/s -> Großwetterlage / Trend
-  windspeed_fast    => { fn => \&_storeVal, storname => 'windspeed_fast', validkey => undef,    fpar => undef    },    # Windgeschwindigkeit in m/s -> kurzfristige Wolkenbewegung
-  rr1c              => { fn => \&_storeVal, storname => 'rr1c',           validkey => undef,    fpar => undef    },    # Gesamtniederschlag (1-stündig) letzte 1 Stunde
-  presence          => { fn => \&_storeVal, storname => 'presence',       validkey => undef,    fpar => undef    },    # zeitgewichtete Anwesenheit
-  pvcorrfactor      => { fn => \&_storeVal, storname => 'pvcorrf',        validkey => undef,    fpar => undef    },    # pvCorrectionFactor
-  temperature       => { fn => \&_storeVal, storname => 'temp',           validkey => undef,    fpar => undef    },    # Außentemperatur
-  conprice          => { fn => \&_storeVal, storname => 'conprice',       validkey => undef,    fpar => undef    },    # Bezugspreis pro kWh der Stunde
-  feedprice         => { fn => \&_storeVal, storname => 'feedprice',      validkey => undef,    fpar => undef    },    # Einspeisevergütung pro kWh der Stunde
-  socwhsum          => { fn => \&_storeVal, storname => 'socwhsum',       validkey => undef,    fpar => undef    },    # real eerichter SoC (Wh) zusammengefasst über alle Batterien
-  socprogwhsum      => { fn => \&_storeVal, storname => 'socprogwhsum',   validkey => undef,    fpar => undef    },    # prognostizierter SoC (Wh) zusammengefasst über alle Batterien
-  pvapifcraw        => { fn => \&_storeVal, storname => 'pvapifcraw',     validkey => undef,    fpar => undef    },    # prognostizierter Energieertrag Raw
-  pvfc              => { fn => \&_storeVal, storname => 'pvfc',           validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
-  confc             => { fn => \&_storeVal, storname => 'confc',          validkey => undef,    fpar => 'comp99' },    # durch KI oder herkömmlich prognostizierter Hausverbrauch
-  conaifc           => { fn => \&_storeVal, storname => 'conaifc',        validkey => undef,    fpar => undef    },    # Hilfswert: durch KI prognostizierter Hausverbrauch
-  conbiascorr       => { fn => \&_storeVal, storname => 'conbiascorr',    validkey => undef,    fpar => undef    },    # in der KI Verbrauchsprognose enthaltene kombinierte Bias- und Driftkorrektur 
-  conlegfc          => { fn => \&_storeVal, storname => 'conlegfc',       validkey => undef,    fpar => undef    },    # Hilfswert: herkömmlich prognostizierter Hausverbrauch
-  gcons             => { fn => \&_storeVal, storname => 'gcons',          validkey => undef,    fpar => 'comp99' },    # bezogene Energie
-  gfeedin           => { fn => \&_storeVal, storname => 'gfeedin',        validkey => undef,    fpar => 'comp99' },    # eingespeiste Energie
-  con               => { fn => \&_storeVal, storname => 'con',            validkey => undef,    fpar => 'comp99' },    # realer Hausverbrauch Energie
-  pvrl              => { fn => \&_storeVal, storname => 'pvrl',           validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag PV
-  plantderated      => { fn => \&_storeVal, storname => 'plantderated',   validkey => undef,    fpar => undef    },    # Abregelungsstatus der Anlage
-  comforttemp       => { fn => \&_storeVal, storname => 'comforttemp',    validkey => undef,    fpar => undef    },    # Komforttemperatur des Gebäudes
-  hpcsm             => { fn => \&_storeVal, storname => 'hpcsm',          validkey => undef,    fpar => undef    },    # Consumernummern installierter Wärmepumpen
-  bevcsm            => { fn => \&_storeVal, storname => 'bevcsm',         validkey => undef,    fpar => undef    },    # Consumernummern installierter BEV
+  radiation         => { fn => \&_saveHistP2, storname => 'rad1h',          validkey => undef,    fpar => undef    },    # irradiation
+  DoN               => { fn => \&_saveHistP2, storname => 'DoN',            validkey => undef,    fpar => undef    },    # Tag 1 oder Nacht 0
+  holiday           => { fn => \&_saveHistP2, storname => 'holiday',        validkey => undef,    fpar => undef    },    # Urlaub, Feiertag
+  sunaz             => { fn => \&_saveHistP2, storname => 'sunaz',          validkey => undef,    fpar => undef    },    # Sonnenstand Azimuth
+  sunalt            => { fn => \&_saveHistP2, storname => 'sunalt',         validkey => undef,    fpar => undef    },    # Sonnenstand Altitude
+  etotal            => { fn => \&_saveHistP2, storname => 'etotal',         validkey => undef,    fpar => undef    },    # etotal des Wechselrichters
+  weatherid         => { fn => \&_saveHistP2, storname => 'weatherid',      validkey => undef,    fpar => undef    },    # Wetter ID
+  weathercloudcover => { fn => \&_saveHistP2, storname => 'wcc',            validkey => undef,    fpar => undef    },    # Wolkenbedeckung
+  windspeed         => { fn => \&_saveHistP2, storname => 'windspeed',      validkey => undef,    fpar => undef    },    # Windgeschwindigkeit in m/s -> Großwetterlage / Trend
+  windspeed_fast    => { fn => \&_saveHistP2, storname => 'windspeed_fast', validkey => undef,    fpar => undef    },    # Windgeschwindigkeit in m/s -> kurzfristige Wolkenbewegung
+  rr1c              => { fn => \&_saveHistP2, storname => 'rr1c',           validkey => undef,    fpar => undef    },    # Gesamtniederschlag (1-stündig) letzte 1 Stunde
+  presence          => { fn => \&_saveHistP2, storname => 'presence',       validkey => undef,    fpar => undef    },    # zeitgewichtete Anwesenheit
+  pvcorrfactor      => { fn => \&_saveHistP2, storname => 'pvcorrf',        validkey => undef,    fpar => undef    },    # pvCorrectionFactor
+  temperature       => { fn => \&_saveHistP2, storname => 'temp',           validkey => undef,    fpar => undef    },    # Außentemperatur
+  conprice          => { fn => \&_saveHistP2, storname => 'conprice',       validkey => undef,    fpar => undef    },    # Bezugspreis pro kWh der Stunde
+  feedprice         => { fn => \&_saveHistP2, storname => 'feedprice',      validkey => undef,    fpar => undef    },    # Einspeisevergütung pro kWh der Stunde
+  socwhsum          => { fn => \&_saveHistP2, storname => 'socwhsum',       validkey => undef,    fpar => undef    },    # real eerichter SoC (Wh) zusammengefasst über alle Batterien
+  socprogwhsum      => { fn => \&_saveHistP2, storname => 'socprogwhsum',   validkey => undef,    fpar => undef    },    # prognostizierter SoC (Wh) zusammengefasst über alle Batterien
+  pvapifcraw        => { fn => \&_saveHistP2, storname => 'pvapifcraw',     validkey => undef,    fpar => undef    },    # prognostizierter Energieertrag Raw
+  pvfc              => { fn => \&_saveHistP2, storname => 'pvfc',           validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
+  confc             => { fn => \&_saveHistP2, storname => 'confc',          validkey => undef,    fpar => 'comp99' },    # durch KI oder herkömmlich prognostizierter Hausverbrauch
+  conaifc           => { fn => \&_saveHistP2, storname => 'conaifc',        validkey => undef,    fpar => undef    },    # Hilfswert: durch KI prognostizierter Hausverbrauch
+  conbiascorr       => { fn => \&_saveHistP2, storname => 'conbiascorr',    validkey => undef,    fpar => undef    },    # in der KI Verbrauchsprognose enthaltene kombinierte Bias- und Driftkorrektur 
+  conlegfc          => { fn => \&_saveHistP2, storname => 'conlegfc',       validkey => undef,    fpar => undef    },    # Hilfswert: herkömmlich prognostizierter Hausverbrauch
+  gcons             => { fn => \&_saveHistP2, storname => 'gcons',          validkey => undef,    fpar => 'comp99' },    # bezogene Energie
+  gfeedin           => { fn => \&_saveHistP2, storname => 'gfeedin',        validkey => undef,    fpar => 'comp99' },    # eingespeiste Energie
+  con               => { fn => \&_saveHistP2, storname => 'con',            validkey => undef,    fpar => 'comp99' },    # realer Hausverbrauch Energie
+  pvrl              => { fn => \&_saveHistP2, storname => 'pvrl',           validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag PV
+  plantderated      => { fn => \&_saveHistP2, storname => 'plantderated',   validkey => undef,    fpar => undef    },    # Abregelungsstatus der Anlage
+  comforttemp       => { fn => \&_saveHistP2, storname => 'comforttemp',    validkey => undef,    fpar => undef    },    # Komforttemperatur des Gebäudes
+  hpcsm             => { fn => \&_saveHistP2, storname => 'hpcsm',          validkey => undef,    fpar => undef    },    # Consumernummern installierter Wärmepumpen
+  bevcsm            => { fn => \&_saveHistP2, storname => 'bevcsm',         validkey => undef,    fpar => undef    },    # Consumernummern installierter BEV
 );
 
   for my $in (1..MAXINVERTER) {
       $in                              = sprintf "%02d", $in;
-      $hfspvh{'pvrl'.$in}{fn}          = \&_storeVal;                         # realer Energieertrag Inverter
+      $hfspvh{'pvrl'.$in}{fn}          = \&_saveHistP2;                         # realer Energieertrag Inverter
       $hfspvh{'pvrl'.$in}{storname}    = 'pvrl'.$in;
       $hfspvh{'pvrl'.$in}{validkey}    = undef;
       $hfspvh{'pvrl'.$in}{fpar}        = 'comp99';
 
-      $hfspvh{'etotali'.$in}{fn}       = \&_storeVal;                         # etotal Inverter
+      $hfspvh{'etotali'.$in}{fn}       = \&_saveHistP2;                         # etotal Inverter
       $hfspvh{'etotali'.$in}{storname} = 'etotali'.$in;
       $hfspvh{'etotali'.$in}{validkey} = undef;
       $hfspvh{'etotali'.$in}{fpar}     = undef;
@@ -1620,12 +1605,12 @@ my %hfspvh = (
   
   for my $cn (1..MAXCONSUMER) {
       $cn = sprintf "%02d", $cn;
-      $hfspvh{'bevcsmSoC'.$cn}{fn}       = \&_storeVal;                       # BEV aktueller SoC
+      $hfspvh{'bevcsmSoC'.$cn}{fn}       = \&_saveHistP2;                       # BEV aktueller SoC
       $hfspvh{'bevcsmSoC'.$cn}{storname} = 'bevcsmSoC'.$cn;
       $hfspvh{'bevcsmSoC'.$cn}{validkey} = undef;
       $hfspvh{'bevcsmSoC'.$cn}{fpar}     = undef;
       
-      $hfspvh{'bevcsmTargSoC'.$cn}{fn}       = \&_storeVal;                   # BEV Ziel-SoC
+      $hfspvh{'bevcsmTargSoC'.$cn}{fn}       = \&_saveHistP2;                   # BEV Ziel-SoC
       $hfspvh{'bevcsmTargSoC'.$cn}{storname} = 'bevcsmTargSoC'.$cn;
       $hfspvh{'bevcsmTargSoC'.$cn}{validkey} = undef;
       $hfspvh{'bevcsmTargSoC'.$cn}{fpar}     = undef;       
@@ -1633,12 +1618,12 @@ my %hfspvh = (
 
   for my $pn (1..MAXPRODUCER) {
       $pn                              = sprintf "%02d", $pn;
-      $hfspvh{'pprl'.$pn}{fn}          = \&_storeVal;                         # realer Energieertrag sonstiger Erzeuger
+      $hfspvh{'pprl'.$pn}{fn}          = \&_saveHistP2;                         # realer Energieertrag sonstiger Erzeuger
       $hfspvh{'pprl'.$pn}{storname}    = 'pprl'.$pn;
       $hfspvh{'pprl'.$pn}{validkey}    = undef;
       $hfspvh{'pprl'.$pn}{fpar}        = 'comp99';
 
-      $hfspvh{'etotalp'.$pn}{fn}       = \&_storeVal;                         # etotal sonstiger Erzeuger
+      $hfspvh{'etotalp'.$pn}{fn}       = \&_saveHistP2;                         # etotal sonstiger Erzeuger
       $hfspvh{'etotalp'.$pn}{storname} = 'etotalp'.$pn;
       $hfspvh{'etotalp'.$pn}{validkey} = undef;
       $hfspvh{'etotalp'.$pn}{fpar}     = undef;
@@ -1646,52 +1631,52 @@ my %hfspvh = (
 
   for my $bn (1..MAXBATTERIES) {
       $bn                                     = sprintf "%02d", $bn;
-      $hfspvh{'batintotal'.$bn}{fn}           = \&_storeVal;                  # totale Batterieladung
+      $hfspvh{'batintotal'.$bn}{fn}           = \&_saveHistP2;                  # totale Batterieladung
       $hfspvh{'batintotal'.$bn}{storname}     = 'batintotal'.$bn;
       $hfspvh{'batintotal'.$bn}{validkey}     = undef;
       $hfspvh{'batintotal'.$bn}{fpar}         = undef;
 
-      $hfspvh{'batouttotal'.$bn}{fn}          = \&_storeVal;                  # totale Batterieentladung
+      $hfspvh{'batouttotal'.$bn}{fn}          = \&_saveHistP2;                  # totale Batterieentladung
       $hfspvh{'batouttotal'.$bn}{storname}    = 'batouttotal'.$bn;
       $hfspvh{'batouttotal'.$bn}{validkey}    = undef;
       $hfspvh{'batouttotal'.$bn}{fpar}        = undef;
 
-      $hfspvh{'batinthishour'.$bn}{fn}        = \&_storeVal;                  # Batterieladung in Stunde
+      $hfspvh{'batinthishour'.$bn}{fn}        = \&_saveHistP2;                  # Batterieladung in Stunde
       $hfspvh{'batinthishour'.$bn}{storname}  = 'batin'.$bn;
       $hfspvh{'batinthishour'.$bn}{validkey}  = undef;
       $hfspvh{'batinthishour'.$bn}{fpar}      = 'comp99';
 
-      $hfspvh{'batoutthishour'.$bn}{fn}       = \&_storeVal;                  # Batterieentladung in Stunde
+      $hfspvh{'batoutthishour'.$bn}{fn}       = \&_saveHistP2;                  # Batterieentladung in Stunde
       $hfspvh{'batoutthishour'.$bn}{storname} = 'batout'.$bn;
       $hfspvh{'batoutthishour'.$bn}{validkey} = undef;
       $hfspvh{'batoutthishour'.$bn}{fpar}     = 'comp99';
 
-      $hfspvh{'batprogsoc'.$bn}{fn}           = \&_storeVal;                  # Prognose-SOC des Tages
+      $hfspvh{'batprogsoc'.$bn}{fn}           = \&_saveHistP2;                  # Prognose-SOC des Tages
       $hfspvh{'batprogsoc'.$bn}{storname}     = 'batprogsoc'.$bn;
       $hfspvh{'batprogsoc'.$bn}{validkey}     = undef;
       $hfspvh{'batprogsoc'.$bn}{fpar}         = undef;
 
-      $hfspvh{'lcintimebat'.$bn}{fn}          = \&_storeVal;                  # Ladesteuerung der Batterie In Time, d.h. war sie aktiv? (1 - Ja, 0 - Nein)
+      $hfspvh{'lcintimebat'.$bn}{fn}          = \&_saveHistP2;                  # Ladesteuerung der Batterie In Time, d.h. war sie aktiv? (1 - Ja, 0 - Nein)
       $hfspvh{'lcintimebat'.$bn}{storname}    = 'lcintimebat'.$bn;
       $hfspvh{'lcintimebat'.$bn}{validkey}    = undef;
       $hfspvh{'lcintimebat'.$bn}{fpar}        = undef;
 
-      $hfspvh{'strategybat'.$bn}{fn}          = \&_storeVal;                  # Ladestrategie der Batterie
+      $hfspvh{'strategybat'.$bn}{fn}          = \&_saveHistP2;                  # Ladestrategie der Batterie
       $hfspvh{'strategybat'.$bn}{storname}    = 'strategybat'.$bn;
       $hfspvh{'strategybat'.$bn}{validkey}    = undef;
       $hfspvh{'strategybat'.$bn}{fpar}        = undef;
 
-      $hfspvh{'batmaxsoc'.$bn}{fn}            = \&_storeVal;                  # max. erreichter SOC des Tages
+      $hfspvh{'batmaxsoc'.$bn}{fn}            = \&_saveHistP2;                  # max. erreichter SOC des Tages
       $hfspvh{'batmaxsoc'.$bn}{storname}      = 'batmaxsoc'.$bn;
       $hfspvh{'batmaxsoc'.$bn}{validkey}      = undef;
       $hfspvh{'batmaxsoc'.$bn}{fpar}          = undef;
 
-      $hfspvh{'batsetsoc'.$bn}{fn}            = \&_storeVal;                  # gesetzter optimaler SOC für den Tag
+      $hfspvh{'batsetsoc'.$bn}{fn}            = \&_saveHistP2;                  # gesetzter optimaler SOC für den Tag
       $hfspvh{'batsetsoc'.$bn}{storname}      = 'batsetsoc'.$bn;
       $hfspvh{'batsetsoc'.$bn}{validkey}      = undef;
       $hfspvh{'batsetsoc'.$bn}{fpar}          = undef;
 
-      $hfspvh{'batsoc'.$bn}{fn}               = \&_storeVal;                  # aktueller SOC für Tag / Stunde
+      $hfspvh{'batsoc'.$bn}{fn}               = \&_saveHistP2;                  # aktueller SOC für Tag / Stunde
       $hfspvh{'batsoc'.$bn}{storname}         = 'batsoc'.$bn;
       $hfspvh{'batsoc'.$bn}{validkey}         = undef;
       $hfspvh{'batsoc'.$bn}{fpar}             = undef;
@@ -3118,7 +3103,7 @@ sub _setreset {                          ## no critic "not used"
               $paref->{reorgday} = $dday;
               $paref->{hkey}     = '';
 
-              setPVhistory ($paref);
+              _saveHistP1 ($paref);
 
               delete $paref->{reorg};
               delete $paref->{reorgday};
@@ -3150,7 +3135,7 @@ sub _setreset {                          ## no critic "not used"
               $paref->{reorgday} = $dday;
               $paref->{hkey}     = '';
 
-              setPVhistory ($paref);
+              _saveHistP1 ($paref);
 
               delete $paref->{reorg};
               delete $paref->{reorgday};
@@ -7442,7 +7427,7 @@ sub _attrconsumer {                      ## no critic "not used"
       # --- nur für bev (musts in __attrKeyAction checken)
       batCap          => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh))',  must => 0, act => 1 },
       currSoC         => { comp => '(.*)',                                       must => 0, act => 1 },
-      targetSoC       => { comp => '(?:100|[1-9][0-9]?)',                        must => 0, act => 0 },
+      targetSoC       => { comp => '(?:[0-9]|[1-9][0-9]|100|.+)',                must => 0, act => 1 },
       evid            => { comp => '(.*:.*)',                                    must => 0, act => 1 },
       timeOfDeparture => { comp => '.*',                                         must => 0, act => 1 },
   };
@@ -9166,7 +9151,7 @@ sub __attrKeyAction {
           }
       }
       
-      if ($akey =~ /^(?:batCap|currSoC)$/xs) {     
+      if ($akey =~ /^(?:batCap|currSoC|targetSoC)$/xs) {     
           if (!isNumeric ($akeyval)) {   
               my ($rdg, $unit) = split ':', $akeyval, 2;
               ($err)          = isDeviceValid ( { name => $name, obj => $adev, method => 'string' } );
@@ -9175,11 +9160,11 @@ sub __attrKeyAction {
               my $cval  = ReadingsNum ($adev, $rdg, '');
               my $valid = 1;
               
-              $valid = 0 if(!isNumeric ($cval));
-              $valid = 0 if(isNumeric ($cval)  &&
-                            $akey eq 'currSoC' && 
-                            ($cval < 0 || $cval > 100)
-                           );
+              $valid = 0 if (!isNumeric ($cval));
+              $valid = 0 if (isNumeric ($cval)  
+                             && ($akey eq 'currSoC' || $akey eq 'targetSoC') 
+                             && ($cval < 0          || $cval > 100)
+                            );
               
               unless ($valid) {
                   return "The device:reading '$adev:$rdg=$cval' is an invalid combination or doesn't deliver a valid numeric value";
@@ -10690,7 +10675,7 @@ sub centralTask {
       #my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
       #aiFannDetectDrift ($name, $t, 'DE', $debug, 'con', 96) if($rdy);                         # Drift von AI 'con' Werten ermitteln
 
-  debugLog ($centpars, 'saveData2Cache', "setPVhistory -> stored simple  - current dayname=$dayname");
+  debugLog ($centpars, 'saveData2Cache', "_saveHistP1 -> stored simple  - current dayname=$dayname");
 
   if ($debug !~ /^none$/xs) {
       Log3 ($name, 4, "$name DEBUG> ################################################################");
@@ -15300,7 +15285,7 @@ sub __saveBEVvalues {
   
   if (!isNumeric ($p1)) {                                                                               # p1 ist ein Reading
       my $bcval  = ReadingsNum ($cname, $p1, undef); 
-      $batCapVal = $bcval if(isNumeric (defined $bcval));
+      $batCapVal = $bcval if(defined $bcval && isNumeric ($bcval));
   }
   else {
       $batCapVal = $p1;                                                                                 # direkte Angabe
@@ -15320,7 +15305,9 @@ sub __saveBEVvalues {
   }
   
   # --- targetSoC
-  my $tgtsocval = ConsumerVal ($name, $c, 'targetSoC', BEVTGTSOC);
+  my $targetsoc = ConsumerVal ($name, $c, 'targetSoC', BEVTGTSOC);
+  my $tgtsocval = isNumeric ($targetsoc) ? $targetsoc : ReadingsNum ($cname, $targetsoc, '');
+  $tgtsocval    = BEVTGTSOC if(!isNumeric ($tgtsocval));
   
   if (defined $tgtsocval) {                                                                             # BEV Ziel-SoC      
       writeToHistory ( { paref => $paref, key => 'bevcsmTargSoC'.$c, val => round0 ($tgtsocval), day => $day, hour => $hod } );          
@@ -15407,14 +15394,14 @@ sub __savePowerAndEnergy {
               $paref->{val}  = round2 ($consumerco);                                    # Verbrauch des Consumers aktuelle Stunde
               $paref->{hkey} = "csme${c}";
 
-              setPVhistory ($paref);
+              _saveHistP1 ($paref);
           }
       }
       else {
           $paref->{val}  = $etot;                                                       # Totalverbrauch des Verbrauchers
           $paref->{hkey} = "csmt${c}";
 
-          setPVhistory ($paref);
+          _saveHistP1 ($paref);
 
           delete $paref->{hkey};
           delete $paref->{val};
@@ -16860,12 +16847,12 @@ sub __getCyclesAndRuntime {
   $paref->{val}  = ConsumerVal ($name, $c, "cycleDayNum", 0);                           # Anzahl Tageszyklen des Verbrauchers speichern
   $paref->{hkey} = "cyclescsm${c}";
   
-  setPVhistory ($paref);
+  _saveHistP1 ($paref);
 
   $paref->{val}  = ceil ConsumerVal ($name, $c, "minutesOn", 0);                        # Verbrauchsminuten akt. Stunde des Consumers speichern
   $paref->{hkey} = "minutescsm${c}";
   
-  setPVhistory ($paref);
+  _saveHistP1 ($paref);
 
   delete $paref->{hkey};
   delete $paref->{val};
@@ -17074,7 +17061,7 @@ sub _calcConsForecast_legacy {
 
   if ($tomnum) {
       if ($tomexnum) {
-          $tomex              = round0 ($tomex / $tomexnum);                                                            # Ex Tageswert Durchschnitt bilden
+          $tomex              = round0 ($tomex / $tomexnum);                                          # Ex Tageswert Durchschnitt bilden
           $usage->{tom}{con} -= $tomex;
       }
 
@@ -27701,7 +27688,7 @@ sub writeToHistory {
       $paref->{$hfspvh{$key}{validkey}} = $valid;
   }
   
-  setPVhistory ($paref);
+  _saveHistP1 ($paref);
 
   delete $paref->{hkey};
   delete $paref->{nday};
@@ -27715,7 +27702,7 @@ return;
 ################################################################
 #   History-Hash verwalten
 ################################################################
-sub setPVhistory {
+sub _saveHistP1 {
   my $paref     = shift;
   my $name      = $paref->{name};                                            
   my $nhour     = $paref->{nhour};                                          # Stunde des Tages
@@ -27842,11 +27829,11 @@ sub setPVhistory {
           $data{$name}{pvhist}{$reorgday}{99}{'batout'.$bn} = $bot->{$bn};
       }
 
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> Day >$reorgday< reorganized keys: batinXX, batoutXX, pvrl, pvfc, con, confc, gcons, gfeedin, pvrlXX, pprlXX");
+      debugLog ($paref, 'saveData2Cache', "_saveHistP1 -> Day >$reorgday< reorganized keys: batinXX, batoutXX, pvrl, pvfc, con, confc, gcons, gfeedin, pvrlXX, pprlXX");
   }
 
   if ($hkey) {
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> store Day: $nday, Hour of Day: $nhour, Key: $hkey, Value: ".(defined $val ? $val : 'undef'));
+      debugLog ($paref, 'saveData2Cache', "_saveHistP1 -> store Day: $nday, Hour of Day: $nhour, Key: $hkey, Value: ".(defined $val ? $val : 'undef'));
   }
 
 return;
@@ -27855,7 +27842,7 @@ return;
 ################################################################
 # Wert mit optional weiteren Berechnungen in pvHistory speichen
 ################################################################
-sub _storeVal {                          ## no critic "not used"
+sub _saveHistP2 {                       ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $day   = $paref->{day};
@@ -27878,7 +27865,7 @@ sub _storeVal {                          ## no critic "not used"
       $data{$name}{pvhist}{$nday}{$nhour}{$validkey} = $validval;
   }
 
-  debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored simple  - Day: $nday, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
+  debugLog ($paref, 'saveData2Cache', "_saveHistP2 -> stored simple  - Day: $nday, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
                                       (defined $validkey ? ", ValidKey: $validkey, ValidValue: $validval" : '') );
 
   if (defined $hfspvh{$hkey}{fpar} && $hfspvh{$hkey}{fpar} eq 'comp99') {
@@ -27893,7 +27880,7 @@ sub _storeVal {                          ## no critic "not used"
       
       $data{$name}{pvhist}{$nday}{99}{$store} = $sum;
       
-      debugLog ($paref, 'saveData2Cache', "setPVhistory -> stored compute - Day: $nday, Hour: 99, Key: $store, Value: $sum");
+      debugLog ($paref, 'saveData2Cache', "_saveHistP2 -> stored compute - Day: $nday, Hour: 99, Key: $store, Value: $sum");
   }
 
 return;
@@ -34138,56 +34125,59 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>batintotalXX</b>   </td><td>total battery XX charge (Wh) at the beginning of the hour                                                                </td></tr>
-            <tr><td> <b>batinXX</b>        </td><td>Charge of battery XX within the hour (Wh)                                                                                </td></tr>
-            <tr><td> <b>batouttotalXX</b>  </td><td>total battery XX discharge (Wh) at the beginning of the hour                                                             </td></tr>
-            <tr><td> <b>batoutXX</b>       </td><td>Discharge of battery XX within the hour (Wh)                                                                             </td></tr>
-            <tr><td> <b>batprogsocXX</b>   </td><td>predicted state of charge SOC (%) of battery XX at the end of the hour                                                   </td></tr>
-            <tr><td> <b>batsocXX</b>       </td><td>real State of charge SOC (%) of battery XX at the end of the hour                                                        </td></tr>
-            <tr><td> <b>batmaxsocXX</b>    </td><td>Maximum SOC (%) achieved by battery XX on the day                                                                        </td></tr>
-            <tr><td> <b>batsetsocXX</b>    </td><td>Optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>
-            <tr><td> <b>comforttemp</b>    </td><td>set comfort temperature for the building in °C                                                                           </td></tr>
-            <tr><td> <b>confc</b>          </td><td>expected energy consumption (Wh)                                                                                         </td></tr>
-            <tr><td> <b>conaifc</b>        </td><td>energy consumption predicted by AI (Wh)                                                                                  </td></tr>
-            <tr><td> <b>conbiascorr</b>    </td><td>combined bias and drift correction included in the AI consumption forecast (Wh)                                          </td></tr>
-            <tr><td> <b>conlegfc</b>       </td><td>conventional energy consumption forecast without AI (Wh)                                                                 </td></tr>
-            <tr><td> <b>con</b>            </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
-            <tr><td> <b>conprice</b>       </td><td>Price for the purchase of one kWh. The currency of the price is defined in the setupMeterDev.                            </td></tr>
-            <tr><td> <b>csmtXX</b>         </td><td>total energy consumption by ConsumerXX at the start of the hour                                                          </td></tr>
-            <tr><td> <b>csmeXX</b>         </td><td>Energy consumption of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                             </td></tr>
-            <tr><td> <b>cyclescsmXX</b>    </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
-            <tr><td> <b>dayname</b>        </td><td>short name of the day (locale-dependent)                                                                                 </td></tr>
-            <tr><td> <b>DoN</b>            </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
-            <tr><td> <b>etotaliXX</b>      </td><td>PV meter reading 'Total energy yield' (Wh) of inverter XX at the beginning of the hour                                   </td></tr>
-            <tr><td> <b>etotalpXX</b>      </td><td>Meter reading 'Total energy yield' (Wh) of producer XX at the beginning of the hour                                      </td></tr>
-            <tr><td> <b>gcons</b>          </td><td>real consumption (Wh) from the electricity grid                                                                          </td></tr>
-            <tr><td> <b>gfeedin</b>        </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
-            <tr><td> <b>feedprice</b>      </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the setupMeterDev.                      </td></tr>
-            <tr><td> <b>holiday</b>        </td><td>Vacation or holiday                                                                                                      </td></tr>
-            <tr><td> <b>hourscsmeXX</b>    </td><td>total active hours of the day from ConsumerXX                                                                            </td></tr>
-            <tr><td> <b>hpcsm</b>          </td><td>Serial numbers of the registered heat pumps                                                                              </td></tr>
-            <tr><td> <b>lcintimebatXX</b>  </td><td>the charge management for battery XX was activated (1 - Yes, 0 - No)                                                     </td></tr>
-            <tr><td> <b>strategybatXX</b>  </td><td>the selected charging strategy                                                                                           </td></tr>
-            <tr><td> <b>minutescsmXX</b>   </td><td>total active minutes in the hour of ConsumerXX                                                                           </td></tr>
-            <tr><td> <b>plantderated</b>   </td><td>Timestamp of the first curtailment event of the system in this hour, otherwise '0'                                       </td></tr>
-            <tr><td> <b>pprlXX</b>         </td><td>Energy generation of producer XX (see attribute setupOtherProducerXX) in the hour (Wh)                                   </td></tr>
-            <tr><td> <b>presence</b>       </td><td>time-weighted attendance status of household residents                                                                   </td></tr>
-            <tr><td> <b>pvapifcraw</b>     </td><td>expected PV generation (Wh) of the API used (raw)                                                                        </td></tr>
-            <tr><td> <b>pvfc</b>           </td><td>the predicted PV yield (Wh)                                                                                              </td></tr>
-            <tr><td> <b>pvrlXX</b>         </td><td>real PV generation (Wh) of inverter XX                                                                                   </td></tr>
-            <tr><td> <b>pvrl</b>           </td><td>Sum real PV generation (Wh) of all inverters                                                                             </td></tr>
-            <tr><td> <b>pvrlvd</b>         </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as copromitted                 </td></tr>
-            <tr><td> <b>pvcorrf</b>        </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
-            <tr><td> <b>rad1h</b>          </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
-            <tr><td> <b>rr1c</b>           </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
-            <tr><td> <b>socwhsum</b>       </td><td>real SoC achieved (Wh) summarized across all batteries                                                                   </td></tr>
-            <tr><td> <b>socprogwhsum</b>   </td><td>predicted SoC (Wh) summarized across all batteries                                                                       </td></tr>
-            <tr><td> <b>sunalt</b>         </td><td>Altitude of the sun (in decimal degrees)                                                                                 </td></tr>
-            <tr><td> <b>sunaz</b>          </td><td>Azimuth of the sun (in decimal degrees)                                                                                  </td></tr>
-            <tr><td> <b>wcc</b>            </td><td>effective cloud cover                                                                                                    </td></tr>
-            <tr><td> <b>wid</b>            </td><td>Weather identification number                                                                                            </td></tr>           
-            <tr><td> <b>windspeed</b>      </td><td>Wind speed general weather situation / Trend (m/s)                                                                       </td></tr>
-            <tr><td> <b>windspeed_fast</b> </td><td>Wind speed short-term smoothing (m/s)                                                                                    </td></tr>
+            <tr><td> <b>batintotalXX</b>    </td><td>total battery XX charge (Wh) at the beginning of the hour                                                                </td></tr>
+            <tr><td> <b>batinXX</b>         </td><td>Charge of battery XX within the hour (Wh)                                                                                </td></tr>
+            <tr><td> <b>batouttotalXX</b>   </td><td>total battery XX discharge (Wh) at the beginning of the hour                                                             </td></tr>
+            <tr><td> <b>batoutXX</b>        </td><td>Discharge of battery XX within the hour (Wh)                                                                             </td></tr>
+            <tr><td> <b>batprogsocXX</b>    </td><td>predicted state of charge SOC (%) of battery XX at the end of the hour                                                   </td></tr>
+            <tr><td> <b>batsocXX</b>        </td><td>real State of charge SOC (%) of battery XX at the end of the hour                                                        </td></tr>
+            <tr><td> <b>batmaxsocXX</b>     </td><td>Maximum SOC (%) achieved by battery XX on the day                                                                        </td></tr>
+            <tr><td> <b>batsetsocXX</b>     </td><td>Optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>
+            <tr><td> <b>bevcsm</b>          </td><td>Consumer numbers of registered electric cars (BEV)                                                                       </td></tr>
+            <tr><td> <b>bevcsmSoCXX</b>     </td><td>current SOC (%) of the BEV consumer XX                                                                                   </td></tr>
+            <tr><td> <b>bevcsmTargSoCXX</b> </td><td>Target SOC (%) set for BEV consumer XX                                                                                   </td></tr>
+            <tr><td> <b>comforttemp</b>     </td><td>set comfort temperature for the building in °C                                                                           </td></tr>
+            <tr><td> <b>confc</b>           </td><td>expected energy consumption (Wh)                                                                                         </td></tr>
+            <tr><td> <b>conaifc</b>         </td><td>energy consumption predicted by AI (Wh)                                                                                  </td></tr>
+            <tr><td> <b>conbiascorr</b>     </td><td>combined bias and drift correction included in the AI consumption forecast (Wh)                                          </td></tr>
+            <tr><td> <b>conlegfc</b>        </td><td>conventional energy consumption forecast without AI (Wh)                                                                 </td></tr>
+            <tr><td> <b>con</b>             </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
+            <tr><td> <b>conprice</b>        </td><td>Price for the purchase of one kWh. The currency of the price is defined in the setupMeterDev.                            </td></tr>
+            <tr><td> <b>csmtXX</b>          </td><td>total energy consumption (Wh) by ConsumerXX at the start of the hour                                                     </td></tr>
+            <tr><td> <b>csmeXX</b>          </td><td>Energy consumption (Wh) of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                        </td></tr>
+            <tr><td> <b>cyclescsmXX</b>     </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
+            <tr><td> <b>dayname</b>         </td><td>short name of the day (locale-dependent)                                                                                 </td></tr>
+            <tr><td> <b>DoN</b>             </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
+            <tr><td> <b>etotaliXX</b>       </td><td>PV meter reading 'Total energy yield' (Wh) of inverter XX at the beginning of the hour                                   </td></tr>
+            <tr><td> <b>etotalpXX</b>       </td><td>Meter reading 'Total energy yield' (Wh) of producer XX at the beginning of the hour                                      </td></tr>
+            <tr><td> <b>gcons</b>           </td><td>real consumption (Wh) from the electricity grid                                                                          </td></tr>
+            <tr><td> <b>gfeedin</b>         </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
+            <tr><td> <b>feedprice</b>       </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the setupMeterDev.                      </td></tr>
+            <tr><td> <b>holiday</b>         </td><td>Vacation or holiday                                                                                                      </td></tr>
+            <tr><td> <b>hourscsmeXX</b>     </td><td>total active hours of the day from ConsumerXX                                                                            </td></tr>
+            <tr><td> <b>hpcsm</b>           </td><td>Consumer numbers of the registered heat pumps                                                                            </td></tr>
+            <tr><td> <b>lcintimebatXX</b>   </td><td>the charge management for battery XX was activated (1 - Yes, 0 - No)                                                     </td></tr>
+            <tr><td> <b>strategybatXX</b>   </td><td>the selected charging strategy                                                                                           </td></tr>
+            <tr><td> <b>minutescsmXX</b>    </td><td>total active minutes in the hour of ConsumerXX                                                                           </td></tr>
+            <tr><td> <b>plantderated</b>    </td><td>Timestamp of the first curtailment event of the system in this hour, otherwise '0'                                       </td></tr>
+            <tr><td> <b>pprlXX</b>          </td><td>Energy generation of producer XX (see attribute setupOtherProducerXX) in the hour (Wh)                                   </td></tr>
+            <tr><td> <b>presence</b>        </td><td>time-weighted attendance status of household residents                                                                   </td></tr>
+            <tr><td> <b>pvapifcraw</b>      </td><td>expected PV generation (Wh) of the API used (raw)                                                                        </td></tr>
+            <tr><td> <b>pvfc</b>            </td><td>the predicted PV yield (Wh)                                                                                              </td></tr>
+            <tr><td> <b>pvrlXX</b>          </td><td>real PV generation (Wh) of inverter XX                                                                                   </td></tr>
+            <tr><td> <b>pvrl</b>            </td><td>Sum real PV generation (Wh) of all inverters                                                                             </td></tr>
+            <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as copromitted                 </td></tr>
+            <tr><td> <b>pvcorrf</b>         </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
+            <tr><td> <b>rad1h</b>           </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
+            <tr><td> <b>rr1c</b>            </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
+            <tr><td> <b>socwhsum</b>        </td><td>real SoC achieved (Wh) summarized across all batteries                                                                   </td></tr>
+            <tr><td> <b>socprogwhsum</b>    </td><td>predicted SoC (Wh) summarized across all batteries                                                                       </td></tr>
+            <tr><td> <b>sunalt</b>          </td><td>Altitude of the sun (in decimal degrees)                                                                                 </td></tr>
+            <tr><td> <b>sunaz</b>           </td><td>Azimuth of the sun (in decimal degrees)                                                                                  </td></tr>
+            <tr><td> <b>wcc</b>             </td><td>effective cloud cover                                                                                                    </td></tr>
+            <tr><td> <b>wid</b>             </td><td>Weather identification number                                                                                            </td></tr>           
+            <tr><td> <b>windspeed</b>       </td><td>Wind speed general weather situation / Trend (m/s)                                                                       </td></tr>
+            <tr><td> <b>windspeed_fast</b>  </td><td>Wind speed short-term smoothing (m/s)                                                                                    </td></tr>
          </table>
       </ul>
       </li>
@@ -34883,6 +34873,37 @@ to ensure that the system configuration is correct.
          </ul>
        <br>
 
+       (*) The consumer type <b>bev</b> is always assigned <b>mode=mustNot</b>, and there are additional special considerations to keep in mind: 
+       <br>
+       <br>
+       
+         <ul>
+         <table>
+         <colgroup> <col width="12%"> <col width="88%"> </colgroup>
+            <tr><td> <b>evid</b>           </td><td>The key value uniquely identifies a connected electric vehicle.                                                                                    </td></tr>
+            <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;Regex&gt;</b> - The specified regular expression is applied to the reading value. If the expression is true, the            </td></tr>
+            <tr><td>                       </td><td><ul><ul><ul><ul>&nbsp; consumer is activated in SolarForecast. </ul></ul></ul></ul>                                                                </td></tr>
+			<tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+			<tr><td> <b>batCap</b>         </td><td>Indicates the nominal battery capacity. This information may be provided by:                                                                       </td></tr>
+            <tr><td>                       </td><td>Integer: <b>0..X</b> - the battery capacity in Wh <b>without specifying the unit</b>                                                               </td></tr>
+			<tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;Unit&gt;</b> - Reading that provides the capacity and the unit of measurement (Wh, kWh)                                     </td></tr>
+			<tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+			<tr><td> <b>etotal</b>         </td><td>The key is a required field using the syntax specified above. The value is the total amount of charging energy consumed.                           </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>The key is a required field using the syntax specified above. The value is the current charging power.                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>power</b>          </td><td>Maximum charging power of the vehicle or wallbox using the syntax defined above.                                                                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+			<tr><td> <b>currSoC</b>        </td><td><b>&lt;Reading&gt;</b> - A reading from the device that returns the vehicle's current battery SoC in %.                                            </td></tr>
+			<tr><td>                       </td><td><ul><ul>&nbsp;&nbsp; The reading must be a value in the range 0 < X <= 100. </ul></ul>                                                             </td></tr>
+			<tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>targetSoC</b>      </td><td>Optional specification of the target SoC in % for the charging session.                                                                            </td></tr>
+            <tr><td>                       </td><td>Value range: <b>0..100</b> default: 80                                                                                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+         </table>
+         </ul>
+       <br>
+       
        (**) The consumer type <b>heatpump</b> is always assigned <b>mode=mustNot</b>, and there are additional special considerations to keep in mind:
        <br>
        <br>
@@ -37170,6 +37191,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batsocXX</b>        </td><td>realer Ladezustand SOC (%) der Batterie XX am Ende der Stunde                                          </td></tr>
             <tr><td> <b>batmaxsocXX</b>     </td><td>maximal erreichter SOC (%) der Batterie XX an dem Tag                                                  </td></tr>
             <tr><td> <b>batsetsocXX</b>     </td><td>optimaler SOC Sollwert (%) der Batterie XX für den Tag                                                 </td></tr>
+            <tr><td> <b>bevcsm</b>          </td><td>Verbrauchernummern der registrierten E-Autos (BEV)                                                     </td></tr>
+            <tr><td> <b>bevcsmSoCXX</b>     </td><td>aktueller SOC (%) des BEV-Verbrauchers XX                                                              </td></tr>
+            <tr><td> <b>bevcsmTargSoCXX</b> </td><td>eingestellter Ziel-SOC (%) des BEV-Verbrauchers XX                                                     </td></tr>
             <tr><td> <b>comforttemp</b>     </td><td>eingestellte Komforttemperatur des Gebäudes in °C                                                      </td></tr>
             <tr><td> <b>confc</b>           </td><td>erwarteter Energieverbrauch (Wh)                                                                       </td></tr>
             <tr><td> <b>conaifc</b>         </td><td>durch KI prognostizierter Energieverbrauch (Wh)                                                        </td></tr>
@@ -37177,8 +37201,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>conlegfc</b>        </td><td>herkömmlich ohne KI prognostizierter Energieverbrauch (Wh)                                             </td></tr>
             <tr><td> <b>con</b>             </td><td>realer Energieverbrauch (Wh) des Hauses                                                                </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.                 </td></tr>
-            <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total von ConsumerXX zum Beginn der Stunde                                            </td></tr>
-            <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)            </td></tr>
+            <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total (Wh) von ConsumerXX zum Beginn der Stunde                                       </td></tr>
+            <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch (Wh) von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)       </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                          </td></tr>
             <tr><td> <b>dayname</b>         </td><td>Kurzname des Tages (locale-abhängig)                                                                   </td></tr>
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                                   </td></tr>
@@ -37190,7 +37214,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>avgcycmntscsmXX</b> </td><td>durchschnittliche Dauer eines Einschaltzyklus des Tages von ConsumerXX in Minuten                      </td></tr>
             <tr><td> <b>holiday</b>         </td><td>Urlaub oder Feiertag                                                                                   </td></tr>
             <tr><td> <b>hourscsmeXX</b>     </td><td>Summe Aktivstunden des Tages von ConsumerXX                                                            </td></tr>
-            <tr><td> <b>hpcsm</b>           </td><td>Nummern der registrierten Wärmepumpen                                                                  </td></tr>
+            <tr><td> <b>hpcsm</b>           </td><td>Verbrauchernummern der registrierten Wärmepumpen                                                       </td></tr>
             <tr><td> <b>lcintimebatXX</b>   </td><td>das Lademanagement für Batterie XX war aktiviert (1 - Ja, 0 - Nein)                                    </td></tr>
             <tr><td> <b>strategybatXX</b>   </td><td>die gewählte Ladestrategie                                                                             </td></tr>
             <tr><td> <b>minutescsmXX</b>    </td><td>Summe Aktivminuten in der Stunde von ConsumerXX                                                        </td></tr>
@@ -37915,11 +37939,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
-            <tr><td> <b>evid</b>           </td><td>Der Schlüsselwert identifiziert eindeutig ein angeschlossenes Elektrofahrzeug.                                                                     </td></tr>
+            <tr><td> <b>evid</b>           </td><td>Der Schlüsselwert identifiziert ein angeschlossenes Elektrofahrzeug eindeutig.                                                                     </td></tr>
             <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;Regex&gt;</b> - Der angegebene reguläre Ausdruck wird auf den Readingswert angewendet. Passt der Ausdruck, wird der         </td></tr>
             <tr><td>                       </td><td><ul><ul><ul><ul>&nbsp; Consumer in SolarForecast aktiviert. </ul></ul></ul></ul>                                                                   </td></tr>
 			<tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-			<tr><td> <b>batcap</b>         </td><td>Gibt die nominale Batteriekapazität an. Die Angabe kann erfolgen durch:                                                                            </td></tr>
+			<tr><td> <b>batCap</b>         </td><td>Gibt die nominale Batteriekapazität an. Die Angabe kann erfolgen durch:                                                                            </td></tr>
             <tr><td>                       </td><td>Ganzzahl: <b>0..X</b> - die Batteriekapaziät in Wh <b>ohne Angabe der Einheit</b>                                                                  </td></tr>
 			<tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;Einheit&gt;</b> - Reading welches die Kapazität liefert und die Einheit der Wertes (Wh, kWh)                                </td></tr>
 			<tr><td>                       </td><td>                                                                                                                                                   </td></tr>
@@ -37930,10 +37954,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>power</b>          </td><td>Maximale Ladeleistung des Fahrzeugs bzw. der Wallbox mit der oben definierten Syntax.                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
 			<tr><td> <b>currSoC</b>        </td><td><b>&lt;Reading&gt;</b> - Reading des Devices welches den aktuellen Batterie-SoC des Fahrzeugs in % liefert.                                        </td></tr>
-			<tr><td>                       </td><td><ul><ul>&nbsp;&nbsp; Das Reading muß einen Wert im Bereich 0 < X <= 100 liefern. </ul></ul>                                                          </td></tr>
+			<tr><td>                       </td><td><ul><ul>&nbsp;&nbsp; Das Reading muß einen Wert im Bereich 0 < X <= 100 liefern. </ul></ul>                                                        </td></tr>
 			<tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>targetSoC</b>      </td><td>Optionale Angabe des Ziel-SoC in % für die Ladesession.                                                                                            </td></tr>
-            <tr><td>                       </td><td>Wertebereich: <b>0..100</b> default: 80                                                                                                            </td></tr>
+            <tr><td> <b>targetSoC</b>      </td><td>Optionale Angabe des Ziel-SoC für die Ladesession. Die Angabe kann alternativ festgelegt werden durch:                                             </td></tr>
+            <tr><td>                       </td><td>Ganzzahl: <b>0..100</b> - der Ziel-SoC in % als feste Einstellung (default: 80)                                                                    </td></tr>
+            <tr><td>                       </td><td><b>&lt;Reading&gt;</b> -  Reading welches den Ziel-SoC in (0..100 %) liefert.                                                                      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
          </table>
          </ul>
