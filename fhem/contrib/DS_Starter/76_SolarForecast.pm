@@ -163,13 +163,14 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.5.1"  => "05.04.2026  bugfixes _calcConsForecast_legacy Forum: https://forum.fhem.de/index.php?msg=1361272 ",
   "2.5.0"  => "05.04.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
                            "edit ComRef, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
                            "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
                            "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ".
                            "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ".
                            "new key aiControl->aiConAbsOversample, new key hpcsm in pvHistory & aiRawData ".
-                           "integrate new consumer type=bev as a device with no control ",
+                           "integrate new consumer type=bev as a device with no control, rework of _listDataPoolPvHist ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
@@ -4577,20 +4578,20 @@ sub __getDWDSolarData {
 
   debugLog ($paref, "apiCall", "DWD API - collect DWD Radiation data with start >$stime<- device: $raname =>");
 
-  my $end = (24 + $fcdays * 24) - 1;                                                           # V 1.55.0 -> default 71
+  my $end = (24 + $fcdays * 24) - 1;                                                                # V 1.55.0 -> default 71
 
-  for my $num (0..$end) {                                                                      # V 1.36.0
+  for my $num (0..$end) {                                                                           # V 1.36.0
       my ($fd, $fh) = calcDayHourMove (0, $num);
       next if($fh == 24);
 
-      my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));            # abzurufendes Datum ' ' Zeit
-      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);     # Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
-      my $rad      = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                   # kJ/m2
+      my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));                 # abzurufendes Datum ' ' Zeit
+      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);          # Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
+      my $rad      = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                        # kJ/m2
 
-      my ($ddate, $dtime) = split ' ', $dateTime;                                              # abzurufendes Datum + Zeit
+      my ($ddate, $dtime) = split ' ', $dateTime;                                                   # abzurufendes Datum + Zeit
       my $dtpart          = (split ":", $dateTime)[0];
-      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                      # abzurufende Zeit
-      my $dday            = (split '-', $ddate)[2];                                            # abzurufender Tag: 01, 02 ... 31
+      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                           # abzurufende Zeit
+      my $dday            = (split '-', $ddate)[2];                                                 # abzurufender Tag: 01, 02 ... 31
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
@@ -4604,12 +4605,12 @@ sub __getDWDSolarData {
 
       $data{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h} = round0 ($rad);
 
-      my $cafd = 'trackFlex';                                                                  # Art der Flächenfaktor Berechnung ('fix' wäre alternativ möglich = alte Methode)
+      my $cafd = 'trackFlex';                                                                       # Art der Flächenfaktor Berechnung ('fix' wäre alternativ möglich = alte Methode)
 
-      for my $string (@strings) {                                                              # für jeden String der Config ..
-          my $ti   = StringVal ($name, $string, 'tilt',   undef);                              # Neigungswinkel Solarmodule
-          my $peak = StringVal ($name, $string, 'peak',   undef);                              # String Peak (kWp)
-          my $az   = StringVal ($name, $string, 'azimut', undef);                              # Ausrichtung der Solarmodule
+      for my $string (@strings) {                                                                   # für jeden String der Config ..
+          my $ti   = StringVal ($name, $string, 'tilt',   undef);                                   # Neigungswinkel Solarmodule
+          my $peak = StringVal ($name, $string, 'peak',   undef);                                   # String Peak (kWp)
+          my $az   = StringVal ($name, $string, 'azimut', undef);                                   # Ausrichtung der Solarmodule
 
           if (!defined $ti || !defined $peak || !defined $az) {
               $ti   //= 'undef';
@@ -4619,12 +4620,12 @@ sub __getDWDSolarData {
               next;
           }
 
-          $peak *= 1000;                                                                       # kWp in Wp umrechnen
-          $az    = azSolar2Astro ($az);                                                        # Konvertiert Azimut der Solar-Konvention in die astronomische Konvention
+          $peak *= 1000;                                                                            # kWp in Wp umrechnen
+          $az    = azSolar2Astro ($az);                                                             # Konvertiert Azimut der Solar-Konvention in die astronomische Konvention
 
           my ($af, $pv, $sdr, $wcc);
 
-          if ($cafd eq 'trackFlex') {                                                          # Flächenfaktor Sonnenstand geführt
+          if ($cafd eq 'trackFlex') {                                                               # Flächenfaktor Sonnenstand geführt
               ($af, $sdr, $wcc) = ___areaFactorTrack ( { name   => $name,
                                                          day    => $day,
                                                          dday   => $dday,
@@ -4636,17 +4637,12 @@ sub __getDWDSolarData {
                                                        }
                                                      );
 
-              #if ($wcc >= 80 || !$af) {
-                  my $dirrad = $rad * $sdr;                                                         # Anteil Direktstrahlung an Globalstrahlung
-                  my $difrad = $rad - $dirrad;                                                      # Anteil Diffusstrahlung an Globalstrahlung
+              my $dirrad = $rad * $sdr;                                                             # Anteil Direktstrahlung an Globalstrahlung
+              my $difrad = $rad - $dirrad;                                                          # Anteil Diffusstrahlung an Globalstrahlung
 
-                  $pv = (($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF;                       # Rad wird in kW/m2 erwartet
+              $pv = (($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF;                           # Rad wird in kW/m2 erwartet
 
-                  debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dtpart, rad: $rad, direct share: $dirrad, diffuse share: $difrad");
-              #}
-              #else {                                                                                # Flächenfaktor auf volle Rad1h anwenden
-              #    $pv = $rad * $af * KJ2KWH * $peak * PRDEF;
-              #}
+              debugLog ($paref, "apiProcess", "DWD API - PV estimate String >$string< => $dtpart, rad: $rad, direct share: $dirrad, diffuse share: $difrad");
           }
           else {                                                                                    # Flächenfaktor Fix
               $af = ___areaFactorFix ($ti, $az);                                                    # Flächenfaktor: https://wiki.fhem.de/wiki/Ertragsprognose_PV
@@ -17080,54 +17076,50 @@ sub _calcConsForecast_legacy {
   debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next 24 Hours ###################");
         
   for my $nh (sort keys %{ $data{$name}{nexthours} }) {
-      my $isToday = NexthoursVal ($name, $nh, 'today', 0);
-      my $hod     = NexthoursVal ($name, $nh, 'hourofday', undef);
-      my $nhn     = (split 'NextHour', $nh)[1];
-      my $u       = $usage->{nxt}{$hod};                                            # Kurzreferenz
+      my $isToday  = NexthoursVal ($name, $nh, 'today', 0);
+      my $hod      = NexthoursVal ($name, $nh, 'hourofday', undef);
+      my $nhn      = (split 'NextHour', $nh)[1];
+      my $u        = $usage->{nxt}{$hod};                                                           # Kurzreferenz
+      my $con_base = $u->{con} // 0;                                                                # Basiswert lesen, NICHT modifizieren
       
       my ($msg1, $msg2, $msg3, $msg4) = ('', '', '', '');
 
-      if (defined $u->{histnum}) {                                                  # historische Stundenverbräuche exkludieren
-          my $exhcon = $u->{histcon} / $u->{histnum};                               # durchschnittlichen Verbrauchswert
-          $u->{con} -= $exhcon;
-
-          $exhcon = round0 ($exhcon);
-          $msg1   = "EXCLUDE hist $exhcon Wh (entities=$u->{histnum}), ";
+      if (defined $u->{histnum}) {                                                                  # Exclude
+          my $exhcon = $u->{histcon} / $u->{histnum};
+          $con_base -= $exhcon;
+          $msg1      = "EXCLUDE hist " . round0($exhcon) . " Wh (entities=$u->{histnum}), ";
       }
 
-      $u->{conex} = $u->{con};                                                      # Ausgangswert sichern (vor Plan-Inklusion)
+      my $conex = $con_base;                                                                        # Ausgangswert vor Plan-Inklusion
 
-      if (defined $u->{plannum}) {                                                  # Geplante Verbräuche INKLUDIEREN
+      if (defined $u->{plannum}) {                                                                  # Include geplante Verbräuche
           my $inhcon = $u->{plancon} / $u->{plannum};
-          $u->{con} += $inhcon;
-
-          $inhcon = round0($inhcon);
-          $msg2   = "INCLUDE planned $inhcon Wh (entities=$u->{plannum}), ";
+          $con_base += $inhcon;
+          $msg2      = "INCLUDE planned " . round0($inhcon) . " Wh (entities=$u->{plannum}), ";
       }
 
-      $u->{con} = round0($u->{con}) if defined $u->{con};                           # Finalen Verbrauch runden
+      $con_base = round0 ($con_base);                                                               # Finalen Verbrauch runden
 
       debugLog ($paref, 
                'consumption_long',
-               "NH=$nhn, isToday=$isToday, hod=$hod, ${msg1}${msg2}SUMMARY -> estimated CON: "
-               . (defined $u->{con} ? "$u->{con} Wh" : 'undef')
+               "NH=$nhn, isToday=$isToday, hod=$hod, ${msg1}${msg2}SUMMARY -> estimated CON: $con_base Wh"
                );
 
-      next if(!defined $u->{con});                                                  # Wenn kein Verbrauch → weiter
+      next if(!defined $con_base);                                                                  # Wenn kein Verbrauch → weiter
 
-      $u->{conex} //= $u->{con};                                                    # falls conex noch undef → setzen
+      $conex //= $con_base;                                                                         # falls conex noch undef → setzen
 
       # --- Consumption Base berücksichtigen
-      my $confc   = __considerConsBase ({ name      => $name,                       # prognostizierter Verbrauch mit Con-Base
-                                         confc_raw => round0 ($u->{con}), 
-                                         hod       => $hod, 
-                                         debug     => $paref->{debug},
+      my $confc   = __considerConsBase ({ name      => $name,                                       # prognostizierter Verbrauch mit Con-Base
+                                          confc_raw => $con_base, 
+                                          hod       => $hod, 
+                                          debug     => $paref->{debug},
                                        });
                                        
-      my $confcex = __considerConsBase ({ name      => $name,                       # prognostizierter Verbrauch mit excluded Verbraucher & Con-Base
-                                         confc_raw => round0 ($u->{conex}), 
-                                         hod       => $hod, 
-                                         debug     => $paref->{debug},
+      my $confcex = __considerConsBase ({ name      => $name,                                       # prognostizierter Verbrauch mit excluded Verbraucher & Con-Base
+                                          confc_raw => round0 ($conex),
+                                          hod       => $hod, 
+                                          debug     => $paref->{debug},
                                        });
 
       # --- Ergebnisse in nexthours speichern
@@ -17168,17 +17160,17 @@ sub __readConFromCircular {
   my $lct        = $paref->{lct};
   my $dayname    = $paref->{dayname};
   my $tomdayname = $paref->{tomdayname};
-  my $cofciwd    = $paref->{cofciwd};
+  my $cofciwd    = $paref->{cofciwd};                       # consForecastIdentWeekdays (default: 0)
   my $usage      = $paref->{usage};                         # Referenz von %usage
   my $ncds       = $paref->{ncds};                          # consForecastIdentWeekdays ? consForecastLastDays * 7 : consForecastLastDays
   my $nhist      = $paref->{nhist};                         # Anzahl vorhandener Tage in pvHistory
       
-  my (@conh, @conhtom);
+  my (@conhtod, @conhtom);
   my $mix = 0;
 
   if ($cofciwd) {                                                                                                                                       
       # --- nur Stunde eines bestimmten Wochentags (Mo...So) einbeziehen
-      push @conh,    @{$data{$name}{circular}{$hod}{con_all}{"$dayname"}}    if(defined ${$data{$name}{circular}{$hod}{con_all}{"$dayname"}}[0]);
+      push @conhtod, @{$data{$name}{circular}{$hod}{con_all}{"$dayname"}}    if(defined ${$data{$name}{circular}{$hod}{con_all}{"$dayname"}}[0]);
       push @conhtom, @{$data{$name}{circular}{$hod}{con_all}{"$tomdayname"}} if(defined ${$data{$name}{circular}{$hod}{con_all}{"$tomdayname"}}[0]);      # für den nächsten Tag
   }
   else {                                                                                                                                                
@@ -17192,31 +17184,35 @@ sub __readConFromCircular {
           for my $dy (sort keys %habwdn) {
               my $dayshortname = $habwdn{$dy}{$lct};
               
-              push @conh,    ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]  if(defined ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]);
-              push @conhtom, @conh;
+              push @conhtod, ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]  
+                             if(defined ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]);
+              #push @conhtom, @conh;                                                                        # V2.5.1 ->
+              
+              push @conhtom, ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]                   # V2.5.1 
+                             if(defined ${$data{$name}{circular}{$hod}{con_all}{$dayshortname}}[$i]);
           }
       }
   }
 
-  my $hnum    = scalar @conh;
+  my $hnumtod = scalar @conhtod;
   my $hnumtom = scalar @conhtom;
 
-  if ($hnum) {
+  if ($hnumtod) {
       # --- die nächsten 1..24 Stunden
-      if ($hnum > $fcld) {
-          @conh = splice (@conh, $fcld * -1);
-          $hnum = scalar @conh;
+      if ($hnumtod > $fcld) {
+          @conhtod = splice (@conhtod, $fcld * -1);
+          $hnumtod = scalar @conhtod;
       }
 
-      my $hcon = $ncds <= $nhist 
-                 ? (round0 (avgArray    (\@conh, $hnum))) 
-                 : (round0 (medianArray (\@conh)));                  
+      my $hcontod = $ncds <= $nhist 
+                    ? (round0 (avgArray    (\@conhtod, $hnumtod))) 
+                    : (round0 (medianArray (\@conhtod)));                  
       
-      $usage->{nxt}{$hod}{con} = $hcon;                                                                                 # prognostizierter Verbrauch der Stunde hh (Hour of Day)
-      $usage->{nxt}{$hod}{num} = $hnum;
+      $usage->{nxt}{$hod}{con} = $hcontod;                                                                  # prognostizierter Verbrauch der Stunde hh (Hour of Day)
+      $usage->{nxt}{$hod}{num} = $hnumtod;
       
       # --- mit consForecastLastDays = 0
-      if ($fcld == 0) {                                                                                                 # Prognose aus hist. Tagen für Stunde löschen wenn keine Integration historischer Tage gewünscht                                                                                                 
+      if ($fcld == 0) {                                                                                     # Prognose aus hist. Tagen für Stunde löschen wenn keine Integration historischer Tage gewünscht                                                                                                 
           $usage->{nxt}{$hod}{con} = 0;
           $usage->{nxt}{$hod}{num} = 1;
       }    
@@ -17224,17 +17220,22 @@ sub __readConFromCircular {
 
   if ($hnumtom) {
       # --- Stunden des nächsten Tages
-      if ($hnumtom > $fcld) {
-          @conhtom = splice (@conhtom, $fcld * -1);
-          $hnumtom = scalar @conhtom;
+      if ($fcld == 0) {                                                                                     # V2.5.1
+          # keine Addition — historische Tage sollen nicht einfließen
       }
+      else {
+          if ($hnumtom > $fcld) {
+              @conhtom = splice (@conhtom, $fcld * -1);
+              $hnumtom = scalar @conhtom;
+          }
 
-      my $hcontom = $ncds <= $nhist 
-                    ? (round0 (avgArray    (\@conhtom, $hnumtom))) 
-                    : (round0 (medianArray (\@conhtom)));             
-      
-      $usage->{tom}{con} += $hcontom;                                                                                                                   # Summe prognostizierter Verbrauch des Tages
-      $usage->{tom}{num} += $hnumtom;
+          my $hcontom = $ncds <= $nhist 
+                        ? (round0 (avgArray    (\@conhtom, $hnumtom))) 
+                        : (round0 (medianArray (\@conhtom)));             
+          
+          $usage->{tom}{con} += $hcontom;                                                                                                                   # Summe prognostizierter Verbrauch des Tages
+          $usage->{tom}{num} += $hnumtom;
+      }      
   }
 
 return;
@@ -17272,9 +17273,10 @@ sub __exincl_from_pvHistory {
       @days          = @days[-$fcld .. -1];    
   }
    
+  my $lap = 1;                                                                                     # V2.5.1
+  
   for my $dhist (@days) {                                                                          # Tagesdatum (01..31)
       my $do  = 1;
-      my $lap = 1;
 
       for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {                                  # historischer Verbrauch aller registrierten Verbraucher aufaddieren
           my $exconfc = ConsumerVal ($name, $c, 'exconfc', 0);
@@ -27953,15 +27955,14 @@ sub _listDataPoolPvHist {
   my $sub = sub {
       my $day = shift;
       my $ret;
-      
-      for my $hr (keys %{$h->{$day}}) {                                             # bereinigen
-          if (!isNumeric ($hr)) {
-              delete $data{$name}{pvhist}{$day}{$hr};
-              Log3 ($name, 2, qq{$name - INFO - invalid hour=$hr (day=$day) was deleted from pvHistory storage});
-          }
-      }
 
       for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
+          if (!isNumeric ($key)) {                                                  # bereinigen
+              delete $data{$name}{pvhist}{$day}{$key};
+              Log3 ($name, 2, qq{$name - INFO - invalid hour=$key (day=$day) was deleted from pvHistory storage});
+              next;
+          }
+          
           my $pvrl         = HistoryVal ($name, $day, $key, 'pvrl',           '-');
           my $pvrlvd       = HistoryVal ($name, $day, $key, 'pvrlvd',         '-');
           my $pvfc         = HistoryVal ($name, $day, $key, 'pvfc',           '-');
@@ -28194,14 +28195,14 @@ sub _listDataPoolPvHist {
               my $evtgtsoc = HistoryVal ($name, $day, $key, "bevcsmTargSoC${c}",  undef);
 
               if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc  if(defined $csmc);
-                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt  if(defined $csmt);
-                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme  if(defined $csme);
-                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm  if(defined $csmm);
-                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh  if(defined $csmh);
-                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma  if(defined $csma);
-                  $hexp->{$day}{$key}{"BEVcsmSoC${c}"}          = $evsoc if(defined $evsoc);
-                  $hexp->{$day}{$key}{"BEVcsmTargSoC${c}"}      = $evsoc if(defined $evtgtsoc);
+                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc  // '-';
+                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt  // '-';
+                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme  // '-';
+                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm  // '-';
+                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh  // '-';
+                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma  // '-';
+                  $hexp->{$day}{$key}{"BEVcsmSoC${c}"}          = $evsoc // '-';
+                  $hexp->{$day}{$key}{"BEVcsmTargSoC${c}"}      = $evsoc // '-';
               }
 
               if (defined $csmc) {
@@ -28265,21 +28266,21 @@ sub _listDataPoolPvHist {
       return $ret;
   };
 
+  # ---------------------------------------------------------------------------------------------------------
+  
   $h = $data{$name}{pvhist};
 
   if (!keys %{$h}) {
       return qq{PV cache is empty.};
   }
 
-  for my $i (keys %{$h}) {                                                      # bereinigen
-      if (!isNumeric ($i)) {
-          delete $data{$name}{pvhist}{$i};
-          Log3 ($name, 2, qq{$name - INFO - invalid key "$i" was deleted from pvHistory storage});
-      }
-  }
-
   for my $idx (sort keys %{$h}) {
-      next if(!$idx);
+      if (!isNumeric ($idx)) {                                                   # bereinigen
+          delete $data{$name}{pvhist}{$idx};
+          Log3 ($name, 2, qq{$name - INFO - invalid key "$idx" was deleted from pvHistory storage});
+          next;
+      }
+      
       next if($par && $idx ne $par);
       my $content = $sub->($idx) // 'no content';
       $sq .= $idx." => ".$content."\n";
@@ -34897,8 +34898,9 @@ to ensure that the system configuration is correct.
 			<tr><td> <b>currSoC</b>        </td><td><b>&lt;Reading&gt;</b> - A reading from the device that returns the vehicle's current battery SoC in %.                                            </td></tr>
 			<tr><td>                       </td><td><ul><ul>&nbsp;&nbsp; The reading must be a value in the range 0 < X <= 100. </ul></ul>                                                             </td></tr>
 			<tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>targetSoC</b>      </td><td>Optional specification of the target SoC in % for the charging session.                                                                            </td></tr>
-            <tr><td>                       </td><td>Value range: <b>0..100</b> default: 80                                                                                                             </td></tr>
+            <tr><td> <b>targetSoC</b>      </td><td>Optional specification of the target SoC for the charging session. This can alternatively be set by:                                               </td></tr>
+            <tr><td>                       </td><td>Integer: <b>0..100</b> - the target SoC in % as a fixed setting (default: 80)                                                                      </td></tr>
+            <tr><td>                       </td><td><b>&lt;Reading&gt;</b> -  A reading that returns the target SoC as a percentage (0–100%).                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
          </table>
          </ul>
