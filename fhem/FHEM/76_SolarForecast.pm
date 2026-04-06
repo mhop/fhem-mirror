@@ -5486,14 +5486,14 @@ sub __openMeteo_ApiResponse {
 
   if ($err ne "") {
       $msg = 'ERROR - Open-Meteo API server response: '.$err;
-      return ___openMeteoAPIerrorExit ($paref, $msg, 1);
+      return ___openMeteoErrorExit ($paref, $msg, 1);
   }
   elsif ($myjson ne "") {                                                                                       # Evaluiere ob Daten im JSON-Format empfangen wurden
       my ($success) = evaljson ($hash, $myjson);
 
       if (!$success) {
           $msg = 'ERROR - invalid Open-Meteo API server response';
-          return ___openMeteoAPIerrorExit ($paref, $msg, 1);
+          return ___openMeteoErrorExit ($paref, $msg, 1);
       }
 
       my $rt    = (timestampToTimestring ($t, $lang))[3];
@@ -5509,7 +5509,7 @@ sub __openMeteo_ApiResponse {
 
       if ($jdata->{'error'}) {
           $msg = "ERROR - Open-Meteo API server response: ".$jdata->{'reason'};
-          return ___openMeteoAPIerrorExit ($paref, $msg, 1);
+          return ___openMeteoErrorExit ($paref, $msg, 1);
       }
 
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = 'success';
@@ -5534,7 +5534,7 @@ sub __openMeteo_ApiResponse {
 
               if ($err) {
                   $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
-                  return ___openMeteoAPIerrorExit ($paref, $msg, 1);
+                  return ___openMeteoErrorExit ($paref, $msg, 1);
               }
 
               $curwid  = $jdata->{current}{weather_code};
@@ -5555,7 +5555,7 @@ sub __openMeteo_ApiResponse {
 
           if ($err) {
               $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
-              return ___openMeteoAPIerrorExit ($paref, $msg, 1);
+              return ___openMeteoErrorExit ($paref, $msg, 1);
           }
 
           my $ots     = timestringToTimestamp  ($otmstr);
@@ -5681,7 +5681,7 @@ sub __openMeteo_ApiResponse {
 
               if ($err) {
                   $msg = 'ERROR - Open-Meteo invalid time conversion: '.$err;
-                  return ___openMeteoAPIerrorExit ($paref, $msg, 1);
+                  return ___openMeteoErrorExit ($paref, $msg, 1);
               }
 
               if ($k == 0) {
