@@ -68,30 +68,30 @@ use vars qw($FW_tp);      # is touchpad (iPad / etc)
 use vars qw($FW_sp);      # stylesheetPrefix
 
 # global variables, also used by 97_GROUP/95_VIEW/95_FLOORPLAN
-use vars qw(%FW_types);   # device types,
-use vars qw($FW_RET);     # Returned data (html)
-use vars qw($FW_RETTYPE); # image/png or the like. Note: also as my below!
-use vars qw($FW_wname);   # Web instance
-use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
-use vars qw(%FW_pos);     # scroll position
-use vars qw($FW_cname);   # Current connection name
+use vars qw($FW_addJs);   # Only for helper like AttrTemplate
 use vars qw($FW_chash);   # client fhem hash
+use vars qw($FW_cmdret);  # Returned data by the fhem call
+use vars qw($FW_cname);   # Current connection name
+use vars qw($FW_detail);  # currently selected device for detail view
+use vars qw(@FW_fhemwebjs);
+use vars qw($FW_fhemwebjs);# List of fhemweb*js scripts to load
+use vars qw($FW_formmethod);
 use vars qw(%FW_hiddenroom); # hash of hidden rooms, used by weblink
+use vars qw(%FW_httpheader); # HTTP header, as hash
+use vars qw(@FW_httpheader); # HTTP header, line by line
+use vars qw(%FW_id2inform);
 use vars qw($FW_plotmode);# Global plot mode (WEB attribute), used by SVG
 use vars qw($FW_plotsize);# Global plot size (WEB attribute), used by SVG
-use vars qw(%FW_webArgs); # all arguments specified in the GET
-use vars qw(@FW_fhemwebjs);# List of fhemweb*js scripts to load
-use vars qw($FW_fhemwebjs);# List of fhemweb*js scripts to load
-use vars qw($FW_detail);  # currently selected device for detail view
-use vars qw($FW_cmdret);  # Returned data by the fhem call
+use vars qw(%FW_pos);     # scroll position
+use vars qw($FW_RET);     # Returned data (html)
+use vars qw($FW_RETTYPE); # image/png or the like. Note: also as my below!
 use vars qw($FW_room);    # currently selected room
-use vars qw($FW_formmethod);
-use vars qw(%FW_visibleDeviceHash);
-use vars qw(@FW_httpheader); # HTTP header, line by line
-use vars qw(%FW_httpheader); # HTTP header, as hash
+use vars qw($FW_subdir);  # Sub-path in URL, used by FLOORPLAN/weblink
+use vars qw(%FW_types);   # device types,
 use vars qw($FW_userAgent); # user agent string
-use vars qw($FW_addJs);     # Only for helper like AttrTemplate
-use vars qw(%FW_id2inform);
+use vars qw(%FW_visibleDeviceHash);
+use vars qw(%FW_webArgs); # all arguments specified in the GET
+use vars qw($FW_wname);   # Web instance
 
 $FW_formmethod = "post";
 
@@ -146,16 +146,9 @@ FHEMWEB_Initialize($)
   $hash->{CanAuthenticate} = 1;
   no warnings 'qw';
   my @attrList = qw(
-    CORS:0,1
-    HTTPS:1,0
-    CssFiles
-    Css:textField-long
-    JavaScripts
-    SVGcache:1,0
     addHtmlTitle:1,0
+    additionalInform
     addStateEvent
-    csrfToken
-    csrfTokenHTTPHeader:0,1
     alarmTimeout
     allowedHttpMethods
     allowfrom
@@ -163,6 +156,11 @@ FHEMWEB_Initialize($)
     column
     confirmDelete:0,1
     confirmJSError:0,1
+    CORS:0,1
+    csrfToken
+    csrfTokenHTTPHeader:0,1
+    CssFiles
+    Css:textField-long
     defaultRoom
     detailLinks
     deviceOverview:always,iconOnly,onClick,never
@@ -180,20 +178,22 @@ FHEMWEB_Initialize($)
     hiddenroomRegexp
     htmlInEventMonitor:1,0
     httpHeader
+    HTTPS:1,0
     iconPath
+    JavaScripts
     jsLog:1,0
-    longpoll:0,1,websocket
-    longpollSVG:1,0
     logDevice
     logFormat
-    menuEntries
+    longpoll:0,1,websocket
+    longpollSVG:1,0
     mainInputLength
+    menuEntries
     nameDisplay
     nrAxis
     ploteditor:always,onClick,never
+    plotEmbed:2,1,0
     plotfork:1,0
     plotmode:gnuplot-scroll,gnuplot-scroll-svg,SVG
-    plotEmbed:2,1,0
     plotsize
     plotWeekStartDay:0,1,2,3,4,5,6
     publicHostnames
@@ -203,13 +203,14 @@ FHEMWEB_Initialize($)
     reverseLogs:0,1
     roomIcons:textField-long
     showUsedFiles:0,1
-    sortRooms
-    sslVersion
-    sslCertPrefix
-    smallscreen:unused
     smallscreenCommands:0,1
-    stylesheetPrefix
+    smallscreen:unused
+    sortRooms
+    sslCertPrefix
+    sslVersion
     styleData:textField-long
+    stylesheetPrefix
+    SVGcache:1,0
     title
     touchpad:unused
     viewport
@@ -691,7 +692,10 @@ FW_initInform($$)
   $filter = "room!=.+" if($filter eq "room=Unsorted");
 
   my %h = map { $_ => 1 } devspec2array($filter);
-  $h{global} = 1 if( $me->{inform}{addglobal} );
+
+  my $addInform = AttrVal($FW_wname, "additionalInform", undef); #144147
+  map {$h{$_} = 1} split(',', $addInform) if($addInform);
+
   $h{"#FHEMWEB:$FW_wname"} = 1;
   $me->{inform}{devices} = \%h;
   %FW_visibleDeviceHash = FW_visibleDevices();
@@ -3838,10 +3842,17 @@ FW_log($$)
   <a id="FHEMWEB-attr"></a>
   <b>Attributes</b>
   <ul>
-    <a id="addHtmlTitle"></a>
+    <a id="FHEMWEB-attr-addHtmlTitle"></a>
     <li>addHtmlTitle<br>
       If set to 0, do not add a title Attribute to the set/get/attr detail
       widgets. This might be necessary for some screenreaders. Default is 1.
+      </li><br>
+
+    <a id="FHEMWEB-attr-additionalInform"></a>
+    <li>additionalInform<br>
+      Comma separated list of devices. If set, events from these devices 
+      notify the frontend in addition to the selected view. Used by 
+      voicecontrol.js, see forum entry #144147.
       </li><br>
 
     <li>alias_&lt;RoomName&gt;<br>
@@ -4679,6 +4690,13 @@ FW_log($$)
       Falls der Wert 0 ist, wird bei den set/get/attr Parametern in der
       DetailAnsicht der Ger&auml;te kein title Attribut gesetzt. Das is bei
       manchen Screenreadern erforderlich. Die Voreinstellung ist 1.
+      </li><br>
+
+    <a id="FHEMWEB-attr-additionalInform"></a>
+    <li>additionalInform<br>
+      Komma getrennte Liste von Ger&auml;ten. Falls gesetzt, dann werden
+      Events dieser Ger&auml;te an das Frontend weitergereicht. Wird von
+      voicecontrol.js verwendet, siehe Forumsthema #144147.
       </li><br>
 
     <li>alias_&lt;RoomName&gt;<br>
