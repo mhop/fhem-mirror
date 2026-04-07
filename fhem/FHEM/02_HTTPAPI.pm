@@ -10,6 +10,7 @@
 
 package main;
 use Encode qw(decode encode);
+use JSON qw(encode_json);
 use SetExtensions;
 use strict;
 use TcpServerUtils;
@@ -236,27 +237,47 @@ sub HTTPAPI_CGI {
     $request =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
     readingsSingleUpdate($defs{$name}, 'request', $request, 0);
 
-      my ($cmd, $exec, $ret);
-      if ($apiCmdString =~ /&(cmd|cmds|perl)(\=[^&]*)?(?=&|$)|^(cmd|cmds|perl)(\=[^&]*)?(&|$)/) {
-        $exec = $1 // $3; 
-        $cmd = substr(($2 // $4), 1);
-        # url decoding
-        $cmd =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-        if ($exec eq 'cmd') {
-          $ret = AnalyzeCommand($defs{$name}, $cmd);
-        } elsif ($exec eq 'cmds') {
-          $ret = AnalyzeCommandChain($defs{$name}, $cmd);
-        } elsif ($exec eq 'perl') {
-          $ret = AnalyzePerlCommand($defs{$name}, $cmd);
-        }
-        if ($ret) {
-          return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > $ret"))
-        } else {
-          return($hash, 200, 'close', "text/plain; charset=utf-8", encode($encoding, "$apiCmd?$exec=$cmd"))
-        }
-      } else {
-        return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute is wrong or missing"))
+    my ($cmd, $exec, $ret);
+    if ($apiCmdString =~ /&(cmd|cmds|perl)(\=[^&]*)?(?=&|$)|^(cmd|cmds|perl)(\=[^&]*)?(&|$)/) {
+      $exec = $1 // $3; 
+      $cmd = substr(($2 // $4), 1);
+      # url decoding
+      $cmd =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+      if ($exec eq 'cmd') {
+        $ret = AnalyzeCommand($defs{$name}, $cmd);
+      } elsif ($exec eq 'cmds') {
+        $ret = AnalyzeCommandChain($defs{$name}, $cmd);
+      } elsif ($exec eq 'perl') {
+        $ret = AnalyzePerlCommand($defs{$name}, $cmd);
       }
+
+      # JSON-Konvertierung von $ret
+      my $json;
+      if (!defined $ret) {
+        # undef ? JSON null
+        $json = 'null';
+      } elsif (!ref $ret) {
+        # einfacher Scalar ? JSON-String
+        my $utf8 = encode($encoding, $ret);
+        $json = encode_json($utf8);
+      } elsif (ref $ret eq 'ARRAY' || ref $ret eq 'HASH') {
+        # Array- oder Hash-Referenz ? JSON
+        $json = encode_json($ret);
+      } else {
+        # andere Referenzen ? JSON wenn möglich
+        my $tmp = eval { encode_json($ret) };
+        if (!$@) {
+          $json = $tmp;
+        } else {
+         # Fallback: stringify
+         my $utf8 = encode($encoding, "$ret");
+         $json = encode_json($utf8);
+        }
+      }  
+      return($hash, 200, 'close', "text/plain; charset=utf-8", encode($encoding, $json));
+    } else {
+      return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute is wrong or missing"))
+    }
 
   } else {
     return HTTPAPI_CommandRef($hash);
@@ -493,7 +514,7 @@ sub HTTPAPI_Undef {
       </ul>
       Response:
       <ul>
-        <code>&lt;exec?cmd|cmds|perl&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
+        <code>&lt;JSON string&gt;</code><br>
       </ul>
     </li>
   </ul>
