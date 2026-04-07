@@ -143,7 +143,7 @@
 
             let clientId = $("body").attr("fw_id") || "no_fw_id";
             const fhemCmd = `setreading global STT ${cmd} [${clientId}]`;
-            FW_cmd("/fhem?cmd=" + encodeURIComponent(fhemCmd) + "&XHR=1");
+            FW_cmd(FW_root + "?cmd=" + encodeURIComponent(fhemCmd) + "&XHR=1");
 
             if (isMobile) {
                 speak("Okay", () => {
