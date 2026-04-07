@@ -1072,7 +1072,7 @@ sub _analyze_rhassypAttr {
             next if !$val;
             for my $rooms (@rooms) {
                 push @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}}, $device if !grep { m{\A$device\z}x } @{$hash->{helper}{devicemap}{$item}{$rooms}{$key}};
-				#any { $_ eq $scalar } @array;
+		#any { $_ eq $scalar } @array;
             }
             $hash->{helper}{devicemap}{devices}{$device}{$item}{$key} = $val;
         }
@@ -2992,12 +2992,16 @@ sub notifySTT {
     return if !@events;
 
     for my $event (@events){
-        #still missing handling for speech-end events
-        next if $event !~ m{(?:receiveVoiceCommand|STT):.(.+)}xms;
+        my $isTTSdone = $event =~ m{TTS_state:.finished}xms;
+        
+        next if !$isTTSdone && $event !~ m{(?:receiveVoiceCommand|STT):.(.+)}xms;
         my $msgtext = trim($1);         ##no critic qw(Capture)
         my $client = ReadingsVal($device,'receiveVoiceDevice', InternalVal($device,'TYPE','unknown') eq 'FHEMWEB' ? $device : undef) // return;
         my $allowed = InternalVal($client,'AuthenticatedUser',$client);
         return if $hash->{helper}->{SpeechDialog}->{config}->{allowed} !~ m{\b(?:$allowed|everyone)(?:\b|\z)}xms;
+
+        #handle speech-end events for FHEMWEB devices
+        return activateClientVoiceInput($hash, $device, 1) if $isTTSdone;
 
         Log3($name, 4 , qq($name received $msgtext from $client (triggered by $device) ));
 
@@ -3029,17 +3033,39 @@ sub notifyAMADDev{
 
         Log3($name, 5 , qq($name: $device may have finished voice output));
 
-        my $iscont = SpeechDialog_sayFinish($hash, $device);
-        if ( $iscont && ReadingsVal($device, 'rhasspy_dialogue', 'closed') eq 'open' ) {
-            AnalyzeCommand( $hash, "set $device activateVoiceInput" );
-            readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'listening', 1);
-        }
+        return activateClientVoiceInput($hash, $device, 1);
     }
 
     return;
 }
 
 
+sub activateClientVoiceInput {
+    my $hash    = shift // return;
+    my $device  = shift // return;
+    my $chkcont = shift // 0;           #check, if this is a session to be continued
+
+    my $iscont = SpeechDialog_sayFinish($hash, $device);
+
+    return if !$iscont && $chkcont;
+
+    my $aVICommand = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{activateVoiceInput};
+    $aVICommand //= 'set $DEVICE activateVoiceInput' if InternalVal($device, 'TYPE', '') eq 'AMADDevice';
+    $aVICommand //= q({ my $js = "if((document.querySelector('input[name=\"fw_id\"]')||{}).value==='$hash->{FW_ID}'){f18_stt()}"; FW_directNotify("#FHEMWEB:$_", $js, "")
+            for devspec2array("TYPE=FHEMWEB"); }) if InternalVal($device, 'TYPE', '') eq 'FULLY';
+    $aVICommand //= q({ FW_AsyncOutput($defs{$DEVICE},'',qq/["#FHEMWEB:","f18_stt()",""]/)}) if InternalVal($device, 'TYPE', '') eq 'FHEMWEB';
+
+    return if !$aVICommand ;
+    my %specials = (
+         '$DEVICE'  => $device,
+         '$NAME'  => $hash->{NAME}
+        );
+    $aVICommand  = EvalSpecials($aVICommand, %specials);
+    AnalyzeCommandChain($hash, $aVICommand );        # for FHEMWEB input, we might check authorisation!
+    readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'listening', 1);
+
+    return;
+}
 
 sub activateVoiceInput {
     my $hash    = shift //return;
@@ -3505,7 +3531,8 @@ sub SpeechDialog_close {
     SpeechDialog_sayFinish($hash, $device);
 
     deleteSingleRegIntTimer($device, $hash);
-    readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'closed', 1);
+    my $dev_hash = $defs{$device};
+    readingsSingleUpdate( $dev_hash, 'rhasspy_dialogue', 'closed', 1) if defined $dev_hash;
 
     delete $hash->{helper}{SpeechDialog}->{$device};
     return;
@@ -3583,15 +3610,16 @@ sub SpeechDialog_respond {
         );
     $msgCommand  = EvalSpecials($msgCommand, %specials);
     AnalyzeCommandChain($hash, $msgCommand);                                                     # for FHEMWEB input, we might check authorisation!
+    my $dev_hash = $defs{$device};
     if ( $keepopen ) {
         my $tout = $hash->{helper}->{SpeechDialog}->{config}->{$device}->{sessionTimeout} // $hash->{sessionTimeout};
         $tout //= _getDialogueTimeout($hash) if !$cntByDelay;
         resetRegIntTimer( $device, time + $tout, \&RHASSPY_SpeechDialogTimeout, $hash, 0);
-        readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'open', 1);
+        readingsSingleUpdate($dev_hash, 'rhasspy_dialogue', 'open', 1) if defined $dev_hash;
     } else {
         deleteSingleRegIntTimer($device, $hash);
         delete $hash->{helper}->{SpeechDialog}->{$device};
-        readingsSingleUpdate($defs{$device}, 'rhasspy_dialogue', 'closed', 1);
+        readingsSingleUpdate($dev_hash, 'rhasspy_dialogue', 'closed', 1) if defined $dev_hash;
     }
     return $device;
 }
@@ -3797,7 +3825,7 @@ sub respond {
     my $delay    = shift;
 
     $response = q{} if $response eq 'SilentClosure'; 
-	
+    
     my $contByDelay = $delay // $topic ne 'endSession';
     #$delay //= ReadingsNum($hash->{NAME}, "sessionTimeout_$data->{siteId}", $hash->{sessionTimeout});
 
@@ -4909,7 +4937,7 @@ sub handleIntentSetNumeric {
     }
     
     # Mapping and device found -> execute command
-	my $cmd;        
+    my $cmd;        
     #if ( ! defined $mapping->{$change} ) { # @@@
     #if ( !defined $change || !defined $mapping->{$change} ) { # @@@
 
@@ -6654,7 +6682,7 @@ After changing something relevant within FHEM for either the data structure in</
     <li>siteId, Device etc. => any element out of the JSON-$data.</li>
     </ul>
     <p>If a simple text is returned, this will be considered as response, if return value is not defined, the default response will be used.<br>
-	You may use the internal functions (e.g. "handleIntentSetOnOff()" as well. To skipp the default answers for these intents, you have to add a "noResponse"-key to the $data argument (or ".inBulk" key forr single device intents).<br>
+    You may use the internal functions (e.g. "handleIntentSetOnOff()" as well. To skipp the default answers for these intents, you have to add a "noResponse"-key to the $data argument (or ".inBulk" key forr single device intents).<br>
     For more advanced use of this feature, you may return either a HASH or an ARRAY data structure (Note: The formating of the required data might be subject to changes!). If ARRAY is returned:
     <ul><li>First element of the array is interpreted as response and may be plain text (dialog will be ended) or HASH type to continue the session. The latter will keep the dialogue-session open to allow interactive data exchange with <i>Rhasspy</i>. An open dialogue will be closed after some time, (configurable) default is 20 seconds, you may alternatively hand over other numeric values as second element of the array.
     </li>
