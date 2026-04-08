@@ -163,8 +163,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.5.3"  => "08.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ",
   "2.5.2"  => "07.04.2026  func ___openMeteoErrorExit, ___solCastErrorExit -> 5 minutes Log message lock ".
-                           "get solardata API response code reworked ___forecastSolarErrorExit ",
+                           "get solardata API response code refactored ___forecastSolarErrorExit ",
   "2.5.1"  => "06.04.2026  bugfixes _calcConsForecast_legacy Forum: https://forum.fhem.de/index.php?msg=1361272 ".
                            "new func ___openMeteoErrorExit, ___solCastErrorExit, edit CommandRef ",
   "2.5.0"  => "05.04.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
@@ -8076,29 +8077,35 @@ return;
 ################################################################
 #                      Attr setupMeterDev
 ################################################################
-sub _attrMeterDev {                    ## no critic "not used"
+sub _attrMeterDev {                      ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
+  my $cmd   = $paref->{cmd};
 
   return if(!$init_done);
 
-  my $hash = $defs{$name};
+  my $hash  = $defs{$name};
+  my $prreg = '(?:\d+(?:[.,]\d+)?:[^:\r\n]+|[^:\r\n]+:[^:\r\n]+|[^:\r\n]+:[^:\r\n]+:[^:\r\n]+)';
 
   my $valid = {
-      gcon      => '',
-      contotal  => '',
-      gfeedin   => '',
-      feedtotal => '',
-      conprice  => '',
-      feedprice => '',
-      asynchron => '',
+      gcon        => { comp => '(?:-gfeedin|[^:\r\n]+:(?:k?W))',    must => 1, act => 1 },
+      contotal    => { comp => '.+:k?Wh',                           must => 1, act => 1 },
+      gfeedin     => { comp => '(?:-gcon|[^:\r\n]+:(?:k?W))',       must => 1, act => 0 },
+      feedtotal   => { comp => '.+:k?Wh',                           must => 1, act => 0 },
+      conprice    => { comp => $prreg,                              must => 0, act => 1 },
+      feedprice   => { comp => $prreg,                              must => 0, act => 1 },
+      asynchron   => { comp => '(0|1)',                             must => 0, act => 0 },
   };
 
-  if ($paref->{cmd} eq 'set') {
+  if ($cmd eq 'set') {
       my ($err, $medev, $h) = isDeviceValid ( { name => $name, obj => $aVal, method => 'string' } );
       return $err if($err);
+
+      for my $mkey (keys %{$valid}) {
+          return qq{The key '$mkey' is mandatory for setting in attribute '$aName'} if($valid->{$mkey}{must} && !exists $h->{$mkey});
+      }
 
       for my $key (keys %{$h}) {
           return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
@@ -8106,44 +8113,54 @@ sub _attrMeterDev {                    ## no critic "not used"
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
           }
-      }
 
-      if (!$h->{gcon} || !$h->{contotal} || !$h->{gfeedin} || !$h->{feedtotal}) {
-          return qq{The syntax of '$aName' is not correct. Please consider the commandref.};
-      }
+          my $comp = $valid->{$key}{comp};
+          next if(!$comp);
 
-      if ($h->{gcon} eq "-gfeedin" && $h->{gfeedin} eq "-gcon") {
-          return qq{Incorrect input. It is not allowed that the keys gcon and gfeedin refer to each other.};
-      }
+          if ($h->{$key} =~ /^$comp$/xs) {
+              if ($valid->{$key}{act}) {
+                  my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                                aName   => $aName,
+                                                pphash  => $h,                                                          # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                akey    => $key,
+                                                akeyval => $h->{$key},
+                                                cmd     => $cmd,
+                                              } );
 
-      if ($h->{conprice}) {                                                                       # Bezugspreis (Arbeitspreis) pro kWh
-          my @acp = split ":", $h->{conprice};
-          return qq{Incorrect input for key 'conprice'. Please consider the commandref.} if(scalar(@acp) != 2 && scalar(@acp) != 3);
-      }
-
-      if ($h->{feedprice}) {                                                                       # Einspeisevergütung pro kWh
-          my @afp = split ":", $h->{feedprice};
-          return qq{Incorrect input for key 'feedprice'. Please consider the commandref.} if(scalar(@afp) != 2 && scalar(@afp) != 3);
+                  return $err if($err);
+              }
+          }
+          else {
+              return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
+          }
       }
   }
-  elsif ($paref->{cmd} eq 'del') {
+  elsif ($cmd eq 'del') {
       readingsDelete ($hash, "Current_GridConsumption");
       readingsDelete ($hash, "Current_GridFeedIn");
-      delete $data{$name}{circular}{99}{initdayfeedin};
-      delete $data{$name}{circular}{99}{gridcontotal};
-      delete $data{$name}{circular}{99}{initdaygcon};
-      delete $data{$name}{circular}{99}{feedintotal};
-      delete $data{$name}{current}{gridconsumption};
-      delete $data{$name}{current}{tomorrowconsumption};
-      delete $data{$name}{current}{gridfeedin};
-      delete $data{$name}{current}{consumption};
-      delete $data{$name}{current}{autarkyrate};
-      delete $data{$name}{current}{selfconsumption};
-      delete $data{$name}{current}{selfconsumptionrate};
-      delete $data{$name}{current}{eFeedInTariff};
-      delete $data{$name}{current}{eFeedInTariffCcy};
-      delete $data{$name}{current}{ePurchasePrice};
-      delete $data{$name}{current}{ePurchasePriceCcy};
+      
+      my @delrdg = qw ( gridconsumption
+                        tomorrowconsumption
+                        gridfeedin
+                        consumption
+                        autarkyrate
+                        selfconsumption
+                        selfconsumptionrate
+                        eFeedInTariff
+                        eFeedInTariffCcy
+                        ePurchasePrice
+                        ePurchasePriceCcy
+                      );
+
+      delete @{$data{$name}{current}}{@delrdg};
+      
+      @delrdg = qw ( initdayfeedin
+                     gridcontotal
+                     initdaygcon
+                     feedintotal
+                   );
+
+      delete @{$data{$name}{circular}{99}}{@delrdg};
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
@@ -8975,6 +8992,20 @@ sub __attrKeyAction {
       if ($akey eq 'limit') {
           if (!isNumeric ($akeyval) || $akeyval < 0 || $akeyval > 100) {
               return qq{The value '$akey=$akeyval' is not valid. Please consider the commandref.};
+          }
+      }
+      
+      if ($akey =~ /(gfeedin|gcon)/xs) {
+          if ($pphash->{gcon} eq '-gfeedin' && $pphash->{gfeedin} eq '-gcon') {
+              return qq{Incorrect input. It is not allowed that the keys 'gcon' and 'gfeedin' refer to each other.};
+          }
+      }
+      
+      if ($akey =~ /(con|feed)price/xs) {                                                                       # Einspeisevergütung / Bezugspreis (Arbeitspreis) pro kWh
+          my @acp = split ":", $akeyval;
+          
+          if (scalar(@acp) != 2 && scalar(@acp) != 3) {
+              return qq{Incorrect input for key '$akey'};
           }
       }
 
