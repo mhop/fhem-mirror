@@ -87,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.04.03";
+our $ModulVersion = "26.04.10";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -786,8 +786,8 @@ our %LuaQueryCmd = (
 our %FB_Model = (
        '7690'        => { version => "8.22", date => "26.02.2026"},
        '7682'        => { version => "8.03", date => "21.01.2025"},
-       '7590 AX'     => { version => "8.50", date => "26.03.2026"},
-       '7590'        => { version => "8.50", date => "26.03.2026"},
+       '7590 AX'     => { version => "8.25", date => "26.03.2026"},
+       '7590'        => { version => "8.25", date => "26.03.2026"},
        '7583 VDSL'   => { version => "8.20", date => "28.08.2025"},
        '7583'        => { version => "8.20", date => "28.08.2025"},
        '7582'        => { version => "7.18", date => "19.08.2024"},
@@ -809,6 +809,7 @@ our %FB_Model = (
        '7360'        => { version => "6.85", date => "13.03.2017"},
        '7360 SL'     => { version => "6.35", date => "07.09.2023"},
        '7340'        => { version => "6.06", date => "24.04.2014"},
+       '7330'        => { version => "6.56", date => "07.09.2034"},
        '7320'        => { version => "6.35", date => "07.09.2023"},
        '7312'        => { version => "6.56", date => "07.09.2023"},
        '7272'        => { version => "6.89", date => "04.09.2023"},
@@ -2159,6 +2160,201 @@ sub Fritz_Helper_retMsg($$;@) {
 }
 
 ###############################################################################
+sub Fritz_Helper_SmartHome_PreDef($$$$$$) {
+
+   my ($hash, $action, $preDefID, $preDefDevice, $preDefName, $preDefWeb) = @_;
+   my $name = $hash->{NAME};
+   my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
+
+   my $retMsgbySet = main::AttrVal($name, "retMsgbySet", "all");
+   my $retMsg = "";
+   my $returnData;
+   my @webCmdArray;
+
+   if ($action =~ /preDefLoad/ ) {
+
+     my $retDataVgl;
+
+     $returnData = Fritz_Get_SmartHome_Devices_List($hash, $preDefDevice, "load", $preDefName);
+
+     if ($returnData->{Error}) {
+       $retMsg = "ERROR: " . $returnData->{Error} . " " . $returnData->{Info};
+       return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+     }
+
+     Fritz_Log $hash, 5, "SmartHome Device preDefLoad-> \n" . Fritz_Helper_Dumper($hash, $returnData, 5);
+
+     if ($preDefID ne $preDefDevice) {
+       $retDataVgl = Fritz_Get_SmartHome_Devices_List($hash, $preDefID, "load", $preDefName);
+
+       if ($retDataVgl->{Error}) {
+         $retMsg = "ERROR: " . $retDataVgl->{Error} . " " . $retDataVgl->{Info};
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+
+       Fritz_Log $hash, 5, "SmartHome Device preDefLoad-> \n" . Fritz_Helper_Dumper($hash, $retDataVgl, 5);
+
+       unless ($returnData->{device_name_category} && $retDataVgl->{device_name_category} && $returnData->{device_name_category} eq $retDataVgl->{device_name_category}) {
+         $retMsg = "ERROR: category device:" . $retDataVgl->{device} . " not equal to category device:" . $returnData->{device};
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+
+     }
+
+     if ($returnData->{device_name_category} && $returnData->{device_name_category} eq "SOCKET") {
+
+       if ($preDefWeb ne "A") {
+         my $returnDataG = Fritz_Get_SmartHome_Devices_List($hash, $preDefDevice, "loads", $preDefName);
+         delete $returnDataG->{device_name_category} if exists $returnDataG->{device_name_category};
+         delete $returnDataG->{device_web_site}      if exists $returnDataG->{device_web_site};
+                $returnDataG->{device}               = $preDefID;
+                $returnDataG->{ule_device_name}      = encode("ISO-8859-1", $returnDataG->{ule_device_name});
+
+         @webCmdArray = %$returnDataG;
+
+         # xhr 1 lang de page home_auto_edit_view view nop apply nop
+
+         push @webCmdArray, "xhr"            => "1";
+         push @webCmdArray, "view"           => "";
+         push @webCmdArray, "apply"          => "";
+         push @webCmdArray, "lang"           => "de";
+         push @webCmdArray, "page"           => "home_auto_edit_view";
+
+         Fritz_Log $hash, 4, "set $name $action \n" . join(" ", @webCmdArray);
+
+         my $result = Fritz_call_LuaData($hash, "data", \@webCmdArray);
+
+         my $analyse = Fritz_Helper_analyse_Lua_Result($hash, $result);
+
+         Fritz_Log $hash, 4, "SmartHome Device " . $preDefID . " - " . $analyse;
+
+         if ( $analyse =~ /ERROR/) {
+           Fritz_Log $hash, 2, "SmartHome Device " . $preDefID . " - " . $analyse;
+           return Fritz_Helper_retMsg($hash, $analyse, $retMsgbySet);
+         }
+
+         if (defined $result->{data}->{apply}) {
+           if ($result->{data}->{apply} eq "ok") {
+             main::readingsSingleUpdate($hash,"retStat_smartHome","ID:$preDefID - preDef loaded with name $preDefName $preDefWeb", 1);
+             $retMsg = "ID:$preDefID - preDef loaded with name $preDefName - $preDefWeb";
+             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) if $preDefWeb eq "G";
+           } else {
+             Fritz_Log $hash, 2, "SmartHome Device " . $preDefID . " - " . Fritz_Helper_Dumper($hash, $result, 2);
+             main::readingsSingleUpdate($hash,"retStat_smartHome","failed: ID:$preDefID - preDef not loaded with name $preDefName $preDefWeb", 1);
+             $retMsg = "ERROR: ID:$preDefID - preDef not loaded with name $preDefName $preDefWeb";
+             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+           }
+         }
+       }
+
+       if ($preDefWeb ne "G") {
+         delete $returnData->{device_name_category} if exists $returnData->{device_name_category};
+         delete $returnData->{device_web_site}      if exists $returnData->{device_web_site};
+                $returnData->{device}               = $preDefID;
+
+         @webCmdArray = %$returnData;
+
+         push @webCmdArray, "xhr"            => "1";
+         push @webCmdArray, "view"           => "";
+         push @webCmdArray, "apply"          => "";
+         push @webCmdArray, "lang"           => "de";
+         push @webCmdArray, "page"           => "home_auto_timer_view";
+       }
+
+     } elsif ($returnData->{device_name_category} && $returnData->{device_name_category} eq "THERMOSTAT") {
+
+       delete $returnData->{device_name_category} if exists $returnData->{device_name_category};
+       delete $returnData->{device_web_site}      if exists $returnData->{device_web_site};
+              $returnData->{device}               = $preDefID;
+              $returnData->{ule_device_name}      = encode("ISO-8859-1", $returnData->{ule_device_name});
+
+       @webCmdArray = %$returnData;
+
+       Fritz_Log $hash, 4, "set $name $action \n" . join(" ", @webCmdArray);
+
+       push @webCmdArray, "xhr"            => "1";
+       push @webCmdArray, "view"           => "";
+       push @webCmdArray, "apply"          => "";
+       push @webCmdArray, "lang"           => "de";
+       push @webCmdArray, "page"           => "home_auto_hkr_edit";
+
+     } else {
+
+       main::readingsSingleUpdate($hash,"retStat_smartHome","ERROR: ID:$preDefID - preDef loading not possible for $preDefName", 1);
+       $retMsg = "ERROR: ID:$preDefID - preDef loading not possible for $preDefName";
+       return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
+     }
+
+     Fritz_Log $hash, 4, "set $name $action \n" . join(" ", @webCmdArray);
+
+     my $result  = Fritz_call_LuaData($hash, "data", \@webCmdArray);
+     my $analyse = Fritz_Helper_analyse_Lua_Result($hash, $result);
+
+     Fritz_Log $hash, 4, "SmartHome Device " . $preDefID . " - " . $analyse;
+
+     if ( $analyse =~ /ERROR/) {
+       Fritz_Log $hash, 2, "SmartHome Device " . $preDefID . " - " . $analyse;
+       return Fritz_Helper_retMsg($hash, $analyse, $retMsgbySet);
+     }
+
+     if (defined $result->{data}->{apply}) {
+       if ($result->{data}->{apply} eq "ok") {
+         main::readingsSingleUpdate($hash,"retStat_smartHome","ID:$preDefID - preDef loaded with name $preDefName $preDefWeb", 1);
+         $retMsg = "ID:$preDefID - preDef loaded with name $preDefName $preDefWeb";
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       } else {
+         Fritz_Log $hash, 2, "SmartHome Device " . $preDefID . " - " . Fritz_Helper_Dumper($hash, $result, 2);
+         main::readingsSingleUpdate($hash,"retStat_smartHome","failed: ID:$preDefID - preDef not loaded with name $preDefName $preDefWeb", 1);
+         $retMsg = "ERROR: ID:$preDefID - preDef not loaded with name $preDefName $preDefWeb";
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+     }
+
+     Fritz_Log $hash, 2, "SmartHome Device " . $preDefID . " - " . Fritz_Helper_Dumper($hash, $result, 2);
+     main::readingsSingleUpdate($hash,"retStat_smartHome","failed: ID:$preDefID - unexpected result", 1);
+     $retMsg = "ERROR: Unexpected result: " . Fritz_Helper_Dumper($hash, $result);
+     return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
+   } elsif ($action =~ /preDefSave/ ) {
+
+     $returnData = Fritz_Get_SmartHome_Devices_List($hash, $preDefDevice, "save", $preDefName);
+
+     if ($returnData->{Error}) {
+       $retMsg = "ERROR: " . $returnData->{Error} . " " . $returnData->{Info};
+       return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+     }
+
+     Fritz_Log $hash, 5, "SmartHome Device preDefSave-> \n" . Fritz_Helper_Dumper($hash, $returnData, 5);
+
+     main::readingsSingleUpdate($hash,"retStat_smartHome","ID:$preDefID - preDef saved with name $preDefName", 1);
+     $retMsg = "ID:$preDefID - preDef saved with name $preDefName";
+
+     return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
+   } elsif ($action =~ /preDefDel/ ) {
+
+     $returnData = Fritz_Get_SmartHome_Devices_List($hash, $preDefDevice, "delete", $preDefName);
+
+     if ($returnData->{Error}) {
+       $retMsg = "ERROR: " . $returnData->{Error} . " " . $returnData->{Info};
+       return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+     }
+
+     Fritz_Log $hash, 5, "SmartHome Device preDefDel-> \n" . Fritz_Helper_Dumper($hash, $returnData, 5);
+
+     main::readingsSingleUpdate($hash,"retStat_smartHome","ID:$preDefID - preDef deleted with name $preDefName", 1);
+     $retMsg = "ID:$preDefID - preDef deleted with name $preDefName";
+
+     return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+   }
+
+   $retMsg = "ERROR: ID:$preDefID no valid preDef: $action.";
+   return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
+}
+
+###############################################################################
 sub Fritz_Set_Modul($$@)
 {
    my ($hash, $name, $cmd, @val) = @_;
@@ -2448,65 +2644,60 @@ sub Fritz_Set_Modul($$@)
            $action    = $1;
            $actionVal = $2;
 
-           if($hash->{fhem}{fwVersion} < 820) {
-              unless(    ($action =~ /tempOffset/ && $actionVal =~ /^-?\d+(\.[05])?$/ )
-                      || ($action =~ /tmpAdjust/  && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$/ )
-                      || ($action =~ /tmpAdjust/  && $actionVal =~ /^(([8-9]|1[0-9]|2[0-7])(\.[05]))$/ )
-                      || ($action =~ /tmpPerm/    && $actionVal =~ /^[01]$/ )
-                      || ($action =~ /boost/      && $actionVal >= 0 && $actionVal < 1440 && $actionVal =~ /\d{1,4}/)
-                      || ($action =~ /switch/     && $actionVal =~ /^[01]$/ )
-                      || ($action =~ /automatic/  && $actionVal =~ /^[01]$/ )
-                      || ($action =~ /preDefSave/ && $actionVal =~ /^[-\w]+$/ )
-                      || ($action =~ /preDefDel/  && $actionVal =~ /^[-\w]+$/ )
-                      || ($action =~ /preDefLoad/ && $actionVal =~ /^[-\w]+(:A|:G)?$|^preDefLoad:[\d]+:[-\w]+(:A|:G)?$/ )
-                    ) {
+           my $cmdText  = "tempOffset,tmpAdjust,tmpAdjust,tmpPerm,boost,switch,automatic,preDefSave,preDefDel,preDefLoad";
+              $cmdText .= ",minTemp,maxTemp,mimaRange" if ($hash->{fhem}{fwVersion} >= 820);
 
-                 $retMsg = "ERROR: second parameter not valid:\n"
-                                   . "    <tempOffset:degrees> steps 0.5\n"
-                                   . " or <tmpAdjust:[8 .. 28]> degrees steps 0.5\n" 
-                                   . " or <tmpPerm:0|1>\n"
-                                   . " or <boost:[0..1439] minutes\n"
-                                   . " or <switch:0|1>\n"
-                                   . " or <automatic:0|1>\n"
-                                   . " or <preDefSave:name>\n"
-                                   . " or <preDefDel:name>\n"
-                                   . " or <preDefLoad:[id:]name[:A|:G]>\n";
+           if($cmdText !~ /$action/){
+              $retMsg = "ERROR: first parameter: $action not valid. Has to be:\n" . $cmdText;
+              return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
+           }
 
-               return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
-             }
-           } else {
+           unless(    ($action =~ /tempOffset/ && $actionVal =~ /^-?[0-5](\.[05])?$/ )
+                   || ($action =~ /tmpAdjust/  && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$/ )
+                   || ($action =~ /tmpAdjust/  && $actionVal =~ /^(([8-9]|1[0-9]|2[0-7])(\.[05]))$/ )
+                   || ($action =~ /tmpPerm/    && $actionVal =~ /^[01]$/ )
+                   || ($action =~ /boost/      && $actionVal >= 0 && $actionVal < 1440 && $actionVal =~ /\d{1,4}/)
+                   || ($action =~ /switch/     && $actionVal =~ /^[01]$/ )
+                   || ($action =~ /automatic/  && $actionVal =~ /^[01]$/ )
+                   || ($action =~ /preDefSave/ && $actionVal =~ /^[-\w]+$/ )
+                   || ($action =~ /preDefDel/  && $actionVal =~ /^[-\w]+$/ )
+                   || ($action =~ /preDefLoad/ && $actionVal =~ /^[-\w]+(:A|:G)?$|^preDefLoad:[\d]+:[-\w]+(:A|:G)?$/ )
+                   || ($action =~ /minTemp/    && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$|^(7\.5)|([8-9]|1[0-9]|2[0-7])(\.[05])|(28\.5)$/ )
+                   || ($action =~ /maxTemp/    && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$|^(7\.5)|([8-9]|1[0-9]|2[0-7])(\.[05])|(28\.5)$/ )
+                   || ($action =~ /mimaRange/  && $actionVal =~ /^[01]$/ )
+                 ) {
 
-              unless(    ($action =~ /tempOffset/ && $actionVal =~ /^-?\d+(\.[05])?$/ )
-                      || ($action =~ /tmpAdjust/  && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$/ )
-                      || ($action =~ /tmpAdjust/  && $actionVal =~ /^(([8-9]|1[0-9]|2[0-7])(\.[05]))$/ )
-                      || ($action =~ /tmpPerm/    && $actionVal =~ /^[01]$/ )
-                      || ($action =~ /boost/      && $actionVal >= 0 && $actionVal < 1440 && $actionVal =~ /\d{1,4}/)
-                      || ($action =~ /switch/     && $actionVal =~ /^[01]$/ )
-                      || ($action =~ /automatic/  && $actionVal =~ /^[01]$/ )
-                      || ($action =~ /preDefSave/ && $actionVal =~ /^[-\w]+$/ )
-                      || ($action =~ /preDefDel/  && $actionVal =~ /^[-\w]+$/ )
-                      || ($action =~ /preDefLoad/ && $actionVal =~ /^[-\w]+(:A|:G)?$|^preDefLoad:[\d]+:[-\w]+(:A|:G)?$/ )
-                      || ($action =~ /minTemp/    && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$|^(7\.5)|([8-9]|1[0-9]|2[0-7])(\.[05])|(28\.5)$/ )
-                      || ($action =~ /maxTemp/    && $actionVal =~ /^([8-9]|1[0-9]|2[0-8])$|^(7\.5)|([8-9]|1[0-9]|2[0-7])(\.[05])|(28\.5)$/ )
-                      || ($action =~ /mimaRange/  && $actionVal =~ /^[01]$/ )
-                    ) {
+              my $helptxt = "<tempOffset:[-5 .. 5]> steps 0.5|"
+                          . "<tmpAdjust:[8 .. 28]> degrees steps 0.5|" 
+                          . "<tmpPerm:0|1>|"
+                          . "<boost:[0..1439]> minutes|"
+                          . "<switch:0|1>|"
+                          . "<automatic:0|1>|"
+                          . "<preDefSave:name>|"
+                          . "<preDefDel:name>|"
+                          . "<preDefLoad:[id:]name[:A|:G]>|"
+                          . "<minTemp:[7.5 .. 28.5]> degrees steps 0.5|"
+                          . "<maxTemp:[7.5 .. 28.5]> degrees steps 0.5|"
+                          . "<mimaRange:0|1>|";
 
-                 $retMsg = "ERROR: second parameter not valid:\n"
-                                   . "    <tempOffset:degrees> steps 0.5\n"
-                                   . " or <tmpAdjust:[8 .. 28]> degrees steps 0.5\n" 
-                                   . " or <tmpPerm:0|1>\n"
-                                   . " or <boost:[0..1439] minutes\n"
-                                   . " or <switch:0|1>\n"
-                                   . " or <automatic:0|1>\n"
-                                   . " or <preDefSave:name>\n"
-                                   . " or <preDefDel:name>\n"
-                                   . " or <preDefLoad:[id:]name[:A|:G]>\n"
-                                   . " or <minTemp:[7.5 .. 28.5]> degrees steps 0.5\n"
-                                   . " or <maxTemp:[7.5 .. 28.5]> degrees steps 0.5\n"
-                                   . " or <mimaRange:0|1>\n";
-
-               return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
-             }
+              if($helptxt =~ /(\<${action}.*?)\|/ ) {
+                $retMsg = "ERROR: second parameter:$actionVal not valid for $1\n"
+              } else {
+                $retMsg = "ERROR: second parameter not valid for $action:\n"
+                        . "    <tempOffset:[-5 .. 5]> steps 0.5\n"
+                        . " or <tmpAdjust:[8 .. 28]> degrees steps 0.5\n" 
+                        . " or <tmpPerm:0|1>\n"
+                        . " or <boost:[0..1439] minutes\n"
+                        . " or <switch:0|1>\n"
+                        . " or <automatic:0|1>\n"
+                        . " or <preDefSave:name>\n"
+                        . " or <preDefDel:name>\n"
+                        . " or <preDefLoad:[id:]name[:A|:G]>\n"
+                        . " or <minTemp:[7.5 .. 28.5]> degrees steps 0.5\n"
+                        . " or <maxTemp:[7.5 .. 28.5]> degrees steps 0.5\n"
+                        . " or <mimaRange:0|1>\n";
+              }
+              return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) ;
            }
          }
 
@@ -2534,6 +2725,7 @@ sub Fritz_Set_Modul($$@)
          my $smartName = main::ReadingsVal($name, "shdevice" .$preDefDevice, undef);
 
          if ( $action =~ /preDefSave|preDefDel|preDefLoad/ ) {
+     
            if ( $action =~ /preDefSave/ && $actionVal =~ /^([-\w]+)$/ ) {
              $preDefName = $1;
 
@@ -2609,7 +2801,12 @@ sub Fritz_Set_Modul($$@)
              $preDefName = "Automatic";
              $newValue   = "ON"  if $1 == 1;
              $newValue   = "OFF" if $1 == 0;
+
+#           } elsif ( $action =~ /tempOffset/ && $actionVal =~ /^(-?\d+(\.\d+)?)$/ ) {
+#             $preDefName = "Offset";
+#             $newValue   = $1;
            }
+
          }
 
          $preDefWeb =~ s/\://gs;
@@ -2617,7 +2814,7 @@ sub Fritz_Set_Modul($$@)
          #return "Testausgabe2: $val[0] - $preDefDevice - $preDefName - $preDefWeb - $newValue";
 
          if (!defined $newValue && $preDefName eq "") {
-           $retMsg = "ERROR: no valid Paramter:$action for SmartDevice:$preDefDevice";
+           $retMsg = "ERROR: no valid Paramter:$action for SmartDevice:$preDefDevice with category:$smartCat";
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
@@ -2630,186 +2827,19 @@ sub Fritz_Set_Modul($$@)
 
        my $returnData;
 
-       if ($action =~ /preDefLoad/ ) {
+       if ($action =~ /preDefSave|preDefDel|preDefLoad/ ) {
 
-         my $retDataVgl;
+         return Fritz_Helper_SmartHome_PreDef($hash, $action, $val[0], $preDefDevice, $preDefName, $preDefWeb);
 
-         $returnData = Fritz_Get_SmartHome_Devices_List($hash, $preDefDevice, "load", $preDefName);
-
-         if ($returnData->{Error}) {
-           $retMsg = "ERROR: " . $returnData->{Error} . " " . $returnData->{Info};
-           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-         }
-
-         Fritz_Log $hash, 5, "SmartHome Device preDefLoad-> \n" . Fritz_Helper_Dumper($hash, $returnData, 5);
-
-         if ($val[0] ne $preDefDevice) {
-           $retDataVgl = Fritz_Get_SmartHome_Devices_List($hash, $val[0], "load", $preDefName);
-
-           if ($retDataVgl->{Error}) {
-             $retMsg = "ERROR: " . $retDataVgl->{Error} . " " . $retDataVgl->{Info};
-             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-           }
-
-           Fritz_Log $hash, 5, "SmartHome Device preDefLoad-> \n" . Fritz_Helper_Dumper($hash, $retDataVgl, 5);
-
-           unless ($returnData->{device_name_category} && $retDataVgl->{device_name_category} && $returnData->{device_name_category} eq $retDataVgl->{device_name_category}) {
-             $retMsg = "ERROR: category device:" . $retDataVgl->{device} . " not equal to category device:" . $returnData->{device};
-             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-           }
-
-         }
-
-         if ($returnData->{device_name_category} && $returnData->{device_name_category} eq "SOCKET") {
-
-           if ($preDefWeb ne "A") {
-             my $returnDataG = Fritz_Get_SmartHome_Devices_List($hash, $preDefDevice, "loads", $preDefName);
-             delete $returnDataG->{device_name_category} if exists $returnDataG->{device_name_category};
-             delete $returnDataG->{device_web_site}      if exists $returnDataG->{device_web_site};
-                    $returnDataG->{device}               = $val[0];
-                    $returnDataG->{ule_device_name}      = encode("ISO-8859-1", $returnDataG->{ule_device_name});
-
-             @webCmdArray = %$returnDataG;
-
-             # xhr 1 lang de page home_auto_edit_view view nop apply nop
-
-             push @webCmdArray, "xhr"            => "1";
-             push @webCmdArray, "view"           => "";
-             push @webCmdArray, "apply"          => "";
-             push @webCmdArray, "lang"           => "de";
-             push @webCmdArray, "page"           => "home_auto_edit_view";
-
-             Fritz_Log $hash, 4, "set $name $cmd \n" . join(" ", @webCmdArray);
-
-             my $result = Fritz_call_LuaData($hash, "data", \@webCmdArray);
-
-             my $analyse = Fritz_Helper_analyse_Lua_Result($hash, $result);
-
-             Fritz_Log $hash, 4, "SmartHome Device " . $val[0] . " - " . $analyse;
-
-             if ( $analyse =~ /ERROR/) {
-               Fritz_Log $hash, 2, "SmartHome Device " . $val[0] . " - " . $analyse;
-               return Fritz_Helper_retMsg($hash, $analyse, $retMsgbySet);
-             }
-
-             if (defined $result->{data}->{apply}) {
-               if ($result->{data}->{apply} eq "ok") {
-                 main::readingsSingleUpdate($hash,"retStat_smartHome","ID:$val[0] - preDef loaded with name $preDefName $preDefWeb", 1);
-                 $retMsg = "ID:$val[0] - preDef loaded with name $preDefName - $preDefWeb";
-                 return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) if $preDefWeb eq "G";
-               } else {
-                 Fritz_Log $hash, 2, "SmartHome Device " . $val[0] . " - " . Fritz_Helper_Dumper($hash, $result, 2);
-                 main::readingsSingleUpdate($hash,"retStat_smartHome","failed: ID:$val[0] - preDef not loaded with name $preDefName $preDefWeb", 1);
-                 $retMsg = "ERROR: ID:$val[0] - preDef not loaded with name $preDefName $preDefWeb";
-                 return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-               }
-             }
-           }
-
-           if ($preDefWeb ne "G") {
-             delete $returnData->{device_name_category} if exists $returnData->{device_name_category};
-             delete $returnData->{device_web_site}      if exists $returnData->{device_web_site};
-                    $returnData->{device}               = $val[0];
-
-             @webCmdArray = %$returnData;
-
-             push @webCmdArray, "xhr"            => "1";
-             push @webCmdArray, "view"           => "";
-             push @webCmdArray, "apply"          => "";
-             push @webCmdArray, "lang"           => "de";
-             push @webCmdArray, "page"           => "home_auto_timer_view";
-           }
-
-
-         } elsif ($returnData->{device_name_category} && $returnData->{device_name_category} eq "THERMOSTAT") {
-
-           delete $returnData->{device_name_category} if exists $returnData->{device_name_category};
-           delete $returnData->{device_web_site}      if exists $returnData->{device_web_site};
-                  $returnData->{device}               = $val[0];
-                  $returnData->{ule_device_name}      = encode("ISO-8859-1", $returnData->{ule_device_name});
-
-           @webCmdArray = %$returnData;
-
-           Fritz_Log $hash, 4, "set $name $cmd \n" . join(" ", @webCmdArray);
-
-           push @webCmdArray, "xhr"            => "1";
-           push @webCmdArray, "view"           => "";
-           push @webCmdArray, "apply"          => "";
-           push @webCmdArray, "lang"           => "de";
-           push @webCmdArray, "page"           => "home_auto_hkr_edit";
-
-         } else {
-
-           main::readingsSingleUpdate($hash,"retStat_smartHome","ERROR: ID:$val[0] - preDef loading not possible for $preDefName", 1);
-           $retMsg = "ERROR: ID:$val[0] - preDef loading not possible for $preDefName";
-           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-
-         }
-
-         Fritz_Log $hash, 4, "set $name $cmd \n" . join(" ", @webCmdArray);
-
-         my $result = Fritz_call_LuaData($hash, "data", \@webCmdArray);
-
-         my $analyse = Fritz_Helper_analyse_Lua_Result($hash, $result);
-
-         Fritz_Log $hash, 4, "SmartHome Device " . $val[0] . " - " . $analyse;
-
-         if ( $analyse =~ /ERROR/) {
-           Fritz_Log $hash, 2, "SmartHome Device " . $val[0] . " - " . $analyse;
-           return Fritz_Helper_retMsg($hash, $analyse, $retMsgbySet);
-         }
-
-         if (defined $result->{data}->{apply}) {
-           if ($result->{data}->{apply} eq "ok") {
-             main::readingsSingleUpdate($hash,"retStat_smartHome","ID:$val[0] - preDef loaded with name $preDefName $preDefWeb", 1);
-             $retMsg = "ID:$val[0] - preDef loaded with name $preDefName $preDefWeb";
-             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-           } else {
-             Fritz_Log $hash, 2, "SmartHome Device " . $val[0] . " - " . Fritz_Helper_Dumper($hash, $result, 2);
-             main::readingsSingleUpdate($hash,"retStat_smartHome","failed: ID:$val[0] - preDef not loaded with name $preDefName $preDefWeb", 1);
-             $retMsg = "ERROR: ID:$val[0] - preDef not loaded with name $preDefName $preDefWeb";
-             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-           }
-         }
-
-         Fritz_Log $hash, 2, "SmartHome Device " . $val[0] . " - " . Fritz_Helper_Dumper($hash, $result, 2);
-         main::readingsSingleUpdate($hash,"retStat_smartHome","failed: ID:$val[0] - unexpected result", 1);
-         $retMsg = "ERROR: Unexpected result: " . Fritz_Helper_Dumper($hash, $result);
-         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-
-       } elsif ($action =~ /preDefSave/ ) {
-
-         $returnData = Fritz_Get_SmartHome_Devices_List($hash, $preDefDevice, "save", $preDefName);
-
-         if ($returnData->{Error}) {
-           $retMsg = "ERROR: " . $returnData->{Error} . " " . $returnData->{Info};
-           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-         }
-
-         Fritz_Log $hash, 5, "SmartHome Device preDefSave-> \n" . Fritz_Helper_Dumper($hash, $returnData, 5);
-
-         main::readingsSingleUpdate($hash,"retStat_smartHome","ID:$val[0] - preDef saved with name $preDefName", 1);
-         $retMsg = "ID:$val[0] - preDef saved with name $preDefName";
-
-         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-
-       } elsif ($action =~ /preDefDel/ ) {
-
-         $returnData = Fritz_Get_SmartHome_Devices_List($hash, $preDefDevice, "delete", $preDefName);
-
-         if ($returnData->{Error}) {
-           $retMsg = "ERROR: " . $returnData->{Error} . " " . $returnData->{Info};
-           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-         }
-
-         Fritz_Log $hash, 5, "SmartHome Device preDefDel-> \n" . Fritz_Helper_Dumper($hash, $returnData, 5);
-
-         main::readingsSingleUpdate($hash,"retStat_smartHome","ID:$val[0] - preDef deleted with name $preDefName", 1);
-         $retMsg = "ID:$val[0] - preDef deleted with name $preDefName";
-
-         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
-
+       # FritzWeb Smart Home/Bedienung => page sh_control
        } elsif ($action =~ /tmpAdjust|tmpPerm|switch/ ) {
+
+         $returnData = Fritz_Get_SmartHome_Devices_List($hash, $val[0]);
+
+         if ($returnData->{Error}) {
+           $retMsg = "ERROR: " . $returnData->{Error} . " " . $returnData->{Info};
+           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
 
          push @webCmdArray, "page" => "sh_control";
    
@@ -2845,7 +2875,7 @@ sub Fritz_Set_Modul($$@)
              } elsif ($action =~ /tmpAdjust/) {
                main::readingsSingleUpdate($hash, "shdevice" . $val[0] . "_targetTemp", $newValue, 1);
              } elsif ($action =~ /tmpPerm/) {
-               main::readingsSingleUpdate($hash, "shdevice" . $val[0] . "_tempOffset", $newValue, 1);
+               main::readingsSingleUpdate($hash, "shdevice" . $val[0] . "_mode", $newValue, 1);
              } else {
              }
 
@@ -2867,7 +2897,8 @@ sub Fritz_Set_Modul($$@)
          $retMsg = "ERROR: Unexpected result: " . Fritz_Helper_Dumper($hash, $result);
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
 
-       } elsif ($action =~ /tempOffset|minTemp|maxTemp|mimaRange/) {
+       # FritzWeb Smart Home/Geräte und Gruppen => page home_auto_hkr_edit oder CONTROL: page home_auto_edit_view
+       } elsif ( $action =~ /tempOffset|minTemp|maxTemp|mimaRange/ ) {
 
          $returnData = Fritz_Get_SmartHome_Devices_List($hash, $val[0]);
 
@@ -9644,7 +9675,7 @@ sub Fritz_Readout_SetGet_Start($)
       my @val = split / /, $cmdBuffer[0];
       Fritz_Log $hash, 3, "restarting internal Timer: next set/get: $val[0] will be processed";
       main::RemoveInternalTimer($hash->{helper}{TimerCmd});
-      main::InternalTimer(gettimeofday() + 1, "Fritz_Readout_SetGet_Start", $hash->{helper}{TimerCmd}, 1);
+      main::InternalTimer(gettimeofday() + 1, "Fritz::Fritz_Readout_SetGet_Start", $hash->{helper}{TimerCmd}, 1);
    }
 
 # do not continue until running command has finished or is aborted
