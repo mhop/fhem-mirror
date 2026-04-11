@@ -4847,10 +4847,10 @@ sub ___computeTiltedIrradianceCached {
     $dofyear;
     
   # --- Cache-Treffer? ---
-  if (exists $AREA_CACHE{$cache_key}) {
-      $AREA_CACHE_STATS{hits}++;
-      return $AREA_CACHE{$cache_key};
-  }
+  #if (exists $AREA_CACHE{$cache_key}) {
+  #    $AREA_CACHE_STATS{hits}++;
+  #    return $AREA_CACHE{$cache_key};
+  #}
 
   my $sg  = $rad * KJ2WH;                                                       # rad=kJ/m²h -> 1kJ = 0,27778 Wh
   my $rho = 0.2;                                                                # Bodenalbedo
