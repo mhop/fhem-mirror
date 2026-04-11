@@ -163,8 +163,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.5.3"  => "09.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ".
-                           "correct ___areaFactorTrack: offset_hours ",
+  "2.5.3"  => "08.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ",
   "2.5.2"  => "07.04.2026  func ___openMeteoErrorExit, ___solCastErrorExit -> 5 minutes Log message lock ".
                            "get solardata API response code refactored ___forecastSolarErrorExit ",
   "2.5.1"  => "06.04.2026  bugfixes _calcConsForecast_legacy Forum: https://forum.fhem.de/index.php?msg=1361272 ".
@@ -4536,7 +4535,7 @@ return;
 #
 # Berechnung nach Formel 2 aus http://www.ing-büro-junge.de/html/photovoltaik.html:
 #
-#    * Globalstrahlung:                G = kWh/m2   (DWD Rad1h = kJh/m2)
+#    * Globalstrahlung:                G = kWh/m2   (DWD Rad1h = kJ/m2)
 #    * Korrektur mit Flächenfaktor f:  Gk = G * f
 #    * Globalstrahlung (STC):          1 kW/m2
 #    * Peak Leistung String (kWp):     Pnenn = x kW
@@ -4594,14 +4593,13 @@ sub __getDWDSolarData {
       next if($fh == 24);
 
       my $dateTime = strftime "%Y-%m-%d %H:%M:00", localtime($sts + (3600 * $num));                 # abzurufendes Datum ' ' Zeit
+      my $runh     = int strftime "%H",            localtime($sts + (3600 * $num) + 3600);          # Stunde in 24h format (00-23), Rad1h = Absolute Globalstrahlung letzte 1 Stunde
+      my $rad      = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                        # kJ/m2
 
       my ($ddate, $dtime) = split ' ', $dateTime;                                                   # abzurufendes Datum + Zeit
       my $dtpart          = (split ":", $dateTime)[0];
-      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                           # abzurufende Hour of Day
+      my $hod             = sprintf "%02d", ((split ':', $dtime)[0] + 1);                           # abzurufende Zeit
       my $dday            = (split '-', $ddate)[2];                                                 # abzurufender Tag: 01, 02 ... 31
-
-      my $runh = int strftime "%H", localtime($sts + (3600 * $num) + 3600);                         # Stunde in 24h format (00-23)
-      my $rad  = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                            # Rad1h = Absolute Globalstrahlung letzte 1 Stunde, kJ/m2
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
@@ -4638,7 +4636,6 @@ sub __getDWDSolarData {
           if ($cafd eq 'trackFlex') {                                                               # Flächenfaktor Sonnenstand geführt
               ($af, $sdr, $wcc) = ___areaFactorTrack ( { name   => $name,
                                                          day    => $day,
-                                                         fd     => $fd,
                                                          dday   => $dday,
                                                          chour  => $paref->{chour},
                                                          hod    => $hod,
@@ -4724,15 +4721,14 @@ return $af;
 #
 ##########################################################################################################
 sub ___areaFactorTrack {
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $day      = $paref->{day};                                                 # aktueller Tag 01 .. 31
-  my $fd       = $paref->{fd};                                                  # lfd. Tag 0, 1, 2 ...
-  my $dday     = $paref->{dday};                                                # abzufragender Tag: 01 .. 31
-  my $chour    = $paref->{chour};                                               # aktuelle Stunde (00 .. 23)
-  my $hod      = $paref->{hod};                                                 # abzufragende Stunde des Tages 01, 02 ... 24
-  my $str_tilt = $paref->{tilt};                                                # String Anstellwinkel / Neigung
-  my $str_azi  = $paref->{azimut};                                              # String Ausrichtung / Azimut
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $day    = $paref->{day};                                                   # aktueller Tag 01 .. 31
+  my $dday   = $paref->{dday};                                                  # abzufragender Tag: 01 .. 31
+  my $chour  = $paref->{chour};                                                 # aktuelle Stunde (00 .. 23)
+  my $hod    = $paref->{hod};                                                   # abzufragende Stunde des Tages 01, 02 ... 24
+  my $tilt   = $paref->{tilt};                                                  # String Anstellwinkel / Neigung
+  my $azimut = $paref->{azimut};                                                # String Ausrichtung / Azimut
 
   my ($sunalt, $sunaz, $wcc);
 
@@ -4742,10 +4738,7 @@ sub ___areaFactorTrack {
       $wcc    = HistoryVal ($name, $dday, $hod, 'wcc',        0);               # Bewölkung
   }
   else {
-      my $target_hour  = ($hod - 1) % 24;                                       # Zielstunde normalisieren (1–24 → 0–23)
-      my $offset_hours = $fd * 24 + ($target_hour - $chour);                    # Gesamtstundenversatz relativ zu jetzt
-
-      my $nhtstr = 'NextHour'.sprintf "%02d",  $offset_hours;
+      my $nhtstr = 'NextHour'.sprintf "%02d",  (23 - (int $chour) + $hod);
       $sunalt    = NexthoursVal ($name, $nhtstr, 'sunalt', undef);
       $sunaz     = NexthoursVal ($name, $nhtstr, 'sunaz',  undef);
       $wcc       = NexthoursVal ($name, $nhtstr, 'wcc',        0);
@@ -4760,9 +4753,9 @@ sub ___areaFactorTrack {
   $wcc      = cloud2bin ($wcc);
 
   #-- Normale der Anlage (Nordrichtung = y-Achse, Ostrichtung = x-Achse)
-  my $nz = cos ($str_tilt * $pi180);
-  my $ny = sin ($str_tilt * $pi180) * cos ($str_azi * $pi180);
-  my $nx = sin ($str_tilt * $pi180) * sin ($str_azi * $pi180);
+  my $nz = cos ($tilt * $pi180);
+  my $ny = sin ($tilt * $pi180) * cos ($azimut * $pi180);
+  my $nx = sin ($tilt * $pi180) * sin ($azimut * $pi180);
 
   #-- Vektor zur Sonne
   my $sz = sin ($sunalt * $pi180);
@@ -4772,6 +4765,7 @@ sub ___areaFactorTrack {
   #-- Normale N = ($nx,$ny,$nz) Richtung Sonne S = ($sx,$sy,$sz)
   my $daf = $nx * $sx + $ny * $sy + $nz * $sz;
   $daf    = max ($daf, 0);
+  #$daf   += 1 if($daf);                                                                    # V 1.53.4 -> Bugfix
 
   ## Schätzung Anteil Direktstrahlung an Globalstrahlung
   ########################################################
@@ -12434,7 +12428,7 @@ sub __calcSunPosition {
   my $paref  = shift;
   my $name   = $paref->{name};
   my $type   = $paref->{type};
-  my $t      = $paref->{t};                                                                                 # Epoche Zeit
+  my $t      = $paref->{t};                                                                                # Epoche Zeit
   my $chour  = $paref->{chour};
   my $wtday  = $paref->{wtday};
   my $num    = $paref->{num};
@@ -12444,7 +12438,7 @@ sub __calcSunPosition {
   my ($fd, $fh)          = calcDayHourMove ($chour, $num);
   my $tstr               = (timestampToTimestring ($t + ($num * 3600)))[3];
   my ($date, $h, $m, $s) = split /[ :]/, $tstr;
-  $tstr                  = $date.' '.$h.':30:00';                                                           # Mitte der Stunde verwenden
+  $tstr                  = $date.' '.$h.':30:00';
 
   my ($az, $alt);
 
@@ -12465,7 +12459,7 @@ sub __calcSunPosition {
 
   debugLog ($paref, 'collectData_long', "Sun position: day: $wtday, hod: $hodn, $tstr, azimuth: $az, altitude: $alt");
 
-  if ($fd == 0 && $hodn) {                                                                                  # Sun Position für aktuellen Tag in pvHistory speichern
+  if ($fd == 0 && $hodn) {                                                                            # Sun Position für aktuellen Tag in pvHistory speichern
       writeToHistory ( { paref => $paref, key => 'sunaz',  val => $az,  day => $wtday, hour => $hodn } );
       writeToHistory ( { paref => $paref, key => 'sunalt', val => $alt, day => $wtday, hour => $hodn } );
   }
@@ -30252,7 +30246,6 @@ sub timestringsFromOffset {
       minute  => (strftime "%M",       (@ts)),                                                  # Minute (00-59)
       dayname => (strftime "%a",       (@ts)),                                                  # Wochentagsname
       dayunum => (strftime "%u",       (@ts)),                                                  # The day of the week as a decimal, range 1 to 7, Monday being 1. See also %w. (SU)
-      doyear  => (strftime "%j",       (@ts)),                                                  # Day of the year (001-366)
   };
 
 return $dt;
