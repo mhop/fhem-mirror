@@ -372,6 +372,7 @@ FHEM/70_SISPM.pm             real-wusel           Sonstiges
 FHEM/70_SML.pm               bentele              Sonstiges
 FHEM/70_SolarEdgeAPI.pm      pizmus               Solaranlagen
 FHEM/70_STV.pm               bentele              Sonstiges
+FHEM/70_SVDRP.pm             hapege               Sonstiges
 FHEM/70_TellStick.pm         real-wusel           Sonstiges
 FHEM/70_USBWX.pm             wherzig              Sonstiges
 FHEM/70_VIERA.pm             mabula               Multimedia
