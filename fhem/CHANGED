@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 70_SVDRP: added PLAY
  - bugfix: 72_FritzSmart: Fehlerkorrektur.
  - feature: 76_SolarForecast: Version 2.5.1
  - bugfix: 72_FritzSmart: weitere Fehlerkorrektur. Besonderheiten FritzOS.
