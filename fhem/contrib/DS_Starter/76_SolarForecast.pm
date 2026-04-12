@@ -4700,6 +4700,8 @@ sub __getDWDSolarData {
   }
 
   $data{$name}{statusapi}{DWD}{'?All'}{response_message} = 'success' if(!$ret);
+              
+  LRU_update_internals ($paref, $hash->{tiltCache});                                                # Internals f. Cache aktualisieren
 
 return;
 }
@@ -4782,6 +4784,7 @@ sub ___computeTiltedIrradianceCached {
   my $tail  = ${ $cache->{tail} };
   my $max   = ${ $cache->{max}  };
   my $size  = ${ $cache->{size} };
+  my $title = $cache->{title};
   
   if ($debug =~ /tiltedIrrCache/xs) {
       LRU_debug ($paref, $cache) if(askLogtime ($name, 'Dummy_Entry', 300));
@@ -4792,7 +4795,7 @@ sub ___computeTiltedIrradianceCached {
 
   if (defined $cached) {
       if ($debug =~ /tiltedIrrCache/xs) {
-          Log3 ($name, 1, "$name DEBUG> tiltedIrrCache HIT for key: $cache_key -> $cached")
+          Log3 ($name, 1, "$name DEBUG> $title HIT for key: $cache_key -> $cached")
                if askLogtime($name, $cached, 300);
       }
       return $cached;
@@ -4809,7 +4812,7 @@ sub ___computeTiltedIrradianceCached {
   $cache->{stats}{misses}++;
   
   if ($debug =~ /tiltedIrrCache/xs) {
-      Log3 ($name, 1, "$name DEBUG> tiltedIrrCache MISS for key: $cache_key") 
+      Log3 ($name, 1, "$name DEBUG> $title MISS for key: $cache_key") 
            if(askLogtime ($name, $cache_key, 300));
   }
 
@@ -4898,13 +4901,13 @@ sub ___computeTiltedIrradianceCached {
   
   if ($G_tilt > 0) {
       if ($debug =~ /tiltedIrrCache/xs) {
-          Log3 ($name, 1, "$name DEBUG> tiltedIrrCache INSERT key: $cache_key, value: $G_tilt") 
+          Log3 ($name, 1, "$name DEBUG> $title INSERT key: $cache_key, value: $G_tilt") 
                if(askLogtime ($name, $G_tilt, 300));
       }        
         
       if ($size >= $max) {                                                      # LRU: wenn voll → ältesten Eintrag entfernen
           if ($debug =~ /tiltedIrrCache/xs) {
-              Log3 ($name, 1, "$name DEBUG> tiltedIrrCache FULL -> evicting tail: $tail") 
+              Log3 ($name, 1, "$name DEBUG> $title FULL -> evicting tail: $tail") 
                    if(askLogtime ($name, $tail, 300));
           }
                     
@@ -33648,7 +33651,7 @@ sub LRU_move_to_front {
   my $tail  = ${ $cache->{tail} };
   
   if (!LRU_sanity_check ($cache)) {                                            # Sanity Check
-      LRU_reset ($cache);
+      LRU_reset ($paref, $cache);
       Log3 ($name, 1, "$name - $title LRU structure corrupted – cache reset and reinitialized");
       return;
   }
@@ -33700,7 +33703,7 @@ sub LRU_insert {
   }
   
   if (!LRU_sanity_check ($cache)) {                                             # Sanity Check
-      LRU_reset ($cache);
+      LRU_reset ($paref, $cache);
       Log3 ($name, 1, "$name - $title LRU structure corrupted – cache reset and reinitialized");
       return;
   }
@@ -33721,7 +33724,6 @@ sub LRU_insert {
 
   ${ $cache->{head} } = $key;
   ${ $cache->{tail} } = $key if !$tail;
-
   ${ $cache->{size} }++;
     
 return;
@@ -33751,7 +33753,7 @@ sub LRU_evict_tail {
   my $tail  = ${ $cache->{tail} };
   
   if (!LRU_sanity_check ($cache)) {                                            # Sanity Check
-      LRU_reset ($cache);
+      LRU_reset ($paref, $cache);
       Log3 ($name, 1, "$name - $title LRU structure corrupted – cache reset and reinitialized");
       return;
   }
@@ -33775,7 +33777,7 @@ sub LRU_evict_tail {
   delete $cache->{data}{$old};
 
   ${ $cache->{size} }--;
-  $cache->{stats}{evicts}++;                             
+  $cache->{stats}{evicts}++;  
     
 return;
 }
@@ -33803,8 +33805,23 @@ sub LRU_sanity_check {
 return 1;                                                           # alles ok
 }
 
+# --- Internals updaten         
+sub LRU_update_internals {
+  my ($paref, $cache) = @_;
+  
+  my $title = $cache->{title};  
+  
+  if ($title =~ /tiltedIrrCache/xs) {
+      my $hash = $defs{$paref->{name}};
+      $hash->{TILTED_IRR_CACHE} = "Hits=$cache->{stats}{hits}, Misses=$cache->{stats}{misses}, Evicts=$cache->{stats}{evicts}";
+  }
+  
+return;
+}
+
+# --- Cache zurücksetzen
 sub LRU_reset {
-  my ($cache) = @_;
+  my ($paref, $cache) = @_;
   
   %{ $cache->{data} } = ();
   %{ $cache->{lru} }  = ();
@@ -33816,9 +33833,7 @@ sub LRU_reset {
 return;
 }
 
-################################################################
-#      Debug DWD Tilted Irradiance Cache
-################################################################
+# --- Cache debuggen
 sub LRU_debug {
   my ($paref, $cache) = @_;
   
