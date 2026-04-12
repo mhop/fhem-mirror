@@ -19,6 +19,10 @@ use warnings;
 #   or MQTT-Connect, it is valid for 1h
 # - refresh_token is used to get a new access_token, validity period unclear
 # - auth with user/pw should be avoided, unclear why
+#
+# Change 12.04.26: The endpoint for the userId was changed by Worx/Positec without a message. 
+#                  It is possible to get the userId from the devicelist too. 
+#                  After this SUB2 is obsolete and I put the request into SUB3.
 
 my %types = (
    worx => {
@@ -79,7 +83,7 @@ Landroid_connect($$;$$)
        ReadingsAge($m2c_name, ".access_token", 0) <
        ReadingsVal($m2c_name, ".expires_in", 0)) {
     Log3 $m2c, 4, "$m2c_name: reusing the acess_token";
-    return Landroid_connect2($m2c_name);
+    return Landroid_connect3($m2c_name);
   }
 
   my $rt = ReadingsVal($m2c_name, ".refresh_token", undef);
@@ -116,7 +120,7 @@ Landroid_connect($$;$$)
       Log3 $m2c, 4, "$m2c_name: Got auth info, type ".$data->{grant_type};
       map { setReadingsVal($m2c, ".$_", $auth->{$_}, TimeNow()) }
             ( "refresh_token", "access_token", "expires_in", "token_type");
-      Landroid_connect2($m2c_name);
+      Landroid_connect3($m2c_name); #Test
     },
     header => {
       "Accept"=>"application/json",
@@ -127,47 +131,47 @@ Landroid_connect($$;$$)
 }
 
 # Step 2: get userId
-sub
-Landroid_connect2($)
-{
-  my ($m2c_name) = @_;
-  my $m2c = $defs{$m2c_name};
+#sub
+#Landroid_connect2($)
+#{
+#  my ($m2c_name) = @_;
+#  my $m2c = $defs{$m2c_name};
+#
+#  my $errPrefix = "ERROR: Landroid_connect2 $m2c_name -";
+#  my $t = $types{$m2c->{landroidType}};
+#
+#  HttpUtils_NonblockingGet({
+#    url => "https://$t->{url}/api/v2/users/me",
+#    header => { 
+#      "Accept"=>"application/json",
+#      "Authorization"=>"Bearer ".ReadingsVal($m2c_name,".access_token","")
+#    },
+#    callback=>sub($$$){
+#      my ($h,$e,$d) = @_;
+#      return Landroid_retry($m2c, "$errPrefix $e") if($e);
+#      return Landroid_retry($m2c, "$errPrefix no data") if(!$d);
+#      Log3 $m2c, 5, $d;
+#      my $me = json2nameValue($d);
+#      if(!$me->{id}) {
+#        if($m2c->{authRetry}) {
+#          Landroid_retry($m2c, "$errPrefix no userId after auth retry", $d);
+#        } else {
+#          $m2c->{authRetry} = 1;
+#          readingsDelete($m2c, ".access_token");
+#          Log3 $m2c, 4, "$errPrefix no userId, retrying auth / $d";
+#          Landroid_connect($m2c_name,$m2c->{landroidType},$m2c->{autocreate},1);
+#        }
+#        return;
+#      }
+#      delete($m2c->{authRetry});
+#      Log3 $m2c, 4, "$m2c_name: Got userId: $me->{id}";
+#      $m2c->{userId} = $me->{id};
+#      Landroid_connect3($m2c_name);
+#    }
+#  });
+#}
 
-  my $errPrefix = "ERROR: Landroid_connect2 $m2c_name -";
-  my $t = $types{$m2c->{landroidType}};
-
-  HttpUtils_NonblockingGet({
-    url => "https://$t->{url}/api/v2/users/me",
-    header => { 
-      "Accept"=>"application/json",
-      "Authorization"=>"Bearer ".ReadingsVal($m2c_name,".access_token","")
-    },
-    callback=>sub($$$){
-      my ($h,$e,$d) = @_;
-      return Landroid_retry($m2c, "$errPrefix $e") if($e);
-      return Landroid_retry($m2c, "$errPrefix no data") if(!$d);
-      Log3 $m2c, 5, $d;
-      my $me = json2nameValue($d);
-      if(!$me->{id}) {
-        if($m2c->{authRetry}) {
-          Landroid_retry($m2c, "$errPrefix no userId after auth retry", $d);
-        } else {
-          $m2c->{authRetry} = 1;
-          readingsDelete($m2c, ".access_token");
-          Log3 $m2c, 4, "$errPrefix no userId, retrying auth / $d";
-          Landroid_connect($m2c_name,$m2c->{landroidType},$m2c->{autocreate},1);
-        }
-        return;
-      }
-      delete($m2c->{authRetry});
-      Log3 $m2c, 4, "$m2c_name: Got userId: $me->{id}";
-      $m2c->{userId} = $me->{id};
-      Landroid_connect3($m2c_name);
-    }
-  });
-}
-
-# Step 3: get device list & create MQTT2_DEVICEs if necessary
+# Step 3: get useId and device list & create MQTT2_DEVICEs if necessary
 sub
 Landroid_connect3($)
 {
@@ -188,7 +192,25 @@ Landroid_connect3($)
       return Landroid_retry($m2c, "$errPrefix no data") if(!$d);
       Log3 $m2c, 5, $d;
       my $dl = json2nameValue($d); # DeviceList
-      return Landroid_retry($m2c, "$errPrefix no devicelist") if(!$dl);
+	  return Landroid_retry($m2c, "$errPrefix no devicelist") if(!$dl);
+
+	  # from Landroid_connect2
+	  if(!$dl->{'1_user_id'}) { #id
+        if($m2c->{authRetry}) {
+          Landroid_retry($m2c, "$errPrefix no userId after auth retry", $d);
+        } else {
+          $m2c->{authRetry} = 1;
+          readingsDelete($m2c, ".access_token");
+          Log3 $m2c, 4, "$errPrefix no userId, retrying auth / $d";
+          Landroid_connect($m2c_name,$m2c->{landroidType},$m2c->{autocreate},1);
+        }
+        return;
+      }
+      delete($m2c->{authRetry});
+      Log3 $m2c, 4, "$m2c_name: Got userId: $dl->{'1_user_id'}";
+      $m2c->{userId} = $dl->{'1_user_id'}; #id
+	  # end Landroid_connect2
+
       Log3 $m2c, 4, "$m2c_name: Got device info";
       my %sn;
       for my $d (keys %defs) {
