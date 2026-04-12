@@ -17,6 +17,7 @@
 #                 handle HELP responses
 #    1.01.06      strip <epgsearch> info from timername, fix stateFormat overwrite
 #    1.01.07      optimize help text
+#    1.01.08      added SVDRP play
 #
 ########################################################################################
 #
@@ -48,7 +49,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday);
 use POSIX;
 
-my $version = "1.01.07";
+my $version = "1.01.08";
 
 my %SVDRP_gets = (
   #
@@ -56,14 +57,15 @@ my %SVDRP_gets = (
 
 # Raw is not used by now
 my %SVDRP_defaultsetsRaw = (
-  "HITK"     => "",
-  "LSTT"     => ":get",
-  "LSTR"     => ":get",
-  "NEXT"     => ":get",
-  "STAT"     => ":disk",
-  "UPDR"     => ":get",
   "CHAN"     => ":+,-",
   "DELT"     => "",
+  "HITK"     => "",
+  "LSTR"     => ":get",
+  "LSTT"     => ":get",
+  "NEXT"     => ":get",
+  "PLAY"     => ":get",
+  "STAT"     => ":disk",
+  "UPDR"     => ":get",
   "VOLU"     => ":+,-,mute",
   "cleanUp"  => ":noArg",
   "closeDev" => ":noArg",
@@ -71,24 +73,25 @@ my %SVDRP_defaultsetsRaw = (
 );
 
 my %SVDRP_defaultsets = (
-  "HitKey"            => "",
-  "ListTimers"        => ":noArg",
-  "NextTimer"         => ":noArg",
-  "DiskStatus"        => ":noArg",
-  "UpdateRecordings"  => ":get",
   "Channel"           => ":+,-",
   "DeleteTimer"       => "",
-  "Volume"            => ":+,-,mute",
+  "DiskStatus"        => ":noArg",
+  "GetAll"            => ":noArg",
+  "Help"              => ":noArg",
+  "HitKey"            => "",
+  "ListRecording"     => "",  
+  "ListTimers"        => ":noArg",
+  "NextTimer"         => ":noArg",
+  "Play"              => ":noArg",
+  "Plugin"            => "",
+  "PowerOff"          => ":noArg",
+  "SatIP"             => ":INFO,MODE,LIST,SCAN,STAT,CONT,OPER,ATTA,DETA,TRAC",  
+  "StreamdevServer"   => ":LSTC,DISC",  
+  "UpdateRecordings"  => ":get",
+  "Volume"            => ":+,-,mute",  
   "cleanUp"           => ":noArg",
   "closeDev"          => ":noArg",
-  "connect"           => ":noArg",
-  "PowerOff"          => ":noArg",
-  "ListRecording"     => "",
-  "GetAll"            => ":noArg",
-  "Plugin"            => "",
-  "StreamdevServer"   => ":LSTC,DISC",
-  "SatIP"             => ":INFO,MODE,LIST,SCAN,STAT,CONT,OPER,ATTA,DETA,TRAC",
-  "Help"              => ":noArg"
+  "connect"           => ":noArg"
 );
 
 my %SVDRP_defaultsets_unused = (
@@ -96,22 +99,23 @@ my %SVDRP_defaultsets_unused = (
 );
 
 my %SVDRP_cmdmap = (
-  "HitKey"           => "HITK",
-  "ListTimers"       => "LSTT",
-  "NextTimer"        => "NEXT",
-  "DiskStatus"       => "STAT",
-  "UpdateRecordings" => "UPDR",
   "Channel"          => "CHAN",
   "DeleteTimer"      => "DELT",
-  "Volume"           => "VOLU",
-  "ListRecording"    => "LSTR",
+  "DiskStatus"       => "STAT",
+  "Help"             => "HELP",    
+  "HitKey"           => "HITK",
+  "ListRecording"    => "LSTR",  
+  "ListTimers"       => "LSTT",
+  "NextTimer"        => "NEXT",
+  "Play"             => "PLAY",
   "Plugin"           => "PLUG",
+  "SatIP"            => "PLUG satip",  
   "StreamdevServer"  => "PLUG streamdev-server",
-  "SatIP"            => "PLUG satip",
-  "Help"             => "HELP"
+  "UpdateRecordings" => "UPDR",
+  "Volume"           => "VOLU"
 );
 
-my @SVDRP_statusCmds = ("LSTT", "NEXT", "CHAN", "VOLU", "STAT");
+my @SVDRP_statusCmds = ("LSTT", "NEXT", "CHAN", "VOLU", "STAT", "PLAY");
 
 my %SVDRP_cmdmap_unused = (
   "ListRecordings" => "LSTR"
@@ -538,6 +542,7 @@ sub SVDRP_parseMessage {
   my $parsedmsg = "";
   my $code;
   my $recording = "";
+  my $playstatus = "";
   my $plugin = "";
   my $text="";
    
@@ -555,6 +560,13 @@ sub SVDRP_parseMessage {
   elsif ($msg =~ /^221/){
     # format: 220 VDR SVDRP VideoDiskRecorder 2.0.6; Sun Feb 13 17:33:10 2022; UTF-8
     $reading = "infoClose";
+    (my $code, $msg) = split (/ /, $msg, 2);
+    $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
+    #Log3 $name, 5, "[$name] Parse: updated $reading with '$msg'";
+  }
+  elsif ($msg =~ /^550\d\d/){
+    # format: 550 Not Playing
+    $reading = "PlayStatus";
     (my $code, $msg) = split (/ /, $msg, 2);
     $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
     #Log3 $name, 5, "[$name] Parse: updated $reading with '$msg'";
@@ -641,6 +653,23 @@ sub SVDRP_parseMessage {
     $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
     #Log3 $name, 5, "[$name] Parse: updated $reading with $msg"        
   }
+  elsif ($msg =~ /^250[ ]\d+\h[0-9]{2}\.[0-9]{2}\.[0-9]{2}\h[0-9]{2}:[0-9]{2}\h/){
+    # Play format:
+    # 250 84 26.02.20 16:05 Recording Title Text
+    $reading = "PlayStatus";
+    # check if we got "250-n"
+    if (substr($msg, 3, 1) eq "-"){
+      ($code, $msg) = split (/-/, $msg, 2);
+      #Log3 $name, 5, "[$name] Parse: substring contains '-'";
+    }
+    else{
+      ($code, $msg) = split (/ /, $msg, 2);
+    }
+    $playstatus = ReadingsVal($name, $reading, "");
+    $msg = $playstatus."\n".$msg;    
+    $rv = readingsSingleUpdate($hash, $reading, $msg, 1);
+    #Log3 $name, 5, "[$name] Parse: updated $reading with $msg"        
+  }  
   elsif ($msg =~ /^215/){
     # Recording format: 215-xxxx
     $reading = "Recordings";
