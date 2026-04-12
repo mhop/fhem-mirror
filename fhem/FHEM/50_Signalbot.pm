@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.22";
+my $Signalbot_VERSION="3.23";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -2076,7 +2076,8 @@ sub Signalbot_setCaptcha {
 	#Use number from verification mode as "register" is already empty when in stage 2 of VOICE
 	$account=$hash->{helper}{verification} if $method==2;
 	my $ret=Signalbot_Registration($hash,$account);
-	if (defined $ret) {
+	# Fehlermeldung bei "SMS" Registrierung? - Ignore error on first attempt
+	if (defined $ret || $method == 1) {
 		$hash->{helper}{register}=undef;
 		$hash->{helper}{verification}=$account;
 		#Switch back to device overview - experimental hint from rudolphkoenig https://forum.fhem.de/index.php/topic,122771.msg1173835.html#new
@@ -2112,11 +2113,11 @@ sub Signalbot_Registration($$) {
 	my $ret;
 	if (!defined $captcha) {
 		#try without captcha (but never works nowadays)
-		Log3 $hash->{NAME}, 4, $hash->{NAME}." Register $account";
-		Log3 $hash->{NAME}, 4, $hash->{NAME}." Method $method";
-		Log3 $hash->{NAME}, 4, $hash->{NAME}." Without Captcha";
-		$ret=Signalbot_CallS($hash,"register",$account,$method);
-		return -1 if (defined $ret)
+		#Log3 $hash->{NAME}, 4, $hash->{NAME}." Register $account";
+		#Log3 $hash->{NAME}, 4, $hash->{NAME}." Method $method";
+		#Log3 $hash->{NAME}, 4, $hash->{NAME}." Without Captcha";
+		#$ret=Signalbot_CallS($hash,"register",$account,$method);
+		return -1; # if (defined $ret)
 	} else {
 		Log3 $hash->{NAME}, 4, $hash->{NAME}." Register $account";
 		Log3 $hash->{NAME}, 4, $hash->{NAME}." Method $method";

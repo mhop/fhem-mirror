@@ -7,9 +7,9 @@ SCRIPTVERSION="3.35"
 SIGNALPATH=/opt
 SIGNALUSER=signal-cli
 LIBPATH=/usr/lib
-SIGNALVERSION="0.13.23"
+SIGNALVERSION="0.14.2"
 #Check for latest valid version at https://github.com/AsamK/signal-cli/releases
-LIBRARYVERSION="0.87.0"
+LIBRARYVERSION="0.90.0"
 #Check for latest valid version at https://github.com/exquo/signal-libs-build/releases
 #Make sure this matches the required version for signal-cli (see lib/libsignal-client-0.xx.x.jar version in signal-cli)
 LIBSIG=libsignal_jni.tgz
@@ -23,7 +23,7 @@ DBVER=0.22
 OPERATION=$1
 UNATTENDED=$2
 JAVACMD=java
-JAVA_VERSION=21.0
+JAVA_VERSION=25.0
 JDK_PACKAGE=openjdk-21-jre-headless
 JAVA_NATIVE=yes
 
@@ -302,12 +302,12 @@ if [ "$JAVA_NATIVE" = "download" ]; then
 	cd /opt
 	if [ "$ARCHJ" = "arm" ]; then
 		echo -n "Downloading private jdk21 build for armv7l platform..."
-		JAVA_ARC=openjdk-21.0.35-armv7l-glibc2.28.tar.gz
+		JAVA_ARC=openjdk-25.0.35-armv7l-glibc2.28.tar.gz
 		wget -qN https://github.com/bublath/FHEM-Signalbot/raw/main/java/$JAVA_ARC
 	else
 		echo -n "Downloading Java from adoptium..."
-		JAVA_ARC=OpenJDK21U-jdk_$ARCHJ\_linux_hotspot_21.0.2_13.tar.gz
-		wget -qN https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/$JAVA_ARC
+		JAVA_ARC=OpenJDK25U-jre_$ARCHJ\_linux_hotspot_25.0.2_10.tar.gz
+		wget -qN https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/$JAVA_ARC
 	fi
 	
 	if [ -z $JAVA_ARC ]; then
@@ -411,10 +411,10 @@ if [ $NEEDINSTALL = 1 ]; then
 	stop_service
 	cd /tmp
 	echo -n "Downloading signal-cli $SIGNALVERSION..."
-	wget -qN https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION-Linux.tar.gz -O signal-cli-$SIGNALVERSION.tar.gz
+	wget -Nq https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION.tar.gz -O signal-cli-$SIGNALVERSION.tar.gz
 	if [ ! -s signal-cli-$SIGNALVERSION.tar.gz ]; then
-		#Try alternative name used in 0.12.3
-		wget -qN https://github.com/AsamK/signal-cli/releases/download/v$SIGNALVERSION/signal-cli-$SIGNALVERSION.tar.gz -O signal-cli-$SIGNALVERSION.tar.gz
+		echo "Failed to download signal-cli $SIGNALVERSION"
+		exit
 	fi
 	if [ -s signal-cli-$SIGNALVERSION.tar.gz ]; then
 		echo "done"
