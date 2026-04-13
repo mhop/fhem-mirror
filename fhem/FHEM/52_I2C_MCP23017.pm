@@ -11,7 +11,7 @@ use strict;
 use warnings;
 use SetExtensions;
 use Scalar::Util qw(looks_like_number);
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+use List::Util qw(any);
 
 my %Registers = (
 	'IODIRA'   => 0x00,		#1 = input; 0 = output (default 1)
@@ -328,7 +328,7 @@ sub I2C_MCP23017_Set($@) {
 		my @scmd = split(",", $cmd);
 		foreach (@scmd) {
 			$_ =~ tr/P(ort|)//d;			#Nummer aus String extrahieren
-			$msg .= (defined $msg ? "," : "") . "Port" . $_ unless ( ($_) ~~ @outports );		#Pruefen ob entsprechender Port Input ist
+			$msg .= (defined $msg ? "," : "") . "Port" . $_ unless ( AttrVal($name, "OutputPorts", "") =~ /$_/ );		#Pruefen ob entsprechender Port Input ist
 		}
 		return "$name error: $msg is defined as input" if $msg;
 		#Log3 $hash, 1, "$name: multitest gereinigt: @scmd";
@@ -337,7 +337,8 @@ sub I2C_MCP23017_Set($@) {
 		foreach (reverse 0..7) {
 			foreach my $po ("A","B") {
 				my $bank = ($po eq "A") ? 0 : 8;	# A oder B
-				if ( ($po.$_) ~~ @scmd ) {				#->wenn aktueller Port in Liste dann neuer Wert
+				if ( $cmd =~ /$po$_/ ) {				#->wenn aktueller Port in Liste dann neuer Wert
+
 					$regval += $setsP{$val} << ($bank + $_);
 				} else {													#->sonst aus dem Reading holen
 					$regval += $setsP{ReadingsVal($name,"Port".$po.$_,"off")} << ($bank + $_);		
@@ -349,11 +350,11 @@ sub I2C_MCP23017_Set($@) {
 	} else {
 		my $list = "";
 		foreach (0..7) {
-			next unless ( ("A" . $_) ~~ @outports );		#Inputs ueberspringen
+			next unless ( AttrVal($name, "OutputPorts", "") =~ /A$_/ );		#Inputs ueberspringen
 			$list .= "PortA" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
 		}
 		foreach (0..7) {
-			next unless ( ("B" . $_) ~~ @outports );		#Inputs ueberspringen
+			next unless ( AttrVal($name, "OutputPorts", "") =~ /B$_/ );		#Inputs ueberspringen
 			$list .= "PortB" . $_ . ":" . join(',', (sort { $setsP{ $a } <=> $setsP{ $b } } keys %setsP) ) . " ";
 		}
 		$msg = "Unknown argument $a[1], choose one of " . $list;
