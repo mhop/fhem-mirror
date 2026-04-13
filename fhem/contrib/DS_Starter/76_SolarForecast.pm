@@ -165,6 +165,7 @@ BEGIN {
 my %vNotesIntern = (
   "2.6.0"  => "12.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
                            "rename debug id saveData2Cache -> saveData2Storage, new Debug Id tiltedIrrCache ".
+                           "new solar2astro_cache ".
                            "complete universal LRU-Cache implementation for DWD Tilted Irradiance Cache ",
   "2.5.3"  => "09.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ".
                            "correct ___areaFactorTrack: offset_hours ",
@@ -473,6 +474,7 @@ use constant {
 ######################
 my @da;                                                                             # zentraler temporärer Readings-Storage
 my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
+my %solar2astro_cache;                                                              # Solar2Astro Cache
 
 ## Standardvariablen
 ######################
@@ -2430,7 +2432,7 @@ sub Define {
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                # Modul Meta.pm nicht vorhanden
 
   $hash->{tiltCache} = LRU_cache_create ('tiltedIrrCache', 'Tilted Irradiance Cache', 2000);            # Tilted Irradiance Cache initialisieren
-    
+ 
   my $params = {
       hash        => $hash,
       name        => $name,
@@ -30688,8 +30690,15 @@ return $dolog;
 sub azSolar2Astro {
   my ($azsolar) = @_;
 
-return ($azsolar + 180) % 360;
+  return $solar2astro_cache{$azsolar} if exists $solar2astro_cache{$azsolar};               # Cache-Hit
+  
+  my $astro                    = ($azsolar + 180) % 360;                                    # Berechnung
+  $solar2astro_cache{$azsolar} = $astro;                                                    # in Cache speichern
+
+return $astro;
 }
+
+
 
 ###################################################################
 #  liefert eine dynamische Farbe abhängig von "$val" und dem
@@ -33809,11 +33818,13 @@ return 1;                                                           # alles ok
 sub LRU_update_internals {
   my ($paref, $cache) = @_;
   
-  my $title = $cache->{title};  
+  my $title = $cache->{title};
+  my $max   = ${ $cache->{max}  };
+  my $size  = ${ $cache->{size} };  
   
   if ($title =~ /tiltedIrrCache/xs) {
       my $hash = $defs{$paref->{name}};
-      $hash->{TILTED_IRR_CACHE} = "Hits=$cache->{stats}{hits}, Misses=$cache->{stats}{misses}, Evicts=$cache->{stats}{evicts}";
+      $hash->{TILTED_IRR_CACHE} = "Hits=$cache->{stats}{hits}, Misses=$cache->{stats}{misses}, Evicts=$cache->{stats}{evicts}, Entries=$size/$max";
   }
   
 return;
