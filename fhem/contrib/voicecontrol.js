@@ -1,11 +1,10 @@
 // =======================================================
 // VoiceControl für FHEM
-// Version: 0.9
-// Datum: 20.03.2026
+// Version: 0.9.7
 // Änderungen:
-// - Mobile + Desktop getrennt
-// - Desktop Fix: kein Selbsttriggern durch TTS
-// - Desktop Fix: stabilerer Wakeword Flow
+// - Sicherheits-Timer wird bei Sprechbeginn sofort gekillt
+// - Unbegrenzte Sprechzeit möglich
+// - Alle "Okay" entfernt
 // =======================================================
 
 (function() {
@@ -14,6 +13,7 @@
 
         let isJamesActive = false;
         let isSpeaking = false; 
+        let isUserSpeaking = false; 
         let pressTimer;
         let isHolding = false;
         let recognition;
@@ -53,7 +53,6 @@
         function speak(text, callback) {
             if (!text || text === " ") { if(callback) callback(); return; }
             isSpeaking = true;
-
             if (isFully) {
                 try {
                     fully.textToSpeech(text);
@@ -62,7 +61,6 @@
                     return;
                 } catch(e) {}
             }
-
             try {
                 const synth = window.speechSynthesis;
                 synth.cancel();
@@ -96,7 +94,6 @@
         }
 
         function processSpeech(text) {
-
             if (!isMobile) {
                 if (isSpeaking || startupBlock) return;
                 if (!isJamesActive && !isHolding && !isWaitingForCommand) return;
@@ -118,17 +115,17 @@
 
                 clearTimeout(commandTimeout);
                 commandTimeout = setTimeout(() => {
-                    if(isWaitingForCommand){
+                    if(isWaitingForCommand && !isUserSpeaking){
                         isWaitingForCommand = false;
-                        btn.style.background = COLOR_IDLE; 
+                        btn.style.background = isJamesActive ? COLOR_IDLE : COLOR_OFF;
                         showBubble("⏳ Abgebrochen");
                     }
-                }, 6000);
+                }, 10000); 
                 return;
             }
 
             if(isWaitingForCommand && !isSpeaking){
-                clearTimeout(commandTimeout);
+                clearTimeout(commandTimeout); // Befehl erhalten -> Timer löschen!
                 isWaitingForCommand = false;
                 btn.style.background = COLOR_IDLE;
                 sendAction(spoken);
@@ -140,22 +137,10 @@
 
         function sendAction(cmd) {
             showBubble("🎤 " + cmd);
-
             let clientId = $("body").attr("fw_id") || "no_fw_id";
             const fhemCmd = `setreading global STT ${cmd} [${clientId}]`;
             FW_cmd(FW_root + "?cmd=" + encodeURIComponent(fhemCmd) + "&XHR=1");
-
-            if (isMobile) {
-                speak("Okay", () => {
-                    try {
-                        if (recognition && (isJamesActive || isHolding || isWaitingForCommand)) {
-                            recognition.start();
-                        }
-                    } catch(e) {}
-                });
-            } else {
-                speak("Okay");
-            }
+            // Okay entfernt
         }
 
         if(SpeechRecognition){
@@ -163,6 +148,25 @@
             recognition.lang = "de-DE";
             recognition.continuous = true;
             recognition.interimResults = false;
+
+            recognition.onspeechstart = () => {
+                isUserSpeaking = true;
+                clearTimeout(commandTimeout); // WICHTIG: Stoppt den 10s Abbruch sofort beim ersten Laut!
+            };
+
+            recognition.onspeechend = () => {
+                isUserSpeaking = false;
+                if (isWaitingForCommand) {
+                    clearTimeout(commandTimeout);
+                    commandTimeout = setTimeout(() => {
+                        if (isWaitingForCommand && !isUserSpeaking) {
+                            isWaitingForCommand = false;
+                            btn.style.background = isJamesActive ? COLOR_IDLE : COLOR_OFF;
+                            showBubble("⏳ Abgebrochen");
+                        }
+                    }, 3000);
+                }
+            };
 
             recognition.onresult = (e) => {
                 if (!isMobile && isSpeaking) return;
@@ -172,20 +176,8 @@
 
             recognition.onend = () => {
                 if(isSpeaking) return;
-
-                if (isMobile) {
-                    if(isJamesActive || isHolding || isWaitingForCommand){
-                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 400);
-                    }
-                } else {
-                    if (isWaitingForCommand) {
-                        isWaitingForCommand = false;
-                        btn.style.background = COLOR_IDLE;
-                    }
-
-                    if(isJamesActive || isHolding){
-                        setTimeout(() => { try { recognition.start(); } catch(e){} }, 100);
-                    }
+                if(isJamesActive || isHolding || isWaitingForCommand){
+                    setTimeout(() => { try { recognition.start(); } catch(e){} }, 500);
                 }
             }
         }
@@ -193,7 +185,6 @@
         const handleDown = (e) => {
             if(e.cancelable) e.preventDefault();
             if(!audioUnlocked){ speak(" "); audioUnlocked = true; }
-
             pressTimer = setTimeout(() => {
                 pressTimer = null;
                 isHolding = true;
@@ -205,32 +196,25 @@
 
         const handleUp = (e) => {
             if(e.cancelable) e.preventDefault();
-
             if(pressTimer){
                 clearTimeout(pressTimer);
                 pressTimer = null;
-
                 isJamesActive = !isJamesActive;
                 btn.style.background = isJamesActive ? COLOR_IDLE : COLOR_OFF;
-
                 if(isJamesActive){
-
                     if (!isMobile) {
                         startupBlock = true;
                         setTimeout(() => { startupBlock = false; }, 3000);
                     }
-
                     showBubble("🤖 Aktiv", 2000);
                     speak("James aktiviert");
                     try { recognition.start(); } catch(e){}
-
                 }else{
                     isWaitingForCommand = false;
                     showBubble("😴 Aus", 2000);
                     speak("James deaktiviert");
                     try { recognition.stop(); } catch(e){}
                 }
-
             }else if(isHolding){
                 btn.style.background = isJamesActive ? COLOR_IDLE : COLOR_OFF;
                 setTimeout(()=>{ 
