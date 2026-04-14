@@ -163,10 +163,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.0"  => "12.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
+  "2.6.0"  => "14.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
                            "rename debug id saveData2Cache -> saveData2Storage, new Debug Id tiltedIrrCache ".
-                           "new solar2astro_cache ".
-                           "complete universal LRU-Cache implementation for DWD Tilted Irradiance Cache ",
+                           "new Mini Caches: Solar2Astro_Cache, DayHourMove_Cache, move __createAdditionalEvents to Task 8 ".
+                           "complete universal LRU-Cache implementation for DWD Tilted Irradiance Cache, TimestringsFromOffset Cache ".
+                           "prepare replacing of Reading Tomorrow_ConsumptionForecast by Tomorrow_CONforecast ",
   "2.5.3"  => "09.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ".
                            "correct ___areaFactorTrack: offset_hours ",
   "2.5.2"  => "07.04.2026  func ___openMeteoErrorExit, ___solCastErrorExit -> 5 minutes Log message lock ".
@@ -474,7 +475,10 @@ use constant {
 ######################
 my @da;                                                                             # zentraler temporärer Readings-Storage
 my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
-my %solar2astro_cache;                                                              # Solar2Astro Cache
+my %Solar2Astro_Cache;                                                              # Solar2Astro Cache
+my %DayHourMove_Cache;                                                              # dayhourmove Cache
+my %MCache_Stats;                                                                   # Statistik für Minicaches
+
 
 ## Standardvariablen
 ######################
@@ -1591,15 +1595,15 @@ my %hfspvh = (
   socwhsum          => { fn => \&_saveHistP2, storname => 'socwhsum',       validkey => undef,    fpar => undef    },    # real eerichter SoC (Wh) zusammengefasst über alle Batterien
   socprogwhsum      => { fn => \&_saveHistP2, storname => 'socprogwhsum',   validkey => undef,    fpar => undef    },    # prognostizierter SoC (Wh) zusammengefasst über alle Batterien
   pvapifcraw        => { fn => \&_saveHistP2, storname => 'pvapifcraw',     validkey => undef,    fpar => undef    },    # prognostizierter Energieertrag Raw
-  pvfc              => { fn => \&_saveHistP2, storname => 'pvfc',           validkey => undef,    fpar => 'comp99' },    # prognostizierter Energieertrag
-  confc             => { fn => \&_saveHistP2, storname => 'confc',          validkey => undef,    fpar => 'comp99' },    # durch KI oder herkömmlich prognostizierter Hausverbrauch
+  pvfc              => { fn => \&_saveHistP2, storname => 'pvfc',           validkey => undef,    fpar => 'calc99' },    # prognostizierter Energieertrag
+  confc             => { fn => \&_saveHistP2, storname => 'confc',          validkey => undef,    fpar => 'calc99' },    # durch KI oder herkömmlich prognostizierter Hausverbrauch
   conaifc           => { fn => \&_saveHistP2, storname => 'conaifc',        validkey => undef,    fpar => undef    },    # Hilfswert: durch KI prognostizierter Hausverbrauch
   conbiascorr       => { fn => \&_saveHistP2, storname => 'conbiascorr',    validkey => undef,    fpar => undef    },    # in der KI Verbrauchsprognose enthaltene kombinierte Bias- und Driftkorrektur 
   conlegfc          => { fn => \&_saveHistP2, storname => 'conlegfc',       validkey => undef,    fpar => undef    },    # Hilfswert: herkömmlich prognostizierter Hausverbrauch
-  gcons             => { fn => \&_saveHistP2, storname => 'gcons',          validkey => undef,    fpar => 'comp99' },    # bezogene Energie
-  gfeedin           => { fn => \&_saveHistP2, storname => 'gfeedin',        validkey => undef,    fpar => 'comp99' },    # eingespeiste Energie
-  con               => { fn => \&_saveHistP2, storname => 'con',            validkey => undef,    fpar => 'comp99' },    # realer Hausverbrauch Energie
-  pvrl              => { fn => \&_saveHistP2, storname => 'pvrl',           validkey => 'pvrlvd', fpar => 'comp99' },    # realer Energieertrag PV
+  gcons             => { fn => \&_saveHistP2, storname => 'gcons',          validkey => undef,    fpar => 'calc99' },    # bezogene Energie
+  gfeedin           => { fn => \&_saveHistP2, storname => 'gfeedin',        validkey => undef,    fpar => 'calc99' },    # eingespeiste Energie
+  con               => { fn => \&_saveHistP2, storname => 'con',            validkey => undef,    fpar => 'calc99' },    # realer Hausverbrauch Energie
+  pvrl              => { fn => \&_saveHistP2, storname => 'pvrl',           validkey => 'pvrlvd', fpar => 'calc99' },    # realer Energieertrag PV
   plantderated      => { fn => \&_saveHistP2, storname => 'plantderated',   validkey => undef,    fpar => undef    },    # Abregelungsstatus der Anlage
   comforttemp       => { fn => \&_saveHistP2, storname => 'comforttemp',    validkey => undef,    fpar => undef    },    # Komforttemperatur des Gebäudes
   hpcsm             => { fn => \&_saveHistP2, storname => 'hpcsm',          validkey => undef,    fpar => undef    },    # Consumernummern installierter Wärmepumpen
@@ -1611,7 +1615,7 @@ my %hfspvh = (
       $hfspvh{'pvrl'.$in}{fn}          = \&_saveHistP2;                         # realer Energieertrag Inverter
       $hfspvh{'pvrl'.$in}{storname}    = 'pvrl'.$in;
       $hfspvh{'pvrl'.$in}{validkey}    = undef;
-      $hfspvh{'pvrl'.$in}{fpar}        = 'comp99';
+      $hfspvh{'pvrl'.$in}{fpar}        = 'calc99';
 
       $hfspvh{'etotali'.$in}{fn}       = \&_saveHistP2;                         # etotal Inverter
       $hfspvh{'etotali'.$in}{storname} = 'etotali'.$in;
@@ -1637,7 +1641,7 @@ my %hfspvh = (
       $hfspvh{'pprl'.$pn}{fn}          = \&_saveHistP2;                         # realer Energieertrag sonstiger Erzeuger
       $hfspvh{'pprl'.$pn}{storname}    = 'pprl'.$pn;
       $hfspvh{'pprl'.$pn}{validkey}    = undef;
-      $hfspvh{'pprl'.$pn}{fpar}        = 'comp99';
+      $hfspvh{'pprl'.$pn}{fpar}        = 'calc99';
 
       $hfspvh{'etotalp'.$pn}{fn}       = \&_saveHistP2;                         # etotal sonstiger Erzeuger
       $hfspvh{'etotalp'.$pn}{storname} = 'etotalp'.$pn;
@@ -1660,12 +1664,12 @@ my %hfspvh = (
       $hfspvh{'batinthishour'.$bn}{fn}        = \&_saveHistP2;                  # Batterieladung in Stunde
       $hfspvh{'batinthishour'.$bn}{storname}  = 'batin'.$bn;
       $hfspvh{'batinthishour'.$bn}{validkey}  = undef;
-      $hfspvh{'batinthishour'.$bn}{fpar}      = 'comp99';
+      $hfspvh{'batinthishour'.$bn}{fpar}      = 'calc99';
 
       $hfspvh{'batoutthishour'.$bn}{fn}       = \&_saveHistP2;                  # Batterieentladung in Stunde
       $hfspvh{'batoutthishour'.$bn}{storname} = 'batout'.$bn;
       $hfspvh{'batoutthishour'.$bn}{validkey} = undef;
-      $hfspvh{'batoutthishour'.$bn}{fpar}     = 'comp99';
+      $hfspvh{'batoutthishour'.$bn}{fpar}     = 'calc99';
 
       $hfspvh{'batprogsoc'.$bn}{fn}           = \&_saveHistP2;                  # Prognose-SOC des Tages
       $hfspvh{'batprogsoc'.$bn}{storname}     = 'batprogsoc'.$bn;
@@ -2431,8 +2435,9 @@ sub Define {
   
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                # Modul Meta.pm nicht vorhanden
 
-  $hash->{tiltCache} = LRU_cache_create ('tiltedIrrCache', 'Tilted Irradiance Cache', 2000);            # Tilted Irradiance Cache initialisieren
- 
+  $hash->{'.tiltCache'} = LRU_cache_create ('tiltedIrrCache', 'Tilted Irradiance Cache',     2000);     # Tilted Irradiance Cache initialisieren
+  $hash->{'.tsCache'}   = LRU_cache_create ('tsCache',        'TimestringsFromOffset Cache', 1000);     # timestringsFromOffset Cache
+
   my $params = {
       hash        => $hash,
       name        => $name,
@@ -3181,7 +3186,7 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if ($args[0] eq 'pvCorrection') {
-      my $dt  = timestringsFromOffset (time, 0);
+      my $dt  = timestringsFromOffset ($name, time, 0);
       my $hod = $dt->{hour} + 1;
 
       for my $n (1..24) {
@@ -3651,16 +3656,18 @@ sub Get {
       return "Select the action you want from the Drop-Down list";
   }
 
-  my $t      = int time;
+  my $t  = int time;
+  my $dt = timestringsFromOffset ($name, $t);
+
   my $params = {
       name  => $name,
       type  => $type,
       opt   => $opt,
       arg   => $arg,
       t     => $t,
-      chour => (strftime "%H",       localtime($t)),                                            # aktuelle Stunde in 24h format (00-23)
-      date  => (strftime "%Y-%m-%d", localtime($t)),
-      day   => (strftime "%d",       localtime($t)),                                            # aktueller Tag (range 01 .. 31)
+      chour => $dt->{hour},                                                 # aktuelle Stunde in 24h format (00-23)
+      date  => $dt->{date},
+      day   => $dt->{day},                                                  # aktueller Tag (range 01 .. 31)
       debug => getDebug ($hash),
       lang  => getLang  ($hash)
   };
@@ -3687,7 +3694,6 @@ return $getlist;
 sub _getRoofTopData {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $hash  = $defs{$name};
 
   delete $data{$name}{current}{dwdRad1hAge};
@@ -4141,7 +4147,6 @@ sub ___setSolCastAPIcallKeyData {
   my $paref = shift;
 
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $lang  = $paref->{lang};
   my $debug = $paref->{debug};
   my $t     = $paref->{t} // time;
@@ -4172,7 +4177,9 @@ sub ___setSolCastAPIcallKeyData {
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
-  my $date   = strftime "%Y-%m-%d", localtime($t);
+  my $dt   = timestringsFromOffset ($name, $t, 0);  
+  my $date = $dt->{date};
+
   my $sunset = $date.' '.ReadingsVal ($name, "Today_SunSet", '00:00').':00';
   my $sstime = timestringToTimestamp ($sunset);
   my $dart   = $sstime - $t;                                                                                          # verbleibende Sekunden bis Sonnenuntergang
@@ -4210,8 +4217,11 @@ sub __getForecastSolarData {
 
   if (!$force) {                                                                                   # regulärer API Abruf
       my $etxt   = $hqtxt{bnsas}{$lang};
-      $etxt      =~ s{<WT>}{(LEADTIME/60)}eg;
-      my $date   = strftime "%Y-%m-%d", localtime($t);
+      $etxt      =~ s{<WT>}{(LEADTIME/60)}eg;      
+      
+      my $dt     = timestringsFromOffset ($name, $t, 0);  
+      my $date   = $dt->{date};
+  
       my $srtime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunRise", '23:59').':59');
       my $sstime = timestringToTimestamp ($date.' '.ReadingsVal($name, "Today_SunSet",  '00:00').':00');
 
@@ -4605,7 +4615,7 @@ sub __getDWDSolarData {
       my ($fd, $fh) = calcDayHourMove (0, $num);                                                    # immer bei 0 = Taganfang starten
       last if($fd > MAXNEXTDAYS);
       
-      my $dt       = timestringsFromOffset ($sts, $num * 3600);
+      my $dt       = timestringsFromOffset ($name, $sts, $num * 3600);
       my $ddate    = $dt->{date};                                                                   # abzurufendes Datum
       my $dday     = $dt->{day};                                                                    # abzurufender Tag: 01, 02 ... 31
       my $dofyear  = $dt->{dofyear};                                                                # Tag des Jahres (001...366)
@@ -4701,10 +4711,10 @@ sub __getDWDSolarData {
       }
   }
 
+  LRU_update_internals ($name, $hash->{'.tiltCache'});                                              # Internals f. Cache aktualisieren
+  
   $data{$name}{statusapi}{DWD}{'?All'}{response_message} = 'success' if(!$ret);
               
-  LRU_update_internals ($paref, $hash->{tiltCache});                                                # Internals f. Cache aktualisieren
-
 return;
 }
 
@@ -4782,24 +4792,17 @@ sub ___computeTiltedIrradianceCached {
     $dofyear;
     
   my $hash  = $defs{$name};
-  my $cache = $hash->{tiltCache};
-  my $tail  = ${ $cache->{tail} };
-  my $max   = ${ $cache->{max}  };
-  my $size  = ${ $cache->{size} };
+  my $cache = $hash->{'.tiltCache'};
   my $title = $cache->{title};
   
   if ($debug =~ /tiltedIrrCache/xs) {
-      LRU_debug ($paref, $cache) if(askLogtime ($name, 'Dummy_Entry', 300));
+      LRU_debug ($name, $cache) if(askLogtime ($name, 'Dummy_Entry', 300));
   }
     
   # --- Cache-Treffer? ---
-  my $cached = LRU_get ($paref, $cache, $cache_key);
+  my $cached = LRU_get ($name, $cache, $cache_key);
 
   if (defined $cached) {
-      if ($debug =~ /tiltedIrrCache/xs) {
-          Log3 ($name, 1, "$name DEBUG> $title HIT for key: $cache_key -> $cached")
-               if askLogtime($name, $cached, 300);
-      }
       return $cached;
   }
 
@@ -4810,13 +4813,6 @@ sub ___computeTiltedIrradianceCached {
   my $deg = $pi / 180.0;
 
   return 0 if(!defined ($sg) || $sg <= 0);
-  
-  $cache->{stats}{misses}++;
-  
-  if ($debug =~ /tiltedIrrCache/xs) {
-      Log3 ($name, 1, "$name DEBUG> $title MISS for key: $cache_key") 
-           if(askLogtime ($name, $cache_key, 300));
-  }
 
   my $sunaz_r  = $sunaz    * $deg;
   my $sunalt_r = $sunalt   * $deg;
@@ -4902,21 +4898,7 @@ sub ___computeTiltedIrradianceCached {
   $G_tilt = round2 ($G_tilt);
   
   if ($G_tilt > 0) {
-      if ($debug =~ /tiltedIrrCache/xs) {
-          Log3 ($name, 1, "$name DEBUG> $title INSERT key: $cache_key, value: $G_tilt") 
-               if(askLogtime ($name, $G_tilt, 300));
-      }        
-        
-      if ($size >= $max) {                                                      # LRU: wenn voll → ältesten Eintrag entfernen
-          if ($debug =~ /tiltedIrrCache/xs) {
-              Log3 ($name, 1, "$name DEBUG> $title FULL -> evicting tail: $tail") 
-                   if(askLogtime ($name, $tail, 300));
-          }
-                    
-          LRU_evict_tail ($paref, $cache);
-      }
-
-      LRU_insert ($paref, $cache, $cache_key, $G_tilt);                         # neuen Eintrag einfügenund LRU aktualisieren
+      LRU_insert ($name, $cache, $cache_key, $G_tilt);                          # neuen Eintrag einfügenund LRU aktualisieren
   }                                     
 
 return $G_tilt;                                                                 # effektive Einstrahlung $G_tilt auf die PV-Anlage in W/m² 
@@ -5744,7 +5726,9 @@ sub __openMeteo_ApiResponse {
           Log3 ($name, 1, "$name DEBUG> Open-Meteo API Call - status: success");
       }
 
-      my $date  = strftime "%Y-%m-%d", localtime(time);
+      my $dt    = timestringsFromOffset ($name, $t, 0);  
+      my $date  = $dt->{date};
+  
       my $refts = timestringToTimestamp ($date.' 00:00:00');                                      # Referenztimestring
       my $peak  = StringVal ($name, $string, 'peak', 0);                                          # String Peak (kWp)
       $peak    *= 1000;                                                                           # kWp in Wp
@@ -6195,7 +6179,9 @@ sub ___setOpenMeteoAPIcallKeyData {
 
   ## Berechnung des optimalen Request Intervalls
   ################################################
-  my $edate = strftime "%Y-%m-%d 23:58:00", localtime($t);
+  my $dt    = timestringsFromOffset ($name, $t, 0);  
+  my $edate = $dt->{date}." 23:58:00";
+  
   my $ets   = 3600 + timestringToTimestamp ($edate);                                   # V 1.50.3 1h Sicherheitspuffer -> Intervall vergößern
   my $rmdif = $ets - int $t;
 
@@ -8367,7 +8353,6 @@ sub _attrMeterDev {                      ## no critic "not used"
       readingsDelete ($hash, "Current_GridFeedIn");
       
       my @delrdg = qw ( gridconsumption
-                        tomorrowconsumption
                         gridfeedin
                         consumption
                         autarkyrate
@@ -9607,7 +9592,7 @@ sub __attrKeyAction {
   }
 
   if ($akey eq 'lcSlot') {
-      my $dt                = timestringsFromOffset (time, 0);
+      my $dt                = timestringsFromOffset ($name, time, 0);
       my ($lcstart, $lcend) = split "-", $akeyval;
       my $lcstartts         = timestringToTimestamp ("$dt->{date} ${lcstart}:00");
       my $lcendts           = timestringToTimestamp ("$dt->{date} ${lcend}:59");
@@ -10629,23 +10614,23 @@ sub runTask {
 
   return if(!$init_done || CurrentVal ($hash, 'ctrunning', 0));
 
-  my $t           = time;
-  my $ms          = strftime "%M:%S", localtime($t);
-  my ($min, $sec) = split ':', $ms;                                                  # aktuelle Minute (00-59), aktuelle Sekunde (00-61)
-  $min            = int $min;
-  $sec            = int $sec;
+  my $t    = time;
+  my $name = $hash->{NAME};
+  
+  my $dt   = timestringsFromOffset ($name, $t, 0);  
+  my $min  = int $dt->{minute};                                                     # aktuelle Minute (00-59), 
+  my $sec  = int $dt->{second};                                                     # aktuelle Sekunde (00-60)
 
-  if ($sec > 10) {                                                                   # Attribute zur Laufzeit hinzufügen
+  if ($sec > 10) {                                                                  # Attribute zur Laufzeit hinzufügen
       if (!exists $hash->{HELPER}{S10DONE}) {
           $hash->{HELPER}{S10DONE} = 1;
-          _addDynAttr ($hash);                                                       # relevant für CPU Auslastung!!
+          _addDynAttr ($hash);                                                      # relevant für CPU Auslastung!!
       }
   }
   else {
       delete $hash->{HELPER}{S10DONE};
   }
 
-  my $name                             = $hash->{NAME};
   my ($interval, $disabled, $inactive) = controller ($name);
 
   if (!$interval) {
@@ -10887,7 +10872,6 @@ sub centralTask {
           }
       }
   }
-  
   ##########################################################################################################################
 
   if (!CurrentVal ($name, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -10914,7 +10898,7 @@ sub centralTask {
   my $t       = time;                                                                           # aktuelle Unix-Zeit
   my $debug   = getDebug ($hash);                                                               # Debug Module
 
-  my $dt      = timestringsFromOffset ($t, 0);
+  my $dt      = timestringsFromOffset ($name, $t, 0);
   my $chour   = $dt->{hour};
   my $day     = $dt->{day};
   my $dayname = $dt->{dayname};
@@ -10990,7 +10974,10 @@ sub centralTask {
   userExit                    ($centpars);                                            # User spezifische Funktionen ausführen
   
   createReadingsFromArray     ($hash, $evt);                                          # Readings erzeugen
-  
+ 
+  $hash->{MCACHE_STATS} = MCache_dump();                                              # Mini-Cache Statistiken ins Internal schreiben
+  LRU_update_internals ($name, $hash->{'.tsCache'});                                  # Internals f. Cache aktualisieren
+    
   setTimeTracking             ($name, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
   _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
 
@@ -11444,9 +11431,6 @@ sub _specialActivities {
           readingsDelete    ($hash, 'Today_PVdeviation');
           readingsDelete    ($hash, 'Today_PVreal');
 
-          readingsDelete    ($hash, 'Error');
-          readingsDelete    ($hash, 'Errorcode');
-
           if (scalar(@widgetreadings)) {                                                          # vermeide Schleife falls FHEMWEB geöfffnet
               my @acopy       = @widgetreadings;
               @widgetreadings = ();
@@ -11481,7 +11465,7 @@ sub _specialActivities {
           delete $data{$name}{pvhist}{$day};                                                     # den (alten) aktuellen Tag aus History löschen
 
           if (int $day == 1) {                                                                   # Monatswechsel: überhängende Tage löschen
-              my $dtp  = timestringsFromOffset ($t, -86000);                                     # Berechne die Anzahl der Tage im Vormonat
+              my $dtp  = timestringsFromOffset ($name, $t, -86000);                              # Berechne die Anzahl der Tage im Vormonat
               my $dipm = int $dtp->{day};
 
               for my $dtr ($dipm + 1 .. 31) {                                                    # Lösche ungültige Tage des Vormonats
@@ -11532,7 +11516,6 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
 
-          __createAdditionalEvents ($paref);                                                   # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
           __delObsoleteAPIData     ($paref);                                                   # Bereinigung obsoleter Daten im solcastapi Hash
 
           my $ttl    = 24 * 3600;                                                              # Logsperrhash: Lebenszeit eines Eintrags bevor er entfernt wird
@@ -11560,6 +11543,9 @@ sub _specialActivities {
           if (CurrentVal ($name, 'backupFilesKeep', 3)) {
               periodicWriteMemcache ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen (unterbleibt bei 'backupFilesKeep' == 0)
           }
+          
+          readingsDelete ($hash, 'Error');
+          readingsDelete ($hash, 'Errorcode');
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
       }
@@ -11596,7 +11582,7 @@ sub _specialActivities {
           
           my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
           my $ltctrfts                 = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 86400);      # letztes erfolgreiches KI Consumption Training...
-          my $tfo                      = timestringsFromOffset ($ltctrfts, 0);
+          my $tfo                      = timestringsFromOffset ($name, $ltctrfts, 0);
           my $tfodate                  = $tfo->{date};
           my $ltctrts                  = timestringToTimestamp ($tfodate.' 00:00:00');                  # ...auf Tag genau
           my $newctrstts               = $ltctrts + ($aiconpd * 86400);
@@ -11610,6 +11596,23 @@ sub _specialActivities {
   }
   else {
       delete $hash->{HELPER}{T7RUN};
+  }
+  
+  ## Task 8
+  ###########
+  if ($chour == 3 && $minute >= 10) {
+      if (!defined $hash->{HELPER}{T8RUN}) {
+          $hash->{HELPER}{T8RUN} = 1;
+         
+          Log3 ($name, 4, "$name - Daily special tasks - Task 7 started");
+          
+          __createAdditionalEvents ($paref);                                                            # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages                      
+          
+          Log3 ($name, 4, "$name - Daily special tasks - Task 7 finished");
+      }
+  }
+  else {
+      delete $hash->{HELPER}{T8RUN};
   }
 
 return;
@@ -11661,17 +11664,18 @@ sub __createAdditionalEvents  {
 
       my ($dt, $h) = $nhts =~ /([\w-]+)\s(\d{2})/xs;
 
-      if (!$nhfc && $g2ev eq 'adapt4fSteps') {                                         # für SVG 'fsteps'-Darstellung optimieren
+      if (!$nhfc && $g2ev eq 'adapt4fSteps') {                                          # für SVG 'fsteps'-Darstellung optimieren
+           storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00");         # NEU V2.6.0
            storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":59:59");
            next;
       }
-                                                                                       # https://forum.fhem.de/index.php?msg=1340607
-      storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00") if(!$done);  # vor dem ersten Prognosewert immer einen Nullwert setzen
+                                                                                        # https://forum.fhem.de/index.php?msg=1340607
+      storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00") if(!$done);   # vor dem ersten Prognosewert immer einen Nullwert setzen
 
       $done = 1;
 
-      if ($g2ev eq 'adapt4Steps') {                                                    # für SVG 'steps'-Darstellung optimieren
-          storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00");         # jeden neuen Stundenwert mit 0 starten
+      if ($g2ev eq 'adapt4Steps') {                                                     # für SVG 'steps'-Darstellung optimieren
+          storeReading ('AllPVforecastsToEvent', "0 Wh", $dt." ".$h.":00:00");          # jeden neuen Stundenwert mit 0 starten
           storeReading ('AllPVforecastsToEvent', "$nhfc Wh", $dt." ".$h.":00:01");
       }
 
@@ -11770,7 +11774,7 @@ sub _collectAstronomyData {
       my $wantts = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
       my $nhtstr = 'NextHour'.(sprintf "%02d", $num);
 
-      my $dt     = timestringsFromOffset ($wantts, 0);
+      my $dt     = timestringsFromOffset ($name, $wantts, 0);
       my $wtday  = $dt->{day};
       my $wthour = $dt->{hour};
       my $hod    = sprintf "%02d", int ($wthour) + 1;                                                   # Stunde des Tages
@@ -12083,8 +12087,8 @@ sub __readDataWeather {
 
   debugLog ($paref, 'collectData_long', "collect Weather data step $step - device: $fcname =>");
 
-  for my $n (0..$end) {
-      my ($fd, $fh) = calcDayHourMove ($chour, $n);
+  for my $num (0..$end) {
+      my ($fd, $fh) = calcDayHourMove ($chour, $num);
       last if($fd > MAXNEXTDAYS);
 
       my $wid       = ReadingsNum ($fcname, "fc${fd}_${fh}_ww",   undef);                      # Signifikantes Wetter zum Vorhersagezeitpunkt
@@ -12094,8 +12098,8 @@ sub __readDataWeather {
       my $windspeed = ReadingsNum ($fcname, "fc${fd}_${fh}_FF",   undef);                      # Windgeschwindigkeit in m/s
       my $sunup     = ReadingsNum ($fcname, "fc${fd}_${fh}_SunUp",    0);                      # 1 - Tag
 
-      if (!$n) {                                                                               # Hour 00 -> Werte des vorigen Tag / hour 24 verwenden
-          my $dt       = timestringsFromOffset ($t, -86400);
+      if (!$fh) {                                                                              # Hour 00 -> Werte des vorigen Tag / hour 24 verwenden
+          my $dt       = timestringsFromOffset ($name, $t + ($fd * 86400), -86400);
           $wid       //= HistoryVal ($name, $dt->{day}, '24', 'weatherid', undef);
           $neff      //= HistoryVal ($name, $dt->{day}, '24', 'wcc',       undef);
           $temp      //= HistoryVal ($name, $dt->{day}, '24', 'temp',      undef);
@@ -12415,7 +12419,7 @@ sub _transferInverterValues {
       my $hist_etot = HistoryVal ($name, $day, $hod, "etotali$in", undef);                              # etotal zu Beginn der Stunde holen
 
       if (!defined $hist_etot) {                                                                        # Wenn kein etotal für diese Stunde existiert → Stundenwechsel behandeln
-          my $tfo     = timestringsFromOffset ($t, -3600);                                              # Vorherige Stunde bestimmen
+          my $tfo     = timestringsFromOffset ($name, $t, -3600);                                       # Vorherige Stunde bestimmen
           my $lastday = sprintf "%02d", $tfo->{day};
           my $lasthod = sprintf "%02d", ($tfo->{hour} + 1);
 
@@ -12530,7 +12534,7 @@ sub _transferInverterValues {
                      valid => $valid } );                                                                       # valid=1: beim Learning berücksichtigen, 0: nicht
 
   if ($hr_chg_diff > 0) {
-      my $tfo     = timestringsFromOffset ($t, -3600);                                                          # Vorherige Stunde bestimmen
+      my $tfo     = timestringsFromOffset ($name, $t, -3600);                                                   # Vorherige Stunde bestimmen
       my $lastday = sprintf "%02d", $tfo->{day};
       my $lasthod = sprintf "%02d", ($tfo->{hour} + 1);
 
@@ -12618,7 +12622,7 @@ sub _transferAPIRadiationValues {
       my $wantdt = (timestampToTimestring ($wantts, $lang))[1];
       my $nhtstr = 'NextHour'.(sprintf "%02d", $num);
 
-      my $dt     = timestringsFromOffset ($wantts, 0);
+      my $dt     = timestringsFromOffset ($name, $wantts, 0);
       my $wtday  = $dt->{day};
       my $wthour = $dt->{hour};
       my $hod    = sprintf "%02d", int ($wthour) + 1;                                                       # Stunde des Tages
@@ -13602,7 +13606,7 @@ sub _transferEnvironmentValues {
       my $accum_seconds = CircularVal ($name, 99, 'accum_presence_seconds', 0);
       
       my $delta         = $t - $last_check;
-      my $dt            = timestringsFromOffset ($last_check, 0);
+      my $dt            = timestringsFromOffset ($name, $last_check, 0);
       my $lchkhour      = $dt->{hour};
       
       debugLog ($paref, 'collectData_long', "collect Presence data - hour=$chour, last check hour=$lchkhour, delta=$delta, device=$presenceDev, Reading=$presenceRdg, Value=$prestring => Result=$presence");
@@ -13679,7 +13683,7 @@ sub _transferHolidayValues {
       my $sttime  = NexthoursVal ($name, $nhtstr, 'starttime', undef);
       my $wantts  = timestringToTimestamp ($sttime);
 
-      my $dt      = timestringsFromOffset ($wantts, 0);
+      my $dt      = timestringsFromOffset ($name, $wantts, 0);
       my $wtyear  = $dt->{year};
       my $wtmonth = $dt->{month};
       my $wtday   = $dt->{day};
@@ -13768,7 +13772,9 @@ sub _batSocTarget {
 
       my $chargereq  = 0;                                                                       # Ladeanforderung wenn SoC unter Minimum SoC gefallen ist
       my $target     = $lowSoc;
-      my $yday       = strftime "%d", localtime($t - 86400);                                    # Vortag  (range 01 to 31)
+      my $dt         = timestringsFromOffset ($name, ($t - 86400), 0);                          # Vortag (range 01 to 31)
+      my $yday       = $dt->{day};
+      
       my $tdconsset  = CurrentVal ($name, 'tdConFcTillSunset',              0);                 # Verbrauch bis Sonnenuntergang Wh
       my $batymaxsoc = HistoryVal ($name, $yday, 99, 'batmaxsoc'.$bn,       0);                 # gespeicherter max. SOC des Vortages
       my $batysetsoc = HistoryVal ($name, $yday, 99, 'batsetsoc'.$bn, $lowSoc);                 # gespeicherter SOC Sollwert des Vortages
@@ -14092,7 +14098,7 @@ sub _batChargeMgmt {
 
       my $rodpvfc     = ReadingsNum ($name, 'RestOfDayPVforecast',           0);                   # PV Prognose Rest des Tages
       my $tompvfc     = ReadingsNum ($name, 'Tomorrow_PVforecast',           0);                   # PV Prognose nächster Tag
-      my $tomconfc    = ReadingsNum ($name, 'Tomorrow_ConsumptionForecast',  0);                   # Verbrauchsprognose nächster Tag
+      my $tomconfc    = ReadingsNum ($name, 'Tomorrow_CONforecast',          0);                   # Verbrauchsprognose nächster Tag
       my $batoptsoc   = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                   # aktueller optimierter SoC in %
       my $confcss     = CurrentVal  ($name, 'tdConFcTillSunset',             0);                   # Verbrauchsprognose bis Sonnenuntergang
       my $csoc        = BatteryVal  ($name, $bn, 'bcharge',                  0);                   # aktuelle Ladung in %
@@ -14135,7 +14141,7 @@ sub _batChargeMgmt {
       my $goalpercent  = round0 (___batSocWhToPercent ($batinstcap, $goalwh));                     # Ladeziel in %
 
       if (defined $timeTarget && $timeTarget < 0) {                                                # Ladezielzeit relativ zum Sonnenuntergang
-          my $dt      = timestringsFromOffset ($tdaysset, $timeTarget * 3600);
+          my $dt      = timestringsFromOffset ($name, $tdaysset, $timeTarget * 3600);
           $timeTarget = int ($dt->{hour});                                                         # Uhrzeit ohne führende 0
       }
 
@@ -15076,7 +15082,7 @@ sub _createSummaries {
   my $next3HoursSum    = { "PV" => 0, "Consumption" => 0 };
   my $next4HoursSum    = { "PV" => 0, "Consumption" => 0 };
   my $restOfDaySum     = { "PV" => 0, "Consumption" => 0 };
-  my $tomorrowSum      = { "PV" => 0, "Consumption" => 0 };
+  my $tomorrowSum      = { "PV" => 0, "Consumption" => 0 };                                             # Werte Morgen
   my $daftertomSum     = { "PV" => 0, "Consumption" => 0 };                                             # Werte für Übermorgen
   my $todaySumFc       = { "PV" => 0, "Consumption" => 0 };
   my $todayUp2lastHour = { "PV" => 0, "Consumption" => 0 };                                             # historische Werte bis Stunde vor aktueller Stunde                           
@@ -15088,14 +15094,15 @@ sub _createSummaries {
   $minute           = int $minute;                                                               
   my $remainminutes = 60 - $minute;                                                                     # verbleibende Minuten der aktuellen Stunde
   
-  my $tdaysset = CurrentVal ($name, 'sunsetTodayTs',    0);                                             # Timestamp Sonneuntergang am aktuellen Tag
-  my $tmorsset = CurrentVal ($name, 'sunsetTomorrowTs', 0);                                             # Timestamp Sonneuntergang kommenden Tag
-  my $htdsset  = timestringsFromOffset ($tdaysset,      0);
-  my $htmsset  = timestringsFromOffset ($tmorsset,      0);
+  my $tdaysset = CurrentVal ($name, 'sunsetTodayTs',      0);                                           # Timestamp Sonneuntergang am aktuellen Tag
+  my $tmorsset = CurrentVal ($name, 'sunsetTomorrowTs',   0);                                           # Timestamp Sonneuntergang kommenden Tag
+  my $htdsset  = timestringsFromOffset ($name, $tdaysset, 0);
+  my $htmsset  = timestringsFromOffset ($name, $tmorsset, 0);
   
   my $tdhosset = 1 + int $htdsset->{hour};                                                              # heute Stunde des SunSet (wie hod)
   my $tmhosset = 1 + int $htmsset->{hour};                                                              # morgen Stunde des SunSet (wie hod)
   my $tdmtsset = int $htdsset->{minute};                                                                # heute Minute des SunSet
+  my $tmmtsset = int $htmsset->{minute};                                                                # morgen Minute des SunSet
   
   my $tdmints2sunset = $tdmtsset - $minute;                                                             # Restminuten bis heute Sunset
   
@@ -15176,7 +15183,7 @@ sub _createSummaries {
           $next4HoursSum->{Consumption} += $confc / 60 * $remainminutes;
       }
       
-      if ($h == 4) {                                                                                    # Nexthour03
+      if ($h == 4) {                                                                                    # Nexthour04
           $next4HoursSum->{PV}          += $pvfc  / 60 * $minute;                                       # next4HoursSum ist nun vollständig                           
           $next4HoursSum->{Consumption} += $confc / 60 * $minute;  
       }          
@@ -15201,14 +15208,20 @@ sub _createSummaries {
       }
       # --- Morgen
       elsif ($fd == 1) {
-          $tomorrowSum->{PV} += $pvfc;
-          
+          $tomorrowSum->{PV}          += $pvfc;
+          $tomorrowSum->{Consumption} += $confc;
+        
           if ($hod <= $tmhosset) {
-              $tmTillSunsetFc->{Consumption} += $confc;                                                 # Verbrauch kommender Tag bis inkl. Stunde des Sonnenuntergangs
+              if ($hod != $tmhosset) {                                              # Stunden vor Sunset-Stunde: voll addieren
+                  $tmTillSunsetFc->{Consumption} += $confc;
+              }
+              else {                                                                # exakt die Sunset-Stunde: nur Minuten-Anteil
+                  $tmTillSunsetFc->{Consumption} += $confc / 60 * $tmmtsset;
+              }
           }
-          
-          if ($pvfc) {                                                                                  # Summe Verbrauch der Stunden mit PV-Erzeugung am kommenden Tag
-               $tmConInHrWithPVGen += $confc;  
+        
+          if ($pvfc) {
+              $tmConInHrWithPVGen += $confc;                                        
           }
       }
       # --- Übermorgen
@@ -15243,7 +15256,7 @@ sub _createSummaries {
   ## aktuelle Consumption, Autarkie, Selbstverbrauch
   ####################################################
   my $gcon    = CurrentVal ($name, 'gridconsumption',         0);                                       # aktueller Netzbezug
-  my $tconsum = CurrentVal ($name, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
+  #my $tconsum = CurrentVal ($name, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
   my $gfeedin = CurrentVal ($name, 'gridfeedin',              0);
 
   my $batin  = 0;
@@ -15328,7 +15341,7 @@ sub _createSummaries {
   $data{$name}{current}{selfconsumptionrate}   = $selfconsumptionrate;
   $data{$name}{current}{autarkyrate}           = $autarkyrate;
   $data{$name}{current}{tdConFcTillSunset}     = round0 ($tdTillSunsetFc->{Consumption});
-  $data{$name}{current}{tmConFcTillSunset}     = $tmTillSunsetFc->{Consumption};
+  $data{$name}{current}{tmConFcTillSunset}     = round0 ($tmTillSunsetFc->{Consumption});
   $data{$name}{current}{tmConInHrWithPVGen}    = $tmConInHrWithPVGen;
   $data{$name}{current}{surplus}               = $surplus;
   $data{$name}{current}{dayAfterTomorrowPVfc}  = $daftertomSum->{PV};
@@ -15343,7 +15356,6 @@ sub _createSummaries {
   storeReading ('Current_SelfConsumptionRate',  $selfconsumptionrate. ' %');
   storeReading ('Current_Surplus',              $surplus.             ' W');
   storeReading ('Current_AutarkyRate',          $autarkyrate.         ' %');
-  storeReading ('Tomorrow_ConsumptionForecast', $tconsum.            ' Wh') if(defined $tconsum);
 
   storeReading ('NextHours_Sum01_PVforecast',          (round0 ($next1HoursSum->{PV})).         ' Wh');
   storeReading ('NextHours_Sum02_PVforecast',          (round0 ($next2HoursSum->{PV})).         ' Wh');
@@ -15351,12 +15363,18 @@ sub _createSummaries {
   storeReading ('NextHours_Sum04_PVforecast',          (round0 ($next4HoursSum->{PV})).         ' Wh');
   storeReading ('RestOfDayPVforecast',                 (round0 ($restOfDaySum->{PV})).          ' Wh');
   storeReading ('Tomorrow_PVforecast',                 (round0 ($tomorrowSum->{PV})).           ' Wh');
+  storeReading ('Tomorrow_CONforecast',                (round0 ($tomorrowSum->{Consumption})).  ' Wh');
   storeReading ('Today_PVforecast',                    (round0 ($todaySumFc->{PV})).            ' Wh');
   storeReading ('Today_CONforecast',                   (round0 ($todaySumFc->{Consumption})).   ' Wh');
   storeReading ('Today_CONreal',                       (round0 ($todaySumRe->{Consumption})).   ' Wh');
   storeReading ('Today_PVreal',                        (round0 ($todaySumRe->{PV})).            ' Wh');
   storeReading ('NextHours_Sum04_ConsumptionForecast', (round0 ($next4HoursSum->{Consumption})).' Wh');
   storeReading ('RestOfDayConsumptionForecast',        (round0 ($restOfDaySum->{Consumption})). ' Wh');
+  
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ########################################################################################################################
+  #storeReading ('Tomorrow_ConsumptionForecast', $tconsum.            ' Wh') if(defined $tconsum);  
+  storeReading ('Tomorrow_ConsumptionForecast', (round0 ($tomorrowSum->{Consumption})).  ' Wh');   # <- zu eliminieren   14.04.
 
 return;
 }
@@ -16338,13 +16356,12 @@ sub ___saveEhodpieces {
   my $startts = $paref->{startts};                                           # Unix Timestamp für geplanten Switch on
   my $stopts  = $paref->{stopts};                                            # Unix Timestamp für geplanten Switch off
 
-  my $hash = $defs{$name};
-  my $p    = 1;
+  my $p = 1;
   delete $data{$name}{consumers}{$c}{ehodpieces};
 
   for (my $i = $startts; $i <= $stopts; $i+=3600) {
       my $chod    = (strftime "%H", localtime($i)) + 1;
-      my $epieces = ConsumerVal ($hash, $c, 'epieces', '');
+      my $epieces = ConsumerVal ($name, $c, 'epieces', '');
 
       last if(ref $epieces ne "HASH");
 
@@ -17320,7 +17337,7 @@ sub _calcConsForecast_legacy {
   my $fcld       = CurrentVal ($name, 'consForecastLastDays',    CONSFCLDAYS);                          # Beachtung Stundenwerte der letzten X Tage falls gesetzt
   my $ncds       = $cofciwd ? $fcld * 7 : $fcld;                                                        # notwendige Anzahl Vergleichstage die vorhanden sein sollen
 
-  my $dt         = timestringsFromOffset ($t, 86400);
+  my $dt         = timestringsFromOffset ($name, $t, 86400);
   my $tomdayname = $dt->{dayname};                                                                      # Wochentagsname nächster Tag
   
   my $lct        = LOCALE_TIME =~ /^de_/xs ? 'DE' : 'EN';
@@ -17336,7 +17353,7 @@ sub _calcConsForecast_legacy {
   ## Verbrauch der hod-Stunden am aktuellen / nächsten Tag als Median oder Array ermitteln
   ##########################################################################################                                                                                      
   for my $num (1..24) {                                                                               # Median für jede Stunde / Tag berechnen
-      my $dth     = timestringsFromOffset ($st, $num * 3559);                                         # eine Sek. weniger als 1 Stunde
+      my $dth     = timestringsFromOffset ($name, $st, $num * 3559);                                  # eine Sek. weniger als 1 Stunde
       my $dayname = $dth->{dayname};
       my $hod     = sprintf "%02d", $num;
 
@@ -17377,25 +17394,25 @@ sub _calcConsForecast_legacy {
 
   ## nächsten Tageswert Excludes berücksichtigen
   ################################################
-  my $tomnum = $usage->{tom}{num} // 0;
+  #my $tomnum = $usage->{tom}{num} // 0;
 
-  debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day ###################");
+  #debugLog ($paref, 'consumption|consumption_long', "################### Consumption forecast for the next day ###################");
 
-  if ($tomnum) {
-      if ($tomexnum) {
-          $tomex              = round0 ($tomex / $tomexnum);                                          # Ex Tageswert Durchschnitt bilden
-          $usage->{tom}{con} -= $tomex;
-      }
+  #if ($tomnum) {
+  #    if ($tomexnum) {
+  #        $tomex              = round0 ($tomex / $tomexnum);                                          # Ex Tageswert Durchschnitt bilden
+  #        $usage->{tom}{con} -= $tomex;
+  #    }
 
-      $data{$name}{current}{tomorrowconsumption} = $usage->{tom}{con};
-      debugLog ($paref, 'consumption|consumption_long', "estimated con Tomorrow: $usage->{tom}{con} Wh, Individual hourly elements considered: $tomnum, exclude: $tomex Wh (avg of $tomexnum entities)");
-  }
-  else {
-      my $lang                                   = $paref->{lang};
-      $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
-      
-      debugLog ($paref, 'consumption|consumption_long', "no estimated cons for Tomorrow: ".$hqtxt{wfmdcf}{$lang});
-  }
+  #    $data{$name}{current}{tomorrowconsumption} = $usage->{tom}{con};
+  #    debugLog ($paref, 'consumption|consumption_long', "estimated con Tomorrow: $usage->{tom}{con} Wh, Individual hourly elements considered: $tomnum, exclude: $tomex Wh (avg of $tomexnum entities)");
+  #}
+  #else {
+  #    my $lang                                   = $paref->{lang};
+  #    $data{$name}{current}{tomorrowconsumption} = $hqtxt{wfmdcf}{$lang};
+  #    
+  #    debugLog ($paref, 'consumption|consumption_long', "no estimated cons for Tomorrow: ".$hqtxt{wfmdcf}{$lang});
+  #}
   
   ## StundenForecast nächste 24h berechnen und Ergebnisse speichern
   ###################################################################
@@ -17575,7 +17592,7 @@ sub __exincl_from_pvHistory {
   my $name       = $paref->{name};
   my $day        = $paref->{day};                         # aktuelles Tagdatum (01...31)
   my $todayname  = $paref->{todayname};                   # aktueller Tagname
-  my $tomdayname = $paref->{tomdayname};
+  #my $tomdayname = $paref->{tomdayname};
   my $st         = $paref->{st};
   my $cofciwd    = $paref->{cofciwd};
   my $fcld       = $paref->{fcld};
@@ -17609,25 +17626,25 @@ sub __exincl_from_pvHistory {
           if ($exconfc || $fcld == 0) {                                                            # --- mit consForecastLastDays = 0
               ## Tageswert f. kommenden Tag Excludes finden und summieren
               #############################################################
-              if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstellung der Verbrauchsprognose ausschließen
-                  if ($cofciwd) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
-                      my $hdn = HistoryVal ($name, $dhist, 99, 'dayname', undef);
-                      $do     = 0 if(!$hdn || $hdn ne $tomdayname);
-                  }
+              #if ($do && $exconfc == 1) {                                                          # 1 -> Consumer Verbrauch von Erstellung der Verbrauchsprognose ausschließen
+              #   if ($cofciwd) {                                                                  # nur gleiche Tage (Mo...So) einbeziehen
+              #        my $hdn = HistoryVal ($name, $dhist, 99, 'dayname', undef);
+              #        $do     = 0 if(!$hdn || $hdn ne $tomdayname);
+              #    }
 
-                  if ($do) {
-                      my $cegy = HistoryVal ($name, $dhist, 99, "csme${c}", 0);
+              #    if ($do) {
+              #        my $cegy = HistoryVal ($name, $dhist, 99, "csme${c}", 0);
 
-                      if ($cegy > 0) {
-                          $tomex   += $cegy;                                                       # Exclude für nächsten Tag
-                          $tomexnum++;
+              #        if ($cegy > 0) {
+              #            $tomex   += $cegy;                                                       # Exclude für nächsten Tag
+              #            $tomexnum++;
                       
-                          if ($debug =~ /consumption_long/xs) {
-                              Log3 ($name, 1, "$name DEBUG> Consumer '$c' hist cons registered by 'exconfc' for exclude - day: $dhist -> $cegy Wh");
-                          }
-                      }
-                  }
-              }
+              #            if ($debug =~ /consumption_long/xs) {
+              #                Log3 ($name, 1, "$name DEBUG> Consumer '$c' hist cons registered by 'exconfc' for exclude - day: $dhist -> $cegy Wh");
+              #            }
+              #        }
+              #    }
+              #}
 
               ## stundenweise Exkludes / Inkludes für aktuellen Tag aufnehmen
               #################################################################
@@ -17690,7 +17707,8 @@ sub __exincl_from_pvHistory {
       $lap++;
   }
 
-return ($tomexnum, $tomex);
+#return ($tomexnum, $tomex);
+return;
 }
 
 ################################################################
@@ -17867,7 +17885,7 @@ sub _calcReadingsTomorrowPVFc {
 
   return if(!$hods || !keys %{$data{$name}{nexthours}});
 
-  my $dt     = timestringsFromOffset ($t, 86400);
+  my $dt     = timestringsFromOffset ($name, $t, 86400);
   my $tmoday = $dt->{day};                                                                            # Tomorrow Day (01..31)
 
   for my $idx (sort keys %{$data{$name}{nexthours}}) {
@@ -17997,7 +18015,7 @@ sub _calcDataEveryFullHour {
       next if($h > $chour);
 
       if (int $chour == 0) {                                                                      # 00:XX -> Stunde 24 des Vortages speichern
-          my $dt             = timestringsFromOffset ($t, -3600);
+          my $dt             = timestringsFromOffset ($name, $t, -3600);
           $paref->{yt}       = $t - 3600;                                                         # Timestamp Vortag
           $paref->{yday}     = $dt->{day};                                                        # vorheriger Tag (range 01 .. 31)
           $paref->{ydayname} = $dt->{dayname};
@@ -18561,7 +18579,7 @@ sub _genSpecialReadings {
                       $mintotal   -= int ($minute);                                                   # von den volle Stunden die aktuell schon vergangenen Minuten abziehen
 
                       my $tdaysset = CurrentVal ($name, 'sunsetTodayTs', 0);                          # Timestamp Sonnenuntergang aktueller Tag
-                      my $dtsset   = timestringsFromOffset ($tdaysset,   0);
+                      my $dtsset   = timestringsFromOffset ($name, $tdaysset,   0);
 
                       if (int ($lasthod) == int ($dtsset->{hour}) + 1) {                              # wenn die letzte berücksichtigte Stunde die Stunde des Sonnenuntergangs ist
                           my $diflasth = 60 - $dtsset->{minute};                                      # fehlende Minuten zur vollen Stunde in der Stunde des Sunset
@@ -18699,7 +18717,7 @@ sub _genSpecialReadings {
              }
           }
           elsif ($kpi eq 'tomorrowConsumptionForecast') {
-              my $dt     = timestringsFromOffset ($t, 86400);
+              my $dt     = timestringsFromOffset ($name, $t, 86400);
               my $tmoday = $dt->{day};
 
               for my $idx (sort keys %{$data{$name}{nexthours}}) {
@@ -18745,13 +18763,13 @@ sub _genSpecialReadings {
                  my $dt;
                  $confc -= $confcs;
 
-                 $dt           = timestringsFromOffset ($t, 0);
+                 $dt           = timestringsFromOffset ($name, $t, 0);
                  my $curmts    = int ($dt->{minute}) + 1;                                            # vergangene Minuten in der aktuellen Stunde
                  my $cfcscurh  = ($confcs / 60) * (60 - $curmts);                                    # anteiler Verbrauch (Schätzung) aktuelle Zeit bis volle Stunde
                  $confc       += $cfcscurh;
 
                  $confc       -= $confcsr;
-                 my $dtrise    = timestringsFromOffset ($sunrise, 0);
+                 my $dtrise    = timestringsFromOffset ($name, $sunrise, 0);
                  my $srisemts  = int ($dtrise->{minute}) + 1;                                        # vergangene Minuten in der Stunde des Sunrise
                  my $cfcsrish  = ($confcsr / 60) * $srisemts;                                        # anteiler Verbrauch (Schätzung) volle Stunde bis Sunrise
                  $confc       += $cfcsrish;
@@ -18767,10 +18785,10 @@ sub _genSpecialReadings {
              my $donl  = 1;
              my $lap   = 1;
 
-             my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs',  0);
-             my $tdaysrise = CurrentVal ($name, 'sunriseTodayTs', 0);
-             my $dtsset    = timestringsFromOffset ($tdaysset,  0);
-             my $dtsrise   = timestringsFromOffset ($tdaysrise, 0);
+             my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs',       0);
+             my $tdaysrise = CurrentVal ($name, 'sunriseTodayTs',      0);
+             my $dtsset    = timestringsFromOffset ($name, $tdaysset,  0);
+             my $dtsrise   = timestringsFromOffset ($name, $tdaysrise, 0);
 
              for my $idx (sort keys %{$data{$name}{nexthours}}) {
                  my $don = NexthoursVal ($hash, $idx, 'DoN', 2);                                      # Wechsel von 0 -> 1 für Abbruch relevant
@@ -18804,10 +18822,10 @@ sub _genSpecialReadings {
                  $confc -= $confcss;
 
                  if ($t < $tdaysset) {                                                               # Auswertung noch vor Sonnenuntergang
-                     $dt = timestringsFromOffset ($tdaysset, 0);
+                     $dt = timestringsFromOffset ($name, $tdaysset, 0);
                  }
                  else {
-                     $dt = timestringsFromOffset ($t, 0);
+                     $dt = timestringsFromOffset ($name, $t, 0);
                  }
 
                  my $ssetmts   = int ($dt->{minute}) + 1;                                            # vergangene Minuten in der Stunde des Sunset bzw. in der aktuellen Stunde
@@ -18815,7 +18833,7 @@ sub _genSpecialReadings {
                  $confc       += $cfcsseth;
 
                  $confc       -= $confcsr;
-                 my $dtrise    = timestringsFromOffset ($sunrise, 0);
+                 my $dtrise    = timestringsFromOffset ($name, $sunrise, 0);
                  my $srisemts  = int ($dtrise->{minute}) + 1;                                        # vergangene Minuten in der Stunde des Sunrise
                  my $cfcsrish  = ($confcsr / 60) * $srisemts;                                        # anteiler Verbrauch (Schätzung) volle Stunde bis Sunrise
                  $confc       += $cfcsrish;
@@ -19466,14 +19484,14 @@ sub _graphicHeader {
   my $hash      = $defs{$name};
   my $lup       = ReadingsTimestamp ($name, ".lastupdateForecastValues", "0000-00-00 00:00:00");   # letzter Forecast Update
 
-  my $co4h      = ReadingsNum ($name, "NextHours_Sum04_ConsumptionForecast", 0);
-  my $coRe      = ReadingsNum ($name, "RestOfDayConsumptionForecast",        0);
-  my $coTo      = ReadingsNum ($name, "Tomorrow_ConsumptionForecast",        0);
+  my $co4h      = ReadingsNum ($name, 'NextHours_Sum04_ConsumptionForecast', 0);
+  my $coRe      = ReadingsNum ($name, 'RestOfDayConsumptionForecast',        0);
+  my $coTo      = ReadingsNum ($name, 'Tomorrow_CONforecast',                0);
   my $coCu      = CurrentVal  ($name, 'consumption',                         0);
-  my $pv4h      = ReadingsNum ($name, "NextHours_Sum04_PVforecast",          0);
-  my $pvRe      = ReadingsNum ($name, "RestOfDayPVforecast",                 0);
-  my $pvTo      = ReadingsNum ($name, "Tomorrow_PVforecast",                 0);
-  my $pvCu      = ReadingsNum ($name, "Current_PV",                          0);
+  my $pv4h      = ReadingsNum ($name, 'NextHours_Sum04_PVforecast',          0);
+  my $pvRe      = ReadingsNum ($name, 'RestOfDayPVforecast',                 0);
+  my $pvTo      = ReadingsNum ($name, 'Tomorrow_PVforecast',                 0);
+  my $pvCu      = ReadingsNum ($name, 'Current_PV',                          0);
 
   my ($rapi, $wapi) = getStatusApiName ($hash);                                                    # Status-API Name
 
@@ -19593,7 +19611,7 @@ sub _graphicHeader {
       my ($sa,$sh) = parseParams ($showenv, ',');
       my @aenvs    = @$sa;                               
       
-      my $dt       = timestringsFromOffset ($paref->{t}, 0);
+      my $dt       = timestringsFromOffset ($name, $paref->{t}, 0);
       my $hod      = sprintf "%02d", ($dt->{hour} + 1);
       my $presence = CurrentVal ($name, 'presence', undef);                                             # Anwesenheit                 
       
@@ -26127,7 +26145,7 @@ sub aiFannGetConResult {
       
       if (!$num) {                                                                                  # das ist die aktuelle laufende Stunde                                                             
           my $hits   = timestringToTimestamp ($starttime);
-          my $dt     = timestringsFromOffset ($hits, -3600);
+          my $dt     = timestringsFromOffset ($name, $hits, -3600);
           my $hihour = $dt->{hour};
           my $hiday  = $dt->{day};
           my $hihod  = sprintf "%02d", int ($hihour) + 1;
@@ -28195,7 +28213,7 @@ sub _saveHistP2 {                       ## no critic "not used"
   debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored simple  - Day: $nday, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
                                         (defined $validkey ? ", ValidKey: $validkey, ValidValue: $validval" : '') );
 
-  if (defined $hfspvh{$hkey}{fpar} && $hfspvh{$hkey}{fpar} eq 'comp99') {
+  if (defined $hfspvh{$hkey}{fpar} && $hfspvh{$hkey}{fpar} eq 'calc99') {
       my $sum = 0;
       
       for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
@@ -30334,14 +30352,26 @@ return $median;
 ################################################################
 #     Berechnen Tag / Stunden Verschieber
 #     aus aktueller Stunde + lfd. Nummer
-################################################################
+################################################################   
 sub calcDayHourMove {
-  my $chour = shift;
-  my $num   = shift;
+  my ($chour, $num) = @_;
+  
+  my $stats = ($MCache_Stats{DayHourMove_Cache} //= { hits   => 0,                          # Cache Initialisierung
+                                                      misses => 0, 
+                                                      cache  => \%DayHourMove_Cache });
+    
+  my $key = "$chour:$num";                                                                  # Cache-Key  
 
-  my $fh = int ($chour) + $num;
-  my $fd = int ($fh / 24) ;
-  $fh    = $fh - ($fd * 24);
+  if (my $val = MCache_get (\%DayHourMove_Cache, $stats, $key)) {                           # Cache-Hit?
+      return @$val;
+  }  
+
+  my $fh     = int($chour) + $num;                                                          # Berechnung
+  my $fd     = int($fh / 24);
+  $fh        = $fh - ($fd * 24);
+  my $result = [$fd, $fh];
+  
+  MCache_set(\%DayHourMove_Cache, $key, $result);                                           # Cache speichern
 
 return ($fd, $fh);
 }
@@ -30358,7 +30388,7 @@ sub formatWeatherTimestrg {
   my $date = shift // return;
 
   my $cdate = strftime "%Y-%m-%d", localtime(time);
-  my $refts = timestringToTimestamp ($cdate.' 00:00:00');                                      # Referenztimestring
+  my $refts = timestringToTimestamp ($cdate.' 00:00:00');                                   # Referenztimestring
   my $datts = timestringToTimestamp ($date);
   my $fd    = int (($datts - $refts) / 86400);
   my $fh    = int ((split /[ :]/, $date)[1]);
@@ -30509,15 +30539,21 @@ return ($err, $ctime);
 #  berechnen, Rückgabe als Hashreferenz
 ################################################################
 sub timestringsFromOffset {
+  my $name   = shift;
   my $epoch  = shift;
   my $offset = shift // 0;
 
-  return if($epoch !~ /^-?[0-9]*(.[0-9]*)?$/xs);
+  return if !isNumeric($epoch);
+  
+  my $key   = "$epoch:$offset";
+  my $hash  = $defs{$name};
+  my $cache = $hash->{'.tsCache'};
 
-  if (strlength ($epoch) == 13) {                                                               # Millisekunden
-      $epoch = $epoch / 1000;
+  if (my $cached = LRU_get ($name, $cache, $key)) {
+      return $cached;
   }
 
+  $epoch = int($epoch / 1000) if $epoch > 1_000_000_000_000;                                    # Millisekunden
   my @ts = localtime ($epoch + $offset);                                                        # Offset kann pos. oder negativ sein
 
   my $dt = {
@@ -30527,10 +30563,13 @@ sub timestringsFromOffset {
       date    => (strftime "%Y-%m-%d", (@ts)),                                                  # Datum
       hour    => (strftime "%H",       (@ts)),                                                  # Stunde in 24h format (00-23)
       minute  => (strftime "%M",       (@ts)),                                                  # Minute (00-59)
+      second  => (strftime "%S",       (@ts)),                                                  # aktuelle Sekunde (00-60)
       dayname => (strftime "%a",       (@ts)),                                                  # Wochentagsname
       dayunum => (strftime "%u",       (@ts)),                                                  # The day of the week as a decimal, range 1 to 7, Monday being 1. See also %w. (SU)
       dofyear => (strftime "%j",       (@ts)),                                                  # Day of the year (001-366)
   };
+  
+  LRU_insert ($name, $cache, $key, $dt);
 
 return $dt;
 }
@@ -30689,16 +30728,21 @@ return $dolog;
 ##################################################################
 sub azSolar2Astro {
   my ($azsolar) = @_;
-
-  return $solar2astro_cache{$azsolar} if exists $solar2astro_cache{$azsolar};               # Cache-Hit
+ 
+  my $stats = ($MCache_Stats{Solar2Astro_Cache} //= { hits   => 0, 
+                                                      misses => 0, 
+                                                      cache  => \%Solar2Astro_Cache });
   
-  my $astro                    = ($azsolar + 180) % 360;                                    # Berechnung
-  $solar2astro_cache{$azsolar} = $astro;                                                    # in Cache speichern
+  if (my $val = MCache_get (\%Solar2Astro_Cache, $stats, $azsolar)) {                       # Cache-Hit?
+      return $val;
+  }
+  
+  my $astro = ($azsolar + 180) % 360;                                                       # Berechnung
+  
+  MCache_set (\%Solar2Astro_Cache, $azsolar, $astro);                                       # in Cache speichern
 
 return $astro;
 }
-
-
 
 ###################################################################
 #  liefert eine dynamische Farbe abhängig von "$val" und dem
@@ -32321,7 +32365,7 @@ return ($rapi, $wapi);
 ###############################################################
 #  Liefert 2 Array-Refs der letzten $limit Werte von $par1 
 #  und $par2 aus pvHistory synchron/chronologisch zurück.
-#  Enthält automatische Interpolation für fehlende Temperaturwerte.
+#  Enthält automatische Interpolation für fehlende p2key-Werte
 ###############################################################
 sub getPvHistTargetArray {
   my $paref = shift;
@@ -32363,7 +32407,7 @@ sub getPvHistTargetArray {
       }
   }
   
-  my $len = min (scalar @p1keys, scalar @p2keys, scalar @p3keys);                 # --- Arrays synchronisieren ---
+  my $len = min (scalar @p1keys, scalar @p2keys, scalar @p3keys);                # --- Arrays synchronisieren ---
 
   splice @p1keys, $len;
   splice @p2keys, $len;
@@ -33648,19 +33692,99 @@ sub LRU_cache_create {
   };
 }
 
+# --- Neuen Eintrag einfügen
+sub LRU_insert {
+  my ($name, $cache, $key, $value) = @_;
+  
+  my $title = $cache->{title};
+                                       
+  if (exists $cache->{lru}{$key}) {                                             # doppelte Inserts vermeiden
+      Log3 ($name, 3, "$name - $title duplicate insert ignored for key $key");
+      return;
+  }
+  
+  if (!LRU_sanity_check ($cache)) {                                             # Sanity Check
+      LRU_reset ($name, $cache);
+      Log3 ($name, 1, "$name - $title LRU structure corrupted – cache reset and reinitialized");
+      return;
+  }
+  
+  my $max  = ${ $cache->{max}  };
+  my $size = ${ $cache->{size} };
+
+  if ($size >= $max) {                                                          # Wenn voll → evict tail
+      LRU_evict_tail ($name, $cache);
+  }
+  
+  if (getDebug($defs{$name}) =~ /$title/xs) {
+      Log3 ($name, 1, "$name DEBUG> $title INSERT key: $key, value: $value") 
+           if(askLogtime($name, "$key:$value", 300));
+  }
+
+  $cache->{data}{$key} = $value;                                                # Daten einfügen
+  
+  my $head = ${ $cache->{head} };                                               # LRU-Liste aktualisieren (nach Daten einfügen!)
+  my $tail = ${ $cache->{tail} };
+
+  $cache->{lru}{$key} = {
+      prev => undef,
+      next => $head,
+  };
+
+  if ($head) {
+      $cache->{lru}{$head}{prev} = $key;
+  }
+
+  ${ $cache->{head} } = $key;
+  ${ $cache->{tail} } = $key if !$tail;
+  ${ $cache->{size} }++;
+    
+return;
+}
+
+# --- Wert eines key lesen
+sub LRU_get {
+  my ($name, $cache, $key) = @_;
+  
+  my $title = $cache->{title};
+
+  if (!exists $cache->{data}{$key}) {                                           # Cache-Miss    
+      $cache->{stats}{misses}++;
+      
+      if (getDebug($defs{$name}) =~ /$title/xs) {
+          Log3 ($name, 1, "$name DEBUG> $title MISS for key: $key") 
+               if(askLogtime($name, $key, 300));
+      }
+      
+      return;
+  }
+
+  $cache->{stats}{hits}++;                                                      # Cache-Hit
+  
+  my $cached = $cache->{data}{$key};
+  
+  if (getDebug($defs{$name}) =~ /$title/xs) {
+      Log3 ($name, 1, "$name DEBUG> $title HIT for key: $key -> $cached")
+           if(askLogtime($name, "$key:$cached", 300));
+  }
+
+  LRU_move_to_front ($name, $cache, $key);                                      # LRU aktualisieren
+
+return $cached;
+}
+
 # --- Key nach vorne schieben (most recently used)
 sub LRU_move_to_front {
-  my ($paref, $cache, $key) = @_;
+  my ($name, $cache, $key) = @_;
   
   return if !$key;
   
-  my $name  = $paref->{name};
   my $title = $cache->{title};
   my $head  = ${ $cache->{head} };
   my $tail  = ${ $cache->{tail} };
   
   if (!LRU_sanity_check ($cache)) {                                            # Sanity Check
-      LRU_reset ($paref, $cache);
+      LRU_reset ($name, $cache);
       Log3 ($name, 1, "$name - $title LRU structure corrupted – cache reset and reinitialized");
       return;
   }
@@ -33699,75 +33823,26 @@ sub LRU_move_to_front {
 return;
 }
 
-# --- Neuen Eintrag einfügen
-sub LRU_insert {
-  my ($paref, $cache, $key, $value) = @_;
-  
-  my $name  = $paref->{name};
-  my $title = $cache->{title};
-                                       
-  if (exists $cache->{lru}{$key}) {                                             # doppelte Inserts vermeiden
-      Log3 ($name, 3, "$name - $title duplicate insert ignored for key $key");
-      return;
-  }
-  
-  if (!LRU_sanity_check ($cache)) {                                             # Sanity Check
-      LRU_reset ($paref, $cache);
-      Log3 ($name, 1, "$name - $title LRU structure corrupted – cache reset and reinitialized");
-      return;
-  }
-  
-  $cache->{data}{$key} = $value;                                                # Daten einfügen
-  
-  my $head = ${ $cache->{head} };                                               # LRU-Liste aktualisieren (nach Daten einfügen!)
-  my $tail = ${ $cache->{tail} };
-
-  $cache->{lru}{$key} = {
-      prev => undef,
-      next => $head,
-  };
-
-  if ($head) {
-      $cache->{lru}{$head}{prev} = $key;
-  }
-
-  ${ $cache->{head} } = $key;
-  ${ $cache->{tail} } = $key if !$tail;
-  ${ $cache->{size} }++;
-    
-return;
-}
-
-# --- Wert eines key lesen
-sub LRU_get {
-  my ($paref, $cache, $key) = @_;
-
-  return undef if !exists $cache->{data}{$key};                                 # Cache-Miss
-
-  $cache->{stats}{hits}++;                                                      # Cache-Hit
-
-  LRU_move_to_front ($paref, $cache, $key);                                     # LRU aktualisieren
-
-return $cache->{data}{$key};
-}
-
-
 # --- Ältesten Eintrag entfernen (LRU-Eviction)
 sub LRU_evict_tail {
-  my ($paref, $cache) = @_;
+  my ($name, $cache) = @_;
   
-  my $name  = $paref->{name};
   my $title = $cache->{title};
   my $head  = ${ $cache->{head} };
   my $tail  = ${ $cache->{tail} };
   
   if (!LRU_sanity_check ($cache)) {                                            # Sanity Check
-      LRU_reset ($paref, $cache);
+      LRU_reset ($name, $cache);
       Log3 ($name, 1, "$name - $title LRU structure corrupted – cache reset and reinitialized");
       return;
   }
   
   return unless $tail;
+  
+  if (getDebug($defs{$name}) =~ /$title/xs) {
+      Log3 ($name, 1, "$name DEBUG> $title FULL -> evicting tail: $tail")
+          if(askLogtime($name, $tail, 300));
+  }
 
   my $old = $tail;
 
@@ -33816,48 +33891,67 @@ return 1;                                                           # alles ok
 
 # --- Internals updaten         
 sub LRU_update_internals {
-  my ($paref, $cache) = @_;
+  my ($name, $cache) = @_;
   
-  my $title = $cache->{title};
-  my $max   = ${ $cache->{max}  };
-  my $size  = ${ $cache->{size} };  
+  my $hash   = $defs{$name};
+  my $title  = $cache->{title};
+  my $max    = ${ $cache->{max}  };
+  my $size   = ${ $cache->{size} };  
+  my $hits   = $cache->{stats}{hits};
+  my $misses = $cache->{stats}{misses};
+  my $evicts = $cache->{stats}{evicts};
+
+  my $rate = ($hits + $misses) > 0
+             ? sprintf("%.2f", ($hits / ($hits + $misses)) * 100)
+             : 100;
+
+  my $cashname = $title =~ /tiltedIrrCache/xs ? 'TILTED_IRR_CACHE'  
+               : $title =~ /tsCache/xs        ? 'TS_OFFSET_CACHE'
+               : '';
+               
+  return if !$cashname;
   
-  if ($title =~ /tiltedIrrCache/xs) {
-      my $hash = $defs{$paref->{name}};
-      $hash->{TILTED_IRR_CACHE} = "Hits=$cache->{stats}{hits}, Misses=$cache->{stats}{misses}, Evicts=$cache->{stats}{evicts}, Entries=$size/$max";
-  }
-  
+  $hash->{$cashname} = sprintf ( "Hits=%-6d  Misses=%-6d  Evicts=%-6d  Entries=%4d/%-4d  HitRate=%-6.2f", $hits, $misses, $evicts, $size, $max, $rate );
+    
 return;
 }
 
 # --- Cache zurücksetzen
 sub LRU_reset {
-  my ($paref, $cache) = @_;
+  my ($name, $cache) = @_;
   
   %{ $cache->{data} } = ();
   %{ $cache->{lru} }  = ();
   ${ $cache->{head} } = undef;
   ${ $cache->{tail} } = undef;
   ${ $cache->{size} } = 0;
-  $cache->{stats}{evicts}++;                                       # optional: Statistik erhöhen
+  
+  $cache->{stats}{hits}   = 0;
+  $cache->{stats}{misses} = 0;
+  $cache->{stats}{evicts} = 0;
   
 return;
 }
 
 # --- Cache debuggen
 sub LRU_debug {
-  my ($paref, $cache) = @_;
+  my ($name, $cache) = @_;
   
-  my $name      = $paref->{name};
   my $head      = ${ $cache->{head} };
   my $tail      = ${ $cache->{tail} };
   my $max       = ${ $cache->{max}  };
   my $size      = ${ $cache->{size} };
   my $longtitle = $cache->{longtitle};
+  my $hits      = $cache->{stats}{hits};
+  my $misses    = $cache->{stats}{misses};
+
+  my $rate = ($hits + $misses) > 0
+             ? sprintf("%.2f", ($hits / ($hits + $misses)) * 100)
+             : 100;
 
   my $msg = "$longtitle Dump:\n";
   $msg   .= "Size=$size / max=$max\n";
-  $msg   .= "Hits=$cache->{stats}{hits}, Misses=$cache->{stats}{misses}, Evicts=$cache->{stats}{evicts}\n";
+  $msg   .= "Hits=$hits, Misses=$misses, Evicts=$cache->{stats}{evicts}, HitRate=$rate %\n";
   $msg   .= "HEAD=".($head // 'undef')."\n";
   $msg   .= "TAIL=".($tail // 'undef')."\n";
   $msg   .= "Entries (most recent first):\n";
@@ -33883,6 +33977,50 @@ sub LRU_debug {
   Log3 ($name, 1, "$name DEBUG> $msg");
   
 return;
+}
+
+# --- Mini-Cache Wert lesen
+sub MCache_get {
+  my ($cache, $stats, $key) = @_;
+
+  if (exists $cache->{$key}) {
+      $stats->{hits}++;
+      return $cache->{$key};
+  }
+
+  $stats->{misses}++;
+  
+return;
+}
+
+# --- Mini-Cache Wert schreiben
+sub MCache_set {
+  my ($cache, $key, $value) = @_;
+  $cache->{$key} = $value;
+  
+return;
+}
+
+# --- Mini-Cache dumpen
+sub MCache_dump {
+  my $msg = '';
+
+  for my $chn (sort keys %MCache_Stats) {
+      my $stats = $MCache_Stats{$chn};
+      my $size  = $stats->{cache} ? scalar keys %{ $stats->{cache} } : 0;
+      
+      my $hits   = $stats->{hits};
+      my $misses = $stats->{misses};
+
+      my $rate = ($hits + $misses) > 0
+                 ? ($hits / ($hits + $misses)) * 100
+                 : 100;
+
+      $msg .= "\n" if $msg;
+      $msg .= sprintf ( "%-20s Entries=%-5d Misses=%-5d HitRate=%-6.2f Hits=%d", $chn.':', $size, $misses, $rate, $hits );
+  }
+
+return $msg;
 }
 
 #####################################################################################################################
