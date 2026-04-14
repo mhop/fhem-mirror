@@ -1,6 +1,6 @@
 #!/bin/bash
 #$Id:$
-SCRIPTVERSION="3.36"
+SCRIPTVERSION="3.37"
 # Author: Adimarantis
 # License: GPL
 #Install script for signal-cli 
@@ -512,7 +512,7 @@ fi
 stop_service() {
   if [ -z "$DOCKER" ]; then
 	echo "Stopping signal-cli service"
-	service signal stop
+	systemctl stop signal
   else
 	SIGSERVICE=`ps -eo pid,command | grep $SIGNALVAR | grep -v grep`
 	if [ -n "$SIGSERVICE" ]; then
@@ -528,7 +528,7 @@ stop_service() {
 start_service() {
 	if [ -z "$DOCKER" ]; then
 		echo "Start signal-cli service"
-		service signal start
+		systemctl start signal
 	else
 		DBDAEMON=`ps -eo command | grep dbus-daemon | grep -v grep`
 		if [ -z "$DBDAEMON" ]; then
