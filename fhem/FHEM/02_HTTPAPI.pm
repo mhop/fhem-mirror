@@ -238,7 +238,7 @@ sub HTTPAPI_CGI {
     readingsSingleUpdate($defs{$name}, 'request', $request, 0);
 
     my ($cmd, $exec, $ret);
-    if ($apiCmdString =~ /&(cmd|cmds|perl)(\=[^&]*)?(?=&|$)|^(cmd|cmds|perl)(\=[^&]*)?(&|$)/) {
+    if ($apiCmdString =~ /&(cmd|cmds|perl|shell)(\=[^&]*)?(?=&|$)|^(cmd|cmds|perl|shell)(\=[^&]*)?(&|$)/) {
       $exec = $1 // $3; 
       $cmd = substr(($2 // $4), 1);
       # url decoding
@@ -249,6 +249,10 @@ sub HTTPAPI_CGI {
         $ret = AnalyzeCommandChain($defs{$name}, $cmd);
       } elsif ($exec eq 'perl') {
         $ret = AnalyzePerlCommand($defs{$name}, $cmd);
+      } elsif ($exec eq 'shell') {
+        $ret = AnalyzePerlCommand($defs{$name}, q{qx/} . $cmd . q{/});
+        # Whitespace am Ende entfernen 
+        $ret =~ s/\s+$//;
       }
 
       # JSON-Konvertierung von $ret
@@ -507,10 +511,10 @@ sub HTTPAPI_Undef {
   <a id="HTTPAPI-exec"></a>
   <b>Exec</b>
   <ul>
-    <li>API command line for executing Fhem or Perl commands<br>
+    <li>API command line for executing Fhem, Perl or Shell commands<br>
       Request:
       <ul>
-        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?cmd|cmds|perl=&lt;cmd&gt;</code><br>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?cmd|cmds|perl|shell=&lt;cmd&gt;</code><br>
       </ul>
       Response:
       <ul>
@@ -572,36 +576,6 @@ sub HTTPAPI_Undef {
       Response:
       <ul>
         <code>&lt;internal name&gt;=&lt;val&gt;|error=&lt;error message&gt;</code><br>
-      </ul>
-    </li>
-    <li>API command line for execute Fhem command<br>
-      Request:
-      <ul>
-        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?cmd=&lt;cmd&gt;</code><br>
-      </ul>
-      Response:
-      <ul>
-        <code>&lt;exec?cmd&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
-      </ul>
-    </li>
-    <li>API command line for execute Fhem commandchain<br>
-      Request:
-      <ul>
-        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?cmds=&lt;cmd&gt;</code><br>
-      </ul>
-      Response:
-      <ul>
-        <code>&lt;exec?cmds&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
-      </ul>
-    </li>
-    <li>API command line for execute Perl commands<br>
-      Request:
-      <ul>
-        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/exec?perl=&lt;cmd&gt;</code><br>
-      </ul>
-      Response:
-      <ul>
-        <code>&lt;exec?perl&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
   </ul>
