@@ -423,7 +423,7 @@ sub HTTPAPI_Undef {
 <h3>HTTPAPI</h3>
 <ul>
   HTTPAPI is a compact HTML API server that performs http requests to execute set, get and trigger commands,
-   reads and writes readings, querying internals and execute Fhem or Perl commands.<br><br>
+   reads and writes readings, querying internals and execute Fhem, Perl or Shell commands.<br><br>
 
   <a id="HTTPAPI-define"></a>
   <b>Define</b>
@@ -487,6 +487,22 @@ sub HTTPAPI_Undef {
       Response:
       <ul>
         <code>&lt;device&gt;=&lt;cmd&gt;|error=&lt;error message&gt;</code><br>
+      </ul>
+    </li>
+  </ul>
+  <br><br>
+
+  <a id="HTTPAPI-internal"></a>
+  <b>Internal</b>
+  <ul>
+    <li>API command line for read internals<br>
+      Request:
+      <ul>
+        <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/readinternal?device=&lt;devname&gt;&internal=&lt;name&gt;</code><br>
+      </ul>
+      Response:
+      <ul>
+        <code>&lt;internal name&gt;=&lt;val&gt;|error=&lt;error message&gt;</code><br>
       </ul>
     </li>
   </ul>
