@@ -163,10 +163,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.0"  => "14.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
+  "2.6.0"  => "16.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
                            "rename debug id saveData2Cache -> saveData2Storage, new Debug Id tiltedIrrCache ".
                            "new Mini Caches: Solar2Astro_Cache, DayHourMove_Cache, move __createAdditionalEvents to Task 8 ".
                            "complete universal LRU-Cache implementation for DWD Tilted Irradiance Cache, TimestringsFromOffset Cache ".
+                           "rework: timestringsFromOffset, _beamGraphicFirstHour -> fix graphic error hour -1 if graphicHistoryHour > day change ".
                            "prepare replacing of Reading Tomorrow_ConsumptionForecast by Tomorrow_CONforecast ",
   "2.5.3"  => "09.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ".
                            "correct ___areaFactorTrack: offset_hours ",
@@ -314,160 +315,170 @@ my %vNotesIntern = (
 );
 
 
+
+
+# Locale‑abhängige Kurz‑Wochentage erzeugen (Mo, Tue, lun., …)
+my @LOCALE_DAYNAMES;
+
+for my $wday (0..6) {                                                               # 1970-01-04 war ein Sonntag -> wday=0
+    my $epoch = 345600 + $wday * 86400;                                             # 1970-01-04 + wday Tage
+    push @LOCALE_DAYNAMES, POSIX::strftime("%a", localtime($epoch));                # in Konstante speichern
+}
+
 ## Konstanten
 ######################
 use constant {
-  ACTCOLDEF      => 'orange',                                                       # default Färbung Icon wenn aktiv
-  ACTCOLINVBAT   => '#00e000',                                                      # default Färbung aktiver Batterie-Wechselrichter ohne Solarzellen
-  AINUMTREES     => 10,                                                             # Anzahl der Entscheidungsbäume im Ensemble
-  AITRBLTO       => 7200,                                                           # KI DecTree Training BlockingCall Timeout
-  AIASPEAKSFAC   => 1.1,                                                            # Sicherheitsaufschlag auf installiertes PV Peak
-  AINUMEPOCHS    => 15000,                                                          # AI::FANN max. Anzahl Trainigs-Epochen
-  AIIMPPATIENCE  => 1000,                                                           # AI::FANN Training - Schwelle Anzahl Epochen ohne Verbesserung für Early Stopping                                                                           
-  AINNTRBLTO     => 86400,                                                          # Training neuronales Netz BlockingCall Timeout
-  AINUMMININPUTS => 2000,                                                           # Mindestanzahl valider Datensätze für Training AI::FANN
-  AIBCTHHLD      => 0.2,                                                            # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
-  AITRSTARTDEF   => 2,                                                              # default Stunde f. Start AI-Training
-  AISTDUDEF      => 1825,                                                           # default Haltezeit KI Raw Daten (Tage)
-  AIACCUPLIM     => 150,                                                            # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-  AIACCLOWLIM    => 50,                                                             # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
-  AIACCTRNMIN    => 3500,                                                           # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
-  APITIMEOUT     => 30,                                                             # default Timeout HTTP API-Call
+  ACTCOLDEF       => 'orange',                                                      # default Färbung Icon wenn aktiv
+  ACTCOLINVBAT    => '#00e000',                                                     # default Färbung aktiver Batterie-Wechselrichter ohne Solarzellen
+  AINUMTREES      => 10,                                                            # Anzahl der Entscheidungsbäume im Ensemble
+  AITRBLTO        => 7200,                                                          # KI DecTree Training BlockingCall Timeout
+  AIASPEAKSFAC    => 1.1,                                                           # Sicherheitsaufschlag auf installiertes PV Peak
+  AINUMEPOCHS     => 15000,                                                         # AI::FANN max. Anzahl Trainigs-Epochen
+  AIIMPPATIENCE   => 1000,                                                          # AI::FANN Training - Schwelle Anzahl Epochen ohne Verbesserung für Early Stopping                                                                           
+  AINNTRBLTO      => 86400,                                                         # Training neuronales Netz BlockingCall Timeout
+  AINUMMININPUTS  => 2000,                                                          # Mindestanzahl valider Datensätze für Training AI::FANN
+  AIBCTHHLD       => 0.2,                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
+  AITRSTARTDEF    => 2,                                                             # default Stunde f. Start AI-Training
+  AISTDUDEF       => 1825,                                                          # default Haltezeit KI Raw Daten (Tage)
+  AIACCUPLIM      => 150,                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+  AIACCLOWLIM     => 50,                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
+  AIACCTRNMIN     => 3500,                                                          # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
+  APITIMEOUT      => 30,                                                            # default Timeout HTTP API-Call
   
-  BATSOCCHGDAY   => 5,                                                              # Batterie: prozentuale SoC Anpassung pro Tag
-  BEAMWIDTH      => 20,                                                             # default Balkenbreite
-  BEVTGTSOC      => 80,                                                             # default Ziel-SoC für E-Auto Batterieladung
-  BHEIGHTLEVEL   => 200,                                                            # default Multiplikator zur Festlegung der maximalen Balkenhöhe
-  B1COLDEF       => 'FFAC63',                                                       # default Farbe Beam 1
-  B1FONTCOLDEF   => '0D0D0D',                                                       # default Schriftfarbe Beam 1
-  B2COLDEF       => 'C4C4A7',                                                       # default Farbe Beam 2
-  B2FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 2
-  B3COLDEF       => 'BED6C0',                                                       # default Farbe Beam 3
-  B3FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 3
-  B4COLDEF       => 'DBDBD0',                                                       # default Farbe Beam 4
-  B4FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 4
-  B5COLDEF       => 'A3C8FF',                                                       # default Farbe Beam 5
-  B5FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 5
-  B6COLDEF       => 'ABABAB',                                                       # default Farbe Beam 6
-  B6FONTCOLDEF   => '000000',                                                       # default Schriftfarbe Beam 6
-  BICONDEF       => 'measure_battery_75',                                           # default Batterie-Icon
-  BICCOLRCDDEF   => 'grey',                                                         # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
-  BICCOLNRCDDEF  => '#cccccc',                                                      # default Batterie-Icon Färbung bei fehlender Ladefreigabe
-  BCHGICONCOLDEF => 'darkorange',                                                   # default 'Aufladen' Batterie-Icon Färbung
-  BDCHICONCOLDEF => '#b32400',                                                                              # default 'Entladen' Batterie-Icon Färbung
-  BPATH          => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                   # Basispfad Abruf contrib SolarForecast Files
-  BGHPATH        => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',     # Basispfad GitHub SolarForecast Files
+  BATSOCCHGDAY    => 5,                                                             # Batterie: prozentuale SoC Anpassung pro Tag
+  BEAMWIDTH       => 20,                                                            # default Balkenbreite
+  BEVTGTSOC       => 80,                                                            # default Ziel-SoC für E-Auto Batterieladung
+  BHEIGHTLEVEL    => 200,                                                           # default Multiplikator zur Festlegung der maximalen Balkenhöhe
+  B1COLDEF        => 'FFAC63',                                                      # default Farbe Beam 1
+  B1FONTCOLDEF    => '0D0D0D',                                                      # default Schriftfarbe Beam 1
+  B2COLDEF        => 'C4C4A7',                                                      # default Farbe Beam 2
+  B2FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 2
+  B3COLDEF        => 'BED6C0',                                                      # default Farbe Beam 3
+  B3FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 3
+  B4COLDEF        => 'DBDBD0',                                                      # default Farbe Beam 4
+  B4FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 4
+  B5COLDEF        => 'A3C8FF',                                                      # default Farbe Beam 5
+  B5FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 5
+  B6COLDEF        => 'ABABAB',                                                      # default Farbe Beam 6
+  B6FONTCOLDEF    => '000000',                                                      # default Schriftfarbe Beam 6
+  BICONDEF        => 'measure_battery_75',                                          # default Batterie-Icon
+  BICCOLRCDDEF    => 'grey',                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
+  BICCOLNRCDDEF   => '#cccccc',                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
+  BCHGICONCOLDEF  => 'darkorange',                                                  # default 'Aufladen' Batterie-Icon Färbung
+  BDCHICONCOLDEF  => '#b32400',                                                                              # default 'Entladen' Batterie-Icon Färbung
+  BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                   # Basispfad Abruf contrib SolarForecast Files
+  BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',     # Basispfad GitHub SolarForecast Files
   
-  CONSFCLDAYS    => 60,                                                             # die Stundenwerte der letzten CONSFCLDAYS Tage zur Kalkulation der Verbrauchvorhersage einbezogen
-  CONDAYSLIDEMAX => 30,                                                             # max. Anzahl der Arrayelemente im Register pvCircular -> con_all / gcons_a -> <Tag>
-  CARECYCLEDEF   => 20,                                                             # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
-  CAICONDEF      => 'clock@gold',                                                   # default consumerAdviceIcon
-  CICONDEF       => 'light_light_dim_100',                                          # default Consumer-Icon
-  CICONCOLACT    => 'darkorange',                                                   # default Consumer-Icon aktiv Färbung
-  CICONCOLINACT  => 'grey',                                                         # default Consumer-Icon inaktiv Färbung
-  CFILE          => 'controls_solarforecast.txt',                                   # Controlfile Update FTUI-Files
+  CONSFCLDAYS     => 60,                                                            # die Stundenwerte der letzten CONSFCLDAYS Tage zur Kalkulation der Verbrauchvorhersage einbezogen
+  CONDAYSLIDEMAX  => 30,                                                            # max. Anzahl der Arrayelemente im Register pvCircular -> con_all / gcons_a -> <Tag>
+  CARECYCLEDEF    => 20,                                                            # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
+  CAICONDEF       => 'clock@gold',                                                  # default consumerAdviceIcon
+  CICONDEF        => 'light_light_dim_100',                                         # default Consumer-Icon
+  CICONCOLACT     => 'darkorange',                                                  # default Consumer-Icon aktiv Färbung
+  CICONCOLINACT   => 'grey',                                                        # default Consumer-Icon inaktiv Färbung
+  CFILE           => 'controls_solarforecast.txt',                                  # Controlfile Update FTUI-Files
   
-  DEFLANG        => 'EN',                                                           # default Sprache wenn nicht konfiguriert
-  DEFMAXVAR      => 0.75,                                                           # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
-  DEFINTERVAL    => 70,                                                             # Standard Abfrageintervall
-  DEFMINTIME     => 60,                                                             # default Einplanungsdauer in Minuten
-  DEFCTYPE       => 'other',                                                        # default Verbrauchertyp
-  DEFCMODE       => 'can',                                                          # default Planungsmode der Verbraucher
-  DEFPOPERCENT   => 1.0,                                                            # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
-  DEFHYST        => 0,                                                              # default Hysterese
-  DRIFTHZN3TH    => 8,                                                              # Schwellenwert Stunden in DriftZone 3 - bei Erreichen/Überschreiten wird Rekalibrierung ausgeführt 
-  DWDFCDAYSMIN   => 2,                                                              # Mindestwert Attr 'forecastDays' im DWD-Device
+  DEFLANG         => 'EN',                                                          # default Sprache wenn nicht konfiguriert
+  DEFMAXVAR       => 0.75,                                                          # max. Varianz pro Tagesberechnung Autokorrekturfaktor (geändert V.45.0 mit Median Verfahren)
+  DEFINTERVAL     => 70,                                                            # Standard Abfrageintervall
+  DEFMINTIME      => 60,                                                            # default Einplanungsdauer in Minuten
+  DEFCTYPE        => 'other',                                                       # default Verbrauchertyp
+  DEFCMODE        => 'can',                                                         # default Planungsmode der Verbraucher
+  DEFPOPERCENT    => 1.0,                                                           # Standard % aktuelle Leistung an nominaler Leistung gemäß Typenschild
+  DEFHYST         => 0,                                                             # default Hysterese
+  DRIFTHZN3TH     => 8,                                                             # Schwellenwert Stunden in DriftZone 3 - bei Erreichen/Überschreiten wird Rekalibrierung ausgeführt 
+  DWDFCDAYSMIN    => 2,                                                             # Mindestwert Attr 'forecastDays' im DWD-Device
   
-  EPIECMAXCYCLES => 10,                                                             # Anzahl Einschaltzyklen für verbraucherspezifische Energiestück Ermittlung (EnergyPieces)
-  EPIECMAXOPHRS  => 10,                                                             # max. Anzahl ununterbrochene Betriebsstunden für Verbraucher ohne Cycle Switch (EnergyPieces)
+  EPIECMAXCYCLES  => 10,                                                            # Anzahl Einschaltzyklen für verbraucherspezifische Energiestück Ermittlung (EnergyPieces)
+  EPIECMAXOPHRS   => 10,                                                            # max. Anzahl ununterbrochene Betriebsstunden für Verbraucher ohne Cycle Switch (EnergyPieces)
   
-  FORAPIREPDEF   => 900,                                                            # default Abrufintervall ForecastSolar API (s)
-  FLOWGSIZEDEF   => 400,                                                            # default flowGraphicSize
-  FGCDDEF        => 130,                                                            # Abstand Verbrauchericons zueinander
+  FORAPIREPDEF    => 900,                                                           # default Abrufintervall ForecastSolar API (s)
+  FLOWGSIZEDEF    => 400,                                                           # default flowGraphicSize
+  FGCDDEF         => 130,                                                           # Abstand Verbrauchericons zueinander
   
-  GMFBLTO        => 30,                                                             # Timeout Aholen Message File aus GIT
-  GMFILEREPEAT   => 3600,                                                           # Base Wiederholungsuntervall Abholen Message File aus GIT
-  GMFILERANDOM   => 10800,                                                          # Random AddOn zu GMFILEREPEAT
-  GENICONDEF     => 'solar',                                                        # default Generator (z.B. Strings) Icon
-  GENCOLACT      => 'darkorange',                                                   # default Generator-Icon aktiv Färbung
-  GENCOLINACT    => 'grey',                                                         # default Generator-Icon inaktiv Färbung
+  GMFBLTO         => 30,                                                            # Timeout Aholen Message File aus GIT
+  GMFILEREPEAT    => 3600,                                                          # Base Wiederholungsuntervall Abholen Message File aus GIT
+  GMFILERANDOM    => 10800,                                                         # Random AddOn zu GMFILEREPEAT
+  GENICONDEF      => 'solar',                                                       # default Generator (z.B. Strings) Icon
+  GENCOLACT       => 'darkorange',                                                  # default Generator-Icon aktiv Färbung
+  GENCOLINACT     => 'grey',                                                        # default Generator-Icon inaktiv Färbung
   
-  HPCOMFTEMP     => 21,                                                             # Wärmepumpe/Klimagerät Solltemperatur / Komforttemperatur
-  HISTHOURDEF    => 2,                                                              # default Anzeige vorangegangene Stunden
-  HOURCOUNT      => 24,                                                             # default Stundenbalken in Grafik
-  HOMEICONDEF    => 'control_building_control@grey',                                # default Home-Icon
+  HPCOMFTEMP      => 21,                                                            # Wärmepumpe/Klimagerät Solltemperatur / Komforttemperatur
+  HISTHOURDEF     => 2,                                                             # default Anzeige vorangegangene Stunden
+  HOURCOUNT       => 24,                                                            # default Stundenbalken in Grafik
+  HOMEICONDEF     => 'control_building_control@grey',                               # default Home-Icon
   
-  INFINITE       => ~0 >> 1,                                                        # "Unendlich"
-  INPUTSIZE      => 10,                                                             # default Breite eines Textfeldes in graphicHeaderOwnspec
-  IDXLIMIT       => 900000,                                                         # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
-  INPUTROWSHIFT  => 150,                                                            # Flußgrafik: Verschiebung bei Anzeige Solarzellen/Input-Zeile
-  INVICONDEF     => 'weather_sun',                                                  # default Inverter-icon
-  INACTCOLDEF    => 'grey',                                                         # default Färbung Icon wenn inaktiv
+  INFINITE        => ~0 >> 1,                                                       # "Unendlich"
+  INPUTSIZE       => 10,                                                            # default Breite eines Textfeldes in graphicHeaderOwnspec
+  IDXLIMIT        => 900000,                                                        # Notification System: Indexe > IDXLIMIT sind reserviert für Steuerungsaufgaben
+  INPUTROWSHIFT   => 150,                                                           # Flußgrafik: Verschiebung bei Anzeige Solarzellen/Input-Zeile
+  INVICONDEF      => 'weather_sun',                                                 # default Inverter-icon
+  INACTCOLDEF     => 'grey',                                                        # default Färbung Icon wenn inaktiv
   
-  KJ2KWH         => 0.0002777777778,                                                # Umrechnungsfaktor kJ in kWh
-  KJ2WH          => 0.2777777778,                                                   # Umrechnungsfaktor kJ in Wh
+  KJ2KWH          => 0.0002777777778,                                               # Umrechnungsfaktor kJ in kWh
+  KJ2WH           => 0.2777777778,                                                  # Umrechnungsfaktor kJ in Wh
+   
+  LPOOLLENLIM     => 140,                                                           # Breitenbegrenzung der Ausgabe von List Pooldaten
+  LEADTIME        => 3600,                                                          # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
+  LAGTIME         => 1800,                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
+  LOGDELAY        => 600,                                                           # Verzögerungszeit (s) zwischen zwei Logausgaben mit identischen Inhalt
+  LOCALE_TIME     => setlocale (POSIX::LC_TIME),                                    # installierte locale abfragen
+  LOCALE_DAYNAMES => \@LOCALE_DAYNAMES,                                             # Locale‑abhängige Kurz‑Wochentage erzeugen (Mo, Tue, lun., …)
+  MAXWEATHERDEV   => 3,                                                             # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
+  MAXBATTERIES    => 3,                                                             # maximale Anzahl der möglichen Batterien
+  MAXCONSUMER     => 20,                                                            # maximale Anzahl der möglichen Consumer (Attribut)
+  MAXPRODUCER     => 3,                                                             # maximale Anzahl der möglichen anderen Produzenten (Attribut)
+  MAXINVERTER     => 5,                                                             # maximale Anzahl der möglichen Inverter
+  MAXBEAMLEVEL    => 3,                                                             # maximale Anzahl der Balkengrafik Ebenen
+  MAXNEXTHOURS    => 71,                                                            # max. Anzahl Stunden der Wertebasis (Start mit 0 -> 72h) z.B. in Nexthours
+  MAXNEXTDAYS     => 2,                                                             # max. Anzahl volle Tage in NextHours (Start mit 0 -> 3d)
+  MAXCONLIMIT     => 100000,                                                        # oberes Limit stündlicher Energieverbrauch des Hauses (Wh)
+  MAXSOCDEF       => 95,                                                            # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
+  MOONICONDEF     => 2,                                                             # default Mond-Phase (aus %hmoon)
+  MOONCOLDEF      => 'lightblue',                                                   # default Mond Färbung
+  MSGFILETEST     => 'controls_solarforecast_messages_test.txt',                    # TEST Input-File Notification System
+  MSGFILEPROD     => 'controls_solarforecast_messages_prod.txt',                    # PRODUKTIVES Input-File Notification System
   
-  LPOOLLENLIM    => 140,                                                            # Breitenbegrenzung der Ausgabe von List Pooldaten
-  LEADTIME       => 3600,                                                           # relative Zeit vor Sonnenaufgang zur Freigabe API Abruf / Verbraucherplanung
-  LAGTIME        => 1800,                                                           # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
-  LOGDELAY       => 600,                                                            # Verzögerungszeit (s) zwischen zwei Logausgaben mit identischen Inhalt
-  LOCALE_TIME    => setlocale (POSIX::LC_TIME),                                     # installierte locale abfragen
+  NODEICONDEF     => 'virtualbox',                                                  # default Knoten-Icon
   
-  MAXWEATHERDEV  => 3,                                                              # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
-  MAXBATTERIES   => 3,                                                              # maximale Anzahl der möglichen Batterien
-  MAXCONSUMER    => 20,                                                             # maximale Anzahl der möglichen Consumer (Attribut)
-  MAXPRODUCER    => 3,                                                              # maximale Anzahl der möglichen anderen Produzenten (Attribut)
-  MAXINVERTER    => 5,                                                              # maximale Anzahl der möglichen Inverter
-  MAXBEAMLEVEL   => 3,                                                              # maximale Anzahl der Balkengrafik Ebenen
-  MAXNEXTHOURS   => 71,                                                             # max. Anzahl Stunden der Wertebasis (Start mit 0 -> 72h) z.B. in Nexthours
-  MAXNEXTDAYS    => 2,                                                              # max. Anzahl volle Tage in NextHours (Start mit 0 -> 3d)
-  MAXCONLIMIT    => 100000,                                                         # oberes Limit stündlicher Energieverbrauch des Hauses (Wh)
-  MAXSOCDEF      => 95,                                                             # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
-  MOONICONDEF    => 2,                                                              # default Mond-Phase (aus %hmoon)
-  MOONCOLDEF     => 'lightblue',                                                    # default Mond Färbung
-  MSGFILETEST    => 'controls_solarforecast_messages_test.txt',                     # TEST Input-File Notification System
-  MSGFILEPROD    => 'controls_solarforecast_messages_prod.txt',                     # PRODUKTIVES Input-File Notification System
+  OMETEOREPDEF    => 900,                                                           # default Abrufintervall Open-Meteo API (s)
+  OMETMAXREQ      => 8000,                                                          # Beschränkung auf max. mögliche Requests Open-Meteo API
+  OTPDEADBAND     => 10.0,                                                          # Smoother Standard OTP Power Schwellenwert für Änderungen
+  OTPALPHA        => 1.0,                                                           # Smoother Standard OTP Power Alpha default
   
-  NODEICONDEF    => 'virtualbox',                                                   # default Knoten-Icon
-  
-  OMETEOREPDEF   => 900,                                                            # default Abrufintervall Open-Meteo API (s)
-  OMETMAXREQ     => 8000,                                                           # Beschränkung auf max. mögliche Requests Open-Meteo API
-  OTPDEADBAND    => 10.0,                                                           # Smoother Standard OTP Power Schwellenwert für Änderungen
-  OTPALPHA       => 1.0,                                                            # Smoother Standard OTP Power Alpha default
-  
-  PI             => 3.141592653589793,                                              # die Konstante π
-  PERCCONINSOC   => 0.75,                                                           # Batterie SoC-Management: Anteilsfaktor für Verbrauch
-  PRDEF          => 0.9,                                                            # default Performance Ratio (PR)
-  PRDCRROWSHIFT  => 100,                                                            # Flußgrafik: Verschiebung bei Anzeige Producer/Inverter-Zeile
-  PRODICONDEF    => 'sani_garden_pump',                                             # default Producer-Icon
-  PGHPATH        => '',                                                             # GitHub Post Pfad
-  PPATH          => '?format=txt',                                                  # Download Format
+  PI              => 3.141592653589793,                                             # die Konstante π
+  PERCCONINSOC    => 0.75,                                                          # Batterie SoC-Management: Anteilsfaktor für Verbrauch
+  PRDEF           => 0.9,                                                           # default Performance Ratio (PR)
+  PRDCRROWSHIFT   => 100,                                                           # Flußgrafik: Verschiebung bei Anzeige Producer/Inverter-Zeile
+  PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
+  PGHPATH         => '',                                                            # GitHub Post Pfad
+  PPATH           => '?format=txt',                                                 # Download Format
 
-  STOREFFDEF     => 87,                                                             # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
-  SLIDENUMMAX    => 3,                                                              # max. Anzahl der Arrayelemente in Schieberegistern
-  SPLSLIDEMAX    => 20,                                                             # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß und anderen
-  SOLAPIREPDEF   => 3600,                                                           # default Abrufintervall SolCast API (s)
-  SOLARCONSTANT  => 1367.0,                                                         # Solarkonstante W/m²                                                           
-  SOLCMAXREQDEF  => 50,                                                             # max. täglich mögliche Requests SolCast API
-  SFTYMARGIN_20  => 20,                                                             # Sicherheitszuschlag 20%
-  SFTYMARGIN_50  => 50,                                                             # Sicherheitszuschlag 50%
-  SPACESIZE      => 24,                                                             # default Platz in px über oder unter den Balken
-  STROKCOLSTDDEF => 'darkorange',                                                   # Flußgrafik: Standardfarbe aktive normale Kette
-  STROKCOLSIGDEF => 'red',                                                          # Flußgrafik: Standardfarbe aktive Signal-Kette
-  STROKCOLINADEF => 'gray',                                                         # Flußgrafik: Standardfarbe inaktive Kette
-  STROKWIDTHDEF  => 25,                                                             # Flußgrafik: Standard Breite der Kette
-  STROKCMRREDLIM => 400,                                                            # Flußgrafik: Consumerpower ab der dynamische Laufkette rot gefärbt wird
+  STOREFFDEF      => 87,                                                            # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
+  SLIDENUMMAX     => 3,                                                             # max. Anzahl der Arrayelemente in Schieberegistern
+  SPLSLIDEMAX     => 20,                                                            # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß und anderen
+  SOLAPIREPDEF    => 3600,                                                          # default Abrufintervall SolCast API (s)
+  SOLARCONSTANT   => 1367.0,                                                        # Solarkonstante W/m²                                                           
+  SOLCMAXREQDEF   => 50,                                                            # max. täglich mögliche Requests SolCast API
+  SFTYMARGIN_20   => 20,                                                            # Sicherheitszuschlag 20%
+  SFTYMARGIN_50   => 50,                                                            # Sicherheitszuschlag 50%
+  SPACESIZE       => 24,                                                            # default Platz in px über oder unter den Balken
+  STROKCOLSTDDEF  => 'darkorange',                                                  # Flußgrafik: Standardfarbe aktive normale Kette
+  STROKCOLSIGDEF  => 'red',                                                         # Flußgrafik: Standardfarbe aktive Signal-Kette
+  STROKCOLINADEF  => 'gray',                                                        # Flußgrafik: Standardfarbe inaktive Kette
+  STROKWIDTHDEF   => 25,                                                            # Flußgrafik: Standard Breite der Kette
+  STROKCMRREDLIM  => 400,                                                           # Flußgrafik: Consumerpower ab der dynamische Laufkette rot gefärbt wird
   
-  TEMPCOEFFDEF   => -0.45,                                                          # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
-  TEMPMODINC     => 25,                                                             # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
-  TEMPBASEDEF    => 25,                                                             # Temperatur Module bei Nominalleistung
+  TEMPCOEFFDEF    => -0.45,                                                         # default Temperaturkoeffizient Pmpp (%/°C) lt. Datenblatt Solarzelle
+  TEMPMODINC      => 25,                                                            # default Temperaturerhöhung an Solarzellen gegenüber Umgebungstemperatur bei wolkenlosem Himmel
+  TEMPBASEDEF     => 25,                                                            # Temperatur Module bei Nominalleistung
   
-  VRMAPIREPDEF   => 300,                                                            # default Abrufintervall Victron VRM API Forecast
+  VRMAPIREPDEF    => 300,                                                           # default Abrufintervall Victron VRM API Forecast
   
-  WH2KJ          => 3.6,                                                            # Umrechnungsfaktor Wh in kJ
-  WHISTREPEAT    => 851,                                                            # Wiederholungsintervall Cache File Daten schreiben 
-  WTHCOLDDEF     => 'C7C979',                                                       # Wetter Icon Tag default Farbe
-  WTHCOLNDEF     => 'C7C7C7',                                                       # Wetter Icon Nacht default Farbe 
+  WH2KJ           => 3.6,                                                           # Umrechnungsfaktor Wh in kJ
+  WHISTREPEAT     => 851,                                                           # Wiederholungsintervall Cache File Daten schreiben 
+  WTHCOLDDEF      => 'C7C979',                                                      # Wetter Icon Tag default Farbe
+  WTHCOLNDEF      => 'C7C7C7',                                                      # Wetter Icon Nacht default Farbe 
 };
 
 
@@ -2436,7 +2447,7 @@ sub Define {
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                # Modul Meta.pm nicht vorhanden
 
   $hash->{'.tiltCache'} = LRU_cache_create ('tiltedIrrCache', 'Tilted Irradiance Cache',     2000);     # Tilted Irradiance Cache initialisieren
-  $hash->{'.tsCache'}   = LRU_cache_create ('tsCache',        'TimestringsFromOffset Cache', 1000);     # timestringsFromOffset Cache
+  $hash->{'.tsCache'}   = LRU_cache_create ('tsCache',        'TimestringsFromOffset Cache', 4000);     # timestringsFromOffset Cache
 
   my $params = {
       hash        => $hash,
@@ -4128,7 +4139,7 @@ sub ___convPendToPstart {
 
       if ($chrst < 0) {
           my $nt     = (timestringToTimestamp ($cdatest.' 00:00:00')) - 3600;
-          $nt        = (timestampToTimestring ($nt, $lang))[1];
+          $nt        = (timestampToTimestring ($name, $nt, $lang))[1];
           ($cdatest) = split " ", $nt;
           $chrst     = 23;
       }
@@ -4153,15 +4164,15 @@ sub ___setSolCastAPIcallKeyData {
 
   my $hash  = $defs{$name};
 
-  $data{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];       # letzte Abrufzeit
-  $data{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_timestamp} = $t;                                           # letzter Abrufzeitstempel
+  $data{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($name, $t, $lang))[3];    # letzte Abrufzeit
+  $data{$name}{statusapi}{SolCast}{'?All'}{lastretrieval_timestamp} = $t;                                               # letzter Abrufzeitstempel
 
   my $apimaxreq = AttrVal      ($name, 'ctrlSolCastAPImaxReq',            SOLCMAXREQDEF);
   my $mpl       = StatusAPIVal ($hash, 'SolCast', '?All', 'solCastAPIcallMultiplier', 1);
   my $ddc       = StatusAPIVal ($hash, 'SolCast', '?All', 'todayDoneAPIcalls',        0);
 
   $ddc         += 1 if($paref->{firstreq});
-  my $drc       = StatusAPIVal ($hash, 'SolCast', '?All', 'todayMaxAPIcalls', $apimaxreq / $mpl) - $ddc;               # verbleibende SolCast API Calls am aktuellen Tag
+  my $drc       = StatusAPIVal ($hash, 'SolCast', '?All', 'todayMaxAPIcalls', $apimaxreq / $mpl) - $ddc;                # verbleibende SolCast API Calls am aktuellen Tag
   $drc          = 0 if($drc < 0);
 
   $data{$name}{statusapi}{SolCast}{'?All'}{todayDoneAPIrequests} = $ddc * $mpl;
@@ -4195,10 +4206,11 @@ sub ___setSolCastAPIcallKeyData {
 
   if ($debug =~ /apiProcess|apiCall/x) {
       Log3 ($name, 1, "$name DEBUG> SolCast API Call - remaining API Calls: ".($drc - 1));
-      Log3 ($name, 1, "$name DEBUG> SolCast API Call - next API Call: ".(timestampToTimestring ($t + $apiitv, $lang))[0]);
+      Log3 ($name, 1, "$name DEBUG> SolCast API Call - next API Call: ".(timestampToTimestring ($name, $t + $apiitv, $lang))[0]);
   }
 
-  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
+  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.
+                                                       (timestampToTimestring ($name, $t + $apiitv, $lang))[0], 1);
 
 return;
 }
@@ -4438,7 +4450,7 @@ sub __forecastSolar_ApiResponse {
 
       for my $k (sort keys %{$jdata->{'result'}}) {                                   # Vorhersagedaten in Hash eintragen
           my $kts        = (timestringToTimestamp ($k)) - 3600;                       # Endezeit der Periode auf Startzeit umrechnen
-          my $starttmstr = (timestampToTimestring ($kts, $lang))[3];
+          my $starttmstr = (timestampToTimestring ($name, $kts, $lang))[3];
 
           $data{$name}{solcastapi}{$string}{$starttmstr}{pv_estimate50} = $jdata->{'result'}{$k};
 
@@ -4507,7 +4519,7 @@ sub ___setForeCastAPIcallKeyData {
 
   my $hash  = $defs{$name};
 
-  $data{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
+  $data{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($name, $t, $lang))[3];     # letzte Abrufzeit
   $data{$name}{statusapi}{ForecastSolar}{'?All'}{lastretrieval_timestamp} = $t;
   $data{$name}{statusapi}{ForecastSolar}{'?All'}{todayDoneAPIrequests}   += 1;
 
@@ -4536,7 +4548,8 @@ sub ___setForeCastAPIcallKeyData {
       $smt    = '(forced waiting time)';
   }
 
-  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0].' '.$smt, 1);
+  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.
+                                                       (timestampToTimestring ($name, $t + $apiitv, $lang))[0].' '.$smt, 1);
 
 return;
 }
@@ -4597,7 +4610,7 @@ sub __getDWDSolarData {
   my @strings = sort keys %{$data{$name}{strings}};
   my $ret     = q{};
 
-  $data{$name}{statusapi}{DWD}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];
+  $data{$name}{statusapi}{DWD}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($name, $t, $lang))[3];
   $data{$name}{statusapi}{DWD}{'?All'}{lastretrieval_timestamp} = $t;
   $data{$name}{statusapi}{DWD}{'?All'}{todayDoneAPIrequests}   += 1;
 
@@ -5011,7 +5024,8 @@ sub __getVictronSolarData {
       }
   }
 
-  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
+  readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.
+                                                       (timestampToTimestring ($name, $t + $apiitv, $lang))[0], 1);
 
   __VictronVRM_ApiRequestLogin ($paref);
 
@@ -5139,7 +5153,7 @@ sub __VictronVRM_ApiResponseLogin {
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
           $data{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $jdata->{'error_code'};
-          $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
+          $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($name, $t, $lang))[3];  # letzte Abrufzeit
           $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
 
           if ($debug =~ /apiProcess|apiCall/x) {
@@ -5153,7 +5167,7 @@ sub __VictronVRM_ApiResponseLogin {
           $data{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = 'success';
           $data{$name}{statusapi}{VictronKi}{'?All'}{idUser}                  = $jdata->{'idUser'};
           $data{$name}{statusapi}{VictronKi}{'?All'}{verification_mode}       = $jdata->{'verification_mode'};
-          $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];                # letzte Abrufzeit
+          $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($name, $t, $lang))[3];                # letzte Abrufzeit
           $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
 
           if ($debug eq 'apiProcess') {
@@ -5279,7 +5293,7 @@ sub __VictronVRM_ApiResponseForecast {
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
           $data{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $jdata->{'error_code'};
-          $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
+          $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($name, $t, $lang))[3];  # letzte Abrufzeit
           $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
 
           if ($debug =~ /apiProcess|apiCall/x) {
@@ -5303,7 +5317,7 @@ sub __VictronVRM_ApiResponseForecast {
               $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
               $data{$name}{statusapi}{VictronKi}{'?All'}{response_message}        = $msg;
-              $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($t, $lang))[3];  # letzte Abrufzeit
+              $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_time}      = (timestampToTimestring ($name, $t, $lang))[3];  # letzte Abrufzeit
               $data{$name}{statusapi}{VictronKi}{'?All'}{lastretrieval_timestamp} = $t;
 
               debugLog ($paref, 'apiProcess|apiCall', 'Victron VRM API Call - ERROR - records are not an ARRAY: '.$syforecast);
@@ -5321,7 +5335,7 @@ sub __VictronVRM_ApiResponseForecast {
 
               my $starttmstr = $jdata->{'records'}{'solar_yield_forecast'}[$k][0];              # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'solar_yield_forecast'}[$k][1];
-              $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
+              $starttmstr    = (timestampToTimestring ($name, $starttmstr, $lang))[3];
 
               debugLog ($paref, 'apiProcess', 'Victron VRM API - PV estimate: '.$starttmstr.' => '.$val.' Wh');
 
@@ -5345,7 +5359,7 @@ sub __VictronVRM_ApiResponseForecast {
 
               my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];               # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
-              $starttmstr    = (timestampToTimestring ($starttmstr, $lang))[3];
+              $starttmstr    = (timestampToTimestring ($name, $starttmstr, $lang))[3];
 
               debugLog ($paref, "apiProcess", "Victron VRM API - CO estimate: ".$starttmstr.' => '.$val.' Wh');
 
@@ -5584,7 +5598,7 @@ sub __openMeteo_ApiRequest {
 
   if (!$allstrings) {                                                         # alle Strings wurden abgerufen
       my $apiitv = StatusAPIVal ($hash, 'OpenMeteo', '?All', 'currentAPIinterval', OMETEOREPDEF);
-      readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($t + $apiitv, $lang))[0], 1);
+      readingsSingleUpdate ($hash, 'nextRadiationAPICall', $hqtxt{after}{$lang}.' '.(timestampToTimestring ($name, $t + $apiitv, $lang))[0], 1);
 
       $data{$name}{statusapi}{OpenMeteo}{'?All'}{todayDoneAPIcalls} += 1;
 
@@ -5685,7 +5699,7 @@ sub __openMeteo_ApiResponse {
   my $t       = int time;
   my $nghi    = 0;
   my $sta     = [gettimeofday];                           # Start Response Verarbeitung
-  my $rt      = (timestampToTimestring ($t, $lang))[3];
+  my $rt      = (timestampToTimestring ($name, $t, $lang))[3];
   
   $paref->{sta} = $sta;
   $paref->{t}   = $t;
@@ -5767,11 +5781,11 @@ sub __openMeteo_ApiResponse {
           }
 
           my $ots     = timestringToTimestamp  ($otmstr);
-          my $pvtmstr = (timestampToTimestring ($ots - 3600))[0];                                   # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
+          my $pvtmstr = (timestampToTimestring ($name, $ots - 3600))[0];                                # Strahlung wird als Durchschnitt der !vorangegangenen! Stunde geliefert!
 
           if (timestringToTimestamp ($pvtmstr) < $refts && $submodel ne 'HistoricalData') {
               $k++;
-              next;                                                                                 # Daten älter als akt. Tag 00:00:00 verwerfen
+              next;                                                                                     # Daten älter als akt. Tag 00:00:00 verwerfen
           }
 
           ## Strahlungsdaten
@@ -5830,12 +5844,12 @@ sub __openMeteo_ApiResponse {
               my $wcc  = $jdata->{hourly}{cloud_cover}[$k];
               my $wind = $jdata->{hourly}{wind_speed_10m}[$k];                                          # Windgeschwindigkeit in 10m
               
-              my $fwtg = formatWeatherTimestrg ($pvtmstr);                                              # Zeit gemäß DWD_OpenData-Format
+              my $fwtg = formatWeatherTimestrg ($name, $pvtmstr);                                       # Zeit gemäß DWD_OpenData-Format
 
               $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{rr1c}       = $rain if(defined $rain);
               $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{StartTime}  = $pvtmstr;
 
-              $fwtg = formatWeatherTimestrg ($otmstr);                                                  # Zeit gemäß DWD_OpenData-Format
+              $fwtg = formatWeatherTimestrg ($name, $otmstr);                                           # Zeit gemäß DWD_OpenData-Format
 
               $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{don}        = $don  if(defined $don);
               $data{$name}{weatherapi}{OpenMeteo}{$fwtg}{neff}       = $wcc  if(defined $wcc);
@@ -6884,7 +6898,7 @@ sub __getaiRuleStrings {                 ## no critic "not used"
   }
 
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
-  $atf    = '<b>'.$hqtxt{ailatr}{$lang}.' </b>'.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
+  $atf    = '<b>'.$hqtxt{ailatr}{$lang}.' </b>'.($atf ? (timestampToTimestring ($name, $atf, $lang))[0] : '-');
   my $art = $hqtxt{aitris}{$lang}.' '.CircularVal ($hash, 99, 'runTimeTrainAI', '-');
 
   my $agt = CurrentVal  ($hash, 'aiLastGetResultTime', '');
@@ -7030,7 +7044,7 @@ sub __getaiFannState {            ## no critic "not used"
 
   my $art  = $hqtxt{aitris}{$lang}.' '.$rtt;   
   $ars     = '<b>'.$hqtxt{airest}{$lang}.'</b> '.$ars;
-  $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
+  $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($name, $atf, $lang))[0] : '-');
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
   $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;
 
@@ -9969,7 +9983,7 @@ sub periodicWriteMemcache {
   Log3 ($name, 4, "$name - The working memory >circular, pvhist, solcastapi, statusapi, weatherapi< has been saved to persistance");
 
   if ($bckp) {
-      my $tstr = (timestampToTimestring (time))[2];
+      my $tstr = (timestampToTimestring ($name, time))[2];
       $tstr    =~ s/[-: ]/_/g;
 
       writeCacheToFile ($hash, 'circular',  $pvccache.$name.'_'.$tstr);        # Cache File PV Circular Sicherung schreiben
@@ -11415,7 +11429,7 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
 
-          $date = strftime "%Y-%m-%d", localtime($t-7200);                                         # Vortag (2 h Differenz reichen aus)
+          $date = timestringsFromOffset ($name, $t, -7200)->{date};                               # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
 
           $pvfc = ReadingsNum ($name, "Today_Hour24_PVforecast", 0);
@@ -11819,7 +11833,7 @@ sub _collectAstronomyData {
   
   # --- Mondphase holen 
   my $moonphasei;
-  my $tstr = (timestampToTimestring ($t))[2];
+  my $tstr = (timestampToTimestring ($name, $t))[2];
 
   eval {
       $moonphasei = FHEM::Astro::Get (undef, 'global', 'text', 'MoonPhaseI', $tstr);
@@ -11841,7 +11855,6 @@ return;
 sub __calcSunPosition {
   my $paref    = shift;
   my $name     = $paref->{name};
-  #my $fd       = $paref->{fd};
   my $wtday    = $paref->{wtday};
   my $chour    = $paref->{chour};
   my $date     = $paref->{date};
@@ -11851,7 +11864,7 @@ sub __calcSunPosition {
   my $is_today = $paref->{is_today};
 
   my $base_ts = timestringToTimestamp ($date.' '.$chour.':00:00');
-  my $tstr    = (timestampToTimestring ($base_ts + $num * 3600))[3];
+  my $tstr    = (timestampToTimestring ($name, $base_ts + $num * 3600))[3];
 
   my ($dstr, $hh) = split /[ :]/, $tstr;
   $tstr           = $dstr.' '.$hh.':30:00';                                                                 # Stundenmitte verwenden
@@ -12619,7 +12632,7 @@ sub _transferAPIRadiationValues {
       last if($fd > MAXNEXTDAYS);
 
       my $wantts = (timestringToTimestamp ($date.' '.$chour.':00:00')) + ($num * 3600);
-      my $wantdt = (timestampToTimestring ($wantts, $lang))[1];
+      my $wantdt = (timestampToTimestring ($name, $wantts, $lang))[1];
       my $nhtstr = 'NextHour'.(sprintf "%02d", $num);
 
       my $dt     = timestringsFromOffset ($name, $wantts, 0);
@@ -13816,7 +13829,7 @@ sub _batSocTarget {
       my $sunrise = CurrentVal ($name, 'sunriseTodayTs', $t);
       #my $delayts = $sunset - 5400;                                                            # Pflege-SoC/Erhöhung SoC erst ab 1,5h vor Sonnenuntergang berechnen/anwenden
       my $delayts = $sunrise + (($sunset - $sunrise) / 2);                                      # V 1.59.5 neues SoC-Ziel ab ca. Mittag berechnen/anwenden
-      my $nt      = (timestampToTimestring ($delayts, $paref->{lang}))[0];
+      my $nt      = (timestampToTimestring ($name, $delayts, $paref->{lang}))[0];
       my $la      = '';
       my $careSoc = $target;
 
@@ -16360,17 +16373,17 @@ sub ___saveEhodpieces {
   delete $data{$name}{consumers}{$c}{ehodpieces};
 
   for (my $i = $startts; $i <= $stopts; $i+=3600) {
-      my $chod    = (strftime "%H", localtime($i)) + 1;
+      my $dt      = timestringsFromOffset ($name, $i, 0);  
+      my $chod    = sprintf '%02d', ($dt->{hour} + 1);
       my $epieces = ConsumerVal ($name, $c, 'epieces', '');
 
-      last if(ref $epieces ne "HASH");
+      last if(ref $epieces ne 'HASH');
 
       my $ep = defined $data{$name}{consumers}{$c}{epieces}{$p}
                ? $data{$name}{consumers}{$c}{epieces}{$p}
                : 0;
 
-      $chod                                          = sprintf '%02d', $chod;
-      $data{$name}{consumers}{$c}{ehodpieces}{$chod} = round2 ($ep) if($ep);
+      $data{$name}{consumers}{$c}{ehodpieces}{$chod} = round2($ep) if($ep);
 
       $p++;
   }
@@ -16409,12 +16422,12 @@ sub ___setConsumerPlanningState {
   }
 
   if ($startts) {
-      $starttime                                = (timestampToTimestring ($startts, $lang))[3];
+      $starttime                                = (timestampToTimestring ($name, $startts, $lang))[3];
       $data{$name}{consumers}{$c}{planswitchon} = $startts;
   }
 
   if ($stopts) {
-      $stoptime                                  = (timestampToTimestring ($stopts, $lang))[3];
+      $stoptime                                  = (timestampToTimestring ($name, $stopts, $lang))[3];
       $data{$name}{consumers}{$c}{planswitchoff} = $stopts;
   }
 
@@ -16445,7 +16458,7 @@ sub ___planMust {
   my $maxts     = timestringToTimestamp ($maxref->{$elem}{starttime});                 # Unix Timestamp des max. Überschusses heute
   my $half      = floor ($mintime / 2 / 60);                                           # die halbe Gesamtplanungsdauer in h als Vorlaufzeit einkalkulieren
   my $startts   = $maxts - ($half * 3600);
-  my $starttime = (timestampToTimestring ($startts, $lang))[3];
+  my $starttime = (timestampToTimestring ($name, $startts, $lang))[3];
 
   $paref->{starttime} = $starttime;
   $starttime          = ___switchonTimelimits ($paref);
@@ -16488,7 +16501,7 @@ sub ___switchonTimelimits {
   if (isSunPath ($hash, $c)) {                                                          # SunPath ist in mintime gesetzt
       my ($riseshift, $setshift) = sunShift   ($hash, $c);
       $startts                   = CurrentVal ($name, 'sunriseTodayTs', 0) + $riseshift;
-      $starttime                 = (timestampToTimestring ($startts, $lang))[3];
+      $starttime                 = (timestampToTimestring ($name, $startts, $lang))[3];
 
       debugLog ($paref, "consumerPlanning", qq{consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
   }
@@ -16543,7 +16556,7 @@ sub ___switchonTimelimits {
   my $change = q{};
 
   if ($t > timestringToTimestamp ($starttime)) {
-      $starttime   = (timestampToTimestring ($t, $lang))[3];
+      $starttime   = (timestampToTimestring ($name, $t, $lang))[3];
       $change      = 'current time';
   }
 
@@ -16576,22 +16589,20 @@ return $starttime;
 sub ___setPlanningDeleteMeth {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
 
-  my $hash    = $defs{$name};
-  my $sonkey  = ConsumerVal ($hash, $c, "planswitchon",  "");
-  my $soffkey = ConsumerVal ($hash, $c, "planswitchoff", "");
+  my $sonkey  = ConsumerVal ($name, $c, 'planswitchon',  '');
+  my $soffkey = ConsumerVal ($name, $c, 'planswitchoff', '');
 
-  if($sonkey && $soffkey) {
-      my $onday  = strftime "%d", localtime($sonkey);
-      my $offday = strftime "%d", localtime($soffkey);
+  if ($sonkey && $soffkey) {
+      my $onday  = timestringsFromOffset($name, $sonkey, 0)->{day};       
+      my $offday = timestringsFromOffset($name, $soffkey, 0)->{day};
 
       if ($offday ne $onday) {                                                          # Planungsdaten spezifische Löschmethode
-          $data{$name}{consumers}{$c}{plandelete} = "specific";
+          $data{$name}{consumers}{$c}{plandelete} = 'specific';
       }
       else {                                                                            # Planungsdaten Löschmethode jeden Tag in Stunde 0 (_specialActivities)
-          $data{$name}{consumers}{$c}{plandelete} = "regular";
+          $data{$name}{consumers}{$c}{plandelete} = 'regular';
       }
   }
 
@@ -16767,7 +16778,7 @@ sub ___switchConsumerOn {
 
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
                       qq{auto mode: $auto, Current household consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
-                      qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($startts, $lang))[0] : "undef")
+                      qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($name, $startts, $lang))[0] : "undef")
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime: $iilt}.($rlt ? ", remainLockTime: $rlt seconds" : ''));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch on' => }.
@@ -17125,56 +17136,74 @@ sub __getCyclesAndRuntime {
             $data{$name}{consumers}{$c}{cycleStarttime} = $t;
             $data{$name}{consumers}{$c}{cycleTime}      = 0;
             $data{$name}{consumers}{$c}{lastMinutesOn}  = ConsumerVal ($name, $c, 'minutesOn', 0);
-
             $data{$name}{consumers}{$c}{cycleDayNum}++;                                                                                  # Anzahl der On-Schaltungen am Tag
         }
         else {
-            $data{$name}{consumers}{$c}{cycleTime} = round2 ( ($t - ConsumerVal ($name, $c, 'cycleStarttime', $t)) / 60 );                        # Minuten
-        }
+            my $cst = ConsumerVal($name, $c, 'cycleStarttime', $t);
+            $data{$name}{consumers}{$c}{cycleTime} = round2(($t - $cst) / 60);        
+        }                                                 
 
-        $starthour = strftime "%H", localtime(ConsumerVal ($name, $c, 'startTime', $t));
-        $startday  = strftime "%d", localtime(ConsumerVal ($name, $c, 'startTime', $t));                                                 # aktueller Tag  (range 01 to 31)
+        # --- Startzeit auslesen (Default = $t) ---
+        my $startts = ConsumerVal           ($name, $c, 'startTime', $t);
+        my $dt      = timestringsFromOffset ($name, $startts, 0);
+        
+        $startday   = $dt->{day};                                                                                                        # Tag  (range 01 to 31)
+        $starthour  = $dt->{hour};
 
+        # --- Stundenwechsel? ---
         if ($chour eq $starthour) {
-            my $runtime                            = round2 ( ($t - ConsumerVal ($name, $c, 'startTime', $t)) / 60 );                             # in Minuten ! (gettimeofday sind ms !)
+            my $runtime                            = round2(($t - $startts) / 60);                                                                
             $data{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($name, $c, 'lastMinutesOn', 0) + $runtime;
         }
-        else {                                                                                                                           # Stundenwechsel
+        else {
+            # --- Stundenwechsel            
             if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'on') {                                                                       # Status im letzen Zyklus war "on"
                 my $newst                                  = timestringToTimestamp ($date.' '.sprintf("%02d",  $chour).':00:00');
                 $data{$name}{consumers}{$c}{startTime}     = $newst;
-                $data{$name}{consumers}{$c}{minutesOn}     = ($t - ConsumerVal ($name, $c, 'startTime', $newst)) / 60;                   # in Minuten ! (gettimeofday sind ms !)
+                $data{$name}{consumers}{$c}{minutesOn}     = ($t - $newst) / 60;                                                         
                 $data{$name}{consumers}{$c}{lastMinutesOn} = 0;
 
-                if ($day ne $startday) {                                                                                                 # Tageswechsel
+                # --- Tageswechsel?
+                if ($day ne $startday) {                                                                                                 
                     $data{$name}{consumers}{$c}{cycleDayNum} = 1;
                 }
             }
         }
   }
   else {                                                                                                                                 # Verbraucher soll nicht aktiv sein
-      $starthour = strftime "%H", localtime (ConsumerVal ($name, $c, 'startTime', 1));
-      $startday  = strftime "%d", localtime (ConsumerVal ($name, $c, 'startTime', 1));                                                    # aktueller Tag  (range 01 to 31)
-
-      if ($chour ne $starthour) {                                                                                                        # Stundenwechsel
+      # --- Startzeit auslesen (Default = 1) ---
+      my $startts = ConsumerVal($name, $c, 'startTime', 1);
+      my $dt      = timestringsFromOffset ($name, $startts, 0);  
+      $startday   = $dt->{day};                                                                                                          # Tag  (range 01 to 31)
+      $starthour  = $dt->{hour};
+      
+      # --- Stundenwechsel?
+      if ($chour ne $starthour) {                                                                                                        
           $data{$name}{consumers}{$c}{minutesOn} = 0;
       }
 
-      if ($day ne $startday) {                                                                                                           # Tageswechsel
+      # --- Tageswechsel?
+      if ($day ne $startday) {                                                                                                           
           $data{$name}{consumers}{$c}{cycleDayNum} = 0;
       }
 
       $data{$name}{consumers}{$c}{onoff} = 'off';
   }
 
+  # --- Debug-Ausgabe ---
   if ($debug =~ /consumerSwitching${c}/xs) {
       my $sr  = 'still running';
-      my $son = isConsumerLogOn ($hash, $c, $pcurr) ? $sr : ConsumerVal ($name, $c, 'cycleTime', 0) * 60;                                # letzte Cycle-Zeitdauer in Sekunden
+      my $son = isConsumerLogOn ($hash, $c, $pcurr) 
+                ? $sr 
+                : ConsumerVal ($name, $c, 'cycleTime', 0) * 60;                                 # letzte Cycle-Zeitdauer in Sekunden
+      
       my $cst = ConsumerVal     ($name, $c, 'cycleStarttime', 0);
-      $son    = $son && $son ne $sr ? timestampToTimestring ($cst + $son, $paref->{lang}) :
-                $son eq $sr         ? $sr                                                 :
-                '-';
-      $cst    = $cst ? timestampToTimestring ($cst, $paref->{lang}) : '-';
+      
+      $son    = $son && $son ne $sr ? timestampToTimestring ($name, $cst + $son, $paref->{lang}) 
+              : $son eq $sr         ? $sr                                                 
+              : '-';
+      
+      $cst = $cst ? timestampToTimestring ($name, $cst, $paref->{lang}) : '-';
 
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - cycleDayNum: }.ConsumerVal ($name, $c, 'cycleDayNum', 0));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle start time: $cst});
@@ -17183,12 +17212,12 @@ sub __getCyclesAndRuntime {
 
   ## History schreiben
   ######################
-  $paref->{val}  = ConsumerVal ($name, $c, "cycleDayNum", 0);                           # Anzahl Tageszyklen des Verbrauchers speichern
+  $paref->{val}  = ConsumerVal ($name, $c, "cycleDayNum", 0);                                   # Anzahl Tageszyklen des Verbrauchers speichern
   $paref->{hkey} = "cyclescsm${c}";
   
   _saveHistP1 ($paref);
 
-  $paref->{val}  = ceil ConsumerVal ($name, $c, "minutesOn", 0);                        # Verbrauchsminuten akt. Stunde des Consumers speichern
+  $paref->{val}  = ceil ConsumerVal ($name, $c, "minutesOn", 0);                                # Verbrauchsminuten akt. Stunde des Consumers speichern
   $paref->{hkey} = "minutescsm${c}";
   
   _saveHistP1 ($paref);
@@ -17290,8 +17319,8 @@ sub __getPlanningStateAndTimes {
 
   my $starttime = '';
   my $stoptime  = '';
-  $starttime    = (timestampToTimestring ($startts, $lang))[0] if($startts);
-  $stoptime     = (timestampToTimestring ($stopts, $lang))[0]  if($stopts);
+  $starttime    = (timestampToTimestring ($name, $startts, $lang))[0] if($startts);
+  $stoptime     = (timestampToTimestring ($name, $stopts, $lang))[0]  if($stopts);
 
 return ($simpCstat, $starttime, $stoptime, $supplmnt);
 }
@@ -19571,10 +19600,10 @@ sub _graphicHeader {
       ## Message-Icon
       #################
       my $tfl            = $data{$name}{messages}{999000}{TS}                                    
-                           ? (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0]
+                           ? (timestampToTimestring ($name, $data{$name}{messages}{999000}{TS}, $lang))[0]
                            : 'n.a.';
       my $tfn            = $data{$name}{messages}{999000}{TSNEXT}                                     
-                           ? (timestampToTimestring ($data{$name}{messages}{999000}{TSNEXT}, $lang))[0]
+                           ? (timestampToTimestring ($name, $data{$name}{messages}{999000}{TSNEXT}, $lang))[0]
                            : 'n.a.';
       my ($micon, $midx) = fillupMessageSystem ($paref);
       $img               = FW_makeImage ($micon);
@@ -20114,7 +20143,7 @@ sub __aiCreatePvIcon {
 
   my $atf = CircularVal ($hash, 99, 'aitrainLastFinishTs', 0);
   my $art = CurrentVal  ($hash, 'aiLastGetResultTime', '');
-  $atf    = $hqtxt{ailatr}{$lang}.' '.($atf ? (timestampToTimestring ($atf, $lang))[0] : '-');
+  $atf    = $hqtxt{ailatr}{$lang}.' '.($atf ? (timestampToTimestring ($name, $atf, $lang))[0] : '-');
   $art    = $hqtxt{ailgrt}{$lang}.' '.($art ? ($art * 1000).' ms' : '-');
 
   my $aiimg  = $aidtabs          ? '--' :
@@ -20159,7 +20188,7 @@ sub __aiCreateConIcon {
 
   my $ntf = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 0);
   my $nrt = CurrentVal  ($name, 'conNNLastGetResultTime', '');
-  $ntf    = $hqtxt{nnlatr}{$lang}.' '.($ntf ? (timestampToTimestring ($ntf, $lang))[0] : '-');
+  $ntf    = $hqtxt{nnlatr}{$lang}.' '.($ntf ? (timestampToTimestring ($name, $ntf, $lang))[0] : '-');
   $nrt    = $hqtxt{nnlgrt}{$lang}.' '.($nrt ? ($nrt * 1000).' ms' : '-');
 
   my $nnimg  = !$aiconact                    ? '-' : 
@@ -20904,158 +20933,152 @@ sub _beamGraphicFirstHour {
   my $paref     = shift;
   my $name      = $paref->{name};
   my $hfcg      = $paref->{hfcg};
-  my $offset    = $paref->{offset};
+  my $offset    = $paref->{offset};         # Offset ist IMMER 0 oder NEGATIV
   my $hourstyle = $paref->{hourstyle};
   my $beam1cont = $paref->{beam1cont};
   my $beam2cont = $paref->{beam2cont};
   my $lang      = $paref->{lang};
   my $kw        = $paref->{kw};
 
-  my ($day, $bn);
+  my $stt = NexthoursVal($name, 'NextHour00', 'starttime', '0000-00-00 24');                                # Startzeit aus NextHour00 holen → liefert echte Stunde (0..23) und Datum
+  my ($year, $month, $day_str, $thishour) =
+      $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
-  my $hash                             = $defs{$name};
-  my $stt                              = NexthoursVal ($hash, 'NextHour00', 'starttime', '0000-00-00 24');
-  my ($year,$month,$day_str,$thishour) = $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
+  my $mktime = fhemTimeLocal (0, 0, $thishour,                                                              # mktime für die echte Stunde berechnen → fhemTimeLocal erwartet 0..23
+                              int($day_str),                                                                # daher wird hier NICHT HOD übergeben
+                              int($month) - 1,
+                              $year - 1900
+                             );
 
-  my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8, $val9, $val10);
-  my $hbsocs;
+  my $hod  = int($thishour) + 1;                                                                            # HOD (History Hour of Day) berechnen
+  $mktime += 3600;                                                                                          # mktime auf HOD synchronisieren
+  my $day  = int($day_str);
+  my $time = $hod + $offset;                                                                                # Offset anwenden (0 oder negativ)
 
-  $thishour++;
+  if ($time < 1) {                                                                                          # Tageswechsel bei negativem Offset
+      $time   += 24;
+      my $dt   = timestringsFromOffset ($name, $mktime, -86400);
+      $day     = int($dt->{day});
+      $day_str = $dt->{day};
+  }
 
-  $hfcg->{0}{time_str} = $thishour;
-  $thishour            = int($thishour);                                                            # keine führende Null
+  my $time_str = sprintf '%02d', $time;                                                                     # time_str für HistoryVal (1..24)
 
-  $hfcg->{0}{time}     = $thishour;
-  $hfcg->{0}{day_str}  = $day_str;
-  $day                 = int($day_str);
+  # --- Werte in hfcg speichern
+  $hfcg->{0}{mktime}   = $mktime;
+  $hfcg->{0}{time}     = $time;       # HOD + offset (1..24)
+  $hfcg->{0}{time_str} = $time_str;   # für HistoryVal
   $hfcg->{0}{day}      = $day;
-  $hfcg->{0}{mktime}   = fhemTimeLocal (0,0,$thishour,$day,int($month)-1,$year-1900);               # gleich die Unix Zeit dazu holen
-  $hfcg->{0}{time}    += $offset;
+  $hfcg->{0}{day_str}  = $day_str;
 
-  if ($hfcg->{0}{time} < 0) {                                                                       # Tageswechsel: day muss jetzt neu berechnet werden !
-      $hfcg->{0}{time}   += 24;
-      my $n_day           = strftime "%d", localtime($hfcg->{0}{mktime} - (3600 * abs($offset)));
-      $hfcg->{0}{day}     = int($n_day);
-      $hfcg->{0}{day_str} = $n_day;
-  }
+  # --- Wetter- und Sonnendaten aus History
+  $hfcg->{0}{weather} = HistoryVal($name, $day_str, $time_str, 'weatherid', 999);
+  $hfcg->{0}{wcc}     = HistoryVal($name, $day_str, $time_str, 'wcc',       '-');
+  $hfcg->{0}{sunalt}  = HistoryVal($name, $day_str, $time_str, 'sunalt',    '-');
+  $hfcg->{0}{sunaz}   = HistoryVal($name, $day_str, $time_str, 'sunaz',     '-');
+  $hfcg->{0}{don}     = HistoryVal($name, $day_str, $time_str, 'DoN',         0);
 
-  $hfcg->{0}{time_str} = sprintf '%02d', $hfcg->{0}{time};
+  # --- Energiewerte
+  my $val3 = HistoryVal($name, $day_str, $time_str, 'gcons',   0);
+  my $val7 = HistoryVal($name, $day_str, $time_str, 'gfeedin', 0);
 
-  $hfcg->{0}{weather} = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'weatherid', 999);
-  $hfcg->{0}{wcc}     = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'wcc',       '-');
-  $hfcg->{0}{sunalt}  = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunalt',    '-');
-  $hfcg->{0}{sunaz}   = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'sunaz',     '-');
-  $hfcg->{0}{don}     = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'DoN',         0);
+  my %beam_val = (
+      pvForecast          => HistoryVal($name, $day_str, $time_str, 'pvfc',  0),
+      pvReal              => HistoryVal($name, $day_str, $time_str, 'pvrl',  0),
+      gridconsumption     => $val3,
+      consumptionForecast => HistoryVal($name, $day_str, $time_str, 'confc', 0),
+      consumption         => HistoryVal($name, $day_str, $time_str, 'con',   0),
+      energycosts         => round2(HistoryVal($name, $day_str, $time_str, 'conprice', 0) * $val3 / 1000),
+      gridfeedin          => $val7,
+      feedincome          => round2(HistoryVal($name, $day_str, $time_str, 'feedprice', 0) * $val7 / 1000),
+  );
 
-  $val1 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvfc',  0);
-  $val2 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'pvrl',  0);
-  $val3 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gcons', 0);
-  $val4 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'confc', 0);
-  $val5 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'con',   0);
-  $val6 = round2 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
-  $val7 = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'gfeedin', 0);
-  $val8 = round2 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
+  # --- Batterie-SoC-Werte
+  my $hbsocs  = {};
+  my $bcapsum = CurrentVal($name, 'batcapsum', 0);
 
-  ## Batterien Selektionshash erstellen
-  #######################################
   for my $bn (1..MAXBATTERIES) {
-      $bn = sprintf "%02d", $bn;
+      my $bns = sprintf '%02d', $bn;
 
-      $hbsocs->{0}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                     $beam1cont =~ /batsocForecast_${bn}/xs ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
-                                     $beam1cont =~ /batsocReal_${bn}/xs     ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
-                                     0;
+      for my $slot (['beam1cont', $beam1cont],
+                    ['beam2cont', $beam2cont]
+                   ) {
+          my ($bkey, $bcont) = @$slot;
 
-      $hbsocs->{0}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                     $beam2cont =~ /batsocForecast_${bn}/xs ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
-                                     $beam2cont =~ /batsocReal_${bn}/xs     ? round1 (HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
-                                     0;
+          my $soc =
+              $bcont =~ /batsocCombi_${bns}/xs    ? round1(HistoryVal($name,$day_str,$time_str,'batsoc'.$bns,    0)) :
+              $bcont =~ /batsocForecast_${bns}/xs ? round1(HistoryVal($name,$day_str,$time_str,'batprogsoc'.$bns,0)) :
+              $bcont =~ /batsocReal_${bns}/xs     ? round1(HistoryVal($name,$day_str,$time_str,'batsoc'.$bns,    0)) :
+              0;
 
-      $hbsocs->{0}{$bn}{beam1cont} = 100 if($hbsocs->{0}{$bn}{beam1cont} >= 100);
-      $hbsocs->{0}{$bn}{beam2cont} = 100 if($hbsocs->{0}{$bn}{beam2cont} >= 100);
+          $hbsocs->{0}{$bns}{$bkey} = $soc >= 100 ? 100 : $soc;
+      }
   }
 
-  ## Batterien summarische Werte erstellen
-  ##########################################
-  my $bcapsum = CurrentVal ($name, 'batcapsum', 0);                                                         # Summe installierte Batterie Kapazität in Wh
-
+  # --- Batterie-Summenwerte
   if ($bcapsum) {
-      my $socprogwhsum = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socprogwhsum', 0);
-      my $socwhsum     = HistoryVal ($name, $hfcg->{0}{day_str}, $hfcg->{0}{time_str}, 'socwhsum', 0);
-      $val9            = round1 (100 * $socprogwhsum / $bcapsum);                                           # Summe Prognose SoC in % über alle Batterien
-      $val10           = round1 (100 * $socwhsum / $bcapsum);                                               # Summe real erreichter SoC in % über alle Batterien
+      my $socprogwhsum = HistoryVal($name, $day_str, $time_str, 'socprogwhsum', 0);
+      my $socwhsum     = HistoryVal($name, $day_str, $time_str, 'socwhsum',     0);
+
+      $beam_val{batsocForecastSum} = round1(100 * $socprogwhsum / $bcapsum);
+      $beam_val{batsocRealSum}     = round1(100 * $socwhsum     / $bcapsum);
   }
 
-  ## Zuordnung Werte zu den Balken entsprechend Selektion
-  #########################################################
-  $hfcg->{0}{beam1}    = $beam1cont eq 'pvForecast'          ? $val1  :
-                         $beam1cont eq 'pvReal'              ? $val2  :
-                         $beam1cont eq 'gridconsumption'     ? $val3  :
-                         $beam1cont eq 'consumptionForecast' ? $val4  :
-                         $beam1cont eq 'consumption'         ? $val5  :
-                         $beam1cont eq 'energycosts'         ? $val6  :
-                         $beam1cont eq 'gridfeedin'          ? $val7  :
-                         $beam1cont eq 'feedincome'          ? $val8  :
-                         $beam1cont eq 'batsocForecastSum'   ? $val9  :
-                         $beam1cont eq 'batsocRealSum'       ? $val10 :
-                         $beam1cont =~ /^batsoc/xs           ? $hbsocs->{0}{(split '_', $beam1cont)[1]}{beam1cont} :
-                         undef;
+  # --- Texte für Balken
+  my $epc = CurrentVal($name, 'ePurchasePriceCcy', 0);
+  my $efc = CurrentVal($name, 'eFeedInTariffCcy',  0);
 
-  $hfcg->{0}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1  :
-                         $beam2cont eq 'pvReal'              ? $val2  :
-                         $beam2cont eq 'gridconsumption'     ? $val3  :
-                         $beam2cont eq 'consumptionForecast' ? $val4  :
-                         $beam2cont eq 'consumption'         ? $val5  :
-                         $beam2cont eq 'energycosts'         ? $val6  :
-                         $beam2cont eq 'gridfeedin'          ? $val7  :
-                         $beam2cont eq 'feedincome'          ? $val8  :
-                         $beam2cont eq 'batsocForecastSum'   ? $val9  :
-                         $beam2cont eq 'batsocRealSum'       ? $val10 :
-                         $beam2cont =~ /^batsoc/xs           ? $hbsocs->{0}{(split '_', $beam2cont)[1]}{beam2cont} :
-                         undef;
+  my %beam_txt = (
+      pvForecast          => $htitles{pvgenefc}{$lang}." ($kw)",
+      pvReal              => $htitles{pvgenerl}{$lang}." ($kw)",
+      gridconsumption     => $htitles{enppubgd}{$lang}." ($kw)",
+      consumptionForecast => $htitles{enconsfc}{$lang}." ($kw)",
+      consumption         => $htitles{enconsrl}{$lang}." ($kw)",
+      energycosts         => $htitles{enpchcst}{$lang}." ($epc)",
+      gridfeedin          => $htitles{enfeedgd}{$lang}." ($kw)",
+      feedincome          => $htitles{rengfeed}{$lang}." ($efc)",
+      batsocForecastSum   => $htitles{socfcsum}{$lang},
+      batsocRealSum       => $htitles{socresum}{$lang},
+  );
 
-  $hfcg->{0}{beam1}  //= 0;
-  $hfcg->{0}{beam2}  //= 0;
-  my %roundable        = map { $_ => 1 } qw(pvForecast pvReal consumptionForecast consumption);
-  my @beams            = ($beam1cont, $beam2cont);
-  $hfcg->{0}{diff}     = round1 ($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
-  $hfcg->{0}{diff}     = round0 ($hfcg->{0}{diff}) if($kw eq 'Wh' && grep { $roundable{$_} } @beams);
+  # --- beam1 / beam2 + Texte setzen
+  for my $slot (
+      ['beam1', 'beam1cont', 'beam1txt', $beam1cont],
+      ['beam2', 'beam2cont', 'beam2txt', $beam2cont]
+  ) {
+      my ($bval_key, $bsoc_key, $btxt_key, $bcont) = @$slot;
+      my $bnum = (split '_', $bcont)[1] // '';
 
-  my $epc = CurrentVal ($name, 'ePurchasePriceCcy', 0);
-  my $efc = CurrentVal ($name, 'eFeedInTariffCcy',  0);
+      if (exists $beam_val{$bcont}) {
+          $hfcg->{0}{$bval_key} = $beam_val{$bcont} // 0;
+          $hfcg->{0}{$btxt_key} = $beam_txt{$bcont} // '';
+      }
+      elsif ($bcont =~ /^batsoc/xs) {
+          $hfcg->{0}{$bval_key} = $hbsocs->{0}{$bnum}{$bsoc_key} // 0;
+          $hfcg->{0}{$btxt_key} = $bcont =~ /batsocCombi_/xs    ? $htitles{socrfcba}{$lang}." $bnum (%)" :
+                                  $bcont =~ /batsocForecast_/xs ? $htitles{socfcbat}{$lang}." $bnum (%)" :
+                                  $bcont =~ /batsocReal_/xs     ? $htitles{socrebat}{$lang}." $bnum (%)" :
+                                  '';
+      }
+      else {
+          $hfcg->{0}{$bval_key} = 0;
+          $hfcg->{0}{$btxt_key} = '';
+      }
+  }
 
-  $hfcg->{0}{beam1txt} = $beam1cont eq 'pvForecast'          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
-                         $beam1cont eq 'pvReal'              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
-                         $beam1cont eq 'gridconsumption'     ? $htitles{enppubgd}{$lang}." ($kw)"  :
-                         $beam1cont eq 'consumptionForecast' ? $htitles{enconsfc}{$lang}." ($kw)"  :
-                         $beam1cont eq 'consumption'         ? $htitles{enconsrl}{$lang}." ($kw)"  :
-                         $beam1cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
-                         $beam1cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
-                         $beam1cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
-                         $beam1cont eq 'batsocForecastSum'   ? $htitles{socfcsum}{$lang}           :
-                         $beam1cont eq 'batsocRealSum'       ? $htitles{socresum}{$lang}           :
-                         $beam1cont =~ /batsocCombi_/xs      ? $htitles{socrfcba}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
-                         $beam1cont =~ /batsocForecast_/xs   ? $htitles{socfcbat}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
-                         $beam1cont =~ /batsocReal_/xs       ? $htitles{socrebat}{$lang}." ".(split '_', $beam1cont)[1]." (%)" :
-                         '';
-  $hfcg->{0}{beam2txt} = $beam2cont eq 'pvForecast'          ? $htitles{pvgenefc}{$lang}." ($kw)"  :
-                         $beam2cont eq 'pvReal'              ? $htitles{pvgenerl}{$lang}." ($kw)"  :
-                         $beam2cont eq 'gridconsumption'     ? $htitles{enppubgd}{$lang}." ($kw)"  :
-                         $beam2cont eq 'consumptionForecast' ? $htitles{enconsfc}{$lang}." ($kw)"  :
-                         $beam2cont eq 'consumption'         ? $htitles{enconsrl}{$lang}." ($kw)"  :
-                         $beam2cont eq 'energycosts'         ? $htitles{enpchcst}{$lang}." ($epc)" :
-                         $beam2cont eq 'gridfeedin'          ? $htitles{enfeedgd}{$lang}." ($kw)"  :
-                         $beam2cont eq 'feedincome'          ? $htitles{rengfeed}{$lang}." ($efc)" :
-                         $beam2cont eq 'batsocForecastSum'   ? $htitles{socfcsum}{$lang}           :
-                         $beam2cont eq 'batsocRealSum'       ? $htitles{socresum}{$lang}           :
-                         $beam2cont =~ /batsocCombi_/xs      ? $htitles{socrfcba}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
-                         $beam2cont =~ /batsocForecast_/xs   ? $htitles{socfcbat}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
-                         $beam2cont =~ /batsocReal_/xs       ? $htitles{socrebat}{$lang}." ".(split '_', $beam2cont)[1]." (%)" :
-                         '';
+  # --- Differenz berechnen
+  my %roundable = map { $_ => 1 } qw(pvForecast pvReal consumptionForecast consumption);
 
-  $hfcg->{0}{time_str} = sprintf('%02d', $hfcg->{0}{time}-1).$hourstyle;
+  $hfcg->{0}{diff} = round1($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
 
-return $thishour;
+  if ($kw eq 'Wh' && grep { $roundable{$_} } ($beam1cont, $beam2cont)) {
+      $hfcg->{0}{diff} = round0($hfcg->{0}{diff});
+  }
+
+  # --- Anzeige-Stunde setzen
+  $hfcg->{0}{time_str} = sprintf ('%02d', $hfcg->{0}{time} - 1) . $hourstyle;                           # time = HOD + offset (1..24) → Anzeige = time - 1 (0..23)
+
+return $hod;
 }
 
 ################################################################
@@ -21096,12 +21119,17 @@ sub _beamGraphicRemainingHours {
       my $nh;                                                                                           # next hour
 
       if ($offset < 0) {
-          if ($i <= abs($offset)) {                                                                     # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !
-              my $ds = strftime "%d", localtime ($hfcg->{0}{mktime} - (3600 * abs($offset+$i)));        # V0.49.4
+          if ($i <= abs($offset)) {                                                                     # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !                 
+              my $base = $hfcg->{0}{mktime};
 
-              if ($hfcg->{$i}{time} == 24) {                                                            # Sonderfall Mitternacht
-                  $ds = strftime "%d", localtime ($hfcg->{0}{mktime} - (3600 * (abs($offset-$i+1))));
-              }
+              my $ds = timestringsFromOffset (
+                        $name,
+                        $base - 3600 * abs( $hfcg->{$i}{time} == 24                                     # Sonderfall Mitternacht
+                                            ? ($offset - $i + 1)
+                                            : ($offset + $i)
+                                          ),
+                        0
+                       )->{day};
 
               $hfcg->{$i}{weather} = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
               $hfcg->{$i}{wcc}     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
@@ -21874,9 +21902,11 @@ sub __batteryOnBeam {
   my $barcount = $paref->{barcount} // 9999;                                                          # Sync Anzahl Balken dieser Ebene mit voriger Ebene
 
   my $m     = $paref->{modulo} % 2;
-  my $day   = strftime "%d", localtime($t);                                                           # aktueller Tag (range 01 .. 31)
-  my $chour = strftime "%H", localtime($t);                                                           # aktuelle Stunde in 24h format (00-23)
   my $ret   = q{};
+  
+  my $dt    = timestringsFromOffset ($name, $t, 0);  
+  my $day   = $dt->{day};                                                                             # aktueller Tag (range 01 .. 31)
+  my $chour = $dt->{hour};                                                                            # aktuelle Stunde in 24h format (00-23)     
 
   for my $bn (1..MAXBATTERIES) {                                                                      # für jede definierte Batterie
       $bn = sprintf "%02d", $bn;
@@ -23680,15 +23710,15 @@ sub outputMessages {
 
   my ($micon, $midx) = fillupMessageSystem ($paref);                                                 # Ergebnisse füllen (sind leer wenn Browser nicht refreshed)
   my $tfl            = $data{$name}{messages}{999000}{TS}                                     ?
-                       (timestampToTimestring ($data{$name}{messages}{999000}{TS}, $lang))[0] :
+                       (timestampToTimestring ($name, $data{$name}{messages}{999000}{TS}, $lang))[0] :
                        'n.a.';
 
   my $tfn            = $data{$name}{messages}{999000}{TSNEXT}                                     ?
-                       (timestampToTimestring ($data{$name}{messages}{999000}{TSNEXT}, $lang))[0] :
+                       (timestampToTimestring ($name, $data{$name}{messages}{999000}{TSNEXT}, $lang))[0] :
                        'n.a.';
 
   my $tpm            = $data{$name}{messages}{999500}{TS}  ?
-                       (timestampToTimestring ($data{$name}{messages}{999500}{TS}, $lang))[0] :
+                       (timestampToTimestring ($name, $data{$name}{messages}{999500}{TS}, $lang))[0] :
                        'n.a.';
   ## Ausgabe
   ############
@@ -23804,7 +23834,7 @@ sub __aiAddRawData {
       for my $hod (sort keys %{$data{$name}{pvhist}{$pvd}}) {
           next if(!$hod || $hod eq '99' || ($rho && $hod ne $rho));
           
-          my $ridx      = _aiMakeIdxRaw ($pvd, $hod, $paref->{yt});
+          my $ridx      = _aiMakeIdxRaw ($name, $pvd, $hod, $paref->{yt});
 
           my $temp      = HistoryVal ($name, $pvd, $hod, 'temp',             undef);
           my $presence  = HistoryVal ($name, $pvd, $hod, 'presence',         undef);
@@ -23897,7 +23927,7 @@ sub aiDelRawData {
   my $hd   = CurrentVal ($name, 'aiStorageDuration', AISTDUDEF);                # Haltezeit KI Raw Daten (Tage)
   my $ht   = time - ($hd * 86400);
   my $day  = strftime "%d", localtime($ht);
-  my $didx = _aiMakeIdxRaw ($day, '00', $ht);                                   # Daten mit idx <= $didx löschen
+  my $didx = _aiMakeIdxRaw ($name, $day, '00', $ht);                            # Daten mit idx <= $didx löschen
 
   debugLog ($paref, 'aiProcess', qq{AI Raw delete data equal or less than index >$didx<});
 
@@ -23930,12 +23960,11 @@ return;
 #  den Index für AI raw Daten erzeugen
 ################################################################
 sub _aiMakeIdxRaw {
-  my $day = shift;
-  my $hod = shift;
-  my $t   = shift // time;
+    my ($name, $day, $hod, $t) = @_;
+    $t //= time;
 
-  my $ridx = strftime "%Y%m", localtime($t);
-  $ridx   .= $day.$hod;
+    my $dt   = timestringsFromOffset ($name, $t, 0);
+    my $ridx = $dt->{year} . $dt->{month} . $day . $hod;
 
 return $ridx;
 }
@@ -26863,7 +26892,7 @@ sub aiFannDetectDrift {
           $data{$name}{neuralnet}{$fanntyp}{DriftSlope} = 1;
 
           $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}    = 0;
-          $data{$name}{neuralnet}{$fanntyp}{DriftLastRecalTime} = (timestampToTimestring ($t, $lang))[0];
+          $data{$name}{neuralnet}{$fanntyp}{DriftLastRecalTime} = (timestampToTimestring ($name, $t, $lang))[0];
         
           $flag = 'recalibrated';
       }
@@ -30385,9 +30414,12 @@ return ($fd, $fh);
 #  Return:  fc${fd}_${fh}
 ################################################################
 sub formatWeatherTimestrg {
+  my $name = shift;
   my $date = shift // return;
 
-  my $cdate = strftime "%Y-%m-%d", localtime(time);
+  my $dt    = timestringsFromOffset ($name, time, 0);    
+  my $cdate = $dt->{date};
+  
   my $refts = timestringToTimestamp ($cdate.' 00:00:00');                                   # Referenztimestring
   my $datts = timestringToTimestamp ($date);
   my $fd    = int (($datts - $refts) / 86400);
@@ -30423,50 +30455,54 @@ return ($val1,$val2);
 ################################################################
 #              Timestrings berechnen
 #  gibt Zeitstring in lokaler Zeit zurück
+#  Erlaubt: 1234567890
+#  Erlaubt: 1234567890.123456
+#  Verboten: alles andere
 ################################################################
 sub timestampToTimestring {
-  my ($epoch, $lang) = @_;
-  $lang //= 'EN';
+    my ($name, $epoch, $lang) = @_;
+    $lang //= 'EN';
 
-  $epoch = trim ($epoch) if(defined $epoch);
-  # Erlaubt: 1234567890
-  # Erlaubt: 1234567890.123456
-  # Verboten: alles andere
-  return unless $epoch =~ /^\d+(?:\.\d+)?$/;
+    return unless defined $epoch;
+    $epoch = trim($epoch);
 
-  if ($epoch =~ /\./) {                                                             # --- 3. Normalisierung auf Sekunden ---
-      $epoch = int ($epoch);
-  }
-  else {                                                                            # Länge bestimmt die Einheit
-      my $len = length($epoch);
+    # --- Normalisierung ---
+    return unless $epoch =~ /^\d+(?:\.\d+)?$/;
 
-      if    ($len > 13) { $epoch = int($epoch / 1_000_000_000); }                   # ns → s
-      elsif ($len > 10) { $epoch = int($epoch / 1000); }                            # ms → s
-      else              { $epoch = int($epoch); }                                   # s
-  }
+    if ($epoch =~ /\./) {                                                           # Normalisierung auf Sekunden 
+        $epoch = int($epoch);
+    }
+    else {
+        my $len = length($epoch);                                                   # Länge bestimmt die Einheit
+        $epoch = $len > 13 ? int($epoch / 1_000_000_000)                            # ns → s
+               : $len > 10 ? int($epoch / 1000)                                     # ms → s
+               :             int($epoch);                                           # s
+    }
 
-  my ($sec,$min,$hour,$day,$mon,$year) = localtime ($epoch);
-  $year += 1900;
-  $mon  += 1;
+    # --- Zeitdaten aus Cache holen ---
+    my $dt  = timestringsFromOffset ($name, $epoch, 0);
+    my $now = timestringsFromOffset ($name, time,   0);
 
-  my %fmt = (                                                                       # Formatstrings definieren
-      EN_full => "%04d-%02d-%02d %02d:%02d:%02d",
-      EN_def  => "%04d-%02d-%02d %02d:%s",
-      DE_full => "%02d.%02d.%04d %02d:%02d:%02d",
-  );
+    # --- Formatstrings ---
+    my $tm = $lang eq 'DE'                                                          # Vollzeit abhängig von Sprache
+        ? sprintf("%02d.%02d.%04d %02d:%02d:%02d",
+                  $dt->{day}, $dt->{month}, $dt->{year},
+                  $dt->{hour}, $dt->{minute}, $dt->{second})
+        : sprintf("%04d-%02d-%02d %02d:%02d:%02d",
+                  $dt->{year}, $dt->{month}, $dt->{day},
+                  $dt->{hour}, $dt->{minute}, $dt->{second});
 
-  my $tm = ($lang eq 'DE')                                                          # Vollzeit abhängig von Sprache
-           ? sprintf($fmt{DE_full}, $day,$mon,$year,$hour,$min,$sec)
-           : sprintf($fmt{EN_full}, $year,$mon,$day,$hour,$min,$sec);
+    my $tmdef = sprintf("%04d-%02d-%02d %02d:%s",                                   # Definierte Zeit (Min/Sek = 00:00), engl. Format
+                        $dt->{year}, $dt->{month}, $dt->{day},
+                        $dt->{hour}, "00:00");
 
-  my $tmdef = sprintf ($fmt{EN_def}, $year,$mon,$day,$hour,"00:00");                # Definierte Zeit (Min/Sek = 00:00)
+    my $realtm = sprintf("%04d-%02d-%02d %02d:%02d:%02d",                           # aktuelle Zeit, engl. Format
+                         $now->{year}, $now->{month}, $now->{day},
+                         $now->{hour}, $now->{minute}, $now->{second});
 
-  my ($s2,$m2,$h2,$d2,$mo2,$y2) = localtime (time);                                 # Aktuelle Zeit (englisch)
-  $y2       += 1900;
-  $mo2      += 1;
-  my $realtm = sprintf ($fmt{EN_full}, $y2,$mo2,$d2,$h2,$m2,$s2);
-
-  my $tmfull = sprintf($fmt{EN_full}, $year,$mon,$day,$hour,$min,$sec);             # Englische Vollzeit des Epoch
+    my $tmfull = sprintf("%04d-%02d-%02d %02d:%02d:%02d",                           # Vollzeit der Epoche,  engl. Format
+                         $dt->{year}, $dt->{month}, $dt->{day},
+                         $dt->{hour}, $dt->{minute}, $dt->{second});
 
 return ($tm, $tmdef, $realtm, $tmfull);
 }
@@ -30537,38 +30573,52 @@ return ($err, $ctime);
 ################################################################
 #  Timestrings aus Startzeit Timestamp und gegebenen Offset (s)
 #  berechnen, Rückgabe als Hashreferenz
+#  Performance optimiert
 ################################################################
 sub timestringsFromOffset {
-  my $name   = shift;
-  my $epoch  = shift;
-  my $offset = shift // 0;
+  my ($name, $epoch, $offset) = @_;
+  $offset //= 0;
 
   return if !isNumeric($epoch);
-  
+
+  # --- Cache
   my $key   = "$epoch:$offset";
   my $hash  = $defs{$name};
   my $cache = $hash->{'.tsCache'};
 
-  if (my $cached = LRU_get ($name, $cache, $key)) {
+  if (my $cached = LRU_get($name, $cache, $key)) {
       return $cached;
   }
 
-  $epoch = int($epoch / 1000) if $epoch > 1_000_000_000_000;                                    # Millisekunden
-  my @ts = localtime ($epoch + $offset);                                                        # Offset kann pos. oder negativ sein
+  $epoch = int($epoch / 1000) if $epoch > 1_000_000_000_000;                                    # Millisekunden → Sekunden
+  my @ts = localtime($epoch + $offset);                                                         # EINMAL localtime -> Offset kann pos. oder negativ sein
+
+  my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday) = @ts;                               # @ts = (sec, min, hour, mday, mon, year, wday, yday, isdst)
+
+  $year += 1900;                                                                                # Jahr / Monat korrigieren
+  $mon  += 1;
+
+  my $zp = sub { $_[0] < 10 ? "0$_[0]" : "$_[0]" };                                             # Schnelle Zero‑Pad Funktion
 
   my $dt = {
-      year    => (strftime "%Y",       (@ts)),                                                  # Jahr
-      month   => (strftime "%m",       (@ts)),                                                  # Monat als zweistellige Dezimalzahl (01 bis 12) aber String formatiert
-      day     => (strftime "%d",       (@ts)),                                                  # Tag (range 01 .. 31)
-      date    => (strftime "%Y-%m-%d", (@ts)),                                                  # Datum
-      hour    => (strftime "%H",       (@ts)),                                                  # Stunde in 24h format (00-23)
-      minute  => (strftime "%M",       (@ts)),                                                  # Minute (00-59)
-      second  => (strftime "%S",       (@ts)),                                                  # aktuelle Sekunde (00-60)
-      dayname => (strftime "%a",       (@ts)),                                                  # Wochentagsname
-      dayunum => (strftime "%u",       (@ts)),                                                  # The day of the week as a decimal, range 1 to 7, Monday being 1. See also %w. (SU)
-      dofyear => (strftime "%j",       (@ts)),                                                  # Day of the year (001-366)
+      year    => $year,                                                                         # Jahr
+      month   => $zp->($mon),                                                                   # Monat als zweistellige Dezimalzahl (01 bis 12) aber String formatiert
+      day     => $zp->($mday),                                                                  # Tag (range 01 .. 31)
+      date    => sprintf("%04d-%02d-%02d", $year, $mon, $mday),                                 # Datum
+      hour    => $zp->($hour),                                                                  # Stunde in 24h format (00-23)
+      minute  => $zp->($min),                                                                   # Minute (00-59)
+      second  => $zp->($sec),                                                                   # aktuelle Sekunde (00-60)                                    
+
+      # --- Locale‑abhängig, aber ohne strftime‑Kosten
+      dayname => LOCALE_DAYNAMES->[$wday],                                                      # Wochentagsname
+
+      # --- %u (1=Mo … 7=So)
+      dayunum => $wday == 0 ? 7 : $wday,                                                        # The day of the week as a decimal, range 1 to 7, Monday being 1. See also %w. (SU)                     
+
+      # --- %j (001–366)
+      dofyear => sprintf("%03d", $yday + 1),                                                    # Day of the year (001-366)
   };
-  
+
   LRU_insert ($name, $cache, $key, $dt);
 
 return $dt;
@@ -31002,11 +31052,11 @@ sub getConsumerMintime {
           Log3 ($name, 1, "$name DEBUG> consumer '$c' - mintime is controlled by 'SunPath'");
 
           if (defined $startts) {
-              my $starttime = (timestampToTimestring ($startts, $lang))[3];
+              my $starttime = (timestampToTimestring ($name, $startts, $lang))[3];
               Log3 ($name, 1, "$name DEBUG> consumer '$c' - Sunrise is replaced by $starttime, as the time of sunrise is in the past");
           }
           else {
-              my $startsunrisetime = (timestampToTimestring ($sunrisestartts, $lang))[3];
+              my $startsunrisetime = (timestampToTimestring ($name, $sunrisestartts, $lang))[3];
               Log3 ($name, 1, "$name DEBUG> consumer '$c' - Sunrise is shifted by >".($riseshift / 60)."< minutes");
               Log3 ($name, 1, "$name DEBUG> consumer '$c' - starttime is set to >$startsunrisetime<");
           }
@@ -32068,7 +32118,7 @@ sub isWeatherAgeExceeded {
   }
 
   $resh->{exceed} = $currts - $agets > $th ? 1 : 0;
-  $resh->{fctime} = (timestampToTimestring ($agets, $lang))[0];
+  $resh->{fctime} = (timestampToTimestring ($name, $agets, $lang))[0];
 
 return ('', $resh);
 }
@@ -32112,7 +32162,7 @@ sub isRad1hAgeExceeded {
   my $agets       = timestringToTimestamp ($fct);
   my $th          = $resh->{mosmix} eq 'MOSMIX_S' ? 7200 : 25200;
   $resh->{exceed} = $currts - $agets > $th ? 1 : 0;
-  $resh->{fctime} = (timestampToTimestring ($agets, $lang))[0];
+  $resh->{fctime} = (timestampToTimestring ($name, $agets, $lang))[0];
 
 return ('', $resh);
 }
