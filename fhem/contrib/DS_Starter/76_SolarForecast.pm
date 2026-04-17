@@ -168,7 +168,7 @@ my %vNotesIntern = (
                            "new Mini Caches: Solar2Astro_Cache, DayHourMove_Cache, move __createAdditionalEvents to Task 8 ".
                            "complete universal LRU-Cache implementation for DWD Tilted Irradiance Cache, TimestringsFromOffset Cache ".
                            "rework: timestringsFromOffset, _beamGraphicFirstHour -> fix graphic error hour -1 if graphicHistoryHour > day change ".
-                           "prepare replacing of Reading Tomorrow_ConsumptionForecast by Tomorrow_CONforecast ",
+                           "prepare replacing of Reading Tomorrow_ConsumptionForecast by Tomorrow_CONforecast, reqork _createSummaries to slots ",
   "2.5.3"  => "09.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ".
                            "correct ___areaFactorTrack: offset_hours ",
   "2.5.2"  => "07.04.2026  func ___openMeteoErrorExit, ___solCastErrorExit -> 5 minutes Log message lock ".
@@ -369,6 +369,10 @@ use constant {
   BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                   # Basispfad Abruf contrib SolarForecast Files
   BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',     # Basispfad GitHub SolarForecast Files
   
+  CACHETIRMS      => 2000,                                                          # max. Size Tilted Irradiance Cache
+  CACHETSOMS      => 4000,                                                          # max. Size TimestringsFromOffset Cache
+  CACHEPVHMS      => 500,                                                           # max. Size pvHistory Cache  
+  CACHEMISS       => '__CACHE_MISS__',                                              # Sentinel-Pattern für Cache Miss
   CONSFCLDAYS     => 60,                                                            # die Stundenwerte der letzten CONSFCLDAYS Tage zur Kalkulation der Verbrauchvorhersage einbezogen
   CONDAYSLIDEMAX  => 30,                                                            # max. Anzahl der Arrayelemente im Register pvCircular -> con_all / gcons_a -> <Tag>
   CARECYCLEDEF    => 20,                                                            # default max. Anzahl Tage die zwischen der Batterieladung auf maxSoC liegen dürfen
@@ -2444,10 +2448,11 @@ sub Define {
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
   
-  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                # Modul Meta.pm nicht vorhanden
+  $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                                        # Modul Meta.pm nicht vorhanden
 
-  $hash->{'.tiltCache'} = LRU_cache_create ('tiltedIrrCache', 'Tilted Irradiance Cache',     2000);     # Tilted Irradiance Cache initialisieren
-  $hash->{'.tsCache'}   = LRU_cache_create ('tsCache',        'TimestringsFromOffset Cache', 4000);     # timestringsFromOffset Cache
+  $hash->{'.tiltCache'}   = LRU_cache_create ('tiltedIrrCache', 'Tilted Irradiance Cache',     CACHETIRMS);     # Tilted Irradiance Cache initialisieren
+  $hash->{'.tsCache'}     = LRU_cache_create ('tsCache',        'TimestringsFromOffset Cache', CACHETSOMS);     # timestringsFromOffset Cache
+  $hash->{'.pvHistCache'} = LRU_cache_create ('pvHistCache',    'pvHistory Cache',             CACHEPVHMS);     # Init zentralen pvHistory Cache
 
   my $params = {
       hash        => $hash,
@@ -2460,7 +2465,7 @@ sub Define {
       useCTZ      => 1,
   };
 
-  use version 0.77; our $VERSION = moduleVersion ($params);                                              # Versionsinformationen setzen
+  use version 0.77; our $VERSION = moduleVersion ($params);                                                     # Versionsinformationen setzen
   delete $params->{hash};
 
   createAssociatedWith ($hash);
@@ -3039,11 +3044,9 @@ sub _setpvCorrectionFactor {             ## no critic "not used"
 
   my $hash  = $defs{$name};
 
-  if ($prop !~ /[0-9,.]/x) {
+  if (!isNumeric($prop)) {
       return qq{The correction value must be specified by numbers and optionally with decimal places};
   }
-
-  $prop =~ s/,/./x;
 
   my ($acu, $aln) = isAutoCorrUsed ($name);
   my $mode        = $acu =~ /on/xs ? 'manual flex' : 'manual fix';
@@ -4792,17 +4795,18 @@ sub ___computeTiltedIrradianceCached {
       return 0;
   }
   
-  my $cache_key = join ':',                                                     # Cache‑Key erzeugen
-    $ddate,                                                                     # Datum der Zielstunde
-    $hod,                                                                       # Stunde der Zielstunde
-    $sunalt // 'U',
-    $sunaz  // 'U',
-    $rad    // 'U',
-    $str_tilt,
-    $str_azi,
-    $model,
-    $b0,
-    $dofyear;
+  my $cache_key = join '::', 'TILTIRR',                                         # Cache Key ID
+                              $name,
+                              $ddate,                                           # Datum der Zielstunde
+                              $hod,                                             # Stunde der Zielstunde
+                              $sunalt // 'U',
+                              $sunaz  // 'U',
+                              $rad    // 'U',
+                              $str_tilt,
+                              $str_azi,
+                              $model,
+                              $b0,
+                              $dofyear;
     
   my $hash  = $defs{$name};
   my $cache = $hash->{'.tiltCache'};
@@ -10991,6 +10995,7 @@ sub centralTask {
  
   $hash->{MCACHE_STATS} = MCache_dump();                                              # Mini-Cache Statistiken ins Internal schreiben
   LRU_update_internals ($name, $hash->{'.tsCache'});                                  # Internals f. Cache aktualisieren
+  LRU_update_internals ($name, $hash->{'.pvHistCache'});                              # Internals f. getPvHistTargetArray Cache aktualisieren
     
   setTimeTracking             ($name, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
   _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
@@ -11801,7 +11806,6 @@ sub _collectAstronomyData {
       $paref->{hod}      = $hod;
       $paref->{nhtstr}   = $nhtstr;
       $paref->{num}      = $num;
-      #$paref->{fd}       = $fd;
       $paref->{is_today} = $is_today;
       
       if ($is_today) {                                                                                     
@@ -11823,8 +11827,7 @@ sub _collectAstronomyData {
           __calcSunPosition ($paref);
       }
   }
-
-  #delete $paref->{fd};
+  
   delete $paref->{is_today};
   delete $paref->{num};
   delete $paref->{nhtstr};
@@ -15127,13 +15130,15 @@ sub _createSummaries {
       my ($fd, $fh) = calcDayHourMove ($chour, $h);
       last if($fd > MAXNEXTDAYS);
 
-      my $idx   = sprintf "%02d", $h;                                                                   # Start bei Nexthour00
-      my $pvfc  = NexthoursVal ($name, "NextHour".$idx, 'pvfc',      0);
-      my $confc = NexthoursVal ($name, "NextHour".$idx, 'confc',     0);
-      my $istdy = NexthoursVal ($name, "NextHour".$idx, 'today',     0);
-      my $don   = NexthoursVal ($name, "NextHour".$idx, 'DoN',       0);
-      my $hod   = NexthoursVal ($name, "NextHour".$idx, 'hourofday', 0);
-      my $nhday = NexthoursVal ($name, "NextHour".$idx, 'day',       0);
+      my $idx   = sprintf "%02d", $h;                                                                   # Start bei Nexthour00      
+      my $slot  = $data{$name}{nexthours}{'NextHour'.$idx} // {};
+
+      my $pvfc  = $slot->{pvfc}      // 0;
+      my $confc = $slot->{confc}     // 0;
+      my $istdy = $slot->{today}     // 0;
+      my $don   = $slot->{DoN}       // 0;
+      my $hod   = $slot->{hourofday} // 0;
+      my $nhday = $slot->{day}       // 0;
       
       $hod   = int ($hod);
       $pvfc  = max (0, $pvfc);                                                                          # PV Prognose darf nicht negativ sein
@@ -15246,16 +15251,27 @@ sub _createSummaries {
 
   # --- Werte aus pvHistory
   ###########################
+  my $dayslot = $data{$name}{pvhist}{$day} // {};
+  
   for my $th (1..24) {
-      $th                         = sprintf "%02d", $th;
-      $todaySumFc->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
-      $todaySumRe->{PV}          += HistoryVal ($name, $day, $th, 'pvrl',  0);
-      $todaySumFc->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
-      $todaySumRe->{Consumption} += HistoryVal ($name, $day, $th, 'con',   0);
+      $th       = sprintf "%02d", $th;
+      my $slot  = $dayslot->{$th} // {};
+      
+      my $pvfc  = $slot->{pvfc}  // 0;
+      my $pvrl  = $slot->{pvrl}  // 0;
+      my $confc = $slot->{confc} // 0;
+      my $con   = $slot->{con}   // 0;   
+
+      $todaySumFc->{PV}          += $pvfc;
+      $todaySumRe->{PV}          += $pvrl;
+      $todaySumFc->{Consumption} += $confc;
+      $todaySumRe->{Consumption} += $con;   
       
       if ($th <= $chour) {                                                                              # Werte bis 1 Stunde vor aktueller Stunde (pvHistory nutzt hod)
-          $todayUp2lastHour->{PV}          += HistoryVal ($name, $day, $th, 'pvfc',  0);
-          $todayUp2lastHour->{Consumption} += HistoryVal ($name, $day, $th, 'confc', 0);
+          if ($th <= $chour) {
+              $todayUp2lastHour->{PV}          += $pvfc;                                                # kein zweiter HistoryVal-Call nötig
+              $todayUp2lastHour->{Consumption} += $confc;
+          }
       }
   }
   
@@ -15269,7 +15285,6 @@ sub _createSummaries {
   ## aktuelle Consumption, Autarkie, Selbstverbrauch
   ####################################################
   my $gcon    = CurrentVal ($name, 'gridconsumption',         0);                                       # aktueller Netzbezug
-  #my $tconsum = CurrentVal ($name, 'tomorrowconsumption', undef);                                       # Verbrauchsprognose für folgenden Tag
   my $gfeedin = CurrentVal ($name, 'gridfeedin',              0);
 
   my $batin  = 0;
@@ -15385,8 +15400,7 @@ sub _createSummaries {
   storeReading ('RestOfDayConsumptionForecast',        (round0 ($restOfDaySum->{Consumption})). ' Wh');
   
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ########################################################################################################################
-  #storeReading ('Tomorrow_ConsumptionForecast', $tconsum.            ' Wh') if(defined $tconsum);  
+  ######################################################################################################################## 
   storeReading ('Tomorrow_ConsumptionForecast', (round0 ($tomorrowSum->{Consumption})).  ' Wh');   # <- zu eliminieren   14.04.
 
 return;
@@ -18077,6 +18091,7 @@ sub _calcDataEveryFullHour {
                                                                par1  => 'con', 
                                                                par2  => 'con',
                                                                par3  => 'con',
+                                                               t     => $t,
                                                                limit => 750,
                                                              }
                                                            );        
@@ -20940,7 +20955,7 @@ sub _beamGraphicFirstHour {
   my $lang      = $paref->{lang};
   my $kw        = $paref->{kw};
 
-  my $stt = NexthoursVal($name, 'NextHour00', 'starttime', '0000-00-00 24');                                # Startzeit aus NextHour00 holen → liefert echte Stunde (0..23) und Datum
+  my $stt = NexthoursVal ($name, 'NextHour00', 'starttime', '0000-00-00 24');                               # Startzeit aus NextHour00 holen → liefert echte Stunde (0..23) und Datum
   my ($year, $month, $day_str, $thishour) =
       $stt =~ m/(\d{4})-(\d{2})-(\d{2})\s(\d{2})/x;
 
@@ -20966,31 +20981,31 @@ sub _beamGraphicFirstHour {
 
   # --- Werte in hfcg speichern
   $hfcg->{0}{mktime}   = $mktime;
-  $hfcg->{0}{time}     = $time;       # HOD + offset (1..24)
-  $hfcg->{0}{time_str} = $time_str;   # für HistoryVal
+  $hfcg->{0}{time}     = $time;                                                                             # HOD + offset (1..24)
+  $hfcg->{0}{time_str} = $time_str;                                                                         # für HistoryVal
   $hfcg->{0}{day}      = $day;
   $hfcg->{0}{day_str}  = $day_str;
 
   # --- Wetter- und Sonnendaten aus History
-  $hfcg->{0}{weather} = HistoryVal($name, $day_str, $time_str, 'weatherid', 999);
-  $hfcg->{0}{wcc}     = HistoryVal($name, $day_str, $time_str, 'wcc',       '-');
-  $hfcg->{0}{sunalt}  = HistoryVal($name, $day_str, $time_str, 'sunalt',    '-');
-  $hfcg->{0}{sunaz}   = HistoryVal($name, $day_str, $time_str, 'sunaz',     '-');
-  $hfcg->{0}{don}     = HistoryVal($name, $day_str, $time_str, 'DoN',         0);
+  $hfcg->{0}{weather} = CachedHistoryVal ($name, $day_str, $time_str, 'weatherid', 999);
+  $hfcg->{0}{wcc}     = CachedHistoryVal ($name, $day_str, $time_str, 'wcc',       '-');
+  $hfcg->{0}{sunalt}  = CachedHistoryVal ($name, $day_str, $time_str, 'sunalt',    '-');
+  $hfcg->{0}{sunaz}   = CachedHistoryVal ($name, $day_str, $time_str, 'sunaz',     '-');
+  $hfcg->{0}{don}     = CachedHistoryVal ($name, $day_str, $time_str, 'DoN',         0);
 
   # --- Energiewerte
-  my $val3 = HistoryVal($name, $day_str, $time_str, 'gcons',   0);
-  my $val7 = HistoryVal($name, $day_str, $time_str, 'gfeedin', 0);
+  my $val3 = CachedHistoryVal ($name, $day_str, $time_str, 'gcons',   0);
+  my $val7 = CachedHistoryVal ($name, $day_str, $time_str, 'gfeedin', 0);
 
   my %beam_val = (
-      pvForecast          => HistoryVal($name, $day_str, $time_str, 'pvfc',  0),
-      pvReal              => HistoryVal($name, $day_str, $time_str, 'pvrl',  0),
+      pvForecast          => CachedHistoryVal ($name, $day_str, $time_str, 'pvfc',  0),
+      pvReal              => CachedHistoryVal ($name, $day_str, $time_str, 'pvrl',  0),
       gridconsumption     => $val3,
-      consumptionForecast => HistoryVal($name, $day_str, $time_str, 'confc', 0),
-      consumption         => HistoryVal($name, $day_str, $time_str, 'con',   0),
-      energycosts         => round2(HistoryVal($name, $day_str, $time_str, 'conprice', 0) * $val3 / 1000),
+      consumptionForecast => CachedHistoryVal ($name, $day_str, $time_str, 'confc', 0),
+      consumption         => CachedHistoryVal ($name, $day_str, $time_str, 'con',   0),
+      energycosts         => round2 (CachedHistoryVal ($name, $day_str, $time_str, 'conprice', 0) * $val3 / 1000),
       gridfeedin          => $val7,
-      feedincome          => round2(HistoryVal($name, $day_str, $time_str, 'feedprice', 0) * $val7 / 1000),
+      feedincome          => round2 (CachedHistoryVal ($name, $day_str, $time_str, 'feedprice', 0) * $val7 / 1000),
   );
 
   # --- Batterie-SoC-Werte
@@ -21006,9 +21021,9 @@ sub _beamGraphicFirstHour {
           my ($bkey, $bcont) = @$slot;
 
           my $soc =
-              $bcont =~ /batsocCombi_${bns}/xs    ? round1(HistoryVal($name,$day_str,$time_str,'batsoc'.$bns,    0)) :
-              $bcont =~ /batsocForecast_${bns}/xs ? round1(HistoryVal($name,$day_str,$time_str,'batprogsoc'.$bns,0)) :
-              $bcont =~ /batsocReal_${bns}/xs     ? round1(HistoryVal($name,$day_str,$time_str,'batsoc'.$bns,    0)) :
+              $bcont =~ /batsocCombi_${bns}/xs    ? round1 (CachedHistoryVal ($name,$day_str,$time_str,'batsoc'.$bns,    0)) :
+              $bcont =~ /batsocForecast_${bns}/xs ? round1 (CachedHistoryVal ($name,$day_str,$time_str,'batprogsoc'.$bns,0)) :
+              $bcont =~ /batsocReal_${bns}/xs     ? round1 (CachedHistoryVal ($name,$day_str,$time_str,'batsoc'.$bns,    0)) :
               0;
 
           $hbsocs->{0}{$bns}{$bkey} = $soc >= 100 ? 100 : $soc;
@@ -21017,8 +21032,8 @@ sub _beamGraphicFirstHour {
 
   # --- Batterie-Summenwerte
   if ($bcapsum) {
-      my $socprogwhsum = HistoryVal($name, $day_str, $time_str, 'socprogwhsum', 0);
-      my $socwhsum     = HistoryVal($name, $day_str, $time_str, 'socwhsum',     0);
+      my $socprogwhsum = CachedHistoryVal ($name, $day_str, $time_str, 'socprogwhsum', 0);
+      my $socwhsum     = CachedHistoryVal ($name, $day_str, $time_str, 'socwhsum',     0);
 
       $beam_val{batsocForecastSum} = round1(100 * $socprogwhsum / $bcapsum);
       $beam_val{batsocRealSum}     = round1(100 * $socwhsum     / $bcapsum);
@@ -21131,34 +21146,34 @@ sub _beamGraphicRemainingHours {
                         0
                        )->{day};
 
-              $hfcg->{$i}{weather} = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
-              $hfcg->{$i}{wcc}     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
-              $hfcg->{$i}{sunalt}  = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'sunalt',    '-');
-              $hfcg->{$i}{sunaz}   = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
-              $hfcg->{$i}{don}     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'DoN',         0);
+              $hfcg->{$i}{weather} = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'weatherid', 999);
+              $hfcg->{$i}{wcc}     = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'wcc',       '-');
+              $hfcg->{$i}{sunalt}  = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'sunalt',    '-');
+              $hfcg->{$i}{sunaz}   = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
+              $hfcg->{$i}{don}     = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'DoN',         0);
 
-              $val1 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
-              $val2 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
-              $val3 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
-              $val4 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
-              $val5 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'con',   0);
-              $val6 = round2 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
-              $val7 = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
-              $val8 = round2 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
+              $val1 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
+              $val2 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
+              $val3 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
+              $val4 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
+              $val5 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'con',   0);
+              $val6 = round2 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
+              $val7 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
+              $val8 = round2 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
 
               ## Batterien Selektionshash erstellen
               #######################################
               for my $bn (1..MAXBATTERIES) {
                   $bn = sprintf "%02d", $bn;
 
-                  $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                                  $beam1cont =~ /batsocForecast_${bn}/xs ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
-                                                  $beam1cont =~ /batsocReal_${bn}/xs     ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
+                  $hbsocs->{$i}{$bn}{beam1cont} = $beam1cont =~ /batsocCombi_${bn}/xs    ? round1 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                                  $beam1cont =~ /batsocForecast_${bn}/xs ? round1 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
+                                                  $beam1cont =~ /batsocReal_${bn}/xs     ? round1 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
                                                   0;
 
-                  $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
-                                                  $beam2cont =~ /batsocForecast_${bn}/xs ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
-                                                  $beam2cont =~ /batsocReal_${bn}/xs     ? round1 (HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
+                  $hbsocs->{$i}{$bn}{beam2cont} = $beam2cont =~ /batsocCombi_${bn}/xs    ? round1 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # real erreichter SoC (Vergangenheit) / SoC-Prognose
+                                                  $beam2cont =~ /batsocForecast_${bn}/xs ? round1 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batprogsoc'.$bn, 0)) :       # nur SoC-Prognose
+                                                  $beam2cont =~ /batsocReal_${bn}/xs     ? round1 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'batsoc'.$bn, 0))     :       # nur real erreichter SoC
                                                   0;
 
                   $hbsocs->{$i}{$bn}{beam1cont} = 100 if($hbsocs->{$i}{$bn}{beam1cont} >= 100);
@@ -21168,8 +21183,8 @@ sub _beamGraphicRemainingHours {
               ## Batterien summarische Werte erstellen
               ##########################################
               if ($bcapsum) {
-                  my $socprogwhsum = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'socprogwhsum', 0);
-                  my $socwhsum     = HistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'socwhsum', 0);
+                  my $socprogwhsum = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'socprogwhsum', 0);
+                  my $socwhsum     = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'socwhsum', 0);
                   $val9            = round1 (100 * $socprogwhsum / $bcapsum);                           # Summe Prognose SoC in % über alle Batterien
                   $val10           = round1 (100 * $socwhsum / $bcapsum);                               # Summe real erreichter SoC in % über alle Batterien
               }
@@ -26128,6 +26143,7 @@ sub aiFannGetConResult {
                                                                   par1  => $fanntyp, 
                                                                   par2  => 'temp', 
                                                                   par3  => 'presence',
+                                                                  t     => $paref->{t},
                                                                   limit => 600,
                                                                 }
                                                               );                                # $fanntyp + Temperaturen aus History lesen                     
@@ -30582,11 +30598,15 @@ sub timestringsFromOffset {
   return if !isNumeric($epoch);
 
   # --- Cache
-  my $key   = "$epoch:$offset";
+  my $key = join '::', 'TSO',                                                                   # Cache Key ID
+                       $name,
+                       $epoch,
+                       $offset;
+  
   my $hash  = $defs{$name};
   my $cache = $hash->{'.tsCache'};
 
-  if (my $cached = LRU_get($name, $cache, $key)) {
+  if (my $cached = LRU_get ($name, $cache, $key)) {
       return $cached;
   }
 
@@ -32420,87 +32440,105 @@ return ($rapi, $wapi);
 sub getPvHistTargetArray {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $debug = $paref->{debug};                                                       
-  my $par1  = $paref->{par1};                                               
+  my $debug = $paref->{debug};
+  my $par1  = $paref->{par1};
   my $par2  = $paref->{par2};
-  my $par3  = $paref->{par3};   
-  my $limit = $paref->{limit} // 200;                                                   
+  my $par3  = $paref->{par3};
+  my $t     = $paref->{t}     // time;
+  my $limit = $paref->{limit} // 200;
 
+  # --- Cache-Objekt initialisieren ---
+  my $hash  = $defs{$name};
+  my $cache = $hash->{'.pvHistCache'} //= LRU_cache_create ('pvHistCache', 'pvHistory Cache', CACHEPVHMS);
+
+  # --- Zeitkontext über TS_OFFSET_CACHE (stabil & gecacht) ---        
+  my $dt   = timestringsFromOffset ($name, $t, 0);  
+  my $year = $dt->{year};
+  my $mon  = $dt->{month};
+  my $mday = $dt->{day};
+  my $hour = $dt->{hour};
+
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'PVHISTARR',                                                     # Cache Key ID
+                       $name, $year, $mon, $mday, $hour,
+                       $par1, $par2, ($par3 // 'undef'), $limit;
+
+  # --- Cache-Hit? ---
+  if (my $cached = LRU_get ($name, $cache, $key)) {
+      return @$cached;                                                                  # (\@p1, \@p2, \@p3)
+  }
+
+  # --- Kein Cache-Hit → Originalberechnung ---
   my (@p1keys, @p2keys, @p3keys);
   return (\@p1keys, \@p2keys, \@p3keys) unless exists $data{$name}{pvhist};
 
-  my ($sec,$minute,$hour,$mday) = localtime();
-  $hour = int($hour);
-  $mday = int($mday);
-
   my $ph = $data{$name}{pvhist};
 
-  my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;            # Tage sortieren (Vormonat + aktueller Monat)
+  # --- Tage sortieren (Vormonat + aktueller Monat) ---
+  my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;
   my @days_upto  = sort { $a <=> $b } grep { $_ <= $mday } keys %$ph;
   my @days       = (@days_after, @days_upto);
 
-  for my $day (@days) {                                                          # --- Werte sammeln ---
+  # --- Werte sammeln ---
+  for my $day (@days) {
       my @hods = sort { $a <=> $b } keys %{ $ph->{$day} };
 
       for my $hod (@hods) {
           next if $hod < 1 || $hod > 24;
-          last if ($day == $mday && $hod == $hour + 1);                          # aktuelle Stunde überspringen
+          last if ($day == $mday && $hod == $hour + 1);
 
           my $rec = $ph->{$day}{$hod};
 
-          next unless (defined $rec->{$par1});                                   # Wert muss vorhanden sein
-          next unless ($rec->{$par1} >= 0);
+          next unless defined $rec->{$par1};
+          next unless $rec->{$par1} >= 0;
 
           push @p1keys, $rec->{$par1};
-          push @p2keys, $rec->{$par2};                                           # kann undef sein, wird später gefixt
-          push @p3keys, $rec->{$par3} // 0 if(defined $par3);                    # darf nicht undef sein!
+          push @p2keys, $rec->{$par2};
+          push @p3keys, $rec->{$par3} // 0 if defined $par3;
       }
   }
-  
-  my $len = min (scalar @p1keys, scalar @p2keys, scalar @p3keys);                # --- Arrays synchronisieren ---
+
+  # --- Arrays synchronisieren ---
+  my $len = min scalar(@p1keys), scalar(@p2keys), scalar(@p3keys);
 
   splice @p1keys, $len;
   splice @p2keys, $len;
   splice @p3keys, $len;
 
-  # --- Interpolation fehlender Werte in Array @p2keys ---
+  # --- Interpolation fehlender Werte in @p2keys ---
   for (my $i = 0; $i < $len; $i++) {
       next if defined $p2keys[$i];
-        
-      if ($debug =~ /aiData/xs) {
-          Log3 ($name, 1, "$name DEBUG> AI FANN - UNDEFINED value found in Array at position $i ... interpolate it");
-      }
 
-      my $li = $i - 1;                                                            # Linken definierten Wert suchen
+      my $li = $i - 1;
       $li-- while $li >= 0 && !defined $p2keys[$li];
 
-      my $ri = $i + 1;                                                            # Rechten definierten Wert suchen
+      my $ri = $i + 1;
       $ri++ while $ri < $len && !defined $p2keys[$ri];
 
-      if ($li < 0 && $ri >= $len) {                                               # Fall 1: beide Seiten undef -> 0
+      if ($li < 0 && $ri >= $len) {
           $p2keys[$i] = 0;
-          next;
       }
-
-      if ($ri >= $len) {                                                          # Fall 2: nur links vorhanden
+      elsif ($ri >= $len) {
           $p2keys[$i] = $p2keys[$li];
-          next;
       }
-
-      if ($li < 0) {                                                              # Fall 3: nur rechts vorhanden
+      elsif ($li < 0) {
           $p2keys[$i] = $p2keys[$ri];
-          next;
       }
-
-      my $ratio   = ($i - $li) / ($ri - $li);                                     # Fall 4: beide vorhanden -> lineare Interpolation
-      $p2keys[$i] = $p2keys[$li] + ($p2keys[$ri] - $p2keys[$li]) * $ratio;
+      else {
+          my $ratio = ($i - $li) / ($ri - $li);
+          $p2keys[$i] = $p2keys[$li] + ($p2keys[$ri] - $p2keys[$li]) * $ratio;
+      }
   }
 
-  my $min = min ($len, $limit);
+  # --- Limit anwenden ---
+  my $min = min $len, $limit;
 
-  @p1keys = @p1keys[-$min .. -1];                                                 # --- Limit anwenden ---
+  @p1keys = @p1keys[-$min .. -1];
   @p2keys = @p2keys[-$min .. -1];
   @p3keys = @p3keys[-$min .. -1];
+
+  # --- Ergebnis cachen ---
+  LRU_insert ($name, $cache, $key, [ \@p1keys, \@p2keys, \@p3keys ]);
 
 return (\@p1keys, \@p2keys, \@p3keys);
 }
@@ -32938,32 +32976,7 @@ return $result;
 #
 #    $day: Tag des Monats (01,02,...,31)
 #    $hod: Stunde des Tages (01,02,...,24,99)
-#    $key:    etotaliXX      - totale PV Erzeugung (Wh) des Inverters XX
-#             pvrlXX         - realer PV Ertrag (Wh) des Inverters XX
-#             pvfc           - PV Vorhersage
-#             pprlXX         - Energieerzeugung des Produzenten XX
-#             etotalpXX      - Zählerstand "Energieertrag total" (Wh) des Produzenten XX
-#             confc          - Vorhersage Hausverbrauch (Wh)
-#             gcons          - realer Netzbezug
-#             gfeedin        - reale Netzeinspeisung
-#             batintotalXX   - Gesamtladung Batterie XX (Wh) zu Beginn der Stunde
-#             batinXX        - Ladung Batterie XX innerhalb der Stunde (Wh)
-#             batouttotalXX  - Gesamtentladung Batterie XX (Wh)
-#             batoutXX       - Entladung Batterie XX innerhalb der Stunde (Wh)
-#             batmsoc        - max. SOC des Tages (%)
-#             batmaxsocXX    - maximum SOC (%) der Batterie XX des Tages
-#             batsetsocXX    - optimaler (berechneter) SOC (%) der Batterie XX für den Tag
-#             weatherid      - Wetter ID
-#             wcc            - Grad der Bewölkung
-#             temp           - Außentemperatur
-#             rr1c           - Gesamtniederschlag (1-stündig) letzte 1 Stunde kg/m2
-#             pvcorrf        - PV Autokorrekturfaktor f. Stunde des Tages
-#             dayname        - Tagesname (Kürzel)
-#             csmt${c}       - Totalconsumption Consumer $c (1..MAXCONSUMER)
-#             csme${c}       - Consumption Consumer $c (1..MAXCONSUMER) in $hod
-#             minutescsm${c} - Laufzeit des Consumers in Minuten in $hod
-#             sunaz          - Azimuth der Sonne (in Dezimalgrad)
-#             sunalt         - Höhe der Sonne (in Dezimalgrad)
+#    $key: Werteschlüssel
 #    $def: Defaultwert
 #
 ###############################################################################
@@ -32986,6 +32999,46 @@ sub HistoryVal {
   }
 
 return $def;
+}
+
+###############################################################################
+#    Wert des pvhist-Hash Cached zurückliefern
+#    Achtung! - nur für stabile vergangene Stunden/ Tage verwenden
+###############################################################################    
+sub CachedHistoryVal {
+  my ($name, $day, $hod, $key, $def, $t) = @_;
+  $t //= time;
+
+  my $cache = $defs{$name}{'.pvHistCache'} 
+          //= LRU_cache_create ('pvHistCache', 'pvHistory Cache', CACHEPVHMS);                  # Init globalen pvHistory Cache
+  
+  # --- Zeitkontext Abfrage über TS_OFFSET_CACHE (stabil & gecacht) ---        
+  my $dt = timestringsFromOffset ($name, $t, 0);    
+                        
+  # --- aktuelle Stunde NICHT cachen -> ändert sich inhaltlich noch
+  if ($day == $dt->{day} && $hod >= $dt->{hour} + 1 ) {                                         # hour anpassen gemäß HOD-Logik
+      return HistoryVal ($name, $day, $hod, $key, $def);
+  }
+  
+  my $ckey = join '::', 'HVAL',                                                                 # Cache Key ID
+                        $name, $dt->{year}, $dt->{month}, $dt->{day},
+                        $day, $hod, $key;
+
+  if (my $hit = LRU_get ($name, $cache, $ckey)) {
+      my $v = $hit->[0];
+      return (defined $v && $v eq CACHEMISS) ? $def : $v;
+  }
+
+  my $val = HistoryVal ($name, $day, $hod, $key, CACHEMISS);
+  
+  if (defined $val && $val eq CACHEMISS) {                  
+      LRU_insert ($name, $cache, $ckey, [CACHEMISS]);
+      return $def;
+  }
+
+  LRU_insert ($name, $cache, $ckey, [ $val ]);
+
+return $val;
 }
 
 #####################################################################################################
@@ -33943,6 +33996,8 @@ return 1;                                                           # alles ok
 sub LRU_update_internals {
   my ($name, $cache) = @_;
   
+  return if(!$cache);
+  
   my $hash   = $defs{$name};
   my $title  = $cache->{title};
   my $max    = ${ $cache->{max}  };
@@ -33957,6 +34012,7 @@ sub LRU_update_internals {
 
   my $cashname = $title =~ /tiltedIrrCache/xs ? 'TILTED_IRR_CACHE'  
                : $title =~ /tsCache/xs        ? 'TS_OFFSET_CACHE'
+               : $title =~ /pvHistCache/xs    ? 'PVH_CACHE'
                : '';
                
   return if !$cashname;
@@ -34581,21 +34637,23 @@ to ensure that the system configuration is correct.
       <a id="SolarForecast-set-pvCorrectionFactor_" data-pattern="pvCorrectionFactor_.*"></a>
       <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br><br>
 
-      Manual correction factor for hour XX of the day. <br>
-      (default: 1.0) <br><br>
+      Preset correction factor for hour XX of the day. <br>
+      Enter the desired factor (e.g. 0.5) by which the forecast value will be multiplied. <br>
 
-      Depending on the setting <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a> ('off' or 'on_.*'),
-      a static or dynamic default setting is made: <br><br>
+      The effect of the preset depends on the setting <a hrefSolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a>. <br>
+      A static or dynamic forecast correction is performed. <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-            <tr><td> <b>off</b>     </td><td>The set correction factor is not overwritten by the auto-correction.                         </td></tr>
-            <tr><td>                </td><td>In the pvCorrectionFactor_XX reading, the status is signaled by the addition 'manual fix'.   </td></tr>
-            <tr><td>                </td><td>                                                                                             </td></tr>
-            <tr><td> <b>on_.*</b>   </td><td>The set correction factor is overwritten by the auto-correction or AI                        </td></tr>
-            <tr><td>                </td><td>if a calculated correction value is available in the system.                                 </td></tr>
-            <tr><td>                </td><td>In the pvCorrectionFactor_XX reading, the status is signaled by the addition 'manual flex'.  </td></tr>
+            <tr><td> <b>off</b>     </td><td>with pvCorrectionFactor_Auto=off  ->                                                           </td></tr>
+            <tr><td>                </td><td>The set correction factor is not overwritten by autocorrect.                                   </td></tr>
+            <tr><td>                </td><td>In the pvCorrectionFactor_XX reading, the status is indicated by the addition 'manual fix'.    </td></tr>
+            <tr><td>                </td><td>                                                                                               </td></tr>
+            <tr><td> <b>on</b>      </td><td>with pvCorrectionFactor_Auto=on... ->                                                          </td></tr>
+            <tr><td>                </td><td>The set correction factor is overwritten by the autocorrect or AI if a calculated correction   </td></tr>
+            <tr><td>                </td><td>value is available in the system.                                                              </td></tr>
+            <tr><td>                </td><td>In the pvCorrectionFactor_XX reading, the status is signaled by the addition 'manual flex'.    </td></tr>
          </table>
       </ul>
       </li>
@@ -37646,18 +37704,21 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <li><b>pvCorrectionFactor_XX &lt;Zahl&gt; </b> <br><br>
 
       Voreinstellung des Korrekturfaktors für die Stunde XX des Tages. <br>
+      Einzugeben ist der gewünschte Faktor (z.B. 0.5) mit dem der Prognosewert multipliziert wird. <br>
       (default: 1.0)  <br><br>
 
-      In Abhängigkeit vom Setting <a href="#SolarForecast-set-pvCorrectionFactor_Auto ">pvCorrectionFactor_Auto </a> ('off' bzw. 'on_.*') erfolgt
-      eine statische oder dynamische Voreinstellung: <br><br>
+      Die Wirkung der Voreinstellung ist abhängig von der Einstellung <a href="#SolarForecast-set-pvCorrectionFactor_Auto">pvCorrectionFactor_Auto </a>. <br>
+      Es erfolgt eine statische oder dynamische Prognosekorrektur. <br><br>
 
       <ul>
          <table>
          <colgroup> <col width="10%"> <col width="90%"> </colgroup>
-            <tr><td> <b>off</b>     </td><td>Der eingestellte Korrekturfaktor wird durch die Autokorrektur nicht überschrieben.             </td></tr>
+            <tr><td> <b>off</b>     </td><td>mit pvCorrectionFactor_Auto=off  ->                                                            </td></tr>
+            <tr><td>                </td><td>Der eingestellte Korrekturfaktor wird durch die Autokorrektur nicht überschrieben.             </td></tr>
             <tr><td>                </td><td>Im Reading pvCorrectionFactor_XX wird der Status durch den Zusatz 'manual fix' signalisiert.   </td></tr>
             <tr><td>                </td><td>                                                                                               </td></tr>
-            <tr><td> <b>on_.*</b>   </td><td>Der eingestellte Korrekturfaktor wird durch die Autokorrektur bzw. KI überschrieben            </td></tr>
+            <tr><td> <b>on</b>      </td><td>mit pvCorrectionFactor_Auto=on... ->                                                           </td></tr>
+            <tr><td>                </td><td>Der eingestellte Korrekturfaktor wird durch die Autokorrektur bzw. KI überschrieben            </td></tr>
             <tr><td>                </td><td>sofern ein berechneter Korrekturwert im System verfügbar ist.                                  </td></tr>
             <tr><td>                </td><td>Im Reading pvCorrectionFactor_XX wird der Status durch den Zusatz 'manual flex' signalisiert.  </td></tr>
          </table>
