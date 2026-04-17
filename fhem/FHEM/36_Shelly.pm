@@ -191,6 +191,7 @@
 # 6.05.10   add: Shelly Pro 1 UL
 # 6.05.11   fix: ID of Shelly Pro 1 UL
 # 6.05.12   fix: timer handling of Shelly4Pro (w/old fw)
+# 6.05.13   add: ecoflow Pro3EM
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -213,7 +214,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.12 03.04.2026";
+my $version = "6.05.13 17.04.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -416,7 +417,9 @@ my %shelly_vendor_ids = (
     "SAWD1"           => [ 2, "walldisplay1",   "Shelly Wall Display"],
     "SAWD-2A1XX10EU1" => [ 2, "walldisplay1",   "Shelly Wall Display", 0x3002],   # added 03/2025
     # UL-Types
-    "SPSW-202XE12UL"  => [ 2, "shellypro2",     "Shelly Pro 2 v.1"]          # added 10/2025, not listed by KB
+    "SPSW-202XE12UL"  => [ 2, "shellypro2",     "Shelly Pro 2 v.1"],          # added 10/2025, not listed by KB
+    # others
+    "EFPEM-003CEBEU120"=>[ 2, "shellypro3em",   "Shelly Pro 3EM",        0x9999,  'EM1'],  # added 04/2026
     );
 
 my %shelly_family = (
@@ -427,11 +430,14 @@ my %shelly_family = (
      "SP" => "Pro/Gen2",
      "SA" => "Control Panel",
      "S3" => "Gen3",
-     "S4" => "Gen4"
+     "S4" => "Gen4",
+     "EF" => "EcoFlow Gen2"    # following 'P' ignored
      );
 
 my %shelly_category = (
     # code as given in characters 3 & 4 of family-id
+    # or in characters 4 & 5 if device is of EcoFlow Family
+    # 
     # Gen1 - devices
      "BD" => "bulb",             # BDUO
      "CB" => "bulb",             # CB - color bulb
@@ -1221,7 +1227,8 @@ sub Shelly_getModel {
         $hash->{ID}=$model_id;
         readingsSingleUpdate($hash,"model_ID",$model_id,1);
         readingsSingleUpdate($hash,"model_family",$shelly_family{substr($model_id,0,2)},1);
-        readingsSingleUpdate($hash,"model_function",$shelly_category{substr($model_id,2,2)}//"unknown",1);
+        my $j=substr($model_id,0,2) eq "EF" ? 3 : 2; # ecoflow devices have a three letter family code
+        readingsSingleUpdate($hash,"model_function",$shelly_category{substr($model_id,$j,2)}//"unknown",1);
         readingsSingleUpdate($hash,"model_name",$shelly_vendor_ids{$model_id}[2],1);
         #--------
         $hash->{GEN} = $shelly_vendor_ids{$model_id}[0]; # model generation: 1, 2, 3, ...
