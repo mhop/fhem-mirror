@@ -190,30 +190,52 @@ sub DOIF_UpdateCell
         my $err="$pn: eval: $command error: $@" ;
         Log3 $pn,3,$err; 
     }
+    
+    
   }
 }
 
 sub DOIF_Widget
 {
-  my ($hash,$reg,$doifId,$value,$style,$widget,$command,$dev,$reading)=@_;
+  my ($hash,$reg,$doifId,$values,$style,$widget,$command,$dev,$reading)=@_;
+  my $value;
+  my $js;
+  if (ref($values) eq "ARRAY") {
+    $value=${$values}[0];
+    $js=${$values}[1];
+  } else {
+    $value=$values;
+  }
   if ($reg) {
     return DOIF_Widget_Register($doifId,$value,$style,$widget,$dev,$reading,$command);
   } else {
-    DOIF_Widget_Update($hash->{NAME},$doifId,$value,$style,$widget,$command,$dev,$reading);
+    if (defined $js) {
+      DOIF_JS_Update ($js);
+    } else {
+      DOIF_Widget_Update($hash->{NAME},$doifId,$value,$style,$widget,$command,$dev,$reading);
+    }
   }
+}
+
+sub DOIF_JS_Update 
+{
+  my ($js)=@_;
+  map { 
+    FW_directNotify("#FHEMWEB:$_", $js,"");
+  } devspec2array("TYPE=FHEMWEB");
 }
 
 sub DOIF_Widget_Update
 {
   my ($pn,$doifId,$value,$style,$widget,$command,$dev,$reading)=@_;
   if (defined $widget and $widget ne "") {
-      map { 
-         FW_directNotify("#FHEMWEB:$_", "doifUpdateCell('$pn','informid','$dev-$reading','$value')","");
-      } devspec2array("TYPE=FHEMWEB");
+    map { 
+      FW_directNotify("#FHEMWEB:$_", "doifUpdateCell('$pn','informid','$dev-$reading','$value')","");
+    } devspec2array("TYPE=FHEMWEB");
   } else {
-      map { 
-         FW_directNotify("#FHEMWEB:$_", "doifUpdateCell('$pn','doifId','$doifId','$value','display:inline-table;$style')","");
-      } devspec2array("TYPE=FHEMWEB") if ($value ne "");
+   map { 
+     FW_directNotify("#FHEMWEB:$_", "doifUpdateCell('$pn','doifId','$doifId','$value','display:inline-table;$style')","");
+   } devspec2array("TYPE=FHEMWEB") if ($value ne "");
   }
 }
 
@@ -236,7 +258,7 @@ sub DOIF_Widget_Register
     $cmd = $cmd eq '' ? $reading : $cmd;
     return "<div class='fhemWidget' cmd='$cmd' reading='$reading' dev='$dev' arg='$widget' current='$value' type='$type'></div>";
   } else {
-    return "<div class='dval' doifId='$doifId' style='display:inline-table;$style'>$value</div>";
+     return "<div class='dval' doifId='$doifId' style='display:inline-table;$style'>$value</div>";
   }
 }
 
@@ -255,6 +277,7 @@ sub DOIF_RegisterCell
   my $cell;
   my $widsty=0;
   my $trigger=0;
+  my $reg=1;
   
   if ($func=~ /^\s*(STY[ \t]*\(|WID[ \t]*\()/) {
     my ($beginning,$currentBlock,$err,$tailBlock)=GetBlockDoIf($func,'[\(\)]');
