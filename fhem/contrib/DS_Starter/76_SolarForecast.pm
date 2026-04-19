@@ -163,6 +163,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.1"  => "19.04.2026  Bugfix in _batChargeMgmt: Doppel-Skalierung der Tages-Summenvariablen, neues Debug: miniCache ".
+                           "Bugfix in __batChargeOptTargetPower: Patch für Einfrieren Ladezustand auf 100% ".
+                           "replace separate Mini Caches by one Multi_Cache ".
+                           "Mini Caches FmtWeatherCache / cloud2bin / sunalt2bin / temp2bin ", 
   "2.6.0"  => "16.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
                            "rename debug id saveData2Cache -> saveData2Storage, new Debug Id tiltedIrrCache ".
                            "new Mini Caches: Solar2Astro_Cache, DayHourMove_Cache, move __createAdditionalEvents to Task 8 ".
@@ -428,6 +432,7 @@ use constant {
   LOGDELAY        => 600,                                                           # Verzögerungszeit (s) zwischen zwei Logausgaben mit identischen Inhalt
   LOCALE_TIME     => setlocale (POSIX::LC_TIME),                                    # installierte locale abfragen
   LOCALE_DAYNAMES => \@LOCALE_DAYNAMES,                                             # Locale‑abhängige Kurz‑Wochentage erzeugen (Mo, Tue, lun., …)
+  
   MAXWEATHERDEV   => 3,                                                             # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
   MAXBATTERIES    => 3,                                                             # maximale Anzahl der möglichen Batterien
   MAXCONSUMER     => 20,                                                            # maximale Anzahl der möglichen Consumer (Attribut)
@@ -438,6 +443,7 @@ use constant {
   MAXNEXTDAYS     => 2,                                                             # max. Anzahl volle Tage in NextHours (Start mit 0 -> 3d)
   MAXCONLIMIT     => 100000,                                                        # oberes Limit stündlicher Energieverbrauch des Hauses (Wh)
   MAXSOCDEF       => 95,                                                            # default Wert (%) auf den die Batterie maximal aufgeladen werden soll bzw. als aufgeladen gilt
+  MINICACHEMS     => 1000,                                                          # Mini Cache max. Size
   MOONICONDEF     => 2,                                                             # default Mond-Phase (aus %hmoon)
   MOONCOLDEF      => 'lightblue',                                                   # default Mond Färbung
   MSGFILETEST     => 'controls_solarforecast_messages_test.txt',                    # TEST Input-File Notification System
@@ -490,9 +496,10 @@ use constant {
 ######################
 my @da;                                                                             # zentraler temporärer Readings-Storage
 my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
-my %Solar2Astro_Cache;                                                              # Solar2Astro Cache
-my %DayHourMove_Cache;                                                              # dayhourmove Cache
-my %MCache_Stats;                                                                   # Statistik für Minicaches
+#my %Solar2Astro_Cache;                                                              # Solar2Astro Cache
+#my %DayHourMove_Cache;                                                              # dayhourmove Cache
+my %Multi_Cache;                                                                    # Multifunktions Mini Cache
+my %MCache_Stats;                                                                   # Statistik für Mini Caches
 
 
 ## Standardvariablen
@@ -527,7 +534,6 @@ my @dd = qw( aiProcess
              apiCall
              apiProcess
              batteryManagement
-             tiltedIrrCache
              collectData
              collectData_long
              consumerPlanning
@@ -536,11 +542,13 @@ my @dd = qw( aiProcess
              dwdComm
              epiecesCalc
              graphic
+             miniCache
              notifyHandling
              pvCorrectionRead
              pvCorrectionWrite
              radiationProcess
              saveData2Storage
+             tiltedIrrCache
            );
                                                                                    # FTUI V2 Widget Files
 my @fs = qw( ftui_forecast.css
@@ -10993,13 +11001,17 @@ sub centralTask {
   
   createReadingsFromArray     ($hash, $evt);                                          # Readings erzeugen
  
-  $hash->{MCACHE_STATS} = MCache_dump();                                              # Mini-Cache Statistiken ins Internal schreiben
+  MC_update_internals  ($name);                                                       # Mini-Cache Statistiken ins Internal schreiben
   LRU_update_internals ($name, $hash->{'.tsCache'});                                  # Internals f. Cache aktualisieren
   LRU_update_internals ($name, $hash->{'.pvHistCache'});                              # Internals f. getPvHistTargetArray Cache aktualisieren
     
   setTimeTracking             ($name, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
   _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
 
+  if ($debug =~ /miniCache/xs) {                                                      # Mini Cache Inhalt ausgeben 
+      MC_debug ($name) if(askLogtime ($name, 'Dummy_Entry', 300));
+  }
+  
   if ($evt) {
       $centpars->{evt} = $evt;
       InternalTimer (gettimeofday() + 1, "FHEM::SolarForecast::singleUpdateState", {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}}, 0);
@@ -13945,9 +13957,12 @@ sub __parseAttrBatSoc {
   ($lrMargin, $otpMargin)    = split (':', $ph->{safetyMargin})  if(defined $ph->{safetyMargin});
   ($barrierSoC, $barrierPar) = split (':', $ph->{barrierSoC}, 2) if(defined $ph->{barrierSoC});
   ($loadTarget, $timeTarget) = split (':', $ph->{loadTarget})    if(defined $ph->{loadTarget});
+  
+  my $lowSoc  = $ph->{lowSoc};
+  $barrierSoC = max ($barrierSoC, $lowSoc + 1) if(defined $barrierSoC);
 
   my $parsed = {
-      lowSoc       => $ph->{lowSoc},
+      lowSoc       => $lowSoc,
       upSoc        => $ph->{upSoC},
       maxSoc       => $ph->{maxSoC}    // MAXSOCDEF,                                      # optional (default: MAXSOCDEF)
       stepSoc      => $ph->{stepSoC}   // BATSOCCHGDAY,                                   # mögliche SoC-Änderung pro Tag
@@ -14054,91 +14069,107 @@ sub _batChargeMgmt {
   my $name   = $paref->{name};
   my $day    = $paref->{day};
   my $chour  = $paref->{chour};
-  my $minute = $paref->{minute};                                                                 # aktuelle Minute (00-59)
+  my $minute = $paref->{minute};                                                                # aktuelle Minute (00-59)
   my $t      = $paref->{t};
 
   return if(!isBatteryUsed ($name));
 
-  my $hash      = $defs{$name};
-  my $pvCu      = ReadingsNum ($name, 'Current_PV',               0);                            # aktuelle PV Erzeugung
-  my $curcon    = ReadingsNum ($name, 'Current_Consumption',      0);                            # aktueller Verbrauch
-  my $feedinlim = CurrentVal  ($name, 'feedinPowerLimit',  INFINITE);                            # Einspeiselimit in W
-  my $bpin      = CurrentVal  ($name, 'batpowerinsum',            0);                            # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
-  my $gfeedin   = CurrentVal  ($name, 'gridfeedin',               0);                            # aktuelle Netzeinspeisung
-  my $inplim    = 0;
-
-  my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs', $t);                                       # Timestamp Sonneuntergang am aktuellen Tag
-  my $hs2sunset = round2 (($tdaysset - $t) / 3600);                                              # Rest-Stunden bis Sonnenuntergang
-
-  my $hsurp  = {};                                                                               # Hashreferenz Überschuß
-  my $hsoc   = {};                                                                               # Hashreferenz Prognose-SOC über alle Batterien
-  my $trans  = {};                                                                               # Referenz Übertrags-Hash
-  my $values = {};                                                                               # Hashreferenz
+  my $hash       = $defs{$name};
+  my $hsurp      = {};                                                                          # Hashreferenz Überschuß
+  my $hsoc       = {};                                                                          # Hashreferenz Prognose-SOC über alle Batterien
+  my $trans      = {};                                                                          # Referenz Übertrags-Hash
+  my $values     = {};                                                                          # Hashreferenz
+  my $batinitval = {};                                                                          # Hashreferenz 
+  
   my ($progsoc, $strategy);
 
-  ## Inverter Limits ermitteln
-  ##############################
-  for my $in (1..MAXINVERTER) {
-      $in       = sprintf "%02d", $in;
-      my $iname = InverterVal ($name, $in, 'iname', '');
-      next if(!$iname);
+  ## Werte initial einlesen
+  ###########################
+  my $pvCu      = ReadingsNum ($name, 'Current_PV',               0);                           # aktuelle PV Erzeugung
+  my $curcon    = ReadingsNum ($name, 'Current_Consumption',      0);                           # aktueller Verbrauch
+  my $feedinlim = CurrentVal  ($name, 'feedinPowerLimit',  INFINITE);                           # Einspeiselimit in W
+  my $bpin      = CurrentVal  ($name, 'batpowerinsum',            0);                           # aktuelle Batterie Ladeleistung (Summe über alle Batterien)
+  my $gfeedin   = CurrentVal  ($name, 'gridfeedin',               0);                           # aktuelle Netzeinspeisung
 
-      my $feed = InverterVal ($name, $in, 'ifeed', 'default');
-      next if($feed eq 'grid');                                                                    # Inverter 'Grid' ausschließen
+  my $tdaysset  = CurrentVal ($name, 'sunsetTodayTs', $t);                                      # Timestamp Sonneuntergang am aktuellen Tag
+  my $hs2sunset = round2 (($tdaysset - $t) / 3600);                                             # Rest-Stunden bis Sonnenuntergang
+                                                                                           
+  my $inplim    = __inverterLimits4Bats ($paref);                                               # Inverter Limits ermitteln
 
-      my $icap  = InverterVal ($name, $in, 'invertercap', 0);
-      my $limit = InverterVal ($name, $in, 'ilimit',    100);                                      # Wirkleistungsbegrenzung  (default keine Begrenzung)
-      my $aplim = $icap * $limit / 100;
-      $inplim  += $aplim;                                                                          # max. Leistung aller WR mit Berücksichtigung Wirkleistungsbegrenzung
-
-      debugLog ($paref, 'batteryManagement', "ChargeMgmt - Inverter '$iname' cap: $icap W, Power limit: $limit % -> Pmax eff: $aplim W");
-  }
-
-  debugLog ($paref, 'batteryManagement', "ChargeMgmt - Summary Power limit of all Inverter (except feed 'grid'): $inplim W");
-  debugLog ($paref, 'batteryManagement', "ChargeMgmt - The limit for grid feed-in is: $feedinlim W");
-
-  ## Schleife über alle Batterien
-  #################################
-  for my $bn (1..MAXBATTERIES) {                                                                   # für jede Batterie
+  # --- Hilfshash mit initialen batterieabhängigen Werten erstellen
+  for my $bn (1..MAXBATTERIES) {                                                                        # für jede Batterie
       $bn = sprintf "%02d", $bn;
 
       my ($err, $badev, $h) = isDeviceValid ( { name => $name, obj => 'setupBatteryDev'.$bn, method => 'attr' } );
       next if($err);
 
-      my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                     # installierte Batteriekapazität Wh
+      my $batinstcap = BatteryVal ($name, $bn, 'binstcap', 0);                                          # installierte Batteriekapazität Wh
 
       if (!$inplim || !$batinstcap) {
           debugLog ($paref, 'batteryManagement', "WARNING - The requirements for dynamic battery charge recommendation for Bat '$bn' are not met. Check key 'cap'. Go to Next.");
           next;
       }
+      
+      my $sf = __batDeficitShareFactor ($name, $bn);                                                    # Anteilsfaktor Ladungsdefizit
+      
+      $batinitval->{$bn}{sf}          = $sf;
+      $batinitval->{$bn}{batinstcap}  = $batinstcap;
+      $batinitval->{$bn}{batoptsoc}   = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);        # aktueller optimierter SoC in %
+      $batinitval->{$bn}{bcharge}     = BatteryVal  ($name, $bn, 'bcharge',                  0);        # aktuelle Ladung in %
+      $batinitval->{$bn}{bchargewh}   = BatteryVal  ($name, $bn, 'bchargewh',                0);        # aktuelle Ladung in Wh
+      $batinitval->{$bn}{bpinmax}     = BatteryVal  ($name, $bn, 'bpinmax',           INFINITE);        # max. mögliche Ladeleistung W
+      $batinitval->{$bn}{bpoutmax}    = BatteryVal  ($name, $bn, 'bpoutmax',          INFINITE);        # max. mögliche Entladeleistung W
+      $batinitval->{$bn}{bpowerin}    = BatteryVal  ($name, $bn, 'bpowerin',          INFINITE);        # aktuelle Ladeleistung W
+      $batinitval->{$bn}{bpinreduced} = BatteryVal  ($name, $bn, 'bpinreduced',              0);        # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
+      $batinitval->{$bn}{befficiency} = BatteryVal  ($name, $bn, 'befficiency', STOREFFDEF) / 100;      # Speicherwirkungsgrad
+      $batinitval->{$bn}{goalwh}      = $batinstcap;                                                    # initiales Ladeziel (Wh)
+      $batinitval->{$bn}{lrMargin}    = SFTYMARGIN_50;
+      $batinitval->{$bn}{otpMargin}   = SFTYMARGIN_20;
+  
+      # --- Werte initial einlesen und auf Batterie-Anteil skalieren
+      $batinitval->{$bn}{confcss}    = $sf * CurrentVal  ($name, 'tdConFcTillSunset',     0);           # Verbrauchsprognose bis Sonnenuntergang
+      $batinitval->{$bn}{rodpvfc}    = $sf * ReadingsNum ($name, 'RestOfDayPVforecast',   0);           # PV Prognose Rest des Tages
+      $batinitval->{$bn}{tompvfc}    = $sf * ReadingsNum ($name, 'Tomorrow_PVforecast',   0);           # PV Prognose nächster Tag
+      $batinitval->{$bn}{tomconfc}   = $sf * ReadingsNum ($name, 'Tomorrow_CONforecast',  0);           # Verbrauchsprognose nächster Tag
+      $batinitval->{$bn}{datompvfc}  = $sf * CurrentVal  ($name, 'dayAfterTomorrowPVfc',  0);           # PV Prognose übernächster Tag
+      $batinitval->{$bn}{datomconfc} = $sf * CurrentVal  ($name, 'dayAfterTomorrowConfc', 0);           # Verbrauchsprognose übernächster Tag             
+  }
+  
+  debugLog ($paref, 'batteryManagement', "ChargeMgmt - Summary Power limit of all Inverter (except feed 'grid'): $inplim W");
+  debugLog ($paref, 'batteryManagement', "ChargeMgmt - The limit for grid feed-in is: $feedinlim W");
 
-      my $rodpvfc     = ReadingsNum ($name, 'RestOfDayPVforecast',           0);                   # PV Prognose Rest des Tages
-      my $tompvfc     = ReadingsNum ($name, 'Tomorrow_PVforecast',           0);                   # PV Prognose nächster Tag
-      my $tomconfc    = ReadingsNum ($name, 'Tomorrow_CONforecast',          0);                   # Verbrauchsprognose nächster Tag
-      my $batoptsoc   = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);                   # aktueller optimierter SoC in %
-      my $confcss     = CurrentVal  ($name, 'tdConFcTillSunset',             0);                   # Verbrauchsprognose bis Sonnenuntergang
-      my $csoc        = BatteryVal  ($name, $bn, 'bcharge',                  0);                   # aktuelle Ladung in %
-      my $csocwh      = BatteryVal  ($name, $bn, 'bchargewh',                0);                   # aktuelle Ladung in Wh
-      my $bpinmax     = BatteryVal  ($name, $bn, 'bpinmax',           INFINITE);                   # max. mögliche Ladeleistung W
-      my $bpoutmax    = BatteryVal  ($name, $bn, 'bpoutmax',          INFINITE);                   # max. mögliche Entladeleistung W
-      my $bpowerin    = BatteryVal  ($name, $bn, 'bpowerin',          INFINITE);                   # aktuelle Ladeleistung W
-      my $bpinreduced = BatteryVal  ($name, $bn, 'bpinreduced',              0);                   # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
-      my $befficiency = BatteryVal  ($name, $bn, 'befficiency', STOREFFDEF) / 100;                 # Speicherwirkungsgrad
-      my $cgbt        = AttrVal     ($name, 'ctrlBatSocManagement'.$bn,  undef);
-      my $sf          = __batDeficitShareFactor ($name, $bn);                                      # V 1.59.5 Anteilsfaktor Ladungsdefizit
+
+  ## äußere BATTERIESCHLEIFE
+  ############################
+  for my $bn (1..MAXBATTERIES) {                                                                    # für jede Batterie
+      $bn = sprintf "%02d", $bn;
+      next if(!exists $batinitval->{$bn});
+
+      my $batinstcap  = $batinitval->{$bn}{batinstcap};
+      my $batoptsoc   = $batinitval->{$bn}{batoptsoc};                                              # aktueller optimierter SoC in %
+      my $csoc        = $batinitval->{$bn}{bcharge};                                                # aktuelle Ladung in %
+      my $csocwh      = $batinitval->{$bn}{bchargewh};                                              # aktuelle Ladung in Wh
+      my $bpinmax     = $batinitval->{$bn}{bpinmax};                                                # max. mögliche Ladeleistung W
+      my $bpoutmax    = $batinitval->{$bn}{bpoutmax};                                               # max. mögliche Entladeleistung W
+      my $bpowerin    = $batinitval->{$bn}{bpowerin};                                               # aktuelle Ladeleistung W
+      my $bpinreduced = $batinitval->{$bn}{bpinreduced};                                            # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
+      my $befficiency = $batinitval->{$bn}{befficiency};                                            # Speicherwirkungsgrad
+      my $sf          = $batinitval->{$bn}{sf};                                                     # V 1.59.5 Anteilsfaktor Ladungsdefizit
+      my $goalwh      = $batinitval->{$bn}{goalwh};                                                 # initiales Ladeziel (Wh)
+      my $lrMargin    = $batinitval->{$bn}{lrMargin};
+      my $otpMargin   = $batinitval->{$bn}{otpMargin};      
+      my $cgbt        = AttrVal ($name, 'ctrlBatSocManagement'.$bn,  undef);
       $strategy       = 'loadRelease';                                                             # 'loadRelease', 'optPower', 'smartPower'
       my $wou         = 0;                                                                         # Gewichtung Prognose-Verbrauch als Anteil "Eigennutzung" (https://forum.fhem.de/index.php?msg=1348429)
       my $lowSoc      = 0;
       my $barrierSoc  = 0;
       my $loadAbort   = '';
-      my $goalwh      = $batinstcap;                                                               # initiales Ladeziel (Wh)
-      my $lrMargin    = SFTYMARGIN_50;
-      my $otpMargin   = SFTYMARGIN_20;
+      
       my ($lcslot, $barrierPar, $timeTarget);
 
       if ($cgbt) {
           my $parsed  = __parseAttrBatSoc ($name, $cgbt);
-          $lowSoc     = $parsed->{lowSoc}       // 0;
+          $lowSoc     = $parsed->{lowSoc}       // $lowSoc;
           $barrierSoc = $parsed->{barrierSoc}   // $barrierSoc;                                    # SoC-Barriere, ab der die Ladesteuerung akitv sein soll
           $barrierPar = $parsed->{barrierPar};                                                     # Aktionsparameter innerhalb der SoC Barriere
           $lcslot     = $parsed->{lcslot};
@@ -14159,10 +14190,9 @@ sub _batChargeMgmt {
       if (defined $timeTarget && $timeTarget < 0) {                                                # Ladezielzeit relativ zum Sonnenuntergang
           my $dt      = timestringsFromOffset ($name, $tdaysset, $timeTarget * 3600);
           $timeTarget = int ($dt->{hour});                                                         # Uhrzeit ohne führende 0
-      }
+      }   
 
-      ## generelle Ladeabbruchbedingung evaluieren
-      ##############################################
+      # --- generelle Ladeabbruchbedingung evaluieren
       if ($loadAbort) {
           my ($abortSoc, $abortpin, $releaseSoC) = split ':', $loadAbort;                          # Ladeabbruch Forum: https://forum.fhem.de/index.php?msg=1342556
 
@@ -14180,16 +14210,19 @@ sub _batChargeMgmt {
       my $batoptsocwh = ___batSocPercentToWh ($batinstcap, $batoptsoc);                           # optimaler SoC in Wh
       my $lowSocwh    = ___batSocPercentToWh ($batinstcap, $lowSoc);                              # lowSoC in Wh
       my $socwh       = round0 (___batSocPercentToWh ($batinstcap, $csoc));                       # aktueller SoC in Wh
-
       my $whneed      = max (0, ($goalwh - $socwh));
 
-      ## Zeitfenster für aktives Lademanagement ermitteln
-      #####################################################
+      # --- Zeitfenster für aktives Lademanagement ermitteln
       $lcslot             //= '00:00-23:59';
       my ($lcstart, $lcend) = split "-", $lcslot;
+      
+      # --- auf Batterie XX aufgeteilte Energie im Verhältnis aller Bat
+      my $confcss  = round0 ($batinitval->{$bn}{confcss});
+      my $rodpvfc  = round0 ($batinitval->{$bn}{rodpvfc}); 
+      my $tompvfc  = round0 ($batinitval->{$bn}{tompvfc});   
+      my $tomconfc = round0 ($batinitval->{$bn}{tomconfc}); 
 
-      # Debuglog allgemein
-      ######################
+      # --- Debuglog allgemein
       if ($paref->{debug} =~ /batteryManagement/) {
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - selected charging strategy: $strategy");
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - general load termination condition: $labortCond");
@@ -14203,14 +14236,13 @@ sub _batChargeMgmt {
           Log3 ($name, 1, "$name DEBUG> ChargeMgmt Bat $bn - The PV generation, consumption and surplus listed below are based on the battery's share of the total amount of charging energy required!");
       }
 
-      ## Debuglog LR
-      ################
+      # --- Debuglog LR
       if ($paref->{debug} =~ /batteryManagement/ && $strategy eq 'loadRelease') {
           Log3 ($name, 1, "$name DEBUG> ChargeLR Bat $bn - used safety margin: $lrMargin %");
       }
 
-      ## Auswertung für jede kommende Stunde
-      ########################################
+      ## innere STUNDENSCHLEIFE
+      ###########################
       for my $num (0..MAXNEXTHOURS) {
           my ($fd, $fh) = calcDayHourMove ($chour, $num);
           last if($fd > MAXNEXTDAYS);
@@ -14224,13 +14256,16 @@ sub _batChargeMgmt {
           next if(!defined ($hod) || !defined ($nhstt));
 
           my $today = NexthoursVal ($name, 'NextHour'.$nhr, 'today', 0);
-          my $confc = NexthoursVal ($name, 'NextHour'.$nhr, 'confc', 0);
-          my $pvfc  = NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',  0);
-
+          
+          ## auf Batterie XX aufgeteilte Energie im Verhältnis aller Bat (stundenabhängig)
+          ##################################################################################
+          my $confc = round0 ($sf * NexthoursVal ($name, 'NextHour'.$nhr, 'confc', 0));
+          my $pvfc  = round0 ($sf * NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',  0));     
+          
           if ($fd == 2 && $fh == 0) {
-              $tompvfc  = CurrentVal ($name, 'dayAfterTomorrowPVfc',  0);                        # PV Prognose übernächster Tag
-              $tomconfc = CurrentVal ($name, 'dayAfterTomorrowConfc', 0);                        # Verbrauchsprognose übernächster Tag
-          }
+              $tompvfc  = $batinitval->{$bn}{datompvfc};                        
+              $tomconfc = $batinitval->{$bn}{datomconfc};
+          } 
 
           ## Zeitfenster für aktives Lademanagement anwenden
           #####################################################
@@ -14244,15 +14279,6 @@ sub _batChargeMgmt {
 
           my $crel  = 0;                                                                         # Ladefreigabe 0 Ausgangswert
           my $spday = 0;
-
-          ## Aufteilung Energie auf Batterie XX im Verhältnis aller Bat
-          ###############################################################
-          $pvfc     = round0 ($sf * $pvfc);
-          $confcss  = round0 ($sf * $confcss);
-          $confc    = round0 ($sf * $confc);
-          $rodpvfc  = round0 ($sf * $rodpvfc);
-          $tomconfc = round0 ($sf * $tomconfc);
-          $tompvfc  = round0 ($sf * $tompvfc);
 
           ## PV-Überschuß und (Rest)Tagesüberschuß heute/morgen
           #######################################################
@@ -14276,14 +14302,16 @@ sub _batChargeMgmt {
 
           ## Steuerung nach Ladefreigabe
           ################################
+          my $hyst = $batinstcap * 0.005;                                                        # 0.5 % Hysterese‑Patch
+          
           if ( $whneed * (1 + ($lrMargin / 100)) >= $spday ) {$crel = 1}                         # Ladefreigabe wenn benötigte Ladeenergie zzgl. Sicherheitsaufschlag >= Restüberschuß des Tages
           if ( !$num && ($pvCu - $curcon) >= $inplim )       {$crel = 1}                         # Ladefreigabe wenn akt. PV Leistung - Abschläge >= WR-Leistungsbegrenzung
           if ( !$bpin && $gfeedin > $feedinlim )             {$crel = 1}                         # V 1.49.6 Ladefreigabe wenn akt. keine Bat-Ladung UND akt. Einspeisung > Einspeiselimit der Anlage
           if ( $bpin && ($gfeedin - $bpin) > $feedinlim )    {$crel = 1}                         # V 1.49.6 Ladefreigabe wenn akt. Bat-Ladung UND Eispeisung - Bat-Ladung > Einspeiselimit der Anlage
           if ( !$cgbt )                                      {$crel = 1}                         # generelle Ladefreigabe wenn kein BatSoc/Lade-Management
           if ( !$lcintime )                                  {$crel = 1}                         # generelle Ladefreigabe wenn nicht innerhalb Zeitslot für Ladesteuerung
-          if ( $csocwh <= $barrierSocWh)                     {$crel = 1}                         # generelle Ladefreigabe wenn aktueller SoC <= Barriere-SoC
-          if ( $whneed <= 0 )                                {$crel = 0}                         # keine Ladefreigabe wenn kein Bedarf, z.B. eingestellter Ziel-SoC erreicht
+          if ( $csocwh <= $barrierSocWh + $hyst )            {$crel = 1}                         # generelle Ladefreigabe wenn aktueller SoC <= Barriere-SoC
+          if ( $whneed <= 0 && $num == 0 )                   {$crel = 0}                         # keine Ladefreigabe wenn kein Bedarf, z.B. eingestellter Ziel-SoC erreicht
           if ( $labortCond )                                 {$crel = 0}                         # keine Ladefreigabe bei genereller Abbruchbedingung
 
           # Steuerhash für optimimierte Ladeleistung erstellen
@@ -14323,14 +14351,23 @@ sub _batChargeMgmt {
           $speff    = $speff > 0 ? ($speff >= $bpinmax   ? $bpinmax   : $speff) :
                       $speff < 0 ? ($speff <= -$bpoutmax ? -$bpoutmax : $speff) :
                       $speff;
+                      
+          my $delta = 0;
 
-          my $delta = $speff > 0 ? ($crel ? $speff * $befficiency : 0) :                         # PV Überschuß (d.h. Aufladung) nur einbeziehen wenn Ladefreigabe
-                      $speff < 0 ? $speff / $befficiency               :                         # Verbrauch einbeziehen
-                      0;
+          if ($speff > 0) {                                                                      # Laden: immer mit Effizienz, aber nur wenn Ladefreigabe
+              $delta = $crel ? $speff * $befficiency : 0;
+          }
+          elsif ($speff < 0) {
+              if ($num == 0) {                                                                   # aktuelle Stunde: reale Entladeverluste
+                  $delta = $speff / $befficiency;
+              }
+              else {                                                                             # Prognosefall: keine realen Entladeverluste
+                  $delta = $speff;
+              }
+          }
 
           $socwh += $delta;
           $socwh  = ___batClampValue ($socwh, $lowSocwh, $batoptsocwh, $batinstcap);             # SoC begrenzen
-
           $socwh   = round0 ($socwh);                                                            # SoC Prognose in Wh
           $progsoc = round1 (___batSocWhToPercent ($batinstcap, $socwh));                        # Prognose SoC in %
 
@@ -14378,6 +14415,7 @@ sub _batChargeMgmt {
       }
   }
 
+  
   ## leistungsoptimierte (optPower/smartPower) Beladungssteuerung
   #################################################################
   for my $lfd (0..max (0, keys %{$hsurp})) {
@@ -14566,11 +14604,20 @@ sub __batChargeOptTargetPower {
           my $init_soc_wh = $hsurp->{$hod}{$sbn}{initsocwh};
           my $transfer    = $trans->{$sbn}{$lfd}{transfer};
 
+          #my $runwh = do {
+          #    if (defined $fc_next_wh)   { $fc_next_wh }
+          #    elsif ($nhr eq '00')       { $csocwh }
+          #    elsif (defined $transfer)  { delete $trans->{$sbn}{$lfd}{transfer} }
+          #    else                       { $init_soc_wh }
+          #};
+          
+          # Patch für Einfrieren Ladezustand auf 100%
           my $runwh = do {
-              if (defined $fc_next_wh)   { $fc_next_wh }
-              elsif ($nhr eq '00')       { $csocwh }
-              elsif (defined $transfer)  { delete $trans->{$sbn}{$lfd}{transfer} }
-              else                       { $init_soc_wh }
+              if (defined $fc_next_wh)     { $fc_next_wh  }                                     # Intra-Tag Fortschreibung OTP
+              elsif ($nhr eq '00')         { $csocwh }                                          # aktuelle Stunde: realer SoC
+              elsif (defined $init_soc_wh) { $init_soc_wh }                                     # LR-Wert bevorzugen (enthält Nachtentladung)
+              elsif (defined $transfer)    { delete $trans->{$sbn}{$lfd}{transfer} }            # Fallback: Transfer
+              else                         { $csocwh }
           };
 
           $runwh                      = min ($runwh, $batinstcap);
@@ -14637,7 +14684,6 @@ sub __batChargeOptTargetPower {
 
               $runwh += $diff / $befficiency;                                                                    # um Verbrauch reduzieren
               $runwh  = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                         # runwh begrenzen
-
               $hsurp->{$hod}{$sbn}{fcendwh}      = round0 ($runwh);
               $hsurp->{$nexthod}{$sbn}{fcnextwh} = $hsurp->{$hod}{$sbn}{fcendwh} if(defined $nextnhr);           # Startwert kommende Stunde
 
@@ -14750,7 +14796,7 @@ sub __batChargeOptTargetPower {
           else              { $diff = min ($spls, $hsurp->{$hod}{$sbn}{pneedmin}) }                              # kleinster Wert aus PV-Überschuß oder Ladeleistungsbegrenzung
 
           $runwh = min ($goalwh, $runwh + $diff * $befficiency);                                                 # Endwert Prognose
-          $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen
+          $runwh = ___batClampValue ($runwh, $lowSocwh, $batoptsocwh, $batinstcap);                              # runwh begrenzen     
           $runwh = round0 ($runwh);
 
           $hsurp->{$hod}{$sbn}{fcendwh}      = $runwh;
@@ -14758,11 +14804,40 @@ sub __batChargeOptTargetPower {
       }
   }
 
-  for my $bat (sort { $a <=> $b } @batteries) {
-      $trans->{$bat}{$lfd + 1}{transfer} = $hsurp->{24}{$bat}{fcendwh};                                          # Übertrag SoC-Prognose für kommenden Tag
-  }
+  # Patch für Einfrieren Ladezustand auf 100%
+  #for my $bat (sort { $a <=> $b } @batteries) {
+  #    $trans->{$bat}{$lfd + 1}{transfer} = $hsurp->{24}{$bat}{fcendwh};                                          # Übertrag SoC-Prognose für kommenden Tag
+  #}
 
 return ($hsurp, $otp);
+}
+
+################################################################
+#  Inverter Limits für Batteriemanagement ermitteln
+################################################################      
+sub __inverterLimits4Bats {
+  my ($paref) = @_;
+  
+  my $name   = $paref->{name};
+  my $inplim = 0; 
+  
+  for my $in (1..MAXINVERTER) {
+      $in       = sprintf "%02d", $in;
+      my $iname = InverterVal ($name, $in, 'iname', '');
+      next if(!$iname);
+
+      my $feed = InverterVal ($name, $in, 'ifeed', 'default');
+      next if($feed eq 'grid');                                                                    # Inverter 'Grid' ausschließen
+
+      my $icap  = InverterVal ($name, $in, 'invertercap', 0);
+      my $limit = InverterVal ($name, $in, 'ilimit',    100);                                      # Wirkleistungsbegrenzung  (default keine Begrenzung)
+      my $aplim = $icap * $limit / 100;
+      $inplim  += $aplim;                                                                          # max. Leistung aller WR mit Berücksichtigung Wirkleistungsbegrenzung
+
+      debugLog ($paref, 'batteryManagement', "ChargeMgmt - Inverter '$iname' cap: $icap W, Power limit: $limit % -> Pmax eff: $aplim W");
+  }
+
+return $inplim;
 }
 
 ################################################################
@@ -14848,8 +14923,6 @@ return  100 / $base * $socwh ;
 
 ################################################################
 #   Begrenzungen einhalten zwischen low, opt und high Grenze
-#
-#   $x = ___batClampValue ($value, $low, $opt, $high);
 ################################################################
 sub ___batClampValue {
   my ($value, $low, $opt, $high) = @_;
@@ -30401,22 +30474,25 @@ return $median;
 sub calcDayHourMove {
   my ($chour, $num) = @_;
   
-  my $stats = ($MCache_Stats{DayHourMove_Cache} //= { hits   => 0,                          # Cache Initialisierung
-                                                      misses => 0, 
-                                                      cache  => \%DayHourMove_Cache });
-    
-  my $key = "$chour:$num";                                                                  # Cache-Key  
+  my $stats = ($MCache_Stats{Multi_Cache} //= { hits   => 0,                            # Cache Initialisierung
+                                                misses => 0,
+                                                evicts => 0,                                                
+                                                cache  => \%Multi_Cache });
+     
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'DAYHMOV',                                                       # Cache Key ID
+                       $chour, $num;
 
-  if (my $val = MCache_get (\%DayHourMove_Cache, $stats, $key)) {                           # Cache-Hit?
+  if (my $val = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
       return @$val;
   }  
 
-  my $fh     = int($chour) + $num;                                                          # Berechnung
+  my $fh     = int($chour) + $num;                                                      # Berechnung
   my $fd     = int($fh / 24);
   $fh        = $fh - ($fd * 24);
   my $result = [$fd, $fh];
   
-  MCache_set(\%DayHourMove_Cache, $key, $result);                                           # Cache speichern
+  MCache_set (\%Multi_Cache, $stats, $key, $result);                                    # Cache speichern
 
 return ($fd, $fh);
 }
@@ -30432,16 +30508,33 @@ return ($fd, $fh);
 sub formatWeatherTimestrg {
   my $name = shift;
   my $date = shift // return;
+  
+  my $stats = ($MCache_Stats{Multi_Cache} //= { hits   => 0,                            # Cache Initialisierung
+                                                misses => 0,
+                                                evicts => 0,
+                                                cache  => \%Multi_Cache });
 
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'FMTWTSTR',                                                      # Cache Key ID
+                       $date;                                                    
+  
+  if (my $val = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
+      return $val;
+  } 
+  
   my $dt    = timestringsFromOffset ($name, time, 0);    
   my $cdate = $dt->{date};
   
-  my $refts = timestringToTimestamp ($cdate.' 00:00:00');                                   # Referenztimestring
+  my $refts = timestringToTimestamp ($cdate.' 00:00:00');                               # Referenztimestring
   my $datts = timestringToTimestamp ($date);
   my $fd    = int (($datts - $refts) / 86400);
   my $fh    = int ((split /[ :]/, $date)[1]);
+  
+  my $result = "fc${fd}_${fh}";
+  
+  MCache_set (\%Multi_Cache, $stats, $key, $result);                                    # Cache speichern
 
-return "fc${fd}_${fh}";
+return $result;
 }
 
 ################################################################
@@ -30799,17 +30892,21 @@ return $dolog;
 sub azSolar2Astro {
   my ($azsolar) = @_;
  
-  my $stats = ($MCache_Stats{Solar2Astro_Cache} //= { hits   => 0, 
-                                                      misses => 0, 
-                                                      cache  => \%Solar2Astro_Cache });
+  my $stats = ($MCache_Stats{Multi_Cache} //= { hits   => 0, 
+                                                misses => 0,
+                                                evicts => 0,
+                                                cache  => \%Multi_Cache });
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'AZSOL',                                                   # Cache Key ID
+                       $azsolar;                              
   
-  if (my $val = MCache_get (\%Solar2Astro_Cache, $stats, $azsolar)) {                       # Cache-Hit?
+  if (my $val = MCache_get (\%Multi_Cache, $stats, $key)) {                       # Cache-Hit?
       return $val;
   }
   
-  my $astro = ($azsolar + 180) % 360;                                                       # Berechnung
+  my $astro = ($azsolar + 180) % 360;                                             # Berechnung
   
-  MCache_set (\%Solar2Astro_Cache, $azsolar, $astro);                                       # in Cache speichern
+  MCache_set (\%Multi_Cache, $stats, $key, $astro);                               # in Cache speichern
 
 return $astro;
 }
@@ -32547,7 +32644,20 @@ return (\@p1keys, \@p2keys, \@p3keys);
 #  diskrete Temperaturen in "Bins" wandeln
 ################################################################
 sub temp2bin {
-  my $val = shift;
+  my ($val) = @_;
+  
+  my $stats = ($MCache_Stats{Multi_Cache} //= { hits   => 0,                            # Cache Initialisierung
+                                                misses => 0,
+                                                evicts => 0,                                                
+                                                cache  => \%Multi_Cache });
+
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'TEMPBIN',                                                       # Cache Key ID
+                       $val;
+                       
+  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
+      return $hit;
+  }
 
   my $bin = $val >=  35  ?  35 :
             $val >   32  ?  35 :
@@ -32572,6 +32682,8 @@ sub temp2bin {
             $val >= -15  ? -15 :
             $val >  -17  ? -15 :
             -20;
+            
+  MCache_set (\%Multi_Cache, $stats, $key, $bin);                                       # Cache speichern
 
 return $bin;
 }
@@ -32580,8 +32692,21 @@ return $bin;
 #  diskrete Bewölkung in "Bins" wandeln
 ################################################################
 sub cloud2bin {
-  my $val = shift;
+  my ($val) = @_;
+  
+  my $stats = ($MCache_Stats{Multi_Cache} //= { hits   => 0,                            # Cache Initialisierung
+                                                misses => 0,
+                                                evicts => 0,                                                
+                                                cache  => \%Multi_Cache });
 
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'CLOUDBIN',                                                      # Cache Key ID
+                       $val;
+                       
+  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
+      return $hit;
+  }
+                       
   my $bin = $val == 100 ? '100' :
             $val >  97  ? '100' :
             $val >= 95  ? '95'  :
@@ -32623,6 +32748,8 @@ sub cloud2bin {
             $val >= 5   ? '05'  :
             $val >  2   ? '05'  :
             '00';
+            
+  MCache_set (\%Multi_Cache, $stats, $key, $bin);                                       # Cache speichern
 
 return $bin;
 }
@@ -32631,7 +32758,20 @@ return $bin;
 #  diskrete Sonnen Höhe (altitude) in "Bins" wandeln
 ################################################################
 sub sunalt2bin {
-  my $val = shift;
+  my ($val) = @_;
+  
+  my $stats = ($MCache_Stats{Multi_Cache} //= { hits   => 0,                            # Cache Initialisierung
+                                                misses => 0,
+                                                evicts => 0,                                                
+                                                cache  => \%Multi_Cache });
+
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'SUNALTBIN',                                                     # Cache Key ID
+                       $val;
+                       
+  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
+      return $hit;
+  }
 
   my $bin = $val == 90  ? 90  :
             $val >  87  ? 90  :
@@ -32670,6 +32810,8 @@ sub sunalt2bin {
             $val >= 5   ? 5   :
             $val >  2   ? 5   :
             0;
+            
+  MCache_set (\%Multi_Cache, $stats, $key, $bin);                                       # Cache speichern
 
 return $bin;
 }
@@ -34050,6 +34192,7 @@ sub LRU_debug {
   my $longtitle = $cache->{longtitle};
   my $hits      = $cache->{stats}{hits};
   my $misses    = $cache->{stats}{misses};
+  my $evicts    = $cache->{stats}{evicts};
 
   my $rate = ($hits + $misses) > 0
              ? sprintf("%.2f", ($hits / ($hits + $misses)) * 100)
@@ -34057,7 +34200,7 @@ sub LRU_debug {
 
   my $msg = "$longtitle Dump:\n";
   $msg   .= "Size=$size / max=$max\n";
-  $msg   .= "Hits=$hits, Misses=$misses, Evicts=$cache->{stats}{evicts}, HitRate=$rate %\n";
+  $msg   .= "Hits=$hits, Misses=$misses, Evicts=$evicts, HitRate=$rate %\n";
   $msg   .= "HEAD=".($head // 'undef')."\n";
   $msg   .= "TAIL=".($tail // 'undef')."\n";
   $msg   .= "Entries (most recent first):\n";
@@ -34101,32 +34244,91 @@ return;
 
 # --- Mini-Cache Wert schreiben
 sub MCache_set {
-  my ($cache, $key, $value) = @_;
+  my ($cache, $stats, $key, $value) = @_;
   $cache->{$key} = $value;
   
+  if (keys %$cache > MINICACHEMS) {                     # auf X Einträge begrenzen
+      delete $cache->{(keys %$cache)[0]};               # FIFO, reicht völlig
+      $stats->{evicts}++;
+ }
+
 return;
 }
 
-# --- Mini-Cache dumpen
-sub MCache_dump {
+# --- Mini-Cache Internal updaten     
+sub MC_update_internals {
+  my ($name) = @_;
+  
   my $msg = '';
 
   for my $chn (sort keys %MCache_Stats) {
-      my $stats = $MCache_Stats{$chn};
-      my $size  = $stats->{cache} ? scalar keys %{ $stats->{cache} } : 0;
+      my $stats  = $MCache_Stats{$chn};
+      my $cache  = $stats->{cache} // {};
+      my $size   = scalar keys %{$cache};
       
       my $hits   = $stats->{hits};
       my $misses = $stats->{misses};
+      my $evicts = $stats->{evicts};
+      my $max    = MINICACHEMS;
 
       my $rate = ($hits + $misses) > 0
                  ? ($hits / ($hits + $misses)) * 100
                  : 100;
 
       $msg .= "\n" if $msg;
-      $msg .= sprintf ( "%-20s Entries=%-5d Misses=%-5d HitRate=%-6.2f Hits=%d", $chn.':', $size, $misses, $rate, $hits );
+      $msg .= sprintf ( "Hits=%-6d  Misses=%-6d  Evicts=%-6d  Entries=%4d/%-4d  HitRate=%-6.2f", $hits, $misses, $evicts, $size, $max, $rate );
   }
+  
+  $defs{$name}->{MULTI_CACHE} = $msg;
 
-return $msg;
+return;
+}
+
+# --- Mini Cache debuggen
+sub MC_debug {
+  my ($name) = @_;
+  
+  for my $chn (sort keys %MCache_Stats) {
+      my $stats  = $MCache_Stats{$chn};
+      my $cache  = $stats->{cache} // {};
+      my $size   = scalar keys %{$cache};
+      
+      my $hits   = $stats->{hits};
+      my $misses = $stats->{misses};
+      my $evicts = $stats->{evicts};
+      my $max    = MINICACHEMS;
+
+      my $rate = ($hits + $misses) > 0
+                 ? sprintf ("%.2f", ($hits / ($hits + $misses)) * 100)
+                 : 100;
+
+      my $msg = "Dump Mini Cache '$chn':\n";
+      $msg   .= "Size=$size / max=$max\n";
+      $msg   .= "Hits=$hits, Misses=$misses, Evicts=$evicts, HitRate=$rate %\n";
+      $msg   .= "Entries (sorted by key):\n";
+      
+      my $ent = '';
+      
+      for my $key (sort keys %{$cache}) {
+          my $raw = $cache->{$key};
+
+          my $val = !defined $raw
+                    ? '<undef>'
+                    : ref $raw eq 'ARRAY'
+                    ? join (',', @$raw)
+                    : ref $raw eq 'HASH'
+                    ? join (',', map { "$_=$raw->{$_}" } sort keys %$raw)
+                    : $raw; 
+
+          $ent .= "  $key => $val\n";        
+      }
+      
+      $msg .= $ent ? $ent : 'no Entries';
+      
+      Log3 ($name, 1, "$name DEBUG> $msg");
+  }
+  
+return;
 }
 
 #####################################################################################################################
@@ -35949,6 +36151,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>dwdComm</b>              </td><td>Communication with the website or server of the German Weather Service (DWD)     </td></tr>
             <tr><td> <b>epiecesCalc</b>          </td><td>Calculation of specific energy consumption per operating hour and consumer       </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Module graphic information                                                       </td></tr>
+            <tr><td> <b>miniCache</b>            </td><td>Display the contents of the mini-cache                                           </td></tr>
             <tr><td> <b>notifyHandling</b>       </td><td>Sequence of event processing in the module                                       </td></tr>
             <tr><td> <b>pvCorrectionRead</b>     </td><td>Application of PV correction factors                                             </td></tr>
             <tr><td> <b>pvCorrectionWrite</b>    </td><td>Calculation of PV correction factors                                             </td></tr>
@@ -39017,6 +39220,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>dwdComm</b>              </td><td>Kommunikation mit Webseite oder Server des Deutschen Wetterdienst (DWD)          </td></tr>
             <tr><td> <b>epiecesCalc</b>          </td><td>Berechnung des spezifischen Energieverbrauchs je Betriebsstunde und Verbraucher  </td></tr>
             <tr><td> <b>graphic</b>              </td><td>Informationen der Modulgrafik                                                    </td></tr>
+            <tr><td> <b>miniCache</b>            </td><td>Inhalt des Mini-Cache ausgeben                                                   </td></tr>
             <tr><td> <b>notifyHandling</b>       </td><td>Ablauf der Eventverarbeitung im Modul                                            </td></tr>
             <tr><td> <b>pvCorrectionRead</b>     </td><td>Anwendung PV Korrekturfaktoren                                                   </td></tr>
             <tr><td> <b>pvCorrectionWrite</b>    </td><td>Berechnung PV Korrekturfaktoren                                                  </td></tr>
