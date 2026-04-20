@@ -192,6 +192,8 @@
 # 6.05.11   fix: ID of Shelly Pro 1 UL
 # 6.05.12   fix: timer handling of Shelly4Pro (w/old fw)
 # 6.05.13   add: ecoflow Pro3EM
+# 6.05.14   fix: get model for ShellyPro3EM
+#           add some code to catch an auth-error
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -214,7 +216,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.13 17.04.2026";
+my $version = "6.05.14 20.04.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -1276,7 +1278,7 @@ sub Shelly_getModel {
          Log3 $name,1,"[Shelly_getModel] $call: the mode/profile of device $name is set to \'$mode\' ";
          $attr{$hash->{NAME}}{mode} = $mode;
          Log3 $name,1,"[Shelly_getModel] device $name is working in profile \'$mode\'";
-         readingsSingleUpdate($hash,"model_profile",$mode,1)  if( substr($model_id,2,2) eq "EM" );   # reading is deprecated
+         readingsSingleUpdate($hash,"model_profile",$mode,1)  if( $model_id =~ /EM-/ ); # reading is deprecated
      }else{
          Log3 $name,1,"[Shelly_getModel] found mode \'$mode\' for device $name, but we don't have a multimode-definition";
      }
@@ -7585,7 +7587,10 @@ sub Shelly_error_handling {
     }elsif( $err =~ /wrong (value|pct)/ ){
         $errE = $err;
         $errS = "Error";
-    }elsif( $err =~ /wrong/ || $err =~ /401/ ){ #401 Unauthorized
+    }elsif( $err =~ /wrong/ ){
+        $errE = $err;
+        $errS = "Error: something wrong";
+    }elsif( $err =~ /401/ ){ #401 Unauthorized
         $errE = $err;
         $errS = "Error: Authentication";
     }elsif( $err =~ /404/ ){ #404 No Handler / wrong command
@@ -7622,10 +7627,10 @@ sub Shelly_error_handling {
     if( $flag==0 ){
        readingsEndUpdate($hash,1);
     }
-    if( $errN ){
+    if( $errN || $errE=~/401/ ){ # see forum user "bombardi"
         #******* RESTARTING TIMERS ***********
         # we need this after 'readingsEndUpdate'
-        Log3 $name,4,"($func) calling Shelly_Set for restarting timer(s) caused by network-error of device $name";
+        Log3 $name,4,"($func) calling Shelly_Set for restarting timer(s) caused by network or auth error of device $name";
         Shelly_Set($hash,$name,"startTimer");
         #*************************************
     }
