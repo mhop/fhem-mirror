@@ -194,6 +194,7 @@
 # 6.05.13   add: ecoflow Pro3EM
 # 6.05.14   fix: get model for ShellyPro3EM
 #           add some code to catch an auth-error
+# 6.05.15   add: reading 'button_mode' for plug devices
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -216,7 +217,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.14 20.04.2026";
+my $version = "6.05.15 21.04.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -2383,10 +2384,10 @@ sub Shelly_Get ($@) {
           fhem("attr $rgName commands {}");
       #~~~~ ***Status***
       }elsif( $rgName eq "rgShellyStatus" ){
-            fhem("defmod $rgName readingsGroup <Name>,<Definition>,<mode>,<Interv>,<interv>,<State>,<Relay>,<Volt>,<intTemp>,<intTempStatus>,<InputMode>
-                            .*:FILTER=TYPE=Shelly:+DEF,?mode,?interval,+INTERVAL,state,relay,voltage,inttemp,inttempStatus,input_mode"  );
+            fhem("defmod $rgName readingsGroup <Name>,<Definition>,<mode>,<Interv>,<interv>,<State>,<Relay>,<Volt>,<intTemp>,<intTempStatus>,<InputButton-Mode>
+            .*:FILTER=TYPE=Shelly:+DEF,?mode,?interval,+INTERVAL,state,relay,voltage,inttemp,inttempStatus,button_mode,input_mode"  );
           fhem("attr $rgName sortColumn 0");
-          fhem("attr $rgName valueColumn { DEF=>1, mode=>2, interval=>3, INTERVAL=>4, state=>5, relay=>6, voltage=>7,inttemp=>8, inttempStatus=>9, input_mode=>10 }");
+          fhem("attr $rgName valueColumn { DEF=>1, mode=>2, interval=>3, INTERVAL=>4, state=>5, relay=>6, voltage=>7,inttemp=>8, inttempStatus=>9, button_mode=>10, input_mode=>10 }");
       }
       fhem("attr $rgName room $rgRoom");   #
       $msg = "see readingsGroup device \'$rgName\' in room \'$rgRoom\'";
@@ -5389,7 +5390,7 @@ sub Shelly_settings2G {
         }
 
         ### Inputs: settings regarding the input
-        if( AttrVal($name,"showinputs","show") eq "show" && $shelly_models{$model}[5]>0 ){
+        if( AttrVal($name,"showinputs","show") eq "show" && $shelly_models{$model}[5]>0 ){  
           my $profile = $jhash->{sys}{device}{profile};  # switch, cover
 
           if( !$profile ){
@@ -5483,6 +5484,20 @@ sub Shelly_settings2G {
             }
           }
         }
+        
+        ### Buttons: settings regarding the button of plug-devices, number of buttons given as negative value
+        my $nButtons = -$shelly_models{$model}[5];
+        if( $nButtons > 0 ){
+            my ($button_mode,$subs);
+            Log3 $name,4,"[Shelly_settings2G:button] $name has $nButtons button(s)";
+            for ( my $b=0; $b<$nButtons; $b++ ){
+                $button_mode=$jhash->{plugs_ui}{controls}{"switch:$b"}{in_mode};
+                $subs = $nButtons>1 ? "_$b" : "";
+                Log3 $name,4,"[Shelly_settings2G:button] $name button_$b is of mode $button_mode";
+                readingsBulkUpdateMonitored($hash,"button$subs\_mode",$button_mode) if( $button_mode ); 
+            }
+        }
+        
 
         # looking for roller maxtime and slat-control values
         if( $shelly_models{$model}[1]>0 && AttrVal($name,"mode","-") eq "roller" ){  # $chnls
@@ -6875,7 +6890,8 @@ sub Shelly_webhook_create {
        }elsif( $component eq "input" && AttrVal($name,"showinputs","show") eq "show" && $mode ne "roller" ){
           # ShellyPlus2PM in roller mode does not support Actions for both inputs, even with detached inputs.
           # We don't care, because we can use actions on 'opening' and 'closing'
-          $compCount   = abs($shelly_models{$model}[5]);  # number of inputs on ShellyPlug is -1, because it's a button, not an wired input
+          $compCount   = $shelly_models{$model}[5];  # Gen2+ buttons cannot trigger any actions
+          $compCount   = 0  if( $compCount < 0 );    # number of inputs on ShellyPlug is -1, because it's a button, not an wired input
        }elsif( $component eq "emeter" && $model =~ /shellypro3em|shellyproem50/ ){
           $compCount   = 1;
        }elsif( $component eq "pm1" && $model eq "shellypmmini" ){
