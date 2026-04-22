@@ -14019,15 +14019,15 @@ return $parsed;
 ################################################################
 sub __batDeficitShareFactor {
   my $name = shift;
-  my $bn   = shift;                                                                           # Batterienummer
+  my $bn   = shift;                                                                             # Batterienummer
 
-  my $csocwh          = BatteryVal ($name, $bn, 'bchargewh', 0);                              # aktuelle Ladung in Wh
-  my $binstcap        = BatteryVal ($name, $bn, 'binstcap',  0);                              # installierte Batteriekapazität Wh
+  my $csocwh          = BatteryVal ($name, $bn, 'bchargewh', 0);                                # aktuelle Ladung in Wh
+  my $binstcap        = BatteryVal ($name, $bn, 'binstcap',  0);                                # installierte Batteriekapazität Wh
   my $bdeficit        = $binstcap - $csocwh;
-  my $batwhdeficitsum = CurrentVal ($name, 'batwhdeficitsum', $binstcap);                     # Summe Ladungsdefizit
+  my $batwhdeficitsum = CurrentVal ($name, 'batwhdeficitsum', $binstcap);                       # Summe Ladungsdefizit
 
   my $sf = 0;
-  $sf    = $bdeficit / $batwhdeficitsum if($batwhdeficitsum);                                 # Anteilsfaktor Defizit Batt XX an Gesamtdefizit
+  $sf    = $bdeficit / $batwhdeficitsum if($batwhdeficitsum);                                   # Anteilsfaktor Defizit Batt XX an Gesamtdefizit
 
 return round2 ($sf);
 }
@@ -14037,14 +14037,14 @@ return round2 ($sf);
 ################################################################
 sub __batLoadShareFactor {
   my $name = shift;
-  my $bn   = shift;                                                                           # Batterienummer
+  my $bn   = shift;                                                                             # Batterienummer
 
-  my $csocwh          = BatteryVal ($name, $bn, 'bchargewh',  0);                             # aktuelle Ladung in Wh
-  my $batcapsum       = CurrentVal ($name, 'batcapsum',       1);                             # Summe installierte Batterie Kapazität
-  my $batwhdeficitsum = CurrentVal ($name, 'batwhdeficitsum', 0);                             # Summe Ladungsdefizit
+  my $csocwh          = BatteryVal ($name, $bn, 'bchargewh',  0);                               # aktuelle Ladung in Wh
+  my $batcapsum       = CurrentVal ($name, 'batcapsum',       1);                               # Summe installierte Batterie Kapazität
+  my $batwhdeficitsum = CurrentVal ($name, 'batwhdeficitsum', 0);                               # Summe Ladungsdefizit
   my $loadsum         = max (1, $batcapsum - $batwhdeficitsum);
 
-  my $sf = $csocwh / $loadsum;                                                                # Anteilsfaktor Ladung Batt XX an Gesamtladung
+  my $sf = $csocwh / $loadsum;                                                                  # Anteilsfaktor Ladung Batt XX an Gesamtladung
 
 return round2 ($sf);
 }
@@ -14054,12 +14054,12 @@ return round2 ($sf);
 ################################################################
 sub __batCapShareFactor {
   my $name = shift;
-  my $bn   = shift;                                                          # Batterienummer
+  my $bn   = shift;                                                                             # Batterienummer
 
-  my $binstcap  = BatteryVal ($name, $bn, 'binstcap', 1);                    # Kapazität der Batterie XX
-  my $batcapsum = CurrentVal ($name, 'batcapsum', $binstcap);                # Summe installierte Batterie Kapazität
+  my $binstcap  = BatteryVal ($name, $bn, 'binstcap', 1);                                       # Kapazität der Batterie XX
+  my $batcapsum = CurrentVal ($name, 'batcapsum', $binstcap);                                   # Summe installierte Batterie Kapazität
 
-  my $sf = (100 * $binstcap / $batcapsum) / 100;                             # Anteilsfaktor der Batt XX Kapazität an Gesamtkapazität
+  my $sf = $binstcap / $batcapsum;                                                              # Anteilsfaktor der Batt XX Kapazität an Gesamtkapazität
 
 return round2 ($sf);
 }
@@ -14255,9 +14255,9 @@ sub _batChargeMgmt {
           my $lcintime = 1;
 
           my ($date)    = (split " ", $nhstt)[0];
-          my $sttts     = timestringToTimestamp ($nhstt);
-          my $lcstartts = timestringToTimestamp ("$date ${lcstart}:00");
-          my $lcendts   = timestringToTimestamp ("$date ${lcend}:59");
+          my $sttts     = timestringToTimestamp ($hash, $nhstt);
+          my $lcstartts = timestringToTimestamp ($hash, "$date ${lcstart}:00");
+          my $lcendts   = timestringToTimestamp ($hash, "$date ${lcend}:59");
           $lcintime     = $sttts >= $lcstartts && $sttts <= $lcendts ? 1 : 0;                    # 1 wenn innerhalb Time Slot -> Lademanagement freigegeben, sonst Batterie Ladung immer freigeben
 
           my $crel  = 0;                                                                         # Ladefreigabe 0 Ausgangswert
