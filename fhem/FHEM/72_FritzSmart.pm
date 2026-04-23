@@ -87,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.04.10";
+our $ModulVersion = "26.04.23";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -308,9 +308,21 @@ our %TR064   = (
                                         control => "x_myfritz",
                                         action  => "GetInfo",
                                         igd     => 0},
+        OnTelGetInfo               => { service => "X_AVM-DE_OnTel:1",
+                                        control => "x_contact",
+                                        action  => "GetInfo",
+                                        igd     => 0},
         OnTelGetDECTHandsetList    => { service => "X_AVM-DE_OnTel:1",
                                         control => "x_contact",
                                         action  => "GetDECTHandsetList",
+                                        igd     => 0},
+        OnTelGetGetDeflections     => { service => "X_AVM-DE_OnTel:1",
+                                        control => "x_contact",
+                                        action  => "GetDeflections",
+                                        igd     => 0},
+        OnTelGetGetNumDeflections  => { service => "X_AVM-DE_OnTel:1",
+                                        control => "x_contact",
+                                        action  => "GetNumberOfDeflections",
                                         igd     => 0},
         OnTelGetPhonebook          => { service => "X_AVM-DE_OnTel:1",
                                         control => "x_contact",
@@ -1009,7 +1021,7 @@ sub Fritz_Initialize_Modul($)
                 ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
 
                 ."enableAlarmInfo:0,1 "
-                ."enableCallRedi:0,1 "
+                ."enableCallHandling:0,1 "
                 ."enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 "
                 ."enableDocsisInfo:0,1 " 
                 ."enablePhoneBookInfo:0,1 "
@@ -1335,14 +1347,14 @@ sub Fritz_Define_Modul($$)
    if (defined $args[2] && $args[2] !~ m=$URL_MATCH=i) {
      my $phost = inet_aton($args[2]);
      if (! defined($phost)) {
-       Fritz_Log $hash, 2, "phost -> not defined";
+       Fritz_Log $hash, 2, "DNS name $args[2] could not be resolved";
        return "Fritz-define: DNS name $args[2] could not be resolved";
      }
 
      my $host = inet_ntoa($phost);
 
      if (! defined($host)) {
-       Fritz_Log $hash, 2, "host -> $host";
+       Fritz_Log $hash, 2, "DNS name could not be resolved";
        return "Fritz-define: DNS name could not be resolved";
      }
      $hash->{HOST} = $host;
@@ -1421,7 +1433,7 @@ sub Fritz_Define_Modul($$)
    }
 
    # Check APIs after fhem.cfg is processed
-   $hash->{CKECKAPI_MAX_TMOUT}  = 150;
+   $hash->{CKECKAPI_MAX_TMOUT}  = 200;
    $hash->{CKECKAPI_TMOUT}      = $hash->{CKECKAPI_MAX_TMOUT};
    $hash->{APICHECKED}          = 0;  # full check
    $hash->{WEBCONNECT}          = 0;
@@ -1610,8 +1622,10 @@ sub Fritz_Attr_Modul($@)
    if ($aName eq "userTickets") {
      if ($cmd eq "set") {
        return "the amount of userTicket is 1 to 12. If zero no Tickets will be displayed (Only for Fritz!Box)" if (($aVal < 0 || $aVal > 12) || (defined($avmModel) && $avmModel !~ /Box/));
+       $hash->{LuaQueryCmd}{userTicket}{AttrVal} = 1;
      }
      if ($cmd eq "del" || $aVal == 0) {
+       $hash->{LuaQueryCmd}{userTicket}{AttrVal} = 0;
        foreach (keys %{ $hash->{READINGS} }) {
          main::readingsDelete($hash, $_) if $_ =~ /^userTicket.*?/ && defined $hash->{READINGS}{$_}{VAL};
        }
@@ -1764,6 +1778,19 @@ sub Fritz_Attr_Modul($@)
      } 
    }
 
+   if ($aName eq "enableAlarmInfo") {
+     if ($cmd eq "set") {
+       return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
+       $hash->{LuaQueryCmd}{alarmClock}{AttrVal} = $aVal;
+     }
+     if ($cmd eq "del" || $aVal == 0) {
+       $hash->{LuaQueryCmd}{alarmClock}{AttrVal} = 0;
+       foreach (keys %{ $hash->{READINGS} }) {
+         main::readingsDelete($hash, $_) if $_ =~ /^alarm(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
+       }
+     }
+   }
+
    if ($aName eq "enableCPUInfo") {
      if ($cmd eq "set") {
        return "$aName: $aVal. Valid is -1,0,1,2,...,24" if $aVal !~ /^-?[1]$|^[0-9]$|^[1][0-9]$|^[2][0-4]$/gm;
@@ -1836,6 +1863,17 @@ sub Fritz_Attr_Modul($@)
      }
    }
 
+   if ($aName eq "enableCallHandling") {
+     if ($cmd eq "set") {
+       return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
+     }
+     if ($cmd eq "del" || $aVal == 0) {
+       foreach (keys %{ $hash->{READINGS} }) {
+         main::readingsDelete($hash, $_) if $_ =~ /^callHandling(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
+       }
+     }
+   }
+
    if ($aName eq "enableSIP") {
      if ($cmd eq "set") {
        return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
@@ -1859,30 +1897,6 @@ sub Fritz_Attr_Modul($@)
        $hash->{LuaQueryCmd}{userProfilNew}{AttrVal} = 0;
        foreach (keys %{ $hash->{READINGS} }) {
          main::readingsDelete($hash, $_) if $_ =~ /^user(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
-       }
-     }
-   }
-
-   if ($aName eq "enableAlarmInfo") {
-     if ($cmd eq "set") {
-       return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
-       $hash->{LuaQueryCmd}{alarmClock}{AttrVal} = $aVal;
-     }
-     if ($cmd eq "del" || $aVal == 0) {
-       $hash->{LuaQueryCmd}{alarmClock}{AttrVal} = 0;
-       foreach (keys %{ $hash->{READINGS} }) {
-         main::readingsDelete($hash, $_) if $_ =~ /^alarm(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
-       }
-     }
-   }
-
-   if ($aName eq "enableCallRedi") {
-     if ($cmd eq "set") {
-       return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
-     }
-     if ($cmd eq "del" || $aVal == 0) {
-       foreach (keys %{ $hash->{READINGS} }) {
-         main::readingsDelete($hash, $_) if $_ =~ /^callRedi(\d+).*/ && defined $hash->{READINGS}{$_}{VAL};
        }
      }
    }
@@ -2492,71 +2506,87 @@ sub Fritz_Set_Modul($$@)
 
    # available, if password is set correctly
    if ($hash->{WEBCONNECT}) {
-     # set abhängig von TR064
-     $list    .= " reboot"
-              if $hash->{TR064} == 1 && $hash->{SECPORT};
-
-     $list    .= " call"
-              .  " diversity"
-              .  " dectRing"
-              .  " ring"
-              .  " tam"
-              if $hash->{TR064} == 1 && $hash->{SECPORT} && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $mesh eq "master";
-
-     # set abhängig von TR064 und luaCall
-     $list    .= " wlan:on,off"
-              .  " guestWlan:on,off"
-              if $hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1;
 
      my $wlanNames = "(" . $hash->{fhem}{multiple_wlan}{names} . ")";
      $wlanNames =~ s/ /\|/;
 
-     if($hash->{TR064} == 1 && $hash->{SECPORT} && $hash->{LUAQUERY} == 1) {
-       my @wNames = split(" ", $hash->{fhem}{multiple_wlan}{names});
-       for( my $i = 0; $i < @wNames; $i++) {
-         $list    .=  " " .$wNames[$i]. ":on,off";
+     # set abhängig von TR064
+
+     if ($hash->{TR064} == 1 && $hash->{SECPORT}) {
+       $list    .= " reboot";
+
+       if (defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box")) {
+ 
+         $list .= " call"
+               .  " dectRing"
+               .  " ring"
+               .  " tam";
+
+         $list .= " callHandling";
+
+         $list .= " phoneBookEntry";
+
+         if ($hash->{LUADATA} == 1 && $mesh eq "master") {
+           $list .= " macFilter:on,off";
+           $list .= " enableVPNshare" if ($hash->{fhem}{fwVersion} >= 721);
+         }
        }
-     }
 
-     # set abhängig von TR064 und data.lua
-     $list    .= " macFilter:on,off"
-              if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT}  && $mesh eq "master";
+       # set abhängig von TR064 und luaCall
+       if($hash->{LUAQUERY} == 1) {
 
-     $list    .= " enableVPNshare"
-              if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT}  && $mesh eq "master" && ($hash->{fhem}{fwVersion} >= 721);
+         $list .= " wlan:on,off"
+               .  " guestWlan:on,off";
+ 
+         # my $wlanNames = "(" . $hash->{fhem}{multiple_wlan}{names} . ")";
+         #    $wlanNames =~ s/ /\|/;
 
-     $list    .= " phoneBookEntry"
-              if defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT};
-
+         my @wNames = split(" ", $hash->{fhem}{multiple_wlan}{names});
+         for( my $i = 0; $i < @wNames; $i++) {
+           $list .=  " " .$wNames[$i]. ":on,off";
+         }
+       }
+     } # end set abhängig von TR064
 
      # set abhängig von data.lua
-     $list    .= " switchIPv4DNS:provider,other"
-              .  " dect:on,off"
-              .  " lockLandevice"
-              .  " chgProfile"
-              .  " lockFilterProfile"
-              if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $mesh eq "master";
+     if ($hash->{LUADATA} == 1) {
 
-     $list    .= " wakeUpCall"
-              .  " dectRingblock"
-              .  " blockIncomingPhoneCall"
-              .  " smartHome"
-              if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721);
+       if (defined ($hash->{MODEL})) {
+         if ( $hash->{MODEL} =~ "Box" ) {
 
-     $list    .= " smartHome"
-              if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box|Smart") && ($hash->{fhem}{fwVersion} >= 721);
+           $list .= " switchIPv4DNS:provider,other"
+                 .  " dect:on,off"
+                 .  " lockLandevice"
+                 .  " chgProfile"
+                 .  " lockFilterProfile"
+                    if ($mesh eq "master");
 
-     $list    .= " ledSetting"
-              if ($hash->{LUADATA} == 1) && ($hash->{fhem}{fwVersion} >= 721);
+           $list .= " wakeUpCall"
+                 .  " dectRingblock"
+                 .  " blockIncomingPhoneCall"
+                 .  " smartHome"
+                    if ($hash->{fhem}{fwVersion} >= 721);
 
-     $list    .= " energyMode:default,eco"
-              if ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 750);
+           $list .= " energyMode:default,eco" if ($hash->{fhem}{fwVersion} >= 750);
+         }
+      
+         if ( $hash->{MODEL} =~ "Box|Smart" ) {
+           $list .= " smartHome" if ($hash->{fhem}{fwVersion} >= 721);
+         }
 
-     $list    .= " rescanWLANneighbors:noArg"
-              .  " wlanLogExtended:on,off"
-              .  " wlanGuestParams"
-              if ($hash->{LUADATA} == 1);
+       }
+      
+       $list .= " ledSetting" if ($hash->{fhem}{fwVersion} >= 721);
 
+       $list .= " rescanWLANneighbors:noArg"
+             .  " wlanLogExtended:on,off"
+             .  " wlanGuestParams";
+
+     } # end set abhängig von data.lua
+
+     # Auswertung der set-Befehle
+
+     # set <name> smarthome
      if ( lc $cmd eq 'smarthome') {
 
        if (int @val < 1 || int @val > 2) {
@@ -2637,6 +2667,8 @@ sub Fritz_Set_Modul($$@)
        my $preDefResA   = "no";
        my $preDefResG   = "no";
        my $paraError     = 1;
+
+       # /winOpTrig/ && $actionVal =~ /^low$|^med$|^high$/ ) evtl noch implementieren
 
        if (int @val == 2) {
 
@@ -2741,7 +2773,13 @@ sub Fritz_Set_Modul($$@)
              $preDefWeb    = $3 if $3;
              $preDefDevice = $1;
            }
+
          } elsif($smartCat =~ /THERMOSTAT/) {
+
+#           if ( $action =~ /winOpTrig/ && $actionVal =~ /^low$|^med$|^high$/ ) {
+#            $preDefName = "Offset";
+#             $newValue   = $1;
+
            if ( $action =~ /tempOffset/ && $actionVal =~ /^(-?\d+(\.\d+)?)$/ ) {
              $preDefName = "Offset";
              $newValue   = $1;
@@ -2791,6 +2829,7 @@ sub Fritz_Set_Modul($$@)
              }
              return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
            }
+
          } elsif ($smartCat =~ /CONTROL|SOCKET/) {
            if ( $action =~ /switch/     && $actionVal =~ /^([01])$/ ) {
              $preDefName = "Switch";
@@ -2827,12 +2866,15 @@ sub Fritz_Set_Modul($$@)
 
        my $returnData;
 
+       # FritzWeb Smart Home laden/speichern/löschen Templates(preDef)
        if ($action =~ /preDefSave|preDefDel|preDefLoad/ ) {
 
          return Fritz_Helper_SmartHome_PreDef($hash, $action, $val[0], $preDefDevice, $preDefName, $preDefWeb);
 
+       } # end FritzWeb Smart Home laden/speichern/löschen Templates(preDef)
+
        # FritzWeb Smart Home/Bedienung => page sh_control
-       } elsif ($action =~ /tmpAdjust|tmpPerm|switch/ ) {
+       if ($action =~ /tmpAdjust|tmpPerm|switch/ ) {
 
          $returnData = Fritz_Get_SmartHome_Devices_List($hash, $val[0]);
 
@@ -2897,8 +2939,10 @@ sub Fritz_Set_Modul($$@)
          $retMsg = "ERROR: Unexpected result: " . Fritz_Helper_Dumper($hash, $result);
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
 
+       } # end FritzWeb Smart Home/Bedienung => page sh_control
+
        # FritzWeb Smart Home/Geräte und Gruppen => page home_auto_hkr_edit oder CONTROL: page home_auto_edit_view
-       } elsif ( $action =~ /tempOffset|minTemp|maxTemp|mimaRange/ ) {
+       if ( $action =~ /tempOffset|minTemp|maxTemp|mimaRange/ ) {
 
          $returnData = Fritz_Get_SmartHome_Devices_List($hash, $val[0]);
 
@@ -2923,6 +2967,8 @@ sub Fritz_Set_Modul($$@)
 
            delete $returnData->{$preDefName} if $action =~ /mimaRange/ && $newValue == 0;
 
+           $returnData->{WindowOpenTrigger} += 3; # Warum auch immer das so ist
+
            $returnData->{Absenktemp} = $newValue if $action =~ /minTemp/ && $newValue > $returnData->{Absenktemp};
            $returnData->{Heiztemp}   = $newValue if $action =~ /maxTemp/ && $newValue < $returnData->{Heiztemp};
          }
@@ -2932,10 +2978,16 @@ sub Fritz_Set_Modul($$@)
          push @webCmdArray, "xhr"            => "1";
          push @webCmdArray, "view"           => "";
          push @webCmdArray, "apply"          => "";
-         push @webCmdArray, "lang"           => "de";
-         push @webCmdArray, "page"           => "home_auto_hkr_edit";
+         #push @webCmdArray, "lang"           => "de";
+         #push @webCmdArray, "page"           => "home_auto_hkr_edit";
 
          Fritz_Log $hash, 4, "set $name $cmd \n" . join(" ", @webCmdArray);
+
+         my $arText = join("|", @webCmdArray);
+         my $count  = 0;
+            $arText =~ s/(\|)/ (++$count % 2 == 0) ? "\n" : $1 /ge;
+            $arText =~ s/(\|)/ /g;
+         # return $arText;
 
          my $result = Fritz_call_LuaData($hash, "data", \@webCmdArray);
          
@@ -3214,11 +3266,14 @@ sub Fritz_Set_Modul($$@)
 
      } # end dectringblock
 
-     elsif ( lc $cmd eq 'diversity' && $mesh eq "master") {
+     elsif ( lc $cmd eq 'callhandling' && $mesh eq "master") {
        if ( int @val == 2 && $val[1] =~ /^(on|off)$/ ) {
 
-         unless (defined $hash->{READINGS}{"diversity" .$val[0]} || defined $hash->{READINGS}{"callRedi" .$val[0]}) {
-           return Fritz_Helper_retMsg($hash, "ERROR: no call redirection " .$val[0]. " available.", $retMsgbySet);
+         unless ( main::AttrVal($name, "enableCallHandling", 0 )) {
+           return Fritz_Helper_retMsg($hash, "ERROR: Attribut enableCallHandling not set.", $retMsgbySet);
+         }
+         unless (defined $hash->{READINGS}{"callHandling" .$val[0]. "_active"}) {
+           return Fritz_Helper_retMsg($hash, "ERROR: no callHandling " .$val[0]. " available.", $retMsgbySet);
          }
 
          my $state = $val[1];
@@ -3226,19 +3281,18 @@ sub Fritz_Set_Modul($$@)
          $state =~ s/off/0/;
 
          if ( $hash->{TR064} == 1 ) { #tr064
-           my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetDeflectionEnable", "NewDeflectionId", $val[0], "NewEnable", $state] );
+           my @tr064CmdArray = (["X_AVM-DE_OnTel:1", "x_contact", "SetDeflectionEnable", "NewDeflectionId", $val[0]-1, "NewEnable", $state] );
            my $tr064Result = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
            if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
-             Fritz_Log $hash, 2, "'set ... diversity ': ". Dumper($tr064Result->{Error});
+             Fritz_Log $hash, 2, "'set ... callHandling ': ". Dumper($tr064Result->{Error});
              $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
              return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
            }
 
            if (defined($tr064Result->{"X_AVM-DE_OnTel:1"}->{SetDeflectionEnable}->{Status_line})) {
              if($tr064Result->{"X_AVM-DE_OnTel:1"}->{SetDeflectionEnable}->{Status_line} eq "200 OK") {
-               main::readingsSingleUpdate($hash, "diversity" .$val[0]. "_state", $val[1], 1) if defined $hash->{READINGS}{"diversity" .$val[0]};
-               main::readingsSingleUpdate($hash, "callRedi" .$val[0]. "_state", $val[1], 1) if defined $hash->{READINGS}{"callRedi" .$val[0]};
+               main::readingsSingleUpdate($hash, "callHandling" .$val[0]. "_active", $val[1], 1) if defined $hash->{READINGS}{"callHandling" .$val[0]. "_active"};
              } else {
                $retMsg = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error});
                return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
@@ -3246,13 +3300,13 @@ sub Fritz_Set_Modul($$@)
            }
          }
          else {
-           $retMsg = "ERROR: 'set ... diversity' is not supported by the limited interfaces of your Fritz!Box firmware.";
+           $retMsg = "ERROR: 'set ... redirection' is not supported by the limited interfaces of your Fritz!Box firmware.";
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
          return undef;
        }
-     } # end diversity
+     } # end redirection
 
      elsif ( lc $cmd eq 'energymode') {
        if ( $hash->{TR064} != 1 || ($hash->{fhem}{fwVersion} < 750) ) { #tr064
@@ -4509,9 +4563,13 @@ sub Fritz_Get_Modul($@)
 
        my $tmp = Fritz_Helper_analyse_Lua_Result($hash, $result);
 
-       Fritz_Log $hash, 4, "result luaFunction: \n" . $tmp;
-
-       my $outhash = XMLin($tmp, StrictMode => 0, KeyAttr => []);
+       my $outhash;
+       eval {
+         $outhash = XMLin($tmp, StrictMode => 0, KeyAttr => []);
+       };
+       if ($@) {
+         return "ERROR: SmartHome - getting XML data: $val[0]";
+       }
 
        return $returnStr . Fritz_Helper_encode_json($outhash);
 
@@ -4637,18 +4695,24 @@ sub Fritz_Get_Modul($@)
          return "FritzOS version must be greater than 7.20.";
        }
 
+       my $para1 = '^hash$|^table$';
+       my $para2 = '^all$|^sys$|^wlan$|^usb$|^net$|^fon$';
+       my $paraH2 = 'all|sys|wlan|usb|net|fon';
+       my $msg1 = "parmeter is wrong, usage ";
+       my $msg2   ="number of arguments is wrong, usage: get fritzLog &lt;" . $name. "&gt; ";
        if (int @val == 2) {
-         return "1st parmeter is wrong, usage hash or table for first parameter" if $val[0] !~ /hash|table/;
-         return "2nd parmeter is wrong, usage &lt;all|sys|wlan|usb|net|fon&gt" if $val[1] !~ /all|sys|wlan|usb|net|fon/;
-       } elsif(int @val == 3 && $val[0] eq "hash") {
-         return "1st parmeter is wrong, usage hash or table for first parameter" if $val[0] !~ /hash|table/;
-         return "2nd parmeter is wrong, usage &lt;all|sys|wlan|usb|net|fon&gt" if $val[1] !~ /all|sys|wlan|usb|net|fon/;
-         return "3nd parmeter is wrong, usage on or off" if $val[2] !~ /on|off/;
+         return "1st " . $msg1 . " &lt;hash|table&gt; for first parameter" if $val[0] !~ /$para1/;
+         return "2nd " . $msg1 . " &lt;$paraH2&gt" if $val[1] !~ /$para2/;
+       } elsif(int @val == 3) {
+         return "1st " . $msg1 . " &lt;hash&gt; for first parameter" if $val[0] ne "hash";
+         return "2nd " . $msg1 . " &lt;$paraH2&gt" if $val[1] !~ /$para2/;
+         return "3nd " . $msg1 . " &lt;on|off&gt;" if $val[2] !~ /^on$|^off$/;
        } elsif(int @val == 1) {
-         return "number of arguments is wrong, usage: get fritzLog &lt;" . $name. "&gt; &lt;hash&gt; &lt;all|sys|wlan|usb|net|fon&gt; [on|off]" if $val[0] eq "hash";
-         return "number of arguments is wrong, usage: get fritzLog &lt;" . $name. "&gt; &lt;table&gt; &lt;all|sys|wlan|usb|net|fon&gt;" if $val[0] eq "table";
+         return $msg2 . "&lt;hash&gt; &lt;$paraH2&gt; [on|off]" if $val[0] eq "hash";
+         return $msg2 . "&lt;table&gt; &lt;$paraH2&gt;" if $val[0] eq "table";
+         return $msg2 . "&lt;hash|table&gt; &lt;$paraH2&gt;" if $val[0] !~ /$para1/;
        } else {
-         return "number of arguments is wrong, usage: get fritzLog &lt;" . $name. "&gt; &lt;hash|table&gt; &lt;all|sys|wlan|usb|net|fon&gt; [on|off]";
+         return $msg2 . "&lt;hash|table&gt; &lt;$paraH2&gt; [on|off]";
        }
 
        if ($val[0] eq "hash") {
@@ -6386,15 +6450,22 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
    }
 
 #-------------------------------------------------------------------------------------
-# Diversity
-   $runNo=1;
-   $rName = "diversity1";
-   foreach ( @{ $result->{diversity} } ) {
-     Fritz_Readout_Add_Reading $hash, $roReadings, $rName,          $_->{MSN};
-     Fritz_Readout_Add_Reading $hash, $roReadings, $rName."_state", $_->{Active}, "onoff" ;
-     Fritz_Readout_Add_Reading $hash, $roReadings, $rName."_dest",  $_->{Destination};
-      $runNo++;
-      $rName = "diversity".$runNo;
+# Rufbehandlung/-umleitung _node
+   if ($hash->{fhem}{fwVersion} < 721 && main::AttrVal($name, "enableCallHandling", 0 )) {
+     $runNo=1;
+     $rName = "callHandling1";
+     foreach ( @{ $result->{diversity} } ) {
+#       $rName  = $_->{_node};
+#       $rName  =~ s/Diversity/callRedirect/;
+#       my $idx =~ /(\d+)/;
+       Fritz_Readout_Add_Reading $hash, $roReadings, $rName,           $_->{MSN};
+       Fritz_Readout_Add_Reading $hash, $roReadings, $rName."_active", $_->{Active}, "onoff" ;
+       Fritz_Readout_Add_Reading $hash, $roReadings, $rName."_to",     $_->{Destination};
+       Fritz_Readout_Add_Reading $hash, $roReadings, $rName."_node",   $_->{_node};
+#       Fritz_Readout_Add_Reading $hash, $roReadings, $rName."_idx",    $runNo ;
+       $runNo++;
+       $rName = "callHandling".$runNo;
+     }
    }
 
 #-------------------------------------------------------------------------------------
@@ -7630,7 +7701,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
      # getting redirections 
      # xhr 1 lang de page callRedi xhrId all
 
-     if( !defined ($hash->{READINGS}{"diversity0"}) && main::AttrVal($name, "enableCallRedi", 0 )) {
+     if( ($hash->{fhem}{fwVersion} >= 721) && main::AttrVal($name, "enableCallHandling", 0 )) {
 
        Fritz_Log $hash, 4, "phone redirections - start getting data";
 
@@ -7654,20 +7725,23 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
        }
 
        if ($nbViews > 0) {
-         for( my $i = 0; $i <= $nbViews - 1; $i++) {
+         for( my $i = 1; $i <= $nbViews; $i++) {
+           my $ind = $i - 1;
+           Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_idx",    $resultData->{data}->{rul_list}->[$ind]->{idx};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_from",   $resultData->{data}->{rul_list}->[$ind]->{from};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_to",     $resultData->{data}->{rul_list}->[$ind]->{to};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_active", $resultData->{data}->{rul_list}->[$ind]->{active};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_node",   $resultData->{data}->{rul_list}->[$ind]->{node};
+           Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_numOut", $resultData->{data}->{rul_list}->[$ind]->{num_out};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i,            $resultData->{data}->{rul_list}->[$i]->{idx};
-           Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_from",   $resultData->{data}->{rul_list}->[$i]->{from};
-           Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_to",     $resultData->{data}->{rul_list}->[$i]->{to};
-           Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_active", $resultData->{data}->{rul_list}->[$i]->{active};
-           Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_numOut", $resultData->{data}->{rul_list}->[$i]->{num_out};
-           if($resultData->{data}->{rul_list}->[$i]->{type} eq "rul") {
-             Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_type", "forwarding";
-           } elsif($resultData->{data}->{rul_list}->[$i]->{type} eq "rub") {
-             Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_type", "handling";
+           if($resultData->{data}->{rul_list}->[$ind]->{type} eq "rul") {
+             Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_type", "forwarding";
+           } elsif($resultData->{data}->{rul_list}->[$ind]->{type} eq "rub") {
+             Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_type", "handling";
            } else {
-             Fritz_Readout_Add_Reading $hash, $roReadings, "callRedi" .$i. "_type", "unknown";
+             Fritz_Readout_Add_Reading $hash, $roReadings, "callHandling" .$i. "_type", "unknown";
            }
+
          }
        }
 
@@ -9317,7 +9391,7 @@ sub Fritz_Readout_Process($$@)
                                 ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_Active,box_wlan_LogExtended "
 
                   ."enableAlarmInfo:0,1 "
-                  ."enableCallRedi:0,1 "
+                  ."enableCallHandling:0,1 "
                   ."enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 "
                   ."enableDocsisInfo:0,1 "
                   ."enablePhoneBookInfo:0,1 "
@@ -9933,6 +10007,8 @@ sub Fritz_Readout_API_Check($)
    my $hash       = $defs{$name};
    my $content    = "";
    my $fwVersion  = "0.0.0.error";
+   my @fwV;
+   my $osVersion;
    my $startTime  = time();
    my $apiError   = "";
    my $luaQueryOk = 0;
@@ -9976,57 +10052,169 @@ sub Fritz_Readout_API_Check($)
      Fritz_Log $hash, 2, "No valid Host defined.";
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_HOST", "No Host defined.";
      $crdOK = 0;
-
    }
    # End check for valid host definition
 
    my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
 
-   # Check for defined user in Fritz!Device
    if ($crdOK) {
-     $url       = "http://" . $host;
-     $response  = $agent->get( $url );
 
-     my $user_content;
-     my $bUsers = '&lt;pWd&gt;';
+     # Check if tr064 specification exists and determine TR064-Port
+     # 1. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
 
-     if( $response->is_success && $response->content =~ /\<body\>(.*?)\<\/body\>/isg) {
-       # Log3 "FBUser", 3, "FBUser: \n" . $1;
-       my $mybody = $1;
+     $response = $agent->get( "http://" .$host. ":49000/tr64desc.xml" );
+     $apiError .= " TR064:" . $response->code;
 
-       if($mybody =~ /"activeUsers":(.*?);/isg) {
-         $user_content  = '{"pid":"loginPage","users":'. $1;
-         #Log3 "FBUser", 3, "FBUser: \n" . $user_content;
+     if ($response->is_success) { #determine TR064-Port
+       $content   = $response->content;
 
-         my $resultData = Fritz_Helper_process_JSON($hash, $user_content, "", "");
-
-         my $cData = $resultData->{users};
-
-         if (ref($cData) eq "ARRAY") {
-           my $nbViews = scalar @$cData;
-           for(my $j = 0; $j <= $nbViews - 1; $j++) {
-             if (ref(@$cData[$j]) eq 'HASH') { # $hash_ref is reference to hash
-               $bUsers .= $cData->[$j]->{value} . ";";
-               if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
-                 $hash->{DEFAULT_USER} = $1;
-               }
-             }
-           }
-           if($nbViews != 0) {
-             chop($bUsers) if($nbViews != 0);
-             $bUsers =~ s/&lt;pWd&gt;//;
-           }
+       # Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
+       if ($content =~ /\<modelName\>/) {
+         if ($content =~ /\<modelName\>(.*)\<\/modelName\>/) {
+           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
+           $hash->{boxModel} = $1;
          }
+
+         Fritz_Log $hash, 5-$myVerbose, "TR064 returned: $content";
+
+         if ($content =~ /\<modelNumber\>(.*)\<\/modelNumber\>/) {
+           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", "$1");
+         }
+         if ($content =~ /\<Display\>(.*)\<\/Display\>/) {
+           $fwVersion = $1;
+           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1);
+         }
+
        }
 
-       $boxUser = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
+       $hash->{TR064} = 1;
+       Fritz_Log $hash, 5-$myVerbose, "API TR-064 found.";
 
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "$bUsers";
-       $hash->{fhem}{intBoxUsers} = $bUsers;
+     } else {
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
+       $hash->{TR064} = 0;
+       Fritz_Log $hash, 4-$myVerbose, "API TR-064 not available: " . $response->status_line if $response->code != 500;
      }
+     # End check if tr064 specification exists and determine TR064-Port
+
+     # 2. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
+     Fritz_Log $hash, 4, "Read 'jason_boxinfo.xml' from " . $host;
+
+     if ( $fwVersion =~ /error/ ) {
+       $url       = "http://" . $host . "/jason_boxinfo.xml";
+       $response  = $agent->get( $url );
+       $apiError .= " boxModelJason:" . $response->code;
+
+       if ($response->is_success && $response->content =~ /<j:Name>/) {
+         $content = $response->content;
+         Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $content";
+
+         if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
+           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
+           $hash->{boxModel} = $1;
+         }
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1) if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
+         $fwVersion = $1 if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
+
+         Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $response->is_success with $content";
+       }
+
+     }
+
+     # 3. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
+     if ( $fwVersion =~ /error/ ) {
+       Fritz_Log $hash, 4, "retry with password 'cgi-bin/system_status' from " . $host;
+
+       $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+       $url = "http://".$host."/cgi-bin/system_status";
+       $response = $agent->get( $url );
+       $apiError .= " boxModelSystem:" . $response->code;
+
+       if ($response->is_success && $response->content =~ /\<body\>(.*)\<\/body\>/) {
+         $content =~ /<body>(.*)<\/body>/;
+
+         my @result = split /-/, $content;
+         # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
+         # FRITZ!Box 7590 (UI)-B-132811-010030-XXXXXX-XXXXXX-787902-1540750-101716-1und1
+         # 0 FritzBox-Modell
+         # 1 Annex/Erweiterte Kennzeichnung
+         # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
+         # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
+         # 4+5 Hashcode
+         # 6 Status
+         # 7 Firmwareversion
+         # 8 Sub-Version/Unterversion der Firmware
+         # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
+
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+         $hash->{boxModel} = $result[0];
+
+         my $FBOS = $result[7];
+         $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $FBOS;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+         $fwVersion = $result[7];
+       }
+     }
+
+     @fwV = split(/\./, $fwVersion);
+     $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
+
+     # Check for defined user in Fritz!Device, only if $osVersion >= 725
+
+     if ($osVersion && $osVersion >= 725 && $hash->{boxModel} !~ /Repeater/ ) {
+
+       # Fritz_Log $hash, 3, "boxUser for: $osVersion $hash->{boxModel}";
+       $url       = "http://" . $host;
+       $response  = $agent->get( $url );
+
+       my $user_content;
+       my $bUsers = '&lt;pWd&gt;';
+
+       if( $response->is_success && $response->content =~ /\<body\>(.*?)\<\/body\>/isg) {
+         # Fritz_Log "FBUser", 3, "FBUser: \n" . $1;
+         my $mybody = $1;
+
+         if($mybody =~ /"activeUsers":(.*?);/isg) {
+           $user_content  = '{"pid":"loginPage","users":'. $1;
+           #Fritz_Log "FBUser", 3, "FBUser: \n" . $user_content;
+
+           my $resultData = Fritz_Helper_process_JSON($hash, $user_content, "", "");
+
+           my $cData = $resultData->{users};
+
+           if (ref($cData) eq "ARRAY") {
+             my $nbViews = scalar @$cData;
+             for(my $j = 0; $j <= $nbViews - 1; $j++) {
+               if (ref(@$cData[$j]) eq 'HASH') { # $hash_ref is reference to hash
+                 $bUsers .= $cData->[$j]->{value} . ";";
+                 if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
+                   Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
+                   $hash->{DEFAULT_USER} = $1;
+                 }
+               }
+             }
+             if($nbViews != 0) {
+               chop($bUsers) if($nbViews != 0);
+               $bUsers =~ s/&lt;pWd&gt;//;
+             }
+           }
+         }
+
+         $boxUser = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
+
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "$bUsers";
+         $hash->{fhem}{intBoxUsers} = $bUsers;
+       }
+     } else {
+       $boxUser = main::AttrVal( $name, "boxUser", "" );
+     }
+     # End check for defined user in Fritz!Device
+
    }
-   # End check for defined user in Fritz!Device
 
    # Check for defined password
    if (!Fritz_Helper_read_Password($hash)) {
@@ -10040,7 +10228,6 @@ sub Fritz_Readout_API_Check($)
      }
 
      $crdOK = 0;
-
    }
    # End check for defined password
 
@@ -10068,12 +10255,25 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER" , "" if ( $boxUser ne "");
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_HOST" , "";
    }
-   # end error handling if Passowr, boxUser or host not Ok
+   # end error handling if Password, boxUser or host not Ok
 
    Fritz_Log $hash, 4, "boxUser is set to: $boxUser";
 
    # change host name if necessary
    Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HOST", $host) if $host ne $hash->{HOST};
+
+   # getting TR064 secure port
+   if ( $crdOK && $hash->{TR064} ) {
+     #Determine TR064-Port
+     $tr064Port = Fritz_init_TR064 ( $hash, $host );
+     if ($tr064Port) {
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
+       $hash->{SECPORT} = $tr064Port;
+       Fritz_Log $hash, 5-$myVerbose, "TR-064-SecurePort is $tr064Port.";
+     } else {
+       Fritz_Log $hash, 4-$myVerbose, "TR-064-SecurePort does not exist";
+     }
+   } # end getting TR064 secure port
 
    # Check for remote APIs
    $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
@@ -10117,135 +10317,64 @@ sub Fritz_Readout_API_Check($)
    }
    # end check if data.lua exists
 
-   # Check if tr064 specification exists and determine TR064-Port
-   $response = $agent->get( "http://" .$host. ":49000/tr64desc.xml" );
-   $apiError .= " TR064:" . $response->code;
+   # 4. Versuch: Emitteln Box Model mit Anmeldung, FritzOS Version, OEM aus TR064 Informationen
+   if ( $crdOK && $hash->{SECPORT} && $fwVersion =~ /error/) {
 
-   if ($response->is_success) { #determine TR064-Port
-     $content   = $response->content;
+     my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
 
-     # Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
-     if ($content =~ /\<modelName\>/) {
-       if ($content =~ /\<modelName\>(.*)\<\/modelName\>/) {
-         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-         $hash->{boxModel} = $1;
-       }
-
-       Fritz_Log $hash, 5-$myVerbose, "TR064 returned: $content";
-
-       if ($content =~ /\<modelNumber\>(.*)\<\/modelNumber\>/) {
-         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", "$1");
-       }
-       if ($content =~ /\<Display\>(.*)\<\/Display\>/) {
-         $fwVersion = $1;
-         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1);
-       }
-
-     }
-
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
-     $hash->{TR064} = 1;
-     Fritz_Log $hash, 5-$myVerbose, "API TR-064 found.";
-
-     #Determine TR064-Port
-     $tr064Port = Fritz_init_TR064 ( $hash, $host );
-     if ($tr064Port) {
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
-       $hash->{SECPORT} = $tr064Port;
-       Fritz_Log $hash, 5-$myVerbose, "TR-064-SecurePort is $tr064Port.";
-     } else {
-       Fritz_Log $hash, 4-$myVerbose, "TR-064-SecurePort does not exist";
-     }
-
-   } else {
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
-     $hash->{TR064} = 0;
-     Fritz_Log $hash, 4-$myVerbose, "API TR-064 not available: " . $response->status_line if $response->code != 500;
-   }
-   # End check if tr064 specification exists and determine TR064-Port
-
-   # push @roReadings, "RT_02_TR064", sprintf( "%.2f", time() - $startTime);
-
-   if ( $fwVersion =~ /error/ && $response->code != 500 && $crdOK) {
-     # Ansonsten ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
-     Fritz_Log $hash, 4, "Read 'jason_boxinfo.xml' from " . $host;
-
-     $agent     = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-     $url       = "http://" . $host . "/jason_boxinfo.xml";
-     $response  = $agent->get( $url );
-     $apiError .= " boxModelJason:" . $response->code;
-
-     unless ($response->is_success) {
-
-       my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
-
-       if (! defined($Fritz_TR064pwd)) {
-         Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
-       } else {
-
-         Fritz_Log $hash, 4, "retry with password 'jason_boxinfo.xml' from " . $host;
-
-         my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-         my $req      = HTTP::Request->new( GET => "http://" . $host . "/jason_boxinfo.xml");
-            $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
-         $response    = $agentPW->request( $req );
-         $apiError .= " boxModelJason:" . $response->code;
-
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "";
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "";
-
-         unless ($response->is_success) {
-           Fritz_Log $hash, 2, "Password or User not correct. Please define the correct credentials.";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "Password or User not correct. Please define the correct credentials";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)";
-         }
-       }
-     }
-
-     if ($response->is_success && $response->content =~ /<j:Name>/) {
-       $content = $response->content;
-       Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $content";
-
-       if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
-         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-         $hash->{boxModel} = $1;
-       }
-       Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
-       Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1) if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
-       $fwVersion = $1 if $content =~ /<j:Version>(.*)<\/j:Version>/ ;
-
-       Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $response->is_success with $content";
+     if (! defined($Fritz_TR064pwd)) {
+       Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
      } else {
 
-       # Ansonsten ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
-       Fritz_Log $hash, 4, "retry with password 'cgi-bin/system_status' from " . $host;
+       Fritz_Log $hash, 4, "retry with password 'jason_boxinfo.xml' from " . $host;
 
-       $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-       $url = "http://".$host."/cgi-bin/system_status";
-       $response = $agent->get( $url );
-       $apiError .= " boxModelSystem:" . $response->code;
+       my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+       my $req      = HTTP::Request->new( GET => "http://" . $host . "/jason_boxinfo.xml");
+          $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
+       $response    = $agentPW->request( $req );
+       $apiError .= " boxModelJason:" . $response->code;
+
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "";
 
        unless ($response->is_success) {
-         Fritz_Log $hash, 4, "read 'cgi-bin/system_status' from " . $host;
+         Fritz_Log $hash, 2, "Password or User not correct. Please define the correct credentials.";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "Password or User not correct. Please define the correct credentials";
 
-         my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
-  
-         my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-         my $req      = HTTP::Request->new( GET => "http://" . $host . "/cgi-bin/system_status");
-            $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
-         $response    = $agentPW->request( $req );
-         $apiError .= " boxModelSystem:" . $response->code;
-
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "";
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "";
-
-         unless ($response->is_success) {
-           Fritz_Log $hash, 2, "Password or User not correct. Please define the correct credentials.";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "Password or User not correct. Please define the correct credentials";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)";
+         if ($osVersion && $osVersion < 725 && $hash->{boxModel} !~ /Repeater/) {
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "Attribut boxUser not set.";
          }
        }
+     }
+   }
+
+   # 5. Versuch: Emitteln Box Model mit Anmeldung, FritzOS Version, OEM aus cgi-bin/system_status Informationen
+   if ( $fwVersion =~ /error/ && $crdOK) {
+
+     Fritz_Log $hash, 4, "read 'cgi-bin/system_status' from " . $host;
+
+     my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
+  
+     my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+     my $req      = HTTP::Request->new( GET => "http://" . $host . "/cgi-bin/system_status");
+        $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
+
+     $response    = $agentPW->request( $req );
+     $apiError .= " boxModelSystem:" . $response->code;
+
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "";
+
+     unless ($response->is_success) {
+       Fritz_Log $hash, 2, "Password or User not correct. Please define the correct credentials.";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_PASSWORD", "Password or User not correct. Please define the correct credentials";
+
+       if ($osVersion && $osVersion < 725 && $hash->{boxModel} !~ /Repeater/) {
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINWEIS_BOXUSER", "Attribut boxUser not set.";
+       }
+
+     } else {
 
        Fritz_Log $hash, 5-$myVerbose, "system_status returned: $content";
 
@@ -10282,8 +10411,8 @@ sub Fritz_Readout_API_Check($)
 
    # push @roReadings, "RT_03_BoxModel", sprintf( "%.2f", time() - $startTime);
 
-   my @fwV = split(/\./, $fwVersion);
-   my $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
+   @fwV = split(/\./, $fwVersion);
+   $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
    Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
    Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
 
@@ -10330,7 +10459,7 @@ sub Fritz_Readout_API_Check($)
          Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 1;
 
          # start testing TR064 services
-         if($hash->{TR064} == 1) {
+         if( $hash->{SECPORT} ) {
 
            if(Fritz_Get_TR064_ServiceList($hash, "wancommonifconfig1") ) {
              Fritz_Log $hash, 4, "wancommonifconfig1/box_wan_AccessType - start getting TR064 data";
@@ -10416,10 +10545,7 @@ sub Fritz_Readout_API_Check($)
                  $stat = 1;
                }
 
-#               push @roReadings, "RT_05_" . sprintf( "%02d", $lfnr++) . "_TR064_Services_" . $key, sprintf( "%.2f", time() - $startTime) . " : " . $stat;
              }
-
-             # push @roReadings, "RT_05_TR064_Services", sprintf( "%.2f", time() - $startTime);
 
              my @trIGDMultCmdArray;
              my @trIGDMultKeyArray;
@@ -10460,10 +10586,7 @@ sub Fritz_Readout_API_Check($)
                  $stat = 1;
                }
 
-               # push @roReadings, "RT_05_" . sprintf( "%02d", $lfnr++) . "_TR064_Services_" . $key, sprintf( "%.2f", time() - $startTime) . " : " . $stat;
              }
-
-             # push @roReadings, "RT_05_TR064_Services", sprintf( "%.2f", time() - $startTime);
 
              $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "igd" . "desc.xml");
              Fritz_Log $hash, 4, "ApiCheck IGD serviceList\n" . $serviceList;
@@ -10482,6 +10605,7 @@ sub Fritz_Readout_API_Check($)
          } # end testing TR064 services
 
          # Start luaQuery API
+
          if($luaQueryOk) {
 
            my $queryStr = "";
@@ -10493,6 +10617,8 @@ sub Fritz_Readout_API_Check($)
 
            Fritz_Log $hash, 4, "ReadOut gestartet: $queryStr";
            $response = Fritz_call_Lua_Query( $hash, $queryStr, "", "luaQuery") ;
+
+#           Fritz_Log $hash, 3, "$queryStr: \n" . Dumper($response);
 
            if ( !defined $response->{sid} || defined $response->{Error} || defined $response->{AuthorizationRequired} ) {
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
@@ -10514,18 +10640,20 @@ sub Fritz_Readout_API_Check($)
                  Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQuery->" . $key . "->active", 0;
 
                } elsif(ref $response->{$key} eq 'ARRAY') {
-                 my $views = $response->{$key};
-#                 if(scalar(@$views) == 0) {
-#                   Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 3 not Ok";
-#                   Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
-#                 } else {
+                 my $views   = $response->{$key};
+                 my $nbViews = scalar @$views;
+
+#                 if($nbViews) {
                    Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: Ok";
                    Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 1;
+#                 } else {
+#                   Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 3 not Ok";
+#                   Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
 #                 }
 
                } elsif ($response->{$key} eq "") {
-#                 Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 4 not Ok";
-#                 Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
+                 Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: 4 not Ok";
+                 Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQueryCmd->" . $key . "->active", 0;
 
                } else {
                  Fritz_Log $hash, 4, "$key = $hash->{LuaQueryCmd}{$key}{cmd}: Ok";
@@ -15260,6 +15388,25 @@ sub Fritz_Get_Kid_Profiles_List($) {
 } # end Fritz_Get_Kid_Profiles_List
 
 ###############################################################################
+# Frizt!OS < 7.50
+# xhr 1 lang de page log xhrId all             wlan 7 (on) | 6 (off)     -> on oder off erweitertes WLAN-Logging
+#
+# xhr 1 lang de page log xhrId log filter 0    useajax 1 no_sidrenew nop -> Log-Einträge Alle
+# xhr 1 lang de page log xhrId log filter 1    useajax 1 no_sidrenew nop -> Log-Einträge System
+# xhr 1 lang de page log xhrId log filter 4    useajax 1 no_sidrenew nop -> Log-Einträge WLAN
+# xhr 1 lang de page log xhrId log filter 5    useajax 1 no_sidrenew nop -> Log-Einträge USB
+# xhr 1 lang de page log xhrId log filter 2    useajax 1 no_sidrenew nop -> Log-Einträge Internetverbindung
+# xhr 1 lang de page log xhrId log filter 3    useajax 1 no_sidrenew nop -> Log-Einträge Fon
+# Frizt!OS >= 7.50
+# xhr 1 lang de page log apply nop filter wlan wlan on | off             -> on oder off erweitertes WLAN-Logging
+#
+# xhr 1 lang de page log xhrId log filter all  useajax 1 no_sidrenew nop -> Log-Einträge Alle
+# xhr 1 lang de page log xhrId log filter sys  useajax 1 no_sidrenew nop -> Log-Einträge System
+# xhr 1 lang de page log xhrId log filter wlan useajax 1 no_sidrenew nop -> Log-Einträge WLAN
+# xhr 1 lang de page log xhrId log filter usb  useajax 1 no_sidrenew nop -> Log-Einträge USB
+# xhr 1 lang de page log xhrId log filter net  useajax 1 no_sidrenew nop -> Log-Einträge Internetverbindung
+# xhr 1 lang de page log xhrId log filter fon  useajax 1 no_sidrenew nop -> Log-Einträge Fon
+
 sub Fritz_Get_Fritz_Log_Info_nonBlk($)
 {
    my ($string) = @_;
@@ -15272,75 +15419,76 @@ sub Fritz_Get_Fritz_Log_Info_nonBlk($)
    my $startTime = time();
    my $returnCase = 2;
    my $returnLog = "";
-
-   # Frizt!OS >= 7.50
-   # xhr 1 lang de page log apply nop filter wlan wlan on | off             -> on oder off erweitertes WLAN-Logging
-
-   # xhr 1 lang de page log xhrId log filter all  useajax 1 no_sidrenew nop -> Log-Einträge Alle
-   # xhr 1 lang de page log xhrId log filter sys  useajax 1 no_sidrenew nop -> Log-Einträge System
-   # xhr 1 lang de page log xhrId log filter wlan useajax 1 no_sidrenew nop -> Log-Einträge WLAN
-   # xhr 1 lang de page log xhrId log filter usb  useajax 1 no_sidrenew nop -> Log-Einträge USB
-   # xhr 1 lang de page log xhrId log filter net  useajax 1 no_sidrenew nop -> Log-Einträge Internetverbindung
-   # xhr 1 lang de page log xhrId log filter fon  useajax 1 no_sidrenew nop -> Log-Einträge Fon
-
-   # Frizt!OS < 7.50
-   # xhr 1 lang de page log xhrId all             wlan 7 (on) | 6 (off)     -> on oder off erweitertes WLAN-Logging
-
-   # xhr 1 lang de page log xhrId log filter 0    useajax 1 no_sidrenew nop -> Log-Einträge Alle
-   # xhr 1 lang de page log xhrId log filter 1    useajax 1 no_sidrenew nop -> Log-Einträge System
-   # xhr 1 lang de page log xhrId log filter 4    useajax 1 no_sidrenew nop -> Log-Einträge WLAN
-   # xhr 1 lang de page log xhrId log filter 5    useajax 1 no_sidrenew nop -> Log-Einträge USB
-   # xhr 1 lang de page log xhrId log filter 2    useajax 1 no_sidrenew nop -> Log-Einträge Internetverbindung
-   # xhr 1 lang de page log xhrId log filter 3    useajax 1 no_sidrenew nop -> Log-Einträge Fon
-
    my $returnStr;
+   my $jsVer = 900;
 
    Fritz_Log $hash, 3, "fritzlog -> $cmd, $val[0], $val[1]";
 
-   push @webCmdArray, "xhr"         => "1";
-   push @webCmdArray, "lang"        => "de";
-   push @webCmdArray, "page"        => "log";
-   push @webCmdArray, "xhrId"       => "log";
-   push @webCmdArray, "useajax"     => "1";
-   push @webCmdArray, "no_sidrenew" => "";
+   if ($hash->{fhem}{fwVersion} < $jsVer ) {
+     push @webCmdArray, "xhr"         => "1";
+     push @webCmdArray, "lang"        => "de";
+     push @webCmdArray, "page"        => "log";
+     push @webCmdArray, "xhrId"       => "log";
+     push @webCmdArray, "useajax"     => "1";
+     push @webCmdArray, "no_sidrenew" => "";
 
-   if ($hash->{fhem}{fwVersion} >= 683 && $hash->{fhem}{fwVersion} < 750) {
-     push @webCmdArray, "filter"      => "0" if $val[1] =~ /all/;
-     push @webCmdArray, "filter"      => "1" if $val[1] =~ /sys/;
-     push @webCmdArray, "filter"      => "2" if $val[1] =~ /net/;
-     push @webCmdArray, "filter"      => "3" if $val[1] =~ /fon/;
-     push @webCmdArray, "filter"      => "4" if $val[1] =~ /wlan/;
-     push @webCmdArray, "filter"      => "5" if $val[1] =~ /usb/;
-   } elsif ($hash->{fhem}{fwVersion} >= 750) {
-     push @webCmdArray, "filter"      => $val[1];
-   } else {
-   }
+     if ($hash->{fhem}{fwVersion} >= 683 && $hash->{fhem}{fwVersion} < 750) {
+       push @webCmdArray, "filter"      => "0" if $val[1] =~ /all/;
+       push @webCmdArray, "filter"      => "1" if $val[1] =~ /sys/;
+       push @webCmdArray, "filter"      => "2" if $val[1] =~ /net/;
+       push @webCmdArray, "filter"      => "3" if $val[1] =~ /fon/;
+       push @webCmdArray, "filter"      => "4" if $val[1] =~ /wlan/;
+       push @webCmdArray, "filter"      => "5" if $val[1] =~ /usb/;
 
-   if ($hash->{fhem}{fwVersion} >= 683) {
-     Fritz_Log $hash, 4, "data.lua: \n" . join(" ", @webCmdArray);
+     } elsif ($hash->{fhem}{fwVersion} >= 750) {
 
-     $result = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
-
-     # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
-     return Fritz_Readout_Response($hash, $result, \@roReadings) if ( defined $result->{Error} || defined $result->{AuthorizationRequired});
-
-     $sidNew += $result->{sidNew} if defined $result->{sidNew};
-
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_fritzLogInfo", "done";
-
-     if (int @val == 3 && $val[2] eq "off") {
-       $returnLog = "|" . $val[1] . "|" . main::toJSON ($result);
-       $returnCase = 3;
+       push @webCmdArray, "filter"      => $val[1];
      } else {
+     }
 
-       my $returnExPost = eval { main::myUtilsFritzLogExPostnb ($hash, $val[1], $result); };
+     if ($hash->{fhem}{fwVersion} >= 683) {
+       Fritz_Log $hash, 4, "data.lua: \n" . join(" ", @webCmdArray);
+       $result = Fritz_call_LuaData($hash, "data", \@webCmdArray);
+     }
 
-       if ($@) {
-         Fritz_Log $hash, 2, "fritzLogExPost: " . $@;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_fritzLogExPost", "->ERROR: " . $@;
-       } else {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_fritzLogExPost", $returnExPost;
+   } else {
+     Fritz_Log $hash, 4, "get $name $val[1] dino/eventlog";
+     my $result = Fritz_call_javaScript($hash, 'dino/eventlog' );
+
+     my $views;
+     my $nbViews = 0;
+     if (defined $result->{result}) {
+       $views = $result->{result};
+       $nbViews = scalar @$views;
+     }
+     eval {
+       for(my $i = 0; $i <= $nbViews - 1; $i++) {
+#         $result->{result}->[$i]->{id};
+#         $result->{result}->[$i]->{date};
+#         $result->{result}->[$i]->{time}";
+#         $result->{result}->[$i]->{msg}";
        }
+     };
+   }
+   
+   # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+   return Fritz_Readout_Response($hash, $result, \@roReadings) if ( defined $result->{Error} || defined $result->{AuthorizationRequired});
+
+   $sidNew += $result->{sidNew} if defined $result->{sidNew};
+
+   Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_fritzLogInfo", "done";
+
+   if (int @val == 3 && $val[2] eq "off") {
+     $returnLog = "|" . $val[1] . "|" . main::toJSON ($result);
+     $returnCase = 3;
+   } else {
+     my $returnExPost = eval { main::myUtilsFritzLogExPostnb ($hash, $val[1], $result); };
+
+     if ($@) {
+       Fritz_Log $hash, 2, "fritzLogExPost: " . $@;
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_fritzLogExPost", "->ERROR: " . $@;
+     } else {
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_fritzLogExPost", $returnExPost;
      }
    }
 
@@ -15360,54 +15508,49 @@ sub Fritz_Get_Fritz_Log_Info_Std($$$) {
 
    my ($hash, $retFormat, $logInfo) = @_;
    my $name = $hash->{NAME};
-
-   # Frizt!OS >= 7.50
-
-   # xhr 1 lang de page log xhrId log filter all  useajax 1 no_sidrenew nop -> Log-Einträge Alle
-   # xhr 1 lang de page log xhrId log filter sys  useajax 1 no_sidrenew nop -> Log-Einträge System
-   # xhr 1 lang de page log xhrId log filter wlan useajax 1 no_sidrenew nop -> Log-Einträge WLAN
-   # xhr 1 lang de page log xhrId log filter usb  useajax 1 no_sidrenew nop -> Log-Einträge USB
-   # xhr 1 lang de page log xhrId log filter net  useajax 1 no_sidrenew nop -> Log-Einträge Internetverbindung
-   # xhr 1 lang de page log xhrId log filter fon  useajax 1 no_sidrenew nop -> Log-Einträge Fon
-
-   # Frizt!OS < 7.50
-
-   # xhr 1 lang de page log xhrId log filter 0    useajax 1 no_sidrenew nop -> Log-Einträge Alle
-   # xhr 1 lang de page log xhrId log filter 1    useajax 1 no_sidrenew nop -> Log-Einträge System
-   # xhr 1 lang de page log xhrId log filter 4    useajax 1 no_sidrenew nop -> Log-Einträge WLAN
-   # xhr 1 lang de page log xhrId log filter 5    useajax 1 no_sidrenew nop -> Log-Einträge USB
-   # xhr 1 lang de page log xhrId log filter 2    useajax 1 no_sidrenew nop -> Log-Einträge Internetverbindung
-   # xhr 1 lang de page log xhrId log filter 3    useajax 1 no_sidrenew nop -> Log-Einträge Fon
-
-   my @webCmdArray;
-
-   push @webCmdArray, "xhr"         => "1";
-   push @webCmdArray, "lang"        => "de";
-   push @webCmdArray, "page"        => "log";
-   push @webCmdArray, "xhrId"       => "log";
-   push @webCmdArray, "useajax"     => "1";
-   push @webCmdArray, "no_sidrenew" => "";
-
    my $returnStr;
+   my $result;
+   my $nbViews;
+   my $views;
+   my $jsVer = 820;
 
-   if ($hash->{fhem}{fwVersion} >= 680 && $hash->{fhem}{fwVersion} < 750) {
-     push @webCmdArray, "filter"      => "0" if $logInfo =~ /all/;
-     push @webCmdArray, "filter"      => "1" if $logInfo =~ /sys/;
-     push @webCmdArray, "filter"      => "2" if $logInfo =~ /net/;
-     push @webCmdArray, "filter"      => "3" if $logInfo =~ /fon/;
-     push @webCmdArray, "filter"      => "4" if $logInfo =~ /wlan/;
-     push @webCmdArray, "filter"      => "5" if $logInfo =~ /usb/;
-   } elsif ($hash->{fhem}{fwVersion} >= 750) {
-     push @webCmdArray, "filter"      => $logInfo;
+   my   @webCmdArray;
+
+   if ($hash->{fhem}{fwVersion} < $jsVer ) {
+
+     push @webCmdArray, "xhr"         => "1";
+     push @webCmdArray, "lang"        => "de";
+     push @webCmdArray, "page"        => "log";
+     push @webCmdArray, "xhrId"       => "log";
+     push @webCmdArray, "useajax"     => "1";
+     push @webCmdArray, "no_sidrenew" => "";
+
+     if ($hash->{fhem}{fwVersion} >= 680 && $hash->{fhem}{fwVersion} < 750) {
+       push @webCmdArray, "filter"      => "0" if $logInfo =~ /all/;
+       push @webCmdArray, "filter"      => "1" if $logInfo =~ /sys/;
+       push @webCmdArray, "filter"      => "2" if $logInfo =~ /net/;
+       push @webCmdArray, "filter"      => "3" if $logInfo =~ /fon/;
+       push @webCmdArray, "filter"      => "4" if $logInfo =~ /wlan/;
+       push @webCmdArray, "filter"      => "5" if $logInfo =~ /usb/;
+
+     } elsif ($hash->{fhem}{fwVersion} >= 750) {
+       push @webCmdArray, "filter"      => $logInfo;
+
+     } else {
+       $returnStr .= "FritzLog Filter:$logInfo\n";
+       $returnStr .= "---------------------------------\n";
+       return $returnStr . "Not supported Fritz!OS $hash->{fhem}{fwVersionStr}";
+     }
+
+     Fritz_Log $hash, 4, "get $name $logInfo " . join(" ", @webCmdArray);
+     $result = Fritz_call_LuaData($hash, "data", \@webCmdArray);
+
    } else {
-     $returnStr .= "FritzLog Filter:$logInfo\n";
-     $returnStr .= "---------------------------------\n";
-     return $returnStr . "Not supported Fritz!OS $hash->{fhem}{fwVersionStr}";
+
+     Fritz_Log $hash, 4, "get $name $logInfo dino/eventlog";
+     $result = Fritz_call_javaScript($hash, 'dino/eventlog' );
+
    }
-
-   Fritz_Log $hash, 3, "set $name $logInfo " . join(" ", @webCmdArray);
-
-   my $result = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
 
    if(defined $result->{Error}) {
      $returnStr .= "FritzLog Filter:$logInfo\n";
@@ -15416,13 +15559,18 @@ sub Fritz_Get_Fritz_Log_Info_Std($$$) {
      return $returnStr . $tmp;
    }
 
-   my $nbViews;
-   my $views;
-
-   $nbViews = 0;
-   if (defined $result->{data}->{log}) {
-     $views = $result->{data}->{log};
-     $nbViews = scalar @$views;
+   if ($hash->{fhem}{fwVersion} < $jsVer ) {
+     $nbViews = 0;
+     if (defined $result->{data}->{log}) {
+       $views = $result->{data}->{log};
+       $nbViews = scalar @$views;
+     }
+   } else {
+     $nbViews = 0;
+     if (defined $result->{result}) {
+       $views = $result->{result};
+       $nbViews = scalar @$views;
+     }
    }
 
    my $tableFormat = main::AttrVal($name, "disableTableFormat", "undef");
@@ -15451,7 +15599,7 @@ sub Fritz_Get_Fritz_Log_Info_Std($$$) {
            $returnStr .= "</tr>\n";
          }
        };
-     } elsif ($hash->{fhem}{fwVersion} >= 750) {
+     } elsif ($hash->{fhem}{fwVersion} >= 750 && $hash->{fhem}{fwVersion} < $jsVer) {
        eval {
          for(my $i = 0; $i <= $nbViews - 1; $i++) {
            $returnStr .= "<tr>\n";
@@ -15460,6 +15608,20 @@ sub Fritz_Get_Fritz_Log_Info_Std($$$) {
            $returnStr .= "<td>" . $result->{data}->{log}->[$i]->{time} . "</td>";
            $returnStr .= "<td>" . $result->{data}->{log}->[$i]->{msg}  . "</td>";
            $returnStr .= "</tr>\n";
+         }
+       };
+     } elsif ($hash->{fhem}{fwVersion} >= $jsVer) {
+       my $all = $logInfo eq "all";
+       eval {
+         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+           if($result->{result}->[$i]->{group} eq $logInfo || $all) {
+             $returnStr .= "<tr>\n";
+             $returnStr .= "<td>" . $result->{result}->[$i]->{id}   . "</td>";
+             $returnStr .= "<td>" . $result->{result}->[$i]->{date} . "</td>";
+             $returnStr .= "<td>" . $result->{result}->[$i]->{time} . "</td>";
+             $returnStr .= "<td>" . $result->{result}->[$i]->{msg}  . "</td>";
+             $returnStr .= "</tr>\n";
+           }
          }
        };
      }
@@ -15811,13 +15973,21 @@ sub Fritz_SOAP_Request($$$;@)
 
          if (!$respData->is_success) {
 
-           my $outHash = XMLin($respData->decoded_content, StrictMode => 0, KeyAttr => []);
-           Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS:\n" . Dumper($outHash);
-
-           if(exists($outHash->{'s:Body'}->{'s:Fault'})) {
-             $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:Fault'};
+           my $outHash;
+           eval {
+             $outHash = XMLin($respData->decoded_content, StrictMode => 0, KeyAttr => []);
+           };
+           if ($@) {
+             $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:XML-Fault:$@'};
            } else {
-             Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS: unhandled error";
+
+             Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS:\n" . Dumper($outHash);
+
+             if(exists($outHash->{'s:Body'}->{'s:Fault'})) {
+               $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:Fault'};
+             } else {
+               Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS: unhandled error";
+             }
            }
 
            $retHash{Error}{$service}{$service_command}{response_error} = $respData->status_line;
@@ -15832,17 +16002,26 @@ sub Fritz_SOAP_Request($$$;@)
 
            Fritz_Log $hash, 4, "XML_RESPONSE_SUCCESS:\n" . Dumper($decContent);
 
-           my $outHash = XMLin($decContent, StrictMode => 0, KeyAttr => [], SuppressEmpty => undef);
-           Fritz_Log $hash, 4, "XML_RESPONSE_SUCCESS:\n" . Dumper($outHash);
-
-           if(defined($outHash->{'s:Body'}->{$service_cmd})) {
-             $retHash{$service}{$service_command} = $outHash->{'s:Body'}->{$service_cmd};
-             $retHash{$service}{$service_command}{Status_line} = $respData->status_line;
-           } else {
+           my $outHash;
+           eval {
+             $outHash = $outHash = XMLin($decContent, StrictMode => 0, KeyAttr => [], SuppressEmpty => undef);
+           };
+           if ($@) {
+             $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:XML-Fault:$@'};
              $retHash{Error}{$service}{$service_command}{response_error} = $respData->status_line;
              $retHash{Error}{$service}{$service_command}{ErrLevel} = "6";
-           }
+           } else {
 
+             Fritz_Log $hash, 4, "XML_RESPONSE_SUCCESS:\n" . Dumper($outHash);
+
+             if(defined($outHash->{'s:Body'}->{$service_cmd})) {
+               $retHash{$service}{$service_command} = $outHash->{'s:Body'}->{$service_cmd};
+               $retHash{$service}{$service_command}{Status_line} = $respData->status_line;
+             } else {
+               $retHash{Error}{$service}{$service_command}{response_error} = $respData->status_line;
+               $retHash{Error}{$service}{$service_command}{ErrLevel} = "6";
+             }
+           }
            Fritz_Log $hash, 4, "$service_cmd:\n" . Dumper(%retHash);
          }
        }
@@ -16247,18 +16426,15 @@ sub Fritz_call_Lua_Query($$@)
      );
    }
 
-   Fritz_Log $hash, 4, "Response: " . $response->status_line . "\n" . $response->content;
+   Fritz_Log $hash, 5, "Response: " . Fritz_Helper_Dumper($hash, $response, 5);
 
    my $luaContent;
       $luaContent = $response->content();
 
-   chop($luaContent);
+   $luaContent =~ s/\n//gsm;
    chop($luaContent);
 
    $luaContent .= ',"status_line":"' . $response->status_line .'"}';
-
-   Fritz_Log $hash, 4, "Response: " . $luaContent;
-
 
 #################
 #     Fritz_Log $hash, 5, "Response: " . $response->content;
@@ -17539,18 +17715,29 @@ sub Fritz_Helper_analyse_Lua_Result($$;@)
      }
    }
 
-   if (ref ($result->{result}) eq "ARRAY" || ref ($result->{data}) eq "HASH" ){
-     $result->{data}->{noJSONdocument} = decode_base64($result->{data}->{noJSONdocument}) if defined ($result->{data}->{noJSONdocument});
+   if (ref($result->{result}) eq "ARRAY"){
      $tmp = Fritz_Helper_Dumper($hash, $result);
 
-     Fritz_Log $name, 5, "result is array/hash: " . $tmp;
+     Fritz_Log $name, 4, "result is array/hash: " . $tmp;
 
      # $tmp = "\n";
    }
-   elsif (defined $result->{result} ) {
-     $tmp = $result->{result};
+   elsif (ref($result->{data}) eq "HASH" ){
+     $result->{data}->{noJSONdocument} = decode_base64($result->{data}->{noJSONdocument}) if defined ($result->{data}->{noJSONdocument});
+     $tmp = Fritz_Helper_Dumper($hash, $result);
 
-     Fritz_Log $name, 5, "result is text: " . $tmp;
+     Fritz_Log $name, 4, "result is array/hash: " . $tmp;
+
+     # $tmp = "\n";
+   }
+   elsif (exists($result->{result}) ) {
+     if ($retData == 1) {
+       $tmp = Fritz_Helper_Dumper($hash, $result);
+     } else {
+       $tmp = $result->{result};
+     }
+
+     Fritz_Log $name, 4, "result is text: " . $tmp;
 
      # $tmp = "\n";
    }
@@ -17905,7 +18092,7 @@ sub Fritz_Helper_read_Password($)
    ($err, $password) = main::getKeyValue($index);
 
    if ( defined($err) ) {
-      Fritz_Log $hash, 2, "unable to read Fritz-Device password from file: $err";
+      Fritz_Log $hash, 4, "unable to read Fritz-Device password from file: $err";
       return undef;
    }
 
@@ -17926,10 +18113,8 @@ sub Fritz_Helper_read_Password($)
       return $dec_pwd;
 
    } else {
-
-      Fritz_Log $hash, 2, "No password in file";
+      Fritz_Log $hash, 4, "No password in file";
       return undef;
-
    }
 
 } # end Fritz_Helper_read_Password
@@ -18248,12 +18433,14 @@ sub Fritz_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="diversity"></a>
-         <dt><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code></dt>
+         <dt><code>set &lt;name&gt; callHandling &lt;reading index&gt; &lt;on|off&gt;</code></dt>
          <br>
-         Switches the call diversity number (0,1,2 ...) on or off.
-         A call diversity for an incoming number has to be created with the FRITZ!BOX web interface. Requires TR064 (>=6.50).
+         Switches the call forwarding/handling reading index (1,2,3 ...) on or off.
+         A call forwarding/handling for an incoming number has to be created with the FRITZ!BOX web interface. Requires TR064 (>=6.50).
          <br>
-         Note! Only a diversity for a concret home number and <u>without</u> filter for the calling number can be set. Hence, an approbriate <i>diversity</i>-reading must exist.
+         The Attribut enableCallHandling has to be set to 1.
+         <br>
+         Note! Only a call forwarding/handling for a concret home number and <u>without</u> filter for the calling number can be set. Hence, an approbriate <i>callHandling</i>-reading must exist.
       </li><br>
 
       <li><a name="enableVPNshare"></a>
@@ -18410,7 +18597,7 @@ sub Fritz_Helper_Dumper($$;@) {
 
          Requires FRITZ!OS 8.00 or higher.<br>
          <ul>
-           <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:8..28 steps 0.5&gt;</code></dt>
+           <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:-5..5 steps 0.5&gt;</code></dt>
            <dd>changes the temperature offset to the value: &lt;8..28&gt; degrees for the SmartHome device with the specified ID.</dd>
            <br>
            <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpAdjust:8..28 steps 0.5&gt;</code></dt>
@@ -18838,8 +19025,8 @@ sub Fritz_Helper_Dumper($$;@) {
          Switches the takeover of alarm information off/on.
       </li><br>
 
-      <li><a name="enableCallRedi"></a>
-         <dt><code>attr &lt;name&gt; enableCallRedi &lt;0 | 1&gt;</code></dt>
+      <li><a name="enableCallHandling"></a>
+         <dt><code>attr &lt;name&gt; enableCallHandling &lt;0 | 1&gt;</code></dt>
          <br>
          Switches the takeover of phone forwarding/handling informations off/on.
       </li><br>
@@ -19128,12 +19315,20 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>alarm</b><i>n</i><b>_wdays</b> - Weekdays of alarm <i>1</i></li>
       <br>
 
-      <li><b>callRedi...</b>Readings callRedi. Available when the enableCallRedi attribute is enabled.</li>
-      <li><b>callRedi</b><i>n</i> - ID of the call forwarding/handling system.<i>1</i></li>
-      <li><b>callRedi</b><i>n</i><b>_active</b> - Current status of the call forwarding/handling system.<i>1</i></li>
-      <li><b>callRedi</b><i>n</i><b>_from</b> - (Partial) number being forwarded/handled.<i>1</i></li>
-      <li><b>callRedi</b><i>n</i><b>_to</b> - Destination of the call forwarding/handling system.<i>1</i></li>
-      <li><b>callRedi</b><i>n</i><b>_type</b> - Type of call forwarding/handling.<i>1</i></li>
+      <li><b>callHandling...</b>Readings callHandling. Available when the enableCallRedi attribute is enabled.</li>
+      <br>
+      <li>Redings available for FritzOS < 271</li>
+      <li><b>callHandling</b><i>n</i> - Own call forwarding number <i>n</i></li> 
+      <li><b>callHandling</b><i>n</i><b>_dest</b> - Destination number of call forwarding <i>n</i></li> 
+      <li><b>callHandling</b><i>n</i><b>_state</b> - Current status of call forwarding <i>n</i></li> 
+      <br>
+
+      <li>Redings available for FritzOS >= 271</li>
+      <li><b>callHandling</b><i>n</i> - ID of the call forwarding/handling system.<i>1</i></li>
+      <li><b>callHandling</b><i>n</i><b>_active</b> - Current status of the call forwarding/handling system.<i>1</i></li>
+      <li><b>callHandling</b><i>n</i><b>_from</b> - (Partial) number being forwarded/handled.<i>1</i></li>
+      <li><b>callHandling</b><i>n</i><b>_to</b> - Destination of the call forwarding/handling system.<i>1</i></li>
+      <li><b>callHandling</b><i>n</i><b>_type</b> - Type of call forwarding/handling.<i>1</i></li>
       <br>
 
       <li><b>kidprofile...</b>Readings kidprofile. Available when the enableKidProfiles attribute is enabled.</li>
@@ -19189,10 +19384,6 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>dect</b><i>n</i><b>_radio</b> - current Internet radio ringtone of the DECT telephone <i>n</i></li> 
       <li><b>dect</b><i>n</i><b>_NoRingTime</b> - Doorbell blocking of the DECT telephone <i>n</i></li> 
       <br> 
-      <li><b>diversity</b><i>n</i> - Own call forwarding number <i>n</i></li> 
-      <li><b>diversity</b><i>n</i><b>_dest</b> - Destination number of call forwarding <i>n</i></li> 
-      <li><b>diversity</b><i>n</i><b>_state</b> - Current status of call forwarding <i>n</i></li> 
-      <br>
       <li><b>fon</b><i>n</i> - Name of the analog telephone connection <i>n</i> on the FRITZ!BOX</li> 
       <li><b>fon</b><i>n</i><b>_device</b> - Internal device number of the analog telephone connection <i>n</i></li> 
       <li><b>fon</b><i>n</i><b>_intern</b> - Internal telephone number of the analog telephone connection <i>n</i></li> 
@@ -19534,13 +19725,15 @@ sub Fritz_Helper_Dumper($$;@) {
          Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
-      <li><a name="diversity"></a>
-         <dt><code>set &lt;name&gt; diversity &lt;number&gt; &lt;on|off&gt;</code></dt>
+      <li><a name="callHandling"></a>
+         <dt><code>set &lt;name&gt; callHandling &lt;Reading-Index&gt; &lt;on|off&gt;</code></dt>
          <br>
-         Schaltet die Rufumleitung (Nummer 0,1,2 ...) für einzelne Rufnummern an oder aus.
+         Schaltet die Rufumleitung/-behandlung (Reading-Index 1,2,3 ...) für einzelne Rufnummern an oder aus.
          <br>
-         Achtung! Es lassen sich nur Rufumleitungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten.
-         Es muss also einen <i>diversity</i>-Gerätewert geben.
+         Achtung! Es lassen sich nur Rufumleitungen/-behandlungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten.
+         Es muss also einen <i>callHandling</i>-Gerätewert geben.
+         <br>
+         Das Attribut enableCallHandling muss auf 1 gesetzt sein.
          <br>
          Benötigt die API: TR064 (>=6.50).
       </li><br>
@@ -19699,7 +19892,7 @@ sub Fritz_Helper_Dumper($$;@) {
 
          Benötigt FRITZ!OS 8.00 oder höher.<br>
          <ul>
-           <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:8..28 steps 0.5&gt;</code></dt>
+           <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tempOffset:-5..5 steps 0.5&gt;</code></dt>
            <dd>ändert den Temperatur Offset auf den Wert: 8..28 Grad für das SmartHome Gerät mit der angegebenen ID.</dd>
            <br>
            <dt><code>set &lt;name&gt; smartHome &lt;deviceID&gt; &lt;tmpAdjust:8..28 steps 0.5&gt;</code></dt>
@@ -20125,8 +20318,8 @@ sub Fritz_Helper_Dumper($$;@) {
          Schaltet die übernahme von Alarm Informationen aus/ein.
       </li><br>
 
-      <li><a name="enableCallRedi"></a>
-         <dt><code>attr &lt;name&gt; enableCallRedi &lt;0 | 1&gt;</code></dt>
+      <li><a name="enableCallHandling"></a>
+         <dt><code>attr &lt;name&gt; enableCallHandling &lt;0 | 1&gt;</code></dt>
          <br>
          Schaltet die Übernahme von Rufumleitungs/-behandlungs-Informationen aus/ein.
       </li><br>
@@ -20416,12 +20609,19 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>alarm</b><i>n</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
       <br>
 
-      <li><b>callRedi...</b>Readings callRedi. Verfügbar, wenn das Attribut enableCallRedi aktiviert ist</li>
-      <li><b>callRedi</b><i>n</i> - ID der Rufumleitung/-behandlung <i>1</i></li>
-      <li><b>callRedi</b><i>n</i><b>_active</b> - Aktueller Status der Rufumleitung/-behandlung <i>1</i></li>
-      <li><b>callRedi</b><i>n</i><b>_from</b> - (Teil)Nummer die umgeleitet/behandelt wird <i>1</i></li>
-      <li><b>callRedi</b><i>n</i><b>_to</b> - Ziel der Rufumleitung/-behandlung <i>1</i></li>
-      <li><b>callRedi</b><i>n</i><b>_type</b> - Typ der Rufumleitung/-behandlung <i>1</i></li>
+      <li><b>callHandling...</b>Readings callHandling. Verfügbar, wenn das Attribut enableCallRedi aktiviert ist</li>
+      <br>
+      <li>Readings für FritzOS < 721</li>
+      <li><b>callHandling</b><i>n</i> - Eigene Rufnummer der Rufumleitung <i>n</i></li>
+      <li><b>callHandling</b><i>n</i><b>_dest</b> - Zielnummer der Rufumleitung <i>n</i></li>
+      <li><b>callHandling</b><i>n</i><b>_state</b> - Aktueller Status der Rufumleitung <i>n</i></li>
+      <br>
+      <li>Readings für FritzOS >= 721</li>
+      <li><b>callHandling</b><i>n</i> - ID der Rufumleitung/-behandlung <i>1</i></li>
+      <li><b>callHandling</b><i>n</i><b>_active</b> - Aktueller Status der Rufumleitung/-behandlung <i>1</i></li>
+      <li><b>callHandling</b><i>n</i><b>_from</b> - (Teil)Nummer die umgeleitet/behandelt wird <i>1</i></li>
+      <li><b>callHandling</b><i>n</i><b>_to</b> - Ziel der Rufumleitung/-behandlung <i>1</i></li>
+      <li><b>callHandling</b><i>n</i><b>_type</b> - Typ der Rufumleitung/-behandlung <i>1</i></li>
       <br>
 
       <li><b>kidprofile...</b>Readings kidprofile. Verfügbar, wenn das Attribut enableKidProfiles aktiviert ist</li>
@@ -20477,10 +20677,6 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Bei aktiver Klingelsperre keine Ereignisse signalisieren für das DECT Telefon <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_radio</b> - aktueller Internet-Radio-Klingelton des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_NoRingTime</b> - Klingelsperren des DECT Telefons <i>n</i></li>
-      <br>
-      <li><b>diversity</b><i>n</i> - Eigene Rufnummer der Rufumleitung <i>n</i></li>
-      <li><b>diversity</b><i>n</i><b>_dest</b> - Zielnummer der Rufumleitung <i>n</i></li>
-      <li><b>diversity</b><i>n</i><b>_state</b> - Aktueller Status der Rufumleitung <i>n</i></li>
       <br>
       <li><b>fon</b><i>n</i> - Name des analogen Telefonanschlusses <i>n</i> an der FRITZ!BOX</li>
       <li><b>fon</b><i>n</i><b>_device</b> - Interne Device Nummer des analogen Telefonanschlusses <i>n</i></li>
