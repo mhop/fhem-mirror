@@ -163,6 +163,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.2"  => "23.04.2026  aiFannDetectDrift: Änderung der Driftanalyse ",
   "2.6.1"  => "22.04.2026  neues Debug: miniCache, replace separate Mini Caches by one Multi_Cache, LRU Cache for timestringToTimestamp ".
                            "Mini Caches FmtWeatherCache / cloud2bin / sunalt2bin / temp2bin / isHoliday ", 
   "2.6.0"  => "16.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
@@ -26673,10 +26674,30 @@ sub aiFannDetectDrift {
 
   if ($age_hours < 24) {
       $flag = 'fresh_model';
+      
+      # --- harter Reset der Drift-Historie beim frischen Modell
+      my $nn = $data{$name}{neuralnet}{$fanntyp} //= {};
+
+      $nn->{DriftZoneHistory}  = [];
+      $nn->{DriftZone3Hours}   = 0;
+      $nn->{DriftBias}         = 0;
+      $nn->{DriftSlope}        = 1;
+
+      # --- Referenzwerte auf Modellniveau setzen                                                           # V 2.6.2
+      my $mae_model      = AiNeuralVal ($name, $fanntyp, 'Mae',     1);
+      my $rmse_rel_model = AiNeuralVal ($name, $fanntyp, 'RmseRel', 30);
+      my $bias_model     = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
+      my $slope_model    = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
+
+      $nn->{DriftRefMae}   = $mae_model;
+      $nn->{DriftRefRmse}  = $rmse_rel_model;
+      $nn->{DriftRefBias}  = $bias_model;
+      $nn->{DriftRefSlope} = $slope_model;                                                                  # V 2.6.2
+      
       $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
       return $flag;
   } 
-
+  
   # --- nur Daten, die vom neuen Modell stammen
   my @post_train_idx = grep {   
       my $idx   = $_;
@@ -26825,43 +26846,44 @@ sub aiFannDetectDrift {
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);
   $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = round2 ($drift_score);
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = round2 ($rmse_rel_ratio);
-  $data{$name}{neuralnet}{$fanntyp}{DriftRefRmse}      = round3 ($rmse_rel_live);
-  $data{$name}{neuralnet}{$fanntyp}{DriftRefMae}       = round2 ($mae_live);
+  #$data{$name}{neuralnet}{$fanntyp}{DriftRefRmse}      = round3 ($rmse_rel_live);                  # V 2.6.2
+  #$data{$name}{neuralnet}{$fanntyp}{DriftRefMae}       = round2 ($mae_live);                       # V 2.6.2
   
   
   # --- Drift-Rekalibrierung (automatisch) ---
   # die Werte aus dem ursprünglichen Training werden überschrieben.
   # die letzten 96 Stunden bestimmen danach das neue Modellniveau ($window)
-  # Bias → absolut ersetzt
-  # Slope → multiplikativ angepasst
-  # Drift‑KPIs → zurückgesetzt
-  # Drift‑Zonen‑Timer → zurückgesetzt
-  #  
-  # Historie der letzten Drift-Zonen speichern
+
+  # --- Historie der letzten Drift-Zonen für Log-Ausgabe speichern
   $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory} //= [];
   push @{$data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory}}, $flag;
 
   my $hist = $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory};
-  splice @$hist, 0, @$hist - 20 if @$hist > 20;
+  splice @$hist, 0, @$hist - 20 if(@$hist > 20);
 
-  # Hysterese: stabile Zone 3 nur wenn 3 von 4 Messungen "moderate" oder "severe"
   my $hist_ref    = $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory} // [];                      # Historie holen, falls undef → leeres Array
   my @hist        = @$hist_ref;
-  my $len         = scalar @hist;
-  my $start       = $len > 4 ? $len - 4 : 0;                                                        # Nur die letzten bis zu 4 Einträge betrachten
-  my $zone3_count = 0;
+  #my $len         = scalar @hist;
+  #my $start       = $len > 4 ? $len - 4 : 0;                                                        # Nur die letzten bis zu 4 Einträge betrachten
+  #my $zone3_count = 0;
   
-  if ($len > 0) {
-      $zone3_count = scalar grep { $_ eq 'moderate' || $_ eq 'severe' } @hist[$start .. $len - 1];
-  }
+  #if ($len > 0) {
+  #    $zone3_count = scalar grep { $_ eq 'moderate' || $_ eq 'severe' } @hist[$start .. $len - 1];
+  #}
 
-  my $stable_zone3 = ($zone3_count >= 3) ? 1 : 0;
+  # my $stable_zone3 = ($zone3_count >= 3) ? 1 : 0;                                                 # V 2.6.2
   
   # --- Rekalibrierung auslösen, wenn Zone 3 > X Stunden stabil  
-  if (!$stable_zone3) {
+  #if (!$stable_zone3) {
+  #    $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
+  #}                                                                                                # V 2.6.2
+                     
+  my $zone3_reset = $drift_index <= 1.5 ? 1 : 0;                                                    # V 2.6.2 unterhalb 'mild'-Schwelle
+
+  if ($zone3_reset) {                                                                               # V 2.6.2
       $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
   }
-  
+
   $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}++;
   
   my $block_reason = _aiDrift_safety_blocked ( {  name            => $name,                         # prüfen ob Rekalibrierung vorgenommen werden darf
@@ -26883,29 +26905,29 @@ sub aiFannDetectDrift {
                                              );
 
   if (!$block_reason) {                                                                             # Rekalibrierung
-      if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= DRIFTHZN3TH) {                      # DRIFTHZN3TH => 8                                 
-          #my $new_bias  = $ref_bias + 0.7 * $bias_drift;
+      my $drifthzn3th = ($flag eq 'severe') ? 4 : DRIFTHZN3TH;                                      # V 2.6.2 - 4h bei severe, sonst 8h -> schnellere Rekalibrierung nur bei schwerem Drift
+
+      if ($data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} >= $drifthzn3th) {                                                     
           # ---- Effektiver Bias-Drift: Kombination aus DriftBias und MAE-Drift
           my $bias_drift_effective = 0.5 * $bias_drift + 0.5 * ($mae_live - $ref_mae);
           $bias_drift_effective    = max(-2*$ref_mae, min(2*$ref_mae, $bias_drift_effective));      # Clamping gegen Überreaktionen
           my $new_bias             = $ref_bias + 0.4 * $bias_drift_effective;                       # Sanfte Anpassung (40 % statt 70 %)        
           
-          #my $new_slope = 1.0 + ($slope_live - 1.0) * 0.5;
-          #$new_slope    = max (0.85, min (1.15, $new_slope));
           # --- Slope-Fehler relativ zur Referenz
           my $slope_error           = $slope_live - $ref_slope;
           my $slope_drift_effective = 0.6 * $slope_error + 0.4 * ($rmse_rel_ratio - 1.0) * 0.1;     # Effektiver Slope-Drift: Kombination aus Slope-Drift und RMSE-Drift
           my $new_slope             = $ref_slope + $slope_drift_effective;                          # Neue Steigung
           $new_slope                = max(0.85, min(1.15, $new_slope));                             # Clamping für Stabilität
      
-          $data{$name}{neuralnet}{$fanntyp}{DriftRefBias}  = $new_bias;
-          $data{$name}{neuralnet}{$fanntyp}{DriftRefSlope} = $new_slope;
-        
-          $data{$name}{neuralnet}{$fanntyp}{DriftBias}  = 0;
-          $data{$name}{neuralnet}{$fanntyp}{DriftSlope} = 1;
-
+          $data{$name}{neuralnet}{$fanntyp}{DriftRefBias}       = $new_bias;
+          $data{$name}{neuralnet}{$fanntyp}{DriftRefSlope}      = $new_slope;
+          $data{$name}{neuralnet}{$fanntyp}{DriftBias}          = 0;
+          $data{$name}{neuralnet}{$fanntyp}{DriftSlope}         = 1;
           $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}    = 0;
           $data{$name}{neuralnet}{$fanntyp}{DriftLastRecalTime} = (timestampToTimestring ($name, $t, $lang))[0];
+          
+          $data{$name}{neuralnet}{$fanntyp}{DriftRefMae}  = round2 ($mae_live);
+          $data{$name}{neuralnet}{$fanntyp}{DriftRefRmse} = round3 ($rmse_rel_live);
         
           $flag = 'recalibrated';
       }
@@ -26918,15 +26940,14 @@ sub aiFannDetectDrift {
       Log3 ($name, 1, sprintf (
           "%s DEBUG> DRIFT [%s]: ".
           "Flag=%s | Block=%s | SlopeLive=%.3f | DriftSlope=%.3f | BiasLive=%.2f | DriftBias=%.2f | ".
-          "RMSErelLive=%.1f | RMSErelRatio=%.2f | BiasVarNorm=%.2f |DriftScore=%.2f | ".
-          "Zone3Hours=%d | Hist=[%s]",
+          "RMSErelLive=%.1f | RMSErelRatio=%.2f | BiasVarNorm=%.2f | DriftIndex=%.2f | DriftScore=%.2f | ".
+          "Zone3Hours=%d | Zone3Reset=%d | Hist=[%s]",
           $name, $fanntyp,
           $flag,
           ($block_reason // 'none'),
           $slope_live, $slope_drift, $bias_live, $bias_drift,
-          $rmse_rel_live, $rmse_rel_ratio, $bias_var_norm, $drift_score,
-          $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} // 0,
-          join (",", @hist)
+          $rmse_rel_live, $rmse_rel_ratio, $bias_var_norm, $drift_index, $drift_score, 
+          $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} // 0, $zone3_reset, join (",", @hist)
       ) );
   }
   
