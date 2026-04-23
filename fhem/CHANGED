@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix: 72_FritzSmart: Fehlerkorrekturen.
+ - feature: 72_FritzSmart: set ... diversity ist jetzt set ... callHandling.
  - feature: 76_SolarForecast: Version 2.6.1
  - feature: 70_SVDRP: added PLAY
  - bugfix: 72_FritzSmart: Fehlerkorrektur.
