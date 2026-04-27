@@ -136,9 +136,10 @@ sub FULLY_Define
 
     if ($init_done && !exists($hash->{fully}{password}) && exists($hash->{CL})) {
         asyncOutput ($hash->{CL}, "Please use command 'set $name authentication' to set the Fully password");
+        return;
     }
 
-    return;
+    return FULLY_Start($hash);
 }
 
 ######################################################################
@@ -207,7 +208,7 @@ sub FULLY_SetPolling
     my $mode = shift // return;
     my $interval = shift;
 
-    return if !$init_done || AttrVal($hash->{NAME}, 'disable', 0);
+    return if !$init_done;
 
     my $name = $hash->{NAME};
     $interval //= AttrVal ($name, 'pollInterval', $hash->{fully}{interval} // $FULLY_POLL_INTERVAL);
