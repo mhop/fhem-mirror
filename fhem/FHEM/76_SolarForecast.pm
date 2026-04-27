@@ -163,6 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.3"  => "27.04.2026  Debug apiProcess: Anzeige ob ein Cached Wert verwendet wird bei 'DWD API Tilted' ".
+                           "__calcSunPosition: Korrektur für Randstunden ",
   "2.6.2"  => "23.04.2026  aiFannDetectDrift: Änderung der Driftanalyse ",
   "2.6.1"  => "22.04.2026  neues Debug: miniCache, replace separate Mini Caches by one Multi_Cache, LRU Cache for timestringToTimestamp ".
                            "Mini Caches FmtWeatherCache / cloud2bin / sunalt2bin / temp2bin / isHoliday ", 
@@ -4664,7 +4666,7 @@ sub __getDWDSolarData {
       #my $cafd = 'trackFlex';                                                                       # Art der Flächenfaktor Berechnung ()
       my $cafd = 'tiltedCached'; 
       
-      my ($af, $G_tilt, $pv, $sdr);
+      my ($af, $G_tilt, $pv, $sdr, $cv);
       
       for my $string (@strings) {                                                                   # für jeden String der Config ..
           my $ti   = StringVal ($name, $string, 'tilt',   undef);                                   # Neigungswinkel Solarmodule
@@ -4708,25 +4710,25 @@ sub __getDWDSolarData {
               }
           }
           else {                                                                                    # es gilt 𝑃eff = peak*𝐺tilt/1000 * Faktor
-              $G_tilt = ___computeTiltedIrradianceCached ( { name    => $name,
-                                                             date    => $date,                      # aktuelles Datum "YYYY-MM-DD"
-                                                             num     => $num,
-                                                             dday    => $dday,
-                                                             ddate   => $ddate,                     # abzurufendes Datum
-                                                             dofyear => $dofyear,
-                                                             chour   => $paref->{chour},
-                                                             hod     => $hod,
-                                                             debug   => $debug,
-                                                             tilt    => $ti,
-                                                             azimut  => $az,
-                                                             rad     => $rad,
-                                                           }
-                                                         ); 
+              ($G_tilt, $cv) = ___computeTiltedIrradianceCached ( { name    => $name,
+                                                                    date    => $date,               # aktuelles Datum "YYYY-MM-DD"
+                                                                    num     => $num,
+                                                                    dday    => $dday,
+                                                                    ddate   => $ddate,              # abzurufendes Datum
+                                                                    dofyear => $dofyear,
+                                                                    chour   => $paref->{chour},
+                                                                    hod     => $hod,
+                                                                    debug   => $debug,
+                                                                    tilt    => $ti,
+                                                                    azimut  => $az,
+                                                                    rad     => $rad,
+                                                                  }
+                                                                ); 
                                                                                                     # --- Peakleistung bedeutet: Bei 1000 W/m² Einstrahlung liefert der String seine Peakleistung                                                                 
               $pv = ($G_tilt / 1000) * $peak * PRDEF;                                               # es gilt 𝑃eff = peak * 𝐺tilt/1000 * Faktor -> peak in W, G_tilt in W/m²
               $pv = round1 ($pv);
               
-              debugLog ($paref, 'apiProcess', "DWD API Tilted - PV estimate String >$string< => $dtpart, rad=$rad, P_tilt=$G_tilt W/m2, pv=$pv Wh");
+              debugLog ($paref, 'apiProcess', "DWD API Tilted - PV estimate String >$string< => $dtpart, rad=$rad, Cache=$cv, P_tilt=$G_tilt W/m2, pv=$pv Wh");
           }
           
           # --- Daten speichern
@@ -4792,13 +4794,17 @@ sub ___computeTiltedIrradianceCached {
   
   #debugLog ($paref, 'apiProcess', "DWD API Tilted - num=$num, dday=$dday, chour=$chour, hod=$hod, nhtstr=$nhtstr, rel=$rel");
 
-  if (!defined $sunalt || !defined $sunaz || $sunalt <= 0) {
+  if (!defined $sunalt || !defined $sunaz) {
       if (!defined $sunalt || !defined $sunaz) {
-          debugLog ($paref, 'apiProcess', "DWD API - day=$dday hod=$hod -> 
-                                           Value of sunaz/sunalt not stored in Nexthours or pvHistory, workaround using G_tilt=0");
+          debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
+                                         ."Value of sunaz/sunalt not stored in Nexthours or pvHistory, workaround using G_tilt=0");
+      }
+      elsif ($sunalt <= 0) {
+          debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
+                                         ."sunalt=$sunalt (sun below horizon for full hour), G_tilt=0");
       }
                                        
-      return 0;
+      return (0, 0);
   }
   
   my $cache_key = join '::', 'TILTIRR',                                         # Cache Key ID
@@ -4826,7 +4832,7 @@ sub ___computeTiltedIrradianceCached {
   my $cached = LRU_get ($name, $cache, $cache_key);
 
   if (defined $cached) {
-      return $cached;
+      return ($cached, 1);
   }
 
   # --- Neuberechnung
@@ -4835,7 +4841,7 @@ sub ___computeTiltedIrradianceCached {
   my $pi  = 4 * atan2 (1,1);                                                    # klassischer Perl-Trick, um π (Pi) mathematisch exakt zu berechnen – ohne es als feste Zahl einzutragen
   my $deg = $pi / 180.0;
 
-  return 0 if(!defined ($sg) || $sg <= 0);
+  return (0, 0) if(!defined ($sg) || $sg <= 0);
 
   my $sunaz_r  = $sunaz    * $deg;
   my $sunalt_r = $sunalt   * $deg;
@@ -4844,12 +4850,12 @@ sub ___computeTiltedIrradianceCached {
   my $sin_ele  = sin ($sunalt_r);
   my $cos_ele  = cos ($sunalt_r);
 
-  return 0 if($sin_ele <= 0.0);
+  return (0, 0) if($sin_ele < 0.01);                                            # entspricht ca. 0.57° Sonnenstand
 
   my $I0n = SOLARCONSTANT * (1.0 + 0.033 * cos (2.0 * $pi * $dofyear / 365.0));
   my $I0h = $I0n * $sin_ele;
   
-  return 0 if($I0h <= 0.0);
+  return (0, 0) if($I0h <= 0.0);
 
   my $Kt = $sg / $I0h;
   $Kt    = max (0.0, min (1.0, $Kt));                                           # Kt (Clear-Sky-Index), Clamping wichtig
@@ -4921,10 +4927,10 @@ sub ___computeTiltedIrradianceCached {
   $G_tilt = round2 ($G_tilt);
   
   if ($G_tilt > 0) {
-      LRU_insert ($name, $cache, $cache_key, $G_tilt);                          # neuen Eintrag einfügenund LRU aktualisieren
+      LRU_insert ($name, $cache, $cache_key, $G_tilt);                          # neuen Eintrag einfügen und LRU aktualisieren
   }                                     
 
-return $G_tilt;                                                                 # effektive Einstrahlung $G_tilt auf die PV-Anlage in W/m² 
+return ($G_tilt, 0);                                                            # effektive Einstrahlung $G_tilt auf die PV-Anlage in W/m² 
 }
 
 ##########################################################################################################
@@ -11886,8 +11892,8 @@ sub __calcSunPosition {
   my ($az, $alt);
   
   eval {                                                                                                    # statt Astro_Get geht auch FHEM::Astro::Get
-      $az  = round0 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr));
-      $alt = round0 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr));
+      $az  = round2 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr));
+      $alt = round2 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr));
       1;
   } or do {
       my $err = "process error while reading sun position: $@";
@@ -11895,6 +11901,40 @@ sub __calcSunPosition {
       Log3 ($name, 1, "$name - ERROR - $err");
       return;                                                                                               # Abbruch weil WICHTIGE Daten fehlen
   };
+  
+  #--------------------------------------------------------------------
+  # Korrektur für Randstunden (Sonnenauf-/-untergang):
+  # Liegt Sonne bei :30 unter dem Horizont, das tatsächlich beleuchtete
+  # Teilfenster innerhalb der Stunde suchen und dessen Mittelpunkt nutzen.
+  #--------------------------------------------------------------------
+  if ($alt <= 0) {
+      my @lit_mins;
+
+      for my $min (5, 15, 25, 35, 45, 55) {
+          my $t_probe   = sprintf '%s %02d:%02d:00', $dstr, $hh, $min;
+          my $alt_probe = eval { FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $t_probe) } // -90;
+          
+          push @lit_mins, $min if($alt_probe > 0);
+      }
+
+      if (@lit_mins) {                                                                                      # Mittelpunkt des beleuchteten Fensters [erstes .. letztes Treffer-Sample]
+          my $mid_min = int (($lit_mins[0] + $lit_mins[-1]) / 2 + 0.5);
+          $tstr       = sprintf '%s %02d:%02d:00', $dstr, $hh, $mid_min;
+
+          debugLog ($paref, 'collectData_long',
+              "Sun position corrected for twilight hour: hod=$hod, "
+             ."lit_mins=[@lit_mins], effective_mid=$mid_min");
+
+          eval {
+              $az  = round2 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr));
+              $alt = round2 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr));
+              1;
+          } or do {
+              Log3 ($name, 2, "$name - WARNING - Could not get corrected sun position for $tstr");          # $az/$alt behalten die ursprünglichen :30-Werte (alt <= 0)
+          };                                                                                                # -> ___computeTiltedIrradianceCached gibt (0,0) zurück
+      }
+  }
+
 
   $data{$name}{nexthours}{$nhtstr}{sunaz}  = $az;
   $data{$name}{nexthours}{$nhtstr}{sunalt} = $alt;
@@ -26846,10 +26886,7 @@ sub aiFannDetectDrift {
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);
   $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = round2 ($drift_score);
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = round2 ($rmse_rel_ratio);
-  #$data{$name}{neuralnet}{$fanntyp}{DriftRefRmse}      = round3 ($rmse_rel_live);                  # V 2.6.2
-  #$data{$name}{neuralnet}{$fanntyp}{DriftRefMae}       = round2 ($mae_live);                       # V 2.6.2
-  
-  
+
   # --- Drift-Rekalibrierung (automatisch) ---
   # die Werte aus dem ursprünglichen Training werden überschrieben.
   # die letzten 96 Stunden bestimmen danach das neue Modellniveau ($window)
@@ -26862,22 +26899,7 @@ sub aiFannDetectDrift {
   splice @$hist, 0, @$hist - 20 if(@$hist > 20);
 
   my $hist_ref    = $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory} // [];                      # Historie holen, falls undef → leeres Array
-  my @hist        = @$hist_ref;
-  #my $len         = scalar @hist;
-  #my $start       = $len > 4 ? $len - 4 : 0;                                                        # Nur die letzten bis zu 4 Einträge betrachten
-  #my $zone3_count = 0;
-  
-  #if ($len > 0) {
-  #    $zone3_count = scalar grep { $_ eq 'moderate' || $_ eq 'severe' } @hist[$start .. $len - 1];
-  #}
-
-  # my $stable_zone3 = ($zone3_count >= 3) ? 1 : 0;                                                 # V 2.6.2
-  
-  # --- Rekalibrierung auslösen, wenn Zone 3 > X Stunden stabil  
-  #if (!$stable_zone3) {
-  #    $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
-  #}                                                                                                # V 2.6.2
-                     
+  my @hist        = @$hist_ref;           
   my $zone3_reset = $drift_index <= 1.5 ? 1 : 0;                                                    # V 2.6.2 unterhalb 'mild'-Schwelle
 
   if ($zone3_reset) {                                                                               # V 2.6.2

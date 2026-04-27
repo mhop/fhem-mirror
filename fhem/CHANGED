@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change: 76_SolarForecast: Version 2.6.3
  - bugfix: 72_FritzSmart: call/ring/dectRing
  - feature: 76_SolarForecast: Version 2.6.2
  - bugfix: 72_FritzSmart: Fehlerkorrekturen.
