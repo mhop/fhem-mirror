@@ -164,7 +164,7 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "2.6.3"  => "27.04.2026  Debug apiProcess: Anzeige ob ein Cached Wert verwendet wird bei 'DWD API Tilted' ".
-                           "__calcSunPosition: Korrektur für Randstunden ",
+                           "__calcSunPosition: Korrektur für Randstunden, __getDWDSolarData: Korrektur DWD rad1h-Reading ",
   "2.6.2"  => "23.04.2026  aiFannDetectDrift: Änderung der Driftanalyse ",
   "2.6.1"  => "22.04.2026  neues Debug: miniCache, replace separate Mini Caches by one Multi_Cache, LRU Cache for timestringToTimestamp ".
                            "Mini Caches FmtWeatherCache / cloud2bin / sunalt2bin / temp2bin / isHoliday ", 
@@ -4650,8 +4650,8 @@ sub __getDWDSolarData {
       my $dtpart   = "$ddate $dt->{hour}";                                                          # Logging <date> <hour>
       my $hod      = sprintf "%02d", ($dt->{hour} + 1);                                             # abzurufende Hour of Day
 
-      my $runh = int $dt->{hour};                                                                   # Stunde für DWD Reading    
-      my $rad  = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                            # Rad1h = Absolute Globalstrahlung letzte 1 Stunde, kJ/m2
+      my $runh = int ($dt->{hour} +1 );                                                             # V 2.6.3 - Korrektur Stunde für DWD Reading    
+      my $rad  = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                            # Rad1h = Absolute Globalstrahlung letzte 1 Stunde (z.B. 7 für 6), kJ/m2
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
