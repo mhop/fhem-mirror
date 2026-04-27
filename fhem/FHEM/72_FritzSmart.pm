@@ -87,7 +87,7 @@ use HttpUtils;
 use feature 'state';
 use Blocking;
 
-our $ModulVersion = "26.04.23";
+our $ModulVersion = "26.04.27";
 our $missingModul = "";
 our $missingXML = "";
 
@@ -300,6 +300,10 @@ our %TR064   = (
                                         control => "lanhostconfigmgm",
                                         action  => "GetInfo",
                                         igd     => 0},
+        Layer3Forwarding           => { service => "Layer3Forwarding:1",
+                                        control => "layer3forwarding",
+                                        action  => "GetDefaultConnectionService",
+                                        igd     => 0},
         ManagementServer           => { service => "ManagementServer:1",
                                         control => "mgmsrv",
                                         action  => "GetInfo",
@@ -373,9 +377,25 @@ our %TR064   = (
                                         control => "wanipconnection1",
                                         action  => "GetInfo",
                                         igd     => 0},
+        WANIPConnection            => { service => "WANIPConnection:1",
+                                        control => "wanipconnection1",
+                                        action  => "GetConnectionTypeInfo",
+                                        igd     => 0},
+        WANIPConnection            => { service => "WANIPConnection:1",
+                                        control => "wanipconnection1",
+                                        action  => "GetStatusInfo",
+                                        igd     => 0},
         WANPPPConnection           => { service => "WANPPPConnection:1",
                                         control => "wanpppconn1",
                                         action  => "GetInfo",
+                                        igd     => 0},
+        WANPPPConnection           => { service => "WANPPPConnection:1",
+                                        control => "wanpppconn1",
+                                        action  => "GetConnectionTypeInfo",
+                                        igd     => 0},
+        WANPPPConnection           => { service => "WANPPPConnection:1",
+                                        control => "wanpppconn1",
+                                        action  => "GetStatusInfo",
                                         igd     => 0},
         WebDAVClient               => { service => "X_AVM-DE_WebDAVClient:1",
                                         control => "x_webdav",
@@ -3158,6 +3178,11 @@ sub Fritz_Set_Modul($$@)
          Fritz_Helper_retMsg($hash, "ERROR: FritzOS version must be greater than 7.20.", $retMsgbySet);
        }
 
+       if(main::AttrVal($name, "disableDectInfo", "0") eq "1") {
+         $retMsg = "ERROR: Attribut disableDectInfo is set. dectRingblock is not available.";
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+
        # only on/off
        my $lm_OnOff = "0";
        my $kl_OnOff = "off";
@@ -3981,6 +4006,11 @@ sub Fritz_Set_Modul($$@)
      # dectRing
      elsif ( lc $cmd eq 'dectring' && $mesh eq "master") {
 
+       if(main::AttrVal($name, "disableDectInfo", "0") eq "1") {
+         $retMsg = "ERROR: Attribut disableDectInfo is set. dectRing is not available.";
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+
        unless (int @val) {
          $retMsg = "ERROR: At least one parameter must be defined.";
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
@@ -4014,8 +4044,15 @@ sub Fritz_Set_Modul($$@)
 
        $duration = 20 if ($duration > 20);
 
-       if($id == -1 || main::ReadingsNum($name, "dect" .$id. "_ID", -1) != $id) {
-         $retMsg = "ERROR: no DECT Phone with ID:$id available";
+       if($id == -1) {
+         $retMsg = "ERROR: no DECT Phone with dect$id available";
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+
+       my $dectID = main::ReadingsVal($name, "dect" .$id, undef);
+
+       if(!$dectID) {
+         $retMsg = "ERROR: no DECT Phone with dect$id available";
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
        }
 
@@ -4047,22 +4084,24 @@ sub Fritz_Set_Modul($$@)
        my $rTones = $result->{data}->{ringTones};
        my $found  = -1;
 
-       if ($tone eq "?") {
-         $retMsg = "Available ring tones: \n";
-       } else {
-         $tone   = ($tone < 10 ? sprintf("%2d", $tone) : $tone) ;
-         $retMsg = "ERROR: no ring tone $tone found. Available ring tones: \n";
-       }
-
        for my $rTone (0 .. scalar @{$rTones} - 1) {
-         if ($rTones->[$rTone]->{id} == $tone) {
+         if ($tone ne "?" && $rTones->[$rTone]->{id} == $tone) {
            $found = $tone;
          }
          $retMsg .= $rTones->[$rTone]->{id}. ":" .$rTones->[$rTone]->{name}. "\n";
        }
 
-       if($found == -1 || $tone eq "?") {
+       if( $tone eq "?") {
+
+         $retMsg = "Available ring tones: \n" . $retMsg;
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
+       } elsif($found == -1) {
+
+         $tone   = ($tone < 10 ? sprintf("%2d", $tone) : $tone) ;
+         $retMsg = "ERROR: Ringtone $tone not available.\nAvailable ring tones: \n" . $retMsg;
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+
        }
 
        push @cmdBuffer, "dectring $id $duration $tone";
@@ -4070,6 +4109,7 @@ sub Fritz_Set_Modul($$@)
        return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
 
      } # end dectRing
+
      #set ring
      elsif ( lc $cmd eq 'ring' && $mesh eq "master") {
        unless (int @val) {
@@ -5713,7 +5753,7 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
        if ($intern) {
          unless ($noDect) {
            Fritz_Readout_Add_Reading $hash, $roReadings, "dect".$runNo,                           $name;
-#           Fritz_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_ID",                     $id;
+#           Fritz_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_internalID",             $id;
            Fritz_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_intern",                 $intern ;
            Fritz_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_alarmRingTone",          $_->{AlarmRingTone0}, "ringtone" ;
            Fritz_Readout_Add_Reading $hash, $roReadings, "dect".$runNo."_intRingTone",            $_->{IntRingTone}, "ringtone" ;
@@ -12801,17 +12841,17 @@ sub Fritz_Set_ring_Phone($)
    my $portName = $tr064NewResult->{"X_VoIP:1"}->{"X_AVM-DE_GetPhonePort"}->{'NewX_AVM-DE_PhoneName'};
    # set click to dial
    @tr064CmdArray = ();
-   if ($portName) {
-     push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialSetConfig", "NewX_AVM-DE_PhoneName", $portName];
-     $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
+#   if ($portName) {
+#     push @tr064CmdArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialSetConfig", "NewX_AVM-DE_PhoneName", $portName];
+#     $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
-     if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
-       Fritz_Log $hash, 2, "(set ring): " . Dumper($tr064NewResult->{Error});
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "ring: " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error}, 1);
-       return $name."|2|Error (set ring): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error});
-     }
-     Fritz_Log $hash, 4, "Switch ClickToDial on, set ring port '$portName'";
-   }
+#     if (exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+#       Fritz_Log $hash, 2, "(set ring): " . Dumper($tr064NewResult->{Error});
+#       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_ring", "ring: " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error}, 1);
+#       return $name."|2|Error (set ring): " . Fritz_Helper_TR064_ErrMsg($hash, $tr064NewResult->{Error});
+#     }
+#     Fritz_Log $hash, 4, "Switch ClickToDial on, set ring port '$portName'";
+#   }
 
    $intNo =~ s/,/#/g;
 
@@ -18398,16 +18438,18 @@ sub Fritz_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="dectRing"></a>
-         <dt><code>set <name>dectRing <id:DECT_ID> [dur:duration] [tone:ringtone_id|?]</code></dt>
+         <dt><code>set <name>dectRing &lt;id:ID&gt; [dur:duration] [tone:ringtone_id|?]</code></dt>
          <br>
          <dt>Example:</dt>
          <dd>
          <code>set <name>dectRing id:1 dur:15 tone:1</code>
          </dd>
          <br>
+         &lt;id:ID&gt; is the numbering of the dect... Readings.
+         <br>
          This sets the DECT phone to ring for a specified number of seconds and a specific [tone:ringtone_id]. The maximum ring duration is 20 seconds.
          <br>
-         The parameter [tone:?] lists the available ringtones for the DECT phone with the &lt;id:DECT_ID&gt;.
+         The parameter [tone:?] lists the available ringtones for the DECT phone with the &lt;id:ID&gt;.
          <br>
          The default duration is 5 seconds. However, there may be delays in the FRITZ!Box. The default ringtone is the DECT phone's internal ringtone.
          <br>
@@ -19691,16 +19733,18 @@ sub Fritz_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="dectRing"></a>
-         <dt><code>set &lt;name&gt; dectRing &lt;id:DECT_ID&gt; [dur:dauer] [tone:ringtone_id|?]</code></dt>
+         <dt><code>set &lt;name&gt; dectRing &lt;id:ID&gt; [dur:dauer] [tone:ringtone_id|?]</code></dt>
          <br>
          <dt>Beispiel:</dt>
          <dd>
          <code>set &lt;name&gt; dectRing id:1 dur:15 tone:1</code>
          </dd>
          <br>
+         &lt;id:ID&gt; ist die Nummerierung der dect... Readings.
+         <br>
          Lässt das DECT Telefon für "dauer" Sekunden und [tone:ringtone_id] klingeln. Maximale Klingeldauer sind 20 Sekunden.
          <br>
-         Der Parameter [tone:?] listet die verfügbaren Klingeltöne für das DECT Telefon mit der &lt;id:DECT_ID&gt; auf
+         Der Parameter [tone:?] listet die verfügbaren Klingeltöne für das DECT Telefon mit der &lt;id:ID&gt; auf
          <br>
          Standard-Dauer ist 5 Sekunden. Es kann aber zu Verzögerungen in der FRITZ!BOX kommen. Standard-Klingelton ist der interne Klingelton des DECT Telefons.
          <br>
@@ -21083,3 +21127,10 @@ sub Fritz_Helper_Dumper($$;@) {
 # {upnp_activated: "1"} upnp_activated:"1"
 
 # modify silent <Geräte_Name> <neue_Definition>
+#
+# man braucht eine Session-ID für eine Sitzung, in der die 2FA bereits erfolgreich ausgeführt wurde
+# $ curl -d "xhr=1&page=support&twofactor=1&sid=981d550133e6a448" http://fritz.box/data.lua
+# xhr=1
+# page=support
+# twofactor=1
+# sid=<hier kommt die SID hin>
