@@ -740,6 +740,30 @@ deletereading -q DEVICE (?!associatedWith|IODev).*
 attr DEVICE model zigbee2mqtt_curtain_driver
 setreading DEVICE attrTemplateVersion 20240108
 
+#contributed by offebaescher, https://forum.fhem.de/index.php?msg=1362615
+name:zigbee2mqtt_Tuya_TS0601_dual_water_switch
+desc: Tuya TS0601_water_switch - Tested with _TZE284_fhvpaltk
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_05m1
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to message_socket;{ AttrVal('DEVICE','icon','sani_water_tap') }
+attr DEVICE icon ICON
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList \
+  on_l1:noArg $\DEVICETOPIC/set {"state_l1":"ON"}\
+  off_l1:noArg $\DEVICETOPIC/set {"state_l1":"OFF"}\
+  on_l2:noArg $\DEVICETOPIC/set {"state_l2":"ON"}\
+  off_l2:noArg $\DEVICETOPIC/set {"state_l2":"OFF"}\
+  countdown_l1:slider,0,1,1440 $\DEVICETOPIC/set {"countdown_l1":$EVTPART1}\
+  countdown_l2:slider,0,1,1440 $\DEVICETOPIC/set {"countdown_l2":$EVTPART1}
+attr DEVICE stateFormat L1: state_l1 (valve_status_l1) | L2: state_l2 (valve_status_l2) | Bat: battery%
+attr DEVICE webCmd on_l1:off_l1:on_l2:off_l2
+attr DEVICE model zigbee2mqtt_Tuya_TS0601_dual_water_switch
+setreading DEVICE attrTemplateVersion 20260425
+
+
 
 name:zigbee2mqtt_ContactSensor
 desc: Contact sensor via zigbee2mqtt <br>Tested with: Xiaomi models Aqara and Mijia
@@ -4173,6 +4197,64 @@ state
 attr DEVICE jsonMap switch_temperature_tC:temperature switch_temperature_tF:0 params_wifi_sta_ip:ip
 attr DEVICE model shellyPlus_i4
 setreading DEVICE attrTemplateVersion 20220128
+
+
+#provided by drhirn, https://forum.fhem.de/index.php?msg=1360790
+name:shellyPowerStripG4_split_cmd
+filter:TYPE=MQTT2_DEVICE
+desc:<p>Shelly Power Strip Gen4 using original firmware<br>NOTE: This is the split template. It creates four different devices.</p><p>MQTT settings at the device:<ul><li><i>Enable 'MQTT Control'</i> enabled</li><li><i>Enable RPC over MQTT</i> disabled</li><li><i>RPC status notifications over MQTT</i> disabled</li><li><i>Generic status update over MQTT</i> enabled</ul></p>
+par:DEV_TPC;Shelly name in the topic;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m<(shellies/[^/]+|shelly(plus|pro4pm|1pmmini-)[^/:_]{4,}+)> ? $1 : undef }
+order:A_21
+par:ICON;ICON as set, defaults to message_socket;{ AttrVal('DEVICE','icon','message_socket') }
+deletereading -q DEVICE (?!associatedWith|IODev).*
+attr DEVICE devicetopic DEV_TPC
+attr DEVICE icon ICON
+attr DEVICE devStateIcon {my $onl = ReadingsVal($name,'LWT','offline') eq 'offline'?'10px-kreis-rot': '10px-kreis-gruen'; $onl = FW_makeImage($onl); my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'power',0); my $total = round(ReadingsNum($name,'energy_total',0)/1000,2); my $ip = ReadingsVal($name,'wifi_sta_ip','none'); qq(<a href="http://$ip" target="_blank">${onl}</a><a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh</div>)}
+attr DEVICE readingList $\DEVICETOPIC/online:.* {my %map=(true=>"online",false=>"offline");; { LWT=>$map{$EVENT}||$EVENT } }\
+  $\DEVICETOPIC:.* {}\
+  $\DEVICETOPIC/announce:.* { json2nameValue($EVENT) }\
+  $\DEVICETOPIC/command:.* {}\
+  $\DEVICETOPIC/command/switch_0:.* {}\
+  $\DEVICETOPIC/status:.* {}\
+  $\DEVICETOPIC/status/mqtt:.* { json2nameValue($EVENT,'mqtt_') }\
+  $\DEVICETOPIC/status/sys:.* { json2nameValue($EVENT,'sys_') }\
+  $\DEVICETOPIC/status/switch_0:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/status/wifi:.* { json2nameValue($EVENT,'wifi_') }\
+  $\DEVICETOPIC/status/(ble|cloud|knx|powerstrip_ui|ws|zigbee):.* {}
+attr DEVICE setList toggle:noArg $\DEVICETOPIC/command/switch:0 toggle\
+  on:noArg $\DEVICETOPIC/command/switch:0 on\
+  off:noArg $\DEVICETOPIC/command/switch:0 off\
+  on-for-timer $\DEVICETOPIC/command/switch:0 on,$EVTPART1\
+  off-for-timer $\DEVICETOPIC/command/switch:0 off,$EVTPART1\
+  x_statusUpdate:noArg $\DEVICETOPIC/command status_update\
+  x_getDeviceInfo:noArg $\DEVICETOPIC/command announce\
+  x_checkUpdate:noArg $\DEVICETOPIC/command ota_update_check\
+  x_update:noArg $\DEVICETOPIC/command ota_update_to_stable
+attr DEVICE jsonMap output:state aenergy_total:energy_total apower:power freq:frequency
+attr DEVICE setStateList on off toggle on-for-timer off-for-timer
+attr DEVICE webCmd :
+deleteattr DEVICE getList
+set DEVICE x_statusUpdate
+set DEVICE x_getDeviceInfo
+setreading DEVICE LWT online
+loop:#:1:2:3
+copy DEVICE DEVICE_CH#
+deleteattr DEVICE_CH# stateFormat
+attr DEVICE_CH# devStateIcon {my $light = FW_makeImage(ReadingsVal($name,'state','off')); my $cons = ReadingsNum($name,'power',0); my $total = round(ReadingsNum($name,'energy_total',0)/1000,2); qq(<a href="/fhem?cmd.dummy=set $name toggle&XHR=1">${light}</a><div>Verbrauch: $cons W / Total: $total kwh</div>)}
+attr DEVICE_CH# readingList\
+  $\DEVICETOPIC/status/switch_#:.* { $EVENT =~ s/"output":true/"state":"on"/g; $EVENT =~ s/"output":false/"state":"off"/g; json2nameValue($EVENT,'',$JSONMAP) }\
+  $\DEVICETOPIC/command/switch_#:.* {}
+attr DEVICE_CH# setList toggle:noArg $\DEVICETOPIC/command/switch:# toggle\
+  on:noArg $\DEVICETOPIC/command/switch:# on\
+  off:noArg $\DEVICETOPIC/command/switch:# off\
+  on-for-timer $\DEVICETOPIC/command/switch:# on,$EVTPART1\
+  off-for-timer $\DEVICETOPIC/command/switch:# off,$EVTPART1
+loop:END
+rename DEVICE_CH3 DEVICE_CH4
+rename DEVICE_CH2 DEVICE_CH3
+rename DEVICE_CH1 DEVICE_CH2
+setreading DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 attrTemplateVersion 20260427
+attr DEVICE,DEVICE_CH2,DEVICE_CH3,DEVICE_CH4 model powerstripg4
 
 
 ###########################################
