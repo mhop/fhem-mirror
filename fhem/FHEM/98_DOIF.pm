@@ -4950,6 +4950,17 @@ sub AttrNum {
 
 package ui_Table;
 
+
+sub get_uiTable {
+  my ($device)=@_;
+  return ::DOIF_RegisterEvalAll($::defs{$device},$device,"uiTable");
+}
+
+sub get_uiState {
+  my ($device)=@_;
+  return ::DOIF_RegisterEvalAll($::defs{$device},$device,"uiState");
+}
+
 sub FW_makeImage {
   my ($image) = @_;
   return (::FW_makeImage($image));
