@@ -18111,9 +18111,17 @@ sub _calcTodayDeviation {
 
   my $confc = CurrentVal  ($name, 'tdConFcUp2Now', 0);
   my $conre = ReadingsNum ($name, 'Today_CONreal', 0);
+  
+  # --- Tagesfortschritt Consumption (0.0 … 1.0) bezogen auf 24h
+  # Consumption ist unabhängig von der Lichtphase und läuft auch nachts.
+  # Mitternacht = 0.0, kurz vor Mitternacht = ~1.0
+  my $midnight_ts  = timestringToTimestamp ($hash, $date.' 00:00:00');
+  my $progress_con = ($t - $midnight_ts) / 86400;                                           # 86400 = Sekunden pro Tag
+  $progress_con    = 0 if $progress_con < 0;
+  $progress_con    = 1 if $progress_con > 1;
 
   if ($conre > $min_wh_con && $confc > $min_wh_con) {
-      my $raw  = ($confc - $conre) / $confc * 100 * $progress;
+      my $raw  = ($confc - $conre) / $confc * 100 * $progress_con;
       $raw     = $raw >  $max_dev ?  $max_dev
                : $raw < -$max_dev ? -$max_dev : $raw;
       $raw    *= -1 if ($perspective eq 'reverse');                                         # früh flippen → alles danach konsistent
