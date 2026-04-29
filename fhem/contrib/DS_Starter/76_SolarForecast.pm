@@ -163,6 +163,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.4"  => "29.04.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
+                           "exponentielles Glätten EWMA -> verhindert Sprünge durch einen gleitenden Mittelwert über die letzten ".
+                           "Berechnungen ",
+  "2.6.3"  => "27.04.2026  Debug apiProcess: Anzeige ob ein Cached Wert verwendet wird bei 'DWD API Tilted' ".
+                           "__calcSunPosition: Korrektur für Randstunden, __getDWDSolarData: Korrektur DWD rad1h-Reading ",
   "2.6.2"  => "23.04.2026  aiFannDetectDrift: Änderung der Driftanalyse ",
   "2.6.1"  => "22.04.2026  neues Debug: miniCache, replace separate Mini Caches by one Multi_Cache, LRU Cache for timestringToTimestamp ".
                            "Mini Caches FmtWeatherCache / cloud2bin / sunalt2bin / temp2bin / isHoliday ", 
@@ -4648,8 +4653,8 @@ sub __getDWDSolarData {
       my $dtpart   = "$ddate $dt->{hour}";                                                          # Logging <date> <hour>
       my $hod      = sprintf "%02d", ($dt->{hour} + 1);                                             # abzurufende Hour of Day
 
-      my $runh = int $dt->{hour};                                                                   # Stunde für DWD Reading    
-      my $rad  = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                            # Rad1h = Absolute Globalstrahlung letzte 1 Stunde, kJ/m2
+      my $runh = int ($dt->{hour} +1 );                                                             # V 2.6.3 - Korrektur Stunde für DWD Reading    
+      my $rad  = ReadingsVal ($raname, "fc${fd}_${runh}_Rad1h", '0.00');                            # Rad1h = Absolute Globalstrahlung letzte 1 Stunde (z.B. 7 für 6), kJ/m2
 
       if ($runh == 12 && !$rad) {
           $ret = "The reading 'fc${fd}_${runh}_Rad1h' does not appear to be present or has an unusual value.\nRun 'set $name plantConfiguration check' for further information.";
@@ -4664,7 +4669,7 @@ sub __getDWDSolarData {
       #my $cafd = 'trackFlex';                                                                       # Art der Flächenfaktor Berechnung ()
       my $cafd = 'tiltedCached'; 
       
-      my ($af, $G_tilt, $pv, $sdr);
+      my ($af, $G_tilt, $pv, $sdr, $cv);
       
       for my $string (@strings) {                                                                   # für jeden String der Config ..
           my $ti   = StringVal ($name, $string, 'tilt',   undef);                                   # Neigungswinkel Solarmodule
@@ -4708,25 +4713,25 @@ sub __getDWDSolarData {
               }
           }
           else {                                                                                    # es gilt 𝑃eff = peak*𝐺tilt/1000 * Faktor
-              $G_tilt = ___computeTiltedIrradianceCached ( { name    => $name,
-                                                             date    => $date,                      # aktuelles Datum "YYYY-MM-DD"
-                                                             num     => $num,
-                                                             dday    => $dday,
-                                                             ddate   => $ddate,                     # abzurufendes Datum
-                                                             dofyear => $dofyear,
-                                                             chour   => $paref->{chour},
-                                                             hod     => $hod,
-                                                             debug   => $debug,
-                                                             tilt    => $ti,
-                                                             azimut  => $az,
-                                                             rad     => $rad,
-                                                           }
-                                                         ); 
+              ($G_tilt, $cv) = ___computeTiltedIrradianceCached ( { name    => $name,
+                                                                    date    => $date,               # aktuelles Datum "YYYY-MM-DD"
+                                                                    num     => $num,
+                                                                    dday    => $dday,
+                                                                    ddate   => $ddate,              # abzurufendes Datum
+                                                                    dofyear => $dofyear,
+                                                                    chour   => $paref->{chour},
+                                                                    hod     => $hod,
+                                                                    debug   => $debug,
+                                                                    tilt    => $ti,
+                                                                    azimut  => $az,
+                                                                    rad     => $rad,
+                                                                  }
+                                                                ); 
                                                                                                     # --- Peakleistung bedeutet: Bei 1000 W/m² Einstrahlung liefert der String seine Peakleistung                                                                 
               $pv = ($G_tilt / 1000) * $peak * PRDEF;                                               # es gilt 𝑃eff = peak * 𝐺tilt/1000 * Faktor -> peak in W, G_tilt in W/m²
               $pv = round1 ($pv);
               
-              debugLog ($paref, 'apiProcess', "DWD API Tilted - PV estimate String >$string< => $dtpart, rad=$rad, P_tilt=$G_tilt W/m2, pv=$pv Wh");
+              debugLog ($paref, 'apiProcess', "DWD API Tilted - PV estimate String >$string< => $dtpart, rad=$rad, Cache=$cv, P_tilt=$G_tilt W/m2, pv=$pv Wh");
           }
           
           # --- Daten speichern
@@ -4792,13 +4797,17 @@ sub ___computeTiltedIrradianceCached {
   
   #debugLog ($paref, 'apiProcess', "DWD API Tilted - num=$num, dday=$dday, chour=$chour, hod=$hod, nhtstr=$nhtstr, rel=$rel");
 
-  if (!defined $sunalt || !defined $sunaz || $sunalt <= 0) {
+  if (!defined $sunalt || !defined $sunaz) {
       if (!defined $sunalt || !defined $sunaz) {
-          debugLog ($paref, 'apiProcess', "DWD API - day=$dday hod=$hod -> 
-                                           Value of sunaz/sunalt not stored in Nexthours or pvHistory, workaround using G_tilt=0");
+          debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
+                                         ."Value of sunaz/sunalt not stored in Nexthours or pvHistory, workaround using G_tilt=0");
+      }
+      elsif ($sunalt <= 0) {
+          debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
+                                         ."sunalt=$sunalt (sun below horizon for full hour), G_tilt=0");
       }
                                        
-      return 0;
+      return (0, 0);
   }
   
   my $cache_key = join '::', 'TILTIRR',                                         # Cache Key ID
@@ -4826,7 +4835,7 @@ sub ___computeTiltedIrradianceCached {
   my $cached = LRU_get ($name, $cache, $cache_key);
 
   if (defined $cached) {
-      return $cached;
+      return ($cached, 1);
   }
 
   # --- Neuberechnung
@@ -4835,7 +4844,7 @@ sub ___computeTiltedIrradianceCached {
   my $pi  = 4 * atan2 (1,1);                                                    # klassischer Perl-Trick, um π (Pi) mathematisch exakt zu berechnen – ohne es als feste Zahl einzutragen
   my $deg = $pi / 180.0;
 
-  return 0 if(!defined ($sg) || $sg <= 0);
+  return (0, 0) if(!defined ($sg) || $sg <= 0);
 
   my $sunaz_r  = $sunaz    * $deg;
   my $sunalt_r = $sunalt   * $deg;
@@ -4844,12 +4853,12 @@ sub ___computeTiltedIrradianceCached {
   my $sin_ele  = sin ($sunalt_r);
   my $cos_ele  = cos ($sunalt_r);
 
-  return 0 if($sin_ele <= 0.0);
+  return (0, 0) if($sin_ele < 0.01);                                            # entspricht ca. 0.57° Sonnenstand
 
   my $I0n = SOLARCONSTANT * (1.0 + 0.033 * cos (2.0 * $pi * $dofyear / 365.0));
   my $I0h = $I0n * $sin_ele;
   
-  return 0 if($I0h <= 0.0);
+  return (0, 0) if($I0h <= 0.0);
 
   my $Kt = $sg / $I0h;
   $Kt    = max (0.0, min (1.0, $Kt));                                           # Kt (Clear-Sky-Index), Clamping wichtig
@@ -4921,10 +4930,10 @@ sub ___computeTiltedIrradianceCached {
   $G_tilt = round2 ($G_tilt);
   
   if ($G_tilt > 0) {
-      LRU_insert ($name, $cache, $cache_key, $G_tilt);                          # neuen Eintrag einfügenund LRU aktualisieren
+      LRU_insert ($name, $cache, $cache_key, $G_tilt);                          # neuen Eintrag einfügen und LRU aktualisieren
   }                                     
 
-return $G_tilt;                                                                 # effektive Einstrahlung $G_tilt auf die PV-Anlage in W/m² 
+return ($G_tilt, 0);                                                            # effektive Einstrahlung $G_tilt auf die PV-Anlage in W/m² 
 }
 
 ##########################################################################################################
@@ -10977,9 +10986,7 @@ sub centralTask {
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
   _transferEnvironmentValues  ($centpars);                                            # Umweltsensorik einsammeln
   _transferHolidayValues      ($centpars);                                            # Wochentage, Feiertage und Urlaubstage einsammeln
-  
-  $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
-  
+    
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
   _batChargeMgmt              ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
@@ -11004,6 +11011,8 @@ sub centralTask {
   setTimeTracking             ($name, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
   _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
 
+  $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
+  
   if ($debug =~ /miniCache/xs) {                                                      # Mini Cache Inhalt ausgeben 
       MC_debug ($name) if(askLogtime ($name, 'Dummy_Entry', 300));
   }
@@ -11886,8 +11895,8 @@ sub __calcSunPosition {
   my ($az, $alt);
   
   eval {                                                                                                    # statt Astro_Get geht auch FHEM::Astro::Get
-      $az  = round0 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr));
-      $alt = round0 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr));
+      $az  = round2 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr));
+      $alt = round2 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr));
       1;
   } or do {
       my $err = "process error while reading sun position: $@";
@@ -11895,6 +11904,40 @@ sub __calcSunPosition {
       Log3 ($name, 1, "$name - ERROR - $err");
       return;                                                                                               # Abbruch weil WICHTIGE Daten fehlen
   };
+  
+  #--------------------------------------------------------------------
+  # Korrektur für Randstunden (Sonnenauf-/-untergang):
+  # Liegt Sonne bei :30 unter dem Horizont, das tatsächlich beleuchtete
+  # Teilfenster innerhalb der Stunde suchen und dessen Mittelpunkt nutzen.
+  #--------------------------------------------------------------------
+  if ($alt <= 0) {
+      my @lit_mins;
+
+      for my $min (5, 15, 25, 35, 45, 55) {
+          my $t_probe   = sprintf '%s %02d:%02d:00', $dstr, $hh, $min;
+          my $alt_probe = eval { FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $t_probe) } // -90;
+          
+          push @lit_mins, $min if($alt_probe > 0);
+      }
+
+      if (@lit_mins) {                                                                                      # Mittelpunkt des beleuchteten Fensters [erstes .. letztes Treffer-Sample]
+          my $mid_min = int (($lit_mins[0] + $lit_mins[-1]) / 2 + 0.5);
+          $tstr       = sprintf '%s %02d:%02d:00', $dstr, $hh, $mid_min;
+
+          debugLog ($paref, 'collectData_long',
+              "Sun position corrected for twilight hour: hod=$hod, "
+             ."lit_mins=[@lit_mins], effective_mid=$mid_min");
+
+          eval {
+              $az  = round2 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAz',  $tstr));
+              $alt = round2 (FHEM::Astro::Get (undef, 'global', 'text', 'SunAlt', $tstr));
+              1;
+          } or do {
+              Log3 ($name, 2, "$name - WARNING - Could not get corrected sun position for $tstr");          # $az/$alt behalten die ursprünglichen :30-Werte (alt <= 0)
+          };                                                                                                # -> ___computeTiltedIrradianceCached gibt (0,0) zurück
+      }
+  }
+
 
   $data{$name}{nexthours}{$nhtstr}{sunaz}  = $az;
   $data{$name}{nexthours}{$nhtstr}{sunalt} = $alt;
@@ -17940,62 +17983,149 @@ sub _calcReadingsTomorrowPVFc {
 return;
 }
 
-################################################################
-#  berechnet die prozentuale Abweichung von Tageswerten
-################################################################
+###########################################################################################
+# Berechnet die prozentuale Abweichung zwischen Prognose und Ist-Wert
+# für PV-Erzeugung und Verbrauch (Consumption).
+# Verbesserungen gegenüber der ursprünglichen Implementierung:
+#   - Dynamische Mindestschwelle (min_wh) verhindert Division durch sehr kleine Werte
+#   - Konfidenz-Gewichtung (progress) dämpft Abweichungen am Tagesanfang
+#   - Time Gate (min_recalc_s) verhindert zu häufige Neuberechnung bei Event-Triggern
+#   - EWMA-Glättung mit dynamischem Alpha dämpft kurzzeitige Sprünge
+#   - Totband (dead_band) verhindert Vorzeichenwechsel bei stabilem Signal
+#   - Perspektiv-Flip vor EWMA sichert Konsistenz zwischen circular und Reading
+###########################################################################################
 sub _calcTodayDeviation {
   my $paref = shift;
   my $name  = $paref->{name};
   my $t     = $paref->{t};
   my $date  = $paref->{date};
-  my $day   = $paref->{day};                                            
-
+  my $day   = $paref->{day};
+  
   my ($dpv, $dcon);
   my ($manner, $perspective) = split ':', CurrentVal ($name, 'genPVdeviation', 'daily');
   $perspective //= 'default';
   my $dosave_dpv = 0;
-  
+
   my $hash = $defs{$name};
+
+  # --- Dynamische Mindestschwelle basierend auf Anlagen-Peak
+  # Verhindert prozentuale Extremwerte wenn Prognose oder Ist-Wert noch sehr klein sind.
+  # Faktor 0.02 = ~2 % des Anlagen-Peaks als Schwellwert.
+  # Beispiele: 3 kWp → 60 Wh, 10 kWp → 200 Wh, 50 kWp → 1.000 Wh
+  my $peak_wp = _aiFannPvMaxLimit ($name);
+  my $min_wh  = int ($peak_wp * 0.02);
+  $min_wh     = 50   if $min_wh <   50;                                                     # floor:   kleinste sinnvolle Schwelle
+  $min_wh     = 2000 if $min_wh > 2000;                                                     # ceiling: Großanlagen deckeln
+
+  # --- Tagesfortschritt (0.0 … 1.0) bezogen auf Lichtphase
+  # Dient als Konfidenz-Gewichtung: am Morgen nahe 0, am Abend nahe 1.
+  # Dadurch werden frühe Abweichungen gedämpft, da die akkumulierten Werte
+  # noch gering und damit wenig aussagekräftig sind.
+  my $sunrise_ts = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, 'Today_SunRise', '06:00').':00');
+  my $sunset_ts  = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, 'Today_SunSet',  '22:00').':00');
+  my $day_len    = ($sunset_ts - $sunrise_ts) || 1;
+  my $progress   = ($t - $sunrise_ts) / $day_len;
+  $progress      = 0 if($progress < 0);
+  $progress      = 1 if($progress > 1);
+
+  my $max_dev = 200;                                                                        # prozentuales Clipping
+  
+  # --- Time Gate: Mindestabstand zwischen zwei Berechnungen
+  # Verhindert unkontrollierte Alpha-Akkumulation bei event-getriggerten
+  # Schnellzyklen (z.B. alle 5 Sekunden). Erst nach min_recalc_s Sekunden
+  # wird neu berechnet, dazwischen wird der letzte Wert beibehalten.
+  # Eigener Zeitstempel unabhängig von last_transfer (anderer Prozess/Semantik).
+  my $min_recalc_s = 60;
+  my $last_t       = $data{$name}{current}{lastDeviationCalc} // 0;
+  my $elapsed_s    = $t - $last_t;
+
+  if ($elapsed_s < $min_recalc_s) {                                                         # Zu kurz seit letzter Berechnung → überspringen
+      return;
+  }
+
+  $data{$name}{current}{lastDeviationCalc} = $t;                                            # Schutz gegen 0 bei Doppel-Events
+
+  # --- EWMA-Glättungsfaktor Alpha dynamisch aus tatsächlichem Intervall ableiten
+  # Formel: α = 1 - e^(-Δt / τ)  (diskretisierter Tiefpassfilter)
+  # τ (tau_s) ist die Zeitkonstante: nach τ Sekunden sind 63 % eines Sprungs übernommen.
+  # Bei τ = 1800 s (30 min) reagiert der Filter träge auf kurzfristige Schwankungen,
+  # folgt aber echten Trends zuverlässig.
+  # Vorteil gegenüber festem Alpha: bei kurzen Intervallen (Events) wird Alpha
+  # automatisch klein → Ausreißer werden kaum übernommen.
+  # Bei langen Intervallen (z.B. nach Pause) wird Alpha größer → Wert holt auf.
+  my $tau_s = 1800;                                                                         # Zeitkonstante 30 min – nach Bedarf anpassbar
+  my $alpha = 1 - exp(-$elapsed_s / $tau_s);
+  $alpha    = 0.05 if $alpha < 0.05;                                                        # floor:   verhindert zu starke Trägheit bei sehr kurzen Intervallen
+  $alpha    = 0.80 if $alpha > 0.80;                                                        # ceiling: verhindert unkontrollierte Sprünge nach langen Pausen
+  
+  my $dead_band = 0.5;                                                                      # Totband in Prozentpunkten
   
   # PV Prognose/Ist Abweichung
   ##############################
-  my $pvfc = CurrentVal  ($name, 'tdPvFcUp2Now', 0);
-  my $pvre = ReadingsNum ($name, 'Today_PVreal', 0);
-  
-  if ($pvre && $pvfc) {                                                                     # Schutz Illegal division by zero
-      if ($manner eq 'daily') {
-          my $sstime = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
+  my $pvfc = CurrentVal  ($name, 'tdPvFcUp2Now', 0);                                        # PV-Prognose akkumuliert bis jetzt
+  my $pvre = ReadingsNum ($name, 'Today_PVreal', 0);                                        # PV-Erzeugung real akkumuliert
 
-          if ($t >= $sstime) {
-              $dpv        = round2 (($pvfc - $pvre) / $pvfc * 100);                         # V 2.0.0
+  if ($pvre > $min_wh && $pvfc > $min_wh) {                                                 # Mindestschwelle: beide Werte müssen ausreichend groß sein
+      if ($manner eq 'daily') {
+          if ($t >= $sunset_ts) {
+              my $raw  = ($pvfc - $pvre) / $pvfc * 100;
+              $raw     = $raw >  $max_dev ?  $max_dev
+                       : $raw < -$max_dev ? -$max_dev : $raw;                               # Clipping
+              $raw    *= -1 if ($perspective eq 'reverse');                                 # Flip vor EWMA: sichert Konsistenz zwischen circular und Reading
+
+              my $prev = $data{$name}{circular}{99}{tdayDvtn} // $raw;
+              $dpv     = abs($raw - $prev) < $dead_band
+                       ? $prev
+                       : round2($alpha * $raw + (1 - $alpha) * $prev);
+              
               $dosave_dpv = 1;
           }
       }
       else {
-          $dpv        = round2 (($pvfc - $pvre) / $pvfc * 100);                             # V 2.0.0
+          my $raw  = ($pvfc - $pvre) / $pvfc * 100 * $progress;
+          $raw     = $raw >  $max_dev ?  $max_dev
+                   : $raw < -$max_dev ? -$max_dev : $raw;
+          $raw    *= -1 if ($perspective eq 'reverse');                                     # früh flippen → alles danach konsistent
+
+          my $prev = $data{$name}{circular}{99}{tdayDvtn} // $raw;
+          $dpv     = abs($raw - $prev) < $dead_band
+                   ? $prev
+                   : round2($alpha * $raw + (1 - $alpha) * $prev);
+          
           $dosave_dpv = 1;
       }
 
       if ($dosave_dpv) {
-          $dpv *= -1 if($perspective eq 'reverse');                                         # Perspektivänderung: Abweichung = Real - Vorhersage statt Abweichung = Vorhersage - Real
-          $data{$name}{circular}{99}{tdayDvtn} = $dpv;
-
-          storeReading ('Today_PVdeviation', $dpv.' %');
+          $data{$name}{circular}{99}{tdayDvtn} = $dpv;                                     # und $dpv ident
+          
+          storeReading ('Today_PVdeviation', $dpv.' %');                                   # circular = Reading
       }
   }
-  
+
   # Consumption Prognose/Ist Abweichung
   #######################################
+  # Eigener Mindestschwellwert für Consumption (unabhängig von PV-Peak)
+  # Basis: typischer Haushalt ~3.000–5.000 kWh/Jahr → ~350–580 Wh/h
+  # 50 Wh als konservativer floor, damit auch Niedrigverbraucher abgedeckt sind
+  my $min_wh_con = 50;
+
   my $confc = CurrentVal  ($name, 'tdConFcUp2Now', 0);
   my $conre = ReadingsNum ($name, 'Today_CONreal', 0);
-  
-  if ($conre && $confc) {
-      $dcon  = round2 (($confc - $conre) / $confc * 100);                                   # V 2.0.0
-      $dcon *= -1 if($perspective eq 'reverse');                                            # Perspektivänderung
+
+  if ($conre > $min_wh_con && $confc > $min_wh_con) {
+      my $raw  = ($confc - $conre) / $confc * 100 * $progress;
+      $raw     = $raw >  $max_dev ?  $max_dev
+               : $raw < -$max_dev ? -$max_dev : $raw;
+      $raw    *= -1 if ($perspective eq 'reverse');                                         # früh flippen → alles danach konsistent
+
+      my $prev = $data{$name}{circular}{99}{tdayConDvtn} // $raw;
+      $dcon    = abs($raw - $prev) < $dead_band
+               ? $prev
+               : round2($alpha * $raw + (1 - $alpha) * $prev);
+
+      $data{$name}{circular}{99}{tdayConDvtn} = $dcon;                                     # und $dcon ident
       
-      $data{$name}{circular}{99}{tdayConDvtn} = $dcon;
-      
-      storeReading ('Today_CONdeviation', $dcon.' %');
+      storeReading ('Today_CONdeviation', $dcon.' %');                                     # circular = Reading
   }
 
 return;
@@ -26846,10 +26976,7 @@ sub aiFannDetectDrift {
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);
   $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = round2 ($drift_score);
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = round2 ($rmse_rel_ratio);
-  #$data{$name}{neuralnet}{$fanntyp}{DriftRefRmse}      = round3 ($rmse_rel_live);                  # V 2.6.2
-  #$data{$name}{neuralnet}{$fanntyp}{DriftRefMae}       = round2 ($mae_live);                       # V 2.6.2
-  
-  
+
   # --- Drift-Rekalibrierung (automatisch) ---
   # die Werte aus dem ursprünglichen Training werden überschrieben.
   # die letzten 96 Stunden bestimmen danach das neue Modellniveau ($window)
@@ -26862,22 +26989,7 @@ sub aiFannDetectDrift {
   splice @$hist, 0, @$hist - 20 if(@$hist > 20);
 
   my $hist_ref    = $data{$name}{neuralnet}{$fanntyp}{DriftZoneHistory} // [];                      # Historie holen, falls undef → leeres Array
-  my @hist        = @$hist_ref;
-  #my $len         = scalar @hist;
-  #my $start       = $len > 4 ? $len - 4 : 0;                                                        # Nur die letzten bis zu 4 Einträge betrachten
-  #my $zone3_count = 0;
-  
-  #if ($len > 0) {
-  #    $zone3_count = scalar grep { $_ eq 'moderate' || $_ eq 'severe' } @hist[$start .. $len - 1];
-  #}
-
-  # my $stable_zone3 = ($zone3_count >= 3) ? 1 : 0;                                                 # V 2.6.2
-  
-  # --- Rekalibrierung auslösen, wenn Zone 3 > X Stunden stabil  
-  #if (!$stable_zone3) {
-  #    $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} = 0;
-  #}                                                                                                # V 2.6.2
-                     
+  my @hist        = @$hist_ref;           
   my $zone3_reset = $drift_index <= 1.5 ? 1 : 0;                                                    # V 2.6.2 unterhalb 'mild'-Schwelle
 
   if ($zone3_reset) {                                                                               # V 2.6.2
