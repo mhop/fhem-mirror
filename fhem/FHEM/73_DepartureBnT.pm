@@ -9,7 +9,7 @@
 #
 #     Author                     : Matthias Deeke 
 #     e-mail                     : matthias.deeke(AT)deeke(PUNKT)eu
-#     Fhem Forum                 : Not yet implemented
+#     Fhem Forum                 : https://forum.fhem.de/index.php?topic=143906.0
 #     Fhem Wiki                  : Not yet implemented
 #
 #     This file is part of fhem.
@@ -76,6 +76,7 @@ sub DepartureBnT_Initialize($) {
 								  "MaxLength " .
 								  "WalkTimeToStation " .
 								  "ConcatReading:0,1 " .
+								  "ZoomOffset " .
 								  $readingFnAttributes;
 	
 	return FHEM::Meta::InitMod( __FILE__, $hash );
@@ -431,6 +432,14 @@ sub DepartureBnT_CheckAttributes($) {
 		### Writing log entry
 		Log3 $name, 4, $name. " : DepartureBnT - The attribute ShowDetails was missing and has been set to Departure = Extended View";
 	}	
+	
+	if(!defined($attr{$name}{ZoomOffset})) {
+		### Set attribute with standard value since it is not available
+		$attr{$name}{ZoomOffset} = 0.001;
+
+		### Writing log entry
+		Log3 $name, 4, $name. " : DepartureBnT - The attribute ZoomOffset was missing and has been set to 0.001";
+	}
 }
 ####END####### Check Attributes ################################################################################END#####
 
@@ -629,6 +638,14 @@ sub DepartureBnT_UpdateResponse($) {
 	}
 	or do  {
 		Log3 $name, 3, $name. " : DepartureBnT_UpdateResponseResponse - Data cannot be parsed by JSON";
+		# Handling the error:
+		#  1. set Timer for next refresh cycle
+		InternalTimer(gettimeofday()+AttrVal($name, "UpdateInterval", 60), \&DepartureBnT_Update, $hash);
+		# 2. trigger the browser
+		FW_directNotify("FILTER=".$name, "#FHEMWEB:WEB", "location.reload('true')", "");
+		# 3. update 'state'
+		readingsSingleUpdate($hash, "state", "error", 1);
+       return;
 	};
 
 	### Initiate Bulk Update
@@ -639,7 +656,7 @@ sub DepartureBnT_UpdateResponse($) {
 	
 	### Delete doubled hash entries
 	my %seen;
-	my @UniqueDepartureEntries =  grep({ my $e = $_; my $key = join '___', map { $e->{$_}; } sort keys %$_;!$seen{$key}++ } @$DepartureEntries);
+	my @UniqueDepartureEntries =  grep({ my $e = $_; my $key = join '___', map { $e->{$_} // ''; } sort keys %$_;!$seen{$key}++ } @$DepartureEntries);
 
 	### Log entries for debugging purposes
 	Log3 $name, 5, $name. " : DepartureBnT_UpdateResponseResponse - UniqueDepartureEntries : " . Dumper(@UniqueDepartureEntries);
@@ -712,7 +729,7 @@ sub DepartureBnT_UpdateResponse($) {
 				}
 
 				### Log entries for debugging purposes
-				Log3 $name, 5, $name. " : DepartureBnT_UpdateResponseResponse - DepartureEntryValue      : " . $DepartureEntry->{$DepartureEntryKey};
+				Log3 $name, 5, $name. " : DepartureBnT_UpdateResponseResponse - DepartureEntryValue      : " . ($DepartureEntry->{$DepartureEntryKey} // "n/a");
 				Log3 $name, 5, $name. " : DepartureBnT_UpdateResponseResponse - ReadingValue             : " . $ReadingValue;
 			}
 			else {
@@ -859,6 +876,14 @@ sub DepartureBnT_UpdateStationDetails($) {
 	}
 	or do  {
 		Log3 $name, 5, $name. " : DepartureBnT_UpdateStationDetails - Data cannot be parsed by JSON";
+		# Handling the error:
+		#  1. set Timer for next refresh cycle
+		InternalTimer(gettimeofday()+AttrVal($name, "UpdateInterval", 60), \&DepartureBnT_Update, $hash);
+		# 2. trigger the browser
+		FW_directNotify("FILTER=".$name, "#FHEMWEB:WEB", "location.reload('true')", "");
+		# 3. update 'state'
+		readingsSingleUpdate($hash, "state", "error", 1);
+		return;
 	};
 
 	### Log entries for debugging purposes
@@ -935,6 +960,13 @@ sub DepartureBnT_FW_detailFn($$$$) {
 
 	### If the Details shall be the Departure Board with Map
 	if (AttrVal($name, "ShowDetails","Departure") eq "Departure"){
+
+		### Calculation of parameters for the map
+		my $zoomOffset = AttrVal($name, "ZoomOffset", 0.001);
+		my $lonMin = $longitude - $zoomOffset;
+		my $latMin = $latitude  - $zoomOffset;
+		my $lonMax = $longitude + $zoomOffset;
+		my $latMax = $latitude  + $zoomOffset;
 
 		$htmlCode = '
 		<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
@@ -1041,7 +1073,7 @@ sub DepartureBnT_FW_detailFn($$$$) {
 							Delayed<BR>in min
 						</td>
 						<td rowspan="' . $TableLines . '">
-							<iframe width="100%" height="' . $MapHeight . '" src="https://www.openstreetmap.org/export/embed.html?bbox=' . $longitude . '%2C' . $latitude . '%2C' . $longitude . '%2C' . $latitude . '&amp;layer=transportmap&amp;marker=' . $latitude . '%2C' . $longitude . '" style="border: 1px solid black"></iframe><br/><small><a href="https://www.openstreetmap.org/?mlat=' . $latitude . '&amp;mlon=' . $longitude . '#map=18/' . $latitude . '/' . $longitude. '&amp;layers=T">Large Map</a></small>
+							<iframe width="100%" height="' . $MapHeight . '" src="https://www.openstreetmap.org/export/embed.html?bbox=' . $lonMin . '%2C' . $latMin . '%2C' . $lonMax . '%2C' . $latMax . '&amp;layer=transportmap&amp;marker=' . $latitude . '%2C' . $longitude . '"style="border: 1px solid black"></iframe>
 						</td>
 					</tr>
 		';
@@ -1198,6 +1230,7 @@ sub DepartureBnT_FW_detailFn($$$$) {
 		<tr><td><ul><ul><a id="DepartureBnT-attr-WalkTimeToStation" > </a><li><b><u><code>WalkTimeToStation   </code></u></b> : Time in minutes for how long it takes from your home to the station. The Default value is 0min = Right in front of the house.<BR>This attribute is influencing the visualisation for the departure.<BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-ConcatReading"     > </a><li><b><u><code>ConcatReading       </code></u></b> : Whether the Reading "departure_concat" for the <a href="https://wiki.fhem.de/wiki/FTUI_Widget_Departure">FTUI Widget Departure</a>  shall be generated.<BR>The Default value is 0 = Disabled<BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-ShowDetails"       > </a><li><b><u><code>ShowDetails         </code></u></b> : Which kind of Details Page shall be presented within FHEMEB - The fhem or Departure Version.<BR>The Default value is Departure = Departure Board with Map<BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DepartureBnT-attr-ZoomOffset"        > </a><li><b><u><code>ZoomOffset          </code></u></b> : Zoom Offset for the map in the Details Page.<BR>The Default value is 0.001<BR></li></ul></ul></td></tr>
 	</table>
 </ul>
 =end html
@@ -1240,7 +1273,8 @@ sub DepartureBnT_FW_detailFn($$$$) {
 		<tr><td><ul><ul><a id="DepartureBnT-attr-MaxLength"         > </a><li><b><u><code>MaxLength           </code></u></b> : Wenn der Wert nicht 0 ist, wird das Modul ein weiteres Reading "Destination-short" einf&uuml;hren und die L&auml;nge begrenzen. <BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-WalkTimeToStation" > </a><li><b><u><code>WalkTimeToStation   </code></u></b> : Anzahl der Minuten die es ben&ouml;tigt um vom eigenen Haus zur Station zu kommen.<BR>Dieses Attribut beeinflu&szlig;t die Visualisierung.<BR></li></ul></ul></td></tr>
 		<tr><td><ul><ul><a id="DepartureBnT-attr-ConcatReading"     > </a><li><b><u><code>ConcatReading       </code></u></b> : Erzeuge das Reading "departure_concat" f&uuml;r die Kompatibilit&auml;t zu <a href="https://wiki.fhem.de/wiki/FTUI_Widget_Departure">FTUI Widget Departure</a>  shall be generated.<BR>Der Default Wert is 0 = Deaktiviert<BR></li></ul></ul></td></tr>
-		<tr><td><ul><ul><a id="DepartureBnT-attr-ShowDetails"       > </a><li><b><u><code>ShowDetails         </code></u></b> : Welche Details Seite soll in FHEMEB angezeigt werden - Die fhem oder Departure Version.<BR>Der Default Wert ist Departure = Abfahrtstafel mit Karte<BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DepartureBnT-attr-ShowDetails"       > </a><li><b><u><code>ShowDetails         </code></u></b> : Welche Details sollen in FHEMEB angezeigt werden - Die fhem oder Departure Version.<BR>Der Default Wert ist Departure = Abfahrtstafel mit Karte<BR></li></ul></ul></td></tr>
+		<tr><td><ul><ul><a id="DepartureBnT-attr-ZoomOffset"        > </a><li><b><u><code>ZoomOffset          </code></u></b> : Zoom Offset f&uuml;r die Kartendarstellung in der Detailansicht.<BR>Der Default Wert is 0.001<BR></li></ul></ul></td></tr>
 	</table>
 </ul>
 =end html_DE
