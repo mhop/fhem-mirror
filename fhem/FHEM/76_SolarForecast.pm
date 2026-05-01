@@ -163,6 +163,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.4"  => "01.05.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
+                           "exponentielles Glätten EWMA -> verhindert Sprünge durch einen gleitenden Mittelwert über die letzten ".
+                           "Berechnungen, Routine ___areaFactorTrack entfernt ",
   "2.6.3"  => "27.04.2026  Debug apiProcess: Anzeige ob ein Cached Wert verwendet wird bei 'DWD API Tilted' ".
                            "__calcSunPosition: Korrektur für Randstunden, __getDWDSolarData: Korrektur DWD rad1h-Reading ",
   "2.6.2"  => "23.04.2026  aiFannDetectDrift: Änderung der Driftanalyse ",
@@ -1096,6 +1099,10 @@ my %hqtxt = (                                                                # H
               DE => qq{von extern umgeschaltet}                                                                             },
   legimp => { EN => qq{Legend Importance: 1 - general Message, 2 - important Message, 3 - Error or Problem},
               DE => qq{Legende Wichtigkeit: 1 - allgemeine Mitteilung, 2 - wichtige Mitteilung, 3 - Fehler oder Problem}    },
+  rmpcon => { EN => qq{the deviation increases proportionally and is fully weighted after <RAMP> hours starting at midnight},
+              DE => qq{die Abweichung wird proportional steigend und nach <RAMP> Stunden ab Mitternacht voll gewichtet}     },  
+  ramppv => { EN => qq{The deviation is weighted proportionally as the daylight phase begins\nand becomes fully effective <RAMP> hours after sunrise},
+              DE => qq{die Abweichung wird mit Beginn der Tageslichtphase proportional hochgewichtet\nund ist nach <RAMP> Stunden ab Sonnenaufgang voll wirksam}                             },  
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
               DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                                                 },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please note the warnings (<W>).},
@@ -4662,9 +4669,6 @@ sub __getDWDSolarData {
       else {
           debugLog ($paref, "apiCall", "DWD API - got data -> starttime: $dtpart, reading: fc${fd}_${runh}_Rad1h, rad: $rad kJ/m2");
       }
-
-      #my $cafd = 'trackFlex';                                                                       # Art der Flächenfaktor Berechnung ()
-      my $cafd = 'tiltedCached'; 
       
       my ($af, $G_tilt, $pv, $sdr, $cv);
       
@@ -4684,52 +4688,25 @@ sub __getDWDSolarData {
           $peak *= 1000;                                                                            # kWp in Wp umrechnen
           $az    = azSolar2Astro ($az);                                                             # Konvertiert Azimut der Solar-Konvention in die astronomische Konvention
 
-          if ($cafd eq 'trackFlex') {                                                               # Flächenfaktor Sonnenstand geführt
-              ($af, $sdr) = ___areaFactorTrack ( { name    => $name,
-                                                   date    => $date,                                # aktuelles Datum "YYYY-MM-DD"
-                                                   dday    => $dday,
-                                                   ddate   => $ddate,                               # abzurufendes Datum
-                                                   chour   => $paref->{chour},
-                                                   hod     => $hod,
-                                                   debug   => $debug,
-                                                   tilt    => $ti,
-                                                   azimut  => $az,
-                                                   num     => $num,
-                                                 }
-                                               );
-
-              my $dirrad = $rad * $sdr;                                                             # Anteil Direktstrahlung an Globalstrahlung
-              my $difrad = $rad - $dirrad;                                                          # Anteil Diffusstrahlung an Globalstrahlung
-
-              $pv = (($dirrad * $af) + $difrad) * KJ2KWH * $peak * PRDEF;                           # Rad wird in kW/m2 erwartet
-              $pv = round1 ($pv);
-          
-              if ($debug =~ /apiProcess/x) {           
-                  Log3 ($name, 1, qq{$name DEBUG> DWD API - PV estimate String >$string< => $dtpart, rad=$rad, direct share=$dirrad, diffuse share=$difrad});
-                  Log3 ($name, 1, qq{$name DEBUG> DWD API - PV estimate String >$string< => $dtpart, pv=$pv Wh, AF=$af, dirfac=$sdr});
-              }
-          }
-          else {                                                                                    # es gilt 𝑃eff = peak*𝐺tilt/1000 * Faktor
-              ($G_tilt, $cv) = ___computeTiltedIrradianceCached ( { name    => $name,
-                                                                    date    => $date,               # aktuelles Datum "YYYY-MM-DD"
-                                                                    num     => $num,
-                                                                    dday    => $dday,
-                                                                    ddate   => $ddate,              # abzurufendes Datum
-                                                                    dofyear => $dofyear,
-                                                                    chour   => $paref->{chour},
-                                                                    hod     => $hod,
-                                                                    debug   => $debug,
-                                                                    tilt    => $ti,
-                                                                    azimut  => $az,
-                                                                    rad     => $rad,
-                                                                  }
-                                                                ); 
+          ($G_tilt, $cv) = ___computeTiltedIrradianceCached ( { name    => $name,
+                                                                date    => $date,                   # aktuelles Datum "YYYY-MM-DD"
+                                                                num     => $num,
+                                                                dday    => $dday,
+                                                                ddate   => $ddate,                  # abzurufendes Datum
+                                                                dofyear => $dofyear,
+                                                                chour   => $paref->{chour},
+                                                                hod     => $hod,
+                                                                debug   => $debug,
+                                                                tilt    => $ti,
+                                                                azimut  => $az,
+                                                                rad     => $rad,
+                                                              }
+                                                            ); 
                                                                                                     # --- Peakleistung bedeutet: Bei 1000 W/m² Einstrahlung liefert der String seine Peakleistung                                                                 
-              $pv = ($G_tilt / 1000) * $peak * PRDEF;                                               # es gilt 𝑃eff = peak * 𝐺tilt/1000 * Faktor -> peak in W, G_tilt in W/m²
-              $pv = round1 ($pv);
-              
-              debugLog ($paref, 'apiProcess', "DWD API Tilted - PV estimate String >$string< => $dtpart, rad=$rad, Cache=$cv, P_tilt=$G_tilt W/m2, pv=$pv Wh");
-          }
+          $pv = ($G_tilt / 1000) * $peak * PRDEF;                                                   # es gilt 𝑃eff = peak * 𝐺tilt/1000 * Faktor -> peak in W, G_tilt in W/m²
+          $pv = round1 ($pv);
+          
+          debugLog ($paref, 'apiProcess', "DWD API Tilted - PV estimate String >$string< => $dtpart, rad=$rad, Cache=$cv, P_tilt=$G_tilt W/m2, pv=$pv Wh");
           
           # --- Daten speichern
           $data{$name}{solcastapi}{'?All'}{$dateTime}{Rad1h}          = round0 ($rad);
@@ -4931,88 +4908,6 @@ sub ___computeTiltedIrradianceCached {
   }                                     
 
 return ($G_tilt, 0);                                                            # effektive Einstrahlung $G_tilt auf die PV-Anlage in W/m² 
-}
-
-##########################################################################################################
-#  Flächenfaktor Photovoltaik und Direktstrahlungsanteilsfaktor in Abhängigkeit des Sonnenstandes
-#
-#  Die Globalstrahlung  (Summe aus diffuser und direkter Sonnenstrahlung)
-#  ----------------------------------------------------------------------
-#  Die Globalstrahlung ist die am Boden von einer horizontalen Ebene empfangene Sonnenstrahlung
-#  und setzt sich aus der direkten Strahlung (der Schatten werfenden Strahlung) und der
-#  gestreuten Sonnenstrahlung (diffuse Himmelsstrahlung) aus der Himmelshalbkugel zusammen.
-#  Bei Sonnenhöhen von mehr als 50° und wolkenlosem Himmel besteht die Globalstrahlung zu ca. 3/4
-#  aus direkter Sonnenstrahlung, bei tiefen Sonnenständen (bis etwa 10°) nur noch zu ca. 1/3.
-#
-#  Direktstrahlung = Globalstrahlung * 0.75   (bei >  50° sunalt)
-#  Direktstrahlung = Globalstrahlung * 0.33   (bei <= 10° sunalt)
-#
-#  Quelle: https://www.dwd.de/DE/leistungen/solarenergie/globalstrahlung.html?nn=16102&lsbId=416798
-#
-#  Return:
-#  $daf - direct Area Faktor für den Anteil Direktstrahlung der Globalstrahlung
-#  $sdr - Share of direct radiation = Faktor Anteil Direktstrahlung an Globalstrahlung (0.33 .. 0.75)
-#
-##########################################################################################################
-sub ___areaFactorTrack {
-  my $paref    = shift;
-  my $name     = $paref->{name};
-  my $date     = $paref->{date};                                                # aktuelles Datum "YYYY-MM-DD"
-  my $dday     = $paref->{dday};                                                # abzufragender Tag: 01 .. 31
-  my $ddate    = $paref->{ddate};                                               # abzurufendes Datum
-  my $chour    = $paref->{chour};                                               # aktuelle Stunde (00 .. 23)
-  my $hod      = $paref->{hod};                                                 # abzufragende Stunde des Tages 01, 02 ... 24
-  my $str_tilt = $paref->{tilt};                                                # String Anstellwinkel / Neigung
-  my $str_azi  = $paref->{azimut};                                              # String Ausrichtung / Azimut
-  my $num      = $paref->{num};
-
-  my ($sunalt, $sunaz, $nhtstr);
-
-  my $is_today = ($ddate eq $date);
-  my $rel      = $num - $chour;
-  
-  if ($is_today) {
-      $sunalt = HistoryVal ($name, $dday, $hod, 'sunalt', undef);               # Sonne Höhe (Altitude)
-      $sunaz  = HistoryVal ($name, $dday, $hod, 'sunaz',  undef);               # Sonne Azimuth     
-  }
-  else {
-      $nhtstr = sprintf 'NextHour%02d', $rel;
-      $sunalt = NexthoursVal ($name, $nhtstr, 'sunalt', undef);
-      $sunaz  = NexthoursVal ($name, $nhtstr, 'sunaz',  undef);
-  }
-
-  if (!defined $sunalt || !defined $sunaz) {
-      debugLog ($paref, "apiProcess", "DWD API - hod: $hod -> Value of sunaz/sunalt not stored in pvHistory, workaround using 1.00/0.75");
-      return (1.00, 0.75);
-  }
-
-  my $pi180 = 0.0174532918889;                                                  # PI/180
-
-  #-- Normale der Anlage (Nordrichtung = y-Achse, Ostrichtung = x-Achse)
-  my $nz = cos ($str_tilt * $pi180);
-  my $ny = sin ($str_tilt * $pi180) * cos ($str_azi * $pi180);
-  my $nx = sin ($str_tilt * $pi180) * sin ($str_azi * $pi180);
-
-  #-- Vektor zur Sonne
-  my $sz = sin ($sunalt * $pi180);
-  my $sy = cos ($sunalt * $pi180) * cos ($sunaz * $pi180);
-  my $sx = cos ($sunalt * $pi180) * sin ($sunaz * $pi180);
-
-  #-- Normale N = ($nx,$ny,$nz) Richtung Sonne S = ($sx,$sy,$sz)
-  my $daf = $nx * $sx + $ny * $sy + $nz * $sz;
-  $daf    = max ($daf, 0);
-
-  ## Schätzung Anteil Direktstrahlung an Globalstrahlung
-  ########################################################
-  my $drif = 0.0105;                                                                        # Faktor Zunahme Direktstrahlung pro Grad sunalt von 10° bis 50°
-  my $sdr  = $sunalt <= 10                  ? 0.33                             :            # Share of direct radiation = Faktor Anteil Direktstrahlung an Globalstrahlung (0.33 .. 0.75)
-             $sunalt >  10 && $sunalt <= 50 ? (($sunalt - 10) * 0.0105) + 0.33 :
-             0.75;
-             
-  $daf = round2 ($daf);
-  $sdr = round2 ($sdr);
-
-return ($daf, $sdr);
 }
 
 ####################################################################################################
@@ -6953,8 +6848,11 @@ sub __getaiFannState {            ## no critic "not used"
 
   my ($rs, $prepared, $rdy, $cause);
   
+  my $aiAlpha = 1;
+  
   if ($fanntyp eq 'con') {
       ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+      $aiAlpha                  = CurrentVal ($name, 'aiConAlpha', 1);                      # eingestellte Gewichtung AI
   }
   
   if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
@@ -7061,6 +6959,7 @@ sub __getaiFannState {            ## no critic "not used"
   $ars     = '<b>'.$hqtxt{airest}{$lang}.'</b> '.$ars;
   $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($name, $atf, $lang))[0] : '-');
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
+  $aiAlpha = '<b>Alpha:</b> '.$aiAlpha;
   $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;
 
   # Modellparameter
@@ -7130,6 +7029,7 @@ sub __getaiFannState {            ## no critic "not used"
   $rs .= $atf.' / '.$art."\n";
   $rs .= $ars."\n";
   $rs .= $agt."\n";
+  $rs .= $aiAlpha."\n";
   $rs .= $hpinst;
   $rs .= "\n\n";
   $rs .= $model."\n";
@@ -10983,7 +10883,7 @@ sub centralTask {
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
   _transferEnvironmentValues  ($centpars);                                            # Umweltsensorik einsammeln
   _transferHolidayValues      ($centpars);                                            # Wochentage, Feiertage und Urlaubstage einsammeln
-  
+    
   $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
   
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
@@ -11009,7 +10909,7 @@ sub centralTask {
     
   setTimeTracking             ($name, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
   _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
-
+  
   if ($debug =~ /miniCache/xs) {                                                      # Mini Cache Inhalt ausgeben 
       MC_debug ($name) if(askLogtime ($name, 'Dummy_Entry', 300));
   }
@@ -17980,62 +17880,161 @@ sub _calcReadingsTomorrowPVFc {
 return;
 }
 
-################################################################
-#  berechnet die prozentuale Abweichung von Tageswerten
-################################################################
+###########################################################################################
+# Berechnet die prozentuale Abweichung zwischen Prognose und Ist-Wert
+# für PV-Erzeugung und Verbrauch (Consumption).
+# Verbesserungen gegenüber der ursprünglichen Implementierung:
+#   - Dynamische Mindestschwelle (min_wh) verhindert Division durch sehr kleine Werte
+#   - Konfidenz-Gewichtung (progress) dämpft Abweichungen am Tagesanfang
+#   - Time Gate (min_recalc_s) verhindert zu häufige Neuberechnung bei Event-Triggern
+#   - EWMA-Glättung mit dynamischem Alpha dämpft kurzzeitige Sprünge
+#   - Totband (dead_band) verhindert Vorzeichenwechsel bei stabilem Signal
+#   - Perspektiv-Flip vor EWMA sichert Konsistenz zwischen circular und Reading
+###########################################################################################
 sub _calcTodayDeviation {
   my $paref = shift;
   my $name  = $paref->{name};
   my $t     = $paref->{t};
   my $date  = $paref->{date};
-  my $day   = $paref->{day};                                            
+  my $day   = $paref->{day};
+  
+  # --- Time Gate: Mindestabstand zwischen zwei Berechnungen
+  # Verhindert unkontrollierte Alpha-Akkumulation bei event-getriggerten
+  # Schnellzyklen (z.B. alle 5 Sekunden). Erst nach min_recalc_s Sekunden
+  # wird neu berechnet, dazwischen wird der letzte Wert beibehalten.
+  # Eigener Zeitstempel unabhängig von last_transfer (anderer Prozess/Semantik).
+  my $min_recalc_s = 60;
+  my $last_t       = $data{$name}{current}{lastDeviationCalc} // 0;
+  my $elapsed_s    = $t - $last_t;
 
+  if ($elapsed_s < $min_recalc_s) {                                                         # Zu kurz seit letzter Berechnung → überspringen
+      return;
+  }
+
+  $data{$name}{current}{lastDeviationCalc} = $t;                                            # Schutz gegen 0 bei Doppel-Events
+  
   my ($dpv, $dcon);
+  
   my ($manner, $perspective) = split ':', CurrentVal ($name, 'genPVdeviation', 'daily');
+  
   $perspective //= 'default';
   my $dosave_dpv = 0;
+
+  my $hash       = $defs{$name};
+  my $max_dev    = 200;                                                                     # prozentuales Clipping
+  my $dead_band  = 0.5;                                                                     # Totband in Prozentpunkten
   
-  my $hash = $defs{$name};
+  my $sunrise_ts = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, 'Today_SunRise', '06:00').':00');
+  my $sunset_ts  = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, 'Today_SunSet',  '22:00').':00');
+  my $day_len    = ($sunset_ts - $sunrise_ts) || 1;
+
+  # --- Dynamische Mindestschwelle basierend auf Anlagen-Peak
+  # Verhindert prozentuale Extremwerte wenn Prognose oder Ist-Wert noch sehr klein sind.
+  # Faktor 0.02 = ~2 % des Anlagen-Peaks als Schwellwert.
+  # Beispiele: 3 kWp → 60 Wh, 10 kWp → 200 Wh, 50 kWp → 1.000 Wh
+  my $peak_wp = _pvMaxLimit ($name);
+  my $min_wh  = int ($peak_wp * 0.02);
+  $min_wh     = 50   if $min_wh <   50;                                                     # floor:   kleinste sinnvolle Schwelle
+  $min_wh     = 2000 if $min_wh > 2000;                                                     # ceiling: Großanlagen deckeln
+    
+  # --- Tagesfortschritt PV: volle Gewichtung nach 1/3 der Tageslänge ab Sonnenaufgang
+  # Passt sich automatisch der Jahreszeit an:
+  # Sommer (~15h Tag) → volle Gewichtung nach ~5h
+  # Winter (~8h Tag)  → volle Gewichtung nach ~2,7h
+  my $ramp_pv_s = $day_len / 3;   
+  my $progress  = ($t - $sunrise_ts) / $ramp_pv_s;
+  $progress     = 0 if $progress < 0;
+  $progress     = 1 if $progress > 1;
   
+  $data{$name}{current}{ramphourspvdev} = round1 ($ramp_pv_s / 3600);                       # Verzögerungszeit bis volle Gewichtung PV-Abweichung speichern
+  
+  # --- EWMA-Glättungsfaktor Alpha dynamisch aus tatsächlichem Intervall ableiten
+  # Formel: α = 1 - e^(-Δt / τ)  (diskretisierter Tiefpassfilter)
+  # τ (tau_s) ist die Zeitkonstante: nach τ Sekunden sind 63 % eines Sprungs übernommen.
+  # Bei τ = 1800 s (30 min) reagiert der Filter träge auf kurzfristige Schwankungen,
+  # folgt aber echten Trends zuverlässig.
+  # Vorteil gegenüber festem Alpha: bei kurzen Intervallen (Events) wird Alpha
+  # automatisch klein → Ausreißer werden kaum übernommen.
+  # Bei langen Intervallen (z.B. nach Pause) wird Alpha größer → Wert holt auf.
+  my $tau_s = 1800;                                                                         # Zeitkonstante 30 min – nach Bedarf anpassbar
+  my $alpha = 1 - exp(-$elapsed_s / $tau_s);
+  $alpha    = 0.05 if $alpha < 0.05;                                                        # floor:   verhindert zu starke Trägheit bei sehr kurzen Intervallen
+  $alpha    = 0.80 if $alpha > 0.80;                                                        # ceiling: verhindert unkontrollierte Sprünge nach langen Pausen
+    
   # PV Prognose/Ist Abweichung
   ##############################
-  my $pvfc = CurrentVal  ($name, 'tdPvFcUp2Now', 0);
-  my $pvre = ReadingsNum ($name, 'Today_PVreal', 0);
-  
-  if ($pvre && $pvfc) {                                                                     # Schutz Illegal division by zero
-      if ($manner eq 'daily') {
-          my $sstime = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, "Today_SunSet", '22:00').':00');
+  my $pvfc = CurrentVal  ($name, 'tdPvFcUp2Now', 0);                                        # PV-Prognose akkumuliert bis jetzt
+  my $pvre = ReadingsNum ($name, 'Today_PVreal', 0);                                        # PV-Erzeugung real akkumuliert
 
-          if ($t >= $sstime) {
-              $dpv        = round2 (($pvfc - $pvre) / $pvfc * 100);                         # V 2.0.0
+  if ($pvre > $min_wh && $pvfc > $min_wh) {                                                 # Mindestschwelle: beide Werte müssen ausreichend groß sein
+      if ($manner eq 'daily') {
+          if ($t >= $sunset_ts) {
+              my $raw  = ($pvfc - $pvre) / $pvfc * 100;
+              $raw     = $raw >  $max_dev ?  $max_dev
+                       : $raw < -$max_dev ? -$max_dev : $raw;                               # Clipping
+              $raw    *= -1 if ($perspective eq 'reverse');                                 # Flip vor EWMA: sichert Konsistenz zwischen circular und Reading
+
+              my $prev = $data{$name}{circular}{99}{tdayDvtn} // $raw;
+              $dpv     = abs($raw - $prev) < $dead_band
+                       ? $prev
+                       : round2 ($alpha * $raw + (1 - $alpha) * $prev);
+              
               $dosave_dpv = 1;
           }
       }
       else {
-          $dpv        = round2 (($pvfc - $pvre) / $pvfc * 100);                             # V 2.0.0
+          my $raw  = ($pvfc - $pvre) / $pvfc * 100 * $progress;
+          $raw     = $raw >  $max_dev ?  $max_dev
+                   : $raw < -$max_dev ? -$max_dev : $raw;
+          $raw    *= -1 if ($perspective eq 'reverse');                                     # früh flippen → alles danach konsistent
+
+          my $prev = $data{$name}{circular}{99}{tdayDvtn} // $raw;
+          $dpv     = abs($raw - $prev) < $dead_band
+                   ? $prev
+                   : round2 ($alpha * $raw + (1 - $alpha) * $prev);
+          
           $dosave_dpv = 1;
       }
 
       if ($dosave_dpv) {
-          $dpv *= -1 if($perspective eq 'reverse');                                         # Perspektivänderung: Abweichung = Real - Vorhersage statt Abweichung = Vorhersage - Real
-          $data{$name}{circular}{99}{tdayDvtn} = $dpv;
-
-          storeReading ('Today_PVdeviation', $dpv.' %');
+          $data{$name}{circular}{99}{tdayDvtn} = $dpv;                                     # und $dpv ident
+          
+          storeReading ('Today_PVdeviation', $dpv.' %');                                   
       }
   }
-  
+
   # Consumption Prognose/Ist Abweichung
   #######################################
-  my $confc = CurrentVal  ($name, 'tdConFcUp2Now', 0);
-  my $conre = ReadingsNum ($name, 'Today_CONreal', 0);
+  # Eigener Mindestschwellwert für Consumption (unabhängig von PV-Peak)
+  # Basis: typischer Haushalt ~3.000–5.000 kWh/Jahr → ~350–580 Wh/h
+  # 50 Wh als konservativer floor, damit auch Niedrigverbraucher abgedeckt sind
+  my $min_wh_con = 50;
+  my $confc      = CurrentVal  ($name, 'tdConFcUp2Now', 0);
+  my $conre      = ReadingsNum ($name, 'Today_CONreal', 0);
   
-  if ($conre && $confc) {
-      $dcon  = round2 (($confc - $conre) / $confc * 100);                                   # V 2.0.0
-      $dcon *= -1 if($perspective eq 'reverse');                                            # Perspektivänderung
+  # --- Tagesfortschritt Consumption: volle Gewichtung nach X Stunden ab Mitternacht
+  my $midnight_ts  = timestringToTimestamp ($hash, $date.' 00:00:00');
+  my $ramp_con_s   = 6 * 3600;                                                              # Ramp-up Stunden in Sekunden – anpassbar
+  my $progress_con = ($t - $midnight_ts) / $ramp_con_s;
+  $progress_con    = 0 if $progress_con < 0;
+  $progress_con    = 1 if $progress_con > 1;
+  
+  $data{$name}{current}{ramphourscondev} = round1 ($ramp_con_s / 3600);                     # Verzögerungszeit bis volle Gewichtung CON-Abweichung speichern
+
+  if ($conre > $min_wh_con && $confc > $min_wh_con) {
+      my $raw  = ($confc - $conre) / $confc * 100 * $progress_con;
+      $raw     = $raw >  $max_dev ?  $max_dev
+               : $raw < -$max_dev ? -$max_dev : $raw;
+      $raw    *= -1 if ($perspective eq 'reverse');                                         # früh flippen → alles danach konsistent
+
+      my $prev = $data{$name}{circular}{99}{tdayConDvtn} // $raw;
+      $dcon    = abs($raw - $prev) < $dead_band
+               ? $prev
+               : round2 ($alpha * $raw + (1 - $alpha) * $prev);
+
+      $data{$name}{circular}{99}{tdayConDvtn} = $dcon;                                      # und $dcon ident
       
-      $data{$name}{circular}{99}{tdayConDvtn} = $dcon;
-      
-      storeReading ('Today_CONdeviation', $dcon.' %');
+      storeReading ('Today_CONdeviation', $dcon.' %');                                      
   }
 
 return;
@@ -19881,8 +19880,10 @@ sub _graphicHeader {
 
       ## Abweichung PV Prognose/Erzeugung
       #####################################
-      my $tdayDvtn = CircularVal ($name, 99, 'tdayDvtn', '-');
-      my $ydayDvtn = CircularVal ($name, 99, 'ydayDvtn', '-');
+      my $tdayDvtn  = CircularVal ($name, 99, 'tdayDvtn', '-');
+      my $ydayDvtn  = CircularVal ($name, 99, 'ydayDvtn', '-');
+      my $ramp_pv_h = CurrentVal  ($name, 'ramphourspvdev', '-');                                   # Verzögerungszeit bis volle Gewichtung PV-Abweichung
+            
       $tdayDvtn    = sprintf "%.1f %%", $tdayDvtn if(isNumeric($tdayDvtn));
       $ydayDvtn    = sprintf "%.1f %%", $ydayDvtn if(isNumeric($ydayDvtn));
       $tdayDvtn    =~ s/\./,/;
@@ -19893,6 +19894,9 @@ sub _graphicHeader {
       my $genpvdva = $paref->{genpvdva};
       my ($manner, $perspective) = split ':', $genpvdva;
       $perspective //= 'default';
+      
+      my $ramppvtxt = $manner ne 'daily' ? $hqtxt{ramppv}{$lang} : '';
+      $ramppvtxt    =~ s/<RAMP>/$ramp_pv_h/;
 
       my $dvtntxt  = 'PV '.$hqtxt{dvtn}{$lang}.'&nbsp;';
       my $tdaytxt  = ($manner eq 'daily' ? $hqtxt{tday}{$lang} : $hqtxt{ctnsly}{$lang}).':&nbsp;'."<b>".$tdayDvtn."</b>";
@@ -19915,6 +19919,11 @@ sub _graphicHeader {
       ######################################
       my $tdayConDvtn = CircularVal ($name, 99, 'tdayConDvtn', '-');
       my $ydayConDvtn = CircularVal ($name, 99, 'ydayConDvtn', '-');
+      my $ramp_con_h  = CurrentVal  ($name, 'ramphourscondev', '-');                                # Verzögerungszeit bis volle Gewichtung CON-Abweichung
+      
+      my $rampcontxt  = $hqtxt{rmpcon}{$lang};
+      $rampcontxt     =~ s/<RAMP>/$ramp_con_h/;
+        
       $tdayConDvtn    = sprintf "%.1f %%", $tdayConDvtn if(isNumeric($tdayConDvtn));
       $ydayConDvtn    = sprintf "%.1f %%", $ydayConDvtn if(isNumeric($ydayConDvtn));
       $tdayConDvtn    =~ s/\./,/;
@@ -19976,7 +19985,7 @@ sub _graphicHeader {
       my $cont2 = join '', map { $_->[0] . ('&nbsp;' x $_->[1]) } @parts2;
       
       my $version = $hash->{HELPER}{VERSION} // '-';
-
+      
       # --- erste Headerzeile
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="1" align="left"   $dstyle> <b>$dlink</b>              </td>};
@@ -19990,7 +19999,7 @@ sub _graphicHeader {
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont1 </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont2 </td>};
-      $header  .= qq{<td colspan="3" align="right" $dstyle> $dvtntxt};
+      $header  .= qq{<td colspan="3" align="right" title="$ramppvtxt" $dstyle> $dvtntxt};
       $header  .= qq{<span title="$text_tdayDvtn">};
       $header  .= qq{$tdaytxt};
       $header  .= qq{</span>};
@@ -20005,7 +20014,7 @@ sub _graphicHeader {
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
-      $header  .= qq{<td colspan="3" align="right" $dstyle> $dcontxt};
+      $header  .= qq{<td colspan="3" align="right" title="$rampcontxt" $dstyle> $dcontxt};
       $header  .= qq{<span title="$text_tdayConDvtn">};
       $header  .= qq{$tdaycontxt};
       $header  .= qq{</span>};
@@ -24076,7 +24085,7 @@ sub aiFannCreateConTrainData {
 
   my ($msg, $serial, $regv);
   
-  my $pv_max_limit = _aiFannPvMaxLimit ($name);
+  my $pv_max_limit = _pvMaxLimit ($name);
 
   if (!$pv_max_limit ) {
       $msg = 'No peak output is provided by the PV system';
@@ -26155,7 +26164,7 @@ sub aiFannGetConResult {
   debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
   $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
   
-  my $pv_max_limit = _aiFannPvMaxLimit ($name);
+  my $pv_max_limit = _pvMaxLimit ($name);
   
   if (!$pv_max_limit) {
       $msg = 'no peak output is provided by the PV system';
@@ -27336,7 +27345,7 @@ return $range;
 #    PV maximum Limit - Begrenzung durch Strings oder 
 #    installierter Inverterleistung
 ################################################################
-sub _aiFannPvMaxLimit {            
+sub _pvMaxLimit {            
   my ($name) = @_;              
     
   my $aspeak       = CurrentVal ($name, 'allstringspeak',   0);                     # PV Anlage Peakleistung (W)
