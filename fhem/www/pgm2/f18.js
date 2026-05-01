@@ -5,7 +5,9 @@ FW_version["f18.js"] = "$Id$";
 // Known bugs: AbsSize is wrong for ColorSlider
 var f18_attr={}, f18_sd, f18_icon={}, f18_room, f18_grid=20, f18_margin=10;
 var f18_small = (screen.width < 600 || screen.height < 600); // #139782
-var f18_webName, f18_swReg;
+var f18_webName, f18_swReg, f18_audio;
+
+
 var f18_cols = {
   "default":{ bg:     "FFFFE7", fg:    "000000", link:   "278727", 
               evenrow:"F8F8E0", oddrow:"F0F0D8", header: "E0E0C8",
@@ -89,10 +91,11 @@ $(document).ready(function(){
   f18_setWrapColumns();
   f18_setFixedInput();
   f18_setWidePortrait();
-  if(typeof fully !== 'undefined')
+  if(typeof fully == 'object' && typeof fully.getDeviceId !== 'undefined')
     FW_cmd(FW_root + "?cmd=set TYPE=FULLY:FILTER=deviceid="+
            fully.getDeviceId()+" host "+fully.getHostname()+"&XHR=1");
-  if(localStorage.getItem("serviceWorker") == "true")
+
+  if(f18_getAttr("serviceWorker", true))
     f18_serviceWorkerRegister(false);
 });
 
@@ -116,10 +119,15 @@ f18_menu()
     .css( {"background-image":"url('"+f18_icon.micro+"')", "cursor":"pointer" })
     .click(f18_stt);
 
+  $("<div id='speaker'></div>").prependTo("div#menuScrollArea")
+    .css( {"background-image":"url('"+f18_icon.speaker+"')", "cursor":"pointer" })
+    .click(f18_toggleSpeaker);
+   f18_toggleSpeaker(f18_getAttr("f18_audioEnabled",true));
+
   $("div#menu").prepend("<div></div>");
   f18_addPin("div#menu > div:first", "menu", true, fixMenu, f18_small);
   setTimeout(function(){
-        $("#menu,#content,#logo,#hdr,#menuBtn,#textInput,#micro")
+        $("#menu,#content,#logo,#hdr,#menuBtn,#textInput,#micro,#speaker")
         .addClass("animated"); }, 10);
   function
   fixMenu()
@@ -129,7 +137,9 @@ f18_menu()
     $("#menuBtn").css("display", 
         f18_getAttr("hideMenu") ? "none" : "block");
     $("#micro").css("display", 
-        f18_getAttr("showMicro") ? "block" : "none");
+        f18_getAttr("showMicro", true) ? "block" : "none");
+    $("#speaker").css("display", 
+        f18_getAttr("showSpeaker", true) ? "block" : "none");
     if(f18_getAttr("Pinned.menu")) {
       $("body").addClass("pinnedMenu");
       $("#menu").removeClass("hidden");
@@ -197,7 +207,7 @@ f18_stt()
     close:function(){
       if(doSend && txt) {
         var fw_id = $("body").attr("fw_id");
-        if(typeof fully !== 'undefined')
+        if(typeof fully == 'object' && typeof fully.getDeviceId !== 'undefined')
            FW_cmd(FW_root + "?cmd=set TYPE=FULLY:FILTER=deviceid=" +
                   fully.getDeviceId()+" STTinput "+encodeURIComponent(txt)+
                   " ["+fw_id+"]&XHR=1");
@@ -210,6 +220,34 @@ f18_stt()
       $(div).remove();
     }
   });
+}
+
+function
+f18_toggleSpeaker(v)
+{
+  let ae = typeof(v) == "object" ? !f18_getAttr("f18_audioEnabled",true) : v;
+  f18_setAttr("f18_audioEnabled", ae, false, true);
+  let style = $("#speaker").attr("style");
+  if(ae) {// activate audio
+    style = style.replace(/fill=\\"none\\" stroke=/, 'fill=');
+    new Audio().play().catch(() => {});
+
+    FW_widgets.speaker = { updateLine: function(e){
+      if(e?.length==3 && typeof(e[0])=="string" && e[0].match(/-lastFilename$/)) {
+        let url = FW_root+"/"+e[1].replace(/www\//,'www/');
+        f18_audio = new Audio(url);
+        f18_audio.play().catch(function(e){ FW_okDialog("Audio: "+e) });
+      }
+    }};
+
+  } else {
+    style = style.replace(/fill=/, 'fill=\\"none\\" stroke=');
+    delete(FW_widgets.speaker);
+    if(f18_audio)
+      f18_audio.pause();
+
+  }
+  $("#speaker").attr("style", style);
 }
 
 function
@@ -565,7 +603,8 @@ f18_special()
     addHider("hidePin", true, "Hide pin", function(c){
       $("div.pinHeader div.pin").css("display", c ? "none":"block");
     });
-    addHider("showMicro", true, "STT", f18_menu);
+    addHider("showMicro", true, "STT", f18_menu, true);
+    addHider("showSpeaker", true, "Speaker", f18_menu, true);
     addHider("fixedInput", false, "Fixed input and menu", f18_setFixedInput);
     addHider("wrapcolumns",false,"Wrap columns<br>on small screen",
                         f18_setWrapColumns);
@@ -625,38 +664,43 @@ f18_addPinToStyleDiv(el)
 function
 f18_resize()
 {
-  var w=$(window).width();
+  let w=$(window).width();
   log("f18.js resize W:"+w+" S:"+screen.width);
-  var hl = f18_getAttr("hideLogo"),
-      hi = f18_getAttr("hideInput"),
-      hm = f18_getAttr("hideMenu"),
-      pm = f18_getAttr("Pinned.menu") || hm,
-      rm = (f18_getAttr("rightMenu") && f18_small),
-      sm = f18_getAttr("showMicro"),
-      hti = f18_getAttr("hideTextInput");
 
-  var left = 0;
-  left += hl ? 0 : 40;
-  left += sm ? 28 : 0;
-  left += pm ? 0 : 44;
-  left += hti ? 0 : 40;
-  var lleft = (pm || hl ? 10 : 52);
-  $("input.maininput").css({ width:(w-left-(FW_isiOS ? 36 : 24))+'px', 
-                             "margin-left":(rm ? "0px" : "10px"),
-                             display: hi ? "none":"block"});
-  $("#menu,#content").css("top", (hi && pm && hl && hti && !sm) ? "10px" : "50px");
-  $("#hdr").css({ left:(rm ? 10 : left)+'px' });
-  $("#textInput").css({ left: (rm ? "auto":(left-32)+"px"),
-                        right:(rm ? (lleft+32)+"px":"auto"),
-                        display: hti ? "none":"block"});
-  $("#menuBtn").toggle(!pm || f18_small);
-  $("#menuBtn").css({ left:rm ? "auto":"10px",  right:rm ? "10px":"auto" });
-  $("#logo")   .css({ left:rm ? "auto":lleft ,  right:rm ? "48px":"auto" });
-  $("#micro")  .css({ left:rm ? "auto":(lleft+32)+"px",
-                     right:rm ? (lleft+64)+"px":"auto" });
-  $("#menu").css({ display: (hm ? "none":"block") });
-  if(FW_isiOS)
-    $("#logo,#menuBtn").css({ top:'12px'});
+  let pm = f18_getAttr("Pinned.menu"),
+      rm = (f18_getAttr("rightMenu") && f18_small),
+      hi = f18_getAttr("hideInput"), attrVal={};
+
+  let xPos = (rm ? w-44 : 10), iconsShown = hi ? 0 : 1;
+  for(let a of [{n:"hideMenu",     i:"#menuBtn", c:f18_small },
+                {n:"hideLogo",     i:"#logo"     },
+                {n:"hideTextInput",i:"#textInput"},
+                {n:"showMicro",    i:"#micro"    },
+                {n:"showSpeaker",  i:"#speaker"  }]) {
+
+    let isShow = a.n.indexOf("show")==0;
+    let v = attrVal[a.n] = f18_getAttr(a.n, isShow);
+    v = (isShow ? v : !v);
+    if(v && a.c != undefined)
+      v = a.c;
+    if(v) {
+      $(a.i).css({ display:"block", left:xPos });
+      xPos = xPos + (rm ? -34 : 34);
+      iconsShown++;
+    } else {
+      $(a.i).css({ display:"none" });
+    }
+  }
+
+  if(hi) {
+    $("#hdr").hide();
+  } else {
+    $("#hdr").show().css({left: rm ? 0 : xPos-10 });
+    $("#hdr .maininput").css({ width: rm ? xPos+10 : w - xPos-20 });
+  }
+
+  $("#menu,#content").css("top", iconsShown ? "50px" : "10px");
+  $("#menu").css({ display: attrVal.hideMenu ? "none":"block" });
 }
 
 function
@@ -891,8 +935,10 @@ f18_doSetPos(el, comp, pos)
 
 
 function
-f18_getAttr(attrName)
+f18_getAttr(attrName, isLs)
 {
+  if(isLs)
+    return localStorage.getItem(attrName) == "true";
   if(f18_room != undefined) {
     var val = f18_attr["Room."+f18_room+"."+attrName];
     if(val != undefined)
@@ -902,8 +948,12 @@ f18_getAttr(attrName)
 }
 
 function
-f18_setAttr(name, value, dontSave)
+f18_setAttr(name, value, dontSave, isLs)
 {
+  if(isLs) {
+    localStorage.setItem(name, value);
+    return;
+  }
   if(name)
     f18_attr[name]=value;
   if(name && value == undefined)
@@ -936,7 +986,7 @@ f18_setCss(why)
   if(f18_getAttr("dayNightActive"))
     dnCols = f18_isday ? f18_cols[f18_getAttr("dayStyle")] :
                          f18_cols[f18_getAttr("nightStyle")];
-  function col(n) { return dnCols ? dnCols[n] : f18_getAttr("cols."+n, true) };
+  function col(n) { return dnCols ? dnCols[n] : f18_getAttr("cols."+n) };
 
   function bg(c) { return "{ background:#"+c+"; fill:#"+c+"; }\n" }
   function fg(c) { return "{ color:#"+c+"; }\n" }
@@ -979,7 +1029,7 @@ f18_setCss(why)
     style += db+".ui-widget-header li { border:none!important; }";
     style += db+".ui-widget-content a "+fg(col("link")+"!important" );
   }
-  var bgImg = f18_getAttr("bgImg", true);
+  var bgImg = f18_getAttr("bgImg");
   if(bgImg) {
     style += 'body { background-image: url('+FW_root+
                      '/images/background/'+bgImg+');}';
@@ -1017,7 +1067,7 @@ f18_setCss(why)
 function
 f18_svgSetCols(svg)
 {
-  function col(n) { return f18_getAttr("cols."+n, true) };
+  function col(n) { return f18_getAttr("cols."+n) };
 
   if(!svg || !$(svg).attr("data-origin"))
     return;
@@ -1054,15 +1104,16 @@ f18_svgSetCols(svg)
 function
 f18_loadIcons()
 {
-  // font-awesome: txInp:plus-square
-  var prf='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" d="';
+  var prf='data:image/svg+xml;utf8,<svg viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path fill="gray" stroke-width="50px" d="';
   var sfx='"/></svg>';
+
   f18_icon.pinIn  = prf+'M 896 1088q66 0 128-15v655q0 26-19 45t-45 19h-128q-26 0-45-19t-19-45v-655q62 15 128 15zm0-1088q212 0 362 150t150 362-150 362-362 150-362-150-150-362 150-362 362-150zm0 224q14 0 23-9t9-23-9-23-23-9q-146 0-249 103t-103 249q0 14 9 23t23 9 23-9 9-23q0-119 84.5-203.5t203.5-84.5z'+sfx;
   f18_icon.burger = prf+'M 1664 1344v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45zm0-512v128q0 26-19 45t-45 19h-1408q-26 0-45-19t-19-45v-128q0-26 19-45t45-19h1408q26 0 45 19t19 45z'+sfx;
   f18_icon.arrows = prf+'M 1792 896q0 26-19 45l-256 256q-19 19-45 19t-45-19-19-45v-128h-384v384h128q26 0 45 19t19 45-19 45l-256 256q-19 19-45 19t-45-19l-256-256q-19-19-19-45t19-45 45-19h128v-384h-384v128q0 26-19 45t-45 19-45-19l-256-256q-19-19-19-45t19-45l256-256q19-19 45-19t45 19 19 45v128h384v-384h-128q-26 0-45-19t-19-45 19-45l256-256q19-19 45-19t45 19l256 256q19 19 19 45t-19 45-45 19h-128v384h384v-128q0-26 19-45t45-19 45 19l256 256q19 19 19 45z'+sfx;
   f18_icon.ban    = prf+'M 1440 893q0-161-87-295l-754 753q137 89 297 89 111 0 211.5-43.5t173.5-116.5 116-174.5 43-212.5zm-999 299l755-754q-135-91-300-91-148 0-273 73t-198 199-73 274q0 162 89 299zm1223-299q0 157-61 300t-163.5 246-245 164-298.5 61-298.5-61-245-164-163.5-246-61-300 61-299.5 163.5-245.5 245-164 298.5-61 298.5 61 245 164 163.5 245.5 61 299.5z'+sfx;
   f18_icon.txInp  = prf+'M 1302,839 V 939 c 0,19 -15,37 -36,37 H 993 v 277 c 0,19 -15,37 -36,37 H 856 c -20,0 -36,-15 -36,-37 V 977 H 546 c -20,0 -36,-15 -36,-37 V 839 c 0,-19 15,-37 36,-37 H 818 V 521 c 0,-19 15,-37 36,-37 h 97 c 20,0 36,15 36,37 V 798 H 1261 c 20,0 36,15 36,37 z M 1600,331 V 1447 c 0,83 -65,151 -148,151 H 360 C 277,1600 212,1532 212,1448 V 331 C 212,246 277,180 360,180 H 1450 c 81,0 147,66 147,151 z M 1450,1428 V 350 c 0,-8 -7,-17 -17,-17 H 379 c -9,0 -17,7 -17,17 V 1428 c 0,8 7,17 17,17 H 1431 c 9,0 17,-7 17,-17 z'+sfx;
   f18_icon.micro  = prf+'M 840 1324 c -298 0 -542 -243 -542 -542 c 0 -31 25 -57 57 -57 c 31 0 57 25 57 57 C 413 1017 604 1209 840 1209 c 235 0 426 -191 426 -426 c 0 -31 25 -57 57 -57 s 57 25 57 57 C 1382 1081 1138 1324 840 1324 z M 840 1133 L 840 1133 c -191 0 -349 -157 -349 -349 V 349 C 490 157 648 0 840 0 h 0 c 191 0 349 157 349 349 v 435 C 1189 976 1031 1133 840 1133 z M 840 1665 c -31 0 -57 -25 -57 -57 V 1281 c 0 -31 25 -57 57 -57 c 31 0 57 25 57 57 v 325 C 897 1639 871 1665 840 1665 z M 1035 1680 H 644 c -31 0 -57 -25 -57 -57 s 25 -57 57 -57 h 390 c 31 0 57 25 57 57 S 1067 1680 1035 1680 z'+sfx;
+  f18_icon.speaker= prf+'M 640 640 L 640 1152 L 960 1152 L 1280 1472 L 1280 320 L 960 640 Z M 1408 512 C 1536 640 1536 1152 1408 1280' +sfx;
 }
 
 function

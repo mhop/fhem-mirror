@@ -918,7 +918,7 @@ FW_answerCall($)
     $ldir = "$attr{global}{modpath}/docs" if($dir eq "docs");
 
     # pgm2 check is for jquery-ui images
-    my $static = ($ext =~ m/(css|js|png|jpg|html|svg)/i || $dir =~ m/^pgm2/);
+    my $static = ($ext =~ m/(css|js|png|jpg|html|svg|mp3)/i || $dir =~ m/^pgm2/);
     my $fname = ($ext ? "$file.$ext" : $file);
     return FW_serveSpecial($file, $ext, $ldir, ($arg =~ m/nocache/) ? 0 : 1)
       if(-r "$ldir/$fname" || $static); # no return for FLOORPLAN
