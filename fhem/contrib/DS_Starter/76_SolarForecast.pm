@@ -163,7 +163,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.4"  => "29.04.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
+  "2.6.4"  => "01.05.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
                            "exponentielles Glätten EWMA -> verhindert Sprünge durch einen gleitenden Mittelwert über die letzten ".
                            "Berechnungen ",
   "2.6.3"  => "27.04.2026  Debug apiProcess: Anzeige ob ein Cached Wert verwendet wird bei 'DWD API Tilted' ".
@@ -1099,6 +1099,10 @@ my %hqtxt = (                                                                # H
               DE => qq{von extern umgeschaltet}                                                                             },
   legimp => { EN => qq{Legend Importance: 1 - general Message, 2 - important Message, 3 - Error or Problem},
               DE => qq{Legende Wichtigkeit: 1 - allgemeine Mitteilung, 2 - wichtige Mitteilung, 3 - Fehler oder Problem}    },
+  rmpcon => { EN => qq{the deviation increases proportionally and is fully weighted after <RAMP> hours starting at midnight},
+              DE => qq{die Abweichung wird proportional steigend und nach <RAMP> Stunden ab Mitternacht voll gewichtet}     },  
+  ramppv => { EN => qq{The deviation is weighted proportionally as the daylight phase begins\nand becomes fully effective <RAMP> hours after sunrise},
+              DE => qq{die Abweichung wird mit Beginn der Tageslichtphase proportional hochgewichtet\nund ist nach <RAMP> Stunden ab Sonnenaufgang voll wirksam}                             },  
   strok  => { EN => qq{Congratulations &#128522;, the system configuration is error-free. Please note any information (<I>).},
               DE => qq{Herzlichen Glückwunsch &#128522;, die Anlagenkonfiguration ist fehlerfrei. Bitte eventuelle Hinweise (<I>) beachten.}                                                 },
   strwn  => { EN => qq{Looks quite good &#128528;, the system configuration is basically OK. Please note the warnings (<W>).},
@@ -18001,35 +18005,6 @@ sub _calcTodayDeviation {
   my $date  = $paref->{date};
   my $day   = $paref->{day};
   
-  my ($dpv, $dcon);
-  my ($manner, $perspective) = split ':', CurrentVal ($name, 'genPVdeviation', 'daily');
-  $perspective //= 'default';
-  my $dosave_dpv = 0;
-
-  my $hash = $defs{$name};
-
-  # --- Dynamische Mindestschwelle basierend auf Anlagen-Peak
-  # Verhindert prozentuale Extremwerte wenn Prognose oder Ist-Wert noch sehr klein sind.
-  # Faktor 0.02 = ~2 % des Anlagen-Peaks als Schwellwert.
-  # Beispiele: 3 kWp → 60 Wh, 10 kWp → 200 Wh, 50 kWp → 1.000 Wh
-  my $peak_wp = _aiFannPvMaxLimit ($name);
-  my $min_wh  = int ($peak_wp * 0.02);
-  $min_wh     = 50   if $min_wh <   50;                                                     # floor:   kleinste sinnvolle Schwelle
-  $min_wh     = 2000 if $min_wh > 2000;                                                     # ceiling: Großanlagen deckeln
-
-  # --- Tagesfortschritt (0.0 … 1.0) bezogen auf Lichtphase
-  # Dient als Konfidenz-Gewichtung: am Morgen nahe 0, am Abend nahe 1.
-  # Dadurch werden frühe Abweichungen gedämpft, da die akkumulierten Werte
-  # noch gering und damit wenig aussagekräftig sind.
-  my $sunrise_ts = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, 'Today_SunRise', '06:00').':00');
-  my $sunset_ts  = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, 'Today_SunSet',  '22:00').':00');
-  my $day_len    = ($sunset_ts - $sunrise_ts) || 1;
-  my $progress   = ($t - $sunrise_ts) / $day_len;
-  $progress      = 0 if($progress < 0);
-  $progress      = 1 if($progress > 1);
-
-  my $max_dev = 200;                                                                        # prozentuales Clipping
-  
   # --- Time Gate: Mindestabstand zwischen zwei Berechnungen
   # Verhindert unkontrollierte Alpha-Akkumulation bei event-getriggerten
   # Schnellzyklen (z.B. alle 5 Sekunden). Erst nach min_recalc_s Sekunden
@@ -18044,7 +18019,42 @@ sub _calcTodayDeviation {
   }
 
   $data{$name}{current}{lastDeviationCalc} = $t;                                            # Schutz gegen 0 bei Doppel-Events
+  
+  my ($dpv, $dcon);
+  
+  my ($manner, $perspective) = split ':', CurrentVal ($name, 'genPVdeviation', 'daily');
+  
+  $perspective //= 'default';
+  my $dosave_dpv = 0;
 
+  my $hash      = $defs{$name};
+  my $max_dev   = 200;                                                                      # prozentuales Clipping
+  my $dead_band = 0.5;                                                                      # Totband in Prozentpunkten
+  
+  my $sunrise_ts = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, 'Today_SunRise', '06:00').':00');
+  my $sunset_ts  = timestringToTimestamp ($hash, $date.' '.ReadingsVal ($name, 'Today_SunSet',  '22:00').':00');
+  my $day_len    = ($sunset_ts - $sunrise_ts) || 1;
+
+  # --- Dynamische Mindestschwelle basierend auf Anlagen-Peak
+  # Verhindert prozentuale Extremwerte wenn Prognose oder Ist-Wert noch sehr klein sind.
+  # Faktor 0.02 = ~2 % des Anlagen-Peaks als Schwellwert.
+  # Beispiele: 3 kWp → 60 Wh, 10 kWp → 200 Wh, 50 kWp → 1.000 Wh
+  my $peak_wp = _pvMaxLimit ($name);
+  my $min_wh  = int ($peak_wp * 0.02);
+  $min_wh     = 50   if $min_wh <   50;                                                     # floor:   kleinste sinnvolle Schwelle
+  $min_wh     = 2000 if $min_wh > 2000;                                                     # ceiling: Großanlagen deckeln
+    
+  # --- Tagesfortschritt PV: volle Gewichtung nach 1/3 der Tageslänge ab Sonnenaufgang
+  # Passt sich automatisch der Jahreszeit an:
+  # Sommer (~15h Tag) → volle Gewichtung nach ~5h
+  # Winter (~8h Tag)  → volle Gewichtung nach ~2,7h
+  my $ramp_pv_s = $day_len / 3;   
+  my $progress  = ($t - $sunrise_ts) / $ramp_pv_s;
+  $progress     = 0 if $progress < 0;
+  $progress     = 1 if $progress > 1;
+  
+  $data{$name}{current}{ramphourspvdev} = round1 ($ramp_pv_s / 3600);                       # Verzögerungszeit bis volle Gewichtung PV-Abweichung speichern
+  
   # --- EWMA-Glättungsfaktor Alpha dynamisch aus tatsächlichem Intervall ableiten
   # Formel: α = 1 - e^(-Δt / τ)  (diskretisierter Tiefpassfilter)
   # τ (tau_s) ist die Zeitkonstante: nach τ Sekunden sind 63 % eines Sprungs übernommen.
@@ -18057,9 +18067,7 @@ sub _calcTodayDeviation {
   my $alpha = 1 - exp(-$elapsed_s / $tau_s);
   $alpha    = 0.05 if $alpha < 0.05;                                                        # floor:   verhindert zu starke Trägheit bei sehr kurzen Intervallen
   $alpha    = 0.80 if $alpha > 0.80;                                                        # ceiling: verhindert unkontrollierte Sprünge nach langen Pausen
-  
-  my $dead_band = 0.5;                                                                      # Totband in Prozentpunkten
-  
+    
   # PV Prognose/Ist Abweichung
   ##############################
   my $pvfc = CurrentVal  ($name, 'tdPvFcUp2Now', 0);                                        # PV-Prognose akkumuliert bis jetzt
@@ -18076,7 +18084,7 @@ sub _calcTodayDeviation {
               my $prev = $data{$name}{circular}{99}{tdayDvtn} // $raw;
               $dpv     = abs($raw - $prev) < $dead_band
                        ? $prev
-                       : round2($alpha * $raw + (1 - $alpha) * $prev);
+                       : round2 ($alpha * $raw + (1 - $alpha) * $prev);
               
               $dosave_dpv = 1;
           }
@@ -18090,7 +18098,7 @@ sub _calcTodayDeviation {
           my $prev = $data{$name}{circular}{99}{tdayDvtn} // $raw;
           $dpv     = abs($raw - $prev) < $dead_band
                    ? $prev
-                   : round2($alpha * $raw + (1 - $alpha) * $prev);
+                   : round2 ($alpha * $raw + (1 - $alpha) * $prev);
           
           $dosave_dpv = 1;
       }
@@ -18108,17 +18116,17 @@ sub _calcTodayDeviation {
   # Basis: typischer Haushalt ~3.000–5.000 kWh/Jahr → ~350–580 Wh/h
   # 50 Wh als konservativer floor, damit auch Niedrigverbraucher abgedeckt sind
   my $min_wh_con = 50;
-
-  my $confc = CurrentVal  ($name, 'tdConFcUp2Now', 0);
-  my $conre = ReadingsNum ($name, 'Today_CONreal', 0);
+  my $confc      = CurrentVal  ($name, 'tdConFcUp2Now', 0);
+  my $conre      = ReadingsNum ($name, 'Today_CONreal', 0);
   
-  # --- Tagesfortschritt Consumption (0.0 … 1.0) bezogen auf 24h
-  # Consumption ist unabhängig von der Lichtphase und läuft auch nachts.
-  # Mitternacht = 0.0, kurz vor Mitternacht = ~1.0
+  # --- Tagesfortschritt Consumption: volle Gewichtung nach X Stunden ab Mitternacht
   my $midnight_ts  = timestringToTimestamp ($hash, $date.' 00:00:00');
-  my $progress_con = ($t - $midnight_ts) / 86400;                                           # 86400 = Sekunden pro Tag
+  my $ramp_con_s   = 6 * 3600;                                                              # Ramp-up Stunden in Sekunden – anpassbar
+  my $progress_con = ($t - $midnight_ts) / $ramp_con_s;
   $progress_con    = 0 if $progress_con < 0;
   $progress_con    = 1 if $progress_con > 1;
+  
+  $data{$name}{current}{ramphourscondev} = round1 ($ramp_con_s / 3600);                     # Verzögerungszeit bis volle Gewichtung CON-Abweichung speichern
 
   if ($conre > $min_wh_con && $confc > $min_wh_con) {
       my $raw  = ($confc - $conre) / $confc * 100 * $progress_con;
@@ -18129,11 +18137,11 @@ sub _calcTodayDeviation {
       my $prev = $data{$name}{circular}{99}{tdayConDvtn} // $raw;
       $dcon    = abs($raw - $prev) < $dead_band
                ? $prev
-               : round2($alpha * $raw + (1 - $alpha) * $prev);
+               : round2 ($alpha * $raw + (1 - $alpha) * $prev);
 
-      $data{$name}{circular}{99}{tdayConDvtn} = $dcon;                                     # und $dcon ident
+      $data{$name}{circular}{99}{tdayConDvtn} = $dcon;                                      # und $dcon ident
       
-      storeReading ('Today_CONdeviation', $dcon.' %');                                     # circular = Reading
+      storeReading ('Today_CONdeviation', $dcon.' %');                                      # circular = Reading
   }
 
 return;
@@ -19979,8 +19987,10 @@ sub _graphicHeader {
 
       ## Abweichung PV Prognose/Erzeugung
       #####################################
-      my $tdayDvtn = CircularVal ($name, 99, 'tdayDvtn', '-');
-      my $ydayDvtn = CircularVal ($name, 99, 'ydayDvtn', '-');
+      my $tdayDvtn  = CircularVal ($name, 99, 'tdayDvtn', '-');
+      my $ydayDvtn  = CircularVal ($name, 99, 'ydayDvtn', '-');
+      my $ramp_pv_h = CurrentVal  ($name, 'ramphourspvdev', '-');                                   # Verzögerungszeit bis volle Gewichtung PV-Abweichung
+            
       $tdayDvtn    = sprintf "%.1f %%", $tdayDvtn if(isNumeric($tdayDvtn));
       $ydayDvtn    = sprintf "%.1f %%", $ydayDvtn if(isNumeric($ydayDvtn));
       $tdayDvtn    =~ s/\./,/;
@@ -19991,6 +20001,9 @@ sub _graphicHeader {
       my $genpvdva = $paref->{genpvdva};
       my ($manner, $perspective) = split ':', $genpvdva;
       $perspective //= 'default';
+      
+      my $ramppvtxt = $manner ne 'daily' ? $hqtxt{ramppv}{$lang} : '';
+      $ramppvtxt    =~ s/<RAMP>/$ramp_pv_h/;
 
       my $dvtntxt  = 'PV '.$hqtxt{dvtn}{$lang}.'&nbsp;';
       my $tdaytxt  = ($manner eq 'daily' ? $hqtxt{tday}{$lang} : $hqtxt{ctnsly}{$lang}).':&nbsp;'."<b>".$tdayDvtn."</b>";
@@ -20013,6 +20026,11 @@ sub _graphicHeader {
       ######################################
       my $tdayConDvtn = CircularVal ($name, 99, 'tdayConDvtn', '-');
       my $ydayConDvtn = CircularVal ($name, 99, 'ydayConDvtn', '-');
+      my $ramp_con_h  = CurrentVal  ($name, 'ramphourscondev', '-');                                # Verzögerungszeit bis volle Gewichtung CON-Abweichung
+      
+      my $rampcontxt  = $hqtxt{rmpcon}{$lang};
+      $rampcontxt     =~ s/<RAMP>/$ramp_con_h/;
+        
       $tdayConDvtn    = sprintf "%.1f %%", $tdayConDvtn if(isNumeric($tdayConDvtn));
       $ydayConDvtn    = sprintf "%.1f %%", $ydayConDvtn if(isNumeric($ydayConDvtn));
       $tdayConDvtn    =~ s/\./,/;
@@ -20074,7 +20092,7 @@ sub _graphicHeader {
       my $cont2 = join '', map { $_->[0] . ('&nbsp;' x $_->[1]) } @parts2;
       
       my $version = $hash->{HELPER}{VERSION} // '-';
-
+      
       # --- erste Headerzeile
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="1" align="left"   $dstyle> <b>$dlink</b>              </td>};
@@ -20088,7 +20106,7 @@ sub _graphicHeader {
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont1 </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle> $cont2 </td>};
-      $header  .= qq{<td colspan="3" align="right" $dstyle> $dvtntxt};
+      $header  .= qq{<td colspan="3" align="right" title="$ramppvtxt" $dstyle> $dvtntxt};
       $header  .= qq{<span title="$text_tdayDvtn">};
       $header  .= qq{$tdaytxt};
       $header  .= qq{</span>};
@@ -20103,7 +20121,7 @@ sub _graphicHeader {
       $header  .= qq{<tr>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
       $header  .= qq{<td colspan="3" align="left"  $dstyle>     </td>};
-      $header  .= qq{<td colspan="3" align="right" $dstyle> $dcontxt};
+      $header  .= qq{<td colspan="3" align="right" title="$rampcontxt" $dstyle> $dcontxt};
       $header  .= qq{<span title="$text_tdayConDvtn">};
       $header  .= qq{$tdaycontxt};
       $header  .= qq{</span>};
@@ -24174,7 +24192,7 @@ sub aiFannCreateConTrainData {
 
   my ($msg, $serial, $regv);
   
-  my $pv_max_limit = _aiFannPvMaxLimit ($name);
+  my $pv_max_limit = _pvMaxLimit ($name);
 
   if (!$pv_max_limit ) {
       $msg = 'No peak output is provided by the PV system';
@@ -26253,7 +26271,7 @@ sub aiFannGetConResult {
   debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
   $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
   
-  my $pv_max_limit = _aiFannPvMaxLimit ($name);
+  my $pv_max_limit = _pvMaxLimit ($name);
   
   if (!$pv_max_limit) {
       $msg = 'no peak output is provided by the PV system';
@@ -27434,7 +27452,7 @@ return $range;
 #    PV maximum Limit - Begrenzung durch Strings oder 
 #    installierter Inverterleistung
 ################################################################
-sub _aiFannPvMaxLimit {            
+sub _pvMaxLimit {            
   my ($name) = @_;              
     
   my $aspeak       = CurrentVal ($name, 'allstringspeak',   0);                     # PV Anlage Peakleistung (W)
