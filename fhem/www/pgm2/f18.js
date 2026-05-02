@@ -41,7 +41,7 @@ $(document).ready(function(){
   }
 
   if(!f18_sd.f18) {
-    f18_attr = { "Pinned.menu":"true", "hidePin":"true" };
+    f18_attr = { "Pinned.menu":true, "hidePin":true };
     f18_resetCol();
     f18_sd.f18 = f18_attr;
   }
@@ -672,7 +672,7 @@ f18_resize()
       hi = f18_getAttr("hideInput"), attrVal={};
 
   let xPos = (rm ? w-44 : 10), iconsShown = hi ? 0 : 1;
-  for(let a of [{n:"hideMenu",     i:"#menuBtn", c:f18_small },
+  for(let a of [{n:"hideMenu",     i:"#menuBtn", c:f18_small||!pm },
                 {n:"hideLogo",     i:"#logo"     },
                 {n:"hideTextInput",i:"#textInput"},
                 {n:"showMicro",    i:"#micro"    },
