@@ -14317,8 +14317,8 @@ sub _batChargeMgmt {
               # Rohwerte als verbraucht merken, dann für nächste Iteration resyncen
               $bs->{confcss_spent} += $confc_raw;
               $bs->{rodpvfc_spent} += $pvfc_raw;
-              $bs->{confcss} = max (0, round0($sf * ($bs->{confcss_raw} - $bs->{confcss_spent})));
-              $bs->{rodpvfc} = max (0, round0($sf * ($bs->{rodpvfc_raw} - $bs->{rodpvfc_spent})));
+              $bs->{confcss} = max(0, round0($sf_con    * ($bs->{confcss_raw} - $bs->{confcss_spent})));
+              $bs->{rodpvfc} = max(0, round0($sf_charge * ($bs->{rodpvfc_raw} - $bs->{rodpvfc_spent})));
           }
           else {                                                                                # nächster Tag
               $bs->{tomconfc} -= $confc;
