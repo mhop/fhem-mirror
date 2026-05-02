@@ -14194,15 +14194,17 @@ sub _batChargeMgmt {
           
           # --- laufende Zustandsvariablen
           sf           => $sf,
-          sf_init      => $sf,                                                              # ← einmalig festhalten für sf_con Fallback
+          sf_con_init  => __batLoadShareFactor ($name, $bn),                                # sf_con Fallback
           socwh        => $socwh,
           whneed       => max (0, $goalwh - $socwh),
+                    
+          # --- Akkumulatoren initial mit sf_con skalieren
+          confcss      => round0 (__batLoadShareFactor ($name, $bn) * $confcss_raw),
+          tomconfc     => round0 (__batLoadShareFactor ($name, $bn) * $tomconfc_raw),
           
-          # --- Akkumulatoren (initial skaliert)
-          confcss      => round0 ($sf * $confcss_raw),
+          # --- PV-Akkumulatoren mit sf_charge
           rodpvfc      => round0 ($sf * $rodpvfc_raw),
           tompvfc      => round0 ($sf * $tompvfc_raw),
-          tomconfc     => round0 ($sf * $tomconfc_raw),
           
           # --- Rohwerte (für Resync)
           confcss_raw  => $confcss_raw,
@@ -14265,11 +14267,15 @@ sub _batChargeMgmt {
           my $stt = (split /[-:]/, $nhstt)[2];
           $stt    =~ s/\s/\//;
 
-          # --- sf auf Basis des Stunden-Snapshots berechnen (konsistent für alle Batterien)
+          # --- sf für Ladeallokation (defizitbasiert, wie bisher)
           my $bdeficit        = $bs->{batinstcap} - $socwh_snap{$bn};
           my $batwhdeficitsum = $bcapsum - $socwhsum_snap;
-          my $sf              = $batwhdeficitsum ? round2($bdeficit / $batwhdeficitsum) : $bs->{sf};
-          $bs->{sf}           = $sf;
+          my $sf_charge       = $batwhdeficitsum ? round2 ($bdeficit / $batwhdeficitsum) : $bs->{sf};
+          $bs->{sf}           = $sf_charge;
+
+          # --- sf_con: Anteil an der Gesamtladung für Verbrauchsallokation (kapazitätsbasiert, konstant)
+          # --- entspricht __batLoadShareFactor, aber dynamisch auf Snapshot-Basis
+          my $sf_con = $socwhsum_snap ? round2 ($socwh_snap{$bn} / $socwhsum_snap) : $bs->{sf_con_init};    # Anteil dieser Batterie an Gesamtkapazität – unabhängig vom Ladestand
 
           # --- Tagwechsel auf übernächsten Tag: Akkumulatoren umschalten
           if ($fd == 2 && $fh == 0) {
@@ -14277,20 +14283,10 @@ sub _batChargeMgmt {
               $bs->{tomconfc_raw}    = $batinitval->{$bn}{datomconfc_raw};
               $bs->{tompvfc_spent}   = 0;
               $bs->{tomconfc_spent}  = 0;
-              $bs->{tompvfc}         = round0($sf * $bs->{tompvfc_raw});
-              $bs->{tomconfc}        = round0($sf * $bs->{tomconfc_raw});
+              $bs->{tompvfc}         = round0 ($sf_charge * $bs->{tompvfc_raw});                # PV → Ladedefizit
+              $bs->{tomconfc}        = round0 ($sf_con    * $bs->{tomconfc_raw});               # Verbrauch → Ladestand
           }
           
-          
-          # --- sf für Ladeallokation (defizitbasiert, wie bisher)
-          my $bdeficit        = $bs->{batinstcap} - $socwh_snap{$bn};
-          my $batwhdeficitsum = $bcapsum - $socwhsum_snap;
-          my $sf_charge       = $batwhdeficitsum ? round2 ($bdeficit / $batwhdeficitsum) : $bs->{sf};
-          $bs->{sf}           = $sf_charge;
-
-          # --- sf für Verbrauchsallokation (kapazitätsbasiert, konstant)
-          my $sf_con = $bcapsum ? round2 ($bs->{batinstcap} / $bcapsum) : $bs->{sf_init};       # Anteil dieser Batterie an Gesamtkapazität – unabhängig vom Ladestand
-
           # --- Stundenwerte skaliert: pvfc mit sf_charge, confc mit sf_con
           my $confc = round0 ($sf_con    * $confc_raw);                                         # Entladung proportional zur Kapazität
           my $pvfc  = round0 ($sf_charge * $pvfc_raw);                                          # Ladung proportional zum Defizit
@@ -14311,25 +14307,26 @@ sub _batChargeMgmt {
               $bs->{confcss} -= $confc;                                                         # Verbrauch bis Sonnenuntergang - Verbrauch Fc aktuelle Stunde
               $bs->{confcss}  = 0 if $bs->{confcss} < 0;
               $bs->{rodpvfc} -= $pvfc;
-              $bs->{rodpvfc}  = 0 if $bs->{rodpvfc} < 0;
-              $spday = $bs->{rodpvfc} - $bs->{confcss};                                         # spday aus post-Abzug Werten (vor Resync)
+              $bs->{rodpvfc}  = 0 if $bs->{rodpvfc} < 0;                                        # Clamp
+              $spday          = $bs->{rodpvfc} - $bs->{confcss};                                # spday aus post-Abzug Werten (vor Resync)
 
               # Rohwerte als verbraucht merken, dann für nächste Iteration resyncen
               $bs->{confcss_spent} += $confc_raw;
               $bs->{rodpvfc_spent} += $pvfc_raw;
-              $bs->{confcss} = max(0, round0($sf_con    * ($bs->{confcss_raw} - $bs->{confcss_spent})));
-              $bs->{rodpvfc} = max(0, round0($sf_charge * ($bs->{rodpvfc_raw} - $bs->{rodpvfc_spent})));
+              $bs->{confcss}        = max (0, round0 ($sf_con    * ($bs->{confcss_raw} - $bs->{confcss_spent})));
+              $bs->{rodpvfc}        = max (0, round0 ($sf_charge * ($bs->{rodpvfc_raw} - $bs->{rodpvfc_spent})));
           }
           else {                                                                                # nächster Tag
               $bs->{tomconfc} -= $confc;
               $bs->{tomconfc}  = 0 if $bs->{tomconfc} < 0;
               $bs->{tompvfc}  -= $pvfc;
-              $spday = $bs->{tompvfc} - $bs->{tomconfc};
+              $bs->{tompvfc}   = 0 if $bs->{tompvfc} < 0; 
+              $spday           = $bs->{tompvfc} - $bs->{tomconfc};
 
               $bs->{tomconfc_spent} += $confc_raw;
               $bs->{tompvfc_spent}  += $pvfc_raw;
-              $bs->{tompvfc}  = max (0, round0($sf * ($bs->{tompvfc_raw}  - $bs->{tompvfc_spent})));
-              $bs->{tomconfc} = max (0, round0($sf * ($bs->{tomconfc_raw} - $bs->{tomconfc_spent})));
+              $bs->{tomconfc}        = max (0, round0 ($sf_con    * ($bs->{tomconfc_raw} - $bs->{tomconfc_spent})));
+              $bs->{tompvfc}         = max (0, round0 ($sf_charge * ($bs->{tompvfc_raw}  - $bs->{tompvfc_spent})));
           }
 
           $spday = 0 if($spday < 0);                                                            # PV Überschuß Prognose bis Sonnenuntergang
