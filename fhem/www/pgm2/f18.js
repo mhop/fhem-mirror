@@ -228,6 +228,8 @@ f18_toggleSpeaker(v)
   let ae = typeof(v) == "object" ? !f18_getAttr("f18_audioEnabled",true) : v;
   f18_setAttr("f18_audioEnabled", ae, false, true);
   let style = $("#speaker").attr("style");
+  if(!style)
+    return;
   if(ae) {// activate audio
     style = style.replace(/fill=\\"none\\" stroke=/, 'fill=');
     new Audio().play().catch(() => {});
