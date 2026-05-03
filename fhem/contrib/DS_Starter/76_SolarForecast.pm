@@ -163,7 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.5"  => "02.05.2026  _batChargeMgmt Refactored: Äußere Stundenschleife -> Innere Batterieschleife, Fix 100%-Bug ",
+  "2.6.5"  => "03.05.2026  _batChargeMgmt Refactored: Äußere Stundenschleife -> Innere Batterieschleife, Fix 100%-Bug ".
+                           "wichtiger Bugfix weekday in LOCALE_DAYNAMES ",
   "2.6.4"  => "01.05.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
                            "exponentielles Glätten EWMA -> verhindert Sprünge durch einen gleitenden Mittelwert über die letzten ".
                            "Berechnungen, Routine ___areaFactorTrack entfernt ",
@@ -326,12 +327,14 @@ my %vNotesIntern = (
 
 
 
-# Locale‑abhängige Kurz‑Wochentage erzeugen (Mo, Tue, lun., …)
+# Locale-abhängige Kurz-Wochentage erzeugen (Mo, Tue, lun., …)
 my @LOCALE_DAYNAMES;
 
-for my $wday (0..6) {                                                               # 1970-01-04 war ein Sonntag -> wday=0
-    my $epoch = 345600 + $wday * 86400;                                             # 1970-01-04 + wday Tage
-    push @LOCALE_DAYNAMES, POSIX::strftime("%a", localtime($epoch));                # in Konstante speichern
+my $sunday_epoch = 3 * 86400;  # 259200                                             # 1970-01-04 00:00:00 UTC war ein Sonntag -> wday = 0
+
+for my $wday (0..6) {
+    my $epoch = $sunday_epoch + $wday * 86400;
+    push @LOCALE_DAYNAMES, POSIX::strftime("%a", localtime($epoch));
 }
 
 ## Konstanten
@@ -437,7 +440,7 @@ use constant {
   LAGTIME         => 1800,                                                          # Nachlaufzeit relativ zu Sunset bis Sperrung API Abruf
   LOGDELAY        => 600,                                                           # Verzögerungszeit (s) zwischen zwei Logausgaben mit identischen Inhalt
   LOCALE_TIME     => setlocale (POSIX::LC_TIME),                                    # installierte locale abfragen
-  LOCALE_DAYNAMES => \@LOCALE_DAYNAMES,                                             # Locale‑abhängige Kurz‑Wochentage erzeugen (Mo, Tue, lun., …)
+  LOCALE_DAYNAMES => \@LOCALE_DAYNAMES,                                             # Locale-abhängige Kurz-Wochentage erzeugen (Mo, Tue, lun., …)
   
   MAXWEATHERDEV   => 3,                                                             # max. Anzahl Wetter Devices (Attr setupWeatherDevX)
   MAXBATTERIES    => 3,                                                             # maximale Anzahl der möglichen Batterien
@@ -25063,7 +25066,8 @@ sub _aiFannOversampling {
   my $targetsnorm_ref    = $paref->{targetsnorm_ref};
   my $presencevalues_ref = $paref->{presencevalues_ref};
   
-  my $absence_oversample = CurrentVal ($name, 'aiConAbsOversample', 0.0); 
+  my $absence_oversample = __aiGetConAbsOversampleVal ($name);                                              # bei "1" keine Berücksichtigung Abwesenheit
+  return if($absence_oversample == 1);                                                                          
 
   my @absence_idx = grep { 
       my $pres_idx = $_ + $splice_len;                                                                      # $_ + $splice_len bildet den (post-splice) Trainingsindex zurück auf den (pre-splice) @presence_values-Index ab, da splice die ersten $splice_len Elemente aus @training_data entfernt hat, aber @presence_values noch unverändert ist
@@ -25120,6 +25124,12 @@ sub _aiFannOversampling {
   }
  
 return; 
+}
+
+sub __aiGetConAbsOversampleVal {
+  my ($name) = @_;
+  
+return CurrentVal ($name, 'aiConAbsOversample', 0.0);
 }
 
 ################################################################
@@ -30839,7 +30849,7 @@ sub timestringsFromOffset {
       minute  => $zp->($min),                                                                   # Minute (00-59)
       second  => $zp->($sec),                                                                   # aktuelle Sekunde (00-60)                                    
 
-      # --- Locale‑abhängig, aber ohne strftime‑Kosten
+      # --- Locale-abhängig, aber ohne strftime Kosten
       dayname => LOCALE_DAYNAMES->[$wday],                                                      # Wochentagsname
 
       # --- %u (1=Mo … 7=So)
