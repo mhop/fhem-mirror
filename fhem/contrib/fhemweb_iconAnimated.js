@@ -1,4 +1,4 @@
-FW_version["fhemweb_iconAnimated.js"] = "$Id: fhemweb_iconAnimated.js 0.8.3 schwatter $";
+FW_version["fhemweb_iconAnimated.js"] = "$Id: fhemweb_iconAnimated.js 0.8.4 schwatter $";
 FW_widgets['iconAnimated'] = { createFn: iconAnimatedCreate };
 
 function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -34,13 +34,16 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
     // ---------------------------
     // Icongröße
     // ---------------------------
-    let iconSizePx = 40; // Standardgröße 40px
+    let iconSizePx = 40;
     vArr.forEach(v => {
         if (v.startsWith("size@")) {
             const px = parseInt(v.split("@")[1]);
             if (!isNaN(px)) iconSizePx = px;
         }
     });
+
+    // --- Platzhalter-ID generieren ---
+    const placeholderId = `placeholder_${dev.replace(/[^a-zA-Z0-9_-]/g,'_')}`;
 
     // ---------------------------
     // Select ausblenden
@@ -58,6 +61,11 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
     hideAnimatedSvgSelect();
     new MutationObserver(hideAnimatedSvgSelect)
         .observe(document.body, { childList:true, subtree:true });
+
+    // --- Bestehende Icons entfernen und Platzhalter mit fester Größe sofort einfügen (CLS Schutz) ---
+    col1.find('svg.icon, img').remove(); 
+    const placeholder = $(`<div id="${placeholderId}" style="display:inline-block; width:${iconSizePx}px; height:${iconSizePx}px; vertical-align:middle; margin-right:4px;"></div>`);
+    col1.prepend(placeholder);
 
     // ---------------------------
     // Animation CSS
@@ -169,7 +177,7 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
     }
 
     // ---------------------------
-    // SVG ? zentrieren + DataURL
+    // SVG zentrieren + DataURL
     // ---------------------------
     function processSvg(svgText) {
         const tmp = document.createElement('div');
@@ -189,10 +197,6 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
 
         // transformOrigin auf Mittelpunkt setzen
         gEl.style.transformOrigin = '50% 50%';
-        // optional: in die Mitte verschieben falls ViewBox nicht 0 0
-        //const translateX = w/2 - (x + w/2);
-        //const translateY = h/2 - (y + h/2);
-        //gEl.setAttribute('transform', `translate(${translateX},${translateY})`);
 
         // Eindeutige Klasse pro Device erzeugen
         const iconClass = 'animatedIcon_' + dev.replace(/[^a-zA-Z0-9_-]/g,'_');
@@ -215,9 +219,14 @@ function iconAnimatedCreate(elName, devName, vArr, currVal, set, params, cmd) {
             document.head.appendChild(style);
         }
 
-        col1.find('svg.icon').remove();
-        col1.prepend(svgEl);
-        col1.prepend(document.createTextNode(' '));
+        // --- SVG in den Placeholder einsetzen statt prepend (verhindert Sprung) ---
+        const ph = document.getElementById(placeholderId);
+        if(ph) {
+            ph.innerHTML = "";
+            ph.appendChild(svgEl);
+        } else {
+            col1.prepend(svgEl);
+        }
 
         FW_queryValue(`{ReadingsVal("${dev}","${readingMap.reading}","")}`, {
             setValueFn: val => updateState(val)
