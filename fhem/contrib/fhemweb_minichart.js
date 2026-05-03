@@ -1,4 +1,4 @@
-FW_version["fhemweb_minichart.js"] = "$Id: fhemweb_minichart.js 0.6.3 schwatter $";
+FW_version["fhemweb_minichart.js"] = "$Id: fhemweb_minichart.js 0.6.4 schwatter $";
 FW_widgets['minichart'] = { createFn: miniChartCreate };
 
 function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -44,7 +44,11 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
     //------------------------------------------------------
     // WIDGET UI (HTML)
     //------------------------------------------------------
-    const wrapper = $('<div/>', { id: dev + "_wrapper", style: `display:block !important; width:100%; position:relative; font-family:sans-serif;` });
+    const wrapper = $('<div/>', { 
+        id: dev + "_wrapper", 
+        style: `display:block !important; width:100%; min-height:90px; position:relative; font-family:sans-serif; visibility:hidden; opacity:0; transition:opacity 0.2s ease;` // --- NEU ---
+    });
+
     const html = `
     <style>
         #${dev}-mobile { display:block; }
@@ -84,6 +88,12 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
     wrapper.html(html);
     $el.append(wrapper);
 
+    function showIfReady() {
+        if (currentValue01 !== "-" || chartValues.length > 0) {
+            wrapper.css({ "visibility": "visible", "opacity": 1 });
+        }
+    }
+
     //------------------------------------------------------
     // HIDDEN DIVS
     //------------------------------------------------------
@@ -97,7 +107,7 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
         FW_queryValue(`{ReadingsVal("${dev}","${id}","")}`, { setValueFn: val => d.setValueFn(val) });
     }
 
-    createHidden(row1.reading, v => { currentValue01 = v; updateTextOutput(); });
+    createHidden(row1.reading, v => { currentValue01 = v; updateTextOutput(); showIfReady(); });
     createHidden(row2.reading, v => { currentValue02 = v; updateTextOutput(); });
     createHidden(row3.reading, v => { currentValue03 = v; updateTextOutput(); });
 
@@ -106,6 +116,7 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
         chartValues = v.split(',').map(Number).filter(n => !isNaN(n));
         if(chartType==="line") renderLineChart(chartValues);
         else renderBarChart(chartValues);
+        showIfReady();
     });
 
     //------------------------------------------------------
@@ -124,9 +135,6 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
         des.children[2].textContent = out(currentValue03,row3.unit);
     }
 
-    //------------------------------------------------------
-    // LINE CHART FUNCTION
-    //------------------------------------------------------
     function renderLineChart(arr){
         renderLine(arr,"mobile",40,3,160);
         const desktopDiv = document.getElementById(`${dev}_chart_desktop`);
@@ -142,7 +150,6 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
         const div = document.getElementById(`${dev}_chart_${mode}`);
         if(!div) return;
         div.innerHTML = "";
-
         let v = arr.slice(-count);
         let out = [];
         for(let i=0;i<v.length;i++){
@@ -152,33 +159,27 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
         }
         v=out;
         if(v.length<2) return;
-
         let vmin=Math.min(...v);
         let vmax=Math.max(...v);
         let min = vmin<0?vmin:0;
         let max = vmax>0?vmax:0;
         let range = (max-min)||1;
-
         const hTotal=70,padTop=2,padBot=2,height=hTotal-padTop-padBot;
         const zeroY=padTop+(height-((0-min)/range*height));
         const step=width/(v.length-1);
         const pts=v.map((val,i)=>[i*step,padTop+(height-((val-min)/range*height))]);
-
         const pathD=pts.map((p,i)=>i===0?`M${p[0]},${p[1]}`:`L${p[0]},${p[1]}`).join(' ');
         const areaD=pathD+` L${width},${zeroY} L0,${zeroY} Z`;
-
         const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
         svg.setAttribute("width",width); svg.setAttribute("height",hTotal);
         svg.setAttribute("viewBox",`0 0 ${width} ${hTotal}`);
         svg.setAttribute("preserveAspectRatio","xMidYMid meet");
         svg.style.cssText=`width:${width}px!important;height:${hTotal}px!important;max-width:${width}px!important;max-height:${hTotal}px!important;overflow:hidden;display:block;padding:0;margin:0;`;
-
         const defs=document.createElementNS(svg.namespaceURI,"defs");
         const grad=document.createElementNS(svg.namespaceURI,"linearGradient");
         grad.setAttribute("id",`${dev}_${mode}_grad`);
         grad.setAttribute("x1","0");grad.setAttribute("y1","0");
         grad.setAttribute("x2","0");grad.setAttribute("y2","1");
-
         function stop(offset,color,op){
             const s=document.createElementNS(svg.namespaceURI,"stop");
             s.setAttribute("offset",offset);
@@ -186,34 +187,25 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
             s.setAttribute("stop-opacity",op);
             grad.appendChild(s);
         }
-
         if(vmin<0&&vmax>0){stop("0%",color1,0.2);stop("50%",color1,0.0);stop("100%",color2,0.2);}
         else if(vmin>=0){stop("0%",color1,0.8);stop("100%",color1,0.0);}
         else{stop("0%",color2,0.0);stop("100%",color2,0.8);}
-
         defs.appendChild(grad); svg.appendChild(defs);
-
         const area=document.createElementNS(svg.namespaceURI,"path");
         area.setAttribute("d",areaD);
         area.setAttribute("fill",`url(#${dev}_${mode}_grad)`);
         svg.appendChild(area);
-
         const zero=document.createElementNS(svg.namespaceURI,"line");
         zero.setAttribute("x1","0"); zero.setAttribute("x2",width);
         zero.setAttribute("y1",zeroY); zero.setAttribute("y2",zeroY);
         zero.setAttribute("stroke","white"); zero.setAttribute("stroke-width","1"); zero.setAttribute("stroke-dasharray","2,2");
         svg.appendChild(zero);
-
         const line=document.createElementNS(svg.namespaceURI,"path");
         line.setAttribute("d",pathD); line.setAttribute("fill","none"); line.setAttribute("stroke",color1); line.setAttribute("stroke-width","2");
         svg.appendChild(line);
-
         div.appendChild(svg);
     }
 
-    //------------------------------------------------------
-    // BAR CHART FUNCTION
-    //------------------------------------------------------
     function renderBarChart(arr){
         ["mobile","desktop"].forEach((mode)=>{
             const width = mode==="mobile"?160:780;
@@ -221,35 +213,32 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
             const div=document.getElementById(`${dev}_chart_${mode}`);
             if(!div) return;
             div.innerHTML="";
-
-            const v=arr.slice(- (mode==="mobile"?40:220)); // nur so viele Werte wie linechart
+            const v=arr.slice(- (mode==="mobile"?40:220));
             const min=Math.min(...v,0); const max=Math.max(...v,0); const range=max-min||1;
             const zeroY=height-((0-min)/range*height);
             const w=width/(v.length-1||1); const barWidth=w*0.6;
-
             const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
             svg.setAttribute("width",width); svg.setAttribute("height",height);
             svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
             svg.setAttribute("preserveAspectRatio","none");
             svg.style.cssText=`position:absolute;top:0;left:0;width:${width}px;height:${height}px`;
-
             v.forEach((val,i)=>{
                 const x=i*w-barWidth/2;
                 const y=height-((val-min)/range*height);
                 let barY,barH;
                 const color = val>=0 ? color1 : color2;
                 if(val>=0){barY=y;barH=zeroY-y;}else{barY=zeroY;barH=y-zeroY;}
-
                 const rect=document.createElementNS(svg.namespaceURI,"rect");
                 rect.setAttribute("x",x); rect.setAttribute("y",barY);
                 rect.setAttribute("width",barWidth); rect.setAttribute("height",barH);
                 rect.setAttribute("fill",color); rect.setAttribute("opacity","0.8");
                 svg.appendChild(rect);
             });
-
             div.appendChild(svg);
         });
     }
+
+    setTimeout(() => { wrapper.css({ "visibility": "visible", "opacity": 1 }); }, 2000);
 
     console.log("[minichart] initialized for", dev);
     return wrapper[0];
