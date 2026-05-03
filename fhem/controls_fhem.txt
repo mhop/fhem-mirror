@@ -1,4 +1,4 @@
-REV 31171
+REV 31177
 DIR unused
 UPD 2026-05-02_07:45:03 456224 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -770,8 +770,8 @@ UPD 2026-05-01_07:45:11 5540366 docs/commandref.html
 UPD 2026-05-01_07:45:16 3531917 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-05-02_07:45:16 329568 docs/commandref_modular.html
-UPD 2026-05-02_07:45:18 341412 docs/commandref_modular_DE.html
+UPD 2026-05-03_07:45:17 329568 docs/commandref_modular.html
+UPD 2026-05-03_07:45:18 341412 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2524,7 +2524,7 @@ UPD 2015-07-28_14:05:34 14171 www/pgm2/dashboard_style.css
 UPD 2024-10-27_07:45:03 5964 www/pgm2/defaultCommon.css
 UPD 2018-09-11_07:45:03 3636 www/pgm2/defaultfloorplanstyle.css
 UPD 2021-05-15_07:45:04 1960 www/pgm2/doif.js
-UPD 2026-05-02_07:45:03 40209 www/pgm2/f18.js
+UPD 2026-05-03_07:45:03 40235 www/pgm2/f18.js
 UPD 2026-03-29_07:45:03 642 www/pgm2/f18_sw.js
 UPD 2026-05-02_07:45:03 10324 www/pgm2/f18style.css
 UPD 2026-01-04_07:45:04 1302 www/pgm2/fbtam.js
