@@ -164,7 +164,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "2.6.5"  => "03.05.2026  _batChargeMgmt Refactored: Äußere Stundenschleife -> Innere Batterieschleife, Fix 100%-Bug ".
-                           "wichtiger Bugfix weekday in LOCALE_DAYNAMES, Debug consumerPlanning angepasst ",
+                           "wichtiger Bugfix weekday in LOCALE_DAYNAMES, Debug consumerPlanning angepasst ".
+                           "Speicherung von bevcsmBatCapXX und bevcsmPwrXX in pvHistory und aiRawData ",
   "2.6.4"  => "01.05.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
                            "exponentielles Glätten EWMA -> verhindert Sprünge durch einen gleitenden Mittelwert über die letzten ".
                            "Berechnungen, Routine ___areaFactorTrack entfernt ",
@@ -1667,7 +1668,17 @@ my %hfspvh = (
       $hfspvh{'bevcsmTargSoC'.$cn}{fn}       = \&_saveHistP2;                   # BEV Ziel-SoC
       $hfspvh{'bevcsmTargSoC'.$cn}{storname} = 'bevcsmTargSoC'.$cn;
       $hfspvh{'bevcsmTargSoC'.$cn}{validkey} = undef;
-      $hfspvh{'bevcsmTargSoC'.$cn}{fpar}     = undef;       
+      $hfspvh{'bevcsmTargSoC'.$cn}{fpar}     = undef;
+      
+      $hfspvh{'bevcsmBatCap'.$cn}{fn}        = \&_saveHistP2;                   # BEV Batteriekapazität
+      $hfspvh{'bevcsmBatCap'.$cn}{storname}  = 'bevcsmBatCap'.$cn;
+      $hfspvh{'bevcsmBatCap'.$cn}{validkey}  = undef;
+      $hfspvh{'bevcsmBatCap'.$cn}{fpar}      = undef;  
+
+      $hfspvh{'bevcsmPwr'.$cn}{fn}       = \&_saveHistP2;                       # BEV aktuelle Ladeleistung
+      $hfspvh{'bevcsmPwr'.$cn}{storname} = 'bevcsmPwr'.$cn;
+      $hfspvh{'bevcsmPwr'.$cn}{validkey} = undef;
+      $hfspvh{'bevcsmPwr'.$cn}{fpar}     = undef;       
   }
 
   for my $pn (1..MAXPRODUCER) {
@@ -15598,6 +15609,8 @@ sub _manageConsumerData {
   
       my $pcurr  = __savePowerAndEnergy ($paref);                                   # aktuelle Leistung und Energieverbrauch auslesen + speichern
       
+      $paref->{nhour} = $hod;                                                       # !! writeToHistory löscht diese Einträge !!
+      $paref->{nday}  = $day;
       $pcurrsum      += $pcurr;
       $paref->{pcurr} = $pcurr;
       
@@ -15760,6 +15773,8 @@ sub __saveBEVvalues {
   if (defined $batCapVal) {
       $batCapVal                            = $batCapVal * ($unit =~ /^kWh$/xi ? 1000 : 1);             # BEV batCap in Wh
       $data{$name}{current}{'batCapBev'.$c} = round0 ($batCapVal);
+  
+      writeToHistory ( { paref => $paref, key => 'bevcsmBatCap'.$c, val => round0 ($batCapVal), day => $day, hour => $hod } );      # BEV batCap Snapshot
   }
 
   # --- aktueller SoC
@@ -15777,10 +15792,10 @@ sub __saveBEVvalues {
   
   if (defined $tgtsocval) {                                                                             # BEV Ziel-SoC      
       writeToHistory ( { paref => $paref, key => 'bevcsmTargSoC'.$c, val => round0 ($tgtsocval), day => $day, hour => $hod } );          
-  } 
-  
+  }  
+                                    
   debugLog ($paref, 'collectData', "BEV - $calias -> bevcsmSoC${c}=$csocval bevcsmTargSoC${c}=$tgtsocval ".
-                                    (defined $batCapVal ? "batCapBev${c}=$batCapVal" : "batCapBev${c}=undef") ); 
+                                   (defined $batCapVal ? "batCapBev${c}=$batCapVal bevcsmBatCap${c}=$batCapVal" : "batCapBev${c}=undef") );
 
 return;
 }
@@ -15794,6 +15809,7 @@ sub __savePowerAndEnergy {
   my $t       = $paref->{t};                                                                    # aktueller Timestamp
   my $c       = $paref->{consumer};
   my $cname   = $paref->{cname};
+  my $ctype   = $paref->{ctype};
   my $cactive = $paref->{cactive};
   my $chour   = $paref->{chour};
   my $day     = $paref->{day};
@@ -15842,7 +15858,6 @@ sub __savePowerAndEnergy {
       if (defined $ehist) {                                                             # Stundenwechsel von vorn beginnen
           if ($etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
               my $consumerco  = $etot - $ehist;
-              #$consumerco    += HistoryVal ($name, $day, $hod, "csme${c}", 0);
 
               if ($consumerco < 0) {                                                              
                   $consumerco = 0;
@@ -15881,6 +15896,10 @@ sub __savePowerAndEnergy {
   else {
       $data{$name}{consumers}{$c}{currpower} = $pcurr;
       storeReading ("consumer${c}_currentPower", $pcurr.' W');
+      
+      if ($ctype eq 'bev') {
+          writeToHistory ( { paref => $paref, key => 'bevcsmPwr'.$c, val => round0 ($pcurr), day => $day, hour => $hod } );           
+      }
   }
 
 return $pcurr;
@@ -24056,13 +24075,17 @@ sub __aiAddRawData {
 
           for my $c (1..MAXCONSUMER) {
               $c           = sprintf "%02d", $c;
-              my $csme     = HistoryVal ($name, $pvd, $hod, 'csme'.$c,          undef);                                         # Energieverbrauch (Wh) von ConsumerXX in der Stunde des Tages
-              my $evsoc    = HistoryVal ($name, $pvd, $hod, 'bevcsmSoC'.$c,     undef);                                         # aktueller SOC (%) des BEV-Verbrauchers XX   
-              my $evtgtsoc = HistoryVal ($name, $pvd, $hod, 'bevcsmTargSoC'.$c, undef);                                         # eingestellter Ziel-SOC (%) des BEV-Verbrauchers XX 
+              my $csme     = HistoryVal ($name, $pvd, $hod, 'csme'.$c,          undef);                         # Energieverbrauch (Wh) von ConsumerXX in der Stunde des Tages
+              my $evsoc    = HistoryVal ($name, $pvd, $hod, 'bevcsmSoC'.$c,     undef);                         # aktueller SOC (%) des BEV-Verbrauchers XX   
+              my $evtgtsoc = HistoryVal ($name, $pvd, $hod, 'bevcsmTargSoC'.$c, undef);                         # eingestellter Ziel-SOC (%) des BEV-Verbrauchers XX 
+              my $evbatcap = HistoryVal ($name, $pvd, $hod, 'bevcsmBatCap'.$c,  undef);                         # EV Batteriekapazität                     
+              my $evcurpwr = HistoryVal ($name, $pvd, $hod, 'bevcsmPwr'.$c,     undef);                         # EV aktuelle Ladeleistung
               
               if (defined $csme)     { $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c}          = round0 ($csme) } 
               if (defined $evsoc)    { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmSoC'.$c}     = round0 ($evsoc) } 
-              if (defined $evtgtsoc) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmTargSoC'.$c} = round0 ($evtgtsoc) }               
+              if (defined $evtgtsoc) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmTargSoC'.$c} = round0 ($evtgtsoc) }  
+              if (defined $evbatcap) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmBatCap'.$c}  = round0 ($evbatcap) } 
+              if (defined $evcurpwr) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmPwr'.$c}     = round0 ($evcurpwr) }               
           }
   
           $dosave++;
@@ -28751,17 +28774,21 @@ sub _listDataPoolPvHist {
               my $csmh     = HistoryVal ($name, $day, $key, "hourscsme${c}",      undef);
               my $csma     = HistoryVal ($name, $day, $key, "avgcycmntscsm${c}",  undef);
               my $evsoc    = HistoryVal ($name, $day, $key, "bevcsmSoC${c}",      undef);   
-              my $evtgtsoc = HistoryVal ($name, $day, $key, "bevcsmTargSoC${c}",  undef);
+              my $evtgtsoc = HistoryVal ($name, $day, $key, "bevcsmTargSoC${c}",  undef);     
+              my $evbatcap = HistoryVal ($name, $day, $key, "bevcsmBatCap${c}",   undef);
+              my $evcurpwr = HistoryVal ($name, $day, $key, "bevcsmPwr${c}",      undef);
 
               if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc  // '-';
-                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt  // '-';
-                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme  // '-';
-                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm  // '-';
-                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh  // '-';
-                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma  // '-';
-                  $hexp->{$day}{$key}{"BEVcsmSoC${c}"}          = $evsoc // '-';
-                  $hexp->{$day}{$key}{"BEVcsmTargSoC${c}"}      = $evsoc // '-';
+                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc     // '-';
+                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt     // '-';
+                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme     // '-';
+                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm     // '-';
+                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh     // '-';
+                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma     // '-';
+                  $hexp->{$day}{$key}{"BEVcsmSoC${c}"}          = $evsoc    // '-';
+                  $hexp->{$day}{$key}{"BEVcsmTargSoC${c}"}      = $evtgtsoc // '-';
+                  $hexp->{$day}{$key}{"BEVcsmBatCap${c}"}       = $evbatcap // '-';
+                  $hexp->{$day}{$key}{"BEVcsmPwr${c}"}          = $evcurpwr // '-';
               }
 
               if (defined $csmc) {
@@ -28808,6 +28835,18 @@ sub _listDataPoolPvHist {
               if (defined $evtgtsoc) {
                   $csm .= ", " if($nl);
                   $csm .= "bevcsmTargSoC${c}: $evtgtsoc";
+                  $nl   = 1;
+              }
+              
+              if (defined $evbatcap) {
+                  $csm .= ", " if($nl);
+                  $csm .= "bevcsmBatCap${c}: $evbatcap";
+                  $nl   = 1;
+              }
+              
+              if (defined $evcurpwr) {
+                  $csm .= ", " if($nl);
+                  $csm .= "bevcsmPwr${c}: $evcurpwr";
                   $nl   = 1;
               }
 
@@ -29415,6 +29454,8 @@ sub _listDataPoolAiRawData {
           my $csme     = AiRawdataVal ($name, $idx, 'csme'.$c,          undef);
           my $evsoc    = AiRawdataVal ($name, $idx, 'bevcsmSoC'.$c,     undef);
           my $evtgtsoc = AiRawdataVal ($name, $idx, 'bevcsmTargSoC'.$c, undef);
+          my $evbatcap = AiRawdataVal ($name, $idx, 'bevcsmBatCap'.$c,  undef);
+          my $evcurpwr = AiRawdataVal ($name, $idx, 'bevcsmPwr'.$c,     undef);
 
           if (defined $csme) {
               $csm .= ", " if($csm);
@@ -29429,6 +29470,16 @@ sub _listDataPoolAiRawData {
           if (defined $evtgtsoc) {
               $csm .= ", " if($csm);
               $csm .= "bevcsmTargSoC${c}: $evtgtsoc";
+          }
+          
+          if (defined $evbatcap) {
+              $csm .= ", " if($csm);
+              $csm .= "bevcsmBatCap${c}: $evbatcap";
+          }
+          
+          if (defined $evcurpwr) {
+              $csm .= ", " if($csm);
+              $csm .= "bevcsmPwr${c}: $evcurpwr";
           }
       }
 
@@ -35370,6 +35421,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batmaxsocXX</b>     </td><td>Maximum SOC (%) achieved by battery XX on the day                                                                        </td></tr>
             <tr><td> <b>batsetsocXX</b>     </td><td>Optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>
             <tr><td> <b>bevcsm</b>          </td><td>Consumer numbers of registered electric cars (BEV)                                                                       </td></tr>
+            <tr><td> <b>bevcsmBatCapXX</b>  </td><td>nominal battery capacity (Wh) of the BEV consumer XX                                                                     </td></tr>
+            <tr><td> <b>bevcsmPwrXX</b>     </td><td>Charging power (W) of BEV consumer XX at the end of the hour                                                             </td></tr>
             <tr><td> <b>bevcsmSoCXX</b>     </td><td>current SOC (%) of the BEV consumer XX                                                                                   </td></tr>
             <tr><td> <b>bevcsmTargSoCXX</b> </td><td>Target SOC (%) set for BEV consumer XX                                                                                   </td></tr>
             <tr><td> <b>comforttemp</b>     </td><td>set comfort temperature for the building in °C                                                                           </td></tr>
@@ -38437,6 +38490,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batmaxsocXX</b>     </td><td>maximal erreichter SOC (%) der Batterie XX an dem Tag                                                  </td></tr>
             <tr><td> <b>batsetsocXX</b>     </td><td>optimaler SOC Sollwert (%) der Batterie XX für den Tag                                                 </td></tr>
             <tr><td> <b>bevcsm</b>          </td><td>Verbrauchernummern der registrierten E-Autos (BEV)                                                     </td></tr>
+            <tr><td> <b>bevcsmBatCapXX</b>  </td><td>nominale Batteriekapazität (Wh) des BEV-Verbrauchers XX                                                </td></tr>
+            <tr><td> <b>bevcsmPwrXX</b>     </td><td>Ladeleistung (W) des BEV-Verbrauchers XX am Ende der Stunde                                            </td></tr>
             <tr><td> <b>bevcsmSoCXX</b>     </td><td>aktueller SOC (%) des BEV-Verbrauchers XX                                                              </td></tr>
             <tr><td> <b>bevcsmTargSoCXX</b> </td><td>eingestellter Ziel-SOC (%) des BEV-Verbrauchers XX                                                     </td></tr>
             <tr><td> <b>comforttemp</b>     </td><td>eingestellte Komforttemperatur des Gebäudes in °C                                                      </td></tr>
