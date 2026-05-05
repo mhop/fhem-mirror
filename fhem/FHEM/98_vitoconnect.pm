@@ -101,6 +101,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.1.2"  => "04.05.2026  Fix schedule setter: support both API format and reading format, stop retry on VALIDATION_ERROR",
   "1.1.1"  => "25.02.2026  Small fixes",
   "1.1.0"  => "24.02.2026  Small adaptions to SVG",
   "1.0.9"  => "17.02.2026  Special SVG handling for vitocal 200S",
@@ -2362,21 +2363,10 @@ sub vitoconnect_Set_New {
                             my $otherData = '';
                             if ($param->{type} eq 'number') {
                              $data = "{\"$paramName\":@args";
-                            } 
+                            }
                             elsif ($param->{type} eq 'Schedule') {
-                             my $decoded_args = decode_json($args[0]);
-                             
-                             # Transformieren der Datenstruktur
-                             my %schedule;
-                             foreach my $day (@$decoded_args) {
-                                 foreach my $key (keys %$day) {
-                                     push @{$schedule{$key}}, $day->{$key};
-                                 }
-                             }
-                             
-                             # Konvertieren der transformierten Datenstruktur in JSON
-                             my $schedule_data = encode_json(\%schedule);
-                             $data = "{\"$paramName\":$schedule_data";
+                             # Schedule data is stored and entered in API format: {"day":[{...}]}
+                             $data = "{\"$paramName\":$args[0]";
                             }
                             else {
                              $data = "{\"$paramName\":\"@args\"";
@@ -4356,18 +4346,21 @@ sub vitoconnect_getResourceCallback {
                     readingsBulkUpdate($hash,$Reading,$comma_separated_string);
                 }
                 elsif ( $Type eq "Schedule" ) {
-                    my @schedule;
+                    # Build JSON with days in weekday order, entries sorted by start time,
+                    # fields in consistent order: start, end, mode, position
+                    my @parts;
                     foreach my $day (@days) {
                      if (exists $Value->{$day}) {
-                       foreach my $entry (@{$Value->{$day}}) {
-                         my $ordered_entry = sprintf('{"mode":"%s","start":"%s","end":"%s","position":%d}',
-                                             $entry->{mode}, $entry->{start}, $entry->{end}, $entry->{position}
-                       );
-                       push @schedule, sprintf('{"%s":%s}', $day, $ordered_entry);
+                       my @sorted_entries = sort { $a->{start} cmp $b->{start} } @{$Value->{$day}};
+                       my @entry_strings;
+                       foreach my $e (@sorted_entries) {
+                         push @entry_strings, sprintf('{"start":"%s","end":"%s","mode":"%s","position":%d}',
+                           $e->{start}, $e->{end}, $e->{mode}, $e->{position});
                        }
+                       push @parts, "\"$day\":[" . join(',', @entry_strings) . "]";
                      }
                     }
-                    my $Result = '[' . join(',', @schedule) . ']';
+                    my $Result = '{' . join(',', @parts) . '}';
                     readingsBulkUpdate($hash, $Reading, $Result);
                     Log3($name, 5, "$name - $Reading: $Result ($Type)");
                 }
@@ -4787,6 +4780,15 @@ sub vitoconnect_action {
             $hash->{".retry_args"}    = [@args];
             $hash->{".action_retry_count"} = $retry_count;
             vitoconnect_getRefresh($hash, 'action');  # Kontext 'action' → kein getResource
+            return;
+        }
+
+        # Bei VALIDATION_ERROR (400) nicht wiederholen - Eingabefehler
+        if (defined($decode_json->{statusCode}) && $decode_json->{statusCode} eq "400") {
+            my $reason = $decode_json->{extendedPayload}{reason} // "unknown";
+            Log3($name, 1, "$name - vitoconnect_action: Abbruch wegen Bad Request ($reason), Retry sinnlos");
+            readingsSingleUpdate($hash, "Aktion_Status", "Fehlgeschlagen: $opt $Text (Bad Request: $reason)", 1);
+            delete $hash->{".action_retry_count"};
             return;
         }
 
