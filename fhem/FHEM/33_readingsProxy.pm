@@ -29,6 +29,7 @@ use vars qw(%defs);
 use vars qw(%attr);
 use vars qw($readingFnAttributes);
 use vars qw($init_done);
+use Data::Dumper;
 sub Log($$);
 sub Log3($$$);
 
@@ -50,45 +51,48 @@ sub readingsProxy_Initialize($)
 }
 
 sub
-readingsProxy_setNotfiyDev($)
+readingsProxy_setNotifyDev($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
-  if( $hash->{DEVICE} ) {
-    notifyRegexpChanged($hash,"(global|".$hash->{DEVICE}.")");
+  my $regexp= join("|", (keys %{$hash->{PROXIES}})) // "";
+  #main::Debug "readingsProxy_setNotifyDev $name $regexp";
+  if( $regexp ne "" ) {
+    notifyRegexpChanged($hash,"(global|$regexp)");
   } else {
     notifyRegexpChanged($hash,'');
   }
 }
+
+sub
+readingsProxy_splitProxyDef($)
+{
+  my ($proxydef) = @_;
+
+  my ($device, $reading, $proxy) = split(":", $proxydef);
+  $reading //= "state";
+  $proxy //= $device . "_" . $reading;
+  return ($device, $reading, $proxy);
+}
+
 sub
 readingsProxy_updateDevices($)
 {
   my ($hash) = @_;
 
-  my %list;
-
-  delete $hash->{DEVICE};
-  delete  $hash->{READING};
-
-  my @params = split(" ", $hash->{DEF});
-  while (@params) {
-    my $param = shift(@params);
-
-    my @device = split(":", $param);
-
-    if( defined($defs{$device[0]}) ) {
-      $list{$device[0]} = 1;
-      $hash->{DEVICE} = $device[0];
-      $hash->{READING} = $device[1];
-
-      $hash->{READING} = "state" if( !$hash->{READING} );
+  my %proxies;
+  my @proxydefs = split(" ", $hash->{DEF});
+  foreach my $proxydef (@proxydefs) {
+    my ($device, $reading, $proxy) = readingsProxy_splitProxyDef($proxydef);
+    if( defined($defs{$device}) ) {
+      $proxies{$device}{$reading} = $proxy;
+      $hash->{primaryProxy} //= $proxydef; # the first proxy is for state, set, get and value
     }
   }
-
-  InternalTimer(gettimeofday(), "readingsProxy_setNotfiyDev", $hash);
-  $hash->{CONTENT} = \%list;
-
-  readingsProxy_update($hash, undef);
+  InternalTimer(gettimeofday(), "readingsProxy_setNotifyDev", $hash);
+  $hash->{PROXIES} = \%proxies;
+  return readingsProxy_updateAll($hash);
 }
 
 sub readingsProxy_Define($$)
@@ -97,57 +101,65 @@ sub readingsProxy_Define($$)
 
   my @args = split("[ \t]+", $def);
 
-  return "Usage: define <name> readingsProxy <device>:<reading>"  if(@args != 3);
+  return "Usage: define <name> readingsProxy <device>:<reading>[:<proxy>] ..."  if(@args < 3);
 
   my $name = shift(@args);
   my $type = shift(@args);
 
   $hash->{STATE} = 'Initialized';
 
-  if( $init_done ) {
-    readingsProxy_updateDevices($hash);
-  }
+  delete $hash->{primaryProxy};
+  readingsProxy_updateDevices($hash) if( $init_done );
 
-  return undef;
+  return;
 }
 
 sub readingsProxy_Undefine($$)
 {
   my ($hash,$arg) = @_;
 
-  return undef;
+  return;
 }
 
 sub
-readingsProxy_update($$)
+readingsProxy_update($$$$)
 {
-  my ($hash,$value) = @_;
+  my ($hash, $devname, $reading, $value) = @_;
   my $name = $hash->{NAME};
 
-  my $DEVICE = $hash->{DEVICE};
-  return if( !$DEVICE );
-  my $READING = $hash->{READING};
+  my $proxy = $hash->{PROXIES}{$devname}{$reading};
+  my ($primaryDevname,$primaryReading,$mappedName) = readingsProxy_splitProxyDef($hash->{primaryProxy});
 
-  $value = ReadingsVal($DEVICE,$READING,undef) if( $DEVICE && !defined($value) );
-  #return if( !defined($value) );
+  $value //= ReadingsVal($devname,$reading,undef);
+  
+  if( $devname eq $primaryDevname && $reading eq $primaryReading) {
+    my $value_fn = AttrVal( $name, "valueFn", "" );
+    if( $value_fn =~ m/^{.*}$/s ) {
+      my $VALUE = $value;
+      my $LASTCMD = ReadingsVal($name,"lastCmd",undef);
 
-  my $value_fn = AttrVal( $name, "valueFn", "" );
-  if( $value_fn =~ m/^{.*}$/s ) {
-    my $VALUE = $value;
-    my $LASTCMD = ReadingsVal($name,"lastCmd",undef);
-
-    my $value_fn = eval $value_fn;
-    Log3 $name, 3, $name .": valueFn: ". $@ if($@);
-    return undef if( !defined($value_fn) );
-    $value = $value_fn if( $value_fn ne '' );
+      my $value_fn = eval $value_fn;
+      Log3 $name, 3, $name .": valueFn: ". $@ if($@);
+      return undef if( !defined($value_fn) );
+      $value = $value_fn if( $value_fn ne '' );
+    }
+    $proxy = 'state' if $mappedName eq "${devname}_$reading";
   }
+  readingsBulkUpdate($hash, $proxy, $value);
+  return 1; #we updated sth...
+}
 
-  if( AttrVal($name, 'event-on-change-reading', undef ) || AttrVal($name, 'event-on-update-reading', undef ) ) {
-     readingsSingleUpdate($hash, 'state', $value, 1)
-  } else {
-    readingsSingleUpdate($hash, 'state', $value, 0);
-    DoTrigger( $name, $value );
+sub
+readingsProxy_updateAll($) 
+{
+  my ($hash) = @_;
+  readingsBeginUpdate($hash);
+  for my $devname (keys %{$hash->{PROXIES}})  {
+    for my $reading (keys %{$hash->{PROXIES}{$devname}}) {
+      readingsProxy_update($hash, $devname, $reading, undef);
+    }
   }
+  readingsEndUpdate($hash,$init_done);
 }
 
 sub
@@ -170,59 +182,69 @@ readingsProxy_Notify($$)
 
   return if( AttrVal($name,"disable", 0) > 0 );
 
-  return if($dev->{NAME} eq $name);
+  my $devname = $dev->{NAME}; # name of device for which event occured
 
+  return if($devname eq $name);
   my $max = int(@{$events});
+
+  #
+  # events for the device global
+  #
+  if( $devname eq "global") {
+    for (my $i = 0; $i < $max; $i++) {
+      my $s = $events->[$i];
+      $s = "" if(!defined($s));
+      if($s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
+        # RENAMED
+        my ($old, $new) = ($1, $2);
+        if( defined($hash->{PROXIES}{$old}) ) {
+
+          $hash->{DEF} =~ s/(^|\s+)$old((:\S+)?\s*)/$1$new$2/g;
+
+          readingsProxy_updateDevices($hash);
+        }
+      } elsif($s =~ m/^DELETED ([^ ]*)$/) {
+        # DELETED
+        my ($delname) = ($1);
+
+        if( defined($hash->{PROXIES}{$delname}) ) {
+          readingsProxy_updateDevices($hash);
+        }
+
+      } elsif($s =~ m/^DEFINED ([^ ]*)$/) {
+        # DEFINED
+        my ($defname) = ($1);
+        readingsProxy_updateDevices($hash) if( !$hash->{PROXIES}{$defname} );
+      }
+    }
+    return; #end global events
+  }
+
+  # events for one of the proxied devices
+  return if !defined $hash->{PROXIES}{$devname};
+
+  my $sthupdated = 0;
+  readingsBeginUpdate($hash);
+
   for (my $i = 0; $i < $max; $i++) {
     my $s = $events->[$i];
     $s = "" if(!defined($s));
-
-    if( $dev->{NAME} eq "global" && $s =~ m/^RENAMED ([^ ]*) ([^ ]*)$/) {
-      my ($old, $new) = ($1, $2);
-      if( defined($hash->{CONTENT}{$old}) ) {
-
-        $hash->{DEF} =~ s/(^|\s+)$old((:\S+)?\s*)/$1$new$2/g;
-
-        readingsProxy_updateDevices($hash);
-      }
-
-    } elsif( $dev->{NAME} eq "global" && $s =~ m/^DELETED ([^ ]*)$/) {
-      my ($name) = ($1);
-
-      if( defined($hash->{CONTENT}{$name}) ) {
-
-        #$hash->{DEF} =~ s/(^|\s+)$name((:\S+)?\s*)/ /g;
-        #$hash->{DEF} =~ s/^ //;
-        #$hash->{DEF} =~ s/ $//;
-
-        readingsProxy_updateDevices($hash);
-      }
-
-    } elsif( $dev->{NAME} eq "global" && $s =~ m/^DEFINED ([^ ]*)$/) {
-      my ($name) = ($1);
-      readingsProxy_updateDevices($hash) if( !$hash->{DEVICE} );
-
-    } else {
-      next if( !$hash->{DEVICE} );
-      next if( $dev->{NAME} ne $hash->{DEVICE} );
-
       my @parts = split(/: /,$s);
       my $reading = shift @parts;
       my $value   = join(": ", @parts);
 
-      $reading = "" if( !defined($reading) );
-      $value = "" if( !defined($value) );
+      $reading //= "";
+      $value //= "";
       if( $value eq "" ) {
         $reading = "state";
         $value = $s;
       }
-      next if( $reading ne $hash->{READING} );
-
-      readingsProxy_update($hash, $value);
-    }
+      next if( !$hash->{PROXIES}{$devname}{$reading} );
+      
+      $sthupdated += readingsProxy_update($hash, $devname, $reading, $value);
   }
-
-  return undef;
+  readingsEndUpdate($hash,$sthupdated);
+  return;
 }
 
 sub
@@ -231,8 +253,12 @@ readingsProxy_Set($@)
   my ($hash, $name, @a) = @_;
 
   return "no set value specified" if(int(@a) < 1);
+  
+  my ($primaryDevname,$primaryReading) = readingsProxy_splitProxyDef($hash->{primaryProxy});
+  return "no such device: $primaryDevname" unless($defs{$primaryDevname});
+
   my $setList = AttrVal($name, "setList", "");
-  $setList = getAllSets($hash->{DEVICE}) if( $setList eq "%PARENT%" );
+  $setList = getAllSets($primaryDevname) if( $setList eq "%PARENT%" );
   return SetExtensions($hash,$setList,$name,@a) if(!$setList || $a[0] eq "?");
 
   my $found = 0;
@@ -253,8 +279,8 @@ readingsProxy_Set($@)
   my $set_fn = AttrVal( $hash->{NAME}, "setFn", "" );
   if( $set_fn =~ m/^{.*}$/s ) {
     my $CMD = $a[0];
-    my $DEVICE = $hash->{DEVICE};
-    my $READING = $hash->{READING};
+    my $DEVICE = $primaryDevname;
+    my $READING = $primaryReading;
     my $ARGS = join(" ", @a[1..$#a]);
 
     my $set_fn = eval $set_fn;
@@ -273,9 +299,9 @@ readingsProxy_Set($@)
     return "ERROR: endless loop detected for $hash->{NAME}";
   }
 
-  Log3 $name, 4, "$name: set hash->{DEVICE} $v";
+  Log3 $name, 4, "$name: set $primaryDevname $v";
   $hash->{INSET} = 1;
-  my $ret = CommandSet(undef,"$hash->{DEVICE} ".$v);
+  my $ret = CommandSet(undef,"$primaryDevname $v");
   delete($hash->{INSET});
   return $ret;
 }
@@ -286,8 +312,12 @@ readingsProxy_Get($@)
   my ($hash, $name, @a) = @_;
 
   return "no get value specified" if(int(@a) < 1);
+
+  my ($primaryDevname,$primaryReading) = readingsProxy_splitProxyDef($hash->{primaryProxy});
+  return "no such device: $primaryDevname" unless($defs{$primaryDevname});
+
   my $getList = AttrVal($name, "getList", "");
-  $getList = getAllGets($hash->{DEVICE}) if( $getList eq "%PARENT%" );
+  $getList = getAllGets($primaryDevname) if( $getList eq "%PARENT%" );
   return "Unknown argument ?, choose one of $getList" if(!$getList || $a[0] eq "?");
 
   my $found = 0;
@@ -303,8 +333,8 @@ readingsProxy_Get($@)
   my $get_fn = AttrVal( $hash->{NAME}, "getFn", "" );
   if( $get_fn =~ m/^{.*}$/s ) {
     my $CMD = $a[0];
-    my $DEVICE = $hash->{DEVICE};
-    my $READING = $hash->{READING};
+    my $DEVICE = $primaryDevname;
+    my $READING = $primaryReading;
     my $ARGS = join(" ", @a[1..$#a]);
 
     my ($get_fn,$direct_return) = eval $get_fn;
@@ -319,9 +349,9 @@ readingsProxy_Get($@)
     return "ERROR: endless loop detected for $hash->{NAME}";
   }
 
-  Log3 $name, 4, "$name: get hash->{DEVICE} $v";
+  Log3 $name, 4, "$name: get $primaryDevname $v";
   $hash->{INSET} = 1;
-  my$ret = CommandGet(undef,"$hash->{DEVICE} ".$v);
+  my$ret = CommandGet(undef,"$primaryDevname $v");
   delete($hash->{INSET});
   return $ret;
 }
@@ -353,82 +383,113 @@ readingsProxy_Attr($$$;$)
 
 1;
 
+__END__
+
 =pod
 =item helper
-=item summary    make (a subset of) a reading from one device available as a new device
-=item summary_DE Reading eines Ger&auml;tes (oder einen Teil daraus) als eigenes Ger&auml;t
+=item summary    make readings of other devices available as readings of a new device
+=item summary_DE Readings anderer Ger&auml;te als Readings eines neuen Ger&auml;ts
 =begin html
 
-<a name="readingsProxy"></a>
+<a id="readingsProxy"></a>
 <h3>readingsProxy</h3>
 <ul>
-  Makes (a subset of) a reading from one device available as a new device.<br>
-  This can be used to map channels from 1-Wire, EnOcean or SWAP devices to independend devices that
-  can have state,icons and webCmd different from the parent device and can be used in a floorplan.
+  This is the April 2026 enhanced downward-compatible version of readingsProxy<br><br>
+  
+  Create a device as aggregation of one or more readings of other devices. Can be used to create a new
+  device with get and set functionality from one reading of another device (device extraction) or to 
+  create a new device as a collection of readings from one or several devices (readings aggregation).<br>
+  This can be used to map channels from 1-Wire, EnOcean or SWAP devices to independent devices that
+  can have state, icons and webCmd different from the parent device and can be used in a floorplan. 
+  Another use case would be a device to serve as single point of data for display of readings.
   <br><br>
-  <a name="readingsProxy_Define"></a>
+  <a id="readingsProxy-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; readingsProxy &lt;device&gt;:&lt;reading&gt;</code><br>
+    <code>define &lt;name&gt; readingsProxy &lt;proxydef&gt; ...</code><br>
     <br>
-
+    The definition of <code>readingsProxy</code> consists of one or more proxy definitions separated by
+    whitespace. A proxy definition is a triplet <code>&lt;proxydef&gt; :=
+    &lt;device&gt;:&lt;reading&gt;[:&lt;proxy&gt;]</code>. For each proxy definition the reading
+    &lt;reading&gt; of device &lt;device&gt; is copied as a reading named &lt;proxy&gt; to the
+    <code>readingsProxy</code> device. If the third part is omitted, the proxy is named
+    as &lt;proxy&gt;_&lt;reading&gt;. If the second part is omitted, the <code>state</code> reading is used.<br><br>
     Examples:
     <ul>
       <code>define myProxy readingsProxy myDS2406:latch.A</code><br>
+      <code>define myProxy readingsProxy myDS2406:latch.A:latchA</code><br>
+      <code>define myProxy readingsProxy myDS2406_1:latch.A:latch1 myDS2406_2:ltach.A:latch2</code><br>
+      <code>define proxy readingsProxy smaem:SMAEM1234567890_Bezug_Wirkleistung:Netzbezug smaem:SMAEM9876543210_GridFreq:Netzfrequenz smainverter:ChargeStatus:Battery</code>
     </ul>
+    <br>
+    Make sure to choose different names for the different proxies of the same <code>readingsProxy</code> device. Non-existent devices will be ignored.
+
+    The first proxy referring to an existing device is called primary proxy. For the primary proxy, additional functionality can be made available 
+    to the user in the form of individually defined get, set and value functionality (see 
+    <a href="#readingsProxy_Attr">Attributes</a>). The <code>state</code> reading is taken from the primary proxy.<br><br>
+
+    Renaming a proxied device will automatically rename the device in the <code>readingsProxy</code> device by changing its definition. 
+    Deleting a proxied device will not change the definition and not change the primary proxy. If the device of the primary proxy is deleted, it
+    will just work as if it were not there at all.
   </ul><br>
 
-  <a name="readingsProxy_Set"></a>
+  <a id="readingsProxy-set"></a>
     <b>Set</b>
     <ul>
     </ul><br>
 
-  <a name="readingsProxy_Get"></a>
+  <a id="readingsProxy-get"></a>
     <b>Get</b>
     <ul>
     </ul><br>
 
-  <a name="readingsProxy_Attr"></a>
+  <a id="readingsProxy-attr"></a>
     <b>Attributes</b>
     <ul>
       <li>disable<br>
-        1 -> disable notify processing. Notice: this also disables rename and delete handling.</li>
-      <li>getList<br>
+        Setting this attribute to 1 disables notify processing. Notice: this also disables rename and delete handling.</li>
+       <a id="readingsProxy-attr-getList"></a>
+       <li>getList<br>
         Space separated list of commands, which will be returned upon "get name ?",
         so the FHEMWEB frontend can construct a dropdown.
         %PARENT% will result in the complete list of commands from the parent device.
         get commands not in this list will be rejected.</li>
-      <li>setList<br>
+       <a id="readingsProxy-attr-setList"></a>
+       <li>setList<br>
         Space separated list of commands, which will be returned upon "set name ?",
         so the FHEMWEB frontend can construct a dropdown and offer on/off switches.
         %PARENT% will result in the complete list of commands from the parent device.
-        set commands not in this list will be rejected.
-        Example: attr proxyName setList on off</li>
-        <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-      <li>getFn<br>
-        perl expresion that will return the get command forwarded to the parent device.
-        has access to $DEVICE, $READING, $CMD and $ARGS.<br>
-        undef -> do nothing<br>
-        ""    -> pass through<br>
-        (&lt;value&gt;,1) -> directly return &lt;value&gt;, don't call parent getFn<br>
-        everything else -> use this instead</li>
-      <li>setFn<br>
-        perl expresion that will return the set command forwarded to the parent device.
-        has access to $CMD, $DEVICE, $READING and $ARGS.<br>
-        undef -> do nothing<br>
-        ""    -> pass through<br>
-        everything else -> use this instead<br>
-        Examples:<br>
-          <code>attr myProxy setFn {($CMD eq "on")?"off":"on"}</code>
+        set commands not in this list will be rejected.<br>
+        Example: <code>attr proxyName setList on off</code>
         </li>
+      <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+      <a id="readingsProxy-attr-getFn"></a>
+      <li>getFn<br>
+        Perl expresion that will return the get command forwarded to the parent device.
+        Has access to $DEVICE, $READING, $CMD and $ARGS.<br>
+        <code>undef</code>: do nothing<br>
+        <code>""</code>: pass through<br>
+        <code>(&lt;value&gt;,1)</code>: directly return &lt;value&gt;, don't call parent getFn<br>
+        everything else: use the provided function
+        </li>
+      <a id="readingsProxy-attr-setFn"></a>
+      <li>setFn<br>
+        Perl expresion that will return the set command forwarded to the parent device.
+        Has access to $CMD, $DEVICE, $READING and $ARGS.<br>
+        <code>undef</code>: do nothing<br>
+        <code>""</code>: pass through<br>
+        everything else: use the provided function<br>
+        Example: <code>attr myProxy setFn {($CMD eq "on")?"off":"on"}</code>
+        </li>
+      <a id="readingsProxy-attr-valueFn"></a>
       <li>valueFn<br>
-        perl expresion that will return the value that sould be used as state.
-        has access to $LASTCMD, $DEVICE, $READING and $VALUE.<br>
-        undef -> do nothing<br>
-        ""    -> pass through<br>
-        everything else -> use this instead<br>
-        Examples:<br>
-          <code>attr myProxy valueFn {($VALUE == 0)?"off":"on"}</code>
+        Perl expresion that will return the value that should be used for the reading.
+        Has access to $LASTCMD, $DEVICE, $READING and $VALUE.<br>
+        <code>undef</code>: do nothing<br>
+        <code>""</code>: pass through<br>
+        <code>(&lt;value&gt;,1)</code>: directly return &lt;value&gt;, don't call parent getFn<br>
+        everything else: use the provided function<br>
+        Examples: <code>attr myProxy valueFn { ($VALUE == 0) ? "off" : "on" }</code>
       </li>
       <br><li><a href="#perlSyntaxCheck">perlSyntaxCheck</a></li>
     </ul><br>

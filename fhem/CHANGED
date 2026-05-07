@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 33_ReadingsProxy: enhanced April 2026 version (forum #144287)
  - bugfix: 98_vitoconnect: Fix schedule setter. Stop retry on VALIDATION_ERROR
  - bugfix: 76_SolarForecast: Version 2.6.5
  - change: 76_SolarForecast: Version 2.6.4
