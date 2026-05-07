@@ -162,9 +162,14 @@ BEGIN {
 }
 
 # Versions History intern
-my %vNotesIntern = (
+my %vNotesIntern = ( 
+  "2.6.6"  => "07.05.2026  nicht mehr benötigten Code entfernt, writeToHistory, _saveHistP1 und _saveHistP2 refactored, ___doPlanning refactored ".
+                           "Einbau consumerCacheDirty, ___setConsumerSwitchingState: lastOwnSwitchCmd eingebaut, ".
+                           "BLINDTIME, REAPLANINTVL einegbaut, Anti-Toggling / Cycle-Budget: Verhindert dass mehrere starke Consumer im selben ".
+                           "Zyklus starten und den PV-Überschuss überzeichnen. Implementiert durch surplusCycleCommitted als Zyklus-Budget ",
   "2.6.5"  => "03.05.2026  _batChargeMgmt Refactored: Äußere Stundenschleife -> Innere Batterieschleife, Fix 100%-Bug ".
-                           "wichtiger Bugfix weekday in LOCALE_DAYNAMES ",
+                           "wichtiger Bugfix weekday in LOCALE_DAYNAMES, Debug consumerPlanning angepasst ".
+                           "Speicherung von bevcsmBatCapXX und bevcsmPwrXX in pvHistory und aiRawData ",
   "2.6.4"  => "01.05.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
                            "exponentielles Glätten EWMA -> verhindert Sprünge durch einen gleitenden Mittelwert über die letzten ".
                            "Berechnungen, Routine ___areaFactorTrack entfernt ",
@@ -291,40 +296,8 @@ my %vNotesIntern = (
                            "surpmeth: use average[_2..20] instead of numeric values 2.20 only ",
   "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
   "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
-  "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
-                           "_setattrKeyVal: optimize function between execute from FHEMWEB and Commandline ".
-                           "_beamGraphicFirstHour, _beamGraphicRemainingHours: decimal places according to the setting of the energy unit ".
-                           "___switchConsumerOn: Switch on consumers even if they are not interruptible after state interrupted|interrupting|continuing ".
-                           "increase MAXCONSUMER up to 20 ",
-  "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
-  "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
-  "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
-                           "setupInverterDevXX: Check that there are no commas with spaces before and after (strings) ",
-  "1.53.1" => "30.06.2025  add utf8 smileys, fix Perl warning uninitialized value \$color ",
-  "1.53.0" => "28.06.2025  new battery style (batcontainer), new key setupBatteryDevXX->label, new reading Battery_ChargeUnrestricted_XX ".
-                           "attribute graphicShowDiff replaced by graphicControl->showDiff ".
-                           "check local coordinates are set in global device and fill message system if failure ".
-                           "consumer Attr key noshow new possible value '9', _beamGraphic: scaleMode log double reduce Discount of z3 ".
-                           "new key plantControl->reductionState, _calcDataEveryFullHour and subs: changeover aln to pvrlvd ".
-                           "_getaiDecTree: reduce character size of aiRawData, set ... reset: pvCorrection deletes hidden readings too ",
-  "1.52.18"=> "23.06.2025  ctrlSpecialReadings: new option conForecastComingNight, fix last hour of remainingSurplsHrsMinPwrBat_ ".
-                           "some more minor fixes ",
-  "1.52.17"=> "22.06.2025  remainingSurplsHrsMinPwrBat_: calculate with two decimal places ",
-  "1.52.16"=> "21.06.2025  _genSpecialReadings: new option remainingSurplsHrsMinPwrBat_XX ",
-  "1.52.15"=> "20.06.2025  ctrlBatSocManagementXX->loadAbort expanded by unlock condition ",
-  "1.52.14"=> "18.06.2025  _beamGraphic: rework linear and logarithmic normalization of beam height ",
-  "1.52.13"=> "17.06.2025  _genSpecialReadings: new option remainingHrsWoChargeRcmdBat_XX, edit comref ",
-  "1.52.12"=> "15.06.2025  readCacheFile: option aitrained -> Code optimized for saving memory ".
-                           "fillupMessageSystem: prevent Icon failore if SV contain spaces ".
-                           "setupBatteryDevXX: 'dyn' -> Battery color can be dynamically set depending from SoC value ",
-  "1.52.11"=> "03.06.2025  _genSpecialReadings: new option todayNotOwnerConsumption ",
-  "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
-  "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
-  "1.52.8" => "01.06.2025  _calcConsForecast_legacy: use avgArray if number included days <= number of days in pvHistory ",
   "0.1.0"  => "09.12.2020  initial Version "
 );
-
-
 
 
 # Locale-abhängige Kurz-Wochentage erzeugen (Mo, Tue, lun., …)
@@ -377,9 +350,10 @@ use constant {
   BICCOLRCDDEF    => 'grey',                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
   BICCOLNRCDDEF   => '#cccccc',                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
   BCHGICONCOLDEF  => 'darkorange',                                                  # default 'Aufladen' Batterie-Icon Färbung
-  BDCHICONCOLDEF  => '#b32400',                                                                              # default 'Entladen' Batterie-Icon Färbung
-  BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                   # Basispfad Abruf contrib SolarForecast Files
-  BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',     # Basispfad GitHub SolarForecast Files
+  BDCHICONCOLDEF  => '#b32400',                                                                             # default 'Entladen' Batterie-Icon Färbung
+  BLINDTIME       => 30,                                                                                    # Sekunden Toleranzfenster nach eigenem Schaltbefehl
+  BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                  # Basispfad Abruf contrib SolarForecast Files
+  BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',    # Basispfad GitHub SolarForecast Files
   
   CACHETIRMS      => 2000,                                                          # max. Size Tilted Irradiance Cache
   CACHETSOMS      => 4000,                                                          # max. Size TimestringsFromOffset Cache
@@ -473,6 +447,8 @@ use constant {
   PGHPATH         => '',                                                            # GitHub Post Pfad
   PPATH           => '?format=txt',                                                 # Download Format
 
+  REAPLANINTVL    => 1800,                                                          # Neuplanungsintervall in Sekunden (30 Min)
+  
   STOREFFDEF      => 87,                                                            # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
   SLIDENUMMAX     => 3,                                                             # max. Anzahl der Arrayelemente in Schieberegistern
   SPLSLIDEMAX     => 20,                                                            # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß und anderen
@@ -1667,7 +1643,17 @@ my %hfspvh = (
       $hfspvh{'bevcsmTargSoC'.$cn}{fn}       = \&_saveHistP2;                   # BEV Ziel-SoC
       $hfspvh{'bevcsmTargSoC'.$cn}{storname} = 'bevcsmTargSoC'.$cn;
       $hfspvh{'bevcsmTargSoC'.$cn}{validkey} = undef;
-      $hfspvh{'bevcsmTargSoC'.$cn}{fpar}     = undef;       
+      $hfspvh{'bevcsmTargSoC'.$cn}{fpar}     = undef;
+      
+      $hfspvh{'bevcsmBatCap'.$cn}{fn}        = \&_saveHistP2;                   # BEV Batteriekapazität
+      $hfspvh{'bevcsmBatCap'.$cn}{storname}  = 'bevcsmBatCap'.$cn;
+      $hfspvh{'bevcsmBatCap'.$cn}{validkey}  = undef;
+      $hfspvh{'bevcsmBatCap'.$cn}{fpar}      = undef;  
+
+      $hfspvh{'bevcsmPwr'.$cn}{fn}       = \&_saveHistP2;                       # BEV aktuelle Ladeleistung
+      $hfspvh{'bevcsmPwr'.$cn}{storname} = 'bevcsmPwr'.$cn;
+      $hfspvh{'bevcsmPwr'.$cn}{validkey} = undef;
+      $hfspvh{'bevcsmPwr'.$cn}{fpar}     = undef;       
   }
 
   for my $pn (1..MAXPRODUCER) {
@@ -3156,15 +3142,11 @@ sub _setreset {                          ## no critic "not used"
 
               Log3 ($name, 3, qq{$name - Day "$dday" hour "$dhour" deleted from pvHistory});
 
-              $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
-              $paref->{reorgday} = $dday;
-              $paref->{hkey}     = '';
-
-              _saveHistP1 ($paref);
-
-              delete $paref->{reorg};
-              delete $paref->{reorgday};
-              delete $paref->{hkey};
+              _saveHistP1 ( { paref    => $paref, 
+                              reorg    => 1,                                    # den Tag Stunde "99" reorganisieren
+                              reorgday => $dday, 
+                              key      => '', 
+                            } );
           }
           else {
               delete $data{$name}{pvhist}{$dday};
@@ -3188,15 +3170,11 @@ sub _setreset {                          ## no critic "not used"
               delete $data{$name}{pvhist}{$dday}{$dhour}{con};
               Log3 ($name, 3, qq{$name - consumption day "$dday" hour "$dhour" deleted from pvHistory});
 
-              $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
-              $paref->{reorgday} = $dday;
-              $paref->{hkey}     = '';
-
-              _saveHistP1 ($paref);
-
-              delete $paref->{reorg};
-              delete $paref->{reorgday};
-              delete $paref->{hkey};
+              _saveHistP1 ( { paref    => $paref, 
+                              reorg    => 1,                                    # den Tag Stunde "99" reorganisieren
+                              reorgday => $dday, 
+                              key      => '', 
+                            } );
           }
           else {
               for my $hr (sort keys %{$data{$name}{pvhist}{$dday}}) {
@@ -3251,15 +3229,15 @@ sub _setreset {                          ## no critic "not used"
               Log3 ($name, 3, qq{$name - stored PV correction factor of hour "$circh" from pvCircular and pvHistory deleted});
           }
           else {
-              for my $hod (keys %{$data{$name}{circular}}) {
-                  delete $data{$name}{circular}{$hod}{pvcorrf};
-                  delete $data{$name}{circular}{$hod}{quality};
-                  delete $data{$name}{circular}{$hod}{pvrlsum};
-                  delete $data{$name}{circular}{$hod}{pvfcsum};
-                  delete $data{$name}{circular}{$hod}{dnumsum};
+              for my $circhod (keys %{$data{$name}{circular}}) {
+                  delete $data{$name}{circular}{$circhod}{pvcorrf};
+                  delete $data{$name}{circular}{$circhod}{quality};
+                  delete $data{$name}{circular}{$circhod}{pvrlsum};
+                  delete $data{$name}{circular}{$circhod}{pvfcsum};
+                  delete $data{$name}{circular}{$circhod}{dnumsum};
 
-                  for my $k (keys %{$data{$name}{circular}{$hod}}) {
-                      delete $data{$name}{circular}{$hod}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
+                  for my $k (keys %{$data{$name}{circular}{$circhod}}) {
+                      delete $data{$name}{circular}{$circhod}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
                   }
               }
 
@@ -10858,8 +10836,6 @@ sub centralTask {
       #my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
       #aiFannDetectDrift ($name, $t, 'DE', $debug, 'con', 96) if($rdy);                         # Drift von AI 'con' Werten ermitteln
 
-  debugLog ($centpars, 'saveData2Storage', "_saveHistP1 -> stored simple  - current dayname=$dayname");
-
   if ($debug !~ /^none$/xs) {
       Log3 ($name, 4, "$name DEBUG> ################################################################");
       Log3 ($name, 4, "$name DEBUG> ###                  New centralTask cycle                   ###");
@@ -15566,15 +15542,17 @@ return $vector;
 #                  Management Consumer
 ################################################################
 sub _manageConsumerData {
-  my $paref   = shift;
-  my $name    = $paref->{name};
-  my $chour   = $paref->{chour};
-  my $day     = $paref->{day};
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  my $day   = $paref->{day};
+  my $debug = $paref->{debug};
 
-  my $hash    = $defs{$name};
-  my $hod     = sprintf "%02d", ($chour + 1);
+  my $hash  = $defs{$name};
+  my $hod   = sprintf "%02d", ($chour + 1);
   
   my $pcurrsum = 0;
+  $data{$name}{current}{surplusCycleCommitted} = 0;                                 # Anti-Toggling: das Surplus Budget zurücksetzen
 
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
       my $cname          = ConsumerVal ($name, $c, 'name',       '');
@@ -15591,14 +15569,15 @@ sub _manageConsumerData {
       $paref->{cactive} = $cactive;
       
       __saveBEVvalues ($paref);                                                     # BEV Consumer (vor __savePowerAndEnergy) auslesen
-      
-      $paref->{nhour} = $hod;                                                       # !! writeToHistory löscht diese Einträge !!
-      $paref->{nday}  = $day;
   
-      my $pcurr  = __savePowerAndEnergy ($paref);                                   # aktuelle Leistung und Energieverbrauch auslesen + speichern
+      my $pcurr = __savePowerAndEnergy ($paref);                                    # aktuelle Leistung und Energieverbrauch auslesen + speichern
       
       $pcurrsum      += $pcurr;
       $paref->{pcurr} = $pcurr;
+      
+      if ($debug =~ /consumerPlanning/x) {
+          Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
+      }
 
       __getAutomaticState     ($paref);                                             # Automatic Status des Consumers abfragen
       __calcEnergyPieces      ($paref);                                             # Energieverbrauch auf einzelne Stunden für Planungsgrundlage aufteilen
@@ -15664,19 +15643,22 @@ sub _manageConsumerData {
       delete $paref->{calias};
       delete $paref->{ctype};
       delete $paref->{cactive};
-      delete $paref->{nday};
-      delete $paref->{nhour};
   }
   
   
   # --- vorhandene Consumernummern v. Wärmepumpen ermitteln und speichern
-  #########################################################################
   my $bevcsm = isBevUsed      ($name);
   my $hpcsm  = isHeatPumpUsed ($name);
   writeToHistory ( { paref => $paref, key => 'hpcsm',  val => $hpcsm,  day => $day, hour => $hod } ) if($hpcsm);
   writeToHistory ( { paref => $paref, key => 'bevcsm', val => $bevcsm, day => $day, hour => $hod } ) if($bevcsm);
 
   $data{$name}{current}{dummyConsumption} = CurrentVal ($name, 'consumption', 0) - $pcurrsum;                     # aktueller Verbrauch - Summe aller ConsumerPower
+  
+  # --- Consumer Cache File schreiben
+  if (CurrentVal ($name, 'consumerCacheDirty', 0)) {
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name);
+      delete $data{$name}{current}{consumerCacheDirty};
+  }
 
 return;
 }
@@ -15755,6 +15737,8 @@ sub __saveBEVvalues {
   if (defined $batCapVal) {
       $batCapVal                            = $batCapVal * ($unit =~ /^kWh$/xi ? 1000 : 1);             # BEV batCap in Wh
       $data{$name}{current}{'batCapBev'.$c} = round0 ($batCapVal);
+  
+      writeToHistory ( { paref => $paref, key => 'bevcsmBatCap'.$c, val => round0 ($batCapVal), day => $day, hour => $hod } );      # BEV batCap Snapshot
   }
 
   # --- aktueller SoC
@@ -15772,10 +15756,10 @@ sub __saveBEVvalues {
   
   if (defined $tgtsocval) {                                                                             # BEV Ziel-SoC      
       writeToHistory ( { paref => $paref, key => 'bevcsmTargSoC'.$c, val => round0 ($tgtsocval), day => $day, hour => $hod } );          
-  } 
-  
+  }  
+                                    
   debugLog ($paref, 'collectData', "BEV - $calias -> bevcsmSoC${c}=$csocval bevcsmTargSoC${c}=$tgtsocval ".
-                                    (defined $batCapVal ? "batCapBev${c}=$batCapVal" : "batCapBev${c}=undef") ); 
+                                   (defined $batCapVal ? "batCapBev${c}=$batCapVal bevcsmBatCap${c}=$batCapVal" : "batCapBev${c}=undef") );
 
 return;
 }
@@ -15789,6 +15773,7 @@ sub __savePowerAndEnergy {
   my $t       = $paref->{t};                                                                    # aktueller Timestamp
   my $c       = $paref->{consumer};
   my $cname   = $paref->{cname};
+  my $ctype   = $paref->{ctype};
   my $cactive = $paref->{cactive};
   my $chour   = $paref->{chour};
   my $day     = $paref->{day};
@@ -15834,10 +15819,9 @@ sub __savePowerAndEnergy {
       }
 
       # --- Energieverbrauch ermitteln
-      if (defined $ehist) {                                                             # Stundenwechsel von vorn beginnen
+      if (defined $ehist) {                                                             
           if ($etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
               my $consumerco  = $etot - $ehist;
-              #$consumerco    += HistoryVal ($name, $day, $hod, "csme${c}", 0);
 
               if ($consumerco < 0) {                                                              
                   $consumerco = 0;
@@ -15852,20 +15836,21 @@ sub __savePowerAndEnergy {
                   Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$cname< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
               }
 
-              $paref->{val}  = round2 ($consumerco);                                    # Verbrauch des Consumers aktuelle Stunde
-              $paref->{hkey} = "csme${c}";
-
-              _saveHistP1 ($paref);
+              _saveHistP1 ( { paref => $paref, 
+                              key   => "csme${c}",
+                              val   => round2 ($consumerco),                            # Verbrauch des Consumers aktuelle Stunde                             
+                              day   => $day,
+                              hour  => $hod,
+                            } );
           }
       }
-      else {
-          $paref->{val}  = $etot;                                                       # Totalverbrauch des Verbrauchers
-          $paref->{hkey} = "csmt${c}";
-
-          _saveHistP1 ($paref);
-
-          delete $paref->{hkey};
-          delete $paref->{val};
+      else {                                                                            # Stundenwechsel von vorn beginnen         
+          _saveHistP1 ( { paref => $paref, 
+                          key   => "csmt${c}",
+                          val   => $etot,                                               # Totalverbrauch des Verbrauchers                            
+                          day   => $day,
+                          hour  => $hod,
+                        } );
       }
   }
 
@@ -15876,6 +15861,10 @@ sub __savePowerAndEnergy {
   else {
       $data{$name}{consumers}{$c}{currpower} = $pcurr;
       storeReading ("consumer${c}_currentPower", $pcurr.' W');
+      
+      if ($ctype eq 'bev') {
+          writeToHistory ( { paref => $paref, key => 'bevcsmPwr'.$c, val => round0 ($pcurr), day => $day, hour => $hod } );           
+      }
   }
 
 return $pcurr;
@@ -16023,16 +16012,6 @@ sub ___csmSpecificEpieces {
   my $c     = $paref->{consumer};
   my $etot  = $paref->{etot};
   my $t     = $paref->{t};
-
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ########################################################################################################################
-  if (defined $data{$name}{consumers}{$c}{epiecHist}) {                                                # 15.11.2025
-      $data{$name}{consumers}{$c}{epiecActive} = delete $data{$name}{consumers}{$c}{epiecHist};
-  }
-  if (defined $data{$name}{consumers}{$c}{epiecStartTime}) {                                                # 15.11.2025
-      $data{$name}{consumers}{$c}{epiecSwitchTime} = delete $data{$name}{consumers}{$c}{epiecStartTime};
-  }
-  ########################################################################################################################
   
   if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'on') {                                                                # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
       $data{$name}{consumers}{$c}{lastOnTime} = $t;
@@ -16165,14 +16144,14 @@ sub __planInitialSwitchTime {
       }
       
       if ($debug =~ /consumerPlanning/x) {          
-          Log3 ($name, 4, qq{$name DEBUG> Planning consumer "$c" not permitted - $dnp (name=$calias)});
+          Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" not permitted - name=$calias, cause=$dnp});
       }
 
       return;
   }
 
   if ($debug =~ /consumerPlanning/x) {
-      Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
+      #Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
       Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name=$cname alias=$calias activated=$cactive});
   }
   
@@ -16248,33 +16227,23 @@ sub __reviewSwitchTime {
   my $pstate    = ConsumerVal    ($name, $c, 'planstate',   '');
   my $plswon    = ConsumerVal    ($name, $c, 'planswitchon', 0);                            # bisher geplante Switch on Zeit
   my $simpCstat = simplifyCstate ($pstate);
+                                                                  
+  my $lastReplan = ConsumerVal ($name, $c, 'lastReplanTs', 0);
 
   if ($simpCstat =~ /planned|suspended/xs) {
-      if ($t < $plswon || $t > $plswon + 300) {                                             # geplante Switch-On Zeit ist 5 Min überschritten und immer noch "planned"
-          my $minute = $paref->{minute};
+      if ($t < $plswon || $t > $plswon + 300) {                                             # Startzeit noch nicht erreicht oder 5 Min überschritten
+          if ($t - $lastReplan >= REAPLANINTVL) {
+              $data{$name}{consumers}{$c}{lastReplanTs} = $t;
 
-          for my $m (qw(15 45)) {
-              if (int $minute >= $m) {
-                  if (!defined $hash->{HELPER}{$c.'M'.$m.'DONE'}) {
-                      my $name                          = $paref->{name};
-                      $hash->{HELPER}{$c.'M'.$m.'DONE'} = 1;
+              debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name=$cname alias=$calias});
 
-                      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name=$cname alias=$calias});
-
-                      $paref->{replan} = 1;                                           
-                      ___doPlanning ($paref);
-                      delete $paref->{replan};
-                  }
-              }
-              else {
-                  delete $hash->{HELPER}{$c.'M'.$m.'DONE'};
-              }
+              my $replan = 1;
+              ___doPlanning ($paref, $replan);
           }
       }
   }
   else {
-      delete $hash->{HELPER}{$c.'M15DONE'};
-      delete $hash->{HELPER}{$c.'M45DONE'};
+      delete $data{$name}{consumers}{$c}{lastReplanTs};                                     # Timestamp zurücksetzen wenn nicht mehr planned/suspended
   }
 
 return;
@@ -16284,14 +16253,16 @@ return;
 #    Consumer Planung ausführen
 ###################################################################
 sub ___doPlanning {
-  my $paref = shift;
+  my ($paref, $replan) = @_;
+  
   my $name   = $paref->{name};
   my $c      = $paref->{consumer};
   my $calias = $paref->{calias};
   my $debug  = $paref->{debug};
   my $lang   = $paref->{lang};
   my $nh     = $data{$name}{nexthours};
-
+  
+  $replan   //= 0;
   my $hash    = $defs{$name};
   my $epieces = ConsumerVal ($name, $c, 'epieces', '');
 
@@ -16303,44 +16274,44 @@ sub ___doPlanning {
   my $cicfip   = CurrentVal  ($name, 'consForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
   my $pvshare  = ConsumerVal ($name, $c, 'pvshare',          100);                         # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden
   my $shfactor = $pvshare / 100;
+  
   my (%tmp, %max, %mtimes);
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
 
   ## max. PV-Forecast bzw. Überschuß (bei gesetzen consForecastInPlanning) ermitteln
-  ####################################################################################
+  #################################################################################### 
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',    0);
-      my $confcex = NexthoursVal ($name, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
+      my $confcex = NexthoursVal ($name, $idx, 'confcEx', 0);                               # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
 
-      my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierte Leistung -> Überschuß oder negativ
-
-      my ($hour)              = $idx =~ /NextHour(\d+)/xs;
-      $tmp{$spexp}{starttime} = NexthoursVal ($name, $idx, 'starttime', '');
-      $tmp{$spexp}{today}     = NexthoursVal ($name, $idx, 'today',      0);
-      $tmp{$spexp}{nexthour}  = int ($hour);
+      my ($hour)            = $idx =~ /NextHour(\d+)/xs;
+      $tmp{$idx}{spexp}     = $pvfc - ($cicfip ? $confcex : 0);                             # prognostizierte Leistung -> Überschuß oder negativ
+      $tmp{$idx}{starttime} = NexthoursVal ($name, $idx, 'starttime', '');
+      $tmp{$idx}{today}     = NexthoursVal ($name, $idx, 'today',      0);
+      $tmp{$idx}{nexthour}  = int ($hour);
   }
 
   my $order = 1;
 
-  for my $k (reverse sort{$a<=>$b} keys %tmp) {
-      my $ts                  = timestringToTimestamp ($hash, $tmp{$k}{starttime});
+  for my $idx (sort { $tmp{$b}{spexp} <=> $tmp{$a}{spexp} } keys %tmp) {
+      my $ts                  = timestringToTimestamp ($hash, $tmp{$idx}{starttime});
 
-      $max{$order}{spexp}     = $k;
+      $max{$order}{spexp}     = $tmp{$idx}{spexp};
       $max{$order}{ts}        = $ts;
-      $max{$order}{starttime} = $tmp{$k}{starttime};
-      $max{$order}{nexthour}  = $tmp{$k}{nexthour};
-      $max{$order}{today}     = $tmp{$k}{today};
+      $max{$order}{starttime} = $tmp{$idx}{starttime};
+      $max{$order}{nexthour}  = $tmp{$idx}{nexthour};
+      $max{$order}{today}     = $tmp{$idx}{today};
 
-      $mtimes{$ts}{spexp}     = $k;
-      $mtimes{$ts}{starttime} = $tmp{$k}{starttime};
-      $mtimes{$ts}{nexthour}  = $tmp{$k}{nexthour};
-      $mtimes{$ts}{today}     = $tmp{$k}{today};
+      $mtimes{$ts}{spexp}     = $tmp{$idx}{spexp};
+      $mtimes{$ts}{starttime} = $tmp{$idx}{starttime};
+      $mtimes{$ts}{nexthour}  = $tmp{$idx}{nexthour};
+      $mtimes{$ts}{today}     = $tmp{$idx}{today};
 
       $order++;
   }
 
-  my $epiece1 = $data{$name}{consumers}{$c}{epieces}{1};
+  my $epiece1 = $epieces->{1} // 0;
 
   debugLog ($paref, "consumerPlanning", qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
 
@@ -16350,9 +16321,8 @@ sub ___doPlanning {
   my ($err, $mintime) = getConsumerMintime ( { name    => $name,                                       # Einplanungsdauer
                                                c       => $c,
                                                lang    => $lang,
-                                               debug   => $debug
-                                             }
-                                           );
+                                               debug   => $debug,
+                                             } );
 
   if ($err) {
       Log3 ($name, 1, "$name - ERROR in consumer $c config: $err");
@@ -16384,7 +16354,7 @@ sub ___doPlanning {
               delete $paref->{starttime};
 
               my $startts       = timestringToTimestamp ($hash, $starttime);                                # Unix Timestamp für geplanten Switch on
-              $paref->{ps}      = $paref->{replan} ? 'replanned:' : 'planned:';                             # V 1.35.0
+              $paref->{ps}      = $replan ? 'replanned:' : 'planned:';                             
               $paref->{startts} = $startts;
               $paref->{stopts}  = $startts + $stopdiff;
 
@@ -16458,7 +16428,7 @@ sub ___doPlanning {
       Log3 ($name, 3, qq{$name - consumer "$calias" $planstate $planspmlt});
   }
 
-  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                               # Cache File Consumer schreiben
+  $data{$name}{current}{consumerCacheDirty} = 1;                                                        # Cache File Consumer schreiben
 
   ___setPlanningDeleteMeth ($paref);
 
@@ -16901,18 +16871,19 @@ sub ___switchConsumerOn {
       }
   }
 
-  my $isintable = isInterruptable ($hash, $c, 0, 1);                                              # mit Ausgabe Interruptable Info im Debug
+  my $isintable = isInterruptable ($hash, $c, 0, 1);                                                # mit Ausgabe Interruptable Info im Debug
 
   if ($debug =~ /consumerSwitching${c}/x) {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable -> $intrptcatic{$isintable}});
   }
 
-  my $isConsRcmd = isConsRcmd ($hash, $c);                                                       # PV-Überschuß als Bedingung
+  my $isConsRcmd          = isConsRcmd ($hash, $c);                                                 # PV-Überschuß als Bedingung
+  my ($permitted, $pvpow) = ___isCycleStartPermitted ($paref);
 
   my $supplmnt         = ConsumerVal ($name, $c, 'planSupplement', '');
   $paref->{supplement} = '' if($supplmnt =~ /swoncond\snot|swoncond\snicht/xs && $swoncond);
-  $paref->{supplement} = encode('utf8', $hqtxt{swonnm}{$lang}) if(!$swoncond);                   # 'swoncond not met'
-  $paref->{supplement} = encode('utf8', $hqtxt{swofmt}{$lang}) if($swoffcond);                   # 'swoffcond met'
+  $paref->{supplement} = encode('utf8', $hqtxt{swonnm}{$lang}) if(!$swoncond);                      # 'swoncond not met'
+  $paref->{supplement} = encode('utf8', $hqtxt{swofmt}{$lang}) if($swoffcond);                      # 'swoffcond met'
 
   if (defined $paref->{supplement}) {
       ___setConsumerPlanningState ($paref);
@@ -16945,6 +16916,10 @@ sub ___switchConsumerOn {
           }          
       }
       elsif ($cplmode eq 'must' || $isConsRcmd) {                                                   # "Muss"-Planung oder Überschuß > Ratio (can)
+          if ($cplmode ne 'must' && !$permitted) {
+              return $state;
+          }
+          
           $state = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom"};
 
           if ($debug =~ /consumerSwitching${c}/x) {
@@ -16955,15 +16930,17 @@ sub ___switchConsumerOn {
           }
 
           CommandSet (undef, "$dswname $oncom");
+          $data{$name}{current}{surplusCycleCommitted} += $pvpow;                                   # Committed erhöhen
 
           $paref->{ps} = "switching on:";
           ___setConsumerPlanningState ($paref);
           delete $paref->{ps};
 
-          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                   # Cache File Consumer schreiben
+          $data{$name}{current}{consumerCacheDirty} = 1;                                            # Cache File Consumer schreiben
       }
   }
   elsif ($isConsRcmd                                                                                # unterbrochenen Consumer fortsetzen
+         && $permitted
          && $cplmode ne 'mustNot'                                                                   # Einschalten ist nicht verboten
          && ($isintable == 0 || $isintable == 1 || $isintable == 3)                                 # $isintable == 0 -> Consumer auch einschalten wenn sie nicht unterbrechbar sind
          && $isInTime
@@ -16982,12 +16959,13 @@ sub ___switchConsumerOn {
       }
 
       CommandSet (undef, "$dswname $oncom");
+      $data{$name}{current}{surplusCycleCommitted} += $pvpow;                                       # Committed erhöhen
 
       $paref->{ps} = 'continuing:';
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                     # Cache File Consumer schreiben
+      $data{$name}{current}{consumerCacheDirty} = 1;                                                # Cache File Consumer schreiben
   }
 
 return $state;
@@ -17037,6 +17015,9 @@ sub ___switchConsumerOff {
   }
 
   my $isintable = isInterruptable ($hash, $c, $hyst, 1);                                            # mit Ausgabe Interruptable Info im Debug
+  
+  my $pvpow = ConsumerVal ($name, $c, 'power',    0)
+            * ConsumerVal ($name, $c, 'pvshare', 100) / 100;                                        # pvshare-gewichteter Leistungsanteil
 
   if (($swoffcond || ($stopts && $t >= $stopts) || $cplmode eq 'mustNot') 
        && ($auto && $offcom && $simpCstat =~ /started|starting|stopping|interrupt|continu/xs)
@@ -17057,12 +17038,14 @@ sub ___switchConsumerOff {
       }
 
       CommandSet (undef,"$dswname $offcom");
+      
+      $data{$name}{current}{surplusCycleCommitted} = max (0, CurrentVal ($name, 'surplusCycleCommitted', 0) - $pvpow);  # Committed reduzieren
 
       $paref->{ps} = "switching off:";
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                       # Cache File Consumer schreiben
+      $data{$name}{current}{consumerCacheDirty} = 1;                                                # Cache File Consumer schreiben
   }
   elsif ((($isintable && !$isConsRcmd) || $isintable == 2)                                          # Consumer unterbrechen
          && isInTimeframe ($hash, $c) 
@@ -17081,12 +17064,14 @@ sub ___switchConsumerOff {
       }
 
       CommandSet (undef,"$dswname $offcom");
+      
+      $data{$name}{current}{surplusCycleCommitted} = max (0, CurrentVal ($name, 'surplusCycleCommitted', 0) - $pvpow);  # Committed reduzieren
 
       $paref->{ps} = "interrupting:";
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                     # Cache File Consumer schreiben
+      $data{$name}{current}{consumerCacheDirty} = 1;                                                # Cache File Consumer schreiben
   }
 
 return $state;
@@ -17102,14 +17087,16 @@ sub ___setConsumerSwitchingState {
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
   my $state = $paref->{state};
-  my $fscss = $paref->{fscss};                                                                     # erster Subaufruf: 1
+  my $fscss = $paref->{fscss};                                                                      # erster Subaufruf: 1
 
   my $hash      = $defs{$name};
   my $simpCstat = simplifyCstate (ConsumerVal ($name, $c, 'planstate', ''));
-  my $calias    = ConsumerVal    ($name, $c, 'alias',                   '');                       # Consumer Device Alias
+  my $calias    = ConsumerVal    ($name, $c, 'alias',                   '');                        # Consumer Device Alias
   my $auto      = ConsumerVal    ($name, $c, 'auto',                     1);
-  my $oldpsw    = ConsumerVal    ($name, $c, 'physoffon',            'off');                       # gespeicherter physischer Schaltzustand
+  my $oldpsw    = ConsumerVal    ($name, $c, 'physoffon',            'off');                        # gespeicherter physischer Schaltzustand
   my $dowri     = 0;
+
+  my $lastOwnSwitch = ConsumerVal ($name, $c, 'lastOwnSwitchCmd', 0);
 
   debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - current planning state: $simpCstat});
 
@@ -17143,6 +17130,7 @@ sub ___setConsumerSwitchingState {
       delete $paref->{stopts};
 
       $state = qq{Consumer '$calias' switched on};
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
   elsif (isConsumerPhysOff ($hash, $c) && $simpCstat eq 'stopping') {
@@ -17157,6 +17145,7 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off};
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
   elsif (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'continuing') {
@@ -17169,6 +17158,7 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOnTs};
 
       $state = qq{Consumer '$calias' switched on (continued)};
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
   elsif (isConsumerPhysOff ($hash, $c) && $simpCstat eq 'interrupting') {
@@ -17181,9 +17171,10 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off (interrupted)};
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
-  elsif ($oldpsw eq 'off' && isConsumerPhysOn ($hash, $c)){
+  elsif ($oldpsw eq 'off' && isConsumerPhysOn ($hash, $c) && ($t - $lastOwnSwitch > BLINDTIME)){
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
 
       ___setConsumerPlanningState ($paref);
@@ -17193,7 +17184,7 @@ sub ___setConsumerSwitchingState {
       $state = qq{Consumer '$calias' was switched on externally};
       $dowri = 1;
   }
-  elsif ($oldpsw eq 'on' && isConsumerPhysOff ($hash, $c)) {
+  elsif ($oldpsw eq 'on' && isConsumerPhysOff ($hash, $c) && ($t - $lastOwnSwitch > BLINDTIME)) {
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
 
       ___setConsumerPlanningState ($paref);
@@ -17206,13 +17197,43 @@ sub ___setConsumerSwitchingState {
 
   if ($dowri) {
       if (!$fscss) {
-          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                           # Cache File Consumer schreiben
+          $data{$name}{current}{consumerCacheDirty} = 1;                            # Cache File Consumer schreiben
       }
 
       Log3 ($name, 3, "$name - $state");
   }
 
 return $state;
+}
+
+################################################################
+#  Anti-Toggling: prüfen ob Consumer im aktuellen Zyklus
+#  gestartet werden darf
+#  return 1 -> Start erlaubt
+#  return 0 -> Start zurückstellen (eff. Surplus unzureichend)
+################################################################
+sub ___isCycleStartPermitted {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+
+  my $nompower  = ConsumerVal ($name, $c, 'power',           0);
+  my $pvshare   = ConsumerVal ($name, $c, 'pvshare',       100);
+  my $surpRes   = ConsumerVal ($name, $c, 'surpmethResult', undef);                             # consumer-spez. Surplus
+  my $committed = CurrentVal  ($name, 'surplusCycleCommitted',  0);
+  
+  my $pvpow = $nompower * $pvshare / 100;                                                       # pvshare-gewichteter Leistungsanteil
+
+  return (1, 0) if(!$pvpow || !defined $surpRes);                                               # kein PV-Anteil oder Surplus unbekannt -> immer erlaubt
+
+  if (($surpRes - $committed) < $pvpow) {
+      debugLog ($paref, "consumerSwitching${c}",
+                qq{consumer "$c" - start deferred: effective surplus }.($surpRes - $committed).
+                qq{ W < required $pvpow W (committed: $committed W)});
+      return (0, $pvpow);                                                                            # nicht erlaubt
+  }
+
+return (1, $pvpow);
 }
 
 ################################################################
@@ -17234,6 +17255,7 @@ sub __getCyclesAndRuntime {
   my $debug = $paref->{debug};
 
   my $hash  = $defs{$name};
+  my $hod   = sprintf "%02d", ($chour + 1);
 
   my ($starthour, $startday);
 
@@ -17305,7 +17327,7 @@ sub __getCyclesAndRuntime {
                 ? $sr 
                 : ConsumerVal ($name, $c, 'cycleTime', 0) * 60;                                 # letzte Cycle-Zeitdauer in Sekunden
       
-      my $cst = ConsumerVal     ($name, $c, 'cycleStarttime', 0);
+      my $cst = ConsumerVal ($name, $c, 'cycleStarttime', 0);
       
       $son    = $son && $son ne $sr ? timestampToTimestring ($name, $cst + $son, $paref->{lang}) 
               : $son eq $sr         ? $sr                                                 
@@ -17319,19 +17341,20 @@ sub __getCyclesAndRuntime {
   }
 
   ## History schreiben
-  ######################
-  $paref->{val}  = ConsumerVal ($name, $c, "cycleDayNum", 0);                                   # Anzahl Tageszyklen des Verbrauchers speichern
-  $paref->{hkey} = "cyclescsm${c}";
-  
-  _saveHistP1 ($paref);
+  ######################  
+  _saveHistP1 ( { paref => $paref, 
+                  key   => "cyclescsm${c}",
+                  val   => ConsumerVal ($name, $c, 'cycleDayNum', 0),                           # Anzahl Tageszyklen des Verbrauchers speichern                                                                
+                  day   => $day,
+                  hour  => $hod,
+                } );
 
-  $paref->{val}  = ceil ConsumerVal ($name, $c, "minutesOn", 0);                                # Verbrauchsminuten akt. Stunde des Consumers speichern
-  $paref->{hkey} = "minutescsm${c}";
-  
-  _saveHistP1 ($paref);
-
-  delete $paref->{hkey};
-  delete $paref->{val};
+  _saveHistP1 ( { paref => $paref, 
+                  key   => "minutescsm${c}",
+                  val   => ceil (ConsumerVal ($name, $c, 'minutesOn', 0)),                      # Verbrauchsminuten akt. Stunde des Consumers speichern
+                  day   => $day,
+                  hour  => $hod,
+                } );
 
 return;
 }
@@ -22308,7 +22331,7 @@ sub _flowGraphic {
   $batin  = 0;
   $batout = 0;
 
-  if ($x > 0) {$batin = $x; $batout = 0;} elsif ($x < 0) {$batout = abs $x; $batin = 0;}                      # es darf nur $batin ODER $batout mit einem Wert > 0 geben
+  if ($x > 0) {$batin = $x; $batout = 0;} elsif ($x < 0) {$batout = abs $x; $batin = 0;}                        # es darf nur $batin ODER $batout mit einem Wert > 0 geben
 
   debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, batout: $batout");
 
@@ -24051,13 +24074,17 @@ sub __aiAddRawData {
 
           for my $c (1..MAXCONSUMER) {
               $c           = sprintf "%02d", $c;
-              my $csme     = HistoryVal ($name, $pvd, $hod, 'csme'.$c,          undef);                                         # Energieverbrauch (Wh) von ConsumerXX in der Stunde des Tages
-              my $evsoc    = HistoryVal ($name, $pvd, $hod, 'bevcsmSoC'.$c,     undef);                                         # aktueller SOC (%) des BEV-Verbrauchers XX   
-              my $evtgtsoc = HistoryVal ($name, $pvd, $hod, 'bevcsmTargSoC'.$c, undef);                                         # eingestellter Ziel-SOC (%) des BEV-Verbrauchers XX 
+              my $csme     = HistoryVal ($name, $pvd, $hod, 'csme'.$c,          undef);                         # Energieverbrauch (Wh) von ConsumerXX in der Stunde des Tages
+              my $evsoc    = HistoryVal ($name, $pvd, $hod, 'bevcsmSoC'.$c,     undef);                         # aktueller SOC (%) des BEV-Verbrauchers XX   
+              my $evtgtsoc = HistoryVal ($name, $pvd, $hod, 'bevcsmTargSoC'.$c, undef);                         # eingestellter Ziel-SOC (%) des BEV-Verbrauchers XX 
+              my $evbatcap = HistoryVal ($name, $pvd, $hod, 'bevcsmBatCap'.$c,  undef);                         # EV Batteriekapazität                     
+              my $evcurpwr = HistoryVal ($name, $pvd, $hod, 'bevcsmPwr'.$c,     undef);                         # EV aktuelle Ladeleistung
               
               if (defined $csme)     { $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c}          = round0 ($csme) } 
               if (defined $evsoc)    { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmSoC'.$c}     = round0 ($evsoc) } 
-              if (defined $evtgtsoc) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmTargSoC'.$c} = round0 ($evtgtsoc) }               
+              if (defined $evtgtsoc) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmTargSoC'.$c} = round0 ($evtgtsoc) }  
+              if (defined $evbatcap) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmBatCap'.$c}  = round0 ($evbatcap) } 
+              if (defined $evcurpwr) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmPwr'.$c}     = round0 ($evcurpwr) }               
           }
   
           $dosave++;
@@ -28230,27 +28257,17 @@ sub writeToHistory {
   my $ph    = shift;
   my $paref = $ph->{paref};
   my $key   = $ph->{key};
-  my $val   = $ph->{val};
-  my $nday  = $ph->{day};
-  my $nhour = $ph->{hour};
-  my $valid = $ph->{valid};
 
-  $paref->{val}   = $val;
-  $paref->{nday}  = sprintf "%02d", $nday;
-  $paref->{nhour} = sprintf "%02d", $nhour;
-  $paref->{hkey}  = $key;
+  $ph->{day}  = sprintf "%02d", $ph->{day};
+  $ph->{hour} = sprintf "%02d", $ph->{hour};
 
   if (defined $hfspvh{$key}{validkey}) {
-      $paref->{$hfspvh{$key}{validkey}} = $valid;
+      my $validkey     = $hfspvh{$key}{validkey};
+      my $valid        = $ph->{valid};
+      $ph->{$validkey} = $valid;
   }
   
-  _saveHistP1 ($paref);
-
-  delete $paref->{hkey};
-  delete $paref->{nday};
-  delete $paref->{nhour};
-  delete $paref->{val};
-  delete $paref->{$hfspvh{$key}{validkey}} if(defined $hfspvh{$key}{validkey});
+  _saveHistP1 ($ph);
 
 return;
 }
@@ -28259,61 +28276,63 @@ return;
 #   History-Hash verwalten
 ################################################################
 sub _saveHistP1 {
-  my $paref     = shift;
-  my $name      = $paref->{name};                                            
-  my $nhour     = $paref->{nhour};                                          # Stunde des Tages
-  my $nday      = $paref->{nday};                                           # zu schreibenden Tag spezifizieren
-  my $hkey      = $paref->{hkey};
-  my $val       = $paref->{val};                                            # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
-  my $reorg     = $paref->{reorg}    // 0;                                  # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
-  my $reorgday  = $paref->{reorgday} // q{};                                # Tag der reorganisiert werden soll
+  my $ph       = shift;                                          
+  my $hod      = $ph->{hour};                                           # Stunde des Tages
+  my $day      = $ph->{day};                                            # zu schreibenden Tag spezifizieren
+  my $key      = $ph->{key};
+  my $val      = $ph->{val};                                            # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
+  my $reorg    = $ph->{reorg}    // 0;                                  # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
+  my $reorgday = $ph->{reorgday} // q{};                                # Tag der reorganisiert werden soll
 
-  if ($hfspvh{$hkey} && defined &{$hfspvh{$hkey}{fn}}) {
-      &{$hfspvh{$hkey}{fn}} ($paref);
+  my $paref    = $ph->{paref}; 
+  my $name     = $paref->{name}; 
+  
+  if ($hfspvh{$key} && defined &{$hfspvh{$key}{fn}}) {
+      &{$hfspvh{$key}{fn}} ($ph);
       return;
   }
 
-  if ($hkey =~ /csm[et][0-9]+$/xs) {                                                                # Verbrauch eines Verbrauchers
-      $data{$name}{pvhist}{$nday}{$nhour}{$hkey} = $val;
+  if ($key =~ /csm[et][0-9]+$/xs) {                                                                # Verbrauch eines Verbrauchers
+      $data{$name}{pvhist}{$day}{$hod}{$key} = $val;
 
-      if ($hkey =~ /csme[0-9]+$/xs) {
+      if ($key =~ /csme[0-9]+$/xs) {
           my $sum = 0;
 
-          for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
+          for my $k (keys %{$data{$name}{pvhist}{$day}}) {
               next if($k eq "99");
-              my $csme = HistoryVal ($name, $nday, $k, $hkey, 0);
+              my $csme = HistoryVal ($name, $day, $k, $key, 0);
               next if(!$csme);
 
               $sum += $csme;
           }
 
-          $data{$name}{pvhist}{$nday}{99}{$hkey} = round2 ($sum);
+          $data{$name}{pvhist}{$day}{99}{$key} = round2 ($sum);
       }
   }
 
-  if ($hkey =~ /minutescsm[0-9]+$/xs) {                                                             # Anzahl Aktivminuten des Verbrauchers
-      $data{$name}{pvhist}{$nday}{$nhour}{$hkey} = $val;
+  if ($key =~ /minutescsm[0-9]+$/xs) {                                                             # Anzahl Aktivminuten des Verbrauchers
+      $data{$name}{pvhist}{$day}{$hod}{$key} = $val;
       my $minutes = 0;
-      my $num     = substr ($hkey,10,2);
+      my ($num)   = $key =~ /minutescsm(\d+)$/xs;
 
-      for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
+      for my $k (keys %{$data{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          my $csmm = HistoryVal ($name, $nday, $k, "$hkey", 0);
+          my $csmm = HistoryVal ($name, $day, $k, $key, 0);
           next if(!$csmm);
 
           $minutes += $csmm;
       }
 
-      my $cycles = HistoryVal ($name, $nday, 99, "cyclescsm${num}", 0);
+      my $cycles = HistoryVal ($name, $day, 99, "cyclescsm${num}", 0);
 
       if ($cycles) {
-          $data{$name}{pvhist}{$nday}{99}{"hourscsme${num}"}     = round2 ($minutes / 60);
-          $data{$name}{pvhist}{$nday}{99}{"avgcycmntscsm${num}"} = round2 ($minutes / $cycles);
+          $data{$name}{pvhist}{$day}{99}{"hourscsme${num}"}     = round2 ($minutes / 60);
+          $data{$name}{pvhist}{$day}{99}{"avgcycmntscsm${num}"} = round2 ($minutes / $cycles);
       }
   }
 
-  if ($hkey =~ /cyclescsm[0-9]+$/xs) {                                                              # Anzahl Tageszyklen des Verbrauchers
-      $data{$name}{pvhist}{$nday}{99}{$hkey} = $val;
+  if ($key =~ /cyclescsm[0-9]+$/xs) {                                                              # Anzahl Tageszyklen des Verbrauchers
+      $data{$name}{pvhist}{$day}{99}{$key} = $val;
   }
   
   if ($reorg) {                                                                                     # Reorganisation Stunde "99"
@@ -28341,27 +28360,27 @@ sub _saveHistP1 {
           ## Reorg Inverter
           ##################
           for my $in (1..MAXINVERTER) {
-              $in   = sprintf "%02d", $in;
-              my $e = HistoryVal ($name, $reorgday, $k, 'pvrl'.$in, undef);
-              $ien->{$in} += $e if(defined $e);
+              $in         = sprintf "%02d", $in;
+              my $e       = HistoryVal ($name, $reorgday, $k, 'pvrl'.$in, undef);
+              $ien->{$in} = ($ien->{$in} // 0) + $e if(defined $e);
           }
 
           ## Reorg Producer
           ##################
           for my $pn (1..MAXPRODUCER) {
-              $pn   = sprintf "%02d", $pn;
-              my $e = HistoryVal ($name, $reorgday, $k, 'pprl'.$pn, undef);
-              $pen->{$pn} += $e if(defined $e);
+              $pn         = sprintf "%02d", $pn;
+              my $e       = HistoryVal ($name, $reorgday, $k, 'pprl'.$pn, undef);
+              $pen->{$pn} = ($pen->{$pn} // 0) + $e if(defined $e);
           }
 
           ## Reorg Battery
           ##################
           for my $bn (1..MAXBATTERIES) {
-              $bn   = sprintf "%02d", $bn;
-              my $bi = HistoryVal ($name, $reorgday, $k, 'batin'.$bn,  undef);
-              my $bo = HistoryVal ($name, $reorgday, $k, 'batout'.$bn, undef);
-              $bin->{$bn} += $bi if(defined $bi);
-              $bot->{$bn} += $bo if(defined $bo);
+              $bn         = sprintf "%02d", $bn;
+              my $bi      = HistoryVal ($name, $reorgday, $k, 'batin'.$bn,  undef);
+              my $bo      = HistoryVal ($name, $reorgday, $k, 'batout'.$bn, undef);
+              $bin->{$bn} = ($bin->{$bn} // 0) + $bi if(defined $bi);
+              $bot->{$bn} = ($bot->{$bn} // 0) + $bo if(defined $bo);
           }
       }
 
@@ -28388,8 +28407,8 @@ sub _saveHistP1 {
       debugLog ($paref, 'saveData2Storage', "_saveHistP1 -> Day >$reorgday< reorganized keys: batinXX, batoutXX, pvrl, pvfc, con, confc, gcons, gfeedin, pvrlXX, pprlXX");
   }
 
-  if ($hkey) {
-      debugLog ($paref, 'saveData2Storage', "_saveHistP1 -> store Day: $nday, Hour of Day: $nhour, Key: $hkey, Value: ".(defined $val ? $val : 'undef'));
+  if ($key) {
+      debugLog ($paref, 'saveData2Storage', "_saveHistP1 -> store Day: $day, Hour of Day: $hod, Key: $key, Value: ".(defined $val ? $val : 'undef'));
   }
 
 return;
@@ -28399,44 +28418,43 @@ return;
 # Wert mit optional weiteren Berechnungen in pvHistory speichen
 ################################################################
 sub _saveHistP2 {                       ## no critic "not used"
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $day   = $paref->{day};
-  my $nhour = $paref->{nhour};
-  my $nday  = $paref->{nday};                                               # zu schreibenden Tag spezifizieren
-  my $hkey  = $paref->{hkey};
-  my $val   = $paref->{val};
+  my $ph    = shift;
+  my $paref = $ph->{paref}; 
+  my $day   = $ph->{day};                                                   # zu schreibenden Tag spezifizieren
+  my $hod   = $ph->{hour};                                                  # Stunde des Tages                                             
+  my $key   = $ph->{key};
+  my $val   = $ph->{val};
 
-  my $hash  = $defs{$name};
-  my $store = $hfspvh{$hkey}{storname};
+  my $name  = $paref->{name};
+  my $store = $hfspvh{$key}{storname};
   
   my ($validkey, $validval);
 
-  $data{$name}{pvhist}{$nday}{$nhour}{$store} = $val;
+  $data{$name}{pvhist}{$day}{$hod}{$store} = $val;
 
-  if (defined $hfspvh{$hkey}{validkey}) {                                   # 1: bestimmter Eintrag wird intern für Prozesse (z.B. Lernprozess) berücksichtigt oder nicht (0)
-      $validkey = $hfspvh{$hkey}{validkey};
-      $validval = $paref->{$validkey};
+  if (defined $hfspvh{$key}{validkey}) {                                   # 1: bestimmter Eintrag wird intern für Prozesse (z.B. Lernprozess) berücksichtigt oder nicht (0)
+      $validkey = $hfspvh{$key}{validkey};
+      $validval = $ph->{$validkey};
       
-      $data{$name}{pvhist}{$nday}{$nhour}{$validkey} = $validval;
+      $data{$name}{pvhist}{$day}{$hod}{$validkey} = $validval;
   }
 
-  debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored simple  - Day: $nday, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
+  debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored simple  - Day: $day, Hour: $hod, Key: $store, Value: ".(defined $val ? $val : 'undef').
                                         (defined $validkey ? ", ValidKey: $validkey, ValidValue: $validval" : '') );
 
-  if (defined $hfspvh{$hkey}{fpar} && $hfspvh{$hkey}{fpar} eq 'calc99') {
+  if (defined $hfspvh{$key}{fpar} && $hfspvh{$key}{fpar} eq 'calc99') {
       my $sum = 0;
       
-      for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
+      for my $k (keys %{$data{$name}{pvhist}{$day}}) {
           next if($k eq '99');
-          $sum += HistoryVal ($name, $nday, $k, $store, 0);
+          $sum += HistoryVal ($name, $day, $k, $store, 0);
       }
       
       $sum = round2 ($sum) if($store =~ /csme[0-9]+$/xs);
       
-      $data{$name}{pvhist}{$nday}{99}{$store} = $sum;
+      $data{$name}{pvhist}{$day}{99}{$store} = $sum;
       
-      debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored compute - Day: $nday, Hour: 99, Key: $store, Value: $sum");
+      debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored compute - Day: $day, Hour: 99, Key: $store, Value: $sum");
   }
 
 return;
@@ -28746,17 +28764,21 @@ sub _listDataPoolPvHist {
               my $csmh     = HistoryVal ($name, $day, $key, "hourscsme${c}",      undef);
               my $csma     = HistoryVal ($name, $day, $key, "avgcycmntscsm${c}",  undef);
               my $evsoc    = HistoryVal ($name, $day, $key, "bevcsmSoC${c}",      undef);   
-              my $evtgtsoc = HistoryVal ($name, $day, $key, "bevcsmTargSoC${c}",  undef);
+              my $evtgtsoc = HistoryVal ($name, $day, $key, "bevcsmTargSoC${c}",  undef);     
+              my $evbatcap = HistoryVal ($name, $day, $key, "bevcsmBatCap${c}",   undef);
+              my $evcurpwr = HistoryVal ($name, $day, $key, "bevcsmPwr${c}",      undef);
 
               if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc  // '-';
-                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt  // '-';
-                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme  // '-';
-                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm  // '-';
-                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh  // '-';
-                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma  // '-';
-                  $hexp->{$day}{$key}{"BEVcsmSoC${c}"}          = $evsoc // '-';
-                  $hexp->{$day}{$key}{"BEVcsmTargSoC${c}"}      = $evsoc // '-';
+                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc     // '-';
+                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt     // '-';
+                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme     // '-';
+                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm     // '-';
+                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh     // '-';
+                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma     // '-';
+                  $hexp->{$day}{$key}{"BEVcsmSoC${c}"}          = $evsoc    // '-';
+                  $hexp->{$day}{$key}{"BEVcsmTargSoC${c}"}      = $evtgtsoc // '-';
+                  $hexp->{$day}{$key}{"BEVcsmBatCap${c}"}       = $evbatcap // '-';
+                  $hexp->{$day}{$key}{"BEVcsmPwr${c}"}          = $evcurpwr // '-';
               }
 
               if (defined $csmc) {
@@ -28803,6 +28825,18 @@ sub _listDataPoolPvHist {
               if (defined $evtgtsoc) {
                   $csm .= ", " if($nl);
                   $csm .= "bevcsmTargSoC${c}: $evtgtsoc";
+                  $nl   = 1;
+              }
+              
+              if (defined $evbatcap) {
+                  $csm .= ", " if($nl);
+                  $csm .= "bevcsmBatCap${c}: $evbatcap";
+                  $nl   = 1;
+              }
+              
+              if (defined $evcurpwr) {
+                  $csm .= ", " if($nl);
+                  $csm .= "bevcsmPwr${c}: $evcurpwr";
                   $nl   = 1;
               }
 
@@ -29410,6 +29444,8 @@ sub _listDataPoolAiRawData {
           my $csme     = AiRawdataVal ($name, $idx, 'csme'.$c,          undef);
           my $evsoc    = AiRawdataVal ($name, $idx, 'bevcsmSoC'.$c,     undef);
           my $evtgtsoc = AiRawdataVal ($name, $idx, 'bevcsmTargSoC'.$c, undef);
+          my $evbatcap = AiRawdataVal ($name, $idx, 'bevcsmBatCap'.$c,  undef);
+          my $evcurpwr = AiRawdataVal ($name, $idx, 'bevcsmPwr'.$c,     undef);
 
           if (defined $csme) {
               $csm .= ", " if($csm);
@@ -29424,6 +29460,16 @@ sub _listDataPoolAiRawData {
           if (defined $evtgtsoc) {
               $csm .= ", " if($csm);
               $csm .= "bevcsmTargSoC${c}: $evtgtsoc";
+          }
+          
+          if (defined $evbatcap) {
+              $csm .= ", " if($csm);
+              $csm .= "bevcsmBatCap${c}: $evbatcap";
+          }
+          
+          if (defined $evcurpwr) {
+              $csm .= ", " if($csm);
+              $csm .= "bevcsmPwr${c}: $evcurpwr";
           }
       }
 
@@ -33079,8 +33125,8 @@ return @sub_arrays;
 sub arraySplitInto {
   my ($count, @original) = @_;
 
-  $count   = max( $count, 1 );
-  my $size = ceil @original / $count;
+  $count   = max  ($count, 1);
+  my $size = ceil (@original / $count);
 
 return arraySplitBy ($size, @original);
 }
@@ -35365,6 +35411,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>batmaxsocXX</b>     </td><td>Maximum SOC (%) achieved by battery XX on the day                                                                        </td></tr>
             <tr><td> <b>batsetsocXX</b>     </td><td>Optimum SOC setpoint (%) of battery XX  for the day                                                                      </td></tr>
             <tr><td> <b>bevcsm</b>          </td><td>Consumer numbers of registered electric cars (BEV)                                                                       </td></tr>
+            <tr><td> <b>bevcsmBatCapXX</b>  </td><td>nominal battery capacity (Wh) of the BEV consumer XX                                                                     </td></tr>
+            <tr><td> <b>bevcsmPwrXX</b>     </td><td>Charging power (W) of BEV consumer XX at the end of the hour                                                             </td></tr>
             <tr><td> <b>bevcsmSoCXX</b>     </td><td>current SOC (%) of the BEV consumer XX                                                                                   </td></tr>
             <tr><td> <b>bevcsmTargSoCXX</b> </td><td>Target SOC (%) set for BEV consumer XX                                                                                   </td></tr>
             <tr><td> <b>comforttemp</b>     </td><td>set comfort temperature for the building in °C                                                                           </td></tr>
@@ -38432,6 +38480,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>batmaxsocXX</b>     </td><td>maximal erreichter SOC (%) der Batterie XX an dem Tag                                                  </td></tr>
             <tr><td> <b>batsetsocXX</b>     </td><td>optimaler SOC Sollwert (%) der Batterie XX für den Tag                                                 </td></tr>
             <tr><td> <b>bevcsm</b>          </td><td>Verbrauchernummern der registrierten E-Autos (BEV)                                                     </td></tr>
+            <tr><td> <b>bevcsmBatCapXX</b>  </td><td>nominale Batteriekapazität (Wh) des BEV-Verbrauchers XX                                                </td></tr>
+            <tr><td> <b>bevcsmPwrXX</b>     </td><td>Ladeleistung (W) des BEV-Verbrauchers XX am Ende der Stunde                                            </td></tr>
             <tr><td> <b>bevcsmSoCXX</b>     </td><td>aktueller SOC (%) des BEV-Verbrauchers XX                                                              </td></tr>
             <tr><td> <b>bevcsmTargSoCXX</b> </td><td>eingestellter Ziel-SOC (%) des BEV-Verbrauchers XX                                                     </td></tr>
             <tr><td> <b>comforttemp</b>     </td><td>eingestellte Komforttemperatur des Gebäudes in °C                                                      </td></tr>
