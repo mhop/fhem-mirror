@@ -166,7 +166,8 @@ my %vNotesIntern = (
   "2.6.6"  => "07.05.2026  nicht mehr benötigten Code entfernt, writeToHistory, _saveHistP1 und _saveHistP2 refactored, ___doPlanning refactored ".
                            "Einbau consumerCacheDirty, ___setConsumerSwitchingState: lastOwnSwitchCmd eingebaut, ".
                            "BLINDTIME, REAPLANINTVL einegbaut, Anti-Toggling / Cycle-Budget: Verhindert dass mehrere starke Consumer im selben ".
-                           "Zyklus starten und den PV-Überschuss überzeichnen. Implementiert durch surplusCycleCommitted als Zyklus-Budget ",
+                           "Zyklus starten und den PV-Überschuss überzeichnen. Implementiert durch surplusCycleCommitted als Zyklus-Budget ".
+                           "neuer Verbraucher Schlüssel swprio ",
   "2.6.5"  => "03.05.2026  _batChargeMgmt Refactored: Äußere Stundenschleife -> Innere Batterieschleife, Fix 100%-Bug ".
                            "wichtiger Bugfix weekday in LOCALE_DAYNAMES, Debug consumerPlanning angepasst ".
                            "Speicherung von bevcsmBatCapXX und bevcsmPwrXX in pvHistory und aiRawData ",
@@ -2644,7 +2645,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
   if ($ctype   eq 'noSchedule' || 
       $cplmode eq 'mostNot') {
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps}       = 'noSchedule';
       $paref->{consumer} = $c;
@@ -7556,6 +7557,7 @@ sub _attrconsumer {                      ## no critic "not used"
       noshow          => { comp => '',                                must => 0, act => 0 },
       exconfc         => { comp => '[012]',                           must => 0, act => 0 },
       pvshare         => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
+      swprio          => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
       
       # --- nur für bev (musts in __attrKeyAction checken)
       batCap          => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh))',  must => 0, act => 1 },
@@ -11186,6 +11188,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;                     # Typ des Verbrauchers
       $data{$name}{consumers}{$c}{power}             = $hc->{power};                                        # Leistungsaufnahme des Verbrauchers in W
       $data{$name}{consumers}{$c}{pvshare}           = $hc->{pvshare}      // 100;                          # Anteil PV am Strommix des Verbrauchers
+      $data{$name}{consumers}{$c}{swprio}            = $hc->{swprio}       // 0;                            # Planungs- und Schaltpriorität des Verbrauchers
       $data{$name}{consumers}{$c}{avgenergy}         = q{};                                                 # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};             # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // DEFCMODE;                     # Planungsmode des Verbrauchers
@@ -15553,11 +15556,23 @@ sub _manageConsumerData {
   
   my $pcurrsum = 0;
   $data{$name}{current}{surplusCycleCommitted} = 0;                                 # Anti-Toggling: das Surplus Budget zurücksetzen
+  
+  # --- Prio-Steuerung
+  # Wertebereich: 0–100, Default 0
+  # 0 = keine Priorität, Reihenfolge wie bisher (Nummer aufsteigend)
+  # 100 = höchste Priorität, wird zuerst verarbeitet, bekommt immer zuerst Budget
+  my @csorted = sort {
+      ConsumerVal ($name, $b, 'swprio', 0) <=> ConsumerVal ($name, $a, 'swprio', 0)
+      ||
+      $a <=> $b                                                                     # bei gleicher Priorität: Nummer aufsteigend
+  } keys %{$data{$name}{consumers}};
 
-  for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
+
+  for my $c (@csorted) {
       my $cname          = ConsumerVal ($name, $c, 'name',       '');
       my $calias         = ConsumerVal ($name, $c, 'alias',  $cname);
-      my $ctype          = ConsumerVal ($name, $c, 'type', DEFCTYPE);   
+      my $ctype          = ConsumerVal ($name, $c, 'type', DEFCTYPE);  
+      my $swprio         = ConsumerVal ($name, $c, 'swprio',      0); 
 
       $paref->{consumer} = $c;
       $paref->{cname}    = $cname;
@@ -15577,6 +15592,7 @@ sub _manageConsumerData {
       
       if ($debug =~ /consumerPlanning/x) {
           Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - priority=$swprio});
       }
 
       __getAutomaticState     ($paref);                                             # Automatic Status des Consumers abfragen
@@ -16158,7 +16174,7 @@ sub __planInitialSwitchTime {
   if (!$cactive                ||
       $ctype   eq 'noSchedule' ||
       $cplmode eq 'mustNot') {                                                                  # vom Consumertyp und Mode abhängige Planungsfreigabe
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps} = 'noSchedule';
       ___setConsumerPlanningState ($paref);
@@ -16235,7 +16251,7 @@ sub __reviewSwitchTime {
           if ($t - $lastReplan >= REAPLANINTVL) {
               $data{$name}{consumers}{$c}{lastReplanTs} = $t;
 
-              debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name=$cname alias=$calias});
+              debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - Review switch time planning name=$cname alias=$calias});
 
               my $replan = 1;
               ___doPlanning ($paref, $replan);
@@ -16267,7 +16283,7 @@ sub ___doPlanning {
   my $epieces = ConsumerVal ($name, $c, 'epieces', '');
 
   if (ref $epieces ne 'HASH') {
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - no first energy piece found. Exiting...});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - no first energy piece found. Exiting...});
       return;
   }
 
@@ -16277,7 +16293,7 @@ sub ___doPlanning {
   
   my (%tmp, %max, %mtimes);
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
 
   ## max. PV-Forecast bzw. Überschuß (bei gesetzen consForecastInPlanning) ermitteln
   #################################################################################### 
@@ -16313,7 +16329,7 @@ sub ___doPlanning {
 
   my $epiece1 = $epieces->{1} // 0;
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
 
   my $cplmode         = getConsumerPlanningMode ($hash, $c);                                           # Planungsmode 'can', 'must' oder 'mustNot'
   my $oldplanstate    = ConsumerVal ($name, $c, 'planstate', '');                                      # V. 1.35.0
@@ -16329,7 +16345,7 @@ sub ___doPlanning {
       return;
   }
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $cplmode, mintime: $mintime, relevant method: surplus});
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - mode: $cplmode, mintime: $mintime, relevant method: surplus});
 
   my $stopdiff       = $mintime * 60;
   $paref->{maxref}   = \%max;
@@ -16581,7 +16597,7 @@ sub ___switchonTimelimits {
       $startts                   = CurrentVal ($name, 'sunriseTodayTs', 0) + $riseshift;
       $starttime                 = (timestampToTimestring ($name, $startts, $lang))[3];
 
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
   }
 
   my $origtime  = $starttime;
@@ -16594,7 +16610,7 @@ sub ___switchonTimelimits {
       ($err, $valb) = checkCode ($name, $notbefore, 'cc1');
       if (!$err && checkhhmm ($valb)) {
           $notbefore = $valb;
-          debugLog ($paref, "consumerPlanning", qq{consumer "$c" - got 'notbefore' function result: $valb});
+          debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - got 'notbefore' function result: $valb});
       }
       else {
           Log3 ($name, 1, "$name - ERROR - the result of the Perl code in 'notbefore' is incorrect: $valb");
@@ -16606,7 +16622,7 @@ sub ___switchonTimelimits {
       ($err, $vala) = checkCode ($name, $notafter, 'cc1');
       if (!$err && checkhhmm ($vala)) {
           $notafter = $vala;
-          debugLog ($paref, "consumerPlanning", qq{consumer "$c" - got 'notafter' function result: $vala})
+          debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - got 'notafter' function result: $vala})
       }
       else {
           Log3 ($name, 1, "$name - ERROR - the result of the Perl code in the 'notafter' key is incorrect: $vala");
@@ -16628,8 +16644,8 @@ sub ___switchonTimelimits {
       $notafter        = (int $nafhh) . $nafmm;
   }
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notbefore' term: }.(defined $notbefore ? $notbefore : ''));
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notafter' term: } .(defined $notafter  ? $notafter  : ''));
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - used 'notbefore' term: }.(defined $notbefore ? $notbefore : ''));
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - used 'notafter' term: } .(defined $notafter  ? $notafter  : ''));
 
   my $change = q{};
 
@@ -16655,7 +16671,7 @@ sub ___switchonTimelimits {
 
   if ($change) {
       my $cname = ConsumerVal ($name, $c, 'name', '');
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Planned starttime of "$cname" changed from "$origtime" to "$starttime" due to $change condition});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - Planned starttime of "$cname" changed from "$origtime" to "$starttime" due to $change condition});
   }
 
 return $starttime;
@@ -16849,21 +16865,23 @@ sub ___switchConsumerOn {
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
   my $cplmode     = getConsumerPlanningMode ($hash, $c);                                          # Planungsmode 'can', 'must' oder 'mustNot'
 
-  if ($debug =~ /consumerSwitching${c}/x) {                                                       # nur für Debugging
-      my $cons   = CurrentVal  ($name, 'consumption',  0);
-      my $nompow = ConsumerVal ($name, $c, 'power',  '-');
-      my $sp     = CurrentVal  ($name, 'surplus',      0);
-
+  if ($debug =~ /consumerSwitching${c}/x) {                                                           
+      my $nompow     = ConsumerVal ($name, $c, 'power', '-');
+      my $swprio     = ConsumerVal ($name, $c, 'swprio',  0); 
+      my $sp         = CurrentVal  ($name, 'surplus',     0);
+      my $cons       = CurrentVal  ($name, 'consumption', 0);
+      
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - priority=$swprio});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
-                      qq{auto mode: $auto, Current household consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
-                      qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($name, $startts, $lang))[0] : "undef")
+                      qq{auto mode=$auto, Current household consumption=$cons W, nompower=$nompow W, surplus=$sp W, }.
+                      qq{planstate=$pstate, starttime=}.($startts ? (timestampToTimestring ($name, $startts, $lang))[0] : "undef")
            );
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime: $iilt}.($rlt ? ", remainLockTime: $rlt seconds" : ''));
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime=$iilt}.($rlt ? ", remainLockTime=$rlt seconds" : ''));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch on' => }.
-                      qq{swoncond: $swoncond, on-command: $oncom }
+                      qq{swoncond=$swoncond, on-command=$oncom }
            );
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon})   if($infon);
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($infoff);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info=$infon})   if($infon);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info=$infoff}) if($infoff);
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - device '$dswname' is used as switching device});
 
       if ($simpCstat =~ /planned|priority|starting|continuing/xs && $isInTime && $iilt) {
@@ -16949,10 +16967,10 @@ sub ___switchConsumerOn {
          && !$iilt
          && $simpCstat =~ /interrupted|interrupting|continuing/xs) {
       my $cause = $isintable == 3 ? 'interrupt condition no longer present' : 'existing surplus';
-      $state    = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom", cause: $cause};
+      $state    = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom", cause=$cause};
 
       if ($debug =~ /consumerSwitching${c}/x) {
-          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command: "set $dswname $oncom"});
       }
       else {
           Log3 ($name, 3, "$name - $state");
@@ -36092,6 +36110,10 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                      </td></tr>
             <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>swprio</b>         </td><td>Sets the scheduling and switching sequence priority (optional). When set to '0', the priority follows the consumer number.                              </td></tr>
+            <tr><td>                       </td><td>The value '100' indicates the highest priority. Consumers with the same priority are listed in the order of their consumer numbers.                     </td></tr>
+            <tr><td>                       </td><td>Value: <b>0..100</b>, default: 0                                                                                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>surpmeth</b>       </td><td>The possible values determine the method used to calculate the surplus PV output:                                                                       </td></tr>
             <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                          </td></tr>
             <tr><td>                       </td><td><b>median[_2..20]</b> - The median of the last PV surplus values is used. The optional specification '_XX' uses the last XX measured values.            </td></tr>
@@ -39160,6 +39182,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                             </td></tr>
             <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
             <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>swprio</b>         </td><td>Legt die Einplanungs- und Schaltreihenfolgepriorität fest (optional). Mit dem Wert '0' folgt die Priorität der Verbraucher-Nummer.                 </td></tr>
+            <tr><td>                       </td><td>Der Wert '100' kennzeichnet die höchste Priorität. Die Reihenfolge von Verbrauchern mit gleicher Priorität erfolgt der Verbraucher-Nummerierung.   </td></tr>
+            <tr><td>                       </td><td>Wert: <b>0..100</b>, default: 0                                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>surpmeth</b>       </td><td>Die möglichen Werte legen das Verfahren zur Ermittlung des PV-Überschusses fest:                                                                   </td></tr>
             <tr><td>                       </td><td><b>default</b> - der PV-Überschuß wird aus dem Reading 'Current_Surplus' direkt ausgelesen. (default)                                              </td></tr>
