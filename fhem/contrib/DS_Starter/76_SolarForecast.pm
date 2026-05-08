@@ -162,7 +162,8 @@ BEGIN {
 }
 
 # Versions History intern
-my %vNotesIntern = ( 
+my %vNotesIntern = (
+  "2.6.7"  => "08.05.2026  __calcVectorConsumption: fix Doppelbatteriebug mit einem Batterieinverter Forum: https://forum.fhem.de/index.php?msg=1363211 ",
   "2.6.6"  => "07.05.2026  nicht mehr benötigten Code entfernt, writeToHistory, _saveHistP1 und _saveHistP2 refactored, ___doPlanning refactored ".
                            "Einbau consumerCacheDirty, ___setConsumerSwitchingState: lastOwnSwitchCmd eingebaut, ".
                            "BLINDTIME, REAPLANINTVL einegbaut, Anti-Toggling / Cycle-Budget: Verhindert dass mehrere starke Consumer im selben ".
@@ -15506,10 +15507,21 @@ sub __calcVectorConsumption {
   ## Vectorverbrauch
   ####################
   if ($batout || $batin) {                                                                # Batterie wird geladen oder entladen
-      $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Inverter Knoten -> Bat, negativ: Richtung Bat -> Inverter Knoten
-      $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
+      $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Inverter-Knoten -> Bat, negativ: Richtung Bat -> Inverter-Knoten
 
-      if ($node2bat < 0 && !$dc2inv2node && !$pv2bat) {                                   # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter und kein Batterieladegerät aktiv
+      # Messversatz-Korrektur positiv: echter Rückfluss Knoten->Bat
+      # nur möglich wenn dc2inv2node > 0
+      if ($node2bat > 0 && !$dc2inv2node) {
+          $node2bat = 0;
+      }
+
+      # Messversatz-Korrektur negativ: echte Direktentladung ins Haus
+      # nur möglich wenn batout > 0 (Batterie entlädt netto)
+      if ($node2bat < 0 && !$batout) {
+          $node2bat = 0;
+      }
+    
+      if ($node2bat < 0) {                                                                # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter und kein Batterieladegerät aktiv
           $bat2home = abs $node2bat;
           $node2bat = 0;
           $vector->{batDischarge2HomeNode} = 1;
@@ -15692,6 +15704,7 @@ sub __queryConsumerActiveState {
   my $c     = $paref->{consumer};
   my $cname = $paref->{cname};
   my $ctype = $paref->{ctype};
+  my $nolog = $paref->{nolog} // 0;                                                             # Logausgabe unterdrücken (z.B. bei Grafik)
   
   my $cactive = 0;
   
@@ -15708,11 +15721,10 @@ sub __queryConsumerActiveState {
       
       $data{$name}{consumers}{$c}{mode} = 'mustNot' if(!$cactive);                              # Planungen verbieten wenn Consumer deaktiviert
       
-      debugLog ($paref, 'collectData', "BEV - id=".(defined $evid ? $evid : 'undef')." -> consumer=$c activated=$cactive");   
+      debugLog ($paref, 'collectData', "BEV - id=".(defined $evid ? $evid : 'undef')." -> consumer=$c activated=$cactive") if(!$nolog);   
   }
   else {
-      $cactive = 1;                                                                             # default 1=active
-      debugLog ($paref, 'collectData', "consumer=$c activated=$cactive"); 
+      $cactive = 1;                                                                             # default 1=active  
   }
 
 return $cactive;
@@ -16167,7 +16179,6 @@ sub __planInitialSwitchTime {
   }
 
   if ($debug =~ /consumerPlanning/x) {
-      #Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
       Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name=$cname alias=$calias activated=$cactive});
   }
   
@@ -20976,6 +20987,7 @@ sub _graphicConsumerLegend {
                                                    cname    => ConsumerVal ($name, $c, 'name',       ''),
                                                    ctype    => ConsumerVal ($name, $c, 'type', DEFCTYPE),
                                                    debug    => $debug,
+                                                   nolog    => 1,
                                                  } 
                                                );                                                   # Consumer aktiviert?
 
@@ -31643,6 +31655,7 @@ sub isConsumerNoshow {
                                                cname    => ConsumerVal ($name, $c, 'name',       ''),
                                                ctype    => ConsumerVal ($name, $c, 'type', DEFCTYPE),
                                                debug    => $debug,
+                                               nolog    => 1,
                                              } 
                                            );                                           # Consumer aktiviert?
                                            
@@ -39184,7 +39197,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>swprio</b>         </td><td>Legt die Einplanungs- und Schaltreihenfolgepriorität fest (optional). Mit dem Wert '0' folgt die Priorität der Verbraucher-Nummer.                 </td></tr>
-            <tr><td>                       </td><td>Der Wert '100' kennzeichnet die höchste Priorität. Die Reihenfolge von Verbrauchern mit gleicher Priorität erfolgt der Verbraucher-Nummerierung.   </td></tr>
+            <tr><td>                       </td><td>Der Wert '100' kennzeichnet die höchste Priorität. Die Reihenfolge von Verbrauchern mit gleicher Priorität folgt der Verbraucher-Nummerierung.     </td></tr>
             <tr><td>                       </td><td>Wert: <b>0..100</b>, default: 0                                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>surpmeth</b>       </td><td>Die möglichen Werte legen das Verfahren zur Ermittlung des PV-Überschusses fest:                                                                   </td></tr>
