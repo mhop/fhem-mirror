@@ -15509,19 +15509,16 @@ sub __calcVectorConsumption {
   if ($batout || $batin) {                                                                # Batterie wird geladen oder entladen
       $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Inverter-Knoten -> Bat, negativ: Richtung Bat -> Inverter-Knoten
 
-      # Messversatz-Korrektur positiv: echter Rückfluss Knoten->Bat
-      # nur möglich wenn dc2inv2node > 0
-      if ($node2bat > 0 && !$dc2inv2node) {
+      # Positives node2bat: immer Messartefakt, echter Ladefluss steckt in node2inv2dc
+      if ($node2bat > 0) {
           $node2bat = 0;
       }
 
-      # Messversatz-Korrektur negativ: echte Direktentladung ins Haus
-      # nur möglich wenn batout > 0 (Batterie entlädt netto)
+      # Negatives node2bat: nur real wenn Batterie netto entlädt (batout > 0)
       if ($node2bat < 0 && !$batout) {
-          $node2bat = 0;
+          $node2bat = 0;                                                                  # Messartefakt beim Laden
       }
-    
-      if ($node2bat < 0) {                                                                # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter und kein Batterieladegerät aktiv
+      elsif ($node2bat < 0) {                                                             # echte Direktentladung ins Haus
           $bat2home = abs $node2bat;
           $node2bat = 0;
           $vector->{batDischarge2HomeNode} = 1;
