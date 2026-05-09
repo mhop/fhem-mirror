@@ -15528,6 +15528,18 @@ sub __calcVectorConsumption {
       $node2bat  = $dc2inv2node - $pv2bat;                                                # falls Batterie Idle und Smartloader arbeitet
       $node2bat  = 0 if($dc2inv2node && $node2bat > 0);                                   # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
   }
+  
+if ($node2bat > 0) {
+    # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
+    # - dc2inv2node: Hybrid-Wechselrichter entlädt (Zeitversatz AC/DC-Messung)
+    # - node2inv2dc: Wechselrichter lädt (Zeitversatz AC/DC-Messung)
+    # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
+    # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
+    # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
+    if ($dc2inv2node || $node2inv2dc || $pv2bat) {
+        $node2bat = 0;
+    }
+}
 
   my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                        # Erzeugung Summe im Inverter-Knoten
   $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                      # z.B. Batterie ist voll und SolarLader liefert an Knoten
