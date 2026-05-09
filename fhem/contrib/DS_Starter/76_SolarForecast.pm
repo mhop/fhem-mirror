@@ -15509,25 +15509,28 @@ sub __calcVectorConsumption {
   if ($batout || $batin) {                                                                # Batterie wird geladen oder entladen
       $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Inverter-Knoten -> Bat, negativ: Richtung Bat -> Inverter-Knoten
 
-      # Positives node2bat: immer Messartefakt, echter Ladefluss steckt in node2inv2dc
-      if ($node2bat > 0) {
-          $node2bat = 0;
-      }
+        if ($node2bat > 0) {
+            # Messartefakt (Zeitversatz AC/DC) nur wenn Batterie-Pfad-Variablen aktiv.
+            # Wenn alle null: direktes Bat-Setup (Enphase, Zendure) →
+            # echter Ladefluss aus dem Knoten → behalten
+            if ($dc2inv2node || $node2inv2dc || $pv2bat) {
+                $node2bat = 0;
+            }
+        }
 
-      # Negatives node2bat: nur real wenn Batterie netto entlädt (batout > 0)
-      if ($node2bat < 0 && !$batout) {
-          $node2bat = 0;                                                                  # Messartefakt beim Laden
-      }
-      elsif ($node2bat < 0) {                                                             # echte Direktentladung ins Haus
-          $bat2home = abs $node2bat;
-          $node2bat = 0;
-          $vector->{batDischarge2HomeNode} = 1;
-      }
-  }
-  else {
-      $node2bat  = $dc2inv2node - $pv2bat;                                                # falls Batterie Idle und Smartloader arbeitet
-      $node2bat  = 0 if($dc2inv2node && $node2bat > 0);                                   # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
-  }
+        if ($node2bat < 0 && !$batout) {
+            $node2bat = 0;                          # neg. Messartefakt beim Laden
+        }
+        elsif ($node2bat < 0) {                     # echte Direktentladung ins Haus
+            $bat2home = abs $node2bat;
+            $node2bat = 0;
+            $vector->{batDischarge2HomeNode} = 1;
+        }
+    }
+    else {
+        $node2bat = $dc2inv2node - $pv2bat;
+        $node2bat = 0 if($dc2inv2node && $node2bat > 0);
+    }
   
 if ($node2bat > 0) {
     # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
