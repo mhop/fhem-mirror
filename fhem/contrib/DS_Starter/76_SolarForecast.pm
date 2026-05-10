@@ -17359,9 +17359,10 @@ sub ___isExclGroupActive {
       my $ocexcl = ConsumerVal ($name, $oc, 'exclgroup', 0);
       next if($ocexcl != $myexcl);                                                # andere Gruppe -> überspringen
 
-      my $ocstate = simplifyCstate (ConsumerVal ($name, $oc, 'planstate', ''));
+      my $ocstate = simplifyCstate (ConsumerVal ($name, $oc, 'planstate', ''));     
+      my $physon  = isConsumerPhysOn ($hash, $oc);
 
-      if ($ocstate =~ /^(?:started|starting|continued|continuing|interrupted|interrupting)$/xs) {
+      if ($ocstate =~ /^(?:started|starting|continued|continuing|interrupted|interrupting)$/xs || $physon) {
           debugLog ($paref, "consumerSwitching${c}",
                     qq{consumer "$c" - exclude group $myexcl blocked by consumer "$oc" (state: $ocstate)});
           return 1;
