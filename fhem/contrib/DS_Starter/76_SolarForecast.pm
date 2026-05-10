@@ -163,7 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.7"  => "08.05.2026  __calcVectorConsumption: fix Doppelbatteriebug mit einem Batterieinverter Forum: https://forum.fhem.de/index.php?msg=1363211 ",
+  "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ",
+  "2.6.7"  => "09.05.2026  __calcVectorConsumption: fix Doppelbatteriebug mit einem Batterieinverter Forum: https://forum.fhem.de/index.php?msg=1363211 ",
   "2.6.6"  => "07.05.2026  nicht mehr benötigten Code entfernt, writeToHistory, _saveHistP1 und _saveHistP2 refactored, ___doPlanning refactored ".
                            "Einbau consumerCacheDirty, ___setConsumerSwitchingState: lastOwnSwitchCmd eingebaut, ".
                            "BLINDTIME, REAPLANINTVL einegbaut, Anti-Toggling / Cycle-Budget: Verhindert dass mehrere starke Consumer im selben ".
@@ -281,24 +282,7 @@ my %vNotesIntern = (
                            "_transferMeterValues: modul accept meter reset > 0 at day start ",
   "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
   "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
-  "1.56.0" => "07.08.2025  set MAXINVERTER to 5 ",
-  "1.55.0" => "06.08.2025  DWD-Weather and DWD-Radiation device new minimum value of attr 'forecastDays' is 2 ".
-                           "checkPlantConfig: check forecastDays of new minimum value ".
-                           "___createOpenMeteoURL: set forecast_hours=72, bugfix of V 1.54.7 ".
-                           "Nexthours: max 72 hours available but not more than 3 days ",
-  "1.54.7" => "01.08.2025  _transferAPIRadiationValues: Extension of Nexthours content up to 48 hours into the future ".
-                           "attr graphicBeamHeightLevelX is obsolete -> use graphicControl instead ".
-                           "attr graphicControl new key beamHeightlevel ",
-  "1.54.6" => "29.07.2025  _graphicConsumerLegend: show surplus method and result in consumer legend hoover ",
-  "1.54.5" => "24.07.2025  isAddSwitchOnCond/isAddSwitchOffCond: change debug info ",
-  "1.54.4" => "22.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
-                           "medianArray: can optional use newest 3..20 elements, avgArray: use the newest elements if num is set ".
-                           "Debug consumerSwitching: print out info message of compare operation, remove attr graphicShowDiff ".
-                           "store surpmeth calc result in key surpmethResult in Consumer master record, __readFileMessages: refactored code ".
-                           "surpmeth: use average[_2..20] instead of numeric values 2.20 only ",
-  "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
-  "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
-  "0.1.0"  => "09.12.2020  initial Version "
+  "0.1.0"  => "09.12.2020  initiale Version "
 );
 
 
@@ -15489,69 +15473,66 @@ return;
 sub __calcVectorConsumption {
   my $paref       = shift;
   my $name        = $paref->{name};
-  my $batout      = $paref->{batout};
-  my $batin       = $paref->{batin};
-  my $pv2bat      = $paref->{pv2bat};
-  my $pv2node     = $paref->{pv2node};
-  my $dc2inv2node = $paref->{dc2inv2node};
-  my $node2inv2dc = $paref->{node2inv2dc};
-  my $ppall       = $paref->{ppall};
-  my $gfeedin     = $paref->{gfeedin};
-  my $gcon        = $paref->{gcon};
+  my $batout      = $paref->{batout};                                                       # akt. Entladeleistung aller Batterien
+  my $batin       = $paref->{batin};                                                        # akt. Ladeleistung aller Batterien
+  my $pv2bat      = $paref->{pv2bat};                                                       # Direktladen PV nur in die Batterie (Solarlader)
+  my $pv2node     = $paref->{pv2node};                                                      # PV-Erzeugung Inverter an den Hausknoten
+  my $dc2inv2node = $paref->{dc2inv2node};                                                  # DC->AC: Speisung Inverter aus Batterie oder Solar-Ladegerät
+  my $node2inv2dc = $paref->{node2inv2dc};                                                  # AC->DC: Ladung Batterie aus Inverterknoten (PV- oder Hybrid-Wechselrichter)
+  my $ppall       = $paref->{ppall};                                                        # aktuelle Erzeuguung aller nicht PV-Producer
+  my $gfeedin     = $paref->{gfeedin};                                                      # vom Inverter-Knoten zum Grid
+  my $gcon        = $paref->{gcon};                                                         # GridConsumption
 
   my $vector;
   $vector->{batDischarge2HomeNode} = 0;
-  my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)
+  my $node2bat = 0;                                                                         # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)
   my $bat2home = 0;
 
   ## Vectorverbrauch
   ####################
-  if ($batout || $batin) {                                                                # Batterie wird geladen oder entladen
-      $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Inverter-Knoten -> Bat, negativ: Richtung Bat -> Inverter-Knoten
+  if ($batout || $batin) {                                                                  # Batterie wird geladen oder entladen
+      $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;               # positiv: Richtung Inverter-Knoten -> Bat, negativ: Richtung Bat -> Inverter-Knoten
 
-        if ($node2bat > 0) {
-            # Messartefakt (Zeitversatz AC/DC) nur wenn Batterie-Pfad-Variablen aktiv.
-            # Wenn alle null: direktes Bat-Setup (Enphase, Zendure) →
-            # echter Ladefluss aus dem Knoten → behalten
-            if ($dc2inv2node || $node2inv2dc || $pv2bat) {
-                $node2bat = 0;
-            }
-        }
+      if ($node2bat > 0) {
+          if ($dc2inv2node || $node2inv2dc || $pv2bat) {                                    # Messartefakt (Zeitversatz AC/DC) nur wenn Batterie-Pfad-Variablen aktiv.
+              $node2bat = 0;
+          }
+      }
 
-        if ($node2bat < 0 && !$batout) {
-            $node2bat = 0;                          # neg. Messartefakt beim Laden
-        }
-        elsif ($node2bat < 0) {                     # echte Direktentladung ins Haus
-            $bat2home = abs $node2bat;
-            $node2bat = 0;
-            $vector->{batDischarge2HomeNode} = 1;
-        }
-    }
-    else {
-        $node2bat = $dc2inv2node - $pv2bat;
-        $node2bat = 0 if($dc2inv2node && $node2bat > 0);
-    }
+      if ($node2bat < 0 && !$batout) {
+          $node2bat = 0;                                                                    # neg. Messartefakt beim Laden
+      }
+      elsif ($node2bat < 0) {                                                               # echte Direktentladung ins Haus
+          $bat2home = abs $node2bat;
+          $node2bat = 0;
+          $vector->{batDischarge2HomeNode} = 1;
+      }
+  }
+  else {
+      $node2bat = $dc2inv2node - $pv2bat;                                                   # falls Batterie Idle und Smartloader arbeitet
+      $node2bat = 0 if($dc2inv2node && $node2bat > 0);                                      # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
+  }
   
-if ($node2bat > 0) {
-    # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
-    # - dc2inv2node: Hybrid-Wechselrichter entlädt (Zeitversatz AC/DC-Messung)
-    # - node2inv2dc: Wechselrichter lädt (Zeitversatz AC/DC-Messung)
-    # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
-    # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
-    # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
-    if ($dc2inv2node || $node2inv2dc || $pv2bat) {
-        $node2bat = 0;
-    }
-}
+  if ($node2bat > 0) {
+      # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
+      # - dc2inv2node: Hybrid-Wechselrichter entlädt (Zeitversatz AC/DC-Messung)
+      # - node2inv2dc: Wechselrichter lädt (Zeitversatz AC/DC-Messung)
+      # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
+      # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
+      # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
+      if ($dc2inv2node || $node2inv2dc || $pv2bat) {
+          $node2bat = 0;
+      }
+  }
 
-  my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                        # Erzeugung Summe im Inverter-Knoten
-  $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                      # z.B. Batterie ist voll und SolarLader liefert an Knoten
+  my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                          # Erzeugung Summe im Inverter-Knoten
+  $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                        # z.B. Batterie ist voll und SolarLader liefert an Knoten
   $pnodesum     = __normDecPlaces ($pnodesum);
 
-  my $node2home = $pnodesum - $gfeedin - ($node2bat > 0 ? $node2bat : 0);                 # Energiefluß vom Knoten zum Haus
+  my $node2home = $pnodesum - $gfeedin - ($node2bat > 0 ? $node2bat : 0);                   # Energiefluß vom Knoten zum Haus
   $node2home    = __normDecPlaces ($node2home);
 
-  $vector->{vectorconsumption} = round0 ($gcon + $node2home + $bat2home);                 # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
+  $vector->{vectorconsumption} = round0 ($gcon + $node2home + $bat2home);                   # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
 
   ## Linearverbrauch
   ####################
@@ -15603,7 +15584,7 @@ sub _manageConsumerData {
       $paref->{calias}   = $calias;
       $paref->{ctype}    = $ctype;
       
-      my $cactive = __queryConsumerActiveState ($paref);                            # Consumer aktiviert?
+      my $cactive      = __queryConsumerActiveState ($paref);                       # Consumer aktiviert?      
       
       $paref->{cactive} = $cactive;
       
@@ -16299,21 +16280,22 @@ sub ___doPlanning {
   my $calias = $paref->{calias};
   my $debug  = $paref->{debug};
   my $lang   = $paref->{lang};
-  my $nh     = $data{$name}{nexthours};
-  
-  $replan   //= 0;
-  my $hash    = $defs{$name};
+    
   my $epieces = ConsumerVal ($name, $c, 'epieces', '');
 
   if (ref $epieces ne 'HASH') {
       debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - no first energy piece found. Exiting...});
       return;
   }
-
-  my $cicfip   = CurrentVal  ($name, 'consForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
-  my $pvshare  = ConsumerVal ($name, $c, 'pvshare',          100);                         # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden
-  my $shfactor = $pvshare / 100;
   
+  $replan   //= 0;
+  my $hash    = $defs{$name};
+  my $nh      = $data{$name}{nexthours};
+
+  my $cicfip   = CurrentVal  ($name, 'consForecastInPlanning', 0);                          # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
+  my $pvshare  = ConsumerVal ($name, $c, 'pvshare',          100);                          # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden
+  my $shfactor = $pvshare / 100;
+
   my (%tmp, %max, %mtimes);
 
   debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
@@ -16376,6 +16358,8 @@ sub ___doPlanning {
   $paref->{stopdiff} = $stopdiff;
 
   if ($cplmode eq 'can') {                                                                                  # Verbraucher _kann_ geplant werden
+      my $powCommitted = ___getPowCommitted ($paref);                                                       # bereits verplante Leistung pro Stunde über alle Consumer bestimmen
+
       if ($debug =~ /consumerPlanning/x) {
           for my $m (sort{$a<=>$b} keys %mtimes) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, }.
@@ -16385,7 +16369,18 @@ sub ___doPlanning {
       }
 
       for my $ts (sort{$a<=>$b} keys %mtimes) {
-          if ($mtimes{$ts}{spexp} >= $epiece1 * $shfactor) {                                                # die früheste Startzeit mit Leistung > als Bedarf
+          my $dt       = timestringsFromOffset ($name, $ts, 0);
+          my $chod     = sprintf '%02d', ($dt->{hour} + 1);
+          my $hcommit  = $powCommitted->{$chod} // 0;                                                       # bereits verplante Leistung in dieser Stunde
+          my $effspexp = $mtimes{$ts}{spexp} - $hcommit;                                                    # effektiv verfügbarer Überschuß
+
+          if ($debug =~ /consumerPlanning/x) {
+              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - hod: $chod, }.
+                              qq{spexp: $mtimes{$ts}{spexp} W, already committed: $hcommit W, }.
+                              qq{effective surplus: $effspexp W, required: }.$epiece1 * $shfactor. qq{ W});
+          }
+
+          if ($effspexp >= $epiece1 * $shfactor) {                                                          # effektiver Überschuß reicht für diesen Consumer
               my $starttime       = $mtimes{$ts}{starttime};
               $paref->{starttime} = $starttime;
               $starttime          = ___switchonTimelimits ($paref);
@@ -16472,6 +16467,35 @@ sub ___doPlanning {
   ___setPlanningDeleteMeth ($paref);
 
 return;
+}
+
+################################################################
+#  Bereits verplante Leistung pro Stunde über alle Consumer
+#  summieren (ohne den aktuell zu planenden Consumer)
+#  return: Hash { hod => committed_W }
+################################################################
+sub ___getPowCommitted {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+
+  my %powCommitted;
+
+  for my $oc (keys %{$data{$name}{consumers}}) {
+      next if($oc == $c);                                                        # aktuell zu planenden Consumer überspringen
+
+      my $opvpow   = ConsumerVal ($name, $oc, 'power',       0)
+                   * ConsumerVal ($name, $oc, 'pvshare',   100) / 100;
+      my $oehodpcs = ConsumerVal ($name, $oc, 'ehodpieces', '');
+
+      next if(!$opvpow || ref $oehodpcs ne 'HASH');
+
+      for my $hod (keys %{$oehodpcs}) {
+          $powCommitted{$hod} += $opvpow;
+      }
+  }
+
+return \%powCommitted;
 }
 
 ################################################################
@@ -16572,7 +16596,7 @@ sub ___planMust {
   
   my $hash     = $defs{$name};
 
-  my $maxts     = timestringToTimestamp ($hash, $maxref->{$elem}{starttime});                 # Unix Timestamp des max. Überschusses heute
+  my $maxts     = timestringToTimestamp ($hash, $maxref->{$elem}{starttime});          # Unix Timestamp des max. Überschusses heute
   my $half      = floor ($mintime / 2 / 60);                                           # die halbe Gesamtplanungsdauer in h als Vorlaufzeit einkalkulieren
   my $startts   = $maxts - ($half * 3600);
   my $starttime = (timestampToTimestring ($name, $startts, $lang))[3];
@@ -22358,11 +22382,11 @@ sub _flowGraphic {
       $pdcr->{$lfn}{pgen}      = $pvout;                                                                        # aktuelleLeistung aus PV-Erzeugung
       $pdcr->{$lfn}{pdc2ac}    = $pdc2ac;                                                                       # aktuelle Leistung DC->AC
       $pdcr->{$lfn}{pac2dc}    = $pac2dc;                                                                       # aktuelle Leistung AC->DC
-      $pv2node                += $pvout  if($ifeed eq 'default' && $isource eq 'pv');                           # PV-Erzeugung Inverter für das Hausnetz
+      $pv2node                += $pvout  if($ifeed eq 'default' && $isource eq 'pv');                           # PV-Erzeugung Inverter an den Hausknoten
       $pv2grid                += $pvout  if($ifeed eq 'grid'    && $isource eq 'pv');                           # PV nur für das öffentliche Netz
       $pv2bat                 += $pvout  if($ifeed eq 'bat'     && $isource eq 'pv');                           # Direktladen PV nur in die Batterie
-      $dc2inv2node            += $pdc2ac if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # DC->AC / Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
-      $node2inv2dc            += $pac2dc if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # AC->DC (Batterie- oder Hybrid-Wechselrichter)
+      $dc2inv2node            += $pdc2ac if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # DC->AC: Speisung Inverter aus Batterie oder Solar-Ladegerät
+      $node2inv2dc            += $pac2dc if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # AC->DC: Ladung Batterie aus Inverterknoten (PV- oder Hybrid-Wechselrichter)
 
       $lfn++;
   }
