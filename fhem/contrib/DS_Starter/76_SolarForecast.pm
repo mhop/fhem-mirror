@@ -17348,8 +17348,8 @@ sub ___isExclGroupActive {
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
 
-  my $hash    = $defs{$name};
-  my $myexcl  = ConsumerVal ($name, $c, 'exclgroup', 0);
+  my $hash   = $defs{$name};
+  my $myexcl = ConsumerVal ($name, $c, 'exclgroup', 0);
 
   return 0 if(!$myexcl);                                                         # kein exclgroup -> immer frei
 
@@ -17360,11 +17360,23 @@ sub ___isExclGroupActive {
       next if($ocexcl != $myexcl);                                                # andere Gruppe -> überspringen
 
       my $ocstate = simplifyCstate (ConsumerVal ($name, $oc, 'planstate', ''));     
-      my $physon  = isConsumerPhysOn ($hash, $oc);
+      
+      # --- Consumer logischen Schaltzustand
+      my $pcurr  = 0;
+      my $cname  = ConsumerVal ($name, $oc, 'name',   '');
+      my $pcread = ConsumerVal ($name, $oc, "rpcurr", '');
+      my $up     = ConsumerVal ($name, $oc, "upcurr", '');
 
-      if ($ocstate =~ /^(?:started|starting|continued|continuing|interrupted|interrupting)$/xs || $physon) {
+      if ($pcread) {
+          my $eup = $up =~ /^kW$/xi ? 1000 : 1;
+          $pcurr  = ReadingsNum ($cname, $pcread, 0) * $eup;
+      }
+      
+      my $islogon = isConsumerLogOn ($hash, $oc, $pcurr);      
+
+      if ($ocstate =~ /^(?:started|starting|continued|continuing|interrupted|interrupting)$/xs || $islogon) {
           debugLog ($paref, "consumerSwitching${c}",
-                    qq{consumer "$c" - exclude group $myexcl blocked by consumer "$oc" (state: $ocstate)});
+                    qq{consumer "$c" - exclgroup $myexcl blocked by consumer "$oc" (state: $ocstate, islogon: $islogon)});
           return 1;
       }
   }
