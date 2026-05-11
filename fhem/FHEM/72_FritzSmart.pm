@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.05.11a";
+our $ModulVersion = "26.05.11b";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -600,6 +600,20 @@ our %JavaScript = (
                                    810 => "generic/sip"},
         smarthome_overview    => { 800 => "smarthome/overview",
                                    810 => "smarthome/overview"},
+        smarthome_devices     => { 800 => "smarthome/overview/devices",
+                                   810 => "smarthome/overview/devices"},
+        smarthome_groups      => { 800 => "smarthome/overview/groups",
+                                   810 => "smarthome/overview/groups"},
+        smarthome_units       => { 800 => "smarthome/overview/units",
+                                   810 => "smarthome/overview/units"},
+        smarthome_templates   => { 800 => "smarthome/overview/templates",
+                                   810 => "smarthome/overview/templates"},
+        smarthome_triggers    => { 800 => "smarthome/overview/triggers",
+                                   810 => "smarthome/overview/triggers"},
+        smarthome_globals     => { 800 => "smarthome/overview/globals",
+                                   810 => "smarthome/overview/globals"},
+        smarthome_globals     => { 800 => "smarthome/overview/globals",
+                                   810 => "smarthome/overview/globals"},
         storage               => { 800 => "storage",
                                    810 => "storage"},
         tam                   => { 800 => "generic?ui=tam",
@@ -2628,7 +2642,7 @@ sub Fritz_Set_Modul($$@)
    } #end missing modul
 
    # available, if password is set correctly
-   if ($hash->{WEBCONNECT} && !$hash->{HINT_PERL}) {
+   if ($hash->{WEBCONNECT} && !$hash->{HINT_PERL} && !$hash->{HINT_NETWORK}) {
 
      my $wlanNames = "(" . $hash->{fhem}{multiple_wlan}{names} . ")";
      $wlanNames =~ s/ /\|/;
@@ -4629,7 +4643,7 @@ sub Fritz_Get_Modul($@)
    my $retMsg = "";
 
    # available, if password is set correctly
-   if ($hash->{WEBCONNECT} && !$hash->{HINT_PERL}) {
+   if ($hash->{WEBCONNECT} && !$hash->{HINT_PERL}&& !$hash->{HINT_NETWORK}) {
 
      if( lc $cmd eq "smarthomepredef" && $hash->{LUADATA} == 1) {
 
@@ -5649,9 +5663,11 @@ sub Fritz_Readout_Start($)
 
       if ($hash->{APICHECKED} == -1) {
         main::readingsSingleUpdate( $hash, "state", "stopped while to many network errors", 1 );
+        $hash->{HINT_PROCESS} = "stopped while to many network errors";
         Fritz_Log $hash, 2, "stopped while to many network errors";
       } else {
         main::readingsSingleUpdate( $hash, "state", "stopped while to many authentication errors", 1 );
+        $hash->{HINT_PROCESS} = "stopped while to many API errors";
         Fritz_Log $hash, 2, "stopped while to many API errors";
       }
 
@@ -5710,17 +5726,21 @@ sub Fritz_Readout_Start($)
    if ( $hash->{APICHECKED} =~ /[0|2]/ ) {
       $interval = $hash->{CKECKAPI_TMOUT} + 10;
       $timeout  = $hash->{CKECKAPI_TMOUT};
-      main::readingsSingleUpdate( $hash, "state", "check APIs " . ($hash->{APICHECKED} ? "basic" : "full"), 1 );
+      main::readingsSingleUpdate( $hash, "state", "check APIs: " . ($hash->{APICHECKED} ? "basic" : "full"), 1 );
       $runFn = "Fritz::Fritz_Readout_API_Check";
+      $hash->{HINT_PROCESS} = "check APIs: " . ($hash->{APICHECKED} ? "basic" : "full");
    } elsif ( $hash->{APICHECKED} < 0 ) {
-      $interval = main::AttrVal( $name, "reConnectInterval", 180 ) < $hash->{CKECKAPI_TMOUT} ? $hash->{CKECKAPI_TMOUT} + 10 : main::AttrVal( $name, "reConnectInterval", 180 );
+      $interval = (main::AttrVal( $name, "reConnectInterval", 180 ) < $hash->{CKECKAPI_TMOUT} ? $hash->{CKECKAPI_TMOUT} + 10 : main::AttrVal( $name, "reConnectInterval", 180 ));
       $timeout  = $hash->{CKECKAPI_TMOUT};
-      main::readingsSingleUpdate( $hash, "state", "recheck APIs every $interval seconds", 1 );
+      main::readingsSingleUpdate( $hash, "state", "check APIs: recheck every $interval sec. with timeout $timeout sec.", 1 );
       $runFn = "Fritz::Fritz_Readout_API_Check";
+      $hash->{HINT_PROCESS} = "check APIs: recheck every $interval sec. with timeout $timeout sec.";
    }
 # Run shell or web api, restrict interval
    else {
+      $interval = $hash->{INTERVAL};
       $runFn = "Fritz::Fritz_Readout_Run_Web";
+      $hash->{HINT_PROCESS} = "normal";
    }
 
    $hash->{helper}{runFN} = $runFn;
@@ -5736,7 +5756,6 @@ sub Fritz_Readout_Start($)
       Fritz_Log $hash, 4, "Skip fork process $runFn";
    }
 
-   $interval = $hash->{INTERVAL};
    if( $interval != 0 ) {
       main::RemoveInternalTimer($hash->{helper}{TimerReadout});
       main::InternalTimer(gettimeofday() + $interval, "Fritz::Fritz_Readout_Start", $hash->{helper}{TimerReadout}, 1);
@@ -5800,11 +5819,6 @@ sub Fritz_Readout_Run_Web($)
    Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
    Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidNewCount", $sidNew;
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 1;
-
-#   use Devel::Size qw(total_size);
-#   my $size = total_size($hash);
-
-#   Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_HashSize", $size;
 
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
 
@@ -9504,7 +9518,7 @@ sub Fritz_Readout_Done($)
 
   if ($hash->{helper}{runFN} eq "Fritz::Fritz_Readout_API_Check") {
     $hash->{fhem}{readOutState} = !main::AttrVal($name, "disable", 0);
-    Fritz_Readout_Start($hash->{helper}{TimerReadout});
+#    Fritz_Readout_Start($hash->{helper}{TimerReadout});
     $hash->{fhem}{readOutState} = 0;
   }
 
@@ -9647,8 +9661,15 @@ sub Fritz_Readout_Process($$@)
        delete ($hash->{HINT_PASSWORD}) if $rName2 eq "HINT_PASSWORD" && $rValue eq "";
        delete ($hash->{HINT_NETWORK}) if $rName2 eq "HINT_NETWORK" && $rValue eq "";
        if ($rName2 eq "APICHECKED") {
-         main::readingsBulkUpdate( $hash, "state", "check API done" ) ;
-         $newState = "check API done";
+         if($rValue == -1) {
+           main::readingsBulkUpdate( $hash, "state", ": waiting for recheck" ) ;
+           $hash->{HINT_PROCESS} = "disrupted -> waiting for API recheck" ;
+           $newState = "check API: waiting for recheck";
+         } else {
+           main::readingsBulkUpdate( $hash, "state", "check API: done" ) ;
+           $newState = "check API: done";
+           $hash->{HINT_PROCESS} = "API:normal" ;
+         }
        }
      }
 
@@ -9788,7 +9809,14 @@ sub Fritz_Readout_Process($$@)
      Fritz_Readout_Start($hash->{helper}{TimerReadout});
      $hash->{fhem}{readOutState} = 0;
 
+   } elsif( $hash->{HINT_PROCESS} eq "API:normal" ) {
+
+     $hash->{fhem}{readOutState} = !main::AttrVal($name, "disable", 0);
+     Fritz_Readout_Start($hash->{helper}{TimerReadout});
+     $hash->{fhem}{readOutState} = 0;
+
    }
+
 
 } # end Fritz_Readout_Process
 
@@ -10233,6 +10261,35 @@ sub Fritz_Readout_SetGet_Aborted($)
 
 # Checks which API is available on the Fritz-Device
 ###############################################################################
+# Check if perl modules for remote APIs exists
+# leave, if error and stop timer
+#
+# Check for valid host definition
+# Check if tr064 specification exists and determine TR064-Port. 1st check get: Box Model, FritzOS Version, OEM from TR064 informations
+# 2nd check get: Box Model, FritzOS Version, OEM from jason_boxinfo.xml
+# 3rd check get: Box Model, FritzOS Version, OEM from cgi-bin/system_status
+# Check for defined user in Fritz!Device, only if $osVersion >= 725
+# Check for defined password
+# leave, if error
+#
+# 4th check get with login: Box Model, FritzOS Version, OEM from cgi-bin/system_status
+# 5th check get with login: Box Model, FritzOS Version, OEM from from jason_boxinfo.xml
+# leave, if error
+#
+# chance attrList depending on Fritz Model and FritzOS Version
+# getting TR064 secure port
+# Check if query.lua exists
+# Check if data.lua exists
+# initialize first SID if password available and start testing the services
+# leave, if error
+#
+# start check API's full ( time intensiv)
+#   start testing TR064 services
+#   Start testing luaQuery API
+#
+# leave
+###############################################################################
+
 sub Fritz_Readout_API_Check($)
 {
    my ($name)     = @_;
@@ -10298,111 +10355,10 @@ sub Fritz_Readout_API_Check($)
 
    my $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
 
-   if ($crdOK) {
-
-     # 1. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
-     Fritz_Log $hash, 4, "Read 'jason_boxinfo.xml' from " . $host;
-
-     if ( $fwVersion =~ /error/ ) {
-       $url       = "http://" . $host . "/jason_boxinfo.xml";
-       $response  = $agent->get( $url );
-       $apiError .= " boxModelJason:" . $response->status_line;
-
-       if (!$response->is_success) {
-
-         Fritz_Log $hash, 4-$myVerbose, "boxModelJason: " . $response->code;
-         Fritz_Log $hash, 4-$myVerbose, "boxModelJason: " . $response->message;
-         Fritz_Log $hash, 4-$myVerbose, "boxModelJason: " . $response->status_line;
-
-         if($response->code == 500) {
-           $crdOK = 0 ;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
-         }
-
-       } elsif ($response->is_success && $response->content =~ /<j:Name>/) {
-
-         $content = $response->content;
-         Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $content";
-
-         if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
-           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-           $hash->{boxModel} = $1;
-         }
-         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
-
-         if($content =~ /<j:Version>(.*)<\/j:Version>/) {
-           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1);
-           $fwVersion = $1;
-
-           Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $response->is_success with $content";
-
-           @fwV = split(/\./, $fwVersion);
-           $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
-
-           $hash->{fhem}{fwVersion} = $osVersion;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
-         }
-       }
-     } # end 1. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
-
-     # 2. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
-     if ( $crdOK && $fwVersion =~ /error/ ) {
-       Fritz_Log $hash, 5-$myVerbose, "without password 'cgi-bin/system_status' from " . $host;
-
-       $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-       $url = "http://".$host."/cgi-bin/system_status";
-       $response = $agent->get( $url );
-
-       $apiError .= " boxModelSystem:" . $response->status_line;
-
-       Fritz_Log $hash, 5-$myVerbose, "2. Versuch: Ermitteln Box Model:" . $response->code ." ". $response->content;
-
-       if (!$response->is_success) {
-
-         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem: " . $response->code;
-         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem: " . $response->message;
-         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem: " . $response->status_line;
-
-         if($response->code == 500) {
-           $crdOK = 0 ;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
-         }
-
-       } elsif ($response->is_success && $response->content =~ /\<body\>(.*)\<\/body\>/) {
-
-         my @result = split /-/, $1;
-         # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
-         # FRITZ!Box 7590 (UI)-B-132811-010030-XXXXXX-XXXXXX-787902-1540750-101716-1und1
-         # 0 FritzBox-Modell
-         # 1 Annex/Erweiterte Kennzeichnung
-         # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
-         # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
-         # 4+5 Hashcode
-         # 6 Status
-         # 7 Firmwareversion
-         # 8 Sub-Version/Unterversion der Firmware
-         # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
-
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-         $hash->{boxModel} = $result[0];
-
-         my $FBOS = $result[7];
-         $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $FBOS;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
-         $fwVersion = $FBOS;
-
-         @fwV = split(/\./, $fwVersion);
-         $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
-
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
-       }
-     } # end 2. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
+   if ($crdOK && $fwVersion =~ /error/) {
 
      # Check if tr064 specification exists and determine TR064-Port
-     # 3. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
+     # 1. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
      if ( $crdOK && $fwVersion =~ /error/ ) {
 
        $response = $agent->get( "http://" .$host. ":49000/tr64desc.xml" );
@@ -10459,6 +10415,107 @@ sub Fritz_Readout_API_Check($)
      }
      # End check if tr064 specification exists and determine TR064-Port
 
+     # 2. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
+     Fritz_Log $hash, 4-$myVerbose, "Read 'jason_boxinfo.xml' from " . $host;
+
+     if ( $crdOK && $fwVersion =~ /error/ ) {
+       $url       = "http://" . $host . "/jason_boxinfo.xml";
+       $response  = $agent->get( $url );
+       $apiError .= " boxModelJason:" . $response->status_line;
+
+       if (!$response->is_success) {
+
+         Fritz_Log $hash, 4-$myVerbose, "boxModelJason: " . $response->code;
+         Fritz_Log $hash, 4-$myVerbose, "boxModelJason: " . $response->message;
+         Fritz_Log $hash, 4-$myVerbose, "boxModelJason: " . $response->status_line;
+
+         if($response->code == 500) {
+           $crdOK = 0 ;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+         }
+
+       } elsif ($response->is_success && $response->content =~ /<j:Name>/) {
+
+         $content = $response->content;
+         Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $content";
+
+         if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
+           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
+           $hash->{boxModel} = $1;
+         }
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
+
+         if($content =~ /<j:Version>(.*)<\/j:Version>/) {
+           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1);
+           $fwVersion = $1;
+
+           Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $response->is_success with $content";
+
+           @fwV = split(/\./, $fwVersion);
+           $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
+
+           $hash->{fhem}{fwVersion} = $osVersion;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
+         }
+       }
+     } # end 2. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
+
+     # 3. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
+     if ( $crdOK && $fwVersion =~ /error/ ) {
+       Fritz_Log $hash, 5-$myVerbose, "without password 'cgi-bin/system_status' from " . $host;
+
+       $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+       $url = "http://".$host."/cgi-bin/system_status";
+       $response = $agent->get( $url );
+
+       $apiError .= " boxModelSystem:" . $response->status_line;
+
+       Fritz_Log $hash, 5-$myVerbose, "2. Versuch: Ermitteln Box Model:" . $response->code ." ". $response->content;
+
+       if (!$response->is_success) {
+
+         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem: " . $response->code;
+         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem: " . $response->message;
+         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem: " . $response->status_line;
+
+         if($response->code == 500) {
+           $crdOK = 0 ;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+         }
+
+       } elsif ($response->is_success && $response->content =~ /\<body\>(.*)\<\/body\>/) {
+
+         my @result = split /-/, $1;
+         # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
+         # FRITZ!Box 7590 (UI)-B-132811-010030-XXXXXX-XXXXXX-787902-1540750-101716-1und1
+         # 0 FritzBox-Modell
+         # 1 Annex/Erweiterte Kennzeichnung
+         # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
+         # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
+         # 4+5 Hashcode
+         # 6 Status
+         # 7 Firmwareversion
+         # 8 Sub-Version/Unterversion der Firmware
+         # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
+
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+         $hash->{boxModel} = $result[0];
+
+         my $FBOS = $result[7];
+         $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $FBOS;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+         $fwVersion = $FBOS;
+
+         @fwV = split(/\./, $fwVersion);
+         $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
+
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
+       }
+     } # end 3. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
+
      # Check for defined user in Fritz!Device, only if $osVersion >= 725
 
      if ($osVersion && $osVersion >= 725 && $hash->{boxModel} !~ /Repeater/ ) {
@@ -10477,7 +10534,10 @@ sub Fritz_Readout_API_Check($)
          Fritz_Log $hash, 4-$myVerbose, "boxUser: " . $response->message;
          Fritz_Log $hash, 4-$myVerbose, "boxUser: " . $response->status_line;
 
-         $crdOK = 0 if($response->code == 500);
+         if($response->code == 500) {
+           $crdOK = 0 ;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+         }
 
        } elsif( $response->is_success && $response->content =~ /\<body\>(.*?)\<\/body\>/isg) {
          # Fritz_Log "boxUser", 3, "FBUser: \n" . $1;
@@ -10533,12 +10593,12 @@ sub Fritz_Readout_API_Check($)
        Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)");
      }
 
-     $crdOK = 0;
+     $crdOK = -1;
    }
    # End check for defined password
 
    # Error handling if Password, boxUser or host not Ok and return to main process
-   if ( !$crdOK) {
+   if ( $crdOK <= 0) {
      push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
 
      Fritz_Readout_Add_Reading ($hash, \@roReadings, ".calledFrom", "checkApis");
@@ -10548,11 +10608,11 @@ sub Fritz_Readout_API_Check($)
 
      $hash->{fhem}{sidTime} = 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", (-1);
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", ($crdOK < 0 ? $crdOK : $hash->{fhem}{sidErrCount} + 1);
 
      my $returnStr = join('|', @roReadings );
 
-     Fritz_Log $hash, 3, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
+     Fritz_Log $hash, 4-$myVerbose, "1. Handover to main process - $crdOK (" . length ($returnStr) . "): " . $returnStr;
 
      return $name . "|" . encode_base64($returnStr,"");
 
@@ -10565,56 +10625,142 @@ sub Fritz_Readout_API_Check($)
 
    # continue apiCheck
 
-   Fritz_Log $hash, 4, "boxUser is set to: $boxUser";
+   Fritz_Log $hash, 4-$myVerbose, "boxUser is set to: $boxUser";
 
-   # change host name if necessary
-   Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HOST", $host) if $host ne $hash->{HOST};
+   # 4. Versuch: Emitteln Box Model mit Anmeldung, FritzOS Version, OEM aus cgi-bin/system_status Informationen
+   if ( $fwVersion =~ /error/ && $crdOK) {
 
-   # getting TR064 secure port
-   if ( $crdOK && $hash->{TR064} ) {
-     #Determine TR064-Port
-     $tr064Port = Fritz_init_TR064 ( $hash, $host ); 
-     if ($tr064Port) {
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
-       $hash->{SECPORT} = $tr064Port;
-       $hash->{TR064}   = 1;
-       Fritz_Log $hash, 5-$myVerbose, "TR-064-SecurePort is $tr064Port.";
-     } else {
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", "";
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
-       $hash->{TR064}   = 0;
-       Fritz_Log $hash, 4-$myVerbose, "TR-064-SecurePort does not exist";
-     }
-   } # end getting TR064 secure port
+     Fritz_Log $hash, 5-$myVerbose, "read 'cgi-bin/system_status' from " . $host;
 
-   # 4. Versuch: Emitteln Box Model mit Anmeldung, FritzOS Version, OEM aus TR064 Informationen
-   if ( $crdOK && $hash->{SECPORT} && $fwVersion =~ /error/) {
+     my $Fritz_Access = Fritz_Helper_read_Password($hash);
+  
+     if (! defined($Fritz_Access)) {
 
-     my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
+       $crdOK = 0;
 
-     if (! defined($Fritz_TR064pwd)) {
        Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
        Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
+
      } else {
 
-       Fritz_Log $hash, 5-$myVerbose, "retry with password 'jason_boxinfo.xml' from " . $host;
-
        my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-       my $req      = HTTP::Request->new( GET => "http://" . $host . "/jason_boxinfo.xml");
-          $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
+       my $req      = HTTP::Request->new( GET => "http://" . $host . "/cgi-bin/system_status");
+          $req->authorization_basic( "$boxUser", "$Fritz_Access" );
 
        $response    = $agentPW->request( $req );
-       $apiError .= " TR064 (login):" . $response->status_line;
+
+       $Fritz_Access = undef;
+
+       $apiError .= " boxModelSystem (login):" . $response->status_line;
 
        Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
        Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
 
        unless ($response->is_success) {
 
-         Fritz_Log $hash, 4-$myVerbose, "TR064 (login): " . $response->code;
-         Fritz_Log $hash, 4-$myVerbose, "TR064 (login): " . $response->message;
-         Fritz_Log $hash, 4-$myVerbose, "TR064 (login): " . $response->status_line;
+         $crdOK = 0 if($response->code == 500);
+
+         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem (login): " . $response->code;
+         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem (login): " . $response->message;
+         Fritz_Log $hash, 4-$myVerbose, "boxModelSystem (login): " . $response->status_line;
+
+         my $statusLine = $response->status_line;
+
+         if(defined $response->{AuthorizationRequired}) {
+           Fritz_Log $hash, 2, $passErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
+
+           if ($osVersion && $osVersion < 725 && $hash->{boxModel} !~ /Repeater/) {
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
+           }
+
+         } elsif( $statusLine =~ /\(No route to host\)/) {
+           Fritz_Log $hash, 2, $netErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+
+         } else {
+           Fritz_Log $hash, 2, $osErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $osErr;
+         }
+
+       } else {
+
+         if ($response->is_success && $response->content =~ /\<body\>(.*)\<\/body\>/) {
+           ($content) = $response->content =~ /\<body\>(.*)\<\/body\>/;
+           Fritz_Log $hash, 4-$myVerbose, "5. Versuch: Emitteln Box Model: $content";
+
+           my @result = split /-/, $content;
+           # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
+           # FRITZ!Box 7590 (UI)-B-132811-010030-XXXXXX-XXXXXX-787902-1540750-101716-1und1
+           # 0 FritzBox-Modell
+           # 1 Annex/Erweiterte Kennzeichnung
+           # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
+           # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
+           # 4+5 Hashcode
+           # 6 Status
+           # 7 Firmwareversion
+           # 8 Sub-Version/Unterversion der Firmware
+           # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
+
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
+           $hash->{boxModel} = $result[0];
+
+           my $FBOS = $result[7];
+           $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $FBOS;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
+           $fwVersion = $FBOS;
+
+           @fwV = split(/\./, $fwVersion);
+           $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
+
+           $hash->{fhem}{fwVersion} = $osVersion;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
+
+           $crdOK = $osVersion;
+
+         } else {
+           Fritz_Log $hash, 4-$myVerbose, "" . $response->status_line;
+         }
+       }
+     }
+   }
+
+   # 5. Versuch: Emitteln Box Model mit Anmeldung, FritzOS Version, OEM mit Passwort
+   if ( $fwVersion =~ /error/ && $crdOK ) {
+
+     my $Fritz_Access = Fritz_Helper_read_Password($hash);
+
+     if (! defined($Fritz_Access)) {
+
+       $crdOK = 0;
+
+       Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
+
+     } else {
+
+       Fritz_Log $hash, 5-$myVerbose, "retry with password 'jason_boxinfo.xml' from " . $host;
+
+       my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
+       my $req      = HTTP::Request->new( GET => "http://" . $host . "/jason_boxinfo.xml");
+          $req->authorization_basic( "$boxUser", "$Fritz_Access" );
+
+       $response    = $agentPW->request( $req );
+
+       $Fritz_Access = undef;
+
+       $apiError .= " boxModelJason(login):" . $response->status_line;
+
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
+
+       if (!$response->is_success) {
+
+         Fritz_Log $hash, 4-$myVerbose, "boxModelJason(login): " . $response->code;
+         Fritz_Log $hash, 4-$myVerbose, "boxModelJason(login): " . $response->message;
+         Fritz_Log $hash, 4-$myVerbose, "boxModelJason(login): " . $response->status_line;
 
          $crdOK = 0 if($response->code == 500);
 
@@ -10634,96 +10780,41 @@ sub Fritz_Readout_API_Check($)
            Fritz_Log $hash, 2, $osErr;
            Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $osErr;
          }
-       }
-     }
-   }
 
-   # 5. Versuch: Emitteln Box Model mit Anmeldung, FritzOS Version, OEM aus cgi-bin/system_status Informationen
-   if ( $fwVersion =~ /error/ && $crdOK) {
+       } elsif ($response->is_success && $response->content =~ /<j:Name>/) {
 
-     Fritz_Log $hash, 5-$myVerbose, "read 'cgi-bin/system_status' from " . $host;
+         $content = $response->content;
+         Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $content";
 
-     my $Fritz_TR064pwd = Fritz_Helper_read_Password($hash);
-  
-     my $agentPW  = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
-     my $req      = HTTP::Request->new( GET => "http://" . $host . "/cgi-bin/system_status");
-        $req->authorization_basic( "$boxUser", "$Fritz_TR064pwd" );
-
-     $response    = $agentPW->request( $req );
-     $apiError .= " boxModelSystem (login):" . $response->status_line;
-
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
-
-     unless ($response->is_success) {
-       Fritz_Log $hash, 4-$myVerbose, "boxModelSystem (login): " . $response->code;
-       Fritz_Log $hash, 4-$myVerbose, "boxModelSystem (login): " . $response->message;
-       Fritz_Log $hash, 4-$myVerbose, "boxModelSystem (login): " . $response->status_line;
-
-       $crdOK = 0 if($response->code == 500);
-
-       my $statusLine = $response->status_line;
-
-       if(defined $response->{AuthorizationRequired}) {
-         Fritz_Log $hash, 2, $passErr;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
-
-         if ($osVersion && $osVersion < 725 && $hash->{boxModel} !~ /Repeater/) {
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
+         if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
+           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
+           $hash->{boxModel} = $1;
          }
 
-       } elsif( $statusLine =~ /\(No route to host\)/) {
-         Fritz_Log $hash, 2, $netErr;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
 
-       } else {
-         Fritz_Log $hash, 2, $osErr;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $osErr;
-       }
+         if($content =~ /<j:Version>(.*)<\/j:Version>/) {
+           Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1);
+           $fwVersion = $1;
 
-     } else {
+           Fritz_Log $hash, 5-$myVerbose, "jason_boxinfo.xml returned: $response->is_success with $content";
 
-       if ($response->is_success && $response->content =~ /\<body\>(.*)\<\/body\>/) {
-         ($content) = $response->content =~ /\<body\>(.*)\<\/body\>/;
-         Fritz_Log $hash, 3, "5. Versuch: Emitteln Box Model: $content";
+           @fwV = split(/\./, $fwVersion);
+           $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
 
-         my @result = split /-/, $content;
-         # http://www.tipps-tricks-kniffe.de/fritzbox-wie-lange-ist-die-box-schon-gelaufen/
-         # FRITZ!Box 7590 (UI)-B-132811-010030-XXXXXX-XXXXXX-787902-1540750-101716-1und1
-         # 0 FritzBox-Modell
-         # 1 Annex/Erweiterte Kennzeichnung
-         # 2 Gesamtlaufzeit der Box in Stunden, Tage, Monate
-         # 3 Gesamtlaufzeit der Box in Jahre, Anzahl der Neustarts
-         # 4+5 Hashcode
-         # 6 Status
-         # 7 Firmwareversion
-         # 8 Sub-Version/Unterversion der Firmware
-         # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
-
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-         $hash->{boxModel} = $result[0];
-
-         my $FBOS = $result[7];
-         $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_fwVersion", $FBOS;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_oem",    $result[9];
-         $fwVersion = $FBOS;
-
-         @fwV = split(/\./, $fwVersion);
-         $osVersion = substr($fwV[1],0,2) * 100 + substr($fwV[2],0,2);
-
-         $hash->{fhem}{fwVersion} = $osVersion;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
-
+           $hash->{fhem}{fwVersion} = $osVersion;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
+         }
        } else {
          Fritz_Log $hash, 4-$myVerbose, "" . $response->status_line;
        }
-     }
+     } # end 5. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
    }
 
+
    # Error handling if FritzOS Version not ok and return to main process
-   if ( !$crdOK && !$hash->{fhem}{fwVersion}) {
+   if ( !$crdOK || !$hash->{fhem}{fwVersion}) {
      push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
 
      Fritz_Readout_Add_Reading ($hash, \@roReadings, ".calledFrom", "checkApis");
@@ -10733,11 +10824,11 @@ sub Fritz_Readout_API_Check($)
 
      $hash->{fhem}{sidTime} = 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", (-1);
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
      my $returnStr = join('|', @roReadings );
 
-     Fritz_Log $hash, 4, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
+     Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
 
      return $name . "|" . encode_base64($returnStr,"");
 
@@ -10755,16 +10846,28 @@ sub Fritz_Readout_API_Check($)
    my $attrList = Fritz_Get_attrList($hash);
    main::setDevAttrList($hash->{NAME}, $attrList);
 
-#   if ($fwVersion =~ /error/) {
-#     $hash->{fhem}{fwVersion} = ($hash->{fhem}{fwVersion} ? $hash->{fhem}{fwVersion} : 0);
-#     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $hash->{fhem}{fwVersion};
-#     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", ($hash->{fhem}{fwVersion} ? $hash->{fhem}{fwVersionStr} : "0.00";
-#     $apiError .= " FritzOS version not be determined";
-#   } else {
-#     # chance attrList depending on Fritz Model and FritzOS Version
-#     my $attrList = Fritz_Get_attrList($hash);
-#     main::setDevAttrList($hash->{NAME}, $attrList);
-#   }
+   # getting TR064 secure port
+   if ( $crdOK && $hash->{TR064} ) {
+
+     #Determine TR064-Port
+     $tr064Port = Fritz_init_TR064 ( $hash, $host ); 
+
+     if ($tr064Port) {
+
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
+       $hash->{SECPORT} = $tr064Port;
+       $hash->{TR064}   = 1;
+       Fritz_Log $hash, 5-$myVerbose, "TR-064-SecurePort is $tr064Port.";
+
+     } else {
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", "";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
+       $hash->{TR064}   = 0;
+       Fritz_Log $hash, 4-$myVerbose, "TR-064-SecurePort does not exist";
+     }
+
+   } # end getting TR064 secure port
 
    # Check for remote APIs
    $agent = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => 10);
@@ -10808,7 +10911,38 @@ sub Fritz_Readout_API_Check($)
    }
    # end check if data.lua exists
 
-   if ($apiError =~ /303|500/ || $fwVersion =~ /error/) {
+   # initialize first SID if password available and start testing the services
+   if ( $crdOK ) {
+     my $result = Fritz_open_Web_Connection( $hash );
+
+     if (defined $result->{Error}) {
+
+       $crdOK = 0;
+
+       Fritz_Log $hash, 4-$myVerbose, "open Web_Connection failed: " . $result->{Error};
+
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $result->{Error};
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 0;
+
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+
+     } else {
+
+       Fritz_Log $hash, 4-$myVerbose, "open Web_Connection succeeded";
+
+       my $sidNew = defined $result->{sidNew} ? $result->{sidNew} : 0;
+
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidNewCount", $sidNew;
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 1;
+
+     }
+   }
+
+   if ($apiError =~ /303|500/ || !$crdOK) {
 
      my $ErrorTXT;
      if ($fwVersion =~ /error/) {
@@ -10829,8 +10963,13 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
-   } else {
+     my $returnStr = join('|', @roReadings );
 
+     Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
+
+     return $name . "|" . encode_base64($returnStr,"");
+
+   } else {
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", 1;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", 55;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", "Ok";
@@ -10838,246 +10977,213 @@ sub Fritz_Readout_API_Check($)
      $hash->{fhem}{sidTime} = 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
+   }
 
-     # initialize first SID if password available and start testing the services
-     if ( $crdOK ) {
-       my $result = Fritz_open_Web_Connection( $hash );
+   # start check API's full
+   if ( $hash->{APICHECKED} <= 0 ) {
 
-       if (defined $result->{Error}) {
+     # start testing TR064 services
+     if( $hash->{SECPORT} ) {
 
-         Fritz_Log $hash, 4-$myVerbose, "open Web_Connection failed: " . $result->{Error};
+       if(Fritz_Get_TR064_ServiceList($hash, "wancommonifconfig1") ) {
+         Fritz_Log $hash, 4, "wancommonifconfig1/box_wan_AccessType - start getting TR064 data";
 
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $result->{Error};
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 0;
+         # WANCommonInterfaceConfig:1 wancommonifconfig1 GetCommonLinkProperties
+         my @tr064CmdArray = (["WANCommonInterfaceConfig:1", "wancommonifconfig1", "GetCommonLinkProperties"]);
+         my $tr064Result = Fritz_SOAP_Request( $hash, 0, \@tr064CmdArray );
 
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+         if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
+           Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
+         } else {
+           Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
 
-       } else {
-         my $sidNew = defined $result->{sidNew} ? $result->{sidNew} : 0;
-
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidNewCount", $sidNew;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 1;
-
-         # start testing TR064 services
-         if( $hash->{SECPORT} ) {
-
-           if(Fritz_Get_TR064_ServiceList($hash, "wancommonifconfig1") ) {
-             Fritz_Log $hash, 4, "wancommonifconfig1/box_wan_AccessType - start getting TR064 data";
-
-             # WANCommonInterfaceConfig:1 wancommonifconfig1 GetCommonLinkProperties
-             my @tr064CmdArray = (["WANCommonInterfaceConfig:1", "wancommonifconfig1", "GetCommonLinkProperties"]);
-             my $tr064Result = Fritz_SOAP_Request( $hash, 0, \@tr064CmdArray );
-
-             if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
-               Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
-               Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
-             } else {
-               Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
-
-               if (exists $tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}) {
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", $tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{NewWANAccessType};
-               } else {
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
-               }
-             }
+           if (exists $tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}) {
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", $tr064Result->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{NewWANAccessType};
            } else {
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "";
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
            }
+         }
+       } else {
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "";
+       }
 
-           # start check API's
-           if ( $hash->{APICHECKED} <= 0 ) {
-             # push @roReadings, "RT_04_webQuery", sprintf( "%.2f", time() - $startTime);
+       my $avmModel = main::InternalVal($name, "MODEL", $hash->{boxModel});
+       my $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "tr64" . "desc.xml");
 
-             my $avmModel = main::InternalVal($name, "MODEL", $hash->{boxModel});
-             my $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "tr64" . "desc.xml");
+       Fritz_Log $hash, 4, "ApiCheck TR64 serviceList\n" . $serviceList;
 
-             Fritz_Log $hash, 4, "ApiCheck TR64 serviceList\n" . $serviceList;
+       # Reboot will not be tested, but added in TR064control
+       my $tr64service = $hash->{helper}{TR064control}{Reboot}{control};
 
-             # Reboot will not be tested, but added in TR064control
-             my $tr64service = $hash->{helper}{TR064control}{Reboot}{control};
+       if ($serviceList =~ /$tr64service/) {
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->Reboot->active", 1;
+       } else {
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->Reboot->active", 0;
+       }
 
-             if ($serviceList =~ /$tr64service/) {
-               Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->Reboot->active", 1;
-             } else {
-               Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->Reboot->active", 0;
-             }
+       # has to be deleted for preventing from testing
+       delete $hash->{helper}{TR064control}{Reboot};
 
-             # has to be deleted for preventing from testing
-             delete $hash->{helper}{TR064control}{Reboot};
+       my $lfnr = 1;
+       my $stat = 0; 
 
-             my $lfnr = 1;
-             my $stat = 0; 
+       my @tr064MultCmdArray;
+       my @tr064MultKeyArray;
+       foreach my $key (sort { $a cmp $b } keys %{ $hash->{helper}{TR064control} }) {
 
-             my @tr064MultCmdArray;
-             my @tr064MultKeyArray;
-             foreach my $key (sort { $a cmp $b } keys %{ $hash->{helper}{TR064control} }) {
+         $tr64service = $hash->{helper}{TR064control}{$key}{control};
 
-               $tr64service = $hash->{helper}{TR064control}{$key}{control};
+         if ($serviceList =~ /$tr64service/) {
 
-               if ($serviceList =~ /$tr64service/) {
+           Fritz_Log $hash, 4, "$key = $hash->{helper}{TR064control}{$key}{service}: available";
 
-                 Fritz_Log $hash, 4, "$key = $hash->{helper}{TR064control}{$key}{service}: available";
-
-                 my @column = split(" ", "$hash->{helper}{TR064control}{$key}{service} $hash->{helper}{TR064control}{$key}{control} $hash->{helper}{TR064control}{$key}{action}");
-                 push (@tr064MultCmdArray, \@column);
-                 my @columnK = split(" ", "$key $hash->{helper}{TR064control}{$key}{service} $hash->{helper}{TR064control}{$key}{action}");
-                 push (@tr064MultKeyArray, \@columnK);
-
-               } else {
-                 Fritz_Log $hash, 4, "$key = $hash->{helper}{TR064control}{$key}{service}: not available";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->" . $key . "->active", (-1);
-                 $stat = 0;
-               }
-             }
-
-             my $tr064Result = Fritz_SOAP_Request( $hash, 0, \@tr064MultCmdArray );
-
-             Fritz_Log $hash, 4, "ApiCheck tr064MultResult\n" . Fritz_Helper_Dumper($hash, $tr064Result);
-
-             for my $i (0 .. $#tr064MultKeyArray) {
-               if (exists($tr064Result->{Error}->{$tr064MultKeyArray[$i][1]}->{$tr064MultKeyArray[$i][2]}->{ErrLevel}) ) {
-                 Fritz_Log $hash, 4, "$tr064MultKeyArray[$i][0] = $tr064MultKeyArray[$i][1]: not Ok";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->" . $tr064MultKeyArray[$i][0] . "->active", 0;
-                 $stat = -1;
-               } else {
-                 Fritz_Log $hash, 4, "$tr064MultKeyArray[$i][0] = $tr064MultKeyArray[$i][1]: Ok";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->" . $tr064MultKeyArray[$i][0] . "->active", 1;
-                 $stat = 1;
-               }
-
-             }
-
-             my @trIGDMultCmdArray;
-             my @trIGDMultKeyArray;
-
-             $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "igd" . "desc.xml");
-             Fritz_Log $hash, 4, "ApiCheck IGD serviceList\n" . $serviceList;
-
-             foreach my $key (sort { $a cmp $b } keys %{ $hash->{helper}{IGDcontrol} }) {
-
-               my $IGDcontrol = $hash->{helper}{IGDcontrol}{$key}{control};
-
-               if ($serviceList =~ /$IGDcontrol/) {
-
-                 my @column = split(" ", "$hash->{helper}{IGDcontrol}{$key}{service} $hash->{helper}{IGDcontrol}{$key}{control} $hash->{helper}{IGDcontrol}{$key}{action}");
-                 push (@trIGDMultCmdArray, \@column);
-                 my @columnK = split(" ", "$key $hash->{helper}{IGDcontrol}{$key}{service} $hash->{helper}{IGDcontrol}{$key}{action}");
-                 push (@trIGDMultKeyArray, \@columnK);
-
-               } else {
-                 Fritz_Log $hash, 4, "$key = $hash->{helper}{IGDcontrol}{$key}{service}: not Ok";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->IGDcontrol->" . $key . "->active", (-1);
-                 $stat = 0;
-               }
-             }
-
-             my $igd064Result = Fritz_SOAP_Request( $hash, 1, \@trIGDMultCmdArray );
-
-             Fritz_Log $hash, 4, "ApiCheck trIGDMultCmdArray\n" . Fritz_Helper_Dumper($hash, $igd064Result);
-
-             for my $i (0 .. $#trIGDMultKeyArray) {
-               if (exists($igd064Result->{Error}->{$trIGDMultKeyArray[$i][1]}->{$trIGDMultKeyArray[$i][2]}->{ErrLevel}) ) {
-                 Fritz_Log $hash, 4, "$trIGDMultKeyArray[$i][0] = $trIGDMultKeyArray[$i][1]: not Ok";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->IGDcontrol->" . $trIGDMultKeyArray[$i][0] . "->active", 0;
-                 $stat = -1;
-               } else {
-                 Fritz_Log $hash, 4, "$trIGDMultKeyArray[$i][0] = $trIGDMultKeyArray[$i][1]: Ok";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->IGDcontrol->" . $trIGDMultKeyArray[$i][0] . "->active", 1;
-                 $stat = 1;
-               }
-
-             }
-
-             $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "igd" . "desc.xml");
-             Fritz_Log $hash, 4, "ApiCheck IGD serviceList\n" . $serviceList;
-
-           } # end testing TR064 services
-
-           # push @roReadings, "RT_06_TR064_IDG_Services", sprintf( "%.2f", time() - $startTime);
+           my @column = split(" ", "$hash->{helper}{TR064control}{$key}{service} $hash->{helper}{TR064control}{$key}{control} $hash->{helper}{TR064control}{$key}{action}");
+           push (@tr064MultCmdArray, \@column);
+           my @columnK = split(" ", "$key $hash->{helper}{TR064control}{$key}{service} $hash->{helper}{TR064control}{$key}{action}");
+           push (@tr064MultKeyArray, \@columnK);
 
          } else {
-           foreach my $key (keys %{ $hash->{helper}{TR064control} }) {
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->" . $key . "->active", -1;
-           }
-           foreach my $key (keys %{ $hash->{helper}{IGDcontrol} }) {
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->IGDcontrol->" . $key . "->active", -1;
-           }
-         } # end testing TR064 services
+           Fritz_Log $hash, 4, "$key = $hash->{helper}{TR064control}{$key}{service}: not available";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->" . $key . "->active", (-1);
+           $stat = 0;
+         }
+       }
 
-         # Start luaQuery API
+       my $tr064Result = Fritz_SOAP_Request( $hash, 0, \@tr064MultCmdArray );
 
-         if($luaQueryOk) {
+       Fritz_Log $hash, 4, "ApiCheck tr064MultResult\n" . Fritz_Helper_Dumper($hash, $tr064Result);
 
-           my $queryStr = "";
+       for my $i (0 .. $#tr064MultKeyArray) {
+         if (exists($tr064Result->{Error}->{$tr064MultKeyArray[$i][1]}->{$tr064MultKeyArray[$i][2]}->{ErrLevel}) ) {
+           Fritz_Log $hash, 4, "$tr064MultKeyArray[$i][0] = $tr064MultKeyArray[$i][1]: not Ok";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->" . $tr064MultKeyArray[$i][0] . "->active", 0;
+           $stat = -1;
+         } else {
+           Fritz_Log $hash, 4, "$tr064MultKeyArray[$i][0] = $tr064MultKeyArray[$i][1]: Ok";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->" . $tr064MultKeyArray[$i][0] . "->active", 1;
+           $stat = 1;
+         }
 
-           foreach my $key (keys %{ $hash->{helper}{LuaQueryCmd} }) {
-             Fritz_Log $hash, 4, $key . ": " . $hash->{helper}{LuaQueryCmd}{$key}{active} . ": " . $hash->{helper}{LuaQueryCmd}{$key}{AttrVal};
-             $queryStr .= "&" . $key . "=" . $hash->{helper}{LuaQueryCmd}{$key}{cmd};
-           }
+       }
 
-           Fritz_Log $hash, 4, "ReadOut gestartet: $queryStr";
-           $response = Fritz_call_Lua_Query( $hash, $queryStr, "", "luaQuery") ;
+       my @trIGDMultCmdArray;
+       my @trIGDMultKeyArray;
 
-           if ( !defined $response->{sid} || defined $response->{Error} || defined $response->{AuthorizationRequired} ) {
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+       $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "igd" . "desc.xml");
+       Fritz_Log $hash, 4, "ApiCheck IGD serviceList\n" . $serviceList;
 
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 0;
-             $apiError = "luaQuery:";
-             $apiError .= " empty sid" if !defined $response->{sid};
-             $apiError .= " error: $response->{Error}" if defined $response->{Error};
-             $apiError .= " authorization: $response->{AuthorizationRequired}" if defined $response->{AuthorizationRequired};
-             Fritz_Log $hash, 4, "$queryStr: not Ok";
+       foreach my $key (sort { $a cmp $b } keys %{ $hash->{helper}{IGDcontrol} }) {
+
+         my $IGDcontrol = $hash->{helper}{IGDcontrol}{$key}{control};
+
+         if ($serviceList =~ /$IGDcontrol/) {
+
+           my @column = split(" ", "$hash->{helper}{IGDcontrol}{$key}{service} $hash->{helper}{IGDcontrol}{$key}{control} $hash->{helper}{IGDcontrol}{$key}{action}");
+           push (@trIGDMultCmdArray, \@column);
+           my @columnK = split(" ", "$key $hash->{helper}{IGDcontrol}{$key}{service} $hash->{helper}{IGDcontrol}{$key}{action}");
+           push (@trIGDMultKeyArray, \@columnK);
+
+         } else {
+           Fritz_Log $hash, 4, "$key = $hash->{helper}{IGDcontrol}{$key}{service}: not Ok";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->IGDcontrol->" . $key . "->active", (-1);
+           $stat = 0;
+         }
+       }
+
+       my $igd064Result = Fritz_SOAP_Request( $hash, 1, \@trIGDMultCmdArray );
+
+       Fritz_Log $hash, 4, "ApiCheck trIGDMultCmdArray\n" . Fritz_Helper_Dumper($hash, $igd064Result);
+
+       for my $i (0 .. $#trIGDMultKeyArray) {
+         if (exists($igd064Result->{Error}->{$trIGDMultKeyArray[$i][1]}->{$trIGDMultKeyArray[$i][2]}->{ErrLevel}) ) {
+           Fritz_Log $hash, 4, "$trIGDMultKeyArray[$i][0] = $trIGDMultKeyArray[$i][1]: not Ok";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->IGDcontrol->" . $trIGDMultKeyArray[$i][0] . "->active", 0;
+           $stat = -1;
+         } else {
+           Fritz_Log $hash, 4, "$trIGDMultKeyArray[$i][0] = $trIGDMultKeyArray[$i][1]: Ok";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->IGDcontrol->" . $trIGDMultKeyArray[$i][0] . "->active", 1;
+           $stat = 1;
+         }
+
+       }
+
+       $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "igd" . "desc.xml");
+       Fritz_Log $hash, 4, "ApiCheck IGD serviceList\n" . $serviceList;
+
+     } else {
+       foreach my $key (keys %{ $hash->{helper}{TR064control} }) {
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->TR064control->" . $key . "->active", -1;
+       }
+       foreach my $key (keys %{ $hash->{helper}{IGDcontrol} }) {
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->IGDcontrol->" . $key . "->active", -1;
+       }
+     } # end testing TR064 services
+
+     # Start testing luaQuery API
+     if($luaQueryOk) {
+
+       my $queryStr = "";
+
+       foreach my $key (keys %{ $hash->{helper}{LuaQueryCmd} }) {
+         Fritz_Log $hash, 4, $key . ": " . $hash->{helper}{LuaQueryCmd}{$key}{active} . ": " . $hash->{helper}{LuaQueryCmd}{$key}{AttrVal};
+         $queryStr .= "&" . $key . "=" . $hash->{helper}{LuaQueryCmd}{$key}{cmd};
+       }
+
+       Fritz_Log $hash, 4, "ReadOut gestartet: $queryStr";
+       $response = Fritz_call_Lua_Query( $hash, $queryStr, "", "luaQuery") ;
+
+       if ( !defined $response->{sid} || defined $response->{Error} || defined $response->{AuthorizationRequired} ) {
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 0;
+         $apiError = "luaQuery:";
+         $apiError .= " empty sid" if !defined $response->{sid};
+         $apiError .= " error: $response->{Error}" if defined $response->{Error};
+         $apiError .= " authorization: $response->{AuthorizationRequired}" if defined $response->{AuthorizationRequired};
+         Fritz_Log $hash, 4, "$queryStr: not Ok";
+       } else {
+
+         foreach my $key (keys %{ $hash->{helper}{LuaQueryCmd} }) {
+
+           if((ref $response->{$key} ne 'ARRAY') && ref \$response->{$key} ne "SCALAR" ) {
+             Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: 2 not Ok";
+
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQuery->" . $key . "->active", 0;
+
+           } elsif(ref $response->{$key} eq 'ARRAY') {
+             my $views   = $response->{$key};
+             my $nbViews = scalar @$views;
+
+#             if($nbViews) {
+               Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: Ok";
+               Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 1;
+#              } else {
+#               Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: 3 not Ok";
+#               Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 0;
+#              }
+
+           } elsif ($response->{$key} eq "") {
+             Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: 4 not Ok";
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 0;
+
            } else {
-
-             foreach my $key (keys %{ $hash->{helper}{LuaQueryCmd} }) {
-
-               if((ref $response->{$key} ne 'ARRAY') && ref \$response->{$key} ne "SCALAR" ) {
-                 Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: 2 not Ok";
-
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "LuaQuery->" . $key . "->active", 0;
-
-               } elsif(ref $response->{$key} eq 'ARRAY') {
-                 my $views   = $response->{$key};
-                 my $nbViews = scalar @$views;
-
-#                 if($nbViews) {
-                   Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: Ok";
-                   Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 1;
-#                 } else {
-#                   Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: 3 not Ok";
-#                   Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 0;
-#                 }
-
-               } elsif ($response->{$key} eq "") {
-                 Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: 4 not Ok";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 0;
-
-               } else {
-                 Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: Ok";
-                 Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 1;
-               }
-             }
-             if ($osVersion >= 800) {
-               Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->box_cpuTemp->active", 0;
-               Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->box_cpuTemp->AttrVal", 0;
-               Fritz_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp", "";
-             }
-
+             Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: Ok";
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 1;
            }
+         }
+         if ($osVersion >= 800) {
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->box_cpuTemp->active", 0;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->box_cpuTemp->AttrVal", 0;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_cpuTemp", "";
+         }
 
-           # push @roReadings, "RT_07_luaQuery", sprintf( "%.2f", time() - $startTime);
-         } # End luaQuery API
+       }
 
-       } # end crdOK
+     } # End luaQuery API
 
-     }
-
-   }
+   } # end check API's full
 
    push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
 
@@ -11089,7 +11195,7 @@ sub Fritz_Readout_API_Check($)
 
    my $returnStr = join('|', @roReadings );
 
-   Fritz_Log $hash, 3, "Response -> " . $apiError;
+   Fritz_Log $hash, 4, "Response -> " . $apiError;
    Fritz_Log $hash, 4, "Captured " . @roReadings . " values";
    Fritz_Log $hash, 5, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
 
