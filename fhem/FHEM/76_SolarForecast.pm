@@ -163,6 +163,15 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
+                           "___csmSpecificEpieces: stündliche AVG-Aktualisierung auch im laufenden Betrieb, ausgelöst durch einen Stundenwechsel ".
+                           "neuer Consumer-Schlüssel exclgroup zur Formung einer Exclude-Gruppe ",
+  "2.6.7"  => "09.05.2026  __calcVectorConsumption: fix Doppelbatteriebug mit einem Batterieinverter Forum: https://forum.fhem.de/index.php?msg=1363211 ",
+  "2.6.6"  => "07.05.2026  nicht mehr benötigten Code entfernt, writeToHistory, _saveHistP1 und _saveHistP2 refactored, ___doPlanning refactored ".
+                           "Einbau consumerCacheDirty, ___setConsumerSwitchingState: lastOwnSwitchCmd eingebaut, ".
+                           "BLINDTIME, REAPLANINTVL einegbaut, Anti-Toggling / Cycle-Budget: Verhindert dass mehrere starke Consumer im selben ".
+                           "Zyklus starten und den PV-Überschuss überzeichnen. Implementiert durch surplusCycleCommitted als Zyklus-Budget ".
+                           "neuer Verbraucher Schlüssel swprio ",
   "2.6.5"  => "03.05.2026  _batChargeMgmt Refactored: Äußere Stundenschleife -> Innere Batterieschleife, Fix 100%-Bug ".
                            "wichtiger Bugfix weekday in LOCALE_DAYNAMES, Debug consumerPlanning angepasst ".
                            "Speicherung von bevcsmBatCapXX und bevcsmPwrXX in pvHistory und aiRawData ",
@@ -275,57 +284,8 @@ my %vNotesIntern = (
                            "_transferMeterValues: modul accept meter reset > 0 at day start ",
   "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
   "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
-  "1.56.0" => "07.08.2025  set MAXINVERTER to 5 ",
-  "1.55.0" => "06.08.2025  DWD-Weather and DWD-Radiation device new minimum value of attr 'forecastDays' is 2 ".
-                           "checkPlantConfig: check forecastDays of new minimum value ".
-                           "___createOpenMeteoURL: set forecast_hours=72, bugfix of V 1.54.7 ".
-                           "Nexthours: max 72 hours available but not more than 3 days ",
-  "1.54.7" => "01.08.2025  _transferAPIRadiationValues: Extension of Nexthours content up to 48 hours into the future ".
-                           "attr graphicBeamHeightLevelX is obsolete -> use graphicControl instead ".
-                           "attr graphicControl new key beamHeightlevel ",
-  "1.54.6" => "29.07.2025  _graphicConsumerLegend: show surplus method and result in consumer legend hoover ",
-  "1.54.5" => "24.07.2025  isAddSwitchOnCond/isAddSwitchOffCond: change debug info ",
-  "1.54.4" => "22.07.2025  replace length by new sub strlength, Consumer attr new key 'aliasshort', change code of medianArray ".
-                           "medianArray: can optional use newest 3..20 elements, avgArray: use the newest elements if num is set ".
-                           "Debug consumerSwitching: print out info message of compare operation, remove attr graphicShowDiff ".
-                           "store surpmeth calc result in key surpmethResult in Consumer master record, __readFileMessages: refactored code ".
-                           "surpmeth: use average[_2..20] instead of numeric values 2.20 only ",
-  "1.54.3" => "19.07.2025  ctrlDebug: add collectData_long ",
-  "1.54.2" => "18.07.2025  _createSummaries: add debug infos ",
-  "1.54.1" => "08.07.2025  userExit: new coding, __createReduceIcon: fix Wide character in syswrite - https://forum.fhem.de/index.php?msg=1344368 ".
-                           "_setattrKeyVal: optimize function between execute from FHEMWEB and Commandline ".
-                           "_beamGraphicFirstHour, _beamGraphicRemainingHours: decimal places according to the setting of the energy unit ".
-                           "___switchConsumerOn: Switch on consumers even if they are not interruptible after state interrupted|interrupting|continuing ".
-                           "increase MAXCONSUMER up to 20 ",
-  "1.54.0" => "05.07.2025  edit commandref, ___areaFactorTrack: important bugfix in calc of direct area factor for DWD use ",
-  "1.53.3" => "04.07.2025  Change of the correction factor calculation to the ratio of real production and the API raw forecast ",
-  "1.53.2" => "03.07.2025  graphicControl->showDiff can be set separately for each level ".
-                           "setupInverterDevXX: Check that there are no commas with spaces before and after (strings) ",
-  "1.53.1" => "30.06.2025  add utf8 smileys, fix Perl warning uninitialized value \$color ",
-  "1.53.0" => "28.06.2025  new battery style (batcontainer), new key setupBatteryDevXX->label, new reading Battery_ChargeUnrestricted_XX ".
-                           "attribute graphicShowDiff replaced by graphicControl->showDiff ".
-                           "check local coordinates are set in global device and fill message system if failure ".
-                           "consumer Attr key noshow new possible value '9', _beamGraphic: scaleMode log double reduce Discount of z3 ".
-                           "new key plantControl->reductionState, _calcDataEveryFullHour and subs: changeover aln to pvrlvd ".
-                           "_getaiDecTree: reduce character size of aiRawData, set ... reset: pvCorrection deletes hidden readings too ",
-  "1.52.18"=> "23.06.2025  ctrlSpecialReadings: new option conForecastComingNight, fix last hour of remainingSurplsHrsMinPwrBat_ ".
-                           "some more minor fixes ",
-  "1.52.17"=> "22.06.2025  remainingSurplsHrsMinPwrBat_: calculate with two decimal places ",
-  "1.52.16"=> "21.06.2025  _genSpecialReadings: new option remainingSurplsHrsMinPwrBat_XX ",
-  "1.52.15"=> "20.06.2025  ctrlBatSocManagementXX->loadAbort expanded by unlock condition ",
-  "1.52.14"=> "18.06.2025  _beamGraphic: rework linear and logarithmic normalization of beam height ",
-  "1.52.13"=> "17.06.2025  _genSpecialReadings: new option remainingHrsWoChargeRcmdBat_XX, edit comref ",
-  "1.52.12"=> "15.06.2025  readCacheFile: option aitrained -> Code optimized for saving memory ".
-                           "fillupMessageSystem: prevent Icon failore if SV contain spaces ".
-                           "setupBatteryDevXX: 'dyn' -> Battery color can be dynamically set depending from SoC value ",
-  "1.52.11"=> "03.06.2025  _genSpecialReadings: new option todayNotOwnerConsumption ",
-  "1.52.10"=> "03.06.2025  attr plantControl->genPVforecastsToEvent new possible value 'adapt4fSteps' ",
-  "1.52.9" => "02.06.2025  __getDWDSolarData: new sub azSolar2Astro, ctrlBatSocManagementXX: new key loadAbort ",
-  "1.52.8" => "01.06.2025  _calcConsForecast_legacy: use avgArray if number included days <= number of days in pvHistory ",
-  "0.1.0"  => "09.12.2020  initial Version "
+  "0.1.0"  => "09.12.2020  initiale Version "
 );
-
-
 
 
 # Locale-abhängige Kurz-Wochentage erzeugen (Mo, Tue, lun., …)
@@ -378,9 +338,10 @@ use constant {
   BICCOLRCDDEF    => 'grey',                                                        # default Batterie-Icon Färbung bei Ladefreigabe und Inaktivität
   BICCOLNRCDDEF   => '#cccccc',                                                     # default Batterie-Icon Färbung bei fehlender Ladefreigabe
   BCHGICONCOLDEF  => 'darkorange',                                                  # default 'Aufladen' Batterie-Icon Färbung
-  BDCHICONCOLDEF  => '#b32400',                                                                              # default 'Entladen' Batterie-Icon Färbung
-  BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                   # Basispfad Abruf contrib SolarForecast Files
-  BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',     # Basispfad GitHub SolarForecast Files
+  BDCHICONCOLDEF  => '#b32400',                                                                             # default 'Entladen' Batterie-Icon Färbung
+  BLINDTIME       => 30,                                                                                    # Sekunden Toleranzfenster nach eigenem Schaltbefehl
+  BPATH           => 'https://svn.fhem.de/trac/browser/trunk/fhem/contrib/SolarForecast/',                  # Basispfad Abruf contrib SolarForecast Files
+  BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',    # Basispfad GitHub SolarForecast Files
   
   CACHETIRMS      => 2000,                                                          # max. Size Tilted Irradiance Cache
   CACHETSOMS      => 4000,                                                          # max. Size TimestringsFromOffset Cache
@@ -474,6 +435,8 @@ use constant {
   PGHPATH         => '',                                                            # GitHub Post Pfad
   PPATH           => '?format=txt',                                                 # Download Format
 
+  REAPLANINTVL    => 1800,                                                          # Neuplanungsintervall in Sekunden (30 Min)
+  
   STOREFFDEF      => 87,                                                            # default Batterie Effizienz (https://www.energie-experten.org/erneuerbare-energien/photovoltaik/stromspeicher/wirkungsgrad)
   SLIDENUMMAX     => 3,                                                             # max. Anzahl der Arrayelemente in Schieberegistern
   SPLSLIDEMAX     => 20,                                                            # max. Anzahl der Arrayelemente in Schieberegister PV Überschuß und anderen
@@ -2669,7 +2632,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
   if ($ctype   eq 'noSchedule' || 
       $cplmode eq 'mostNot') {
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps}       = 'noSchedule';
       $paref->{consumer} = $c;
@@ -3167,15 +3130,11 @@ sub _setreset {                          ## no critic "not used"
 
               Log3 ($name, 3, qq{$name - Day "$dday" hour "$dhour" deleted from pvHistory});
 
-              $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
-              $paref->{reorgday} = $dday;
-              $paref->{hkey}     = '';
-
-              _saveHistP1 ($paref);
-
-              delete $paref->{reorg};
-              delete $paref->{reorgday};
-              delete $paref->{hkey};
+              _saveHistP1 ( { paref    => $paref, 
+                              reorg    => 1,                                    # den Tag Stunde "99" reorganisieren
+                              reorgday => $dday, 
+                              key      => '', 
+                            } );
           }
           else {
               delete $data{$name}{pvhist}{$dday};
@@ -3199,15 +3158,11 @@ sub _setreset {                          ## no critic "not used"
               delete $data{$name}{pvhist}{$dday}{$dhour}{con};
               Log3 ($name, 3, qq{$name - consumption day "$dday" hour "$dhour" deleted from pvHistory});
 
-              $paref->{reorg}    = 1;                                          # den Tag Stunde "99" reorganisieren
-              $paref->{reorgday} = $dday;
-              $paref->{hkey}     = '';
-
-              _saveHistP1 ($paref);
-
-              delete $paref->{reorg};
-              delete $paref->{reorgday};
-              delete $paref->{hkey};
+              _saveHistP1 ( { paref    => $paref, 
+                              reorg    => 1,                                    # den Tag Stunde "99" reorganisieren
+                              reorgday => $dday, 
+                              key      => '', 
+                            } );
           }
           else {
               for my $hr (sort keys %{$data{$name}{pvhist}{$dday}}) {
@@ -3262,15 +3217,15 @@ sub _setreset {                          ## no critic "not used"
               Log3 ($name, 3, qq{$name - stored PV correction factor of hour "$circh" from pvCircular and pvHistory deleted});
           }
           else {
-              for my $hod (keys %{$data{$name}{circular}}) {
-                  delete $data{$name}{circular}{$hod}{pvcorrf};
-                  delete $data{$name}{circular}{$hod}{quality};
-                  delete $data{$name}{circular}{$hod}{pvrlsum};
-                  delete $data{$name}{circular}{$hod}{pvfcsum};
-                  delete $data{$name}{circular}{$hod}{dnumsum};
+              for my $circhod (keys %{$data{$name}{circular}}) {
+                  delete $data{$name}{circular}{$circhod}{pvcorrf};
+                  delete $data{$name}{circular}{$circhod}{quality};
+                  delete $data{$name}{circular}{$circhod}{pvrlsum};
+                  delete $data{$name}{circular}{$circhod}{pvfcsum};
+                  delete $data{$name}{circular}{$circhod}{dnumsum};
 
-                  for my $k (keys %{$data{$name}{circular}{$hod}}) {
-                      delete $data{$name}{circular}{$hod}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
+                  for my $k (keys %{$data{$name}{circular}{$circhod}}) {
+                      delete $data{$name}{circular}{$circhod}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
                   }
               }
 
@@ -7589,6 +7544,8 @@ sub _attrconsumer {                      ## no critic "not used"
       noshow          => { comp => '',                                must => 0, act => 0 },
       exconfc         => { comp => '[012]',                           must => 0, act => 0 },
       pvshare         => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
+      swprio          => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
+      exclgroup       => { comp => '[1-9]\d*',                        must => 0, act => 0 },
       
       # --- nur für bev (musts in __attrKeyAction checken)
       batCap          => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh))',  must => 0, act => 1 },
@@ -10869,8 +10826,6 @@ sub centralTask {
       #my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
       #aiFannDetectDrift ($name, $t, 'DE', $debug, 'con', 96) if($rdy);                         # Drift von AI 'con' Werten ermitteln
 
-  debugLog ($centpars, 'saveData2Storage', "_saveHistP1 -> stored simple  - current dayname=$dayname");
-
   if ($debug !~ /^none$/xs) {
       Log3 ($name, 4, "$name DEBUG> ################################################################");
       Log3 ($name, 4, "$name DEBUG> ###                  New centralTask cycle                   ###");
@@ -11221,6 +11176,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{type}              = $hc->{type}         // DEFCTYPE;                     # Typ des Verbrauchers
       $data{$name}{consumers}{$c}{power}             = $hc->{power};                                        # Leistungsaufnahme des Verbrauchers in W
       $data{$name}{consumers}{$c}{pvshare}           = $hc->{pvshare}      // 100;                          # Anteil PV am Strommix des Verbrauchers
+      $data{$name}{consumers}{$c}{swprio}            = $hc->{swprio}       // 0;                            # Planungs- und Schaltpriorität des Verbrauchers
       $data{$name}{consumers}{$c}{avgenergy}         = q{};                                                 # Initialwert Energieverbrauch (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mintime}           = $hc->{mintime}      // $hef{$ctype}{mt};             # Initialwert min. Einplanungsdauer (evtl. Überschreiben in manageConsumerData)
       $data{$name}{consumers}{$c}{mode}              = $hc->{mode}         // DEFCMODE;                     # Planungsmode des Verbrauchers
@@ -11240,6 +11196,7 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{asynchron}         = $asynchron          // 0;                            # Arbeitsweise FHEM Consumer Device
       $data{$name}{consumers}{$c}{noshow}            = $noshow             // 0;                            # ausblenden in Grafik
       $data{$name}{consumers}{$c}{exconfc}           = $exconfc            // 0;                            # Verbrauch von Erstelleung der Verbrauchsprognose ausschließen
+      $data{$name}{consumers}{$c}{exclgroup}         = $hc->{exclgroup}    // 0;                            # Exclude Gruppe
       $data{$name}{consumers}{$c}{surpmeth}          = $hc->{surpmeth}     // 'default';                    # Ermittlungsmethode des PV-Überschusses, default -> direkte Messung
       $data{$name}{consumers}{$c}{locktime}          = $clt                // '0:0';                        # Sperrzeit im Automatikmodus ('offlt:onlt')
       $data{$name}{consumers}{$c}{onreg}             = $onreg              // 'on';                         # Regex für 'ein'
@@ -13231,7 +13188,7 @@ sub _transferMeterValues {
       $data{$name}{circular}{99}{initdaygcon} = 0;
       Log3 ($name, 3, "$name - WARNING - '$medev' - total Grid consumption '$gctotal' is lower than the day Init value '$idgcon'. The initialization for the day was performed again.");
   }
-  elsif ($gcdaypast == 0) {                                                                             # Stundenberechnung auf Basis Totalwerte GridConsumtion
+  elsif ($gcdaypast == 0) {                                                                                 # Stundenberechnung auf Basis Totalwerte GridConsumtion
       if (defined $idgcon) {
           $docon = 1;
       }
@@ -13293,6 +13250,8 @@ sub _transferMeterValues {
       $data{$name}{circular}{sprintf("%02d",$nhour)}{gfeedin} = $gftotthishour;
 
       writeToHistory ( { paref => $paref, key => 'gfeedin', val => $gftotthishour, day => $day, hour => $nhour } );
+      
+      debugLog ($paref, "saveData2Storage|collectData", "write to pvHistory - day: $paref->{day}, hod: $nhour, GridFeedIn (gfeedin): $gftotthishour Wh");
   }
 
 return;
@@ -13382,7 +13341,7 @@ sub _transferBatteryValues {
       }
 
       if ($debug =~ /collectData/x) {
-          Log3 ($name, 1, "$name DEBUG> collect Battery Readings data: device=$badev =>");
+          Log3 ($name, 1, "$name DEBUG> collect Battery $bn Readings data: device=$badev =>");
           Log3 ($name, 1, "$name DEBUG> pin: $pbi W, pout: $pbo W, totalin: $btotin Wh, totalout: $btotout Wh, soc: $soc");
       }
 
@@ -15457,7 +15416,7 @@ sub _createSummaries {
 
   if ($debug =~ /collectData/xs) {
       Log3 ($name, 1, "$name DEBUG> current Power values -> PV2Node: $pv2node W, PV2Bat: $pv2bat, PV2Grid: $pv2grid W, Other: $ppall W, GridIn: $gfeedin W, GridCon: $gcon W");
-      Log3 ($name, 1, "$name DEBUG> current Power Battery -> BatIn: $batin W (Node2Inv2DC: $node2inv2dc W), BatOut: $batout W (DC2Inv2Node: $dc2inv2node W)");
+      Log3 ($name, 1, "$name DEBUG> current Power Battery (all) -> BatIn: $batin W (Node2Inv2DC: $node2inv2dc W), BatOut: $batout W (DC2Inv2Node: $dc2inv2node W)");
       Log3 ($name, 1, "$name DEBUG> current Consumption result -> $consumption W");
   }
 
@@ -15520,46 +15479,66 @@ return;
 sub __calcVectorConsumption {
   my $paref       = shift;
   my $name        = $paref->{name};
-  my $batout      = $paref->{batout};
-  my $batin       = $paref->{batin};
-  my $pv2bat      = $paref->{pv2bat};
-  my $pv2node     = $paref->{pv2node};
-  my $dc2inv2node = $paref->{dc2inv2node};
-  my $node2inv2dc = $paref->{node2inv2dc};
-  my $ppall       = $paref->{ppall};
-  my $gfeedin     = $paref->{gfeedin};
-  my $gcon        = $paref->{gcon};
+  my $batout      = $paref->{batout};                                                       # akt. Entladeleistung aller Batterien
+  my $batin       = $paref->{batin};                                                        # akt. Ladeleistung aller Batterien
+  my $pv2bat      = $paref->{pv2bat};                                                       # Direktladen PV nur in die Batterie (Solarlader)
+  my $pv2node     = $paref->{pv2node};                                                      # PV-Erzeugung Inverter an den Hausknoten
+  my $dc2inv2node = $paref->{dc2inv2node};                                                  # DC->AC: Speisung Inverter aus Batterie oder Solar-Ladegerät
+  my $node2inv2dc = $paref->{node2inv2dc};                                                  # AC->DC: Ladung Batterie aus Inverterknoten (PV- oder Hybrid-Wechselrichter)
+  my $ppall       = $paref->{ppall};                                                        # aktuelle Erzeuguung aller nicht PV-Producer
+  my $gfeedin     = $paref->{gfeedin};                                                      # vom Inverter-Knoten zum Grid
+  my $gcon        = $paref->{gcon};                                                         # GridConsumption
 
   my $vector;
   $vector->{batDischarge2HomeNode} = 0;
-  my $node2bat = 0;                                                                       # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)
+  my $node2bat = 0;                                                                         # Verbindung Inv.Knoten <-> Batterie ((-) Bat -> Knoten, (+) Knoten -> Bat)
   my $bat2home = 0;
 
   ## Vectorverbrauch
   ####################
-  if ($batout || $batin) {                                                                # Batterie wird geladen oder entladen
-      $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;             # positiv: Richtung Inverter Knoten -> Bat, negativ: Richtung Bat -> Inverter Knoten
-      $node2bat = 0 if(($dc2inv2node || $node2inv2dc) && $node2bat != 0);
+  if ($batout || $batin) {                                                                  # Batterie wird geladen oder entladen
+      $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;               # positiv: Richtung Inverter-Knoten -> Bat, negativ: Richtung Bat -> Inverter-Knoten
 
-      if ($node2bat < 0 && !$dc2inv2node && !$pv2bat) {                                   # Batterieentladung direkt ins Hausnetz wenn kein Batterie- / Hybridwechselrichter und kein Batterieladegerät aktiv
+      if ($node2bat > 0) {
+          if ($dc2inv2node || $node2inv2dc || $pv2bat) {                                    # Messartefakt (Zeitversatz AC/DC) nur wenn Batterie-Pfad-Variablen aktiv.
+              $node2bat = 0;
+          }
+      }
+
+      if ($node2bat < 0 && !$batout) {
+          $node2bat = 0;                                                                    # neg. Messartefakt beim Laden
+      }
+      elsif ($node2bat < 0) {                                                               # echte Direktentladung ins Haus
           $bat2home = abs $node2bat;
           $node2bat = 0;
           $vector->{batDischarge2HomeNode} = 1;
       }
   }
   else {
-      $node2bat  = $dc2inv2node - $pv2bat;                                                # falls Batterie Idle und Smartloader arbeitet
-      $node2bat  = 0 if($dc2inv2node && $node2bat > 0);                                   # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
+      $node2bat = $dc2inv2node - $pv2bat;                                                   # falls Batterie Idle und Smartloader arbeitet
+      $node2bat = 0 if($dc2inv2node && $node2bat > 0);                                      # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
+  }
+  
+  if ($node2bat > 0) {
+      # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
+      # - dc2inv2node: Hybrid-Wechselrichter entlädt (Zeitversatz AC/DC-Messung)
+      # - node2inv2dc: Wechselrichter lädt (Zeitversatz AC/DC-Messung)
+      # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
+      # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
+      # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
+      if ($dc2inv2node || $node2inv2dc || $pv2bat) {
+          $node2bat = 0;
+      }
   }
 
-  my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                        # Erzeugung Summe im Inverter-Knoten
-  $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                      # z.B. Batterie ist voll und SolarLader liefert an Knoten
+  my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                          # Erzeugung Summe im Inverter-Knoten
+  $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                        # z.B. Batterie ist voll und SolarLader liefert an Knoten
   $pnodesum     = __normDecPlaces ($pnodesum);
 
-  my $node2home = $pnodesum - $gfeedin - ($node2bat > 0 ? $node2bat : 0);                 # Energiefluß vom Knoten zum Haus
+  my $node2home = $pnodesum - $gfeedin - ($node2bat > 0 ? $node2bat : 0);                   # Energiefluß vom Knoten zum Haus
   $node2home    = __normDecPlaces ($node2home);
 
-  $vector->{vectorconsumption} = round0 ($gcon + $node2home + $bat2home);                 # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
+  $vector->{vectorconsumption} = round0 ($gcon + $node2home + $bat2home);                   # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
 
   ## Linearverbrauch
   ####################
@@ -15577,45 +15556,54 @@ return $vector;
 #                  Management Consumer
 ################################################################
 sub _manageConsumerData {
-  my $paref   = shift;
-  my $name    = $paref->{name};
-  my $chour   = $paref->{chour};
-  my $day     = $paref->{day};
-  my $debug   = $paref->{debug};
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $chour = $paref->{chour};
+  my $day   = $paref->{day};
+  my $debug = $paref->{debug};
 
-  my $hash    = $defs{$name};
-  my $hod     = sprintf "%02d", ($chour + 1);
+  my $hash  = $defs{$name};
+  my $hod   = sprintf "%02d", ($chour + 1);
   
   my $pcurrsum = 0;
+  $data{$name}{current}{surplusCycleCommitted} = 0;                                 # Anti-Toggling: das Surplus Budget zurücksetzen
+  
+  # --- Prio-Steuerung
+  # Wertebereich: 0–100, Default 0
+  # 0 = keine Priorität, Reihenfolge wie bisher (Nummer aufsteigend)
+  # 100 = höchste Priorität, wird zuerst verarbeitet, bekommt immer zuerst Budget
+  my @csorted = sort {
+      ConsumerVal ($name, $b, 'swprio', 0) <=> ConsumerVal ($name, $a, 'swprio', 0)
+      ||
+      $a <=> $b                                                                     # bei gleicher Priorität: Nummer aufsteigend
+  } keys %{$data{$name}{consumers}};
 
-  for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {
+
+  for my $c (@csorted) {
       my $cname          = ConsumerVal ($name, $c, 'name',       '');
       my $calias         = ConsumerVal ($name, $c, 'alias',  $cname);
-      my $ctype          = ConsumerVal ($name, $c, 'type', DEFCTYPE);   
+      my $ctype          = ConsumerVal ($name, $c, 'type', DEFCTYPE);  
+      my $swprio         = ConsumerVal ($name, $c, 'swprio',      0); 
 
       $paref->{consumer} = $c;
       $paref->{cname}    = $cname;
       $paref->{calias}   = $calias;
       $paref->{ctype}    = $ctype;
       
-      my $cactive = __queryConsumerActiveState ($paref);                            # Consumer aktiviert?
+      my $cactive      = __queryConsumerActiveState ($paref);                       # Consumer aktiviert?      
       
       $paref->{cactive} = $cactive;
       
       __saveBEVvalues ($paref);                                                     # BEV Consumer (vor __savePowerAndEnergy) auslesen
-      
-      $paref->{nhour} = $hod;                                                       # !! writeToHistory löscht diese Einträge !!
-      $paref->{nday}  = $day;
   
-      my $pcurr  = __savePowerAndEnergy ($paref);                                   # aktuelle Leistung und Energieverbrauch auslesen + speichern
+      my $pcurr = __savePowerAndEnergy ($paref);                                    # aktuelle Leistung und Energieverbrauch auslesen + speichern
       
-      $paref->{nhour} = $hod;                                                       # !! writeToHistory löscht diese Einträge !!
-      $paref->{nday}  = $day;
       $pcurrsum      += $pcurr;
       $paref->{pcurr} = $pcurr;
       
       if ($debug =~ /consumerPlanning/x) {
           Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - priority=$swprio});
       }
 
       __getAutomaticState     ($paref);                                             # Automatic Status des Consumers abfragen
@@ -15682,19 +15670,22 @@ sub _manageConsumerData {
       delete $paref->{calias};
       delete $paref->{ctype};
       delete $paref->{cactive};
-      delete $paref->{nday};
-      delete $paref->{nhour};
   }
   
   
   # --- vorhandene Consumernummern v. Wärmepumpen ermitteln und speichern
-  #########################################################################
   my $bevcsm = isBevUsed      ($name);
   my $hpcsm  = isHeatPumpUsed ($name);
   writeToHistory ( { paref => $paref, key => 'hpcsm',  val => $hpcsm,  day => $day, hour => $hod } ) if($hpcsm);
   writeToHistory ( { paref => $paref, key => 'bevcsm', val => $bevcsm, day => $day, hour => $hod } ) if($bevcsm);
 
   $data{$name}{current}{dummyConsumption} = CurrentVal ($name, 'consumption', 0) - $pcurrsum;                     # aktueller Verbrauch - Summe aller ConsumerPower
+  
+  # --- Consumer Cache File schreiben
+  if (CurrentVal ($name, 'consumerCacheDirty', 0)) {
+      writeCacheToFile ($hash, 'consumers', $csmcache.$name);
+      delete $data{$name}{current}{consumerCacheDirty};
+  }
 
 return;
 }
@@ -15712,6 +15703,7 @@ sub __queryConsumerActiveState {
   my $c     = $paref->{consumer};
   my $cname = $paref->{cname};
   my $ctype = $paref->{ctype};
+  my $nolog = $paref->{nolog} // 0;                                                             # Logausgabe unterdrücken (z.B. bei Grafik)
   
   my $cactive = 0;
   
@@ -15728,11 +15720,10 @@ sub __queryConsumerActiveState {
       
       $data{$name}{consumers}{$c}{mode} = 'mustNot' if(!$cactive);                              # Planungen verbieten wenn Consumer deaktiviert
       
-      debugLog ($paref, 'collectData', "BEV - id=".(defined $evid ? $evid : 'undef')." -> consumer=$c activated=$cactive");   
+      debugLog ($paref, 'collectData', "BEV - id=".(defined $evid ? $evid : 'undef')." -> consumer=$c activated=$cactive") if(!$nolog);   
   }
   else {
-      $cactive = 1;                                                                             # default 1=active
-      debugLog ($paref, 'collectData', "consumer=$c activated=$cactive"); 
+      $cactive = 1;                                                                             # default 1=active  
   }
 
 return $cactive;
@@ -15855,7 +15846,7 @@ sub __savePowerAndEnergy {
       }
 
       # --- Energieverbrauch ermitteln
-      if (defined $ehist) {                                                             # Stundenwechsel von vorn beginnen
+      if (defined $ehist) {                                                             
           if ($etot >= $ehist && ($etot - $ehist) >= $ethreshold) {
               my $consumerco  = $etot - $ehist;
 
@@ -15872,20 +15863,21 @@ sub __savePowerAndEnergy {
                   Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$cname< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
               }
 
-              $paref->{val}  = round2 ($consumerco);                                    # Verbrauch des Consumers aktuelle Stunde
-              $paref->{hkey} = "csme${c}";
-
-              _saveHistP1 ($paref);
+              _saveHistP1 ( { paref => $paref, 
+                              key   => "csme${c}",
+                              val   => round2 ($consumerco),                            # Verbrauch des Consumers aktuelle Stunde                             
+                              day   => $day,
+                              hour  => $hod,
+                            } );
           }
       }
-      else {
-          $paref->{val}  = $etot;                                                       # Totalverbrauch des Verbrauchers
-          $paref->{hkey} = "csmt${c}";
-
-          _saveHistP1 ($paref);
-
-          delete $paref->{hkey};
-          delete $paref->{val};
+      else {                                                                            # Stundenwechsel von vorn beginnen         
+          _saveHistP1 ( { paref => $paref, 
+                          key   => "csmt${c}",
+                          val   => $etot,                                               # Totalverbrauch des Verbrauchers                            
+                          day   => $day,
+                          hour  => $hod,
+                        } );
       }
   }
 
@@ -16047,16 +16039,6 @@ sub ___csmSpecificEpieces {
   my $c     = $paref->{consumer};
   my $etot  = $paref->{etot};
   my $t     = $paref->{t};
-
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ########################################################################################################################
-  if (defined $data{$name}{consumers}{$c}{epiecHist}) {                                                # 15.11.2025
-      $data{$name}{consumers}{$c}{epiecActive} = delete $data{$name}{consumers}{$c}{epiecHist};
-  }
-  if (defined $data{$name}{consumers}{$c}{epiecStartTime}) {                                                # 15.11.2025
-      $data{$name}{consumers}{$c}{epiecSwitchTime} = delete $data{$name}{consumers}{$c}{epiecStartTime};
-  }
-  ########################################################################################################################
   
   if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'on') {                                                                # Status "Aus" verzögern um Pausen im Waschprogramm zu überbrücken
       $data{$name}{consumers}{$c}{lastOnTime} = $t;
@@ -16113,51 +16095,74 @@ sub ___csmSpecificEpieces {
       $data{$name}{consumers}{$c}{$epiecHist_hours}          = $ediff > 0.0 ? $hourSinceSwitch : $hourSinceSwitch - 1;  # Stunde akzeptieren wenn mehr als 1 Wh verbraucht
 
       debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - energy consumption in operating hour $hourSinceSwitch (ediff): $ediff Wh});
+
+      # --- stündliche AVG-Aktualisierung im laufenden Betrieb (C5)
+      my $lastAvgUpdate = ConsumerVal ($name, $c, 'epiecAVGUpdateHour', -1);
+
+      if ($hourSinceSwitch != $lastAvgUpdate) {                                                                         # Stundenwechsel -> AVG aktualisieren
+          $data{$name}{consumers}{$c}{epiecAVGUpdateHour} = $hourSinceSwitch;
+          ___calcEpiecAVG ($paref);
+      }
   }
   else {                                                                                                                # neuen epiec-Zyklus starten: nach OFF >= X Sekunden oder mehr als EPIECMAXOPHRS ununterbrochenen Betriebsstunden
       if ($curr_epiecHour > 0) {
-          my $operhours = 0;
-
-          for my $h (1..EPIECMAXCYCLES) {                                                                               # durchschnittliche Betriebsstunden über alle epieces ermitteln
-              $operhours += ConsumerVal ($name, $c, 'epiecHist_'.$h.'_hours', 0);
-          }
-
-          my $avghours                                = ceil ($operhours / EPIECMAXCYCLES);
-          $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                                      # durchschnittliche Betriebsstunden pro Zyklus
-          delete $data{$name}{consumers}{$c}{epiecAVG};                                                                 # Durchschnitt für epics neu ermitteln
-
-          for my $hour (1..$avghours) {                                                                      
-              my $hoursE = 0;
-              my $hsum;
-
-              for my $h (1..EPIECMAXCYCLES) {                                                          
-                  my $ecycle = 'epiecHist_'.$h;
-
-                  if (defined $data{$name}{consumers}{$c}{$ecycle}{$hour}) {
-                      my $pth = ConsumerVal ($name, $c, 'powerthreshold', 0);   
-                      
-                      if ($data{$name}{consumers}{$c}{$ecycle}{$hour} > $pth) {
-                          $hsum += $data{$name}{consumers}{$c}{$ecycle}{$hour};
-                          $hoursE++;
-                      }
-                  }
-
-              }
-
-              my $ahval;
-              $ahval = round2 ($hsum / $hoursE) if($hoursE > 0);                                                       # Durchschnitt ermittelt und speichern
-              
-              $data{$name}{consumers}{$c}{epiecAVG}{$hour} = $ahval;
-
-              debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average epiece of operating hour $hour: }.(defined $ahval ? $ahval : 'undef'));
-          }
-          
-          debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average operating hours per cycle (epiecAVG_hours): $avghours});
+          ___calcEpiecAVG ($paref);
       }
 
       delete $data{$name}{consumers}{$c}{epiecSwitchTime};
-      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                                     # epiecHour bei nächsten Durchlauf erhöhen 
+      delete $data{$name}{consumers}{$c}{epiecAVGUpdateHour};                                                           # Stunden-Tracker zurücksetzen
+      $data{$name}{consumers}{$c}{epiecHour} = -1;                                                                      # epiecHour bei nächsten Durchlauf erhöhen 
   }
+
+return;
+}
+
+################################################################
+#  epiecAVG berechnen und speichern
+#  wird sowohl beim Zyklusende als auch stündlich im
+#  laufenden Betrieb aufgerufen (C5)
+################################################################
+sub ___calcEpiecAVG {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+
+  my $operhours = 0;
+
+  for my $h (1..EPIECMAXCYCLES) {                                                                                       # durchschnittliche Betriebsstunden über alle epieces ermitteln
+      $operhours += ConsumerVal ($name, $c, 'epiecHist_'.$h.'_hours', 0);
+  }
+
+  my $avghours                                = ceil ($operhours / EPIECMAXCYCLES);
+  $data{$name}{consumers}{$c}{epiecAVG_hours} = $avghours;                                                             # durchschnittliche Betriebsstunden pro Zyklus
+  
+  delete $data{$name}{consumers}{$c}{epiecAVG};                                                                        # Durchschnitt für epics neu ermitteln
+
+  for my $hour (1..$avghours) {
+      my $hoursE = 0;
+      my $hsum;
+
+      for my $h (1..EPIECMAXCYCLES) {
+          my $ecycle = 'epiecHist_'.$h;
+
+          if (defined $data{$name}{consumers}{$c}{$ecycle}{$hour}) {
+              my $pth = ConsumerVal ($name, $c, 'powerthreshold', 0);
+
+              if ($data{$name}{consumers}{$c}{$ecycle}{$hour} > $pth) {
+                  $hsum += $data{$name}{consumers}{$c}{$ecycle}{$hour};
+                  $hoursE++;
+              }
+          }
+      }
+
+      my $ahval;
+      $ahval = round2 ($hsum / $hoursE) if($hoursE > 0);                                                               # Durchschnitt ermitteln und speichern
+      $data{$name}{consumers}{$c}{epiecAVG}{$hour} = $ahval;
+
+      debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average epiece of operating hour $hour: }.(defined $ahval ? $ahval : 'undef'));
+  }
+
+  debugLog ($paref, 'epiecesCalc', qq{specificEpieces -> consumer "$c" - Average operating hours per cycle (epiecAVG_hours): $avghours});
 
 return;
 }
@@ -16196,14 +16201,13 @@ sub __planInitialSwitchTime {
   }
 
   if ($debug =~ /consumerPlanning/x) {
-      #Log3 ($name, 1, qq{$name DEBUG> ############### consumerPlanning consumer "$c" ############### });
       Log3 ($name, 1, qq{$name DEBUG> Planning consumer "$c" - name=$cname alias=$calias activated=$cactive});
   }
   
   if (!$cactive                ||
       $ctype   eq 'noSchedule' ||
       $cplmode eq 'mustNot') {                                                                  # vom Consumertyp und Mode abhängige Planungsfreigabe
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - }.$hqtxt{scnp}{EN});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - }.$hqtxt{scnp}{EN});
 
       $paref->{ps} = 'noSchedule';
       ___setConsumerPlanningState ($paref);
@@ -16272,33 +16276,23 @@ sub __reviewSwitchTime {
   my $pstate    = ConsumerVal    ($name, $c, 'planstate',   '');
   my $plswon    = ConsumerVal    ($name, $c, 'planswitchon', 0);                            # bisher geplante Switch on Zeit
   my $simpCstat = simplifyCstate ($pstate);
+                                                                  
+  my $lastReplan = ConsumerVal ($name, $c, 'lastReplanTs', 0);
 
   if ($simpCstat =~ /planned|suspended/xs) {
-      if ($t < $plswon || $t > $plswon + 300) {                                             # geplante Switch-On Zeit ist 5 Min überschritten und immer noch "planned"
-          my $minute = $paref->{minute};
+      if ($t < $plswon || $t > $plswon + 300) {                                             # Startzeit noch nicht erreicht oder 5 Min überschritten
+          if ($t - $lastReplan >= REAPLANINTVL) {
+              $data{$name}{consumers}{$c}{lastReplanTs} = $t;
 
-          for my $m (qw(15 45)) {
-              if (int $minute >= $m) {
-                  if (!defined $hash->{HELPER}{$c.'M'.$m.'DONE'}) {
-                      my $name                          = $paref->{name};
-                      $hash->{HELPER}{$c.'M'.$m.'DONE'} = 1;
+              debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - Review switch time planning name=$cname alias=$calias});
 
-                      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Review switch time planning name=$cname alias=$calias});
-
-                      $paref->{replan} = 1;                                           
-                      ___doPlanning ($paref);
-                      delete $paref->{replan};
-                  }
-              }
-              else {
-                  delete $hash->{HELPER}{$c.'M'.$m.'DONE'};
-              }
+              my $replan = 1;
+              ___doPlanning ($paref, $replan);
           }
       }
   }
   else {
-      delete $hash->{HELPER}{$c.'M15DONE'};
-      delete $hash->{HELPER}{$c.'M45DONE'};
+      delete $data{$name}{consumers}{$c}{lastReplanTs};                                     # Timestamp zurücksetzen wenn nicht mehr planned/suspended
   }
 
 return;
@@ -16308,65 +16302,68 @@ return;
 #    Consumer Planung ausführen
 ###################################################################
 sub ___doPlanning {
-  my $paref = shift;
+  my ($paref, $replan) = @_;
+  
   my $name   = $paref->{name};
   my $c      = $paref->{consumer};
   my $calias = $paref->{calias};
   my $debug  = $paref->{debug};
   my $lang   = $paref->{lang};
-  my $nh     = $data{$name}{nexthours};
-
-  my $hash    = $defs{$name};
+    
   my $epieces = ConsumerVal ($name, $c, 'epieces', '');
 
   if (ref $epieces ne 'HASH') {
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - no first energy piece found. Exiting...});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - no first energy piece found. Exiting...});
       return;
   }
+  
+  $replan   //= 0;
+  my $hash    = $defs{$name};
+  my $nh      = $data{$name}{nexthours};
 
-  my $cicfip   = CurrentVal  ($name, 'consForecastInPlanning', 0);                         # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
-  my $pvshare  = ConsumerVal ($name, $c, 'pvshare',          100);                         # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden
+  my $cicfip   = CurrentVal  ($name, 'consForecastInPlanning', 0);                          # soll Consumption Vorhersage in die Überschußermittlung eingehen ?
+  my $pvshare  = ConsumerVal ($name, $c, 'pvshare',          100);                          # Soll-Anteil PV-Energie an nompower: 100 - nur PV, 0 - kann mit vollem Netzstrom betrieben werden
   my $shfactor = $pvshare / 100;
+
   my (%tmp, %max, %mtimes);
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - consider consumption forecast in consumer planning (attr 'plantControl'): }.($cicfip ? 'yes' : 'no'));
 
   ## max. PV-Forecast bzw. Überschuß (bei gesetzen consForecastInPlanning) ermitteln
-  ####################################################################################
+  #################################################################################### 
   for my $idx (sort keys %{$nh}) {
       my $pvfc    = NexthoursVal ($name, $idx, 'pvfc',    0);
-      my $confcex = NexthoursVal ($name, $idx, 'confcEx', 0);                              # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
+      my $confcex = NexthoursVal ($name, $idx, 'confcEx', 0);                               # prognostizierter Verbrauch ohne registrierte Consumer mit gesetzten Schlüssel exconfc
 
-      my $spexp   = $pvfc - ($cicfip ? $confcex : 0);                                      # prognostizierte Leistung -> Überschuß oder negativ
-
-      my ($hour)              = $idx =~ /NextHour(\d+)/xs;
-      $tmp{$spexp}{starttime} = NexthoursVal ($name, $idx, 'starttime', '');
-      $tmp{$spexp}{today}     = NexthoursVal ($name, $idx, 'today',      0);
-      $tmp{$spexp}{nexthour}  = int ($hour);
+      my ($hour)            = $idx =~ /NextHour(\d+)/xs;
+      $tmp{$idx}{spexp}     = $pvfc - ($cicfip ? $confcex : 0);                             # prognostizierte Leistung -> Überschuß oder negativ
+      $tmp{$idx}{starttime} = NexthoursVal ($name, $idx, 'starttime', '');
+      $tmp{$idx}{today}     = NexthoursVal ($name, $idx, 'today',      0);
+      $tmp{$idx}{nexthour}  = int ($hour);
   }
 
   my $order = 1;
 
-  for my $k (reverse sort{$a<=>$b} keys %tmp) {
-      my $ts                  = timestringToTimestamp ($hash, $tmp{$k}{starttime});
+  for my $idx (sort { $tmp{$b}{spexp} <=> $tmp{$a}{spexp} } keys %tmp) {
+      my $ts                  = timestringToTimestamp ($hash, $tmp{$idx}{starttime});
 
-      $max{$order}{spexp}     = $k;
+      $max{$order}{spexp}     = $tmp{$idx}{spexp};
       $max{$order}{ts}        = $ts;
-      $max{$order}{starttime} = $tmp{$k}{starttime};
-      $max{$order}{nexthour}  = $tmp{$k}{nexthour};
-      $max{$order}{today}     = $tmp{$k}{today};
+      $max{$order}{starttime} = $tmp{$idx}{starttime};
+      $max{$order}{nexthour}  = $tmp{$idx}{nexthour};
+      $max{$order}{today}     = $tmp{$idx}{today};
 
-      $mtimes{$ts}{spexp}     = $k;
-      $mtimes{$ts}{starttime} = $tmp{$k}{starttime};
-      $mtimes{$ts}{nexthour}  = $tmp{$k}{nexthour};
-      $mtimes{$ts}{today}     = $tmp{$k}{today};
+      $mtimes{$ts}{spexp}     = $tmp{$idx}{spexp};
+      $mtimes{$ts}{starttime} = $tmp{$idx}{starttime};
+      $mtimes{$ts}{nexthour}  = $tmp{$idx}{nexthour};
+      $mtimes{$ts}{today}     = $tmp{$idx}{today};
 
       $order++;
   }
 
-  my $epiece1 = $data{$name}{consumers}{$c}{epieces}{1};
+  my $epiece1 = $epieces->{1} // 0;
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
 
   my $cplmode         = getConsumerPlanningMode ($hash, $c);                                           # Planungsmode 'can', 'must' oder 'mustNot'
   my $oldplanstate    = ConsumerVal ($name, $c, 'planstate', '');                                      # V. 1.35.0
@@ -16374,16 +16371,15 @@ sub ___doPlanning {
   my ($err, $mintime) = getConsumerMintime ( { name    => $name,                                       # Einplanungsdauer
                                                c       => $c,
                                                lang    => $lang,
-                                               debug   => $debug
-                                             }
-                                           );
+                                               debug   => $debug,
+                                             } );
 
   if ($err) {
       Log3 ($name, 1, "$name - ERROR in consumer $c config: $err");
       return;
   }
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - mode: $cplmode, mintime: $mintime, relevant method: surplus});
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - mode: $cplmode, mintime: $mintime, relevant method: surplus});
 
   my $stopdiff       = $mintime * 60;
   $paref->{maxref}   = \%max;
@@ -16391,6 +16387,8 @@ sub ___doPlanning {
   $paref->{stopdiff} = $stopdiff;
 
   if ($cplmode eq 'can') {                                                                                  # Verbraucher _kann_ geplant werden
+      my $powCommitted = ___getPowCommitted ($paref);                                                       # bereits verplante Leistung pro Stunde über alle Consumer bestimmen
+
       if ($debug =~ /consumerPlanning/x) {
           for my $m (sort{$a<=>$b} keys %mtimes) {
               Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - surplus expected: $mtimes{$m}{spexp}, }.
@@ -16400,7 +16398,18 @@ sub ___doPlanning {
       }
 
       for my $ts (sort{$a<=>$b} keys %mtimes) {
-          if ($mtimes{$ts}{spexp} >= $epiece1 * $shfactor) {                                                # die früheste Startzeit mit Leistung > als Bedarf
+          my $dt       = timestringsFromOffset ($name, $ts, 0);
+          my $chod     = sprintf '%02d', ($dt->{hour} + 1);
+          my $hcommit  = $powCommitted->{$chod} // 0;                                                       # bereits verplante Leistung in dieser Stunde
+          my $effspexp = $mtimes{$ts}{spexp} - $hcommit;                                                    # effektiv verfügbarer Überschuß
+
+          if ($debug =~ /consumerPlanning/x) {
+              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - hod: $chod, }.
+                              qq{spexp: $mtimes{$ts}{spexp} W, already committed: $hcommit W, }.
+                              qq{effective surplus: $effspexp W, required: }.$epiece1 * $shfactor. qq{ W});
+          }
+
+          if ($effspexp >= $epiece1 * $shfactor) {                                                          # effektiver Überschuß reicht für diesen Consumer
               my $starttime       = $mtimes{$ts}{starttime};
               $paref->{starttime} = $starttime;
               $starttime          = ___switchonTimelimits ($paref);
@@ -16408,7 +16417,7 @@ sub ___doPlanning {
               delete $paref->{starttime};
 
               my $startts       = timestringToTimestamp ($hash, $starttime);                                # Unix Timestamp für geplanten Switch on
-              $paref->{ps}      = $paref->{replan} ? 'replanned:' : 'planned:';                             # V 1.35.0
+              $paref->{ps}      = $replan ? 'replanned:' : 'planned:';                             
               $paref->{startts} = $startts;
               $paref->{stopts}  = $startts + $stopdiff;
 
@@ -16482,11 +16491,40 @@ sub ___doPlanning {
       Log3 ($name, 3, qq{$name - consumer "$calias" $planstate $planspmlt});
   }
 
-  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                               # Cache File Consumer schreiben
+  $data{$name}{current}{consumerCacheDirty} = 1;                                                        # Cache File Consumer schreiben
 
   ___setPlanningDeleteMeth ($paref);
 
 return;
+}
+
+################################################################
+#  Bereits verplante Leistung pro Stunde über alle Consumer
+#  summieren (ohne den aktuell zu planenden Consumer)
+#  return: Hash { hod => committed_W }
+################################################################
+sub ___getPowCommitted {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+
+  my %powCommitted;
+
+  for my $oc (keys %{$data{$name}{consumers}}) {
+      next if($oc == $c);                                                        # aktuell zu planenden Consumer überspringen
+
+      my $opvpow   = ConsumerVal ($name, $oc, 'power',       0)
+                   * ConsumerVal ($name, $oc, 'pvshare',   100) / 100;
+      my $oehodpcs = ConsumerVal ($name, $oc, 'ehodpieces', '');
+
+      next if(!$opvpow || ref $oehodpcs ne 'HASH');
+
+      for my $hod (keys %{$oehodpcs}) {
+          $powCommitted{$hod} += $opvpow;
+      }
+  }
+
+return \%powCommitted;
 }
 
 ################################################################
@@ -16587,7 +16625,7 @@ sub ___planMust {
   
   my $hash     = $defs{$name};
 
-  my $maxts     = timestringToTimestamp ($hash, $maxref->{$elem}{starttime});                 # Unix Timestamp des max. Überschusses heute
+  my $maxts     = timestringToTimestamp ($hash, $maxref->{$elem}{starttime});          # Unix Timestamp des max. Überschusses heute
   my $half      = floor ($mintime / 2 / 60);                                           # die halbe Gesamtplanungsdauer in h als Vorlaufzeit einkalkulieren
   my $startts   = $maxts - ($half * 3600);
   my $starttime = (timestampToTimestring ($name, $startts, $lang))[3];
@@ -16635,7 +16673,7 @@ sub ___switchonTimelimits {
       $startts                   = CurrentVal ($name, 'sunriseTodayTs', 0) + $riseshift;
       $starttime                 = (timestampToTimestring ($name, $startts, $lang))[3];
 
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - starttime is set to >$starttime< due to >SunPath< is used});
   }
 
   my $origtime  = $starttime;
@@ -16648,7 +16686,7 @@ sub ___switchonTimelimits {
       ($err, $valb) = checkCode ($name, $notbefore, 'cc1');
       if (!$err && checkhhmm ($valb)) {
           $notbefore = $valb;
-          debugLog ($paref, "consumerPlanning", qq{consumer "$c" - got 'notbefore' function result: $valb});
+          debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - got 'notbefore' function result: $valb});
       }
       else {
           Log3 ($name, 1, "$name - ERROR - the result of the Perl code in 'notbefore' is incorrect: $valb");
@@ -16660,7 +16698,7 @@ sub ___switchonTimelimits {
       ($err, $vala) = checkCode ($name, $notafter, 'cc1');
       if (!$err && checkhhmm ($vala)) {
           $notafter = $vala;
-          debugLog ($paref, "consumerPlanning", qq{consumer "$c" - got 'notafter' function result: $vala})
+          debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - got 'notafter' function result: $vala})
       }
       else {
           Log3 ($name, 1, "$name - ERROR - the result of the Perl code in the 'notafter' key is incorrect: $vala");
@@ -16682,8 +16720,8 @@ sub ___switchonTimelimits {
       $notafter        = (int $nafhh) . $nafmm;
   }
 
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notbefore' term: }.(defined $notbefore ? $notbefore : ''));
-  debugLog ($paref, "consumerPlanning", qq{consumer "$c" - used 'notafter' term: } .(defined $notafter  ? $notafter  : ''));
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - used 'notbefore' term: }.(defined $notbefore ? $notbefore : ''));
+  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - used 'notafter' term: } .(defined $notafter  ? $notafter  : ''));
 
   my $change = q{};
 
@@ -16709,7 +16747,7 @@ sub ___switchonTimelimits {
 
   if ($change) {
       my $cname = ConsumerVal ($name, $c, 'name', '');
-      debugLog ($paref, "consumerPlanning", qq{consumer "$c" - Planned starttime of "$cname" changed from "$origtime" to "$starttime" due to $change condition});
+      debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - Planned starttime of "$cname" changed from "$origtime" to "$starttime" due to $change condition});
   }
 
 return $starttime;
@@ -16903,21 +16941,23 @@ sub ___switchConsumerOn {
   my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
   my $cplmode     = getConsumerPlanningMode ($hash, $c);                                          # Planungsmode 'can', 'must' oder 'mustNot'
 
-  if ($debug =~ /consumerSwitching${c}/x) {                                                       # nur für Debugging
-      my $cons   = CurrentVal  ($name, 'consumption',  0);
-      my $nompow = ConsumerVal ($name, $c, 'power',  '-');
-      my $sp     = CurrentVal  ($name, 'surplus',      0);
-
+  if ($debug =~ /consumerSwitching${c}/x) {                                                           
+      my $nompow     = ConsumerVal ($name, $c, 'power', '-');
+      my $swprio     = ConsumerVal ($name, $c, 'swprio',  0); 
+      my $sp         = CurrentVal  ($name, 'surplus',     0);
+      my $cons       = CurrentVal  ($name, 'consumption', 0);
+      
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - priority=$swprio});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
-                      qq{auto mode: $auto, Current household consumption: $cons W, nompower: $nompow, surplus: $sp W, }.
-                      qq{planstate: $pstate, starttime: }.($startts ? (timestampToTimestring ($name, $startts, $lang))[0] : "undef")
+                      qq{auto mode=$auto, Current household consumption=$cons W, nompower=$nompow W, surplus=$sp W, }.
+                      qq{planstate=$pstate, starttime=}.($startts ? (timestampToTimestring ($name, $startts, $lang))[0] : "undef")
            );
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime: $iilt}.($rlt ? ", remainLockTime: $rlt seconds" : ''));
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime=$iilt}.($rlt ? ", remainLockTime=$rlt seconds" : ''));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Check Context 'switch on' => }.
-                      qq{swoncond: $swoncond, on-command: $oncom }
+                      qq{swoncond=$swoncond, on-command=$oncom }
            );
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info: $infon})   if($infon);
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info: $infoff}) if($infoff);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOnCond Info=$infon})   if($infon);
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isAddSwitchOffCond Info=$infoff}) if($infoff);
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - device '$dswname' is used as switching device});
 
       if ($simpCstat =~ /planned|priority|starting|continuing/xs && $isInTime && $iilt) {
@@ -16925,18 +16965,20 @@ sub ___switchConsumerOn {
       }
   }
 
-  my $isintable = isInterruptable ($hash, $c, 0, 1);                                              # mit Ausgabe Interruptable Info im Debug
+  my $isintable = isInterruptable ($hash, $c, 0, 1);                                                # mit Ausgabe Interruptable Info im Debug
 
   if ($debug =~ /consumerSwitching${c}/x) {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Interrupt Characteristic value: $isintable -> $intrptcatic{$isintable}});
   }
 
-  my $isConsRcmd = isConsRcmd ($hash, $c);                                                       # PV-Überschuß als Bedingung
+  my $isConsRcmd          = isConsRcmd ($hash, $c);                                                 # PV-Überschuß als Bedingung
+  my ($permitted, $pvpow) = ___isCycleStartPermitted ($paref);
+  my $exclgrpact          = ___isExclGroupActive     ($paref);                                      # Exclude-Gruppe belegt?
 
   my $supplmnt         = ConsumerVal ($name, $c, 'planSupplement', '');
   $paref->{supplement} = '' if($supplmnt =~ /swoncond\snot|swoncond\snicht/xs && $swoncond);
-  $paref->{supplement} = encode('utf8', $hqtxt{swonnm}{$lang}) if(!$swoncond);                   # 'swoncond not met'
-  $paref->{supplement} = encode('utf8', $hqtxt{swofmt}{$lang}) if($swoffcond);                   # 'swoffcond met'
+  $paref->{supplement} = encode('utf8', $hqtxt{swonnm}{$lang}) if(!$swoncond);                      # 'swoncond not met'
+  $paref->{supplement} = encode('utf8', $hqtxt{swofmt}{$lang}) if($swoffcond);                      # 'swoffcond met'
 
   if (defined $paref->{supplement}) {
       ___setConsumerPlanningState ($paref);
@@ -16969,6 +17011,15 @@ sub ___switchConsumerOn {
           }          
       }
       elsif ($cplmode eq 'must' || $isConsRcmd) {                                                   # "Muss"-Planung oder Überschuß > Ratio (can)
+          if ($cplmode ne 'must' && !$permitted) {
+              return $state;
+          }
+          
+          if ($cplmode ne 'must' && $exclgrpact) {                                                  # Exclude-Gruppe: must wird nicht geblockt
+              debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - start blocked by exclude group});
+              return $state;
+          }
+          
           $state = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom"};
 
           if ($debug =~ /consumerSwitching${c}/x) {
@@ -16979,15 +17030,18 @@ sub ___switchConsumerOn {
           }
 
           CommandSet (undef, "$dswname $oncom");
+          $data{$name}{current}{surplusCycleCommitted} += $pvpow;                                   # Committed erhöhen
 
           $paref->{ps} = "switching on:";
           ___setConsumerPlanningState ($paref);
           delete $paref->{ps};
 
-          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                   # Cache File Consumer schreiben
+          $data{$name}{current}{consumerCacheDirty} = 1;                                            # Cache File Consumer schreiben
       }
   }
   elsif ($isConsRcmd                                                                                # unterbrochenen Consumer fortsetzen
+         && $permitted                                                                              # PV Budget verfügbar
+         && !$exclgrpact                                                                            # Exclude-Gruppe frei
          && $cplmode ne 'mustNot'                                                                   # Einschalten ist nicht verboten
          && ($isintable == 0 || $isintable == 1 || $isintable == 3)                                 # $isintable == 0 -> Consumer auch einschalten wenn sie nicht unterbrechbar sind
          && $isInTime
@@ -16996,22 +17050,23 @@ sub ___switchConsumerOn {
          && !$iilt
          && $simpCstat =~ /interrupted|interrupting|continuing/xs) {
       my $cause = $isintable == 3 ? 'interrupt condition no longer present' : 'existing surplus';
-      $state    = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom", cause: $cause};
+      $state    = qq{switching Consumer '$calias' to '$oncom', command: "set $dswname $oncom", cause=$cause};
 
       if ($debug =~ /consumerSwitching${c}/x) {
-          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command now: "set $dswname $oncom"});
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - send switch command: "set $dswname $oncom"});
       }
       else {
           Log3 ($name, 3, "$name - $state");
       }
 
       CommandSet (undef, "$dswname $oncom");
+      $data{$name}{current}{surplusCycleCommitted} += $pvpow;                                       # Committed erhöhen
 
       $paref->{ps} = 'continuing:';
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                     # Cache File Consumer schreiben
+      $data{$name}{current}{consumerCacheDirty} = 1;                                                # Cache File Consumer schreiben
   }
 
 return $state;
@@ -17061,6 +17116,9 @@ sub ___switchConsumerOff {
   }
 
   my $isintable = isInterruptable ($hash, $c, $hyst, 1);                                            # mit Ausgabe Interruptable Info im Debug
+  
+  my $pvpow = ConsumerVal ($name, $c, 'power',    0)
+            * ConsumerVal ($name, $c, 'pvshare', 100) / 100;                                        # pvshare-gewichteter Leistungsanteil
 
   if (($swoffcond || ($stopts && $t >= $stopts) || $cplmode eq 'mustNot') 
        && ($auto && $offcom && $simpCstat =~ /started|starting|stopping|interrupt|continu/xs)
@@ -17081,12 +17139,14 @@ sub ___switchConsumerOff {
       }
 
       CommandSet (undef,"$dswname $offcom");
+      
+      $data{$name}{current}{surplusCycleCommitted} = max (0, CurrentVal ($name, 'surplusCycleCommitted', 0) - $pvpow);  # Committed reduzieren
 
       $paref->{ps} = "switching off:";
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                       # Cache File Consumer schreiben
+      $data{$name}{current}{consumerCacheDirty} = 1;                                                # Cache File Consumer schreiben
   }
   elsif ((($isintable && !$isConsRcmd) || $isintable == 2)                                          # Consumer unterbrechen
          && isInTimeframe ($hash, $c) 
@@ -17105,12 +17165,14 @@ sub ___switchConsumerOff {
       }
 
       CommandSet (undef,"$dswname $offcom");
+      
+      $data{$name}{current}{surplusCycleCommitted} = max (0, CurrentVal ($name, 'surplusCycleCommitted', 0) - $pvpow);  # Committed reduzieren
 
       $paref->{ps} = "interrupting:";
       ___setConsumerPlanningState ($paref);
       delete $paref->{ps};
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                     # Cache File Consumer schreiben
+      $data{$name}{current}{consumerCacheDirty} = 1;                                                # Cache File Consumer schreiben
   }
 
 return $state;
@@ -17126,14 +17188,16 @@ sub ___setConsumerSwitchingState {
   my $c     = $paref->{consumer};
   my $t     = $paref->{t};
   my $state = $paref->{state};
-  my $fscss = $paref->{fscss};                                                                     # erster Subaufruf: 1
+  my $fscss = $paref->{fscss};                                                                      # erster Subaufruf: 1
 
   my $hash      = $defs{$name};
   my $simpCstat = simplifyCstate (ConsumerVal ($name, $c, 'planstate', ''));
-  my $calias    = ConsumerVal    ($name, $c, 'alias',                   '');                       # Consumer Device Alias
+  my $calias    = ConsumerVal    ($name, $c, 'alias',                   '');                        # Consumer Device Alias
   my $auto      = ConsumerVal    ($name, $c, 'auto',                     1);
-  my $oldpsw    = ConsumerVal    ($name, $c, 'physoffon',            'off');                       # gespeicherter physischer Schaltzustand
+  my $oldpsw    = ConsumerVal    ($name, $c, 'physoffon',            'off');                        # gespeicherter physischer Schaltzustand
   my $dowri     = 0;
+
+  my $lastOwnSwitch = ConsumerVal ($name, $c, 'lastOwnSwitchCmd', 0);
 
   debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - current planning state: $simpCstat});
 
@@ -17167,6 +17231,7 @@ sub ___setConsumerSwitchingState {
       delete $paref->{stopts};
 
       $state = qq{Consumer '$calias' switched on};
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
   elsif (isConsumerPhysOff ($hash, $c) && $simpCstat eq 'stopping') {
@@ -17181,6 +17246,7 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off};
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
   elsif (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'continuing') {
@@ -17193,6 +17259,7 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOnTs};
 
       $state = qq{Consumer '$calias' switched on (continued)};
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
   elsif (isConsumerPhysOff ($hash, $c) && $simpCstat eq 'interrupting') {
@@ -17205,9 +17272,10 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off (interrupted)};
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
-  elsif ($oldpsw eq 'off' && isConsumerPhysOn ($hash, $c)){
+  elsif ($oldpsw eq 'off' && isConsumerPhysOn ($hash, $c) && ($t - $lastOwnSwitch > BLINDTIME)){
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
 
       ___setConsumerPlanningState ($paref);
@@ -17217,7 +17285,7 @@ sub ___setConsumerSwitchingState {
       $state = qq{Consumer '$calias' was switched on externally};
       $dowri = 1;
   }
-  elsif ($oldpsw eq 'on' && isConsumerPhysOff ($hash, $c)) {
+  elsif ($oldpsw eq 'on' && isConsumerPhysOff ($hash, $c) && ($t - $lastOwnSwitch > BLINDTIME)) {
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
 
       ___setConsumerPlanningState ($paref);
@@ -17230,13 +17298,90 @@ sub ___setConsumerSwitchingState {
 
   if ($dowri) {
       if (!$fscss) {
-          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                           # Cache File Consumer schreiben
+          $data{$name}{current}{consumerCacheDirty} = 1;                            # Cache File Consumer schreiben
       }
 
       Log3 ($name, 3, "$name - $state");
   }
 
 return $state;
+}
+
+################################################################
+#  Anti-Toggling: prüfen ob Consumer im aktuellen Zyklus
+#  gestartet werden darf
+#  return 1 -> Start erlaubt
+#  return 0 -> Start zurückstellen (eff. Surplus unzureichend)
+################################################################
+sub ___isCycleStartPermitted {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+
+  my $nompower  = ConsumerVal ($name, $c, 'power',           0);
+  my $pvshare   = ConsumerVal ($name, $c, 'pvshare',       100);
+  my $surpRes   = ConsumerVal ($name, $c, 'surpmethResult', undef);                             # consumer-spez. Surplus
+  my $committed = CurrentVal  ($name, 'surplusCycleCommitted',  0);
+  
+  my $pvpow = $nompower * $pvshare / 100;                                                       # pvshare-gewichteter Leistungsanteil
+
+  return (1, 0) if(!$pvpow || !defined $surpRes);                                               # kein PV-Anteil oder Surplus unbekannt -> immer erlaubt
+
+  if (($surpRes - $committed) < $pvpow) {
+      debugLog ($paref, "consumerSwitching${c}",
+                qq{consumer "$c" - start deferred: effective surplus }.($surpRes - $committed).
+                qq{ W < required $pvpow W (committed: $committed W)});
+      return (0, $pvpow);                                                                            # nicht erlaubt
+  }
+
+return (1, $pvpow);
+}
+
+################################################################
+#  Exclude-Gruppe prüfen: ist ein anderer Consumer derselben
+#  exclgroup-Gruppe bereits physisch eingeschaltet?
+#  return 1 -> Gruppe belegt, Consumer darf nicht starten
+#  return 0 -> Gruppe frei, Consumer darf starten
+################################################################
+sub ___isExclGroupActive {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $c     = $paref->{consumer};
+
+  my $hash   = $defs{$name};
+  my $myexcl = ConsumerVal ($name, $c, 'exclgroup', 0);
+
+  return 0 if(!$myexcl);                                                         # kein exclgroup -> immer frei
+
+  for my $oc (keys %{$data{$name}{consumers}}) {
+      next if($oc == $c);                                                         # eigenen Consumer überspringen
+
+      my $ocexcl = ConsumerVal ($name, $oc, 'exclgroup', 0);
+      next if($ocexcl != $myexcl);                                                # andere Gruppe -> überspringen
+
+      my $ocstate = simplifyCstate (ConsumerVal ($name, $oc, 'planstate', ''));     
+      
+      # --- Consumer logischen Schaltzustand
+      my $pcurr  = 0;
+      my $cname  = ConsumerVal ($name, $oc, 'name',   '');
+      my $pcread = ConsumerVal ($name, $oc, "rpcurr", '');
+      my $up     = ConsumerVal ($name, $oc, "upcurr", '');
+
+      if ($pcread) {
+          my $eup = $up =~ /^kW$/xi ? 1000 : 1;
+          $pcurr  = ReadingsNum ($cname, $pcread, 0) * $eup;
+      }
+      
+      my $islogon = isConsumerLogOn ($hash, $oc, $pcurr);      
+
+      if ($ocstate =~ /^(?:started|starting|continued|continuing|interrupted|interrupting)$/xs || $islogon) {
+          debugLog ($paref, "consumerSwitching${c}",
+                    qq{consumer "$c" - exclgroup $myexcl blocked by consumer "$oc" (state: $ocstate, islogon: $islogon)});
+          return 1;
+      }
+  }
+
+return 0;
 }
 
 ################################################################
@@ -17258,6 +17403,7 @@ sub __getCyclesAndRuntime {
   my $debug = $paref->{debug};
 
   my $hash  = $defs{$name};
+  my $hod   = sprintf "%02d", ($chour + 1);
 
   my ($starthour, $startday);
 
@@ -17329,7 +17475,7 @@ sub __getCyclesAndRuntime {
                 ? $sr 
                 : ConsumerVal ($name, $c, 'cycleTime', 0) * 60;                                 # letzte Cycle-Zeitdauer in Sekunden
       
-      my $cst = ConsumerVal     ($name, $c, 'cycleStarttime', 0);
+      my $cst = ConsumerVal ($name, $c, 'cycleStarttime', 0);
       
       $son    = $son && $son ne $sr ? timestampToTimestring ($name, $cst + $son, $paref->{lang}) 
               : $son eq $sr         ? $sr                                                 
@@ -17343,19 +17489,20 @@ sub __getCyclesAndRuntime {
   }
 
   ## History schreiben
-  ######################
-  $paref->{val}  = ConsumerVal ($name, $c, "cycleDayNum", 0);                                   # Anzahl Tageszyklen des Verbrauchers speichern
-  $paref->{hkey} = "cyclescsm${c}";
-  
-  _saveHistP1 ($paref);
+  ######################  
+  _saveHistP1 ( { paref => $paref, 
+                  key   => "cyclescsm${c}",
+                  val   => ConsumerVal ($name, $c, 'cycleDayNum', 0),                           # Anzahl Tageszyklen des Verbrauchers speichern                                                                
+                  day   => $day,
+                  hour  => $hod,
+                } );
 
-  $paref->{val}  = ceil ConsumerVal ($name, $c, "minutesOn", 0);                                # Verbrauchsminuten akt. Stunde des Consumers speichern
-  $paref->{hkey} = "minutescsm${c}";
-  
-  _saveHistP1 ($paref);
-
-  delete $paref->{hkey};
-  delete $paref->{val};
+  _saveHistP1 ( { paref => $paref, 
+                  key   => "minutescsm${c}",
+                  val   => ceil (ConsumerVal ($name, $c, 'minutesOn', 0)),                      # Verbrauchsminuten akt. Stunde des Consumers speichern
+                  day   => $day,
+                  hour  => $hod,
+                } );
 
 return;
 }
@@ -18071,11 +18218,11 @@ sub _calcTodayDeviation {
   $min_wh     = 50   if $min_wh <   50;                                                     # floor:   kleinste sinnvolle Schwelle
   $min_wh     = 2000 if $min_wh > 2000;                                                     # ceiling: Großanlagen deckeln
     
-  # --- Tagesfortschritt PV: volle Gewichtung nach 1/3 der Tageslänge ab Sonnenaufgang
+  # --- Tagesfortschritt PV: volle Gewichtung nach 1/2 der Tageslänge ab Sonnenaufgang
   # Passt sich automatisch der Jahreszeit an:
-  # Sommer (~15h Tag) → volle Gewichtung nach ~5h
-  # Winter (~8h Tag)  → volle Gewichtung nach ~2,7h
-  my $ramp_pv_s = $day_len / 3;   
+  # Sommer (~15h Tag) → volle Gewichtung nach ~7,5h
+  # Winter (~8h Tag)  → volle Gewichtung nach ~4h
+  my $ramp_pv_s = $day_len / 2;   
   my $progress  = ($t - $sunrise_ts) / $ramp_pv_s;
   $progress     = 0 if $progress < 0;
   $progress     = 1 if $progress > 1;
@@ -20959,6 +21106,7 @@ sub _graphicConsumerLegend {
                                                    cname    => ConsumerVal ($name, $c, 'name',       ''),
                                                    ctype    => ConsumerVal ($name, $c, 'type', DEFCTYPE),
                                                    debug    => $debug,
+                                                   nolog    => 1,
                                                  } 
                                                );                                                   # Consumer aktiviert?
 
@@ -22317,11 +22465,11 @@ sub _flowGraphic {
       $pdcr->{$lfn}{pgen}      = $pvout;                                                                        # aktuelleLeistung aus PV-Erzeugung
       $pdcr->{$lfn}{pdc2ac}    = $pdc2ac;                                                                       # aktuelle Leistung DC->AC
       $pdcr->{$lfn}{pac2dc}    = $pac2dc;                                                                       # aktuelle Leistung AC->DC
-      $pv2node                += $pvout  if($ifeed eq 'default' && $isource eq 'pv');                           # PV-Erzeugung Inverter für das Hausnetz
+      $pv2node                += $pvout  if($ifeed eq 'default' && $isource eq 'pv');                           # PV-Erzeugung Inverter an den Hausknoten
       $pv2grid                += $pvout  if($ifeed eq 'grid'    && $isource eq 'pv');                           # PV nur für das öffentliche Netz
       $pv2bat                 += $pvout  if($ifeed eq 'bat'     && $isource eq 'pv');                           # Direktladen PV nur in die Batterie
-      $dc2inv2node            += $pdc2ac if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # DC->AC / Speisung Inverter aus Batterie / Solar-Ladegerät statt PV
-      $node2inv2dc            += $pac2dc if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # AC->DC (Batterie- oder Hybrid-Wechselrichter)
+      $dc2inv2node            += $pdc2ac if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # DC->AC: Speisung Inverter aus Batterie oder Solar-Ladegerät
+      $node2inv2dc            += $pac2dc if($ifeed eq 'hybrid' || ($ifeed eq 'default' && $isource eq 'bat'));  # AC->DC: Ladung Batterie aus Inverterknoten (PV- oder Hybrid-Wechselrichter)
 
       $lfn++;
   }
@@ -22332,7 +22480,7 @@ sub _flowGraphic {
   $batin  = 0;
   $batout = 0;
 
-  if ($x > 0) {$batin = $x; $batout = 0;} elsif ($x < 0) {$batout = abs $x; $batin = 0;}                      # es darf nur $batin ODER $batout mit einem Wert > 0 geben
+  if ($x > 0) {$batin = $x; $batout = 0;} elsif ($x < 0) {$batout = abs $x; $batin = 0;}                        # es darf nur $batin ODER $batout mit einem Wert > 0 geben
 
   debugLog ($paref, 'graphic', "Battery Node summary after calculating resultant - batin: $batin, batout: $batout");
 
@@ -27077,6 +27225,7 @@ sub aiFannDetectDrift {
                                                   slope_var       => $slope_var,
                                                   sem_ratio       => $sem_ratio,
                                                   peak_ratio      => $peak_ratio,
+                                                  debug           => $debug,
                                                }
                                              );
 
@@ -27388,6 +27537,7 @@ sub _aiDrift_safety_blocked {
   my $slope_var       = $paref->{slope_var};
   my $peak_ratio      = $paref->{peak_ratio};
   my $sem_ratio       = $paref->{sem_ratio};
+  my $debug           = $paref->{debug};
   
   my @targets = @$targets;
     
@@ -27396,6 +27546,10 @@ sub _aiDrift_safety_blocked {
   # --- Kritischer Fehler: negative slope_drift (invertierte Dynamik)
   if ($slope_drift < 0 || $slope_live < 0) {
       return 'negative_slope_drift';
+  }
+  
+  if (abs($slope_live) < 0.25 && $sem_ratio > 0.75) {
+      return 'slope_critical';
   }
 
   # --- Dynamischer Nacht-Detektor ---
@@ -27413,6 +27567,30 @@ sub _aiDrift_safety_blocked {
   
   my $median_load     = $median || 1;  
   my $slope_var_limit = 0.00002 * ($median_load ** 2) + 0.02;                                               # dynamische Schwelle für Slope-Varianz
+  my $rmse_limit      = 3.0 + ($median_load / 800);
+  
+  # --- Datenfehler / API-Fehler erkennen
+  if ((abs($slope_live) < 0.20             || $slope_live > 1.8)  && 
+      ($slope_var > $slope_var_limit * 1.5 || $sem_ratio > 0.7)   &&
+       $peak_ratio < 0.15                                         &&
+       $sem_ratio  <= 0.75) {                                     
+      return 'slope_implausible';
+  }
+               
+  # --- RMSE‑Limit steigt automatisch, wenn viele Peaks, viele semantische Abweichungen, hohe Varianz | RMSE‑Limit sinkt bei Grundlast → Nachtfehler werden erkannt
+  my $sem_contrib = $sem_ratio < 0.5 
+                  ? $sem_ratio * 0.8 
+                  : 0.4 - ($sem_ratio - 0.5) * 0.3;                                                         # ab 0.5 sinkt der Beitrag wieder
+  $sem_contrib = max (0, $sem_contrib);
+
+  my $rmse_dynamic_limit = 4.0 
+                         + ($peak_ratio * 1.0) 
+                         + $sem_contrib 
+                         + min (0.5, $slope_var * 0.5);
+
+  if ($rmse_rel_ratio > $rmse_dynamic_limit) {                                                              
+      return 'rmse_anomaly';
+  }
 
   my $bias_limit = max (
       $quant30     * 1.2,                                                                                   # Grundlast + 20%
@@ -27421,22 +27599,6 @@ sub _aiDrift_safety_blocked {
   
   $bias_limit = max ($bias_limit, $quant90 * 0.3);
   
-  my $rmse_limit = 3.0 + ($median_load / 800);
-
-  # --- Datenfehler / API-Fehler erkennen
-  if ((abs($slope_live) < 0.25 || $slope_live > 1.8) && 
-       $slope_var > $slope_var_limit * 1.5           &&
-       $peak_ratio < 0.05) {                                                                                # Blockiert nur, wenn Slope extrem UND instabil ist, Echte Drift (z. B. SlopeLive = 0.2 stabil) wird nicht blockiert
-      return 'slope_implausible';
-  }
-             
-  my $rmse_dynamic_limit = 4.0 + ($peak_ratio * 1.0) + ($sem_ratio * 0.8) + min (0.5, $slope_var * 0.5);    # RMSE‑Limit steigt automatisch, wenn viele Peaks, viele semantische Abweichungen, hohe Varianz | RMSE‑Limit sinkt bei Grundlast → Nachtfehler werden erkannt
-
-
-  if ($rmse_rel_ratio > $rmse_dynamic_limit) {                                                              
-      return 'rmse_anomaly';
-  }
-
   return 'bias_implausible' if(defined $bias_live && abs($bias_live) > $bias_limit && $peak_ratio < 0.10);  # BiasLive extrem hoch → Sensor-/API-Fehler
 
   # --- Modell schlecht, aber NICHT driftend
@@ -27453,10 +27615,63 @@ sub _aiDrift_safety_blocked {
       return 'unstable_slope';
   }
   
-  if ($rmse_rel_ratio > 2.0 && $bias_var_norm > 3.0) {
+  if ($rmse_rel_ratio > $rmse_limit && $bias_var_norm > 3.0) {
       return "unstable_bias";
   }
+  
+  # --- Debug-Ausgabe ---  
+  if ($debug =~ /aiProcess_long/xs) {
+      my $sem_contrib_dbg = $sem_ratio < 0.5 
+                          ? $sem_ratio * 0.8 
+                          : 0.4 - ($sem_ratio - 0.5) * 0.3;
+      $sem_contrib_dbg    = max (0, $sem_contrib_dbg);
 
+      my $rmse_dynamic_limit_dbg = 4.0 
+                                 + ($peak_ratio * 1.0) 
+                                 + $sem_contrib_dbg              
+                                 + min (0.5, $slope_var * 0.5);
+
+      my $rmse_margin = $rmse_dynamic_limit_dbg - $rmse_rel_ratio;                                  # positiv = sicher, negativ = wäre geblockt
+
+      Log3 ($name, 1, sprintf (
+          "%s DEBUG> DRIFT SAFETY [%s]: block=none\n".
+          "  -- RMSE Analysis --\n".
+          "     rmse_rel_ratio=%.3f | dynamic_limit=%.3f | margin=%.3f %s\n".
+          "     Limit Composition: base=4.0 | peak_part=%.3f (peak_ratio=%.3f) | ".
+                                   "sem_part=%.3f (sem_ratio=%.3f) | ".
+                                   "var_part=%.3f (slope_var=%.5f)\n".
+          "  -- Slope Analysis --\n".
+          "     slope_live=%.3f | slope_drift=%.3f | slope_rel_drift=%.3f | slope_var=%.5f\n".
+          "     slope_var_limit=%.5f | var_ratio=%.2f %s\n".
+          "  -- Bias Analysis --\n".
+          "     bias_live=%.1f | bias_limit=%.1f | bias_ratio=%.2f %s\n".
+          "     quant30=%.1f | quant90=%.1f | median_load=%.1f\n".
+          "  -- Context --\n".
+          "     drift_score=%.3f | bias_drift_norm=%.3f | bias_var_norm=%.3f\n".
+          "     peak_ratio=%.3f | sem_ratio=%.3f",
+          $name, $fanntyp,
+          # RMSE
+          $rmse_rel_ratio, $rmse_dynamic_limit_dbg, $rmse_margin,
+          ($rmse_margin < 0 ? '!! EXCEEDED !!' : $rmse_margin < 0.3  ? '!! BARELY !!' : 'ok'),
+          $peak_ratio * 1.0, $peak_ratio,
+          $sem_contrib_dbg, $sem_ratio,
+          min (0.5, $slope_var * 0.5), $slope_var,
+          # Slope
+          $slope_live, $slope_drift, $slope_rel_drift, $slope_var,
+          $slope_var_limit,
+          ($slope_var > 0 ? $slope_var / $slope_var_limit : 0),
+          ($slope_var > $slope_var_limit ? '!! ABOUT LIMIT !!' : 'ok'),
+          # Bias
+          $bias_live // 0, $bias_limit,
+          (defined $bias_live && $bias_limit > 0 ? abs($bias_live) / $bias_limit : 0),
+          (defined $bias_live && abs($bias_live) > $bias_limit ? '!! ABOUT LIMIT !!' : 'ok'),
+          $quant30, $quant90, $median_load,
+          # Kontext
+          $drift_score, $bias_drift_norm, $bias_var_norm,
+          $peak_ratio, $sem_ratio,
+      ));
+  }
+  
 return 0;                                                                                                   # 0 = kein Block, Rekalibrierung erlaubt
 }
 
@@ -28258,27 +28473,17 @@ sub writeToHistory {
   my $ph    = shift;
   my $paref = $ph->{paref};
   my $key   = $ph->{key};
-  my $val   = $ph->{val};
-  my $nday  = $ph->{day};
-  my $nhour = $ph->{hour};
-  my $valid = $ph->{valid};
 
-  $paref->{val}   = $val;
-  $paref->{nday}  = sprintf "%02d", $nday;
-  $paref->{nhour} = sprintf "%02d", $nhour;
-  $paref->{hkey}  = $key;
+  $ph->{day}  = sprintf "%02d", $ph->{day};
+  $ph->{hour} = sprintf "%02d", $ph->{hour};
 
   if (defined $hfspvh{$key}{validkey}) {
-      $paref->{$hfspvh{$key}{validkey}} = $valid;
+      my $validkey     = $hfspvh{$key}{validkey};
+      my $valid        = $ph->{valid};
+      $ph->{$validkey} = $valid;
   }
   
-  _saveHistP1 ($paref);
-
-  delete $paref->{hkey};
-  delete $paref->{nday};
-  delete $paref->{nhour};
-  delete $paref->{val};
-  delete $paref->{$hfspvh{$key}{validkey}} if(defined $hfspvh{$key}{validkey});
+  _saveHistP1 ($ph);
 
 return;
 }
@@ -28287,61 +28492,63 @@ return;
 #   History-Hash verwalten
 ################################################################
 sub _saveHistP1 {
-  my $paref     = shift;
-  my $name      = $paref->{name};                                            
-  my $nhour     = $paref->{nhour};                                          # Stunde des Tages
-  my $nday      = $paref->{nday};                                           # zu schreibenden Tag spezifizieren
-  my $hkey      = $paref->{hkey};
-  my $val       = $paref->{val};                                            # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
-  my $reorg     = $paref->{reorg}    // 0;                                  # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
-  my $reorgday  = $paref->{reorgday} // q{};                                # Tag der reorganisiert werden soll
+  my $ph       = shift;                                          
+  my $hod      = $ph->{hour};                                           # Stunde des Tages
+  my $day      = $ph->{day};                                            # zu schreibenden Tag spezifizieren
+  my $key      = $ph->{key};
+  my $val      = $ph->{val};                                            # Wert zur Speicherung in pvHistory (soll mal generell verwendet werden -> Change)
+  my $reorg    = $ph->{reorg}    // 0;                                  # Neuberechnung von Werten in Stunde "99" nach Löschen von Stunden eines Tages
+  my $reorgday = $ph->{reorgday} // q{};                                # Tag der reorganisiert werden soll
 
-  if ($hfspvh{$hkey} && defined &{$hfspvh{$hkey}{fn}}) {
-      &{$hfspvh{$hkey}{fn}} ($paref);
+  my $paref    = $ph->{paref}; 
+  my $name     = $paref->{name}; 
+  
+  if ($hfspvh{$key} && defined &{$hfspvh{$key}{fn}}) {
+      &{$hfspvh{$key}{fn}} ($ph);
       return;
   }
 
-  if ($hkey =~ /csm[et][0-9]+$/xs) {                                                                # Verbrauch eines Verbrauchers
-      $data{$name}{pvhist}{$nday}{$nhour}{$hkey} = $val;
+  if ($key =~ /csm[et][0-9]+$/xs) {                                                                # Verbrauch eines Verbrauchers
+      $data{$name}{pvhist}{$day}{$hod}{$key} = $val;
 
-      if ($hkey =~ /csme[0-9]+$/xs) {
+      if ($key =~ /csme[0-9]+$/xs) {
           my $sum = 0;
 
-          for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
+          for my $k (keys %{$data{$name}{pvhist}{$day}}) {
               next if($k eq "99");
-              my $csme = HistoryVal ($name, $nday, $k, $hkey, 0);
+              my $csme = HistoryVal ($name, $day, $k, $key, 0);
               next if(!$csme);
 
               $sum += $csme;
           }
 
-          $data{$name}{pvhist}{$nday}{99}{$hkey} = round2 ($sum);
+          $data{$name}{pvhist}{$day}{99}{$key} = round2 ($sum);
       }
   }
 
-  if ($hkey =~ /minutescsm[0-9]+$/xs) {                                                             # Anzahl Aktivminuten des Verbrauchers
-      $data{$name}{pvhist}{$nday}{$nhour}{$hkey} = $val;
+  if ($key =~ /minutescsm[0-9]+$/xs) {                                                             # Anzahl Aktivminuten des Verbrauchers
+      $data{$name}{pvhist}{$day}{$hod}{$key} = $val;
       my $minutes = 0;
-      my $num     = substr ($hkey,10,2);
+      my ($num)   = $key =~ /minutescsm(\d+)$/xs;
 
-      for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
+      for my $k (keys %{$data{$name}{pvhist}{$day}}) {
           next if($k eq "99");
-          my $csmm = HistoryVal ($name, $nday, $k, "$hkey", 0);
+          my $csmm = HistoryVal ($name, $day, $k, $key, 0);
           next if(!$csmm);
 
           $minutes += $csmm;
       }
 
-      my $cycles = HistoryVal ($name, $nday, 99, "cyclescsm${num}", 0);
+      my $cycles = HistoryVal ($name, $day, 99, "cyclescsm${num}", 0);
 
       if ($cycles) {
-          $data{$name}{pvhist}{$nday}{99}{"hourscsme${num}"}     = round2 ($minutes / 60);
-          $data{$name}{pvhist}{$nday}{99}{"avgcycmntscsm${num}"} = round2 ($minutes / $cycles);
+          $data{$name}{pvhist}{$day}{99}{"hourscsme${num}"}     = round2 ($minutes / 60);
+          $data{$name}{pvhist}{$day}{99}{"avgcycmntscsm${num}"} = round2 ($minutes / $cycles);
       }
   }
 
-  if ($hkey =~ /cyclescsm[0-9]+$/xs) {                                                              # Anzahl Tageszyklen des Verbrauchers
-      $data{$name}{pvhist}{$nday}{99}{$hkey} = $val;
+  if ($key =~ /cyclescsm[0-9]+$/xs) {                                                              # Anzahl Tageszyklen des Verbrauchers
+      $data{$name}{pvhist}{$day}{99}{$key} = $val;
   }
   
   if ($reorg) {                                                                                     # Reorganisation Stunde "99"
@@ -28369,27 +28576,27 @@ sub _saveHistP1 {
           ## Reorg Inverter
           ##################
           for my $in (1..MAXINVERTER) {
-              $in   = sprintf "%02d", $in;
-              my $e = HistoryVal ($name, $reorgday, $k, 'pvrl'.$in, undef);
-              $ien->{$in} += $e if(defined $e);
+              $in         = sprintf "%02d", $in;
+              my $e       = HistoryVal ($name, $reorgday, $k, 'pvrl'.$in, undef);
+              $ien->{$in} = ($ien->{$in} // 0) + $e if(defined $e);
           }
 
           ## Reorg Producer
           ##################
           for my $pn (1..MAXPRODUCER) {
-              $pn   = sprintf "%02d", $pn;
-              my $e = HistoryVal ($name, $reorgday, $k, 'pprl'.$pn, undef);
-              $pen->{$pn} += $e if(defined $e);
+              $pn         = sprintf "%02d", $pn;
+              my $e       = HistoryVal ($name, $reorgday, $k, 'pprl'.$pn, undef);
+              $pen->{$pn} = ($pen->{$pn} // 0) + $e if(defined $e);
           }
 
           ## Reorg Battery
           ##################
           for my $bn (1..MAXBATTERIES) {
-              $bn   = sprintf "%02d", $bn;
-              my $bi = HistoryVal ($name, $reorgday, $k, 'batin'.$bn,  undef);
-              my $bo = HistoryVal ($name, $reorgday, $k, 'batout'.$bn, undef);
-              $bin->{$bn} += $bi if(defined $bi);
-              $bot->{$bn} += $bo if(defined $bo);
+              $bn         = sprintf "%02d", $bn;
+              my $bi      = HistoryVal ($name, $reorgday, $k, 'batin'.$bn,  undef);
+              my $bo      = HistoryVal ($name, $reorgday, $k, 'batout'.$bn, undef);
+              $bin->{$bn} = ($bin->{$bn} // 0) + $bi if(defined $bi);
+              $bot->{$bn} = ($bot->{$bn} // 0) + $bo if(defined $bo);
           }
       }
 
@@ -28416,8 +28623,8 @@ sub _saveHistP1 {
       debugLog ($paref, 'saveData2Storage', "_saveHistP1 -> Day >$reorgday< reorganized keys: batinXX, batoutXX, pvrl, pvfc, con, confc, gcons, gfeedin, pvrlXX, pprlXX");
   }
 
-  if ($hkey) {
-      debugLog ($paref, 'saveData2Storage', "_saveHistP1 -> store Day: $nday, Hour of Day: $nhour, Key: $hkey, Value: ".(defined $val ? $val : 'undef'));
+  if ($key) {
+      debugLog ($paref, 'saveData2Storage', "_saveHistP1 -> store Day: $day, Hour of Day: $hod, Key: $key, Value: ".(defined $val ? $val : 'undef'));
   }
 
 return;
@@ -28427,44 +28634,43 @@ return;
 # Wert mit optional weiteren Berechnungen in pvHistory speichen
 ################################################################
 sub _saveHistP2 {                       ## no critic "not used"
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $day   = $paref->{day};
-  my $nhour = $paref->{nhour};
-  my $nday  = $paref->{nday};                                               # zu schreibenden Tag spezifizieren
-  my $hkey  = $paref->{hkey};
-  my $val   = $paref->{val};
+  my $ph    = shift;
+  my $paref = $ph->{paref}; 
+  my $day   = $ph->{day};                                                   # zu schreibenden Tag spezifizieren
+  my $hod   = $ph->{hour};                                                  # Stunde des Tages                                             
+  my $key   = $ph->{key};
+  my $val   = $ph->{val};
 
-  my $hash  = $defs{$name};
-  my $store = $hfspvh{$hkey}{storname};
+  my $name  = $paref->{name};
+  my $store = $hfspvh{$key}{storname};
   
   my ($validkey, $validval);
 
-  $data{$name}{pvhist}{$nday}{$nhour}{$store} = $val;
+  $data{$name}{pvhist}{$day}{$hod}{$store} = $val;
 
-  if (defined $hfspvh{$hkey}{validkey}) {                                   # 1: bestimmter Eintrag wird intern für Prozesse (z.B. Lernprozess) berücksichtigt oder nicht (0)
-      $validkey = $hfspvh{$hkey}{validkey};
-      $validval = $paref->{$validkey};
+  if (defined $hfspvh{$key}{validkey}) {                                   # 1: bestimmter Eintrag wird intern für Prozesse (z.B. Lernprozess) berücksichtigt oder nicht (0)
+      $validkey = $hfspvh{$key}{validkey};
+      $validval = $ph->{$validkey};
       
-      $data{$name}{pvhist}{$nday}{$nhour}{$validkey} = $validval;
+      $data{$name}{pvhist}{$day}{$hod}{$validkey} = $validval;
   }
 
-  debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored simple  - Day: $nday, Hour: $nhour, Key: $store, Value: ".(defined $val ? $val : 'undef').
+  debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored simple  - Day: $day, Hour: $hod, Key: $store, Value: ".(defined $val ? $val : 'undef').
                                         (defined $validkey ? ", ValidKey: $validkey, ValidValue: $validval" : '') );
 
-  if (defined $hfspvh{$hkey}{fpar} && $hfspvh{$hkey}{fpar} eq 'calc99') {
+  if (defined $hfspvh{$key}{fpar} && $hfspvh{$key}{fpar} eq 'calc99') {
       my $sum = 0;
       
-      for my $k (keys %{$data{$name}{pvhist}{$nday}}) {
+      for my $k (keys %{$data{$name}{pvhist}{$day}}) {
           next if($k eq '99');
-          $sum += HistoryVal ($name, $nday, $k, $store, 0);
+          $sum += HistoryVal ($name, $day, $k, $store, 0);
       }
       
       $sum = round2 ($sum) if($store =~ /csme[0-9]+$/xs);
       
-      $data{$name}{pvhist}{$nday}{99}{$store} = $sum;
+      $data{$name}{pvhist}{$day}{99}{$store} = $sum;
       
-      debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored compute - Day: $nday, Hour: 99, Key: $store, Value: $sum");
+      debugLog ($paref, 'saveData2Storage', "_saveHistP2 -> stored compute - Day: $day, Hour: 99, Key: $store, Value: $sum");
   }
 
 return;
@@ -31635,6 +31841,7 @@ sub isConsumerNoshow {
                                                cname    => ConsumerVal ($name, $c, 'name',       ''),
                                                ctype    => ConsumerVal ($name, $c, 'type', DEFCTYPE),
                                                debug    => $debug,
+                                               nolog    => 1,
                                              } 
                                            );                                           # Consumer aktiviert?
                                            
@@ -33135,8 +33342,8 @@ return @sub_arrays;
 sub arraySplitInto {
   my ($count, @original) = @_;
 
-  $count   = max( $count, 1 );
-  my $size = ceil @original / $count;
+  $count   = max  ($count, 1);
+  my $size = ceil (@original / $count);
 
 return arraySplitBy ($size, @original);
 }
@@ -36015,108 +36222,33 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                                 </td></tr>
             <tr><td>                       </td><td><ul><ul>&nbsp;&nbsp;&nbsp;&nbsp; Display functions or manual controls are available.  </ul></ul>                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>power</b>          </td><td>Power consumption of the consumer in W. Typically, it is the nominal power according to the data sheet or a dynamically specified reference value.      </td></tr>
-            <tr><td>                       </td><td>Value range: <b>Integer from 0..X</b>                                                                                                                   </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>pvshare</b>        </td><td>The key can be used to specify the desired percentage of PV power to cover the power consumption 'power'. (optional)                                    </td></tr>
-            <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least 'power'. With 0%, the consumer does not require any PV surplus.                              </td></tr>
-            <tr><td>                       </td><td>Value: <b>0..100</b>, default: 100 (%)                                                                                                                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>switchdev</b>      </td><td>Value: <b>&lt;Device&gt;</b> – the device is assigned to the load as a switch device (optional).                                                        </td></tr>
-            <tr><td>                       </td><td>This device is used to perform switching operations. The key is useful for consumers who measure energy consumption and control systems using           </td></tr>
-            <tr><td>                       </td><td>various devices, such as Homematic or readingsProxy.                                                                                                    </td></tr>
-            <tr><td>                       </td><td>If 'switchdev' is specified, the keys 'on', 'off', 'swstate', 'auto' and 'asynchron' refer to this device.                                              </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Possible values are:                                                                                                 </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                          </td></tr>
-            <tr><td>                       </td><td><ul>          If there is insufficient PV surplus at the time of scheduling, the consumer will not start up. </ul>                                      </td></tr>
-            <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                                  </td></tr>
-            <tr><td>                       </td><td><ul>&nbsp;&nbsp; The consumer will start even if there is insufficient PV surplus, provided that a set "swoncond" condition is met and "swoffcond" is not met. </ul> </td></tr>
-            <tr><td>                       </td><td><b>mustNot</b> - The consumer must not be planned or started. Started consumers are stopped                                                             </td></tr>
-            <tr><td>                       </td><td><ul><ul>         when 'mode' is changed dynamically. </ul></ul>                                                                                         </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - A device/reading combination that returns the planning mode 'can', 'must', or 'mustNot'.                        </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>icon</b>           </td><td>&lt;Icon&gt;[@&lt;Color&gt;] - Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                        </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>mintime</b>        </td><td>Scheduling duration in minutes (optional). The following values are possible:                                                                           </td></tr>
-            <tr><td>                       </td><td><b>&lt;Number&gt;</b> - the scheduling time in minutes as a numerical value                                                                             </td></tr>
-            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - scheduling takes place from sunrise to sunset.                                          </td></tr>
-            <tr><td>                       </td><td> Optionally, a positive and negative shift (minutes) of the planning time with regard to sunrise or sunset can be specified.                            </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/reading combination that provides a variably definable scheduling duration in minutes.                   </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td>                       </td><td>If mintime is not specified, a standard scheduling duration according to the following table is used.                                                   </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td>                       </td><td><b>Default mintime by consumer type:</b>                                                                                                                </td></tr>
-            <tr><td>                       </td><td>- dishwasher: 180 minutes                                                                                                                               </td></tr>
-            <tr><td>                       </td><td>- dryer: 90 minutes                                                                                                                                     </td></tr>
-            <tr><td>                       </td><td>- washingmachine: 120 minutes                                                                                                                           </td></tr>
-            <tr><td>                       </td><td>- heater: 240 minutes                                                                                                                                   </td></tr>
-            <tr><td>                       </td><td>- charger: 120 minutes                                                                                                                                  </td></tr>
-            <tr><td>                       </td><td>- other: 60 minutes                                                                                                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>on</b>             </td><td>Wert: <b>String</b> - Set command to switch on the load (optional)                                                                                      </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>off</b>            </td><td>Wert: <b>String</b> - Set command to switch off the load (optional)                                                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Reading and conditions for determining the operating state of the load (default: 'state').                                                              </td></tr>
-            <tr><td>                       </td><td>Syntax: <b>&lt;Reading&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;</b>                                                                                       </td></tr>
-            <tr><td>                       </td><td><b>&lt;on-Regex&gt;</b> - regular expression for the state 'on' (default: 'on')                                                                         </td></tr>
-            <tr><td>                       </td><td><b>&lt;off-Regex&gt;</b> - regular expression for the state 'off' (default: 'off')                                                                      </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command              </td></tr>
             <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                          </td></tr>
             <tr><td>                       </td><td><b>0</b> - only synchronous processing of switching states (default)                                                                                    </td></tr>
             <tr><td>                       </td><td><b>1</b> - additional asynchronous processing of switching states through event processing                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Value: <b>&lt;expression&gt;</b> – the consumer's start time is not scheduled before the specified time 'hour[:minute]' (optional)                      </td></tr>
-            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code without spaces enclosed in {...} that returns hh[:mm].                                    </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Value: <b>&lt;expression&gt;</b> – the consumer's start time is not scheduled after the specified time 'hour[:minute]' (optional)                       </td></tr>
-            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code without spaces enclosed in {...} that returns hh[:mm].                                    </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>auto</b>           </td><td>Value: <b>&lt;Reading&gt;</b> - A reading in the load device that enables or disables the load (optional)                                               </td></tr>
             <tr><td>                       </td><td>If the key switchdev is given, the reading is set and evaluated in this device.                                                                         </td></tr>
             <tr><td>                       </td><td>Reading value = 1 - switching enabled (default), 0: switching blocked                                                                                   </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Returns the current energy consumption (optional).                                                                                                      </td></tr>
-            <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;unit&gt;[:&lt;threshold&gt]</b> - Consumer reading and unit (W/kW)                                                               </td></tr>
-            <tr><td>                       </td><td><b>&lt;threshold&gt;</b> (W) - Once this service is received, the consumer is considered active. This addition is optional. (default: 0)                </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Total energy consumed by the appliance (optional).                                                                                                      </td></tr>
             <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;unit&gt;[:&lt;threshold&gt]</b> - Consumer reading and unit (Wh/kWh)                                                             </td></tr>
             <tr><td>                       </td><td><b>&lt;threshold&gt;</b> (Wh) - Consumption is considered valid starting at this hourly rate. The addition is optional (default: 0)                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                                    </td></tr>
-            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;</b>                                                                                         </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - The device/reading combination returns $VALUE (“undef” is ignored) for evaluation with &lt;condition&gt;        </td></tr>
-            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                               </td></tr>
-            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regular expression for checking $VALUE which must return 'true' if successful                                                    </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                      </td></tr>
-            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                          </td></tr>
+            <tr><td> <b>exclgroup</b>      </td><td>The number of an optional exclude group. Consumers that belong to the same exclude group are checked against each other at startup.                     </td></tr>
+            <tr><td>                       </td><td>If a consumer in an exclude group is started, all other consumers in the same group will not be released until the                                      </td></tr>
+            <tr><td>                       </td><td>active consumer has finished executing (e.g., status <i>finished</i>).                                                                                  </td></tr>
+            <tr><td>                       </td><td>Value range: <b>Integer from 1 to X</b>, default: 0  (no group membership)                                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                               </td></tr>
-            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;</b>                                                                                         </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - The device/reading combination returns $VALUE (“undef” is ignored) for evaluation with &lt;condition&gt;        </td></tr>
-            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                               </td></tr>
-            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return 'true' if successful                                                            </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                      </td></tr>
-            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                          </td></tr>
+            <tr><td> <b>exconfc</b>        </td><td>Indicator for using the historical energy consumption of the consumer (optional). The key value can be:                                                 </td></tr>
+            <tr><td>                       </td><td><b>0</b> - the stored energy consumption shares are retained as part of the general consumption forecast (default)                                      </td></tr>
+            <tr><td>                       </td><td><b>1</b> - the general consumption forecast is reduced by the stored energy consumption shares.                                                         </td></tr>
+            <tr><td>                       </td><td><b>2</b> - as with '1', but the consumer's planning data is included in the forecast for the coming hours.                                              </td></tr>
+            <tr><td>                       </td><td><b>Note:</b> When using exconfc, <b>plantControl->consForecastIdentWeekdays=1</b> and <b>plantControl->consForecastLastDays=4</b>                       </td></tr>
+            <tr><td>                       </td><td>should be set.                                                                                                                                          </td></tr>
+            <tr><td>                       </td><td>See the explanations in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wie_wird_die_Verbrauchsprognose_erstellt?' target='_blank'>German Wiki</a>  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>surpmeth</b>       </td><td>The possible values determine the method used to calculate the surplus PV output:                                                                       </td></tr>
-            <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                          </td></tr>
-            <tr><td>                       </td><td><b>median[_2..20]</b> - The median of the last PV surplus values is used. The optional specification '_XX' uses the last XX measured values.            </td></tr>
-            <tr><td>                       </td><td><b>average[_2..20]</b> - is the average of 20 PV surplus values. The optional specification '_XX' uses the last XX measured values.                     </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination that provides a numerical PV surplus value (W) determined or calculated by the user. </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                                </td></tr>
-            <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                                </td></tr>         
-            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;</b>                                                                                         </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - the device/reading combination returns the check value $VALUE ('undef' is ignored)                              </td></tr>
-            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                               </td></tr>
-            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regular expression for checking $VALUE which must return 'true' if successful                                                    </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                      </td></tr>
-            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                          </td></tr>
-            <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                           </td></tr>
+            <tr><td> <b>icon</b>           </td><td>&lt;Icon&gt;[@&lt;Color&gt;] - Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>defines the possible interruption options for the consumer after it has been started (optional). The value can be:                                      </td></tr>
             <tr><td>                       </td><td><b>0</b> - Load is not temporarily switched off even if the PV surplus falls below the required energy (default)                                        </td></tr>
@@ -36142,6 +36274,31 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>The consumer is only switched again when the corresponding blocking time has elapsed.                                                                   </td></tr>
             <tr><td>                       </td><td><b>Note:</b> The 'locktime' switch is only effective in automatic mode.                                                                                 </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>mintime</b>        </td><td>Scheduling duration in minutes (optional). The following values are possible:                                                                           </td></tr>
+            <tr><td>                       </td><td><b>&lt;Number&gt;</b> - the scheduling time in minutes as a numerical value                                                                             </td></tr>
+            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - scheduling takes place from sunrise to sunset.                                          </td></tr>
+            <tr><td>                       </td><td> Optionally, a positive and negative shift (minutes) of the planning time with regard to sunrise or sunset can be specified.                            </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/reading combination that provides a variably definable scheduling duration in minutes.                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td>                       </td><td>If mintime is not specified, a standard scheduling duration according to the following table is used.                                                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td>                       </td><td><b>Default mintime by consumer type:</b>                                                                                                                </td></tr>
+            <tr><td>                       </td><td>- dishwasher: 180 minutes                                                                                                                               </td></tr>
+            <tr><td>                       </td><td>- dryer: 90 minutes                                                                                                                                     </td></tr>
+            <tr><td>                       </td><td>- washingmachine: 120 minutes                                                                                                                           </td></tr>
+            <tr><td>                       </td><td>- heater: 240 minutes                                                                                                                                   </td></tr>
+            <tr><td>                       </td><td>- charger: 120 minutes                                                                                                                                  </td></tr>
+            <tr><td>                       </td><td>- other: 60 minutes                                                                                                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>mode</b>           </td><td>Consumer planning mode (optional). Possible values are:                                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - Scheduling takes place at the time when there is probably enough PV surplus available (default).                                          </td></tr>
+            <tr><td>                       </td><td><ul>          If there is insufficient PV surplus at the time of scheduling, the consumer will not start up. </ul>                                      </td></tr>
+            <tr><td>                       </td><td><b>must</b> - The consumer is optimally planned, even if there will probably not be enough PV surplus.                                                  </td></tr>
+            <tr><td>                       </td><td><ul>&nbsp;&nbsp; The consumer will start even if there is insufficient PV surplus, provided that a set "swoncond" condition is met and "swoffcond" is not met. </ul> </td></tr>
+            <tr><td>                       </td><td><b>mustNot</b> - The consumer must not be planned or started. Started consumers are stopped                                                             </td></tr>
+            <tr><td>                       </td><td><ul><ul>         when 'mode' is changed dynamically. </ul></ul>                                                                                         </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - A device/reading combination that returns the planning mode 'can', 'must', or 'mustNot'.                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>noshow</b>         </td><td>Hide or show consumers or certain elements (optional). The numeric values can be combined (see example).                                                </td></tr>
             <tr><td>                       </td><td><b>0</b> - the consumer is displayed (default)                                                                                                          </td></tr>
             <tr><td>                       </td><td><b>1</b> - the consumer is hidden                                                                                                                       </td></tr>
@@ -36152,13 +36309,72 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>If the reading has the value 0 or is not present, the consumer is displayed.                                                                            </td></tr>
             <tr><td>                       </td><td>The effect of the other possible reading values is as described.                                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
-            <tr><td> <b>exconfc</b>        </td><td>Indicator for using the historical energy consumption of the consumer (optional). The key value can be:                                                 </td></tr>
-            <tr><td>                       </td><td><b>0</b> - the stored energy consumption shares are retained as part of the general consumption forecast (default)                                      </td></tr>
-            <tr><td>                       </td><td><b>1</b> - the general consumption forecast is reduced by the stored energy consumption shares.                                                         </td></tr>
-            <tr><td>                       </td><td><b>2</b> - as with '1', but the consumer's planning data is included in the forecast for the coming hours.                                              </td></tr>
-            <tr><td>                       </td><td><b>Note:</b> When using exconfc, <b>plantControl->consForecastIdentWeekdays=1</b> and <b>plantControl->consForecastLastDays=4</b>                       </td></tr>
-            <tr><td>                       </td><td>should be set.                                                                                                                                          </td></tr>
-            <tr><td>                       </td><td>See the explanations in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wie_wird_die_Verbrauchsprognose_erstellt?' target='_blank'>German Wiki</a>  </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Value: <b>&lt;expression&gt;</b> – the consumer's start time is not scheduled before the specified time 'hour[:minute]' (optional)                      </td></tr>
+            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code without spaces enclosed in {...} that returns hh[:mm].                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Value: <b>&lt;expression&gt;</b> – the consumer's start time is not scheduled after the specified time 'hour[:minute]' (optional)                       </td></tr>
+            <tr><td>                       </td><td>The &lt;Expression&gt; has the format hh[:mm] or is Perl code without spaces enclosed in {...} that returns hh[:mm].                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>on</b>             </td><td>Wert: <b>String</b> - Set command to switch on the load (optional)                                                                                      </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>off</b>            </td><td>Wert: <b>String</b> - Set command to switch off the load (optional)                                                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Returns the current energy consumption (optional).                                                                                                      </td></tr>
+            <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;unit&gt;[:&lt;threshold&gt]</b> - Consumer reading and unit (W/kW)                                                               </td></tr>
+            <tr><td>                       </td><td><b>&lt;threshold&gt;</b> (W) - Once this service is received, the consumer is considered active. This addition is optional. (default: 0)                </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>power</b>          </td><td>Power consumption of the consumer in W. Typically, it is the nominal power according to the data sheet or a dynamically specified reference value.      </td></tr>
+            <tr><td>                       </td><td>Value range: <b>Integer from 0..X</b>                                                                                                                   </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>The key can be used to specify the desired percentage of PV power to cover the power consumption 'power'. (optional)                                    </td></tr>
+            <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least 'power'. With 0%, the consumer does not require any PV surplus.                              </td></tr>
+            <tr><td>                       </td><td>Value: <b>0..100</b>, default: 100 (%)                                                                                                                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>spignorecond</b>   </td><td>Condition to ignore a missing PV surplus (optional). If the condition is fulfilled, the load is switched on according to                                </td></tr>
+            <tr><td>                       </td><td>the planning even if there is no PV surplus at the time.                                                                                                </td></tr>         
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;</b>                                                                                         </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - the device/reading combination returns the check value $VALUE ('undef' is ignored)                              </td></tr>
+            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                               </td></tr>
+            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regular expression for checking $VALUE which must return 'true' if successful                                                    </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                      </td></tr>
+            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                          </td></tr>
+            <tr><td>                       </td><td><b>CAUTION:</b> Using both keys <I>spignorecond</I> and <I>interruptable</I> can lead to undesired behaviour!                                           </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>surpmeth</b>       </td><td>The possible values determine the method used to calculate the surplus PV output:                                                                       </td></tr>
+            <tr><td>                       </td><td><b>default</b> - the PV surplus is read directly from the 'Current_Surplus' reading. (default)                                                          </td></tr>
+            <tr><td>                       </td><td><b>median[_2..20]</b> - The median of the last PV surplus values is used. The optional specification '_XX' uses the last XX measured values.            </td></tr>
+            <tr><td>                       </td><td><b>average[_2..20]</b> - is the average of 20 PV surplus values. The optional specification '_XX' uses the last XX measured values.                     </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading combination that provides a numerical PV surplus value (W) determined or calculated by the user. </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>switchdev</b>      </td><td>Value: <b>&lt;Device&gt;</b> – the device is assigned to the load as a switch device (optional).                                                        </td></tr>
+            <tr><td>                       </td><td>This device is used to perform switching operations. The key is useful for consumers who measure energy consumption and control systems using           </td></tr>
+            <tr><td>                       </td><td>various devices, such as Homematic or readingsProxy.                                                                                                    </td></tr>
+            <tr><td>                       </td><td>If 'switchdev' is specified, the keys 'on', 'off', 'swstate', 'auto' and 'asynchron' refer to this device.                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>swoncond</b>       </td><td>Condition that must also be fulfilled in order to switch on the consumer (optional). The scheduled cycle is started.                                    </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;</b>                                                                                         </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - The device/reading combination returns $VALUE (“undef” is ignored) for evaluation with &lt;condition&gt;        </td></tr>
+            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                               </td></tr>
+            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regular expression for checking $VALUE which must return 'true' if successful                                                    </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                      </td></tr>
+            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>priority condition to switch off the consumer (optional). The scheduled cycle is stopped.                                                               </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Condition&gt;</b>                                                                                         </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - The device/reading combination returns $VALUE (“undef” is ignored) for evaluation with &lt;condition&gt;        </td></tr>
+            <tr><td>                       </td><td>The condition can be formulated as a regular expression or as Perl code enclosed in {..}:                                                               </td></tr>
+            <tr><td>                       </td><td><b>Regex</b> - regular expression for checking $VALUE which must return 'true' if successful                                                            </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - the Perl code enclosed in {..} must not contain any spaces. The variable $VALUE can be evaluated by the code.                      </td></tr>
+            <tr><td>                       </td><td>The return value must be 'true' if successful.                                                                                                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>swprio</b>         </td><td>Sets the scheduling and switching sequence priority (optional). When set to '0', the priority follows the consumer number.                              </td></tr>
+            <tr><td>                       </td><td>The value '100' indicates the highest priority. Consumers with the same priority are listed in the order of their consumer numbers.                     </td></tr>
+            <tr><td>                       </td><td>Value: <b>0..100</b>, default: 0                                                                                                                        </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Reading and conditions for determining the operating state of the load (default: 'state').                                                              </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Reading&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;</b>                                                                                       </td></tr>
+            <tr><td>                       </td><td><b>&lt;on-Regex&gt;</b> - regular expression for the state 'on' (default: 'on')                                                                         </td></tr>
+            <tr><td>                       </td><td><b>&lt;off-Regex&gt;</b> - regular expression for the state 'off' (default: 'off')                                                                      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
          </table>
          </ul>
@@ -39084,109 +39300,33 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>noSchedule</b>     - für den Verbraucher erfolgt keine Einplanung oder automatische Schaltung.                                                  </td></tr>
             <tr><td>                       </td><td><ul><ul>&nbsp;&nbsp;&nbsp;&nbsp; Anzeigefunktionen oder manuelle Schaltungen sind verfügbar.  </ul></ul>                                           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>power</b>          </td><td>Leistungsaufnahme des Verbrauchers in W. Typisch ist es die nominale Leistung gemäß Datenblatt oder ein dynamisch vorgegebener Richtwert.          </td></tr>
-            <tr><td>                       </td><td>Wertebereich: <b>Ganzzahl von 0..X</b>                                                                                                             </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pvshare</b>        </td><td>Mit dem Schlüssel kann der gewünschte prozentuale PV-Anteil zur Deckung der Leistungsaufnahme 'power' festgelegt werden. (optional)                </td></tr>
-            <tr><td>                       </td><td>Die Einstellung 100% definiert einen benötigten PV-Überschuß von mindestens 'power'. Mit 0% benötigt der Verbraucher keinen PV-Überschuß.          </td></tr>
-            <tr><td>                       </td><td>Wert: <b>0..100</b>, default: 100 (%)                                                                                                              </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>switchdev</b>      </td><td>Wert: <b>&lt;Device&gt;</b> - das Device wird als Schalter Device dem Verbraucher zugeordnet (optional).                                           </td></tr>
-            <tr><td>                       </td><td>Schaltvorgänge werden mit diesem Gerät ausgeführt. Der Schlüssel ist für Verbraucher nützlich bei denen Energiemessung und Schaltung mit           </td></tr>
-            <tr><td>                       </td><td>verschiedenen Geräten vorgenommen wird, z.B. Homematic oder readingsProxy.                                                                         </td></tr>
-            <tr><td>                       </td><td>Ist switchdev angegeben, beziehen sich die Schlüssel on, off, swstate, auto, asynchron auf dieses Gerät.                                           </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Mögliche Werte sind:                                                                                    </td></tr>
-            <tr><td>                       </td><td><b>can</b>  - die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                                  </td></tr>
-            <tr><td>                       </td><td><ul>          Der Start des Verbrauchers zum Planungszeitpunkt unterbleibt bei ungenügendem PV-Überschuß. </ul>                                    </td></tr>
-            <tr><td>                       </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                   </td></tr>
-            <tr><td>                       </td><td><ul>&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß sofern eine gesetzte "swoncond" Bedingung erfüllt und "swoffcond" nicht erfüllt ist. </ul> </td></tr>
-            <tr><td>                       </td><td><b>mustNot</b> - Der Verbraucher darf nicht geplant bzw. gestartet werden. Gestartete Verbraucher werden gestoppt                                  </td></tr>
-            <tr><td>                       </td><td><ul><ul>         wenn 'mode' dynamisch geändert wird. </ul></ul>                                                                                   </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading Kombination die den Planungsmodus 'can', 'must' oder 'mustNot' zurückgibt.                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>icon</b>           </td><td>&lt;Icon&gt;[@&lt;Farbe&gt;] - Icon und optional dessen Farbe zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>mintime</b>        </td><td>Einplanungsdauer in Minuten (optional). Folgende Werte sind möglich:                                                                               </td></tr>
-            <tr><td>                       </td><td><b>&lt;Zahl&gt;</b> - die Einplanungsdauer in Minuten als numerische Angabe                                                                        </td></tr>
-            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - die Einplanung erfolgt von Sonnenaufgang bis Sonnenuntergang.                      </td></tr>
-            <tr><td>                       </td><td> Optional kann eine positive und negative Verschiebung (Minuten) der Planungszeit bzgl. Sonnenaufgang bzw. Sonnenuntergang angegeben werden.       </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination, die eine variabel definierbare Einplanungsdauer in Minuten liefert.            </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td>                       </td><td>Ist mintime nicht angegeben, wird eine Standard Einplanungsdauer gemäß nachfolgender Tabelle verwendet.                                            </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td>                       </td><td><b>Default mintime nach Verbrauchertyp:</b>                                                                                                        </td></tr>
-            <tr><td>                       </td><td>- dishwasher: 180 Minuten                                                                                                                          </td></tr>
-            <tr><td>                       </td><td>- dryer: 90 Minuten                                                                                                                                </td></tr>
-            <tr><td>                       </td><td>- washingmachine: 120 Minuten                                                                                                                      </td></tr>
-            <tr><td>                       </td><td>- heater: 240 Minuten                                                                                                                              </td></tr>
-            <tr><td>                       </td><td>- charger: 120 Minuten                                                                                                                             </td></tr>
-            <tr><td>                       </td><td>- other: 60 Minuten                                                                                                                                </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>on</b>             </td><td>Wert: <b>String</b> - Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>off</b>            </td><td>Wert: <b>String</b> - Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                     </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Reading und Bedingungen zur Identifikation des Schaltzustandes des Verbrauchers (default: 'state').                                                </td></tr>
-            <tr><td>                       </td><td>Syntax: <b>&lt;Reading&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;</b>                                                                                  </td></tr>
-            <tr><td>                       </td><td><b>&lt;on-Regex&gt;</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                 </td></tr>
-            <tr><td>                       </td><td><b>&lt;off-Regex&gt;</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                               </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>die Art der Schaltstatus Ermittlung im Verbraucher Device. Die Statusermittlung des Verbrauchers nach einem Schaltbefehl erfolgt nur               </td></tr>
             <tr><td>                       </td><td>durch Abfrage innerhalb eines Datensammelintervals (synchron) oder zusätzlich durch Eventverarbeitung (asynchron).                                 </td></tr>
             <tr><td>                       </td><td><b>0</b> - ausschließlich synchrone Verarbeitung von Schaltzuständen  (default)                                                                    </td></tr>
             <tr><td>                       </td><td><b>1</b> - zusätzlich asynchrone Verarbeitung von Schaltzuständen durch Eventverarbeitung                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>notbefore</b>      </td><td>Wert: <b>&lt;Ausdruck&gt;</b> - der Startzeitpunkt des Verbrauchers wird nicht vor der angegebenen Zeit 'Stunde[:Minute]' eingeplant (optional)    </td></tr>
-            <tr><td>                       </td><td>Der &lt;Ausdruck&gt; hat das Format hh[:mm] oder ist in {...} eingeschlossener Perl-Code ohne Leerzeichen der hh[:mm] zurückgibt.                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>notafter</b>       </td><td>Wert: <b>&lt;Ausdruck&gt;</b> - der Startzeitpunkt des Verbrauchers wird nicht nach der angegebenen Zeit 'Stunde[:Minute]' eingeplant (optional)   </td></tr>
-            <tr><td>                       </td><td>Der &lt;Ausdruck&gt; hat das Format hh[:mm] oder ist in {...} eingeschlossener Perl-Code ohne Leerzeichen der hh[:mm] zurückgibt.                  </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>auto</b>           </td><td>Wert: <b>&lt;Reading&gt;</b> - Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)               </td></tr>
             <tr><td>                       </td><td>Ist der Schlüssel switchdev angegeben, wird das Reading in diesem Device gesetzt und ausgewertet.                                                  </td></tr>
             <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                                           </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>Liefert den aktuellen Energieverbrauch (optional).                                                                                                 </td></tr>
-            <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]</b> - Reading des Verbrauchers und Einheit (W/kW)                                        </td></tr>
-            <tr><td>                       </td><td><b>&lt;Schwellenwert&gt;</b> (W) - ab diesem Leistungsbezug wird der Verbraucher als aktiv gewertet. Die Ergänzung ist optional (default: 0)       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Gesamte verbrauchte Energie des Verbrauchers (optional).                                                                                           </td></tr>
             <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]</b> - Reading des Verbrauchers und Einheit (Wh/kWh)                                      </td></tr>
             <tr><td>                       </td><td><b>&lt;Schwellenwert&gt;</b> (Wh) - ab diesem Wert pro Stunde wird der Verbrauch als gültig gewertet. Die Ergänzung ist optional (default: 0)      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>swoncond</b>       </td><td>Bedingung die zusätzlich erfüllt sein muß um den geplanten Zyklus zu starten und den Verbraucher einzuschalten (optional).                         </td></tr>
-            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;</b>                                                                                    </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert $VALUE ('undef' wird ignoriert) zur Prüfung mit &lt;Bedingung&gt;   </td></tr>
-            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
-            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                             </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
-            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
+            <tr><td> <b>exclgroup</b>      </td><td>Nummer einer optionalen Exclude-Gruppe. Verbraucher, die dieselbe Exclude-Gruppe besitzen, werden beim Start gegeneinander geprüft.                </td></tr>
+            <tr><td>                       </td><td>Wird ein Verbraucher einer Exclude-Gruppe gestartet, werden alle weiteren Verbraucher derselben Gruppe so lange nicht freigegeben, bis der         </td></tr>
+            <tr><td>                       </td><td>aktive Verbraucher seine Ausführung beendet hat (z.B. Status <i>finished</i>).                                                                     </td></tr>
+            <tr><td>                       </td><td>Wertebereich: <b>Ganzzahl von 1..X</b>, default: 0  (keine Gruppenzugehörigkeit)                                                                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>swoffcond</b>      </td><td>Vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                               </td></tr>
-            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;</b>                                                                                    </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert $VALUE ('undef' wird ignoriert) zur Prüfung mit &lt;Bedingung&gt;   </td></tr>
-            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
-            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                             </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
-            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
+            <tr><td> <b>exconfc</b>        </td><td>Kennzeichen zur Verwendung des historischen Energieverbrauchs des Verbrauchers (optional). Schlüsselwert kann sein:                                </td></tr>
+            <tr><td>                       </td><td><b>0</b> - die gespeicherten Energieverbrauchsanteile bleiben als Bestandteil der allgemeinen Verbrauchsprognose erhalten (default)                </td></tr>
+            <tr><td>                       </td><td><b>1</b> - die allgemeine Verbrauchsprognose wird um die gespeicherten Energieverbrauchsanteile reduziert.                                         </td></tr>
+            <tr><td>                       </td><td><b>2</b> - wie bei '1', jedoch gehen die Planungsdaten des Verbrauchers bei der Prognose der kommenden Stunden wieder mit ein.                     </td></tr>
+            <tr><td>                       </td><td><b>Hinweis:</b> Bei Verwendung von exconfc sollte <b>plantControl->consForecastIdentWeekdays=1</b> und <b>plantControl->consForecastLastDays=4</b> </td></tr>
+            <tr><td>                       </td><td>gesetzt werden.                                                                                                                                    </td></tr>
+            <tr><td>                       </td><td>Siehe dazu die Erläuterungen im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wie_wird_die_Verbrauchsprognose_erstellt?' target='_blank'>Wiki</a>  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>surpmeth</b>       </td><td>Die möglichen Werte legen das Verfahren zur Ermittlung des PV-Überschusses fest:                                                                   </td></tr>
-            <tr><td>                       </td><td><b>default</b> - der PV-Überschuß wird aus dem Reading 'Current_Surplus' direkt ausgelesen. (default)                                              </td></tr>
-            <tr><td>                       </td><td><b>median[_2..20]</b> - es wird der Median der letzten PV-Überschuß Werte verwendet. Die optionale Angabe '_XX' verwendet die letzten XX Meßwerte. </td></tr>
-            <tr><td>                       </td><td><b>average[_2..20]</b> - bildet den Durchschnitt von 20 PV-Überschuß Werten. Die optionale Angabe '_XX' verwendet die letzten XX Meßwerte.         </td></tr>
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten
-                                                    numerischen PV-Überschuß in Watt liefert.                                                                                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                      </td></tr>
-            <tr><td>                       </td><td>der Planung eingeschaltet auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                                   </td></tr>
-            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;</b>                                                                                    </td></tr>     
-            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE für &lt;Bedingung&gt; ('undef' wird ignoriert)  </td></tr>
-            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
-            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                             </td></tr>
-            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
-            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
-            <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!         </td></tr>
+            <tr><td> <b>icon</b>           </td><td>&lt;Icon&gt;[@&lt;Farbe&gt;] - Icon und optional dessen Farbe zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>interruptable</b>  </td><td>definiert die möglichen Unterbrechungsoptionen für den Verbraucher nachdem er gestartet wurde (optional). Wert kann sein:                          </td></tr>
             <tr><td>                       </td><td><b>0</b> - Verbraucher wird nicht temporär ausgeschaltet auch wenn der PV Überschuß die benötigte Energie unterschreitet (default)                 </td></tr>
@@ -39212,6 +39352,31 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Der Verbraucher wird erst wieder geschaltet wenn die entsprechende Sperrzeit abgelaufen ist.                                                       </td></tr>
             <tr><td>                       </td><td><b>Hinweis:</b> Der Schalter 'locktime' ist nur im Automatik-Modus wirksam.                                                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>mintime</b>        </td><td>Einplanungsdauer in Minuten (optional). Folgende Werte sind möglich:                                                                               </td></tr>
+            <tr><td>                       </td><td><b>&lt;Zahl&gt;</b> - die Einplanungsdauer in Minuten als numerische Angabe                                                                        </td></tr>
+            <tr><td>                       </td><td><b>SunPath</b>[:&lt;Offset_Sunrise&gt;:&lt;Offset_Sunset&gt;] - die Einplanung erfolgt von Sonnenaufgang bis Sonnenuntergang.                      </td></tr>
+            <tr><td>                       </td><td> Optional kann eine positive und negative Verschiebung (Minuten) der Planungszeit bzgl. Sonnenaufgang bzw. Sonnenuntergang angegeben werden.       </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination, die eine variabel definierbare Einplanungsdauer in Minuten liefert.            </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td>                       </td><td>Ist mintime nicht angegeben, wird eine Standard Einplanungsdauer gemäß nachfolgender Tabelle verwendet.                                            </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>Default mintime nach Verbrauchertyp:</b>                                                                                                        </td></tr>
+            <tr><td>                       </td><td>- dishwasher: 180 Minuten                                                                                                                          </td></tr>
+            <tr><td>                       </td><td>- dryer: 90 Minuten                                                                                                                                </td></tr>
+            <tr><td>                       </td><td>- washingmachine: 120 Minuten                                                                                                                      </td></tr>
+            <tr><td>                       </td><td>- heater: 240 Minuten                                                                                                                              </td></tr>
+            <tr><td>                       </td><td>- charger: 120 Minuten                                                                                                                             </td></tr>
+            <tr><td>                       </td><td>- other: 60 Minuten                                                                                                                                </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>mode</b>           </td><td>Planungsmodus des Verbrauchers (optional). Mögliche Werte sind:                                                                                    </td></tr>
+            <tr><td>                       </td><td><b>can</b>  - die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß (default)                                  </td></tr>
+            <tr><td>                       </td><td><ul>          Der Start des Verbrauchers zum Planungszeitpunkt unterbleibt bei ungenügendem PV-Überschuß. </ul>                                    </td></tr>
+            <tr><td>                       </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                   </td></tr>
+            <tr><td>                       </td><td><ul>&nbsp;&nbsp; Der Start des Verbrauchers erfolgt auch bei ungenügendem PV-Überschuß sofern eine gesetzte "swoncond" Bedingung erfüllt und "swoffcond" nicht erfüllt ist. </ul> </td></tr>
+            <tr><td>                       </td><td><b>mustNot</b> - Der Verbraucher darf nicht geplant bzw. gestartet werden. Gestartete Verbraucher werden gestoppt                                  </td></tr>
+            <tr><td>                       </td><td><ul><ul>         wenn 'mode' dynamisch geändert wird. </ul></ul>                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading Kombination die den Planungsmodus 'can', 'must' oder 'mustNot' zurückgibt.                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>noshow</b>         </td><td>Verbraucher bzw. bestimmte Elemente ausblenden oder einblenden (optional). Die numerischen Werte können kombiniert werden (siehe Beispiel).        </td></tr>
             <tr><td>                       </td><td><b>0</b> - der Verbraucher wird eingeblendet (default)                                                                                             </td></tr>
             <tr><td>                       </td><td><b>1</b> - der Verbraucher wird ausgeblendet                                                                                                       </td></tr>
@@ -39222,13 +39387,73 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>Hat das Reading den Wert 0 oder ist nicht vorhanden, wird der Verbraucher eingeblendet.                                                            </td></tr>
             <tr><td>                       </td><td>Die Wirkung der weiteren möglichen Readingwerte ist wie beschrieben.                                                                               </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>exconfc</b>        </td><td>Kennzeichen zur Verwendung des historischen Energieverbrauchs des Verbrauchers (optional). Schlüsselwert kann sein:                                </td></tr>
-            <tr><td>                       </td><td><b>0</b> - die gespeicherten Energieverbrauchsanteile bleiben als Bestandteil der allgemeinen Verbrauchsprognose erhalten (default)                </td></tr>
-            <tr><td>                       </td><td><b>1</b> - die allgemeine Verbrauchsprognose wird um die gespeicherten Energieverbrauchsanteile reduziert.                                         </td></tr>
-            <tr><td>                       </td><td><b>2</b> - wie bei '1', jedoch gehen die Planungsdaten des Verbrauchers bei der Prognose der kommenden Stunden wieder mit ein.                     </td></tr>
-            <tr><td>                       </td><td><b>Hinweis:</b> Bei Verwendung von exconfc sollte <b>plantControl->consForecastIdentWeekdays=1</b> und <b>plantControl->consForecastLastDays=4</b> </td></tr>
-            <tr><td>                       </td><td>gesetzt werden.                                                                                                                                    </td></tr>
-            <tr><td>                       </td><td>Siehe dazu die Erläuterungen im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wie_wird_die_Verbrauchsprognose_erstellt?' target='_blank'>Wiki</a>  </td></tr>
+            <tr><td> <b>notbefore</b>      </td><td>Wert: <b>&lt;Ausdruck&gt;</b> - der Startzeitpunkt des Verbrauchers wird nicht vor der angegebenen Zeit 'Stunde[:Minute]' eingeplant (optional)    </td></tr>
+            <tr><td>                       </td><td>Der &lt;Ausdruck&gt; hat das Format hh[:mm] oder ist in {...} eingeschlossener Perl-Code ohne Leerzeichen der hh[:mm] zurückgibt.                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>notafter</b>       </td><td>Wert: <b>&lt;Ausdruck&gt;</b> - der Startzeitpunkt des Verbrauchers wird nicht nach der angegebenen Zeit 'Stunde[:Minute]' eingeplant (optional)   </td></tr>
+            <tr><td>                       </td><td>Der &lt;Ausdruck&gt; hat das Format hh[:mm] oder ist in {...} eingeschlossener Perl-Code ohne Leerzeichen der hh[:mm] zurückgibt.                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>on</b>             </td><td>Wert: <b>String</b> - Set-Kommando zum Einschalten des Verbrauchers (optional)                                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>off</b>            </td><td>Wert: <b>String</b> - Set-Kommando zum Ausschalten des Verbrauchers (optional)                                                                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>Liefert den aktuellen Energieverbrauch (optional).                                                                                                 </td></tr>
+            <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]</b> - Reading des Verbrauchers und Einheit (W/kW)                                        </td></tr>
+            <tr><td>                       </td><td><b>&lt;Schwellenwert&gt;</b> (W) - ab diesem Leistungsbezug wird der Verbraucher als aktiv gewertet. Die Ergänzung ist optional (default: 0)       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>power</b>          </td><td>Leistungsaufnahme des Verbrauchers in W. Typisch ist es die nominale Leistung gemäß Datenblatt oder ein dynamisch vorgegebener Richtwert.          </td></tr>
+            <tr><td>                       </td><td>Wertebereich: <b>Ganzzahl von 0..X</b>                                                                                                             </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pvshare</b>        </td><td>Mit dem Schlüssel kann der gewünschte prozentuale PV-Anteil zur Deckung der Leistungsaufnahme 'power' festgelegt werden. (optional)                </td></tr>
+            <tr><td>                       </td><td>Die Einstellung 100% definiert einen benötigten PV-Überschuß von mindestens 'power'. Mit 0% benötigt der Verbraucher keinen PV-Überschuß.          </td></tr>
+            <tr><td>                       </td><td>Wert: <b>0..100</b>, default: 100 (%)                                                                                                              </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>spignorecond</b>   </td><td>Bedingung um einen fehlenden PV Überschuß zu ignorieren (optional). Bei erfüllter Bedingung wird der Verbraucher entsprechend                      </td></tr>
+            <tr><td>                       </td><td>der Planung eingeschaltet auch wenn zu dem Zeitpunkt kein PV Überschuß vorliegt.                                                                   </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;</b>                                                                                    </td></tr>     
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert den Prüfwert $VALUE für &lt;Bedingung&gt; ('undef' wird ignoriert)  </td></tr>
+            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
+            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                             </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
+            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
+            <tr><td>                       </td><td><b>ACHTUNG:</b> Die Verwendung beider Schlüssel <I>spignorecond</I> und <I>interruptable</I> kann zu einem unerwünschten Verhalten führen!         </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>surpmeth</b>       </td><td>Die möglichen Werte legen das Verfahren zur Ermittlung des PV-Überschusses fest:                                                                   </td></tr>
+            <tr><td>                       </td><td><b>default</b> - der PV-Überschuß wird aus dem Reading 'Current_Surplus' direkt ausgelesen. (default)                                              </td></tr>
+            <tr><td>                       </td><td><b>median[_2..20]</b> - es wird der Median der letzten PV-Überschuß Werte verwendet. Die optionale Angabe '_XX' verwendet die letzten XX Meßwerte. </td></tr>
+            <tr><td>                       </td><td><b>average[_2..20]</b> - bildet den Durchschnitt von 20 PV-Überschuß Werten. Die optionale Angabe '_XX' verwendet die letzten XX Meßwerte.         </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - Device/Reading-Kombination die einen vom Nutzer bestimmten bzw. berechneten
+                                                    numerischen PV-Überschuß in Watt liefert.                                                                                                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>switchdev</b>      </td><td>Wert: <b>&lt;Device&gt;</b> - das Device wird als Schalter Device dem Verbraucher zugeordnet (optional).                                           </td></tr>
+            <tr><td>                       </td><td>Schaltvorgänge werden mit diesem Gerät ausgeführt. Der Schlüssel ist für Verbraucher nützlich bei denen Energiemessung und Schaltung mit           </td></tr>
+            <tr><td>                       </td><td>verschiedenen Geräten vorgenommen wird, z.B. Homematic oder readingsProxy.                                                                         </td></tr>
+            <tr><td>                       </td><td>Ist switchdev angegeben, beziehen sich die Schlüssel on, off, swstate, auto, asynchron auf dieses Gerät.                                           </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>swoncond</b>       </td><td>Bedingung die zusätzlich erfüllt sein muß um den geplanten Zyklus zu starten und den Verbraucher einzuschalten (optional).                         </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;</b>                                                                                    </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert $VALUE ('undef' wird ignoriert) zur Prüfung mit &lt;Bedingung&gt;   </td></tr>
+            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
+            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                             </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
+            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>swoffcond</b>      </td><td>Vorrangige Bedingung um den Verbraucher auszuschalten (optional). Der geplante Zyklus wird gestoppt.                                               </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Bedingung&gt;</b>                                                                                    </td></tr>
+            <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;</b> - die Device/Reading Kombination liefert $VALUE ('undef' wird ignoriert) zur Prüfung mit &lt;Bedingung&gt;   </td></tr>
+            <tr><td>                       </td><td>Die Bedingung kann als regulärer Ausdruck oder als in {..} eingeschlossener Perl-Code formuliert sein:                                             </td></tr>
+            <tr><td>                       </td><td><b>&lt;Regex&gt;</b> - regulärer Ausdruck zur Prüfung von $VALUE der im Erfolgsfall 'wahr' liefern muß                                             </td></tr>
+            <tr><td>                       </td><td><b>{Perl-Code}</b> - der in {..} eingeschlossene Perl-Code darf keine Leerzeichen enthalten. Die Variable $VALUE kann vom Code ausgewertet werden. </td></tr>
+            <tr><td>                       </td><td>Der return Wert muß im Erfolgsfall 'wahr' sein.                                                                                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>swprio</b>         </td><td>Legt die Einplanungs- und Schaltreihenfolgepriorität fest (optional). Mit dem Wert '0' folgt die Priorität der Verbraucher-Nummer.                 </td></tr>
+            <tr><td>                       </td><td>Der Wert '100' kennzeichnet die höchste Priorität. Die Reihenfolge von Verbrauchern mit gleicher Priorität folgt der Verbraucher-Nummerierung.     </td></tr>
+            <tr><td>                       </td><td>Wert: <b>0..100</b>, default: 0                                                                                                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Reading und Bedingungen zur Identifikation des Schaltzustandes des Verbrauchers (default: 'state').                                                </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Reading&gt;:&lt;on-Regex&gt;:&lt;off-Regex&gt;</b>                                                                                  </td></tr>
+            <tr><td>                       </td><td><b>&lt;on-Regex&gt;</b> - regulärer Ausdruck für den Zustand 'ein' (default: 'on')                                                                 </td></tr>
+            <tr><td>                       </td><td><b>&lt;off-Regex&gt;</b> - regulärer Ausdruck für den Zustand 'aus' (default: 'off')                                                               </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
          </table>
          </ul>
