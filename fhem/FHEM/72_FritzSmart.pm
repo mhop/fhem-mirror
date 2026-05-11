@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.05.11";
+our $ModulVersion = "26.05.11a";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -9744,9 +9744,15 @@ sub Fritz_Readout_Process($$@)
        elsif ( $values{box_tr064} eq "on" && not defined $hash->{SECPORT} ) {
          Fritz_Log $hash, 4, "TR-064 is switched on";
          my $tr064Port = Fritz_init_TR064 ($hash, $hash->{HOST});
-         $hash->{SECPORT} = $tr064Port if $tr064Port;
-         $hash->{TR064} = 1;
-         $TR064_chg = 1;
+         if ($tr064Port) {
+           $hash->{SECPORT} = $tr064Port;
+           $hash->{TR064}   = 1;
+           $TR064_chg       = 1;
+         } else {
+           $hash->{SECPORT} = undef;
+           $TR064_chg = ($hash->{TR064} ? 1 : 0);
+           $hash->{TR064} = 0;
+         }
        }
      }
    }
@@ -10567,12 +10573,17 @@ sub Fritz_Readout_API_Check($)
    # getting TR064 secure port
    if ( $crdOK && $hash->{TR064} ) {
      #Determine TR064-Port
-     $tr064Port = Fritz_init_TR064 ( $hash, $host );
+     $tr064Port = Fritz_init_TR064 ( $hash, $host ); 
      if ($tr064Port) {
        Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", $tr064Port;
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 1;
        $hash->{SECPORT} = $tr064Port;
+       $hash->{TR064}   = 1;
        Fritz_Log $hash, 5-$myVerbose, "TR-064-SecurePort is $tr064Port.";
      } else {
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->SECPORT", "";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->TR064", 0;
+       $hash->{TR064}   = 0;
        Fritz_Log $hash, 4-$myVerbose, "TR-064-SecurePort does not exist";
      }
    } # end getting TR064 secure port
@@ -16656,14 +16667,14 @@ sub Fritz_init_TR064 ($$)
    delete ($hash->{SECPORT});
 
    if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
-     Fritz_Log $hash, 2, "SecPort-String " . Fritz_Helper_Dumper($hash, $tr064Result);
+     Fritz_Log $hash, 4, "SecPort-String " . Fritz_Helper_Dumper($hash, $tr064Result);
      return undef;
    }
 
    my $port = $tr064Result->{"DeviceInfo:1"}->{GetSecurityPort}->{NewSecurityPort};
  
    unless( $port ) {
-      Fritz_Log $hash, 2, "Could not get secure port: $!";
+      Fritz_Log $hash, 4, "Could not get secure port: $!";
       return undef;
    }
 
