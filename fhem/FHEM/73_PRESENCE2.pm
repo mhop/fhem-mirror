@@ -34,7 +34,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.03f";
+my $ModulVersion = "01.03g";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -823,10 +823,12 @@ sub PRESENCE2_Attr(@) {
 
     if ($a[0] eq "set") {
         if ($a[2] =~ m/^(disable)$/ ) {
-            if ( $a[3] eq "0" ){
+            return $a[2] . " must be 0 or 1" if($a[3] !~ /0|1/) ;
+
+            if ( $a[3] == 0 ){
               RemoveInternalTimer($hash);
               $hash->{helper}{DISABLED} = 0;
-              readingsSingleUpdate($hash, "state", "disabled",1);
+              readingsSingleUpdate($hash, "state", "active", 0);
               if ($hash->{MODE} eq "lan-bluetooth"){
                 if(defined($hash->{FD})){
                   PRESENCE2_lanBtDoInit($hash) ;
@@ -836,8 +838,7 @@ sub PRESENCE2_Attr(@) {
               }
             }
             else {#disable
-
-              readingsSingleUpdate($hash, "state", "disabled",0);    
+              readingsSingleUpdate($hash, "state", "disabled", 0);
               $hash->{helper}{DISABLED} = 1;
               PRESENCE2_lanBtWrite($hash, "stop");
             }
@@ -928,6 +929,7 @@ sub PRESENCE2_Attr(@) {
         if ($a[2] =~ m/^(disable)$/ ) {
           RemoveInternalTimer($hash);
           $hash->{helper}{DISABLED} = 0;
+          readingsSingleUpdate($hash, "state", "active", 0);
           if ($hash->{MODE} eq "lan-bluetooth"){
 
             if(defined($hash->{FD})) {
@@ -1070,11 +1072,11 @@ sub PRESENCE2_lanBtDoInit($){  ############## todo
 
     PRESENCE2_Log $hash->{NAME}, 5, "PRESENCE2 ($hash->{NAME}) - do init";
     if(!$hash->{helper}{DISABLED}){
-        readingsSingleUpdate($hash, "state", "active",0);
+        readingsSingleUpdate($hash, "state", "active", 0);
         PRESENCE2_lanBtUpdtTiming($hash);
     }
     else{
-        readingsSingleUpdate($hash, "state", "disabled",0);
+        readingsSingleUpdate($hash, "state", "disabled", 0);
     }
 }
 
