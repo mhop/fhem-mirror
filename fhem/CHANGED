@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix: 72_FritzSmart: Fehlerkorrekturen und Härtung der Fehlerbeahndlung.
+ - feature: 72_FritzSmart: attr <name> enablePowerLine 0|1
+ - bugfix: 73_PRESENCE2.pm: Parameterprüfung bei #netcat' entfernt
+           'unsinnigen' state Eintrag bei deaktivieren vo 'disable' entfernt
  - feature: 33_ReadingsProxy: enhanced April 2026 version (forum #144287)
  - bugfix: 98_vitoconnect: Fix schedule setter. Stop retry on VALIDATION_ERROR
  - bugfix: 76_SolarForecast: Version 2.6.5
