@@ -34,7 +34,7 @@ use Blocking;
 use Time::HiRes qw(gettimeofday usleep sleep);
 use DevIo;
 
-my $ModulVersion = "01.03e";
+my $ModulVersion = "01.03f";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -318,7 +318,7 @@ sub PRESENCE2_Define($$) {
             delete $attr{$name}{nonblockingTimeOut};
             my ($Address, $Port) = split(/:/, $hash->{ADDRESS});
 
-            return "$Address is not a valid IP address" if ($Address !~ m/^\s*([0-9]{1,3}\.){3}[0-9]{1,3}\s*$/);
+            # return "$Address is not a valid IP address" if ($Address !~ m/^\s*([0-9]{1,3}\.){3}[0-9]{1,3}\s*$/);
 
             $hash->{helper}{os}{Cmd} = "nc -vz $Address $Port 2>&1";
 
@@ -928,7 +928,6 @@ sub PRESENCE2_Attr(@) {
         if ($a[2] =~ m/^(disable)$/ ) {
           RemoveInternalTimer($hash);
           $hash->{helper}{DISABLED} = 0;
-          readingsSingleUpdate($hash, "state", "disabled",1);
           if ($hash->{MODE} eq "lan-bluetooth"){
 
             if(defined($hash->{FD})) {
