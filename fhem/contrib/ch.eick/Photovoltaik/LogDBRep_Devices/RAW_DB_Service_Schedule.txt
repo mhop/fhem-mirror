@@ -1,0 +1,42 @@
+defmod DB_Service_Schedule DOIF ## Monatlich Einträge\
+([01:13] and ($mday==1))\
+ (set LogDBRep_Statistic_EnergyHomePvSum_Year_max_Month maxValue writeToDB)\
+ (set LogDBRep_Statistic_Yield_Month_max_Month maxValue writeToDB)\
+ (set LogDBRep_Statistic_previous_Month sqlCmd ckey:latest)                      ## Bildet für verschiedene Devices die Monatsauswertung\
+\
+## Wöchentliche Einträge\
+DOELSEIF\
+([01:17] and ($wday==1))\
+ (set LogDBRep_Statistic_EnergyHomePvSum_Year_diff_Week diffValue writeToDB)\
+ (set LogDBRep_Statistic_EnergyFeedInGrid_Year_diff_Week diffValue writeToDB)\
+ (set LogDBRep_Statistic_Yield_Year_diff_Week diffValue writeToDB)\
+\
+## Wöchentliche Einträge mit löschen\
+DOELSEIF\
+([02:17] and ($wday==1))\
+ (set LogDBRep_delete_Statistic_EnergyHomeBat_Day_max_Day maxValue deleteOther)\
+ (set LogDBRep_delete_Statistic_EnergyHomePvSum_Day_max_Day maxValue deleteOther)\
+ (set LogDBRep_delete_Statistic_TotalConsumption_Day_max_Day maxValue deleteOther)\
+\
+## Tägliche Einträge\
+DOELSEIF\
+([02:16])\
+ (set LogDBRep_Statistic_previous_Day sqlCmd ckey:latest)                   ## Bildet für verschiedene Devices die Tagesauswertung\
+\
+## Quartal Einträge\
+DOELSEIF\
+(($md eq "01-01" or $md eq "04-01" or $md eq "07-01" or $md eq "10-01") and [03:11])\
+ (set LogDBRep_Statistic_previous_Quarter sqlCmd ckey:latest)                    ## Erstellt die Quartalsauswertung für WR_1\
+\
+## Jährliche Einträge\
+DOELSEIF\
+($md eq "01-01" and [08:05])\
+ (set LogDBRep_Statistic_previous_Year sqlCmd ckey:latest)                       ## Bildet für verschiedene Devices die Jahresauswertung
+attr DB_Service_Schedule DbLogExclude .*
+attr DB_Service_Schedule comment Version 2024.01.23 17:00\
+Hier werden zusätzlich Werte in der Datenbank erzeugt.
+attr DB_Service_Schedule do always
+attr DB_Service_Schedule room System
+attr DB_Service_Schedule wait 0,3:0,5,5:0,5,5
+attr DB_Service_Schedule webCmd cmd_1:cmd_2:cmd_3
+attr DB_Service_Schedule webCmdLabel monatlich :wöchentlich :wöchentlich Löschen :

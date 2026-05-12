@@ -2459,9 +2459,9 @@ nodes_TIMESTAMP:current_price.* {\
   return FmtDateTime(time());;\
 },\
 \
-nodes_TIMESTAMP:nodes_0000_cost.* {\
+nodes_TIMESTAMP:nodes_00_00_cost.* {\
 ########################################### Tibber_Live ##############################################\
-  my ($timestamp,$cost_value,$cost_value,$tmp);;\
+  my ($timestamp,$cost_value,$cons_value,$tmp);;\
   my $conf_EVU = ReadingsVal("$name","conf_EVU","EPEX_Spot");;\
 \
   if ( $conf_EVU eq "Tibber_Live" ) {             # Tibber_Live liefert die Kosten und den Verbrauch selber\
