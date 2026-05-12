@@ -7,6 +7,7 @@
 #   execute Command Expression: http://<ip-addr><ip-port>/<apiName>/exec?cmd=<cmd>
 #   execute Commandchain Expression: http://<ip-addr><ip-port>/<apiName>/exec?cmds=<cmdClain>
 #   execute Perl Expression: http://<ip-addr><ip-port>/<apiName>/exec?perl=<perlExpression>
+#   execute shell Expression: http://<ip-addr><ip-port>/<apiName>/exec?shell=<shellExpression>
 
 package main;
 use Encode qw(decode encode);
@@ -278,7 +279,7 @@ sub HTTPAPI_CGI {
          $json = encode_json($utf8);
         }
       }  
-      return($hash, 200, 'close', "text/plain; charset=utf-8", encode($encoding, $json));
+      return($hash, 200, 'close', "application/json; charset=utf-8", encode($encoding, $json));
     } else {
       return($hash, 400, 'close', "text/plain; charset=utf-8", encode($encoding, "error=400 Bad Request, $request > attribute is wrong or missing"))
     }
