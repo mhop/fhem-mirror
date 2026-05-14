@@ -167,7 +167,7 @@ sub _process {
   
   (AttrVal($name,'logFullMessage',0))?  
     _log($hash,4,"Message in:\n$buf"):
-    _log($hash,4,"Message in:\ninfoline");
+    _log($hash,4,"Message in:\n$infoline");
 
   readingsBeginUpdate($hash);
 
