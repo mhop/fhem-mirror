@@ -19,7 +19,8 @@ BEGIN {
 		  AttrVal
 		  readingsBeginUpdate
       readingsBulkUpdate
-      readingsEndUpdate)
+      readingsEndUpdate
+      readingSingleUpdate)
 	);
 }
 
