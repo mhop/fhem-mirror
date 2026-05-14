@@ -435,7 +435,7 @@ sub KODI_PlayerGetItem($$)
   my $obj  = {
     "method" => "Player.GetItem",
     "params" => { 
-      "properties" => ["artist", "album", "thumbnail", "file", "title",
+      "properties" => ["artist", "album", "art", "file", "title",
                         "track", "year", "streamdetails", "tvshowid"]
     }
   };
@@ -752,7 +752,7 @@ sub KODI_ProcessNotification($$)
     Log3($name, 5, "$name: KODI_ProcessNotification: player started playing");
     KODI_ResetMediaReadings($hash);
     KODI_PlayerOnPlay($hash, $obj);
-  KODI_Update($hash);
+    KODI_Update($hash);
   }
   elsif($obj->{method} eq "Player.OnResume") {
     Log3($name, 5, "$name: KODI_ProcessNotification: player resumed");
@@ -964,7 +964,20 @@ sub KODI_CreateReading($$$) {
   elsif($key eq 'stereoscopicmode') {
     $value = $value->{mode};
   }
-  
+  elsif($key eq 'art') {
+    foreach my $artkey (keys %{$value}) {
+      my $arrRef = $value->{$artkey};
+      for (my $i = 0; $i <= $#$arrRef; $i++) {
+        my $propRef = $arrRef->[$i];
+        foreach my $propkey (keys %{$propRef}) {
+          readingsBulkUpdate($hash, "sd_" . $mediakey . $i . $propkey, $propRef->{$propkey});
+        }
+      }
+    }
+    
+    # we dont want to create a "streamdetails" reading
+    $key = undef; 
+  }
   if(ref($value) eq 'ARRAY') {
     $value = join(',',@$value);
   }
