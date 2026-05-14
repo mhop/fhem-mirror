@@ -103,6 +103,7 @@ sub _save {
   $contact      =~ s/^.*<(.*)>.*$/$1/;
   $ip            = _sender_ip($headers);
   $location{$to} = $ip;
+  Debug "contact: $contact to: $to ip: $ip";
 }
 
 sub _header {
@@ -190,14 +191,14 @@ sub _process {
     _send_msg($hash,$ip,"SIP/2.0 500 Error",$msg,"");
   }
 
-  if($method eq "MESSAGE") {
-    readingsBulkUpdate($hash, "lastMsgIn", $infoline);
-    my $msg=$headers;
-    $msg=~s/\nContent-Type:[^\n]*\n/\n/s;
-    $msg=~s/\nContent-Length:[^\n]*\n/\n/s;
-#    _send_msg($hash,$ip,"SIP/2.0 500 Error",$msg,"");
-    _send_msg($hash,$ip,"SIP/2.0 200 OK",$headers,"");
-  }
+#  if($method eq "MESSAGE") {
+#    readingsBulkUpdate($hash, "lastMsgIn", $infoline);
+#    my $msg=$headers;
+#    $msg=~s/\nContent-Type:[^\n]*\n/\n/s;
+#    $msg=~s/\nContent-Length:[^\n]*\n/\n/s;
+##    _send_msg($hash,$ip,"SIP/2.0 500 Error",$msg,"");
+#    _send_msg($hash,$ip,"SIP/2.0 200 OK",$headers,"");
+#  }
 
   if($method eq "ACK") {
 
@@ -208,3 +209,19 @@ sub _process {
 1;
 
 #
+=pod
+MESSAGE fhemsnom@192.168.123.20;transport=udp SIP/2.0
+Via: SIP/2.0/UDP 192.168.123.115:53786;branch=z9hG4bK.75475fe6;rport;alias
+From: sip:sipsak@192.168.123.115:1036;tag=38473
+To: fhemsnom@192.168.123.20
+Call-ID: 6algjorv@test
+CSeq: 59620 MESSAGE
+Max-Forwards: 70
+Contact: <fhemsnom@192.168.123.20;transport=udp>
+Subject: buttons
+Content-Type: application/x-buttons
+Content-Length: 25k=18
+c=on
+o=red
+n=**18
+=cut
