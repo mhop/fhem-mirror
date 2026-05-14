@@ -119,7 +119,7 @@ sub _header {
 
 sub _sender_ip {
   my $headers = shift;
-  my $contact = _header("Contact",$headers);
+  $contact = _header("Contact",$headers);
   my $s;
   $s=$contact;
   $s=~s/^.*\@(\d+(\.\d+){3})\D.*$/$1/s;
@@ -150,6 +150,11 @@ sub _send_msg {
   print $sock $msg;
   close($sock);
 }
+
+sub _button {
+  Debug "_button called";
+}
+
 
 sub _process {
   my ($hash,$bytes,$buf) = @_;
@@ -209,19 +214,3 @@ sub _process {
 1;
 
 #
-=pod
-MESSAGE fhemsnom@192.168.123.20;transport=udp SIP/2.0
-Via: SIP/2.0/UDP 192.168.123.115:53786;branch=z9hG4bK.75475fe6;rport;alias
-From: sip:sipsak@192.168.123.115:1036;tag=38473
-To: fhemsnom@192.168.123.20
-Call-ID: 6algjorv@test
-CSeq: 59620 MESSAGE
-Max-Forwards: 70
-Contact: <fhemsnom@192.168.123.20;transport=udp>
-Subject: buttons
-Content-Type: application/x-buttons
-Content-Length: 25k=18
-c=on
-o=red
-n=**18
-=cut
