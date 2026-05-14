@@ -104,7 +104,7 @@ sub _save {
   $contact      =~ s/^.*<(.*)>.*$/$1/;
   $ip            = _sender_ip($headers);
   $location{$to} = $ip;
-  Debug "contact: $contact to: $to ip: $ip";
+#  Debug "contact: $contact to: $to ip: $ip";
 }
 
 sub _header {
@@ -138,9 +138,9 @@ sub _send_msg {
 
   _log($hash,4,"Message out:\n$infoline\n");
   if (AttrVal($name,'showFullMessage',0) == 1) {  
-     readingsBulkUpdate($hash, "lastMsgOut", $msg);
+     readingSingleUpdate($hash, "lastMsgOut", $msg);
   } else {
-     readingsBulkUpdate($hash, "lastMsgOut", $infoline);
+     readingSingleUpdate($hash, "lastMsgOut", $infoline);
   }
   
   my $sock = new IO::Socket::INET (
@@ -193,8 +193,6 @@ sub _process {
     _log($hash,4,"Message in:\n$buf"):
     _log($hash,4,"Message in:\n$infoline");
 
-  readingsBeginUpdate($hash);
-
   if($method eq "REGISTER") {
     _save($headers);
     _send_msg($hash,$ip,"SIP/2.0 200 OK",$headers,"");
@@ -226,7 +224,6 @@ sub _process {
   if($method eq "ACK") {
 
   }
-  readingsEndUpdate($hash, 1);
 }
 
 1;
