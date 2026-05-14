@@ -12,6 +12,7 @@ use GPUtils qw(GP_Import);
 BEGIN {
 	GP_Import(
 	 qw(readingFnAttributes
+	    defs
 			selectlist
 			Debug
 		  Log3
@@ -153,6 +154,7 @@ sub _send_msg {
 
 sub _button {
   Debug "_button called";
+  my $hash = %defs{minisip};
   my @msg = split("\n",'MESSAGE snom@192.168.123.20;transport=udp SIP/2.0
 From: sip:minisip@192.168.123.111:1036;tag=38473
 To: snom@192.168.123.20
