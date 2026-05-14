@@ -153,6 +153,22 @@ sub _send_msg {
 
 sub _button {
   Debug "_button called";
+  my @msg = split("\n",'MESSAGE snom@192.168.123.20;transport=udp SIP/2.0
+From: sip:minisip@192.168.123.111:1036;tag=38473
+To: snom@192.168.123.20
+Call-ID: 6algjorv@test
+CSeq: 59620 MESSAGE
+Max-Forwards: 70
+Contact: <snom$@192.168.123.20;transport=udp>
+Subject: buttons
+Content-Type: application/x-buttons');
+
+  my $payload = "\n\nk=18\nn=**18\nc=on\no=red\nl=Ventilator\n";
+  my $clen = length($payload); $clen++;
+  push(@msg,"Content-Length: $clen$payload");
+
+  _send_msg($hash,$ip,"",join("\n",@msg),"");
+
 }
 
 
