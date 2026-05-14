@@ -135,7 +135,7 @@ sub _send_msg {
   my $msg=$infoline."\r\n".$headers.$body;
 
   _log($hash,4,"Message out:\n$infoline\n");
-  if (AttrVal($name,'logFullMessage',0) == 1) {  
+  if (AttrVal($name,'showFullMessage',0) == 1) {  
      readingsBulkUpdate($hash, "lastMsgOut", $msg);
   } else {
      readingsBulkUpdate($hash, "lastMsgOut", $infoline);
