@@ -910,6 +910,8 @@ my %hqtxt = (                                                                # H
               DE => qq{Attribut}                                                                                            },
   note   => { EN => qq{Note},
               DE => qq{Hinweis}                                                                                             },
+  anawin => { EN => qq{Analysis window},
+              DE => qq{Analysefenster}                                                                                      },              
   dwdcat => { EN => qq{The Deutscher Wetterdienst Station Catalog},
               DE => qq{Der Stationskatalog des Deutschen Wetterdienstes}                                                    },
   nrsele => { EN => qq{No. selected entries:},
@@ -6892,6 +6894,7 @@ sub __getaiFannState {            ## no critic "not used"
   my $bflim    = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   '-');                      # Bit_Fail_Limit aktuell
   my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');                      # Bit_Fail_Limit Empfehlung
   
+  my $drift_window     = AiNeuralVal ($name, $fanntyp, 'DriftWindowSize',    '-');          # Zeitfenster auf das sich die Driftwerte beziehen
   my $drift_score      = AiNeuralVal ($name, $fanntyp, 'DriftScore',         '-'); 
   my $drift_index      = AiNeuralVal ($name, $fanntyp, 'DriftIndex',         '-');
   my $drift_rmserel    = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio',  '-');  
@@ -7037,6 +7040,7 @@ sub __getaiFannState {            ## no critic "not used"
   # Drift
   #########
   my $drift  = '<b>=== '.$hqtxt{drftid}{$lang}.' ===</b>'."\n\n";                                                                                       # Drift-Kennzahlen                          
+  $drift    .= "<b>".$hqtxt{anawin}{$lang}.":</b> $drift_window h"."\n";                     
   $drift    .= "<b>Drift RMSE ratio:</b> $drift_rmserel"."\n";
   $drift    .= "<b>Slope Reference:</b> $slope_ref"."\n";                                                                                                           # neue Basislinie nach einer Drift-Rekalibrierung. Werden verwendet, sobald vorhanden
   $drift    .= "<b>Slope Live:</b> $slope_live"."\n";                                                                                                               # Slope Live ist die aktuelle Regressionssteigung zwischen den realen Messwerten und den Modellvorhersagen im Zeitfenster
@@ -27097,7 +27101,7 @@ sub aiFannDetectDrift {
 
   my @drift_kpis = qw (
       DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftRefMae DriftIndex
-      DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag DriftSemRatio
+      DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag DriftSemRatio DriftWindowSize
   );
 
   delete @{$data{$name}{neuralnet}{$fanntyp}}{@drift_kpis};
@@ -27293,6 +27297,7 @@ sub aiFannDetectDrift {
   else                        { $flag = 'stable'   }
 
   # --- Ergebnisse speichern ---
+  $data{$name}{neuralnet}{$fanntyp}{DriftWindowSize}   = $window;
   $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = round2 ($bias_drift);          # DriftBias ist der relative Drift gegenüber dem letzten Referenzpunkt (DriftRefBias)
   $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);           # der absolute aktuelle Bias des Modells – also der geglättete Mittelwert, um wie viel Wh das Modell die realen Werte systematisch über- oder unterschätzt
   $data{$name}{neuralnet}{$fanntyp}{DriftIndex}        = round2 ($drift_index);
