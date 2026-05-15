@@ -2,6 +2,15 @@
 #
 ##############################################
 #
+# 2025.04.08 - fichtennadel v0.5.4
+# - CHANGE: 
+#          - eval attr sslargs on set
+#          - log JSON parse errors
+#          - check http status code
+#          - HandleCmdQueue FIFO instead of LIFO
+# - INFO:  
+#          - cosmetic bugfixes (removed unused imports, perl type safety, log messages)
+#
 # 2025.09.02 - fichtennadel v0.5.3
 # - CHANGE: 
 #          - rollback to HttpUtils_NonblockingGet parameter noshutdown = 1 (https://forum.fhem.de/index.php?topic=138356.msg1347245#msg1347245)
@@ -129,18 +138,17 @@
 package main;
 
 use strict;
-use Time::Local;
 use Encode;
-use Encode qw/from_to/;
-use URI::Escape;
 use Data::Dumper;
 use JSON;
 use utf8;
-use Date::Parse;
-use Time::Piece;
+use POSIX qw(ceil strftime);
+use List::Util qw(max);
+use Scalar::Util qw(looks_like_number);
+use vars qw($init_done $readingFnAttributes %defs);
 use lib ('./FHEM/lib', './lib');
 
-my $ModulVersion        = "0.5.3";
+my $ModulVersion        = "0.5.4";
 
 ##############################################################################
 sub fronius_Initialize($) {
@@ -169,7 +177,7 @@ sub fronius_Initialize($) {
                           $readingFnAttributes;
 }
 
-sub fronius_Define($$$) {
+sub fronius_Define($$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   
@@ -221,8 +229,6 @@ sub fronius_StartUp($) {
   my ($hash)       = @_;
   my $name = $hash->{NAME};
   
-  return if(IsDisabled($name));
-  
   RemoveInternalTimer ($hash, 'fronius_StartUp');
 
   if (!$init_done) {
@@ -230,7 +236,9 @@ sub fronius_StartUp($) {
       return;
   }
   
-  my $interval     = List::Util::max(AttrVal( $name, "IntervalArchiveData", AttrVal( $name, "IntervalRealtimeData", 300 ) ), 300);
+  return if(IsDisabled($name));
+
+  my $interval     = max(AttrVal( $name, "IntervalArchiveData", AttrVal( $name, "IntervalRealtimeData", 300 ) ), 300);
 
   Log3 $name, 4, "[$name] [fronius_StartUp]";
 
@@ -330,7 +338,7 @@ sub fronius_Set($@) {
       return join(" ", sort keys %sets);
       
   } elsif ($opt eq 'RestartInterval') {
-    
+
     return "$name is disabled" if(IsDisabled($name));
 
     RemoveInternalTimer($hash, "fronius_GetAPIVersionInfo");
@@ -346,16 +354,14 @@ sub fronius_Set($@) {
     InternalTimer(gettimeofday() + 20 + $interval, "fronius_GetMeterRealtimeData",     $hash, 0);
     InternalTimer(gettimeofday() + 25 + $interval, "fronius_GetInverterRealtimeData",  $hash, 0);
     
-  } elsif ($interval le 0) {
-
+  } elsif ($interval <= 0) {
     return "$name is disabled" if(IsDisabled($name));
-
     if ($opt eq 'GetAllData') {
       #übergabeparameter durchsuchen auf gültigkeit und übernehmen
       my $tdelay = 0;
       while(my $arg = shift(@a)){
         if( exists($order{$arg} ) ) {
-          if ($order{$arg} lt 0){
+          if ($order{$arg} < 0){
             $order{$arg} = $tdelay;
             Log3 $name, 5, "[$name] [fronius_Set] arg set = $arg=$tdelay";
             $tdelay = $tdelay+2;
@@ -366,7 +372,7 @@ sub fronius_Set($@) {
       #reihenfolge aufarbeiten für nicht vorhandene calls in den übergabe parametern
       my @getorder = split ( /\s+/, join(" ", keys %order) );
       while(my $func = shift(@getorder)){
-        if ($order{$func} lt 0){
+        if ($order{$func} < 0){
           $order{$func} = $tdelay;
           $tdelay = $tdelay+2;
         }
@@ -404,12 +410,13 @@ sub fronius_Attr($$$) {
   
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $hash = $defs{$name};
-  
-  Log3 $name, 5, "[$name] [fronius_Attr] attrName=$attrName";
+  return undef if !$hash;
 
+  Log3 $name, 5, "[$name] [fronius_Attr] attrName=$attrName";
   
   if ( $attrName eq "disable" ) {
     $attrVal = "" if !defined($attrVal);
+                                    
     if ($attrVal eq "1") {
       RemoveInternalTimer($hash);
       $hash->{STATE} = 'disabled';
@@ -419,11 +426,23 @@ sub fronius_Attr($$$) {
       $hash->{STATE} = '';
       Log3 $name, 3, "[$name] [fronius_Attr] enabled";
     }
+
   } elsif ( $attrName eq "SaveDataHead" ) {
     fronius_clearHeadData($hash);
+
   } elsif ($attrName eq 'useHTTPS') {
     fronius_StartUp($hash);
+
+  } elsif ($attrName eq 'sslargs') {
+    if ($cmd eq "set" && defined $attrVal && $attrVal ne "") {
+        # check for valid input
+        my @tmp = eval $attrVal;
+        # return error in case
+        return "Invalid sslargs: $@" if ($@);
+        return "Invalid sslargs: uneven key/value list" if (@tmp % 2 != 0);
+    }
   }
+
   
   return;  
 }
@@ -564,9 +583,9 @@ sub fronius_GetMeterRealtimeData($) {
         my @MeterReading = split("\_",$MeterDevice);
           if ($MeterNumber != $MeterReading[2]) {
             $MeterNumber = $MeterReading[2];
-            Log3 $name, 5, "[$name] [fronius_GetMeterRealtimeData] Start Storage $MeterNumber";
+            Log3 $name, 5, "[$name] [fronius_GetMeterRealtimeData] Start Meter $MeterNumber";
             fronius_SendCommand($hash,"GetMeterRealtimeData",$MeterNumber);
-          }else {Log3 $name, 5, "[$name] [fronius_GetMeterRealtimeData] SKIP Storage $MeterNumber";}
+          }else {Log3 $name, 5, "[$name] [fronius_GetMeterRealtimeData] SKIP Meter $MeterNumber";}
       }
     } 
 
@@ -611,11 +630,11 @@ sub fronius_GetInverterRealtimeData($) {
         my @InverterReading = split("\_",$InverterDevice);
           if ($InverterNumber != $InverterReading[2]) {
             $InverterNumber = $InverterReading[2];
-            Log3 $name, 5, "[$name] [fronius_GetInverterRealtimeData] Start Storage $InverterNumber";
+            Log3 $name, 5, "[$name] [fronius_GetInverterRealtimeData] Start Inverter $InverterNumber";
             fronius_SendCommand($hash,"GetInverterRealtimeData_Cumulation",$InverterNumber);
             fronius_SendCommand($hash,"GetInverterRealtimeData_Common",$InverterNumber);
             fronius_SendCommand($hash,"GetInverterRealtimeData_3P",$InverterNumber);
-          }else {Log3 $name, 5, "[$name] [fronius_GetInverterRealtimeData] SKIP Storage $InverterNumber";}
+          }else {Log3 $name, 5, "[$name] [fronius_GetInverterRealtimeData] SKIP Inverter $InverterNumber";}
       }
     } 
 
@@ -700,7 +719,7 @@ sub fronius_SendCommand($$$) {
     return;
   }
     
-  #2018.01.14 - PushToCmdQueue
+  # 2018.01.14 - PushToCmdQueue
   if ($hash->{helper}{VARS}{FroniusBaseURL} eq "nA" && $type ne "GetAPIVersionInfo") {
     Log3 $name, 4, "[$name] [fronius_SendCommand] [$type] NOT PushToCmdQueue ERROR=Fronius API Base URL not set!";
     
@@ -713,7 +732,7 @@ sub fronius_SendCommand($$$) {
   }
   else {
   
-    #2018.01.14 - Übergabe SendCommandQuery
+    # 2018.01.14 - Übergabe SendCommandQuery
     my $SendParam = {
       url             => $SendUrl,
       hash            => $hash,
@@ -732,7 +751,7 @@ sub fronius_SendCommand($$$) {
 }
 
 sub fronius_HandleCmdQueue($) {
-  my ($hash, $param)  = @_;
+  my ($hash)          = @_;
   my $name            = $hash->{NAME};
   
   return undef if(!defined($hash->{helper}{CMD_QUEUE})); 
@@ -740,29 +759,28 @@ sub fronius_HandleCmdQueue($) {
     
   if(not($hash->{helper}{RUNNING_REQUEST}) and @{$hash->{helper}{CMD_QUEUE}}) {
   
+    my $request = shift @{$hash->{helper}{CMD_QUEUE}};
     my $params =  {
-                       url             => $param->{url},
-                       timeout         => AttrVal( $name, "httpTimeout", 10),
+                       url             => $request->{url},
+                       timeout         => AttrVal($name, "httpTimeout", 10),
                        noshutdown      => 1,
                        keepalive       => 0,
                        method          => "GET",
-                       CL              => $param->{CL},
+                       CL              => $request->{CL},
                        hash            => $hash,
-                       type            => $param->{type},
-                       httpversion     => $param->{httpversion},
-                       sslargs         => $param->{sslargs},
+                       type            => $request->{type},
+                       httpversion     => $request->{httpversion},
+                       sslargs         => $request->{sslargs},
                        callback        => \&fronius_Parse
                       };
     
-    my $request = pop @{$hash->{helper}{CMD_QUEUE}};
-    
     map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $params->{$_}} keys %{$params};
-    map {$hash->{helper}{".HTTP_CONNECTION"}{$_} = $request->{$_}} keys %{$request};
     
     my $type = $hash->{helper}{".HTTP_CONNECTION"}{type};
         
     $hash->{helper}{RUNNING_REQUEST} = 1;
-    Log3 $name, 4, "[$name] [fronius_HandleCmdQueue] [$type] send command=" . $hash->{helper}{".HTTP_CONNECTION"}{url};
+    Log3 $name, 5, "[$name] [fronius_HandleCmdQueue] [$type] send command params=" . Dumper({ map { $_ => $params->{$_} } grep { $_ ne 'hash' } keys %$params });
+    Log3 $name, 4, "[$name] [fronius_HandleCmdQueue] [$type] send command url=" . $hash->{helper}{".HTTP_CONNECTION"}{url};
     HttpUtils_NonblockingGet($hash->{helper}{".HTTP_CONNECTION"});
     
   }
@@ -776,7 +794,7 @@ sub fronius_Parse($$$) {
   
   Log3 $name, 4, "[$name] [fronius_Parse] [$msgtype] ";
   Log3 $name, 5, "[$name] [fronius_Parse] [$msgtype] DATA Header=" . $param->{httpheader};
-  Log3 $name, 5, "[$name] [fronius_Parse] [$msgtype] DATA Dumper=" . $data;
+  Log3 $name, 5, "[$name] [fronius_Parse] [$msgtype] DATA Data="   . $data;
 
   $hash->{helper}{RUNNING_REQUEST} = 0;
 
@@ -784,8 +802,10 @@ sub fronius_Parse($$$) {
   if ($err) {
     Log3 $name, 3, "[$name] [fronius_Parse] [$msgtype] ERROR=$err";
     fronius_setState($hash,"disconnected");
-  }
-  else {
+  } elsif ($param->{code} != 200) {
+    Log3 $name, 3, "[$name] [fronius_Parse] [$msgtype] ERROR HTTP=$param->{code}";
+    fronius_setState($hash,"disconnected");
+  } else {
 
     fronius_setState($hash,"connected");
     # HTML Informationen mit schreiben
@@ -794,48 +814,53 @@ sub fronius_Parse($$$) {
     if (index($data, '{') == -1) {$data = '{"data": "nodata"}';}
     
     my $json = eval { JSON->new->utf8(0)->decode($data) };
-    
-    readingsBeginUpdate($hash);
-    
-    if    ($msgtype eq "GetAPIVersionInfo") {
-      fronius_expandJSON($hash,$name,"",$json,"API_");
-    } 
-    elsif ($msgtype eq "GetPowerFlowRealtimeData") {
-      fronius_expandJSON($hash,$name,"",$json,"PowerFlow_");
-    } 
-    elsif ($msgtype eq "GetActiveDeviceInfo") {
-      fronius_expandJSON($hash,$name,"",$json,"DeviceInfo_");
-    }
-    elsif ($msgtype eq "GetStorageRealtimeData") {
-      fronius_expandJSON($hash,$name,"",$json,"Storage_");
-    }
-    elsif ($msgtype eq "GetMeterRealtimeData") {
-      fronius_expandJSON($hash,$name,"",$json,"Meter_");
-    }
-    elsif ($msgtype eq "GetInverterRealtimeData_System") {
-      fronius_expandJSON($hash,$name,"",$json,"Inverter_System_");
-    } 
-    elsif ($msgtype eq "GetInverterRealtimeData_Cumulation") {
-      fronius_expandJSON($hash,$name,"",$json,"Inverter_Cumulation_");
-    }
-    elsif ($msgtype eq "GetInverterRealtimeData_Common") {
-      fronius_expandJSON($hash,$name,"",$json,"Inverter_Common_");
-    }
-    elsif ($msgtype eq "GetInverterRealtimeData_3P") {
-      fronius_expandJSON($hash,$name,"",$json,"Inverter_3P_");
-    } 
-    elsif ($msgtype eq "GetArchiveData") {
-      fronius_expandJSON($hash,$name,"",$json,"ArchiveData_");
-      # Umrechnen in WATT
-      readingsBulkUpdate($hash, "MPPT1_DC_W", ReadingsVal($name, "MPPT1_DC_A", 0) * ReadingsVal($name, "MPPT1_DC_V", 0) );
-      readingsBulkUpdate($hash, "MPPT2_DC_W", ReadingsVal($name, "MPPT2_DC_A", 0) * ReadingsVal($name, "MPPT2_DC_V", 0) );
-    } 
-    else {
-      Log3 $name, 4, "[$name] [fronius_Parse] [$msgtype] json for unknown message \n". $json;
-    }
-    
-    readingsEndUpdate( $hash, 1 );
 
+    if ($@ || !defined $json) {
+      Log3 $name, 3, "[$name] [fronius_Parse] [$msgtype] JSON decode error: $@";
+
+    } else {
+
+        readingsBeginUpdate($hash);
+        
+        if    ($msgtype eq "GetAPIVersionInfo") {
+          fronius_expandJSON($hash,$name,"",$json,"API_");
+        } 
+        elsif ($msgtype eq "GetPowerFlowRealtimeData") {
+          fronius_expandJSON($hash,$name,"",$json,"PowerFlow_");
+        } 
+        elsif ($msgtype eq "GetActiveDeviceInfo") {
+          fronius_expandJSON($hash,$name,"",$json,"DeviceInfo_");
+        }
+        elsif ($msgtype eq "GetStorageRealtimeData") {
+          fronius_expandJSON($hash,$name,"",$json,"Storage_");
+        }
+        elsif ($msgtype eq "GetMeterRealtimeData") {
+          fronius_expandJSON($hash,$name,"",$json,"Meter_");
+        }
+        elsif ($msgtype eq "GetInverterRealtimeData_System") {
+          fronius_expandJSON($hash,$name,"",$json,"Inverter_System_");
+        } 
+        elsif ($msgtype eq "GetInverterRealtimeData_Cumulation") {
+          fronius_expandJSON($hash,$name,"",$json,"Inverter_Cumulation_");
+        }
+        elsif ($msgtype eq "GetInverterRealtimeData_Common") {
+          fronius_expandJSON($hash,$name,"",$json,"Inverter_Common_");
+        }
+        elsif ($msgtype eq "GetInverterRealtimeData_3P") {
+          fronius_expandJSON($hash,$name,"",$json,"Inverter_3P_");
+        } 
+        elsif ($msgtype eq "GetArchiveData") {
+          fronius_expandJSON($hash,$name,"",$json,"ArchiveData_");
+          # Umrechnen in WATT
+          readingsBulkUpdate($hash, "MPPT1_DC_W", ReadingsVal($name, "MPPT1_DC_A", 0) * ReadingsVal($name, "MPPT1_DC_V", 0) );
+          readingsBulkUpdate($hash, "MPPT2_DC_W", ReadingsVal($name, "MPPT2_DC_A", 0) * ReadingsVal($name, "MPPT2_DC_V", 0) );
+        } 
+        else {
+          Log3 $name, 4, "[$name] [fronius_Parse] [$msgtype] json for unknown message \n". $json;
+        }
+        
+        readingsEndUpdate( $hash, 1 );
+    }
   }
   
   fronius_HandleCmdQueue($hash);
@@ -874,7 +899,7 @@ sub fronius_expandJSON($$$$;$$) {
         $reading =~ s/Body_Data_//g;
 
         if ($reading eq "PowerFlow_Site_P_Load") {
-          if ( $value + 0 eq $value) {
+          if (looks_like_number($value) && $value < 0) {
             $value = $value * -1;
           }       
         }
@@ -1031,7 +1056,7 @@ sub fronius_setState($$) {
       </li>
 
       <li><a id="fronius-attr-sslargs">sslargs</a><br>
-      sslargs to pass to HttpUtils_NonblockingGet, see <a href="https://wiki.fhem.de/wiki/HttpUtils">https://wiki.fhem.de/wiki/HttpUtils</a> / <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods">http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods</a>
+      sslargs to pass to HttpUtils_NonBlockingGet, see <a href="https://wiki.fhem.de/wiki/HttpUtils">https://wiki.fhem.de/wiki/HttpUtils</a> / <a href="http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods">http://search.cpan.org/~sullr/IO-Socket-SSL-2.016/lib/IO/Socket/SSL.pod#Description_Of_Methods</a>
       </li>
 
       <li><a id="fronius-attr-httpTimeout">httpTimeout</a><br>
