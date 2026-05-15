@@ -163,8 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.9"  => "12.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
-                           "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug ",
+  "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
+                           "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ",
   "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
                            "___csmSpecificEpieces: stündliche AVG-Aktualisierung auch im laufenden Betrieb, ausgelöst durch einen Stundenwechsel ".
                            "neuer Consumer-Schlüssel exclgroup zur Formung einer Exclude-Gruppe ",
@@ -8064,7 +8064,7 @@ sub _attraiControl {                     ## no critic "not used"
       aiConTrainStart    => { comp => '(?:[1-9]|[1-8][0-9]|90):(?:[1-9]|1[0-9]|2[0-3])',           act => 0 },
       aiTreesPV          => { comp => '(1?[1-9]|10|[2-4][0-9]|50)',                                act => 0 },
       aiConActivate      => { comp => '(0|1|2)',                                                   act => 0 },
-      aiConHiddenLayers  => { comp => '(?:[1-9]\d{1,2}-[1-9]\d{1,2}(?:-[1-9]\d{1,2})?)',           act => 0 },
+      aiConHiddenLayers  => { comp => '(?:[1-9]\d{1,2}-[1-9]\d{1,2}(?:-[1-9]\d{0,2})?)',           act => 0 },
       aiConTrainAlgo     => { comp => '(RPROP|INCREMENTAL)',                                       act => 0 },
       aiConLearnRate     => { comp => '(0\.01|0\.05|0\.00[1-5])',                                  act => 0 },
       aiConMomentum      => { comp => '(0\.[2-9])',                                                act => 0 },
@@ -15585,7 +15585,7 @@ sub __calcVectorConsumption {
       $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;               # positiv: Richtung Inverter-Knoten -> Bat, negativ: Richtung Bat -> Inverter-Knoten
 
       if ($node2bat > 0) {
-          if ($dc2inv2node || $node2inv2dc || $pv2bat) {                                    # Messartefakt (Zeitversatz AC/DC) nur wenn Batterie-Pfad-Variablen aktiv.
+          if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {            # Messartefakt (Zeitversatz AC/DC) nur wenn Batterie-Pfad-Variablen aktiv.
               $node2bat = 0;
           }
       }
@@ -15611,10 +15611,12 @@ sub __calcVectorConsumption {
       # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
       # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
       # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
-      if ($dc2inv2node || $node2inv2dc || $pv2bat) {
+      if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {
           $node2bat = 0;
       }
   }
+  
+  
 
   my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                          # Erzeugung Summe im Inverter-Knoten
   $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                        # z.B. Batterie ist voll und SolarLader liefert an Knoten
@@ -36287,7 +36289,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * small nets (e.g., 50-25) are quick and easy, but less accurate.  </ul>                                                                                </td></tr>
             <tr><td>                          </td><td><ul> * medium nets (64-32) offer a good compromise between speed and accuracy.  </ul>                                                                        </td></tr>
             <tr><td>                          </td><td><ul> * deep networks (64-32-16) recognize complex patterns better, but are more sensitive to outliers.  </ul>                                                </td></tr>
-            <tr><td>                          </td><td>value range:<b> XX[X]-XX[X]-XX[X] (X = 1-9) </b>, default: 80-40-20                                                                                          </td></tr>
+            <tr><td>                          </td><td>value range:<b> XY[Y]-XY[Y]-X[YY] (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                                 </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConLearnRate</b>    </td><td>Determines how strongly the weights of the neural network are adjusted at each training step.                                                                </td></tr>
             <tr><td>                          </td><td><ul> * small (e.g., 0.001): slow, stable learning; low risk of overshoot, but longer training time. </ul>                                                    </td></tr>
@@ -39364,7 +39366,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * kleine Netze (z.B. 50-25) sind schnell und einfach, aber weniger genau  </ul>                                                                         </td></tr>
             <tr><td>                          </td><td><ul> * mittlere Netze (64-32) bieten einen guten Kompromiss aus Geschwindigkeit und Genauigkeit  </ul>                                                       </td></tr>
             <tr><td>                          </td><td><ul> * tiefe Netze (64-32-16) erkennen komplexe Muster besser, sind aber empfindlicher gegenüber Ausreißern  </ul>                                           </td></tr>
-            <tr><td>                          </td><td>Wertebereich:<b> XX[X]-XX[X]-XX[X] (X = 1-9) </b>, default: 80-40-20                                                                                         </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> XY[Y]-XY[Y]-X[YY] (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                                </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConLearnRate</b>    </td><td>Bestimmt, wie stark die Gewichte des neuronalen Netzes bei jedem Traningsschritt angepasst werden.                                                           </td></tr>
             <tr><td>                          </td><td><ul> * Klein (z.B. 0.001): langsames, stabiles Lernen; geringes Risiko von Überschwingen, aber längere Trainingszeit. </ul>                                  </td></tr>
