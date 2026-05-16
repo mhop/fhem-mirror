@@ -164,7 +164,8 @@ BEGIN {
 # Versions History intern
 my %vNotesIntern = (
   "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
-                           "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ",
+                           "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
+                           "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster aiFannSelectWindow invertiert ",
   "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
                            "___csmSpecificEpieces: stündliche AVG-Aktualisierung auch im laufenden Betrieb, ausgelöst durch einen Stundenwechsel ".
                            "neuer Consumer-Schlüssel exclgroup zur Formung einer Exclude-Gruppe ",
@@ -15615,8 +15616,6 @@ sub __calcVectorConsumption {
           $node2bat = 0;
       }
   }
-  
-  
 
   my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                          # Erzeugung Summe im Inverter-Knoten
   $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                        # z.B. Batterie ist voll und SolarLader liefert an Knoten
@@ -18486,8 +18485,7 @@ sub _calcDataEveryFullHour {
 
       # --- Drift Analyse ---
       my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
-      my $window                   = aiFannSelectWindow ($name, 'con');                           # optimales Drift-Detct-Fenster ermitteln
-      aiFannDetectDrift ($name, $t, $lang, $debug, 'con', $window) if($rdy);                      # Drift von AI 'con' Werten ermitteln
+      aiFannDetectDrift ($name, $t, $lang, $debug, 'con') if($rdy);                               # Drift von AI 'con' Werten ermitteln
 
       # --- con - Quantile bestimmen ---    
       my ($targetref, $dmy1, $dmy2) = getPvHistTargetArray ( { name  => $name, 
@@ -27059,33 +27057,60 @@ sub _aiFannApplyBiasCorrection {
 return ($res, $corr_val, $bias_zone, $drift_zone);
 }
 
-################################################################
-# Adaptives Fenster für Drift-Analyse
-# Bei Stress → kürzer
-# Bei Stabilität → länger
-# Bei frischem Modell / fehlenden Daten → Standard
-################################################################         
+####################################################################################
+# Adaptives Fenster für Drift-Analyse (universell & peak-robust)
+# - Ungewöhnliche Ereignisse (Peaks) → Fenster vergrößern
+# - Schleichende Drift          → Fenster verkleinern
+# - Dauerhafte Drift            → Fenster verkleinern
+# - Sehr stabiles Modell        → Fenster vergrößern
+# - Frisches Modell / fehlende Daten → Standard (96)
+#
+# Schwellenwerte:
+#   drift_score: Peak >2.5 | Dauerhaft >2.0 | Schleichend 1.5–2.0 | Stabil <1.2
+#   sem_ratio:   hoch >0.7 (variabler Peak) | niedrig <0.4 (konstante Drift)
+#   age_hours:   Dauerhafte Drift >72h | Schleichende Drift >48h | Stabil >72h
+####################################################################################
 sub aiFannSelectWindow {
   my ($name, $fanntyp) = @_;
 
-  my $window = 96;                                                              # Basis 4 Tage
-  
-  my $age_hours   = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours', undef);
-  my $drift_score = AiNeuralVal ($name, $fanntyp, 'DriftScore',    undef);
-  my $sem_ratio   = AiNeuralVal ($name, $fanntyp, 'DriftSemRatio', undef);
- 
+  my $default     = 96;
+  my $age_hours   = AiNeuralVal($name, $fanntyp, 'ModelAgeHours', undef);
+  my $drift_score = AiNeuralVal($name, $fanntyp, 'DriftScore',    undef);
+  my $sem_ratio   = AiNeuralVal($name, $fanntyp, 'DriftSemRatio', undef);
+
   if (!defined $age_hours || !defined $drift_score || !defined $sem_ratio) {
-      return $window;
+      return $default;
   }
 
-  if ($drift_score > 2.5 && $sem_ratio > 0.7) {                                 # Fenster verkürzen wenn akuter Stress erkennbar
-      $window = 48;                                                             # reagiert schneller 2 Tage
-  }
-  elsif ($drift_score < 1.2 && $age_hours > 72) {                               # > 3 Tage alt, stabil
-      $window = 144;                                                            # 6 Tage → glättet Ausreißer
+  # --- 1) Peak: hoher Score + hohe Varianz → sofort vergrößern (altersunabhängig,
+  #             da Peaks unmittelbar reagieren müssen)
+  if ($drift_score > 2.5 && $sem_ratio > 0.7) {
+      return 120;
   }
 
-return $window;
+  # --- 2) Mittlerer Score + mittlere Varianz → unklar, Default beibehalten
+  #         (sem_ratio ∈ (0.4, 0.7): weder klarer Peak noch konstante Drift)
+  if ($drift_score > 2.0 && $sem_ratio >= 0.4) {
+      return $default;
+  }
+
+  # --- 3) Dauerhafte Drift: hoher Score + niedrige Varianz + altes Modell → stark verkleinern
+  #         (sem_ratio < 0.4 implizit durch Bedingung 2 bereits ausgeschlossen wenn score >2.0 & ratio >=0.4)
+  if ($drift_score > 2.0 && $sem_ratio < 0.4 && $age_hours > 72) {
+      return 48;
+  }
+
+  # --- 4) Schleichende Drift: moderater Score (1.5–2.0) + niedrige Varianz + mittelalt → moderat verkleinern
+  elsif ($drift_score > 1.5 && $drift_score <= 2.0 && $sem_ratio < 0.4 && $age_hours > 48) {
+      return 72;
+  }
+
+  # --- 5) Sehr stabiles Modell: niedriger Score + altes Modell → vergrößern
+  if ($drift_score < 1.2 && $age_hours > 72) {
+      return 144;
+  }
+
+return $default;
 }
 
 ###########################################################################
@@ -27099,7 +27124,6 @@ sub aiFannDetectDrift {
   my $lang    = shift;
   my $debug   = shift;
   my $fanntyp = shift;
-  my $window  = shift // 96;                                                             # Anzahl Stunden für Driftanalyse
 
   my @drift_kpis = qw (
       DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftRefMae DriftIndex
@@ -27110,6 +27134,8 @@ sub aiFannDetectDrift {
 
   my $rawref = $data{$name}{aidectree}{airaw};
   return unless $rawref && ref $rawref eq 'HASH';
+  
+  my $window = aiFannSelectWindow ($name, $fanntyp);                                    # optimales Drift-Detct-Fenster ermitteln
 
   my @indices = sort { $a <=> $b } keys %$rawref;
   return unless(@indices >= $window);
