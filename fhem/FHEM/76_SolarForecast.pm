@@ -163,6 +163,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
+                           "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
+                           "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster aiFannSelectWindow invertiert ".
+                           "AI Status Popup Inhalt aufklappbar ",
   "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
                            "___csmSpecificEpieces: stündliche AVG-Aktualisierung auch im laufenden Betrieb, ausgelöst durch einen Stundenwechsel ".
                            "neuer Consumer-Schlüssel exclgroup zur Formung einer Exclude-Gruppe ",
@@ -316,6 +320,7 @@ use constant {
   AIACCUPLIM      => 150,                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCLOWLIM     => 50,                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCTRNMIN     => 3500,                                                          # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
+  AIMODELMINAGE   => 24,                                                            # Alter eines trainierten AI FANN Model bis zu dem es als "neu/frisch" gilt 
   APITIMEOUT      => 30,                                                            # default Timeout HTTP API-Call
   
   BATSOCCHGDAY    => 5,                                                             # Batterie: prozentuale SoC Anpassung pro Tag
@@ -830,6 +835,21 @@ my %hrepl = (                                                                # Z
   '\.' => 'k',
 );
 
+my %block_translations = (                                                  # Blockierungsgründe Rekalibrierung = Gründe für Trtraining
+  negative_slope  => { EN => "unplausible model slope detected",
+                       DE => "unplausible Modellsteigung erkannt"            },
+  rmse_anomaly    => { EN => "unusually high forecast error",
+                       DE => "ungewöhnlich hoher Vorhersagefehler"           },
+  structural      => { EN => "structural data issue identified",
+                       DE => "strukturelles Datenproblem erkannt"            },
+  severe          => { EN => "drift is too strong for automatic adjustment",
+                       DE => "zu starker Drift für automatische Anpassung"   },
+  persistent      => { EN => "Drift persists – new training required",
+                       DE => "Drift dauerhaft – neues Training erforderlich" },
+  instabil        => { EN => "Model unstable",
+                       DE => "Modell instabil"                               },                           
+);
+
 my %hqtxt = (                                                                # Hash (Setup) Texte
   entry  => { EN => qq{<b>Warm welcome!</b><br>
                        The next queries will guide you through the basic installation.<br>
@@ -887,12 +907,16 @@ my %hqtxt = (                                                                # H
               DE => qq{kein max Überschuss für den aktuellen Tag gefunden}                                                  },
   state  => { EN => qq{Status},
               DE => qq{Status}                                                                                              },
+  calasf => { EN => qq{calculated as of},
+              DE => qq{berechnet ab}                                                                                        },
   result => { EN => qq{Result},
               DE => qq{Ergebnis}                                                                                            },
   attrib => { EN => qq{attribute},
               DE => qq{Attribut}                                                                                            },
   note   => { EN => qq{Note},
               DE => qq{Hinweis}                                                                                             },
+  anawin => { EN => qq{Analysis window},
+              DE => qq{Analysefenster}                                                                                      },              
   dwdcat => { EN => qq{The Deutscher Wetterdienst Station Catalog},
               DE => qq{Der Stationskatalog des Deutschen Wetterdienstes}                                                    },
   nrsele => { EN => qq{No. selected entries:},
@@ -943,6 +967,8 @@ my %hqtxt = (                                                                # H
               DE => qq{gestern}                                                                                             },
   after  => { EN => qq{after},
               DE => qq{nach}                                                                                                },
+  hcause => { EN => qq{Cause},
+              DE => qq{Grund}                                                                                               },
   aihtxt => { EN => qq{AI state:},
               DE => qq{KI Status:}                                                                                          },
   aimmts => { EN => qq{Perl module Test2::Suite is missing},
@@ -6831,6 +6857,7 @@ sub __getaiFannState {            ## no critic "not used"
   }
   
   my $hpinst   = CurrentVal  ($name, 'heatpumpInstalled',        '-');                      # WP installiert?
+  
   my $pvmaxlim = AiNeuralVal ($name, $fanntyp, 'PVMaxLimit',     '?'); 
   my $tgtmin   = AiNeuralVal ($name, $fanntyp, 'MinVal',         '-');              
   my $tgtmax   = AiNeuralVal ($name, $fanntyp, 'MaxVal',         '-');               
@@ -6866,23 +6893,63 @@ sub __getaiFannState {            ## no critic "not used"
   my $bias     = AiNeuralVal ($name, $fanntyp, 'ModelBias',      '-');                              
   my $slope    = AiNeuralVal ($name, $fanntyp, 'ModelSlope',     '-');
   my $ampel    = AiNeuralVal ($name, $fanntyp, 'ModelAmpel',     '-');
-  my $regv     = AiNeuralVal ($name, $fanntyp, 'RegVersion',     '-');                       # verwendete Feature-Registry Version
+  my $regv     = AiNeuralVal ($name, $fanntyp, 'RegVersion',     '-');                      # verwendete Feature-Registry Version
   my $talgo    = AiNeuralVal ($name, $fanntyp, 'TrainAlgo',      '-');
-  my $nslvl    = AiNeuralVal ($name, $fanntyp, 'NoiseLevel',     '-');                       # Rauschbewertung
-  my $bflim    = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   '-');                       # Bit_Fail_Limit aktuell
-  my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');                       # Bit_Fail_Limit Empfehlung
+  my $nslvl    = AiNeuralVal ($name, $fanntyp, 'NoiseLevel',     '-');                      # Rauschbewertung
+  my $bflim    = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   '-');                      # Bit_Fail_Limit aktuell
+  my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');                      # Bit_Fail_Limit Empfehlung
   
-  my $drift_score     = AiNeuralVal ($name, $fanntyp, 'DriftScore',         '-'); 
-  my $drift_index     = AiNeuralVal ($name, $fanntyp, 'DriftIndex',         '-');
-  my $drift_rmserel   = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio',  '-');  
-  my $drift_slope     = AiNeuralVal ($name, $fanntyp, 'DriftSlope',         '-'); 
-  my $drift_bias      = AiNeuralVal ($name, $fanntyp, 'DriftBias',          '-'); 
-  my $drift_bias_live = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive',      '-');  
-  my $drift_flag      = AiNeuralVal ($name, $fanntyp, 'DriftFlag',          '-');
-  my $bias_recal      = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',       '-');
-  my $slope_recal     = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope',      '-');  
-  my $model_age       = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',      '-');
-  my $last_recaltm    = AiNeuralVal ($name, $fanntyp, 'DriftLastRecalTime', '-'); 
+  my $drift_window     = AiNeuralVal ($name, $fanntyp, 'DriftWindowSize',    '-');          # Zeitfenster auf das sich die Driftwerte beziehen
+  my $drift_score      = AiNeuralVal ($name, $fanntyp, 'DriftScore',         '-'); 
+  my $drift_index      = AiNeuralVal ($name, $fanntyp, 'DriftIndex',         '-');
+  my $drift_rmserel    = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio',  '-');  
+  my $bias_ref         = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',       '-');
+  my $drift_bias_live  = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive',      '-');          # der absolute aktuelle Bias des Modells – also der geglättete Mittelwert, um wie viel Wh das Modell die realen Werte systematisch über- oder unterschätzt
+  my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',          '-');          # DriftBias ist der relative Drift gegenüber dem letzten Referenzpunkt (DriftRefBias)
+  my $drift_flag       = AiNeuralVal ($name, $fanntyp, 'DriftFlag',          '-');
+  my $slope_ref        = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope',      '-');  
+  my $slope_live       = AiNeuralVal ($name, $fanntyp, 'DriftSlopeLive',     '-');          # Slope Live ist die aktuelle Regressionssteigung zwischen den realen Messwerten und den Modellvorhersagen im Zeitfenster
+  my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',         '-'); 
+  my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',      '-');
+  my $last_recaltm     = AiNeuralVal ($name, $fanntyp, 'DriftLastRecalTime', '-'); 
+  my $sem_ratio        = AiNeuralVal ($name, $fanntyp, 'DriftSemRatio',      '-');
+  
+  my $drift_retrecomd = AiNeuralVal ($name, $fanntyp, 'RetrainRecommendation', '-'); 
+  my $drift_retreason = AiNeuralVal ($name, $fanntyp, 'RetrainReason',         '-');
+  
+  my $recomd_translated = $drift_retrecomd;
+  
+  if ($lang eq 'DE') {
+      $recomd_translated = $drift_retrecomd eq 'urgent'  ? 'dringend'
+                         : $drift_retrecomd eq 'advised' ? 'empfohlen'
+                         : 'keine'
+  }
+  
+  # Anzeige Retrain-Grund: ersten passenden Treffer nutzen
+  my $display_reason = $drift_retreason;
+  
+  for my $key (sort keys %block_translations) {
+      if ($drift_retreason =~ /$key/i) {
+          $display_reason = $block_translations{$key}{$lang};
+          last;
+      }
+  }
+  
+  # Anzeige Drift-Flag mutzerfreundlich
+  my $display_driftflag = $drift_flag;
+  
+  for my $key (sort keys %block_translations) {
+      if ($drift_flag =~ /$key/i) {
+          $display_driftflag = ($lang eq 'DE' ? 'Rekalibrierung ausgesetzt' : 'recalibration blocked'). ': '.
+                               $block_translations{$key}{$lang};
+          last;
+      }
+  }
+
+  my $retrampel = $drift_retrecomd eq 'urgent'  ? FW_makeImage ('10px-kreis-rot.png',   $recomd_translated) :
+                  $drift_retrecomd eq 'advised' ? FW_makeImage ('10px-kreis-gelb.png',  $recomd_translated) :
+                  $drift_retrecomd eq 'none'    ? FW_makeImage ('10px-kreis-gruen.png', $recomd_translated) : 
+                  '';  
   
   $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
            $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
@@ -6906,10 +6973,11 @@ sub __getaiFannState {            ## no critic "not used"
   $codape      = round2 ($codape)      if($codape      ne '-');
   $conr2       = round2 ($conr2)       if($conr2       ne '-');
   $bias        = round0 ($bias)        if($bias        ne '-');
-  $slope       = round1 ($slope)       if($slope       ne '-');
   $tgtmax      = round0 ($tgtmax)      if($tgtmax      ne '-');
-  $bias_recal  = round0 ($bias_recal)  if($bias_recal  ne '-');
-  $slope_recal = round1 ($slope_recal) if($slope_recal ne '-');
+  $bias_ref    = round0 ($bias_ref)    if($bias_ref    ne '-');
+  $slope_ref   = round2 ($slope_ref)   if($slope_ref   ne '-');
+  $slope       = round2 ($slope)       if($slope       ne '-');
+  $slope_live  = round2 ($slope_live)  if($slope_live  ne '-');
   $pvmaxlim    = round0 ($pvmaxlim)    if($pvmaxlim    ne '?');
   $bfsug       = round2 ($bfsug)       if($bfsug       ne '-');
   
@@ -6934,67 +7002,79 @@ sub __getaiFannState {            ## no critic "not used"
 
   # Modellparameter
   ###################  
-  my $model = '<b>=== '.$hqtxt{nmdpar}{$lang}.' ===</b>'."\n\n";                                                                                        # Modellparameter
-  $model   .= "<b>".$hqtxt{nnmlim}{$lang}.":</b> PV=$pvmaxlim Wh, ".$tgt.": Min=$tgtmin Wh / Max=$tgtmax Wh"."\n";                                      # Normierungsgrenzen, Hausverbrauch/PV-Prognose
-  $model   .= (encode("utf8", "<b>".$hqtxt{tradat}{$lang}.":</b> $dsnum ".$hqtxt{dtsets}{$lang}." (Training=$trdnum, Validation=$tednum)"))."\n";       # Trainingsdaten, Datensätze
-  $model   .= "<b>".$hqtxt{archit}{$lang}.":</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum"."\n";                                          # Architektur
-  $model   .= "<b>".$hqtxt{hyppar}{$lang}.":</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim"."\n";                                   # Hyperparameter
-  $model   .= "<b>".$hqtxt{actvat}{$lang}.":</b> Hidden=$conhaf, Steepness=$hidste, Output=$conoaf"."\n";                                               # Aktivierungen
-  $model   .= "<b>".$hqtxt{tralgo}{$lang}.":</b> $talgo, Registry Version=$regv"."\n";                                                                  # Trainingsalgorithmus
-  $model   .= "<b>".$hqtxt{rangen}{$lang}.":</b> Mode=$shmode, Period=$shperi"."\n";                                                                    # Zufallsgenerator
-  $model   .= "<b>".$hqtxt{modage}{$lang}.":</b> $model_age h"."\n";                                                                                    # Alter des Modells (Stunden)  
-  
+  my $model_content = "<b>".$hqtxt{nnmlim}{$lang}.":</b> PV=$pvmaxlim Wh, ".$tgt.": Min=$tgtmin Wh / Max=$tgtmax Wh\n";                                         # Normierungsgrenzen, Hausverbrauch/PV-Prognose
+  $model_content   .= (encode("utf8", "<b>".$hqtxt{tradat}{$lang}.":</b> $dsnum ".$hqtxt{dtsets}{$lang}." (Training=$trdnum, Validation=$tednum)"))."\n";       # Trainingsdaten, Datensätze
+  $model_content   .= "<b>".$hqtxt{archit}{$lang}.":</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum\n";                                             # Architektur
+  $model_content   .= "<b>".$hqtxt{hyppar}{$lang}.":</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim\n";                                      # Hyperparameter
+  $model_content   .= "<b>".$hqtxt{actvat}{$lang}.":</b> Hidden=$conhaf, Steepness=$hidste, Output=$conoaf\n";                                                  # Aktivierungen
+  $model_content   .= "<b>".$hqtxt{tralgo}{$lang}.":</b> $talgo, Registry Version=$regv\n";                                                                     # Trainingsalgorithmus
+  $model_content   .= "<b>".$hqtxt{rangen}{$lang}.":</b> Mode=$shmode, Period=$shperi\n";                                                                       # Zufallsgenerator
+  $model_content   .= "<b>".$hqtxt{modage}{$lang}.":</b> $model_age h\n";                                                                                       # Alter des Modells (Stunden) 
+  my $model         = ___aiFannSection ($hqtxt{nmdpar}{$lang}, $model_content, 1);                                                                                # 1 = standardmäßig offen
+
   # Trainingsmetriken
   #####################
-  my $keyfig = '<b>=== '.$hqtxt{trmetc}{$lang}.' ===</b>'."\n\n";                                                                                       # Trainingsmetriken
-  $keyfig   .= "<b>".$hqtxt{bmoaep}{$lang}.":</b> $bstmod (max. 15000)"."\n";                                                                           # bestes Modell bei Epoche
-  $keyfig   .= "<b>Training MSE:</b> $tramse"."\n";
-  $keyfig   .= "<b>Validation MSE:</b> $valmse"."\n";
-  $keyfig   .= "<b>Validation MSE Average:</b> $valavg"."\n";
-  $keyfig   .= "<b>Validation MSE Standard Deviation:</b> $valstd"."\n";
-  $keyfig   .= "<b>Validation Bit_Fail:</b> $bitfai"."\n";
-  $keyfig   .= "<b>Model Bias:</b> $bias Wh"."\n";
-  $keyfig   .= "<b>Model Slope:</b> $slope"."\n";
-  $keyfig   .= "<b>".$hqtxt{treval}{$lang}.":</b> $ampel"."\n";                                                                                         # Trainingsbewertung
+  my $keyfig_content = "<b>".$hqtxt{bmoaep}{$lang}.":</b> $bstmod (max. 15000)\n";                                                                              # bestes Modell bei Epoche
+  $keyfig_content   .= "<b>Training MSE:</b> $tramse\n";
+  $keyfig_content   .= "<b>Validation MSE:</b> $valmse\n";
+  $keyfig_content   .= "<b>Validation MSE Average:</b> $valavg\n";
+  $keyfig_content   .= "<b>Validation MSE Standard Deviation:</b> $valstd\n";
+  $keyfig_content   .= "<b>Validation Bit_Fail:</b> $bitfai\n";
+  $keyfig_content   .= "<b>Model Bias:</b> $bias Wh\n";
+  $keyfig_content   .= "<b>Model Slope:</b> $slope\n";
+  $keyfig_content   .= "<b>".$hqtxt{treval}{$lang}.":</b> $ampel\n";                                                                                            # Trainingsbewertung
+  my $keyfig         = ___aiFannSection ($hqtxt{trmetc}{$lang}, $keyfig_content, 1); 
  
   # Fehlermaße der Prognosen
   ############################
-  my $ermsr  = '<b>=== '.(encode('utf8', $hqtxt{fcerma}{$lang})).' ===</b>'."\n\n";                                                                     # Fehlermaße der Prognosen
-  $ermsr    .= "<b>MAE:</b> $conmae Wh"."\n";
-  $ermsr    .= "<b>MedAE:</b> $comdae Wh"."\n";
-  $ermsr    .= "<b>RMSE:</b> $cormse Wh"."\n";
-  $ermsr    .= "<b>RMSE relative:</b> $rmse_rel %"."\n";
-  $ermsr    .= "<b>RMSE Rating:</b> $rmse_rat"."\n";
-  $ermsr    .= "<b>MAPE:</b> $comape %"."\n";
-  $ermsr    .= "<b>MdAPE:</b> $codape %"."\n";
-  $ermsr    .= "<b>".(encode('utf8', 'R²')).":</b> $conr2"."\n";                                   
+  my $ermsr_content = "<b>MAE:</b> $conmae Wh\n";
+  $ermsr_content   .= "<b>MedAE:</b> $comdae Wh\n";
+  $ermsr_content   .= "<b>RMSE:</b> $cormse Wh\n";
+  $ermsr_content   .= "<b>RMSE relative:</b> $rmse_rel %\n";
+  $ermsr_content   .= "<b>RMSE Rating:</b> $rmse_rat\n";
+  $ermsr_content   .= "<b>MAPE:</b> $comape %\n";
+  $ermsr_content   .= "<b>MdAPE:</b> $codape %\n";
+  $ermsr_content   .= "<b>".(encode('utf8', 'R²')).":</b> $conr2"."\n"; 
+  my $ermsr         = ___aiFannSection (encode('utf8', $hqtxt{fcerma}{$lang}), $ermsr_content, 0);                                                                # 0 = standardmäßig geschlossen
  
   # Rauschen
   ############
-  my $noise  = '<b>=== '.$hqtxt{noise}{$lang}.' ===</b>'."\n\n";                                                                                        # Rauschen            
-  $noise    .= "<b>".$hqtxt{nserat}{$lang}.":</b> $nslvl"."\n";                                                                                         # Rauschen Bewertung
-  $noise    .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Bit_Fail')).":</b> $bfsug (".$hqtxt{setof}{$lang}." aiControl->aiConBitFailLimit)"."\n";   # Empfehlung für Bit_Fail, Einstellung von aiControl
-  
+  my $noise_content = "<b>".$hqtxt{nserat}{$lang}.":</b> $nslvl\n";                                                                                             # Rauschen Bewertung
+  $noise_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Bit_Fail')).":</b> $bfsug (".$hqtxt{setof}{$lang}." aiControl->aiConBitFailLimit)\n";       # Empfehlung für Bit_Fail, Einstellung von aiControl
+  my $noise         = ___aiFannSection ($hqtxt{noise}{$lang}, $noise_content, 0);
+
   # Drift
   #########
-  my $drift  = '<b>=== '.$hqtxt{drftid}{$lang}.' ===</b>'."\n\n";                                                                                       # Drift-Kennzahlen                          
-  $drift    .= "<b>Drift Score:</b> $drift_score"."\n";
-  $drift    .= "<b>Drift RMSE ratio:</b> $drift_rmserel"."\n";
-  $drift    .= "<b>Drift Slope:</b> $drift_slope"."\n";
-  $drift    .= "<b>Drift Bias:</b> $drift_bias"."\n";                                                                                                   # wie weit es vom kalibrierten Referenzniveau abgedriftet ist
-  $drift    .= "<b>Drift Bias Live:</b> $drift_bias_live"."\n";                                                                                         # zeigt wie stark das Modell aktuell daneben liegt
-  $drift    .= "<b>Drift Index:</b> $drift_index"."\n";  
-  $drift    .= "<b>".$hqtxt{drfrat}{$lang}.":</b> $drift_flag"."\n";                                                                                    # Drift Bewertung
-  $drift    .= "<b>Slope recalibrated:</b> $slope_recal"."\n";                                                                                          # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
-  $drift    .= "<b>Bias recalibrated:</b> $bias_recal"."\n";                                                                                            # neue Basislinie nach einer Drift‑Rekalibrierung. Werden verwendet, sobald vorhanden
-  $drift    .= "<b>".$hqtxt{lstrcl}{$lang}.":</b> $last_recaltm"."\n";                                                                                  # Zeitpunkt letzte Rekalibrierung
+  my $drift_content = "<b>".$hqtxt{anawin}{$lang}.":</b> $drift_window h\n";
+  $drift_content   .= "<b>Drift RMSE Ratio:</b> $drift_rmserel\n";
+  $drift_content   .= "<b>Semantic Ratio:</b> $sem_ratio\n";                              
+  $drift_content   .= "<b>Slope Reference:</b> $slope_ref\n";                                                                                           # neue Basislinie nach einer Drift-Rekalibrierung. Werden verwendet, sobald vorhanden
+  $drift_content   .= "<b>Slope Live:</b> $slope_live\n";                                                                                               # Slope Live ist die aktuelle Regressionssteigung zwischen den realen Messwerten und den Modellvorhersagen im Zeitfenster
+  $drift_content   .= "<b>Slope Drift:</b> $drift_slope\n";
+  $drift_content   .= "<b>Bias Reference:</b> $bias_ref\n";                                                                                             # neue Basislinie nach einer Drift-Rekalibrierung. Werden verwendet, sobald vorhanden
+  $drift_content   .= "<b>Bias Live:</b> $drift_bias_live\n";                                                                                           # zeigt wie stark das Modell aktuell daneben liegt    
+  $drift_content   .= "<b>Bias Drift:</b> $drift_bias\n";                                                                                               # wie weit es vom kalibrierten Referenzniveau abgedriftet ist
+  $drift_content   .= "<b>Score:</b> $drift_score\n";
+  $drift_content   .= "<b>Index:</b> $drift_index\n";
+  $drift_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
+  $drift_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
+                      ":</b> $retrampel $recomd_translated (".$hqtxt{hcause}{$lang}.
+                      ": ".(encode('utf8', $display_reason)).") \n";
+  $drift_content   .= "<b>".$hqtxt{lstrcl}{$lang}.":</b> $last_recaltm\n";
+  my $drift_title   = $hqtxt{drftid}{$lang}.' ('.$hqtxt{calasf}{$lang}.' '.$hqtxt{modage}{$lang}.' > '.AIMODELMINAGE.' h)';
+  my $drift         = ___aiFannSection ($drift_title, $drift_content, 0);    
     
   # Erläuterungstext
   ####################
-  my $note = ___aiFannExplainKeyFigures ($paref);
+  my $note_content = ___aiFannExplainKeyFigures ($paref);
+  my $note_title   = $lang eq 'DE' 
+                   ? (encode('utf8', 'Erläuterungen zu den Kennzahlen'))
+                   : (encode('utf8', 'Explanations of the key figures'));
+  my $note         = ___aiFannSection ($note_title, $note_content, 0);
   
   # Zusammenstellung
   ####################
+  $rs .= "<style>summary { user-select:none } summary:hover { color:#c8a000 }</style>\n";
   $rs .= $head;
   $rs .= $atf.' / '.$art."\n";
   $rs .= $ars."\n";
@@ -7002,15 +7082,30 @@ sub __getaiFannState {            ## no critic "not used"
   $rs .= $aiAlpha."\n";
   $rs .= $hpinst;
   $rs .= "\n\n";
-  $rs .= $model."\n";
-  $rs .= $keyfig."\n";
-  $rs .= $ermsr."\n";
-  $rs .= $noise."\n";
-  $rs .= $drift."\n";
-  $rs .= "\n\n";
+  $rs .= $model;
+  $rs .= $keyfig;
+  $rs .= $ermsr;
+  $rs .= $noise;
+  $rs .= $drift;
+  $rs .= "\n";
   $rs .= $note;
 
 return $rs;
+}
+
+################################################################
+#       Formatierung der Ausgabeblöcke
+################################################################  
+sub ___aiFannSection {
+  my ($title, $content, $open) = @_;
+  my $attr = $open ? ' open' : '';
+  $content =~ s/^\n+|\n+$//g;                                                                                   # führende/abschließende Leerzeilen entfernen
+  $content =~ s/\n/<br>/g;                                                                                      # kein extra \n nach <br>
+  
+return "<details$attr style='margin:0 0 3px 0;padding:2px 6px;border:1px solid #333;border-radius:3px'>"
+     . "<summary style='cursor:pointer;padding:2px 0'><b>$title</b></summary>"
+     . "<div style='margin:2px 0 2px 1em;line-height:1.5'>$content</div>"
+     . "</details>\n";
 }
 
 ################################################################
@@ -7030,17 +7125,61 @@ sub ___aiFannExplainKeyFigures {
       $tgt = $hqtxt{conspt}{$lang};
   }
   
-  if ($lang eq 'DE') {
-      $note .= (encode('utf8', '<b><u> Erläuterungen zu den Kennzahlen </b></u>'))."\n\n";
+  if ($lang eq 'DE') { 
+      $note .= (encode('utf8', "<b>Semantic Ratio</b> → Gibt an, wie viele Messpunkte im aktuellen Auswertungsfenster nennenswert falsch vorhergesagt wurden – relativ zur üblichen Modellgenauigkeit."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert < 0.4 → Nur wenige Punkte weichen stark ab. Das Modell ist im Großen und Ganzen treffsicher, einzelne Ausreißer verzerren das Bild – typisch bei seltenen Peaks oder kurzen Störereignissen."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 0.4 - 0.7 → unklares Bild – weder eindeutige Drift noch isolierte Peaks."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 0.7 → Der Großteil der Punkte weicht merklich ab. Das Modell liegt flächendeckend daneben – typisch bei anhaltender Drift."))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Hinweis:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'Die Schwelle für "nennenswert falsch" wird dynamisch aus der bisherigen Modellgüte berechnet, sodass der Wert immer relativ zur aktuellen Leistung des Modells zu verstehen ist.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Drift RMSE Ratio</b> → Verhältnis des aktuellen Vorhersagefehlers zum Referenzfehler beim Training."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert = 1.0 → kein Drift"))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 2.0 → deutliche Verschlechterung"))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Reference</b> → Erwartete Modellsteigung aus dem letzten Training bzw. der letzten Rekalibrierung."))."\n";
+      $note .= $spc3.(encode('utf8', "Dient als Vergleichsbasis für Slope Live."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Live</b> → Aktuelle Regressionssteigung zwischen Realwerten und Vorhersagen."))."\n";
+      $note .= $spc3.(encode('utf8', "Idealwert: 1.0. Negative Werte oder Werte nahe 0 deuten auf ein strukturelles Problem in den Eingangsdaten hin (z. B. Sensorausfall)."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Drift</b> → Verhältnis von Slope Live zu Slope Reference."))."\n";
+      $note .= $spc3.(encode('utf8', 'Wert = 1.0 → kein Drift.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Wert = 0.5 → die aktuelle Steigung beträgt nur die Hälfte des Referenzwerts.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Wert < 0.0 → Das Modell läuft mit negativer Steigung. Hinweis auf ein strukturelles Problem in den Eingangsdaten und führt direkt zur Bewertung "structural_block"'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Reference</b> → Erwarteter systematischer Versatz des Modells (in Wh) aus dem letzten Training bzw. der letzten Rekalibrierung."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Live</b> → Aktuell gemessener systematischer Versatz zwischen Realwerten und Vorhersagen (in Wh)."))."\n";
+      $note .= $spc3.(encode('utf8', "Große Abweichungen gegenüber Bias Reference signalisieren Drift."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Drift</b> → Differenz zwischen Bias Live und Bias Reference."))."\n";
+      $note .= $spc3.(encode('utf8', "Zeigt, um wie viel sich das Modellniveau seit der letzten Rekalibrierung verschoben hat."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Score</b> → Verhältnis des aktuellen MAE zum Referenz-MAE."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert 1.0 = kein Drift, Wert > 2.0 = stark erhöhter Vorhersagefehler."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Index</b> → Aggregierter Gesamtindikator aus Score, RMSE Ratio, Slope und Bias."))."\n";
+      $note .= $spc3.(encode('utf8', "Bestimmt die Drift-Bewertung: < 1.1 stabil, > 2.0 moderat, > 3.0 schwer."))."\n";
+      $note .= "\n";
       
       $note .= (encode('utf8', "<b>Model Bias</b> → zeigt, ob das Modell den $tgt im Durchschnitt zu niedrig oder zu hoch vorhersagt:"))."\n";
       $note .= $spc3.(encode('utf8', "Positiver Bias → das Modell unterschätzt den $tgt im Mittel"))."\n";
       $note .= $spc3.(encode('utf8', "Negativer Bias → das Modell überschätzt den $tgt im Mittel"))."\n";
       $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
       $note .= $spc6.(encode('utf8', 'Der Wert wird in Wh angegeben und beschreibt die durchschnittliche Abweichung pro Stunde.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Die interne Bias‑Korrektur hebt oder senkt die Vorhersage entsprechend, jedoch nur'))."\n";
+      $note .= $spc6.(encode('utf8', 'Die interne Bias-Korrektur hebt oder senkt die Vorhersage entsprechend, jedoch nur'))."\n";
       $note .= $spc6.(encode('utf8', 'im Bereich der Grundlast, um Peaks nicht zu verfälschen.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Wenn eine Drift‑Rekalibrierung stattgefunden hat, ersetzt <b>Bias recalibrated</b> den ursprünglichen Model Bias als neue Basislinie.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Wenn eine Drift-Rekalibrierung stattgefunden hat, ersetzt <b>Bias Reference</b> den ursprünglichen Model Bias als neue Basislinie.'))."\n";
       $note .= $spc6.(encode('utf8', 'Er repräsentiert den neu berechneten durchschnittlichen Modellfehler, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
       $note .= "\n";
       
@@ -7053,11 +7192,11 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', "Slope = 1.0 → Das Modell bildet die Steigung korrekt ab. Steigt der echte $tgt um X, steigt die Vorhersage ebenfalls um X"))."\n";
       $note .= $spc6.(encode('utf8', 'Slope < 1.0 → Das Modell reagiert zu flach. Peaks werden abgeschwächt. Beispiel: Slope = 0.9 → Das Modell bildet 90% der realen Dynamik ab.'))."\n";
       $note .= $spc6.(encode('utf8', 'Slope > 1.0 → Das Modell reagiert zu stark. Peaks werden überbetont, Schwankungen überzeichnet.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Wenn eine Drift‑Rekalibrierung stattgefunden hat, ersetzt <b>Model Slope recalibrated</b> den ursprünglichen Model Slope als neue Steigungsbasis.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Wenn eine Drift-Rekalibrierung stattgefunden hat, ersetzt <b>Slope Reference</b> den ursprünglichen Model Slope als neue Steigungsbasis.'))."\n";
       $note .= $spc6.(encode('utf8', 'Er repräsentiert die neu berechnete Modellreaktion, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
       $note .= "\n";
       
-      $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
+      $note .= (encode('utf8', '<b>Training MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE < 0.01 → sehr gut'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → gut'))."\n";
       $note .= $spc3.(encode('utf8', 'MSE > 0.1 → schwach'))."\n";
@@ -7083,7 +7222,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', '> 300 Wh → schwach'))."\n";
       $note .= "\n";
       
-      $note .= (encode('utf8', "<b>RMSE rel</b> (Root Mean Squared Error) → der gewichtete RMSE misst die quadratische Abweichung von Prognose und $tgt in % - mit Gewichtung für hohe Lasten."))."\n";
+      $note .= (encode('utf8', "<b>RMSE relative</b> (Root Mean Squared Error) → der gewichtete RMSE misst die quadratische Abweichung von Prognose und $tgt in % - mit Gewichtung für hohe Lasten."))."\n";
       $note .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
       $note .= $spc3.(encode('utf8', '< 20% → ausgezeichnet, das Modell trifft sowohl Grundlast als auch Peaks sehr präzise'))."\n";
       $note .= $spc3.(encode('utf8', '20-40% → gut, das Modell ist zuverlässig und bildet typische Verbrauchsmuster sauber ab'))."\n";
@@ -7120,7 +7259,51 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', '⚠️ R² ist sehr empfindlich gegenüber Ausreißern und Varianz in den Daten.'))."\n";
   }
   elsif ($lang eq 'EN') {
-      $note .= (encode('utf8', '<b><u> Explanations of the key figures </b></u>'))."\n\n";
+      $note .= (encode('utf8', "<b>Semantic Ratio</b> → Indicates how many data points in the current evaluation window were predicted with significant error—relative to the model's typical accuracy."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert < 0.4 → Only a few data points deviate significantly. The model is generally accurate; individual outliers distort the picture—which is typical for rare peaks or brief disturbances."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 0.4 - 0.7 → Unclear image—neither a distinct drift nor isolated peaks."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 0.7 → Most of the points deviate significantly. The model is off the mark across the board—which is typical in the case of persistent drift."))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Note:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'The threshold for "significantly incorrect" is calculated dynamically based on the models performance to date, so the value should always be understood in relation to the models current performance.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Drift RMSE Ratio</b> → Ratio of the current prediction error to the reference error during training."))."\n";
+      $note .= $spc3.(encode('utf8', "Value = 1.0 → no drift"))."\n";
+      $note .= $spc3.(encode('utf8', "Value > 2.0 → significant deterioration"))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Reference</b> → Expected model slope based on the last training session or recalibration."))."\n";
+      $note .= $spc3.(encode('utf8', "Serves as a basis for comparison in Slope Live."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Live</b> → Current regression slope between actual values and forecasts."))."\n";
+      $note .= $spc3.(encode('utf8', "Ideal value: 1.0. Negative values or values close to 0 indicate a structural problem in the input data (e.g., sensor failure)."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Drift</b> → Ratio of Slope Live to Slope Reference."))."\n";
+      $note .= $spc3.(encode('utf8', 'Value = 1.0 → no drift.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Value = 0.5 → the current slope is only half the reference value.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Value < 0.0 → The model is running with a negative slope. This indicates a structural problem in the input data and leads directly to the "structural_block" evaluation.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Reference</b> → Expected systematic bias of the model (in Wh) from the last training or recalibration."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Live</b> → Currently measured systematic offset between actual values and predictions (in Wh)."))."\n";
+      $note .= $spc3.(encode('utf8', "Large deviations from the bias reference indicate drift."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Drift</b> → Difference between Bias Live and Bias Reference."))."\n";
+      $note .= $spc3.(encode('utf8', "Shows how much the model level has shifted since the last recalibration."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Score</b> → Ratio of the current MAE to the reference MAE."))."\n";
+      $note .= $spc3.(encode('utf8', "Value 1.0 = no drift, value > 2.0 = significantly increased prediction error."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Index</b> → Aggregate composite indicator based on score, RMSE ratio, slope, and bias."))."\n";
+      $note .= $spc3.(encode('utf8', "Determines the drift rating: < 1.1 stable, > 2.0 moderate, > 3.0 severe."))."\n";
+      $note .= "\n";
       
       $note .= (encode('utf8', "<b>Model Bias</b> → shows whether the model predicts average $tgt to be too low or too high:"))."\n";
       $note .= $spc3.(encode('utf8', "Positive Bias → the model underestimates average $tgt"))."\n";
@@ -7129,7 +7312,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', 'The value is given in Wh and describes the average deviation per hour.'))."\n";
       $note .= $spc6.(encode('utf8', 'The internal bias correction raises or lowers the prediction accordingly, but only'))."\n";
       $note .= $spc6.(encode('utf8', 'in the base load range so as not to distort peaks.'))."\n";
-      $note .= $spc6.(encode('utf8', 'When a drift recalibration has taken place, <b>Bias recalibrated</b> replaces the original model bias as the new baseline.'))."\n";
+      $note .= $spc6.(encode('utf8', 'When a drift recalibration has taken place, <b>Bias Reference</b> replaces the original model bias as the new baseline.'))."\n";
       $note .= $spc6.(encode('utf8', 'It represents the newly calculated average model error after longer-term drift has been detected and corrected.'))."\n";
       $note .= "\n";
       
@@ -7142,7 +7325,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc6.(encode('utf8', "Slope = 1.0 → The model correctly reflects $tgt levels. If actual $tgt increases by X, the prediction also increases by X"))."\n";
       $note .= $spc6.(encode('utf8', 'Slope < 1.0 → The model responds too flatly. Peaks are attenuated. Example: Slope = 0.9 → The model depicts 90% of the actual dynamics.')) ."\n";
       $note .= $spc6.(encode('utf8', 'Slope > 1.0 → The model reacts too strongly. Peaks are overemphasised, fluctuations are exaggerated.'))."\n";
-      $note .= $spc6.(encode('utf8', 'When a drift recalibration has occurred, <b>Model Slope recalibrated</b> replaces the original Model Slope as the new slope basis.'))."\n";
+      $note .= $spc6.(encode('utf8', 'When a drift recalibration has occurred, <b>Slope Reference</b> replaces the original Model Slope as the new slope basis.'))."\n";
       $note .= $spc6.(encode('utf8', 'It represents the recalculated model response after longer-term drift has been detected and corrected.'))."\n";
       $note .= "\n";
       
@@ -7172,7 +7355,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', '> 300 Wh → poor'))."\n";
       $note .= "\n";    
 
-      $note .= (encode('utf8', "<b>RMSE rel</b> (Root Mean Squared Error) → the weighted RMSE measures the square deviation between forecast and $tgt in % - with weighting for high loads."))."\n";
+      $note .= (encode('utf8', "<b>RMSE relative</b> (Root Mean Squared Error) → the weighted RMSE measures the square deviation between forecast and $tgt in % - with weighting for high loads."))."\n";
       $note .= $spc3.(encode('utf8', 'Reference values:'))."\n";
       $note .= $spc3.(encode('utf8', '< 20% → excellent, the model accurately predicts both base load and peaks'))."\n";
       $note .= $spc3. (encode('utf8', "20-40% → good, the model is reliable and accurately reflects typical $tgt patterns"))."\n";
@@ -7975,7 +8158,7 @@ sub _attraiControl {                     ## no critic "not used"
       aiConTrainStart    => { comp => '(?:[1-9]|[1-8][0-9]|90):(?:[1-9]|1[0-9]|2[0-3])',           act => 0 },
       aiTreesPV          => { comp => '(1?[1-9]|10|[2-4][0-9]|50)',                                act => 0 },
       aiConActivate      => { comp => '(0|1|2)',                                                   act => 0 },
-      aiConHiddenLayers  => { comp => '(?:[1-9]\d{1,2}-[1-9]\d{1,2}(?:-[1-9]\d{1,2})?)',           act => 0 },
+      aiConHiddenLayers  => { comp => '(?:[1-9]\d{1,2}-[1-9]\d{1,2}(?:-[1-9]\d{0,2})?)',           act => 0 },
       aiConTrainAlgo     => { comp => '(RPROP|INCREMENTAL)',                                       act => 0 },
       aiConLearnRate     => { comp => '(0\.01|0\.05|0\.00[1-5])',                                  act => 0 },
       aiConMomentum      => { comp => '(0\.[2-9])',                                                act => 0 },
@@ -10821,10 +11004,6 @@ sub centralTask {
   };
 
   $data{$name}{pvhist}{$day}{99}{dayname} = $dayname;                                           # akt. Wochentagsnamen in pvHistory eintragen
-  
-      # --- Drift Analyse ---
-      #my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
-      #aiFannDetectDrift ($name, $t, 'DE', $debug, 'con', 96) if($rdy);                         # Drift von AI 'con' Werten ermitteln
 
   if ($debug !~ /^none$/xs) {
       Log3 ($name, 4, "$name DEBUG> ################################################################");
@@ -15500,7 +15679,7 @@ sub __calcVectorConsumption {
       $node2bat = ($batin - $batout) - $pv2bat + $dc2inv2node - $node2inv2dc;               # positiv: Richtung Inverter-Knoten -> Bat, negativ: Richtung Bat -> Inverter-Knoten
 
       if ($node2bat > 0) {
-          if ($dc2inv2node || $node2inv2dc || $pv2bat) {                                    # Messartefakt (Zeitversatz AC/DC) nur wenn Batterie-Pfad-Variablen aktiv.
+          if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {            # Messartefakt (Zeitversatz AC/DC) nur wenn Batterie-Pfad-Variablen aktiv.
               $node2bat = 0;
           }
       }
@@ -15526,7 +15705,7 @@ sub __calcVectorConsumption {
       # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
       # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
       # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
-      if ($dc2inv2node || $node2inv2dc || $pv2bat) {
+      if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {
           $node2bat = 0;
       }
   }
@@ -18399,7 +18578,7 @@ sub _calcDataEveryFullHour {
 
       # --- Drift Analyse ---
       my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
-      aiFannDetectDrift ($name, $t, $lang, $debug, 'con', 96) if($rdy);                           # Drift von AI 'con' Werten ermitteln
+      aiFannDetectDrift ($name, $t, $lang, $debug, 'con') if($rdy);                               # Drift von AI 'con' Werten ermitteln
 
       # --- con - Quantile bestimmen ---    
       my ($targetref, $dmy1, $dmy2) = getPvHistTargetArray ( { name  => $name, 
@@ -26846,20 +27025,20 @@ sub _aiFannApplyBiasCorrection {
   my $rmse_rel         = AiNeuralVal ($name, $fanntyp, 'RmseRel',           100);
   my $mae              = AiNeuralVal ($name, $fanntyp, 'Mae',               100);
   my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',        1.0);
-  my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',         0.0);
+  my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',         0.0);               # DriftBias ist der relative Drift gegenüber dem letzten Referenzpunkt (DriftRefBias)
   my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio', 1.0);
   my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',       0);
   
   my $bias             = AiNeuralVal ($name, $fanntyp, 'ModelBias',       500);
   my $slope            = AiNeuralVal ($name, $fanntyp, 'ModelSlope',        0);
-  my $bias_recal       = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',  undef);
-  my $slope_recal      = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope', undef);
+  my $bias_ref         = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',  undef);
+  my $slope_ref        = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope', undef);
 
   my $ref_level        = CircularVal ($name, '99', $fanntyp.'_quantile30',  0);                 # Wert des 30%-Quantils als Referenzniveau bestimmen
   
   # --- Rekalibrierte Werte verwenden wenn vorhanden
-  $bias  = $bias_recal  if(defined $bias_recal);
-  $slope = $slope_recal if(defined $slope_recal);
+  $bias  = $bias_ref    if(defined $bias_ref);
+  $slope = $slope_ref   if(defined $slope_ref);
   
   my $res        = $val_predict;
   my $bias_ratio = abs($bias) / (max($mae, 0.1));
@@ -26971,6 +27150,42 @@ sub _aiFannApplyBiasCorrection {
 return ($res, $corr_val, $bias_zone, $drift_zone);
 }
 
+####################################################################################
+# Adaptives Fenster für Drift-Analyse (universell & peak-robust)
+# - Ungewöhnliche Ereignisse (Peaks) → Fenster vergrößern
+# - Schleichende Drift          → Fenster verkleinern
+# - Dauerhafte Drift            → Fenster verkleinern
+# - Sehr stabiles Modell        → Fenster vergrößern
+# - Frisches Modell / fehlende Daten → Standard (96)
+#
+# Schwellenwerte:
+#   drift_score: Peak >2.5 | Dauerhaft >2.0 | Schleichend 1.5–2.0 | Stabil <1.2
+#   sem_ratio:   Anteil der Punkte mit |Fehler| > 0.5 × MAE_model
+#                hoch >0.7 → Fehler weit verbreitet (konstante/dauerhafte Drift)
+#                niedrig <0.4 → Fehler konzentriert auf wenige Punkte (seltene Peaks)
+#   age_hours:   Dauerhafte Drift >72h | Schleichende Drift >48h | Stabil >72h
+####################################################################################
+sub aiFannSelectWindow {
+  my ($name, $fanntyp) = @_;
+
+  my $default     = 96;
+  my $age_hours   = AiNeuralVal($name, $fanntyp, 'ModelAgeHours', undef);
+  my $drift_score = AiNeuralVal($name, $fanntyp, 'DriftScore',    undef);
+  my $sem_ratio   = AiNeuralVal($name, $fanntyp, 'DriftSemRatio', undef);
+
+  if (!defined $age_hours || !defined $drift_score || !defined $sem_ratio) {
+      return $default;
+  }
+  
+  if    ($drift_score > 2.5 && $sem_ratio > 0.7)                                             { return 120 }  # 1) Peak: weit verbreitet → vergrößern
+  elsif ($drift_score > 2.0 && $sem_ratio < 0.4)                                             { return 120 }  # 2) seltene extreme Peaks → vergrößern (retuschieren)
+  elsif ($drift_score > 2.0 && $sem_ratio >= 0.4 && $age_hours > 72)                         { return  48 }  # 3) dauerhafte Drift: viele Punkte betroffen → verkleinern
+  elsif ($drift_score > 1.5 && $drift_score <= 2.0 && $sem_ratio < 0.4 && $age_hours > 48)   { return  72 }  # 4) schleichende Drift → moderat verkleinern
+  elsif ($drift_score < 1.2 && $age_hours > 72)                                              { return 144 }  # 5) stabiles Modell → vergrößern  
+
+return $default;
+}
+
 ###########################################################################
 #   Drift-Analyse (peak-aware, semantik-adaptiv, modellskaliert)
 #   mit Rekalibrierung ModelSlope, ModelBias
@@ -26982,18 +27197,19 @@ sub aiFannDetectDrift {
   my $lang    = shift;
   my $debug   = shift;
   my $fanntyp = shift;
-  my $window  = shift // 96;                                                             # Anzahl Stunden für Driftanalyse
+
+  my $window = aiFannSelectWindow ($name, $fanntyp);                                    # optimales Drift-Detct-Fenster ermitteln (vor Löschen Kennwerte)
 
   my @drift_kpis = qw (
-      DriftBias DriftSlope DriftBiasLive DriftRefMae DriftIndex
-      DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag
+      DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftRefMae DriftIndex
+      DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag DriftSemRatio DriftWindowSize
   );
 
   delete @{$data{$name}{neuralnet}{$fanntyp}}{@drift_kpis};
 
   my $rawref = $data{$name}{aidectree}{airaw};
   return unless $rawref && ref $rawref eq 'HASH';
-
+  
   my @indices = sort { $a <=> $b } keys %$rawref;
   return unless(@indices >= $window);
   
@@ -27014,7 +27230,7 @@ sub aiFannDetectDrift {
 
   $data{$name}{neuralnet}{$fanntyp}{ModelAgeHours} = $age_hours;
 
-  if ($age_hours < 24) {
+  if ($age_hours < AIMODELMINAGE) {
       $flag = 'fresh_model';
       
       # --- harter Reset der Drift-Historie beim frischen Modell
@@ -27026,10 +27242,10 @@ sub aiFannDetectDrift {
       $nn->{DriftSlope}        = 1;
 
       # --- Referenzwerte auf Modellniveau setzen                                                           # V 2.6.2
-      my $mae_model      = AiNeuralVal ($name, $fanntyp, 'Mae',     1);
-      my $rmse_rel_model = AiNeuralVal ($name, $fanntyp, 'RmseRel', 30);
-      my $bias_model     = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
-      my $slope_model    = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
+      my $mae_model        = AiNeuralVal ($name, $fanntyp, 'Mae',        1);
+      my $rmse_rel_model   = AiNeuralVal ($name, $fanntyp, 'RmseRel',   30);
+      my $bias_model       = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
+      my $slope_model      = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
 
       $nn->{DriftRefMae}   = $mae_model;
       $nn->{DriftRefRmse}  = $rmse_rel_model;
@@ -27138,7 +27354,7 @@ sub aiFannDetectDrift {
   my $rmse_rel_model  = AiNeuralVal ($name, $fanntyp, 'RmseRel',                   30);
   my $ref_rmse        = AiNeuralVal ($name, $fanntyp, 'DriftRefRmse', $rmse_rel_model);
   
-  my $rmse_rel_ratio  = $ref_rmse > 0 ? ($rmse_rel_live   / $ref_rmse) : 1;
+  my $rmse_rel_ratio  = $ref_rmse > 0 ? ($rmse_rel_live  / $ref_rmse)  : 1;
   my $bias_drift_norm = $ref_mae  > 0 ? abs($bias_drift) / $ref_mae    : abs($bias_drift);
   my $slope_rel_drift = abs ($slope_drift - 1.0);
 
@@ -27182,12 +27398,15 @@ sub aiFannDetectDrift {
   else                        { $flag = 'stable'   }
 
   # --- Ergebnisse speichern ---
-  $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = round2 ($bias_drift);
+  $data{$name}{neuralnet}{$fanntyp}{DriftWindowSize}   = $window;
+  $data{$name}{neuralnet}{$fanntyp}{DriftBias}         = round2 ($bias_drift);          # DriftBias ist der relative Drift gegenüber dem letzten Referenzpunkt (DriftRefBias)
+  $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);           # der absolute aktuelle Bias des Modells – also der geglättete Mittelwert, um wie viel Wh das Modell die realen Werte systematisch über- oder unterschätzt
   $data{$name}{neuralnet}{$fanntyp}{DriftIndex}        = round2 ($drift_index);
   $data{$name}{neuralnet}{$fanntyp}{DriftSlope}        = round3 ($slope_drift);
-  $data{$name}{neuralnet}{$fanntyp}{DriftBiasLive}     = round2 ($bias_live);
+  $data{$name}{neuralnet}{$fanntyp}{DriftSlopeLive}    = round3 ($slope_live);          # Slope Live ist die aktuelle Regressionssteigung zwischen den realen Messwerten und den Modellvorhersagen im Zeitfenster
   $data{$name}{neuralnet}{$fanntyp}{DriftScore}        = round2 ($drift_score);
   $data{$name}{neuralnet}{$fanntyp}{DriftRmseRelRatio} = round2 ($rmse_rel_ratio);
+  $data{$name}{neuralnet}{$fanntyp}{DriftSemRatio}     = round2 ($sem_ratio);
 
   # --- Drift-Rekalibrierung (automatisch) ---
   # die Werte aus dem ursprünglichen Training werden überschrieben.
@@ -27242,7 +27461,7 @@ sub aiFannDetectDrift {
           my $slope_error           = $slope_live - $ref_slope;
           my $slope_drift_effective = 0.6 * $slope_error + 0.4 * ($rmse_rel_ratio - 1.0) * 0.1;     # Effektiver Slope-Drift: Kombination aus Slope-Drift und RMSE-Drift
           my $new_slope             = $ref_slope + $slope_drift_effective;                          # Neue Steigung
-          $new_slope                = max(0.85, min(1.15, $new_slope));                             # Clamping für Stabilität
+          $new_slope                = max (0.85, min (1.15, $new_slope));                           # Clamping für Stabilität
      
           $data{$name}{neuralnet}{$fanntyp}{DriftRefBias}       = $new_bias;
           $data{$name}{neuralnet}{$fanntyp}{DriftRefSlope}      = $new_slope;
@@ -27258,21 +27477,46 @@ sub aiFannDetectDrift {
       }
   }
   
-  
-  $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $block_reason ? 'recalibration blocked: '.$block_reason : $flag;
+  $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $block_reason 
+                                               ? 'recalibration blocked: '.$block_reason 
+                                               : $flag;
+                                               
+  if ($flag eq 'recalibrated') {
+      $data{$name}{neuralnet}{$fanntyp}{RetrainRecommendation} = 'none';
+      $data{$name}{neuralnet}{$fanntyp}{RetrainReason}         = 'just_recalibrated';
+  }
+  else {                                             
+      # --- Retraining-Empfehlung
+      my $retrain                                              = _aiFannRetrainRecommended ($name, $fanntyp);       # liefert Hash
+      $data{$name}{neuralnet}{$fanntyp}{RetrainRecommendation} = $retrain->{recommendation};
+      $data{$name}{neuralnet}{$fanntyp}{RetrainReason}         = $retrain->{reason};
+  }
   
   if ($debug =~ /aiProcess/xs) {
       Log3 ($name, 1, sprintf (
           "%s DEBUG> DRIFT [%s]: ".
-          "Flag=%s | Block=%s | SlopeLive=%.3f | DriftSlope=%.3f | BiasLive=%.2f | DriftBias=%.2f | ".
+          "Flag=%s | WindowSize=%d | Block=%s | SlopeLive=%.3f | DriftSlope=%.3f | BiasLive=%.2f | DriftBias=%.2f | ".
           "RMSErelLive=%.1f | RMSErelRatio=%.2f | BiasVarNorm=%.2f | DriftIndex=%.2f | DriftScore=%.2f | ".
-          "Zone3Hours=%d | Zone3Reset=%d | Hist=[%s]",
-          $name, $fanntyp,
+          "Zone3Hours=%d | Zone3Reset=%d | Hist=[%s] | Retrain=%s (%s)", 
+          $name, 
+          $fanntyp,
           $flag,
+          $window,
           ($block_reason // 'none'),
-          $slope_live, $slope_drift, $bias_live, $bias_drift,
-          $rmse_rel_live, $rmse_rel_ratio, $bias_var_norm, $drift_index, $drift_score, 
-          $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} // 0, $zone3_reset, join (",", @hist)
+          $slope_live, 
+          $slope_drift, 
+          $bias_live, 
+          $bias_drift,
+          $rmse_rel_live, 
+          $rmse_rel_ratio, 
+          $bias_var_norm, 
+          $drift_index, 
+          $drift_score, 
+          $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours} // 0, 
+          $zone3_reset, 
+          join (",", @hist),
+          ($data{$name}{neuralnet}{$fanntyp}{RetrainRecommendation} // '-'),
+          ($data{$name}{neuralnet}{$fanntyp}{RetrainReason} // '-'),
       ) );
   }
   
@@ -27290,27 +27534,110 @@ sub aiFannDetectDrift {
 return $flag;
 }
 
+################################################################
+#  Retrain Indikator nach abgeschlossenen Training 
+#  und Mindestalter des Modells
+################################################################
+sub _aiFannRetrainRecommended {
+  my ($name, $fanntyp) = @_;
+    
+  my $nn          = $data{$name}{neuralnet}{$fanntyp} // {};
+  my $drift_index = $nn->{DriftIndex}       // 0;
+  my $drift_score = $nn->{DriftScore}       // 0;
+  my $drift_flag  = $nn->{DriftFlag}        // '';
+  my $hist        = $nn->{DriftZoneHistory} // [];
+  my $age_hours   = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours', 0);
+    
+  if ($age_hours < AIMODELMINAGE) {
+      return { recommendation => 'none', reason => '-' };
+  }
+    
+  my @recent      = @{$hist}[-12 .. -1];
+  my $persist_cnt = grep { /^(moderate|severe)$/ } @recent;
+    
+  # --- Strukturelle Blocks: Modell ist das Problem
+  my $sig_structural = ($drift_flag =~ /slope_critical
+                                       |negative_slope_drift
+                                       |model_bad_but_stable/x
+                        && $drift_index > 1.8) ? 1 : 0;
+
+  # --- Persistenz-Drift ohne Block
+  my $sig_persist = ($drift_index > 2.0 && $persist_cnt >= 8) ? 1 : 0;
+
+  # --- Schwerer Drift mit hohem Score
+  my $sig_severe  = ($drift_index > 2.5 && $drift_score > 2.5) ? 1 : 0;
+
+  # --- Kontextabhängige Blocks: nur bei Persistenz relevant 
+  my $sig_context = 0;
+  if ($drift_flag =~ /slope_implausible|rmse_anomaly|unstable_slope|unstable_bias/) {
+      $sig_context = 1 if ($persist_cnt >= 10 && $drift_index > 2.0);                         # Nur wenn der Block nicht nur kurz auftritt und der DriftIndex trotzdem hoch ist
+  }
+
+  # --- Datenfehler-Blocks: niemals für Retraining werten                     
+  my $score = $sig_structural + $sig_persist + $sig_severe + $sig_context;                    # bias_implausible, low_load_phase → bewusst ignoriert
+    
+  my $reason = join ', ', grep { $_ } (
+      $sig_structural ? 'structural_block'  : '',
+      $sig_persist    ? 'persistent_drift'  : '',
+      $sig_severe     ? 'severe_drift'      : '',
+      $sig_context    ? 'context_block'     : '',
+  );
+    
+return { recommendation => 'urgent',  reason => $reason } if $score >= 2;
+return { recommendation => 'advised', reason => $reason } if $score == 1;
+return { recommendation => 'none',    reason => '-'     };
+}
+
 ###########################################################################
-#       Slope und Regressions‑Bias (Model Bias) berechnen
-#       -> Modellstruktur
+#    Slope und Regressions-Bias (Model Bias) berechnen
+#    -> Modellstruktur
+#    OLS = Ordinary Least Squares -> Methode der kleinsten Quadrate
+#    Berechnet OLS-Regression: preds (y) auf targets (x)
+#        slope = (n*Σxy - Σx*Σy) / (n*Σx² - (Σx)²)
+#        bias  = (Σy - slope*Σx) / n
+#
+#    Rückgabe:
+#       slope_regres   => Steigung  (undef bei Null-Varianz in targets)
+#       bias_regres    => Achsenabschnitt (= ȳ bei Null-Varianz)
+#       warning        => Fehler-/Sonderfall-Beschreibung (optional)
 ###########################################################################
 sub _aiFannSlopeBias {
   my ($targets_ref, $preds_ref) = @_;
 
   my @targets = @$targets_ref;
   my @preds   = @$preds_ref;
+  my $n       = scalar @targets;
 
-  my $n = @targets;
+  # --- Sonderfall: zu wenige Datenpunkte
   return {
-      slope_regres => 1,            
+      slope_regres => 1,
       bias_regres  => 0,
-  } if($n < 2);                                             # zu wenige Daten für Regression
+      warning      => 'insufficient_data',
+  } if $n < 2;
 
-  my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0,0,0,0);
+  # --- Arrays unterschiedlicher Länge: auf das kürzere kürzen, kein Abbruch wenn ausreichend
+  my $n_preds = scalar @preds;
+  my $warning = '';
+    
+  if ($n != $n_preds) {
+      $n       = $n < $n_preds ? $n : $n_preds;
+      $warning = 'array_length_mismatch_truncated';
+        
+      return {
+          slope_regres => 1,
+          bias_regres  => 0,
+          warning      => $warning . '_insufficient_data',
+      } if $n < 2;
+  }
 
-  for my $i (0 .. $#targets) {
+  # --- Summen berechnen
+  my ($sum_x, $sum_y, $sum_xy, $sum_xx) = (0, 0, 0, 0);
+    
+  for my $i (0 .. $n - 1) {
       my $x = $targets[$i];
       my $y = $preds[$i];
+       
+      next unless defined $x && defined $y;                                   
 
       $sum_x  += $x;
       $sum_y  += $y;
@@ -27318,17 +27645,28 @@ sub _aiFannSlopeBias {
       $sum_xx += $x * $x;
   }
 
-  my $den   = $n * $sum_xx - $sum_x * $sum_x;
-  my $slope = $den != 0
-              ? ($n * $sum_xy - $sum_x * $sum_y) / $den
-              : 0;
+  # --- Nenner / Skalierter Schwellwert
+  my $den = $n * $sum_xx - $sum_x * $sum_x;                                           # Nenner der OLS-Formel für die Steigung
+  my $eps = 1e-10 * ($sum_xx + abs($sum_x) + 1);                                      # skaliert, nie exakt 0
 
+  # --- Sonderfall: Null-Varianz in targets (alle x identisch)
+  if (abs ($den) <= $eps) {
+      return {
+          slope_regres => 0,
+          bias_regres  => $sum_y / $n,                                                # Fallback: ȳ
+          warning      => 'zero_variance_in_targets',
+      };
+  }
+
+  # --- Normalfall
+  my $slope = ($n * $sum_xy - $sum_x * $sum_y) / $den;
   my $bias  = ($sum_y - $slope * $sum_x) / $n;
 
   return {
-      slope_regres => $slope,            
+      slope_regres => $slope,
       bias_regres  => $bias,
-  };      
+      (defined $warning ? (warning => $warning) : ()),
+  };
 }
 
 ###########################################################################
@@ -27599,7 +27937,9 @@ sub _aiDrift_safety_blocked {
   
   $bias_limit = max ($bias_limit, $quant90 * 0.3);
   
-  return 'bias_implausible' if(defined $bias_live && abs($bias_live) > $bias_limit && $peak_ratio < 0.10);  # BiasLive extrem hoch → Sensor-/API-Fehler
+  if (defined $bias_live && abs($bias_live) > $bias_limit && $peak_ratio < 0.10) {
+      return 'bias_implausible';                                                                            # BiasLive extrem hoch → Sensor-/API-Fehler
+  }
 
   # --- Modell schlecht, aber NICHT driftend
   if ($drift_score        > (1.8 + $sem_ratio  * 0.5) 
@@ -27621,17 +27961,7 @@ sub _aiDrift_safety_blocked {
   
   # --- Debug-Ausgabe ---  
   if ($debug =~ /aiProcess_long/xs) {
-      my $sem_contrib_dbg = $sem_ratio < 0.5 
-                          ? $sem_ratio * 0.8 
-                          : 0.4 - ($sem_ratio - 0.5) * 0.3;
-      $sem_contrib_dbg    = max (0, $sem_contrib_dbg);
-
-      my $rmse_dynamic_limit_dbg = 4.0 
-                                 + ($peak_ratio * 1.0) 
-                                 + $sem_contrib_dbg              
-                                 + min (0.5, $slope_var * 0.5);
-
-      my $rmse_margin = $rmse_dynamic_limit_dbg - $rmse_rel_ratio;                                  # positiv = sicher, negativ = wäre geblockt
+      my $rmse_margin = $rmse_dynamic_limit - $rmse_rel_ratio;                                              # positiv = sicher, negativ = wäre geblockt
 
       Log3 ($name, 1, sprintf (
           "%s DEBUG> DRIFT SAFETY [%s]: block=none\n".
@@ -27651,10 +27981,10 @@ sub _aiDrift_safety_blocked {
           "     peak_ratio=%.3f | sem_ratio=%.3f",
           $name, $fanntyp,
           # RMSE
-          $rmse_rel_ratio, $rmse_dynamic_limit_dbg, $rmse_margin,
+          $rmse_rel_ratio, $rmse_dynamic_limit, $rmse_margin,
           ($rmse_margin < 0 ? '!! EXCEEDED !!' : $rmse_margin < 0.3  ? '!! BARELY !!' : 'ok'),
           $peak_ratio * 1.0, $peak_ratio,
-          $sem_contrib_dbg, $sem_ratio,
+          $sem_contrib, $sem_ratio,
           min (0.5, $slope_var * 0.5), $slope_var,
           # Slope
           $slope_live, $slope_drift, $slope_rel_drift, $slope_var,
@@ -36058,7 +36388,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * small nets (e.g., 50-25) are quick and easy, but less accurate.  </ul>                                                                                </td></tr>
             <tr><td>                          </td><td><ul> * medium nets (64-32) offer a good compromise between speed and accuracy.  </ul>                                                                        </td></tr>
             <tr><td>                          </td><td><ul> * deep networks (64-32-16) recognize complex patterns better, but are more sensitive to outliers.  </ul>                                                </td></tr>
-            <tr><td>                          </td><td>value range:<b> XX[X]-XX[X]-XX[X] (X = 1-9) </b>, default: 80-40-20                                                                                          </td></tr>
+            <tr><td>                          </td><td>value range:<b> XY[Y]-XY[Y]-X[YY] (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                                 </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConLearnRate</b>    </td><td>Determines how strongly the weights of the neural network are adjusted at each training step.                                                                </td></tr>
             <tr><td>                          </td><td><ul> * small (e.g., 0.001): slow, stable learning; low risk of overshoot, but longer training time. </ul>                                                    </td></tr>
@@ -39135,7 +39465,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * kleine Netze (z.B. 50-25) sind schnell und einfach, aber weniger genau  </ul>                                                                         </td></tr>
             <tr><td>                          </td><td><ul> * mittlere Netze (64-32) bieten einen guten Kompromiss aus Geschwindigkeit und Genauigkeit  </ul>                                                       </td></tr>
             <tr><td>                          </td><td><ul> * tiefe Netze (64-32-16) erkennen komplexe Muster besser, sind aber empfindlicher gegenüber Ausreißern  </ul>                                           </td></tr>
-            <tr><td>                          </td><td>Wertebereich:<b> XX[X]-XX[X]-XX[X] (X = 1-9) </b>, default: 80-40-20                                                                                         </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> XY[Y]-XY[Y]-X[YY] (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                                </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConLearnRate</b>    </td><td>Bestimmt, wie stark die Gewichte des neuronalen Netzes bei jedem Traningsschritt angepasst werden.                                                           </td></tr>
             <tr><td>                          </td><td><ul> * Klein (z.B. 0.001): langsames, stabiles Lernen; geringes Risiko von Überschwingen, aber längere Trainingszeit. </ul>                                  </td></tr>
