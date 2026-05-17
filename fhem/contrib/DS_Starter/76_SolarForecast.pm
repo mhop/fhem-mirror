@@ -163,9 +163,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.10" => "17.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
+                           "aiFannGetConResult: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
+                           "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ",
   "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
                            "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
-                           "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster aiFannSelectWindow invertiert ".
+                           "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
                            "AI Status Popup Inhalt aufklappbar ",
   "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
                            "___csmSpecificEpieces: stündliche AVG-Aktualisierung auch im laufenden Betrieb, ausgelöst durch einen Stundenwechsel ".
@@ -279,15 +282,6 @@ my %vNotesIntern = (
   "1.58.0" => "06.09.2025  _batChargeMgmt: Code change and new loading feature with Reading Battery_ChargeOptTargetPower_XX ".
                            "ctrlBatSocManagementXX: new parameter safetyMargin ".
                            "edit Comref, delete obsolete Attr graphicBeamHeightLevelX, new parameter setupBatteryDevXX->pinreduced ",
-  "1.57.3" => "26.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
-                           "check global attribute dnsServer in all SF Models, expand plantControl->genPVdeviation for perspective change ".
-                           "Household consumption calculation uniformly converted to vector calculation ".
-                           "new ctrlSpecialReadings->dummyConsumption, _createSummaries: fix calc of surplus ".
-                           "__createOwnSpec: change inputs for ___ghoValForm to prevent failures like https://forum.fhem.de/index.php?msg=1346936 ",
-  "1.57.2" => "15.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ".
-                           "_transferMeterValues: modul accept meter reset > 0 at day start ",
-  "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
-  "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -835,7 +829,7 @@ my %hrepl = (                                                                # Z
   '\.' => 'k',
 );
 
-my %block_translations = (                                                  # Blockierungsgründe Rekalibrierung = Gründe für Trtraining
+my %block_translations = (                                                                  # Blockierungsgründe Rekalibrierung = Gründe für Trtraining
   negative_slope  => { EN => "unplausible model slope detected",
                        DE => "unplausible Modellsteigung erkannt"            },
   rmse_anomaly    => { EN => "unusually high forecast error",
@@ -850,7 +844,18 @@ my %block_translations = (                                                  # Bl
                        DE => "Modell instabil"                               },                           
 );
 
-my %hqtxt = (                                                                # Hash (Setup) Texte
+my %noise_translations = (                                                                  # Übersetzung Rauschlevel
+  stable     => { EN => "low-noise signal, reliable measurements",
+                  DE => "Signal rauscharm, Messwerte zuverlässig"                  },
+  low        => { EN => "low noise, values still usable", 
+                  DE => "geringes Rauschen, Werte noch verwertbar"                 },
+  borderline => { EN => "noticeable noise; interpret with caution",
+                  DE => "merkliches Rauschen, Interpretation mit Vorsicht"         },
+  noisy      => { EN => "significant noise; limited usability of measured values",
+                  DE => "starkes Rauschen, Messwerte eingeschränkt nutzbar"        },                           
+);
+
+my %hqtxt = (                                                                               # Hash (Setup) Texte
   entry  => { EN => qq{<b>Warm welcome!</b><br>
                        The next queries will guide you through the basic installation.<br>
                        If all entries are made, please check the configuration finally with
@@ -1972,7 +1977,8 @@ pv_mittag_peak_boost_special => sub {
     my $amp = 1.5 * ($base + 0.7*$dyn + 0.5*$yday);
 
     # --- Mindestwirkung: verhindert Wegtrainieren ---
-    my $stable = ($amp < 0.05) ? 0.05 : $amp;
+    #my $stable = ($amp < 0.05) ? 0.05 : $amp;
+    my $stable = ($amp < 0.01) ? 0 : $amp;                                              # V 2.6.10
 
     return [$stable];
 },
@@ -6912,6 +6918,7 @@ sub __getaiFannState {            ## no critic "not used"
   my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',         '-'); 
   my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',      '-');
   my $last_recaltm     = AiNeuralVal ($name, $fanntyp, 'DriftLastRecalTime', '-'); 
+  my $sem_ratio        = AiNeuralVal ($name, $fanntyp, 'DriftSemRatio',      '-');
   
   my $drift_retrecomd = AiNeuralVal ($name, $fanntyp, 'RetrainRecommendation', '-'); 
   my $drift_retreason = AiNeuralVal ($name, $fanntyp, 'RetrainReason',         '-');
@@ -6933,6 +6940,9 @@ sub __getaiFannState {            ## no critic "not used"
           last;
       }
   }
+  
+  # Anzeige Rauschwert nutzerfreundlich
+  my $display_noiselvl = $noise_translations{$nslvl}{$lang};
   
   # Anzeige Drift-Flag mutzerfreundlich
   my $display_driftflag = $drift_flag;
@@ -6998,6 +7008,16 @@ sub __getaiFannState {            ## no critic "not used"
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
   $aiAlpha = '<b>Alpha:</b> '.$aiAlpha;
   $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;
+  
+  # Überblick über die Bewertungen
+  #################################
+  my $rating_content = "<b>".$hqtxt{treval}{$lang}.":</b> $ampel ($retran)\n";
+  $rating_content   .= "<b>".$hqtxt{nserat}{$lang}.":</b> $display_noiselvl ($nslvl)\n"; 
+  $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
+  $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
+                       ":</b> $retrampel $recomd_translated (".$hqtxt{hcause}{$lang}.
+                       ": ".(encode('utf8', $display_reason)).") \n";
+  my $rating         = ___aiFannSection (encode('utf8', 'Bewertungsüberblick'), $rating_content, 1);      
 
   # Modellparameter
   ###################  
@@ -7009,7 +7029,7 @@ sub __getaiFannState {            ## no critic "not used"
   $model_content   .= "<b>".$hqtxt{tralgo}{$lang}.":</b> $talgo, Registry Version=$regv\n";                                                                     # Trainingsalgorithmus
   $model_content   .= "<b>".$hqtxt{rangen}{$lang}.":</b> Mode=$shmode, Period=$shperi\n";                                                                       # Zufallsgenerator
   $model_content   .= "<b>".$hqtxt{modage}{$lang}.":</b> $model_age h\n";                                                                                       # Alter des Modells (Stunden) 
-  my $model         = ___aiFannSection ($hqtxt{nmdpar}{$lang}, $model_content, 1);                                                                                # 1 = standardmäßig offen
+  my $model         = ___aiFannSection ($hqtxt{nmdpar}{$lang}, $model_content, 0);                                                                                # 1 = standardmäßig offen
 
   # Trainingsmetriken
   #####################
@@ -7022,7 +7042,7 @@ sub __getaiFannState {            ## no critic "not used"
   $keyfig_content   .= "<b>Model Bias:</b> $bias Wh\n";
   $keyfig_content   .= "<b>Model Slope:</b> $slope\n";
   $keyfig_content   .= "<b>".$hqtxt{treval}{$lang}.":</b> $ampel\n";                                                                                            # Trainingsbewertung
-  my $keyfig         = ___aiFannSection ($hqtxt{trmetc}{$lang}, $keyfig_content, 1); 
+  my $keyfig         = ___aiFannSection ($hqtxt{trmetc}{$lang}, $keyfig_content, 0); 
  
   # Fehlermaße der Prognosen
   ############################
@@ -7045,7 +7065,8 @@ sub __getaiFannState {            ## no critic "not used"
   # Drift
   #########
   my $drift_content = "<b>".$hqtxt{anawin}{$lang}.":</b> $drift_window h\n";
-  $drift_content   .= "<b>Drift RMSE ratio:</b> $drift_rmserel\n";
+  $drift_content   .= "<b>Drift RMSE Ratio:</b> $drift_rmserel\n";
+  $drift_content   .= "<b>Semantic Ratio:</b> $sem_ratio\n";                              
   $drift_content   .= "<b>Slope Reference:</b> $slope_ref\n";                                                                                           # neue Basislinie nach einer Drift-Rekalibrierung. Werden verwendet, sobald vorhanden
   $drift_content   .= "<b>Slope Live:</b> $slope_live\n";                                                                                               # Slope Live ist die aktuelle Regressionssteigung zwischen den realen Messwerten und den Modellvorhersagen im Zeitfenster
   $drift_content   .= "<b>Slope Drift:</b> $drift_slope\n";
@@ -7080,6 +7101,7 @@ sub __getaiFannState {            ## no critic "not used"
   $rs .= $aiAlpha."\n";
   $rs .= $hpinst;
   $rs .= "\n\n";
+  $rs .= $rating;
   $rs .= $model;
   $rs .= $keyfig;
   $rs .= $ermsr;
@@ -7123,25 +7145,49 @@ sub ___aiFannExplainKeyFigures {
       $tgt = $hqtxt{conspt}{$lang};
   }
   
-  if ($lang eq 'DE') {      
+  if ($lang eq 'DE') { 
+      $note .= (encode('utf8', "<b>Semantic Ratio</b> → Gibt an, wie viele Messpunkte im aktuellen Auswertungsfenster nennenswert falsch vorhergesagt wurden – relativ zur üblichen Modellgenauigkeit."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert < 0.4 → Nur wenige Punkte weichen stark ab. Das Modell ist im Großen und Ganzen treffsicher, einzelne Ausreißer verzerren das Bild – typisch bei seltenen Peaks oder kurzen Störereignissen."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 0.4 - 0.7 → unklares Bild – weder eindeutige Drift noch isolierte Peaks."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 0.7 → Der Großteil der Punkte weicht merklich ab. Das Modell liegt flächendeckend daneben – typisch bei anhaltender Drift."))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Hinweis:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'Die Schwelle für "nennenswert falsch" wird dynamisch aus der bisherigen Modellgüte berechnet, sodass der Wert immer relativ zur aktuellen Leistung des Modells zu verstehen ist.'))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Drift RMSE Ratio</b> → Verhältnis des aktuellen Vorhersagefehlers zum Referenzfehler beim Training."))."\n";
       $note .= $spc3.(encode('utf8', "Wert = 1.0 → kein Drift"))."\n";
       $note .= $spc3.(encode('utf8', "Wert > 2.0 → deutliche Verschlechterung"))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Slope Reference</b> → Erwartete Modellsteigung aus dem letzten Training bzw. der letzten Rekalibrierung."))."\n";
       $note .= $spc3.(encode('utf8', "Dient als Vergleichsbasis für Slope Live."))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Slope Live</b> → Aktuelle Regressionssteigung zwischen Realwerten und Vorhersagen."))."\n";
       $note .= $spc3.(encode('utf8', "Idealwert: 1.0. Negative Werte oder Werte nahe 0 deuten auf ein strukturelles Problem in den Eingangsdaten hin (z. B. Sensorausfall)."))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Slope Drift</b> → Verhältnis von Slope Live zu Slope Reference."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert = 1.0 → kein Drift."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert = 0.5 → die aktuelle Steigung beträgt nur die Hälfte des Referenzwerts."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert < 0.0 → Das Modell läuft mit negativer Steigung. Hinweis auf ein strukturelles Problem in den Eingangsdaten und führt direkt zur Bewertung structural_block"))."\n";
+      $note .= $spc3.(encode('utf8', 'Wert = 1.0 → kein Drift.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Wert = 0.5 → die aktuelle Steigung beträgt nur die Hälfte des Referenzwerts.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Wert < 0.0 → Das Modell läuft mit negativer Steigung. Hinweis auf ein strukturelles Problem in den Eingangsdaten und führt direkt zur Bewertung "structural_block"'))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Bias Reference</b> → Erwarteter systematischer Versatz des Modells (in Wh) aus dem letzten Training bzw. der letzten Rekalibrierung."))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Bias Live</b> → Aktuell gemessener systematischer Versatz zwischen Realwerten und Vorhersagen (in Wh)."))."\n";
       $note .= $spc3.(encode('utf8', "Große Abweichungen gegenüber Bias Reference signalisieren Drift."))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Bias Drift</b> → Differenz zwischen Bias Live und Bias Reference."))."\n";
       $note .= $spc3.(encode('utf8', "Zeigt, um wie viel sich das Modellniveau seit der letzten Rekalibrierung verschoben hat."))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Score</b> → Verhältnis des aktuellen MAE zum Referenz-MAE."))."\n";
       $note .= $spc3.(encode('utf8', "Wert 1.0 = kein Drift, Wert > 2.0 = stark erhöhter Vorhersagefehler."))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Index</b> → Aggregierter Gesamtindikator aus Score, RMSE Ratio, Slope und Bias."))."\n";
       $note .= $spc3.(encode('utf8', "Bestimmt die Drift-Bewertung: < 1.1 stabil, > 2.0 moderat, > 3.0 schwer."))."\n";
       $note .= "\n";
@@ -7232,7 +7278,53 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', 'R² < 0.0 → Modell ist schlechter als einfach immer den Mittelwert vorherzusagen'))."\n";
       $note .= $spc3.(encode('utf8', '⚠️ R² ist sehr empfindlich gegenüber Ausreißern und Varianz in den Daten.'))."\n";
   }
-  elsif ($lang eq 'EN') {      
+  elsif ($lang eq 'EN') {
+      $note .= (encode('utf8', "<b>Semantic Ratio</b> → Indicates how many data points in the current evaluation window were predicted with significant error—relative to the model's typical accuracy."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert < 0.4 → Only a few data points deviate significantly. The model is generally accurate; individual outliers distort the picture—which is typical for rare peaks or brief disturbances."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 0.4 - 0.7 → Unclear image—neither a distinct drift nor isolated peaks."))."\n";
+      $note .= $spc3.(encode('utf8', "Wert > 0.7 → Most of the points deviate significantly. The model is off the mark across the board—which is typical in the case of persistent drift."))."\n";
+      $note .= $spc3.(encode('utf8', '<b>Note:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'The threshold for "significantly incorrect" is calculated dynamically based on the models performance to date, so the value should always be understood in relation to the models current performance.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Drift RMSE Ratio</b> → Ratio of the current prediction error to the reference error during training."))."\n";
+      $note .= $spc3.(encode('utf8', "Value = 1.0 → no drift"))."\n";
+      $note .= $spc3.(encode('utf8', "Value > 2.0 → significant deterioration"))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Reference</b> → Expected model slope based on the last training session or recalibration."))."\n";
+      $note .= $spc3.(encode('utf8', "Serves as a basis for comparison in Slope Live."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Live</b> → Current regression slope between actual values and forecasts."))."\n";
+      $note .= $spc3.(encode('utf8', "Ideal value: 1.0. Negative values or values close to 0 indicate a structural problem in the input data (e.g., sensor failure)."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Slope Drift</b> → Ratio of Slope Live to Slope Reference."))."\n";
+      $note .= $spc3.(encode('utf8', 'Value = 1.0 → no drift.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Value = 0.5 → the current slope is only half the reference value.'))."\n";
+      $note .= $spc3.(encode('utf8', 'Value < 0.0 → The model is running with a negative slope. This indicates a structural problem in the input data and leads directly to the "structural_block" evaluation.'))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Reference</b> → Expected systematic bias of the model (in Wh) from the last training or recalibration."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Live</b> → Currently measured systematic offset between actual values and predictions (in Wh)."))."\n";
+      $note .= $spc3.(encode('utf8', "Large deviations from the bias reference indicate drift."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Bias Drift</b> → Difference between Bias Live and Bias Reference."))."\n";
+      $note .= $spc3.(encode('utf8', "Shows how much the model level has shifted since the last recalibration."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Score</b> → Ratio of the current MAE to the reference MAE."))."\n";
+      $note .= $spc3.(encode('utf8', "Value 1.0 = no drift, value > 2.0 = significantly increased prediction error."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Index</b> → Aggregate composite indicator based on score, RMSE ratio, slope, and bias."))."\n";
+      $note .= $spc3.(encode('utf8', "Determines the drift rating: < 1.1 stable, > 2.0 moderate, > 3.0 severe."))."\n";
+      $note .= "\n";
+      
       $note .= (encode('utf8', "<b>Model Bias</b> → shows whether the model predicts average $tgt to be too low or too high:"))."\n";
       $note .= $spc3.(encode('utf8', "Positive Bias → the model underestimates average $tgt"))."\n";
       $note .= $spc3.(encode('utf8', "Negative bias → the model overestimates average $tgt"))."\n";
@@ -15626,17 +15718,19 @@ sub __calcVectorConsumption {
       $node2bat = 0 if($dc2inv2node && $node2bat > 0);                                      # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
   }
   
-  if ($node2bat > 0) {
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ########################################################################################################################
+  #if ($node2bat > 0) {
       # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
       # - dc2inv2node: Hybrid-Wechselrichter entlädt (Zeitversatz AC/DC-Messung)
       # - node2inv2dc: Wechselrichter lädt (Zeitversatz AC/DC-Messung)
       # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
       # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
       # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
-      if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {
-          $node2bat = 0;
-      }
-  }
+      #if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {
+      #    $node2bat = 0;
+      #}
+  #}
 
   my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                          # Erzeugung Summe im Inverter-Knoten
   $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                        # z.B. Batterie ist voll und SolarLader liefert an Knoten
@@ -17515,13 +17609,19 @@ sub __getCyclesAndRuntime {
   my ($starthour, $startday);
 
   if (isConsumerLogOn ($hash, $c, $pcurr)) {                                                                                             # Verbraucher ist logisch "an"
-        if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'off') {                                                                          # Status im letzen Zyklus war "off"
+        if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'off') {
+            my $prevStartts = ConsumerVal ($name, $c, 'startTime', $t);
+            my $prevDt      = timestringsFromOffset ($name, $prevStartts, 0);
+            my $carryMins   = ($prevDt->{hour} eq $chour)                       # V 2.6.10 Fix für besonderes Timing: Consumer OFF kurz vor dem Stundenwechsel + erster Poll danach findet Consumer bereits wieder ON. Das ist ein seltenes Fenster von wenigen Sekunden – daher tritt es nur sporadisch auf 
+                              ? ConsumerVal ($name, $c, 'minutesOn', 0)
+                              : 0;
+
             $data{$name}{consumers}{$c}{onoff}          = 'on';
-            $data{$name}{consumers}{$c}{startTime}      = $t;                                                                            # startTime ist nicht von "Automatic" abhängig -> nicht identisch mit planswitchon !!!
+            $data{$name}{consumers}{$c}{startTime}      = $t;                   # jetzt erst überschreiben
             $data{$name}{consumers}{$c}{cycleStarttime} = $t;
             $data{$name}{consumers}{$c}{cycleTime}      = 0;
-            $data{$name}{consumers}{$c}{lastMinutesOn}  = ConsumerVal ($name, $c, 'minutesOn', 0);
-            $data{$name}{consumers}{$c}{cycleDayNum}++;                                                                                  # Anzahl der On-Schaltungen am Tag
+            $data{$name}{consumers}{$c}{lastMinutesOn}  = $carryMins;           # statt direkt minutesOn zu lesen
+            $data{$name}{consumers}{$c}{cycleDayNum}++;
         }
         else {
             my $cst = ConsumerVal($name, $c, 'cycleStarttime', $t);
@@ -17537,7 +17637,7 @@ sub __getCyclesAndRuntime {
 
         # --- Stundenwechsel? ---
         if ($chour eq $starthour) {
-            my $runtime                            = round2(($t - $startts) / 60);                                                                
+            my $runtime                            = round2 (($t - $startts) / 60);                                                                
             $data{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($name, $c, 'lastMinutesOn', 0) + $runtime;
         }
         else {
@@ -17557,7 +17657,7 @@ sub __getCyclesAndRuntime {
   }
   else {                                                                                                                                 # Verbraucher soll nicht aktiv sein
       # --- Startzeit auslesen (Default = 1) ---
-      my $startts = ConsumerVal($name, $c, 'startTime', 1);
+      my $startts = ConsumerVal ($name, $c, 'startTime', 1);
       my $dt      = timestringsFromOffset ($name, $startts, 0);  
       $startday   = $dt->{day};                                                                                                          # Tag  (range 01 to 31)
       $starthour  = $dt->{hour};
@@ -24509,7 +24609,7 @@ sub aiFannCreateConTrainData {
   my $hidden_steepness  = CurrentVal ($name, 'aiConSteepness',           0.9);            # Empfindlichkeit der Neuronen. Niedrigere Werte glätten, höhere Werte schärfen
   my $learning_rate     = CurrentVal ($name, 'aiConLearnRate',         0.005);            # Lernrate: zu klein -> Netz kommt nicht aus dem Bias-Plateau, zu groß -> Overshooting (0.01, 0.005)
   my $learning_momentum = CurrentVal ($name, 'aiConMomentum',            0.5);            # Momentum 
-  my $shuffle_mode      = CurrentVal ($name, 'aiConShuffleMode',           2);            # 0 = chronologisch, 1 = chronologischer Split und AI::FANN internes shuffle, 2 = shuffle vor dem Split und AI::FANN internes shuffle
+  my $shuffle_mode      = CurrentVal ($name, 'aiConShuffleMode',           1);            # 0 = chronologisch, 1 = chronologischer Split und AI::FANN internes shuffle, 2 = shuffle vor dem Split und AI::FANN internes shuffle
   my $talgo             = CurrentVal ($name, 'aiConTrainAlgo', 'INCREMENTAL');            # Trainingsalgorithmus (RPROP INCREMENTAL)
   my $shuffle_period    = CurrentVal ($name, 'aiConShufflePeriod',        10);            # bei shuffle_mode -> alle X Epochen Trainingsdaten AI::FANN intern neu mischen
   my $bit_fail_limit    = CurrentVal ($name, 'aiConBitFailLimit',       0.35);            # Bit-Fail Limit
@@ -26555,6 +26655,7 @@ sub aiFannGetConResult {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $chour   = $paref->{chour};                                                                # aktuelle Stunde (00 .. 23)
+  my $t       = $paref->{t};
   my $debug   = $paref->{debug};
   my $fanntyp = 'con';                                                                          # FANN Verwendungsart 'consumption' Prognose                   
   
@@ -26872,12 +26973,23 @@ sub aiFannGetConResult {
       $denorm_val = round0 ($denorm_val);
       $prediction = round0 ($prediction);
       $tc         = round0 ($tc);
+
+      # Fortschreibung der Arrays! mit Horizont-Dämpfung
+      ####################################################
+      my $hist_ref    = _aiFannGetHistoricalReference ($name, $fanntyp, $hod, $t);
+      my $blend_alpha = $hist_ref > 0
+                      ? min (0.8, $num / MAXNEXTHOURS)                                      # maximal 80% historisch
+                      : 0;                                                                  # kein Blending ohne Referenz
+
+      my $forward_val = (1 - $blend_alpha) * $prediction 
+                      +      $blend_alpha  * $hist_ref;
       
-      # Fortschreibung der Arrays!
-      ##############################
-      push @flat_targets,     $prediction;
-      push @temp_norm_values, $temp_norm;                                                    # wichtig: Temperaturreihe auch erweitern
-      push @presence_values,  $presence;                                                     # wichtig: Presence fortschreiben
+      $forward_val    = round0 ($forward_val);
+
+      push @flat_targets,     $forward_val;                                                 # V 2.6.10 statt direkt $prediction
+      push @temp_norm_values, $temp_norm;                                                   # wichtig: Temperaturreihe auch erweitern
+      push @presence_values,  $presence;                                                    # wichtig: Presence fortschreiben
+
       
       # Hybridmodell mit Legacy
       ##########################
@@ -26941,6 +27053,32 @@ sub _aiFannPredict {
   $denorm_val    = max (0, $denorm_val);                                                            # Untergrenze schützen
 
 return $denorm_val;
+}
+
+################################################################
+# Historischer Referenzwert: Mittelwert gleiche Stunde
+# der letzten N Tage aus der History
+################################################################
+sub _aiFannGetHistoricalReference {
+  my ($name, $fanntyp, $hod, $t) = @_;
+    
+  my $days  = 7;
+  my $sum   = 0;
+  my $count = 0;
+    
+  for my $d (1 .. $days) {
+      my $dt       = timestringsFromOffset ($name, $t, $d * -86400);  
+      my $past_day = $dt->{day};
+      
+      my $val      = HistoryVal ($name, $past_day, $hod, $fanntyp, undef);
+        
+      if (defined $val && $val >= 0) {
+          $sum   += $val;
+          $count++;
+      }
+  }
+    
+return $count > 0 ? $sum / $count : 0;
 }
 
 ################################################################
@@ -27078,42 +27216,6 @@ sub _aiFannApplyBiasCorrection {
 return ($res, $corr_val, $bias_zone, $drift_zone);
 }
 
-####################################################################################
-# Adaptives Fenster für Drift-Analyse (universell & peak-robust)
-# - Ungewöhnliche Ereignisse (Peaks) → Fenster vergrößern
-# - Schleichende Drift          → Fenster verkleinern
-# - Dauerhafte Drift            → Fenster verkleinern
-# - Sehr stabiles Modell        → Fenster vergrößern
-# - Frisches Modell / fehlende Daten → Standard (96)
-#
-# Schwellenwerte:
-#   drift_score: Peak >2.5 | Dauerhaft >2.0 | Schleichend 1.5–2.0 | Stabil <1.2
-#   sem_ratio:   Anteil der Punkte mit |Fehler| > 0.5 × MAE_model
-#                hoch >0.7 → Fehler weit verbreitet (konstante/dauerhafte Drift)
-#                niedrig <0.4 → Fehler konzentriert auf wenige Punkte (seltene Peaks)
-#   age_hours:   Dauerhafte Drift >72h | Schleichende Drift >48h | Stabil >72h
-####################################################################################
-sub aiFannSelectWindow {
-  my ($name, $fanntyp) = @_;
-
-  my $default     = 96;
-  my $age_hours   = AiNeuralVal($name, $fanntyp, 'ModelAgeHours', undef);
-  my $drift_score = AiNeuralVal($name, $fanntyp, 'DriftScore',    undef);
-  my $sem_ratio   = AiNeuralVal($name, $fanntyp, 'DriftSemRatio', undef);
-
-  if (!defined $age_hours || !defined $drift_score || !defined $sem_ratio) {
-      return $default;
-  }
-
-  if    ($drift_score > 2.5 && $sem_ratio > 0.7)                                             { return 120 }  # 1) Peak: weit verbreitet → vergrößern
-  elsif ($drift_score > 2.0 && $sem_ratio < 0.4)                                             { return 120 }  # 2) seltene extreme Peaks → vergrößern (retuschieren)
-  elsif ($drift_score > 2.0 && $sem_ratio >= 0.4 && $age_hours > 72)                         { return  48 }  # 3) dauerhafte Drift: viele Punkte betroffen → verkleinern
-  elsif ($drift_score > 1.5 && $drift_score <= 2.0 && $sem_ratio < 0.4 && $age_hours > 48)   { return  72 }  # 4) schleichende Drift → moderat verkleinern
-  elsif ($drift_score < 1.2 && $age_hours > 72)                                              { return 144 }  # 5) stabiles Modell → vergrößern  
-
-return $default;
-}
-
 ###########################################################################
 #   Drift-Analyse (peak-aware, semantik-adaptiv, modellskaliert)
 #   mit Rekalibrierung ModelSlope, ModelBias
@@ -27126,6 +27228,8 @@ sub aiFannDetectDrift {
   my $debug   = shift;
   my $fanntyp = shift;
 
+  my $window = _aiFannSelectWindow ($name, $fanntyp);                                       # optimales Drift-Detct-Fenster ermitteln (vor Löschen Kennwerte)
+
   my @drift_kpis = qw (
       DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftRefMae DriftIndex
       DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag DriftSemRatio DriftWindowSize
@@ -27136,8 +27240,6 @@ sub aiFannDetectDrift {
   my $rawref = $data{$name}{aidectree}{airaw};
   return unless $rawref && ref $rawref eq 'HASH';
   
-  my $window = aiFannSelectWindow ($name, $fanntyp);                                    # optimales Drift-Detct-Fenster ermitteln
-
   my @indices = sort { $a <=> $b } keys %$rawref;
   return unless(@indices >= $window);
   
@@ -27460,6 +27562,42 @@ sub aiFannDetectDrift {
   }
   
 return $flag;
+}
+
+####################################################################################
+# Adaptives Fenster für Drift-Analyse (universell & peak-robust)
+# - Ungewöhnliche Ereignisse (Peaks) → Fenster vergrößern
+# - Schleichende Drift          → Fenster verkleinern
+# - Dauerhafte Drift            → Fenster verkleinern
+# - Sehr stabiles Modell        → Fenster vergrößern
+# - Frisches Modell / fehlende Daten → Standard (96)
+#
+# Schwellenwerte:
+#   drift_score: Peak >2.5 | Dauerhaft >2.0 | Schleichend 1.5–2.0 | Stabil <1.2
+#   sem_ratio:   Anteil der Punkte mit |Fehler| > 0.5 × MAE_model
+#                hoch >0.7 → Fehler weit verbreitet (konstante/dauerhafte Drift)
+#                niedrig <0.4 → Fehler konzentriert auf wenige Punkte (seltene Peaks)
+#   age_hours:   Dauerhafte Drift >72h | Schleichende Drift >48h | Stabil >72h
+####################################################################################
+sub _aiFannSelectWindow {
+  my ($name, $fanntyp) = @_;
+
+  my $default     = 96;
+  my $age_hours   = AiNeuralVal($name, $fanntyp, 'ModelAgeHours', undef);
+  my $drift_score = AiNeuralVal($name, $fanntyp, 'DriftScore',    undef);
+  my $sem_ratio   = AiNeuralVal($name, $fanntyp, 'DriftSemRatio', undef);
+
+  if (!defined $age_hours || !defined $drift_score || !defined $sem_ratio) {
+      return $default;
+  }
+  
+  if    ($drift_score > 2.5 && $sem_ratio > 0.7)                                             { return 120 }  # 1) Peak: weit verbreitet → vergrößern
+  elsif ($drift_score > 2.0 && $sem_ratio < 0.4)                                             { return 120 }  # 2) seltene extreme Peaks → vergrößern (retuschieren)
+  elsif ($drift_score > 2.0 && $sem_ratio >= 0.4 && $age_hours > 72)                         { return  48 }  # 3) dauerhafte Drift: viele Punkte betroffen → verkleinern
+  elsif ($drift_score > 1.5 && $drift_score <= 2.0 && $sem_ratio < 0.4 && $age_hours > 48)   { return  72 }  # 4) schleichende Drift → moderat verkleinern
+  elsif ($drift_score < 1.2 && $age_hours > 72)                                              { return 144 }  # 5) stabiles Modell → vergrößern  
+
+return $default;
 }
 
 ################################################################
@@ -36341,7 +36479,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * 0 = chronological, reproducible, but susceptible to sequence effects </ul>                                                                            </td></tr>
             <tr><td>                          </td><td><ul> * 1 = chronological split, followed by internal shuffle—good balance between temporal validation and robust training </ul>                              </td></tr>
             <tr><td>                          </td><td><ul> * 2 = complete shuffle before split + internal shuffle - maximum mixing, but temporal structures are lost </ul>                                         </td></tr>
-            <tr><td>                          </td><td>Values:<b> 0 | 1 | 2 </b>, default: 2                                                                                                                        </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0 | 1 | 2 </b>, default: 1                                                                                                                        </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td><b>aiConShufflePeriod</b> </td><td>The shuffle period determines after how many epochs the training data is reshuffled in the background.                                                       </td></tr>
             <tr><td>                          </td><td>The parameter influences how strongly the network sees random sequences and thus generalization vs. stability.                                               </td></tr>
@@ -39418,7 +39556,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * 0 = chronologisch, reproduzierbar, aber anfällig für Reihenfolge-Effekte </ul>                                                                        </td></tr>
             <tr><td>                          </td><td><ul> * 1 = chronologischer Split, danach internes Shuffle - gute Balance zwischen zeitlicher Validierung und robustem Training </ul>                         </td></tr>
             <tr><td>                          </td><td><ul> * 2 = vollständiges Shuffle vor dem Split + internes Shuffle - maximale Durchmischung, aber zeitliche Strukturen gehen verloren</ul>                    </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2 </b>, default: 2                                                                                                                         </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2 </b>, default: 1                                                                                                                         </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td><b>aiConShufflePeriod</b> </td><td>Die Shuffle-Periode bestimmt, nach wie vielen Epochen die Trainingsdaten im Hintergrund neu gemischt werden.                                                 </td></tr>
             <tr><td>                          </td><td>Der Parameter beeinflusst, wie stark das Netz zufällige Reihenfolgen sieht und damit Generalisation vs. Stabilität.                                          </td></tr>
