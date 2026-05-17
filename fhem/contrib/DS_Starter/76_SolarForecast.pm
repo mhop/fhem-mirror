@@ -165,7 +165,8 @@ BEGIN {
 my %vNotesIntern = (
   "2.6.10" => "17.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
                            "aiFannGetConResult: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
-                           "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ",
+                           "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
+                           "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ",
   "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
                            "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
                            "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
@@ -7012,7 +7013,7 @@ sub __getaiFannState {            ## no critic "not used"
   # Überblick über die Bewertungen
   #################################
   my $rating_content = "<b>".$hqtxt{treval}{$lang}.":</b> $ampel ($retran)\n";
-  $rating_content   .= "<b>".$hqtxt{nserat}{$lang}.":</b> $display_noiselvl ($nslvl)\n"; 
+  $rating_content   .= "<b>".$hqtxt{nserat}{$lang}.":</b> ".(encode('utf8', $display_noiselvl))." ($nslvl)\n";                    
   $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
   $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
                        ":</b> $retrampel $recomd_translated (".$hqtxt{hcause}{$lang}.
@@ -25051,7 +25052,9 @@ sub _aiFannPercentileBasedLimits {
   
   my @outliers = grep { $_ > $p999 } @above;                                         # echte Ausreißer ermitteln (alles > Percentile)
     
-  my $safety     = 1.3;                                                              # 30% Sicherheitsaufschlag
+  my $raw_max    = max (@$tgref);                                                    # max. Targetwert
+  my $overshoot  = $p999 > 0 ? $raw_max / $p999 : 1.0;                               # z.B. 8902/8056 = 1.105
+  my $safety     = max (1.05, $overshoot * 1.05);                                    # V 2.6.10 5% Puffer über dem historischen Maximum
   my $targminval = 0;                                                                # (De)Normalisierung -> Targetgrenze min 
   my $targmaxval = $p999 * $safety;                                     
 
@@ -25060,7 +25063,7 @@ sub _aiFannPercentileBasedLimits {
       $p2 = 'p'.($p2 * 100);
       
       Log3 ($name, 1, sprintf "%s DEBUG> AI FANN - Target-Norm: raw_max=%0.0f, $p1=%0.0f, $p2=%0.0f, targmaxval=%0.0f",
-                               $name, max(@$tgref), $p99, $p999, $targmaxval);
+                               $name, $raw_max, $p99, $p999, $targmaxval);
 
       if (@outliers) {
           my $olist = join (', ', @outliers);
@@ -26409,25 +26412,35 @@ return;
 ################################################################
 sub _aiFannDetectNoiseLevel {
   my ($targets, $mae_live, $median) = @_;
-
+  
   my $n    = @$targets;
   my $flag = 'stable';
   my $bfl  = 0.22;                                                                # Default für stabile Haushalte
-
+  
   return ($flag, $bfl) if $n < 10;
 
-  # --- Volatilität (delta1) ---
+  # --- Schwellenwerte ---
+  my $THR_VOLATILITY  = 0.12;
+  my $THR_ACF1        = 0.25;
+  my $THR_NOISE_RATIO = 0.22;
+
+  # --- Volatilität (delta1) – relativ zum Median ---
   my @deltas;
+  
   for my $i (1 .. $#$targets) {
       push @deltas, abs($targets->[$i] - $targets->[$i-1]);
   }
-  my $volatility = medianArray(\@deltas);
+  
+  my $volatility     = medianArray (\@deltas);
+  my $rel_volatility = $median > 0 ? $volatility / $median : $volatility;
 
   # --- Autokorrelation (ACF1) ---
-  my ($sum_x, $sum_y, $sum_xy, $sum_xx, $sum_yy) = (0,0,0,0,0);
-  for my $i (1 .. $#$targets) {
-      my $x = $targets->[$i];
-      my $y = $targets->[$i-1];
+  my $m = $n - 1;                                                               # V 2.6.10 Anzahl Elemente ist Index - 1
+  my ($sum_x, $sum_y, $sum_xy, $sum_xx, $sum_yy) = (0, 0, 0, 0, 0);
+ 
+ for my $i (1 .. $#$targets) {
+      my $x    = $targets->[$i];
+      my $y    = $targets->[$i-1];
       $sum_x  += $x;
       $sum_y  += $y;
       $sum_xy += $x * $y;
@@ -26435,23 +26448,24 @@ sub _aiFannDetectNoiseLevel {
       $sum_yy += $y * $y;
   }
   
-  my $den  = sqrt(($sum_xx - $sum_x**2/$n) * ($sum_yy - $sum_y**2/$n));
-  my $acf1 = $den > 0 ? ($sum_xy - $sum_x*$sum_y/$n) / $den : 0;
+  my $den  = sqrt(($sum_xx - $sum_x**2/$m) * ($sum_yy - $sum_y**2/$m));
+  my $acf1 = $den > 0 ? ($sum_xy - $sum_x*$sum_y/$m) / $den : 1.0;              # Bei konstanter Reihe ($den == 0): maximale Regelmäßigkeit -> acf1 = 1.0
 
   # --- Noise-Ratio ---
   my $noise_ratio = $median > 0 ? ($mae_live / $median) : 0;
 
-  # --- Score berechnen ---
+  # --- Gewichteter Score ---
+  # noise_ratio ist das stärkste Signal -> doppelte Gewichtung
   my $score = 0;
-  $score++ if $volatility  > 0.12;
-  $score++ if $acf1        < 0.25;
-  $score++ if $noise_ratio > 0.22;
+  $score   += 2 if $noise_ratio    > $THR_NOISE_RATIO;
+  $score   += 1 if $rel_volatility > $THR_VOLATILITY;
+  $score   += 1 if $acf1           < $THR_ACF1;
 
   # --- 4-Stufen-Logik ---
-  if    ($score >= 3) { $flag = 'noisy';      $bfl  = 0.40; }
-  elsif ($score >= 2) { $flag = 'borderline'; $bfl  = 0.34; }
-  elsif ($score >= 1) { $flag = 'low';        $bfl  = 0.28; }
-  else                { $flag = 'stable';     $bfl  = 0.22; }
+  if    ($score >= 4) { $flag = 'noisy';      $bfl = 0.40; }
+  elsif ($score >= 3) { $flag = 'borderline'; $bfl = 0.34; }
+  elsif ($score >= 2) { $flag = 'low';        $bfl = 0.28; }
+  else                { $flag = 'stable';     $bfl = 0.22; }
 
 return ($flag, $bfl);
 }
