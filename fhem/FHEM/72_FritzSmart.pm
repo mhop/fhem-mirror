@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.05.11b";
+our $ModulVersion = "26.05.17";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -100,15 +100,6 @@ use Blocking;
 use FritzBoxUtils; ## only for web access login
 
 our $missingModul = "";
-
-# our $missingXML = "";
-# our $json_doc;
-# our $json_level;
-# our @json_stack;
-# our $need_comma;
-# our $element_string;
-# our $crlf = 1;
-# our $fullHASH = 0;
 
 ###############################################################################
 # perl includes
@@ -841,7 +832,7 @@ our %LuaQueryCmd = (
 );
 
 ###############################################################################
-# FritzOS Versions
+# Fritz!OS Versions
 # https://www.pcwelt.de/article/1196302/die-neuesten-updates-fuer-fritzbox-co.html
 our %FB_Model = (
        '7690'        => { version => "8.22", date => "26.02.2026"},
@@ -1026,7 +1017,12 @@ sub Fritz_Get_attrList($@) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  my $avmModel  = (defined($hash->{MODEL}) ? $hash->{MODEL} : "FRITZ!Box");
+  my $avmModel;
+  if( defined($hash->{MODEL}) && $hash->{MODEL} ne "") {
+    $avmModel = $hash->{MODEL};
+  } else {
+    $avmModel = "Initial";
+  }
   my $fwVersion = (defined($hash->{fhem}{fwVersion}) ? $hash->{fhem}{fwVersion} : 0);
 
   my $retAttr = "disable:0,1 "
@@ -1068,49 +1064,7 @@ sub Fritz_Get_attrList($@) {
                                 ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,Fritz_Helper_TR064_ErrMsg,"
                                 ."Fritz_Helper_removeAfA,Fritz_Helper_reformat ";
 
-  if($avmModel =~ "Repeater") {
-    $retAttr .= "disableBoxReadings:multiple-strict,"
-                                ."box_cpuTemp,"
-                                ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
-                                ."box_IPv6_Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
-                                ."box_ip_name,box_ip_IPv4_Extern,box_ip_connection_Type,box_ip_connect,box_ip_last_connect_err,box_ip_last_auth_err,box_ip_mac_Address,box_ip_connection_Trigger,box_ip_uptimeConnect,"
-                                ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
-                                ."box_tr064,box_tr069,"
-                                ."box_upnp,box_upnp_control_activated,box_uptime,"
-                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_LogExtended "
-
-  } elsif($avmModel =~ "Powerline") {
-
-  } elsif($avmModel =~ "Gateway") {
-    $retAttr .= "disableBoxReadings:multiple-strict,"
-                                ."box_cpuTemp,"
-                                ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
-                                ."box_IPv6_Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
-                                ."box_ip_name,box_ip_IPv4_Extern,box_ip_connection_Type,box_ip_connect,box_ip_last_connect_err,box_ip_last_auth_err,box_ip_mac_Address,box_ip_connection_Trigger,box_ip_uptimeConnect,"
-                                ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
-                                ."box_tr064,box_tr069,"
-                                ."box_upnp,box_upnp_control_activated,box_uptime,"
-                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_LogExtended "
-
-               ."enableSmartHome:off,all,group,device "
-               ."enableReadingsFilter:multiple-strict,"
-                                ."shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
-                                ."shdeviceID_battery,shdeviceID_batteryLow,shdeviceID_buttonLocked,"
-                                ."shdeviceID_category,shdeviceID_currentInAmp,shdeviceID_currentState,shdeviceID_currentStateAction,shdeviceID_currentStateEndTime,"
-                                ."shdeviceID_device,shdeviceID_externalLocked,shdeviceID_firmwareVersion,shdeviceID_holidayActive,"
-                                ."shdeviceID_ledState,shdeviceID_manufacturer,shdeviceID_mode,shdeviceID_modeNextChangeTime,shdeviceID_model,"
-                                ."shdeviceID_powerPerHour,shdeviceID_powerInWatt,"
-                                ."shdeviceID_state,shdeviceID_status,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_summerTimePeriod,shdeviceID_summerTimeRepetition,"
-                                ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
-                                ."shdeviceID_uid,shdeviceID_voltage ";
-
-    if ($fwVersion == 0 || $fwVersion >= 750) {
-#      $retAttr .= "SHInfoExtActive:0,1 "
-#                 ."SHInfoExtInterval:15,30,45,60,20 "
-#                 ."SHInfoExtReadings ";
-    }
-
-  } elsif($avmModel =~ "Box") {
+  if($avmModel =~ /Box|Initial/) {
     $retAttr .= "userTickets:0,1,2,3,4,5,6,7,8,9,10,11,12 "
 
                ."disableDectInfo:0,1 "
@@ -1150,34 +1104,45 @@ sub Fritz_Get_attrList($@) {
                                 ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
                                 ."shdeviceID_uid,shdeviceID_voltage ";
 
-
-    if ($avmModel !~ "Cable") {
-
-      if ($fwVersion == 0 || $fwVersion >= 680) {
-        $retAttr .= "enableBoxReadings:multiple-strict,";
-                     $retAttr .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
-                     $retAttr .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
-                     $retAttr .= "box_energyMode,box_globalFilter,"          if ($fwVersion == 0 || $fwVersion >= 721);
-                     $retAttr .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
-                     chop($retAttr);
-                     $retAttr .= " ";
-      }
-
-    } elsif ($avmModel =~ "Cable") {
+    if ($avmModel =~ /Initial/) {
 
       $retAttr .= "enableDocsisInfo:0,1 ";
+      my $retPara = "enableBoxReadings:multiple-strict,";
+                   $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
+                   $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
+                   $retPara .= "box_energyMode,box_globalFilter,"          if ($fwVersion == 0 || $fwVersion >= 721);
+                   $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
+                   $retPara =~ s/.$/ /;
+      $retAttr .= $retPara;
 
-      if ($fwVersion == 0 || $fwVersion >= 680) {
-        $retAttr .= "enableBoxReadings:multiple-strict,";
-                     $retAttr .= "box_led,"                          if ($fwVersion == 0 || $fwVersion >= 680);
-                     $retAttr .= "box_guestWlan,box_usb,box_notify," if ($fwVersion == 0 || $fwVersion >= 700);
-                     $retAttr .= "box_energyMode,box_globalFilter,"  if ($fwVersion == 0 || $fwVersion >= 721);
-                     $retAttr .= "box_dns,"                          if ($fwVersion == 0 || $fwVersion >= 731);
-                     $retAttr .= "box_pwr,"                          if ($fwVersion == 0 || ($fwVersion >= 700 && ($fwVersion < 790 || $fwVersion >= 804)) ) ;
-                     chop($retAttr);
-                     $retAttr .= " ";
+    } else {
+      if ($avmModel !~ /Cable/) {
+
+        if ($fwVersion == 0 || $fwVersion >= 680) {
+          my $retPara = "enableBoxReadings:multiple-strict,";
+                     $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
+                     $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
+                     $retPara .= "box_energyMode,box_globalFilter,"          if ($fwVersion == 0 || $fwVersion >= 721);
+                     $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
+                     $retPara =~ s/.$/ /;
+          $retAttr .= $retPara;
+        }
+
+      } elsif ($avmModel =~ /Cable/) {
+
+        $retAttr .= "enableDocsisInfo:0,1 ";
+
+        if ($fwVersion == 0 || $fwVersion >= 680) {
+          my $retPara = "enableBoxReadings:multiple-strict,";
+                     $retPara .= "box_led,"                          if ($fwVersion == 0 || $fwVersion >= 680);
+                     $retPara .= "box_guestWlan,box_usb,box_notify," if ($fwVersion == 0 || $fwVersion >= 700);
+                     $retPara .= "box_energyMode,box_globalFilter,"  if ($fwVersion == 0 || $fwVersion >= 721);
+                     $retPara .= "box_dns,"                          if ($fwVersion == 0 || $fwVersion >= 731);
+                     $retPara .= "box_pwr,"                          if ($fwVersion == 0 || ($fwVersion >= 700 && ($fwVersion < 790 || $fwVersion >= 804)) );
+                     $retPara  =~ s/.$/ /;
+          $retAttr .= $retPara;
+        }
       }
-
     }
 
     if ($fwVersion == 0 || $fwVersion >= 700) {
@@ -1199,12 +1164,53 @@ sub Fritz_Get_attrList($@) {
 
   }
 
+  if($avmModel =~ /Repeater|Initial/) {
+    $retAttr .= "disableBoxReadings:multiple-strict,"
+                                ."box_cpuTemp,"
+                                ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
+                                ."box_IPv6_Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
+                                ."box_ip_name,box_ip_IPv4_Extern,box_ip_connection_Type,box_ip_connect,box_ip_last_connect_err,box_ip_last_auth_err,box_ip_mac_Address,box_ip_connection_Trigger,box_ip_uptimeConnect,"
+                                ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
+                                ."box_tr064,box_tr069,"
+                                ."box_upnp,box_upnp_control_activated,box_uptime,"
+                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_LogExtended "
+
+  } 
+  if($avmModel =~ /Powerline|Initial/) {
+
+  } 
+  if($avmModel =~ /Gateway|Initial/) {
+    $retAttr .= "disableBoxReadings:multiple-strict,"
+                                ."box_cpuTemp,"
+                                ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
+                                ."box_IPv6  _Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
+                                ."box_ip_name,box_ip_IPv4_Extern,box_ip_connection_Type,box_ip_connect,box_ip_last_connect_err,box_ip_last_auth_err,box_ip_mac_Address,box_ip_connection_Trigger,box_ip_uptimeConnect,"
+                                ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
+                                ."box_tr064,box_tr069,"
+                                ."box_upnp,box_upnp_control_activated,box_uptime,"
+                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_LogExtended "
+
+               ."enableSmartHome:off,all,group,device "
+               ."enableReadingsFilter:multiple-strict,"
+                                ."shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
+                                ."shdeviceID_battery,shdeviceID_batteryLow,shdeviceID_buttonLocked,"
+                                ."shdeviceID_category,shdeviceID_currentInAmp,shdeviceID_currentState,shdeviceID_currentStateAction,shdeviceID_currentStateEndTime,"
+                                ."shdeviceID_device,shdeviceID_externalLocked,shdeviceID_firmwareVersion,shdeviceID_holidayActive,"
+                                ."shdeviceID_ledState,shdeviceID_manufacturer,shdeviceID_mode,shdeviceID_modeNextChangeTime,shdeviceID_model,"
+                                ."shdeviceID_powerPerHour,shdeviceID_powerInWatt,"
+                                ."shdeviceID_state,shdeviceID_status,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_summerTimePeriod,shdeviceID_summerTimeRepetition,"
+                                ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
+                                ."shdeviceID_uid,shdeviceID_voltage ";
+
+  } 
+
   if ($fwVersion == 0 || $fwVersion >= 800) {
      $retAttr .= "enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 ";
   }
 
   $retAttr .= $readingFnAttributes;
 
+  # main::Log3 $name, 3, "Fritz_Get_attrList: $avmModel \n" . $retAttr;
   return $retAttr;
 }
 
@@ -1224,6 +1230,7 @@ sub Fritz_Initialize_Modul($)
   $hash->{GetFn}       = "Fritz::Fritz_Get_Modul";
   $hash->{AttrFn}      = "Fritz::Fritz_Attr_Modul";
 
+#  main::Log3 $hash, 3, "Fritz_Get_attrList(initial)";
   $hash->{AttrList}    = Fritz_Get_attrList($hash);
 
 #    $hash->{AttrRenameMap} = { "enableMobileModem" => "enableMobileInfo"
@@ -1263,11 +1270,11 @@ sub Fritz_Log($$$)
      $sub = $xsubroutine;
    }
 
-   my $avmModel = "unknown";
-   if ( exists($instHash->{boxModel}) && ref($instHash->{boxModel}) eq "SCALAR" ) {
-     $avmModel = $instHash->{boxModel};
+   my $avmModel = "Initial";
+   if ( exists($instHash->{MODEL}) && ref($instHash->{MODEL}) eq "SCALAR" ) {
+     $avmModel = $instHash->{MODEL};
    } else {
-     $avmModel = main::InternalVal($instName, "MODEL", "unknown");
+     $avmModel = main::InternalVal($instName, "MODEL", "Initial");
    }
 
    my $fwV = main::ReadingsVal($instName, "box_fwVersion", "0.0.0.0");
@@ -1705,13 +1712,13 @@ sub Fritz_Rename_Modul($$)
 ###############################################################################
 sub Fritz_Attr_Modul($@)
 {
-   my ($cmd,$name,$aName,$aVal) = @_;
+   my ($cmd, $name, $aName, $aVal) = @_;
       # $cmd can be "del" or "set"
       # $name is device name
       # aName and aVal are Attribute name and value
 
    my $hash      = $defs{$name};
-   my $avmModel  = main::InternalVal($name, "MODEL", undef);
+   my $avmModel  = main::InternalVal($name, "MODEL", $hash->{MODEL});
    my $URL_MATCH = Fritz_Helper_Url_Regex();
    my $attrList  = Fritz_Get_attrList($hash);
 
@@ -1847,10 +1854,15 @@ sub Fritz_Attr_Modul($@)
 
    if ($aName eq "enableBoxReadings") {
      my @reading_list = qw(box_led box_energyMode box_globalFilter box_vdsl box_dns box_pwr box_guestWlan box_usb box_notify);
+     my @para_list    = split(",", $aVal);
+
      if ($cmd eq "set" && $init_done) {
 
-       if($attrList !~ /$aVal/) {
-         return "box_dns not available for Fritz!OS: $hash->{fhem}{fwVersionStr} or $avmModel";
+       foreach ( @para_list ) {
+         my $paraItem = $_;
+         if ( $attrList !~ /${paraItem}/  ) {
+           return "enableBoxReadings: $paraItem not available for Fritz!OS: $hash->{fhem}{fwVersionStr} or $avmModel";
+         }
        }
 
        $aVal =~ s/\,/\|/g;
@@ -1878,7 +1890,17 @@ sub Fritz_Attr_Modul($@)
 
    if ($aName eq "enableLogReadings") {
      my @reading_list = qw(box_sys_Log box_wlan_Log box_fon_Log);
-     if ($cmd eq "set") {
+     my @para_list    = split(",", $aVal);
+
+     if ($cmd eq "set" && $init_done) {
+
+       foreach ( @para_list ) {
+         my $paraItem = $_;
+         if ( $attrList !~ /${paraItem}/  ) {
+           return "enableBoxReadings: $paraItem not available for Fritz!OS: $hash->{fhem}{fwVersionStr} or $avmModel";
+         }
+       }
+
        $aVal =~ s/\,/\|/g;
        foreach ( @reading_list ) {
          my $boxDel = $_;
@@ -1942,7 +1964,7 @@ sub Fritz_Attr_Modul($@)
    if ($aName eq "enableDocsisInfo") {
      if ($cmd eq "set") {
        return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
-       return "$aName: only for FritzBoxCable." if defined($avmModel) && lc($avmModel) !~ "6[4,5,6][3,6,9][0,1]";
+#       return "$aName: only for FritzBoxCable." if defined($avmModel) && lc($avmModel) !~ "6[4,5,6][3,6,9][0,1]";
      }
      if ($cmd eq "del" || $aVal == 0) {
        foreach (keys %{ $hash->{READINGS} }) {
@@ -2736,7 +2758,7 @@ sub Fritz_Set_Modul($$@)
        if($val[0] =~ /apply|routine/) {
 
          if($hash->{fhem}{fwVersion} < 800) {
-           $retMsg = "ERROR: required FritzOS equa or greater than 8.00.";
+           $retMsg = "ERROR: required Fritz!OS equal or greater than 8.00.";
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
@@ -3341,7 +3363,7 @@ sub Fritz_Set_Modul($$@)
      elsif ( lc $cmd eq 'dectringblock' && $mesh eq "master" && $hash->{fhem}{fwVersion} >= 721) {
 
        if ($hash->{fhem}{fwVersion} < 721) {
-         Fritz_Helper_retMsg($hash, "ERROR: FritzOS version must be greater than 7.20.", $retMsgbySet);
+         Fritz_Helper_retMsg($hash, "ERROR: Fritz!OS version must be greater than 7.20.", $retMsgbySet);
        }
 
        if(main::AttrVal($name, "disableDectInfo", "0") eq "1") {
@@ -3491,7 +3513,7 @@ sub Fritz_Set_Modul($$@)
            }
          }
          else {
-           $retMsg = "ERROR: 'set ... redirection' is not supported by the limited interfaces of your Fritz!Box firmware.";
+           $retMsg = "ERROR: 'set ... redirection' is not supported by the limited interfaces of your Fritz!OS firmware.";
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
@@ -3501,7 +3523,7 @@ sub Fritz_Set_Modul($$@)
 
      elsif ( lc $cmd eq 'energymode') {
        if ( $hash->{TR064} != 1 || ($hash->{fhem}{fwVersion} < 750) ) { #tr064
-         return Fritz_Helper_retMsg($hash, "ERROR: 'set ... energyMode' is not supported by the limited interfaces of your Fritz!Box firmware.", $retMsgbySet);
+         return Fritz_Helper_retMsg($hash, "ERROR: 'set ... energyMode' is not supported by the limited interfaces of your Fritz!OS firmware.", $retMsgbySet);
        } elsif ($val[0] !~ /default|eco/ || int @val != 1) {
          return Fritz_Helper_retMsg($hash, "ERROR: parameter not ok: $val[0]. Requested default or eco.", $retMsgbySet);
        }
@@ -3604,7 +3626,7 @@ sub Fritz_Set_Modul($$@)
        # led:on|off brightness:1..2 ledenv:on|off
 
        unless ( ($hash->{LUADATA} == 1) && ($hash->{fhem}{fwVersion} >= 721)) {
-         $retMsg = "ERROR: 'set ... ledsetting' is not supported by the limited interfaces of your Fritz!Box firmware.";
+         $retMsg = "ERROR: 'set ... ledsetting' is not supported by the limited interfaces of your Fritz!OS firmware.";
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
        }
 
@@ -3783,7 +3805,7 @@ sub Fritz_Set_Modul($$@)
 
      elsif ( lc $cmd eq 'lockfilterprofile') {
        if ( $hash->{TR064} != 1 ) { #tr064
-         $retMsg = "ERROR: 'set ... lockFilterProfile' is not supported by the limited interfaces of your Fritz!Box firmware.";
+         $retMsg = "ERROR: 'set ... lockFilterProfile' is not supported by the limited interfaces of your Fritz!OS firmware.";
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
        } elsif (int @val < 2) {
          $retMsg = "ERROR: 'set ... lockFilterProfile' list of parameters not ok. Requested profile name, profile status and bpmj status.";
@@ -3891,7 +3913,7 @@ sub Fritz_Set_Modul($$@)
        # del     PhoneBookID     Mein_Test_Name
 
        unless ( defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT} ) { #tr064
-         $retMsg = "ERROR: 'set ... PhonebookEntry' is not supported by the limited interfaces of your Fritz!Box firmware.";
+         $retMsg = "ERROR: 'set ... PhonebookEntry' is not supported by the limited interfaces of your Fritz!OS firmware.";
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
        }
 
@@ -4156,7 +4178,7 @@ sub Fritz_Set_Modul($$@)
 
           }
           else {
-            $retMsg = "ERROR: 'set ... reboot' is not supported by the limited interfaces of your Fritz!Box firmware.";
+            $retMsg = "ERROR: 'set ... reboot' is not supported by the limited interfaces of your Fritz!OS firmware.";
             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
           }
           return undef;
@@ -4306,7 +4328,7 @@ sub Fritz_Set_Modul($$@)
        if (int @val == 1 && $val[0] =~ /^(provider|other)$/) {
 
          if ($hash->{fhem}{fwVersion} < 721) {
-           $retMsg = "ERROR: FritzOS version must be greater than 7.20.";
+           $retMsg = "ERROR: Fritz!OS version must be greater than 7.20.";
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
@@ -4441,7 +4463,7 @@ sub Fritz_Set_Modul($$@)
          Fritz_Log $hash, 3, "INFO: set $name $cmd " . join(" ", @val);
 
          if ($hash->{fhem}{fwVersion} < 721 ) {
-           $retMsg = "ERROR: FritzOS version must be greater than 7.20";
+           $retMsg = "ERROR: Fritz!OS version must be greater than 7.20";
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          }
 
@@ -4901,7 +4923,7 @@ sub Fritz_Get_Modul($@)
          $returnStr .= '<td colspan="2">API Call: ' . $val[0] . '</td>';
          $returnStr .= "</tr>\n";
          $returnStr .= "<tr>\n";
-         $returnStr .= "<td>JavaScript not available for FritzOS \< 8.00</td>\n";
+         $returnStr .= "<td>JavaScript not available for Fritz!OS \< 8.00</td>\n";
          $returnStr .= "</tr>\n";
          return $returnStr;
        }
@@ -4975,8 +4997,8 @@ sub Fritz_Get_Modul($@)
        Fritz_Log $hash, 3, "get $name $cmd " . join(" ", @val);
 
        if ($hash->{fhem}{fwVersion} < 721) {
-         Fritz_Log $hash, 2, "FritzOS version must be greater than 7.20";
-         return "FritzOS version must be greater than 7.20.";
+         Fritz_Log $hash, 2, "Fritz!OS version must be greater than 7.20";
+         return "Fritz!OS version must be greater than 7.20.";
        }
 
        my $para1 = '^hash$|^table$';
@@ -5011,8 +5033,8 @@ sub Fritz_Get_Modul($@)
        Fritz_Log $hash, 4, "get $name $cmd [" . int(@val) . "] " . join(" ", @val);
 
        if ($hash->{fhem}{fwVersion} < 721) {
-         Fritz_Log $hash, 2, "FritzOS version must be greater than 7.20";
-         return "FritzOS version must be greater than 7.20.";
+         Fritz_Log $hash, 2, "Fritz!OS version must be greater than 7.20";
+         return "Fritz!OS version must be greater than 7.20.";
        }
 
        return "Wrong number of arguments, usage: get $name argName1 argValue1" if int @val != 1;
@@ -5367,7 +5389,7 @@ sub Fritz_Get_Modul($@)
            $returnStr .= '<td colspan="2">API Call: ' . $val[0] . '</td>';
            $returnStr .= "</tr>\n";
            $returnStr .= "<tr>\n";
-           $returnStr .= "<td>JavaScript not available for FritzOS \< 8.00</td>\n";
+           $returnStr .= "<td>JavaScript not available for Fritz!OS \< 8.00</td>\n";
            $returnStr .= "</tr>\n";
          }
        }
@@ -5534,8 +5556,8 @@ sub Fritz_SetGet_Proof_Params($@) {
    Fritz_Log $hash, 4, "set $name $cmd (Fritz!OS: $hash->{fhem}{fwVersionStr})";
 
    if ($hash->{fhem}{fwVersion} < 721) {
-      Fritz_Log $hash, 2, "FritzOS version must be greater than 7.20";
-      return "ERROR: FritzOS version must be greater than 7.20.";
+      Fritz_Log $hash, 2, "Fritz!OS version must be greater than 7.20";
+      return "ERROR: Fritz!OS version must be greater than 7.20.";
    }
 
    unless ($val[0] =~ /^([0-9a-f]{2}([:-_]|$)){6}$/i ) {
@@ -8082,7 +8104,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
      }
 
      #-------------------------------------------------------------------------------------
-     # Start FritzOS >= 700
+     # Start Fritz!OS >= 700
 
      if ( $hash->{fhem}{fwVersion} < 700 ) {
 
@@ -8236,10 +8258,10 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
          Fritz_Log $hash, 4, "USB Information - end getting data";
        }
      }
-     # End FritzOS >= 700
+     # End Fritz!OS >= 700
 
      #-------------------------------------------------------------------------------------
-     # Start FritzOS >= 731
+     # Start Fritz!OS >= 731
 
      if ( $hash->{fhem}{fwVersion} < 731 ) {
 
@@ -8373,7 +8395,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
        Fritz_Log $hash, 4, "net Monitor - end getting data";
 
      }
-     # End FritzOS >= 731
+     # End Fritz!OS >= 731
 
      #-------------------------------------------------------------------------------------
      # FON log
@@ -9063,7 +9085,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
      } else {
 
-       Fritz_Log $hash, 4, "wrong Fritz!OS: $hash->{fhem}{fwVersionStr} for 2FA information via TR064 or not a Fritz!Box";
+       Fritz_Log $hash, 4, "wrong Fritz!OS: $hash->{fhem}{fwVersionStr} for 2FA information via TR064 or not a Fritz!Smart Device.";
 
      } # end, 2FA Informationen und Status
   
@@ -9207,7 +9229,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
      } else {
 
-       Fritz_Log $hash, 4, "wrong Fritz!OS: $hash->{fhem}{fwVersionStr} for usb mobile via TR064 or not a Fritz!Box";
+       Fritz_Log $hash, 4, "wrong Fritz!OS: $hash->{fhem}{fwVersionStr} for usb mobile via TR064 or not a Fritz!Box Device";
 
      } # end, USB Mobilfunk-Modem Informationen
 
@@ -9691,7 +9713,7 @@ sub Fritz_Readout_Process($$@)
      elsif ($rName eq "box_model") {
        $hash->{MODEL} = $rValue;
 
-       # chance attrList depending on Fritz Model and FritzOS Version
+       # chance attrList depending on Fritz Model and Fritz!OS Version
        my $attrList = Fritz_Get_attrList($hash);
        main::setDevAttrList($hash->{NAME}, $attrList);
 
@@ -9841,7 +9863,7 @@ sub Fritz_Readout_Aborted($)
 
   } else {
 
-    $msg .= "reading Fritz!Box data.";
+    $msg .= "reading Fritz!Smart Device data.";
   }
 
   Fritz_Log $hash, 2, $msg;
@@ -10265,18 +10287,18 @@ sub Fritz_Readout_SetGet_Aborted($)
 # leave, if error and stop timer
 #
 # Check for valid host definition
-# Check if tr064 specification exists and determine TR064-Port. 1st check get: Box Model, FritzOS Version, OEM from TR064 informations
-# 2nd check get: Box Model, FritzOS Version, OEM from jason_boxinfo.xml
-# 3rd check get: Box Model, FritzOS Version, OEM from cgi-bin/system_status
+# Check if tr064 specification exists and determine TR064-Port. 1st check get: Box Model, Fritz!OS Version, OEM from TR064 informations
+# 2nd check get: Box Model, Fritz!OS Version, OEM from jason_boxinfo.xml
+# 3rd check get: Box Model, Fritz!OS Version, OEM from cgi-bin/system_status
 # Check for defined user in Fritz!Device, only if $osVersion >= 725
 # Check for defined password
 # leave, if error
 #
-# 4th check get with login: Box Model, FritzOS Version, OEM from cgi-bin/system_status
-# 5th check get with login: Box Model, FritzOS Version, OEM from from jason_boxinfo.xml
+# 4th check get with login: Box Model, Fritz!OS Version, OEM from cgi-bin/system_status
+# 5th check get with login: Box Model, Fritz!OS Version, OEM from from jason_boxinfo.xml
 # leave, if error
 #
-# chance attrList depending on Fritz Model and FritzOS Version
+# chance attrList depending on Fritz Model and Fritz!OS Version
 # getting TR064 secure port
 # Check if query.lua exists
 # Check if data.lua exists
@@ -10313,9 +10335,9 @@ sub Fritz_Readout_API_Check($)
 
    my $netErr     = "No route to host. Please check your network.";
    my $passErr    = "Password or User not correct. Please define the correct credentials.";
-   my $osErr      = "FritzOS version not be determined. Please define the correct credentials.";
+   my $osErr      = "Fritz!OS version not be determined. Please define the correct credentials.";
 
-   $hash->{boxModel} = $name;
+   $hash->{MODEL} = $name;
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", "";
@@ -10358,7 +10380,7 @@ sub Fritz_Readout_API_Check($)
    if ($crdOK && $fwVersion =~ /error/) {
 
      # Check if tr064 specification exists and determine TR064-Port
-     # 1. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
+     # 1. Versuch: Ermitteln Box Model, Fritz!OS Version, OEM aus TR064 Informationen
      if ( $crdOK && $fwVersion =~ /error/ ) {
 
        $response = $agent->get( "http://" .$host. ":49000/tr64desc.xml" );
@@ -10380,11 +10402,11 @@ sub Fritz_Readout_API_Check($)
 
          Fritz_Log $hash, 5-$myVerbose, "TR064 returned: $content";
 
-         # Ermitteln Box Model, FritzOS Version, OEM aus TR064 Informationen
+         # Ermitteln Box Model, Fritz!OS Version, OEM aus TR064 Informationen
          if ($content =~ /\<modelName\>/) {
            if ($content =~ /\<modelName\>(.*)\<\/modelName\>/) {
              Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-             $hash->{boxModel} = $1;
+             $hash->{MODEL} = $1;
            }
 
            if ($content =~ /\<modelNumber\>(.*)\<\/modelNumber\>/) {
@@ -10415,7 +10437,7 @@ sub Fritz_Readout_API_Check($)
      }
      # End check if tr064 specification exists and determine TR064-Port
 
-     # 2. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
+     # 2. Versuch: Ermitteln Box Model, Fritz!OS Version, OEM aus jason_boxinfo.xml
      Fritz_Log $hash, 4-$myVerbose, "Read 'jason_boxinfo.xml' from " . $host;
 
      if ( $crdOK && $fwVersion =~ /error/ ) {
@@ -10441,7 +10463,7 @@ sub Fritz_Readout_API_Check($)
 
          if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-           $hash->{boxModel} = $1;
+           $hash->{MODEL} = $1;
          }
          Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
 
@@ -10459,9 +10481,9 @@ sub Fritz_Readout_API_Check($)
            Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
          }
        }
-     } # end 2. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
+     } # end 2. Versuch: Ermitteln Box Model, Fritz!OS Version, OEM aus jason_boxinfo.xml
 
-     # 3. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
+     # 3. Versuch: Ermitteln Box Model, Fritz!OS Version, OEM aus cgi-bin/system_status
      if ( $crdOK && $fwVersion =~ /error/ ) {
        Fritz_Log $hash, 5-$myVerbose, "without password 'cgi-bin/system_status' from " . $host;
 
@@ -10500,7 +10522,7 @@ sub Fritz_Readout_API_Check($)
          # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
 
          Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-         $hash->{boxModel} = $result[0];
+         $hash->{MODEL} = $result[0];
 
          my $FBOS = $result[7];
          $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
@@ -10514,13 +10536,13 @@ sub Fritz_Readout_API_Check($)
          Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersion", $osVersion;
          Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->fwVersionStr", substr($fwV[1],0,2) . "." . substr($fwV[2],0,2);
        }
-     } # end 3. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus cgi-bin/system_status
+     } # end 3. Versuch: Ermitteln Box Model, Fritz!OS Version, OEM aus cgi-bin/system_status
 
      # Check for defined user in Fritz!Device, only if $osVersion >= 725
 
-     if ($osVersion && $osVersion >= 725 && $hash->{boxModel} !~ /Repeater/ ) {
+     if ($osVersion && $osVersion >= 725 && $hash->{MODEL} !~ /Repeater/ ) {
 
-       # Fritz_Log $hash, 3, "boxUser for: $osVersion $hash->{boxModel}";
+       # Fritz_Log $hash, 3, "boxUser for: $osVersion $hash->{MODEL}";
        $url       = "http://" . $host;
        $response  = $agent->get( $url );
        $apiError .= " boxUser:" . $response->status_line;
@@ -10627,7 +10649,7 @@ sub Fritz_Readout_API_Check($)
 
    Fritz_Log $hash, 4-$myVerbose, "boxUser is set to: $boxUser";
 
-   # 4. Versuch: Emitteln Box Model mit Anmeldung, FritzOS Version, OEM aus cgi-bin/system_status Informationen
+   # 4. Versuch: Emitteln Box Model mit Anmeldung, Fritz!OS Version, OEM aus cgi-bin/system_status Informationen
    if ( $fwVersion =~ /error/ && $crdOK) {
 
      Fritz_Log $hash, 5-$myVerbose, "read 'cgi-bin/system_status' from " . $host;
@@ -10670,7 +10692,7 @@ sub Fritz_Readout_API_Check($)
            Fritz_Log $hash, 2, $passErr;
            Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
 
-           if ($osVersion && $osVersion < 725 && $hash->{boxModel} !~ /Repeater/) {
+           if ($osVersion && $osVersion < 725 && $hash->{MODEL} !~ /Repeater/) {
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
            }
 
@@ -10703,7 +10725,7 @@ sub Fritz_Readout_API_Check($)
            # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
 
            Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-           $hash->{boxModel} = $result[0];
+           $hash->{MODEL} = $result[0];
 
            my $FBOS = $result[7];
            $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
@@ -10727,7 +10749,7 @@ sub Fritz_Readout_API_Check($)
      }
    }
 
-   # 5. Versuch: Emitteln Box Model mit Anmeldung, FritzOS Version, OEM mit Passwort
+   # 5. Versuch: Emitteln Box Model mit Anmeldung, Fritz!OS Version, OEM mit Passwort
    if ( $fwVersion =~ /error/ && $crdOK ) {
 
      my $Fritz_Access = Fritz_Helper_read_Password($hash);
@@ -10770,7 +10792,7 @@ sub Fritz_Readout_API_Check($)
            Fritz_Log $hash, 2, $passErr;
            Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
 
-           if ($osVersion && $osVersion < 725 && $hash->{boxModel} !~ /Repeater/) {
+           if ($osVersion && $osVersion < 725 && $hash->{MODEL} !~ /Repeater/) {
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
            }
          } elsif( $statusLine =~ /\(No route to host\)/) {
@@ -10788,7 +10810,7 @@ sub Fritz_Readout_API_Check($)
 
          if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-           $hash->{boxModel} = $1;
+           $hash->{MODEL} = $1;
          }
 
          Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
@@ -10809,11 +10831,11 @@ sub Fritz_Readout_API_Check($)
        } else {
          Fritz_Log $hash, 4-$myVerbose, "" . $response->status_line;
        }
-     } # end 5. Versuch: Ermitteln Box Model, FritzOS Version, OEM aus jason_boxinfo.xml
+     } # end 5. Versuch: Ermitteln Box Model, Fritz!OS Version, OEM aus jason_boxinfo.xml
    }
 
 
-   # Error handling if FritzOS Version not ok and return to main process
+   # Error handling if Fritz!OS Version not ok and return to main process
    if ( !$crdOK || !$hash->{fhem}{fwVersion}) {
      push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
 
@@ -10842,7 +10864,7 @@ sub Fritz_Readout_API_Check($)
 
    # continue apiCheck
 
-   # chance attrList depending on Fritz Model and FritzOS Version
+   # chance attrList depending on Fritz Model and Fritz!OS Version
    my $attrList = Fritz_Get_attrList($hash);
    main::setDevAttrList($hash->{NAME}, $attrList);
 
@@ -11008,7 +11030,7 @@ sub Fritz_Readout_API_Check($)
          Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "";
        }
 
-       my $avmModel = main::InternalVal($name, "MODEL", $hash->{boxModel});
+       my $avmModel = main::InternalVal($name, "MODEL", $hash->{MODEL});
        my $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "tr64" . "desc.xml");
 
        Fritz_Log $hash, 4, "ApiCheck TR64 serviceList\n" . $serviceList;
@@ -16864,7 +16886,7 @@ sub Fritz_open_Web_Connection ($)
       Fritz_Log $hash, 4, "renewing SID while: " . $msg;
    }
 
-   my $avmModel = main::InternalVal($name, "MODEL", $hash->{boxModel});
+   my $avmModel = main::InternalVal($name, "MODEL", $hash->{MODEL});
    my $user = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
 
    Fritz_Log $hash, 4, "Fritz_Get_Lan_Device_Info (Fritz!OS: $hash->{fhem}{fwVersionStr}) ";
@@ -17040,8 +17062,8 @@ sub Fritz_call_LuaData($$$@)
    my $queryStr = join (' ', @$queryArray);
 
    if ($hash->{LUADATA} <= 0) {
-      my %retHash = ( "Error" => "data.lua not supportet", "Info" => "Fritz!Box or Fritz!OS outdated" ) ;
-      Fritz_Log $hash, 2, "data.lua not supportet. Fritz!Box or Fritz!OS outdated.";
+      my %retHash = ( "Error" => "data.lua not supportet", "Info" => "FritzSmart Device or Fritz!OS outdated" ) ;
+      Fritz_Log $hash, 2, "data.lua not supportet. FritzSmart Device or FritzSmart Device outdated.";
       return \%retHash;
    }
 
@@ -19144,11 +19166,11 @@ sub Fritz_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="lockLandevice"></a>
-         FritzOS < 8.00 <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt&gt;</code></dt>
-         FritzOS >= 8.00 <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt|rtoff&gt;</code></dt>
+         Fritz!OS < 8.00 <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt&gt;</code></dt>
+         Fritz!OS >= 8.00 <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt|rtoff&gt;</code></dt>
          <br>
-         For FritzOS >= 8.00, the optional parameter OS7 can be used to force execution via data.lua.<br>
-         However, the syntax for FritzOS < 8 also applies:<br>
+         For Fritz!OS >= 8.00, the optional parameter OS7 can be used to force execution via data.lua.<br>
+         However, the syntax for Fritz!OS < 8 also applies:<br>
          <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt&gt; OS7</code></dt>
          <br>
          &lt;number&gt; is the ID from landevice<i>n..n</i><br>
@@ -19585,7 +19607,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="boxUser"></a>
          <dt><code>attr &lt;name&gt; boxUser &lt;user name&gt;</code></dt>
          <br>
-         Username for TR064 or other web-based access. The current FritzOS versions require a user name for login.
+         Username for TR064 or other web-based access. The current Fritz!OS versions require a user name for login.
          <br>
       </li><br>
 
@@ -19618,15 +19640,15 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>attr &lt;name&gt; enableBoxReadings &lt;list&gt;</code></dt>
          <br>
          If the following readings are activated, an entire group of readings is always activated.<br>
-         <b>box_energyMode</b> -&gt; activates all readings <b>box_energyMode</b><i>.*</i> FritzOS >= 7.21<br>
-         <b>box_globalFilter</b> -&gt; activates all readings <b>box_globalFilter</b><i>.*</i> FritzOS >= 7.21<br>
-         <b>box_led</b> -&gt; activates all readings <b>box_led</b><i>.*</i> FritzOS >= 6.00<br>
-         <b>box_vdsl</b> -&gt; activates all readings <b>box_vdsl</b><i>.*</i> FritzOS >= 7.80<br>
-         <b>box_dns</b> -&gt; activates all readings <b>box_dns</b><i>n</i> FritzOS > 7.31<br>
-         <b>box_pwr</b> -&gt; activates all readings <b>box_pwr</b><i>...</i> FritzOS >= 7.00. ! not available for Cable with FritzOS 8.00<br>
-         <b>box_guestWlan</b> -&gt; activates all readings <b>box_guestWlan</b><i>...</i> FritzOS >= 7.00<br>
-         <b>box_usb</b> -&gt; activates all readings <b>box_usb</b><i>...</i> FritzOS >= 7.00<br>
-         <b>box_notify</b> -&gt; activates all readings <b>box_notify</b><i>...</i> FritzOS > 7.00<br>
+         <b>box_energyMode</b> -&gt; activates all readings <b>box_energyMode</b><i>.*</i> Fritz!OS >= 7.21<br>
+         <b>box_globalFilter</b> -&gt; activates all readings <b>box_globalFilter</b><i>.*</i> Fritz!OS >= 7.21<br>
+         <b>box_led</b> -&gt; activates all readings <b>box_led</b><i>.*</i> Fritz!OS >= 6.00<br>
+         <b>box_vdsl</b> -&gt; activates all readings <b>box_vdsl</b><i>.*</i> Fritz!OS >= 7.80<br>
+         <b>box_dns</b> -&gt; activates all readings <b>box_dns</b><i>n</i> Fritz!OS > 7.31<br>
+         <b>box_pwr</b> -&gt; activates all readings <b>box_pwr</b><i>...</i> Fritz!OS >= 7.00. ! not available for Cable with Fritz!OS 8.00<br>
+         <b>box_guestWlan</b> -&gt; activates all readings <b>box_guestWlan</b><i>...</i> Fritz!OS >= 7.00<br>
+         <b>box_usb</b> -&gt; activates all readings <b>box_usb</b><i>...</i> Fritz!OS >= 7.00<br>
+         <b>box_notify</b> -&gt; activates all readings <b>box_notify</b><i>...</i> Fritz!OS > 7.00<br>
       </li><br>
 
       <li><a name="enableLogReadings"></a>
@@ -19978,13 +20000,13 @@ sub Fritz_Helper_Dumper($$;@) {
 
       <li><b>callHandling...</b>Readings callHandling. Available when the enableCallRedi attribute is enabled.</li>
       <br>
-      <li>Redings available for FritzOS < 271</li>
+      <li>Redings available for Fritz!OS < 271</li>
       <li><b>callHandling</b><i>n</i> - Own call forwarding number <i>n</i></li> 
       <li><b>callHandling</b><i>n</i><b>_dest</b> - Destination number of call forwarding <i>n</i></li> 
       <li><b>callHandling</b><i>n</i><b>_state</b> - Current status of call forwarding <i>n</i></li> 
       <br>
 
-      <li>Redings available for FritzOS >= 271</li>
+      <li>Redings available for Fritz!OS >= 271</li>
       <li><b>callHandling</b><i>n</i> - ID of the call forwarding/handling system.<i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_active</b> - Current status of the call forwarding/handling system.<i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_from</b> - (Partial) number being forwarded/handled.<i>1</i></li>
@@ -20276,7 +20298,7 @@ sub Fritz_Helper_Dumper($$;@) {
        <dt>use Data::Dumper</dt>
      </ul>
    </i>
-   Abhängig vom Fritz Device und der FritzOS Version ist das Attribut boxUser und ein ggf. ein Passwort über set &lt;name&gt; passwort zu setzen.
+   Abhängig vom Fritz Device und der Fritz!OS Version ist das Attribut boxUser und ein ggf. ein Passwort über set &lt;name&gt; passwort zu setzen.
    <br><br>
 
    <a name="FritzSmartdefine"></a>
@@ -20470,11 +20492,11 @@ sub Fritz_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="lockLandevice"></a>
-         FritzOS < 8.00: <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt&gt;</code></dt>
-         FritzOS >= 8.00: <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt|rtoff&gt;</code></dt>
+         Fritz!OS < 8.00: <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt&gt;</code></dt>
+         Fritz!OS >= 8.00: <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt|rtoff&gt;</code></dt>
          <br>
-         Bei FritzOS >= 8.00 kann durch den optionalen Parameter OS7 die Ausführung über data.lua erzwungen werden. Es gilt dann allerdings<br>
-         auch die Syntax für FritzOS < 8:<br>
+         Bei Fritz!OS >= 8.00 kann durch den optionalen Parameter OS7 die Ausführung über data.lua erzwungen werden. Es gilt dann allerdings<br>
+         auch die Syntax für Fritz!OS < 8:<br>
          <dt><code>set &lt;name&gt; lockLandevice &lt;number|mac&gt; &lt;on|off|rt&gt; OS7</code></dt>
          <br>
          &lt;number&gt; ist die ID des landevice<i>n..n</i><br>
@@ -20908,7 +20930,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="boxUser"></a>
          <dt><code>attr &lt;name&gt; boxUser &lt;user name&gt;</code></dt>
          <br>
-         Benutzername für den TR064- oder einen anderen webbasierten Zugang. Die aktuellen FritzOS Versionen verlangen zwingend einen Benutzername für das Login.
+         Benutzername für den TR064- oder einen anderen webbasierten Zugang. Die aktuellen Fritz!OS Versionen verlangen zwingend einen Benutzername für das Login.
       </li><br>
 
       <li><a name="deviceInfo"></a>
@@ -20943,15 +20965,15 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>attr &lt;name&gt; enableBoxReadings &lt;liste&gt;</code></dt>
          <br>
          Werden folgende Readings aktiviert, so wird immer eine ganze Gruppe von Readings aktiviert.<br>
-         <b>box_energyMode</b> -&gt; aktiviert alle Readings <b>box_energyMode</b><i>.*</i> FritzOS >= 7.21<br>
-         <b>box_globalFilter</b> -&gt; aktiviert alle Readings <b>box_globalFilter</b><i>.*</i> FritzOS >= 7.21<br>
-         <b>box_led</b> -&gt; aktiviert alle Readings <b>box_led</b><i>.*</i> FritzOS >= 6.00<br>
-         <b>box_vdsl</b> -&gt; aktiviert alle Readings <b>box_vdsl</b><i>.*</i> FritzOS >= 7.80<br>
-         <b>box_dns</b> -&gt; aktiviert alle Readings <b>box_dns</b><i>n</i> FritzOS > 7.31<br>
-         <b>box_pwr</b> -&gt; aktiviert alle Readings <b>box_pwr</b><i>...</i> FritzOS >= 7.00. Nicht verfügbar für Cable mit FritzOS 8.00<br>
-         <b>box_guestWlan</b> -&gt; aktiviert alle Readings <b>box_guestWlan</b><i>...</i> FritzOS > 7.00<br>
-         <b>box_usb</b> -&gt; aktiviert alle Readings <b>box_usb</b><i>...</i> FritzOS > 7.00<br>
-         <b>box_notify</b> -&gt; aktiviert alle Readings <b>box_notify</b><i>...</i> FritzOS > 7.00<br>
+         <b>box_energyMode</b> -&gt; aktiviert alle Readings <b>box_energyMode</b><i>.*</i> Fritz!OS >= 7.21<br>
+         <b>box_globalFilter</b> -&gt; aktiviert alle Readings <b>box_globalFilter</b><i>.*</i> Fritz!OS >= 7.21<br>
+         <b>box_led</b> -&gt; aktiviert alle Readings <b>box_led</b><i>.*</i> Fritz!OS >= 6.00<br>
+         <b>box_vdsl</b> -&gt; aktiviert alle Readings <b>box_vdsl</b><i>.*</i> Fritz!OS >= 7.80<br>
+         <b>box_dns</b> -&gt; aktiviert alle Readings <b>box_dns</b><i>n</i> Fritz!OS > 7.31<br>
+         <b>box_pwr</b> -&gt; aktiviert alle Readings <b>box_pwr</b><i>...</i> Fritz!OS >= 7.00. Nicht verfügbar für Cable mit Fritz!OS 8.00<br>
+         <b>box_guestWlan</b> -&gt; aktiviert alle Readings <b>box_guestWlan</b><i>...</i> Fritz!OS > 7.00<br>
+         <b>box_usb</b> -&gt; aktiviert alle Readings <b>box_usb</b><i>...</i> Fritz!OS > 7.00<br>
+         <b>box_notify</b> -&gt; aktiviert alle Readings <b>box_notify</b><i>...</i> Fritz!OS > 7.00<br>
       </li><br>
 
       <li><a name="enableLogReadings"></a>
@@ -21308,12 +21330,12 @@ sub Fritz_Helper_Dumper($$;@) {
 
       <li><b>callHandling...</b>Readings callHandling. Verfügbar, wenn das Attribut enableCallRedi aktiviert ist</li>
       <br>
-      <li>Readings für FritzOS < 721</li>
+      <li>Readings für Fritz!OS < 721</li>
       <li><b>callHandling</b><i>n</i> - Eigene Rufnummer der Rufumleitung <i>n</i></li>
       <li><b>callHandling</b><i>n</i><b>_dest</b> - Zielnummer der Rufumleitung <i>n</i></li>
       <li><b>callHandling</b><i>n</i><b>_state</b> - Aktueller Status der Rufumleitung <i>n</i></li>
       <br>
-      <li>Readings für FritzOS >= 721</li>
+      <li>Readings für Fritz!OS >= 721</li>
       <li><b>callHandling</b><i>n</i> - ID der Rufumleitung/-behandlung <i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_active</b> - Aktueller Status der Rufumleitung/-behandlung <i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_from</b> - (Teil)Nummer die umgeleitet/behandelt wird <i>1</i></li>
