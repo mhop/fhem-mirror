@@ -151,6 +151,7 @@ FHEMWEB_Initialize($)
     addStateEvent
     alarmTimeout
     allowedHttpMethods
+    allowedroom
     allowfrom
     closeConn:1,0
     column
@@ -171,7 +172,6 @@ FHEMWEB_Initialize($)
     endPlotToday:1,0
     extraRooms:textField-long
     forbiddenroom
-    fwcompress:0,1
     hiddengroup
     hiddengroupRegexp
     hiddenroom
@@ -1373,7 +1373,23 @@ FW_updateHashes()
   %FW_rooms = ();  # Make a room  hash
   %FW_groups = (); # Make a group  hash
   %FW_types = ();  # Needed for type sorting
+  %FW_hiddenroom = (); 
 
+  my %ar;
+  my $ar = AttrVal($FW_wname,"allowedroom", "");
+  if($ar) {
+    map { $ar{$_}=1 } split(",", $ar);
+    my @sr = ('input', 'detail', 'save',
+              'Everything', 'Commandref', 'Remote doc',
+              'Edit files', 'Select style', 'Event monitor',
+              "devSpecHelp", "forumCopy", "rawDef", "style iconFor",
+              "style showDSI", 'style eventMonitor', "delete");
+    map { $FW_hiddenroom{$_}=1 if(!$ar{$_}) } @sr;
+  }
+
+  map { $FW_hiddenroom{$_}=1 } split(",",AttrVal($FW_wname,"hiddenroom", ""));
+  map { $FW_hiddenroom{$_}=1 } split(",",AttrVal($FW_wname,"forbiddenroom",""));
+  
   my $hre = AttrVal($FW_wname, "hiddenroomRegexp", "");
   foreach my $d (devspec2array(".*", $FW_chash)) {
     next if(IsIgnored($d));
@@ -1382,6 +1398,7 @@ FW_updateHashes()
     foreach my $r (split(",", AttrVal($d, "room", "Unsorted"))) {
       next if($hre && $r =~ m/$hre/);
       $FW_rooms{$r}{$d} = 1;
+      $FW_hiddenroom{$r} = 1 if($ar && !$ar{$r});
     }
     foreach my $r (split(",", AttrVal($d, "group", ""))) {
       $FW_groups{$r}{$d} = 1;
@@ -1734,10 +1751,6 @@ FW_roomOverview($)
 {
   my ($cmd) = @_;
 
-  %FW_hiddenroom = ();
-  map { $FW_hiddenroom{$_}=1 } split(",",AttrVal($FW_wname,"hiddenroom", ""));
-  map { $FW_hiddenroom{$_}=1 } split(",",AttrVal($FW_wname,"forbiddenroom",""));
-
   ##############
   # LOGO
   my $hasMenuScroll;
@@ -2056,6 +2069,9 @@ FW_showRoom()
   $roomRe =~ s/([[\\\]().+*?])/\\$1/g;
   return 0 if(!$FW_room ||
               AttrVal($FW_wname,"forbiddenroom","") =~ m/\b$roomRe\b/);
+
+  my $ar = AttrVal($FW_wname,"allowedroom","");
+  return 0 if($ar && $ar !~ m/\b$roomRe\b/);
 
   %FW_hiddengroup = ();
   foreach my $r (split(",",AttrVal($FW_wname, "hiddengroup", ""))) {
@@ -3888,6 +3904,16 @@ FW_log($$)
       OPTIONS is always enabled.
       </li><br>
 
+    <a id="FHEMWEB-attr-allowedroom"></a>
+    <li>allowedroom<br>
+      Comma separated list of rooms to show. For special rooms to show
+      see <a href="#FHEMWEB-attr-hiddenroom">hiddenroom</a>.
+      Accessing any other room or the detailed view via direct URL is
+      prohibited. If
+      <a href="#FHEMWEB-attr-forbiddenroom">forbiddenroom</a> is also set,
+      forbiddenroom restricts the list of allowed rooms.
+      </li><br>
+
     <a id="FHEMWEB-attr-closeConn"></a>
     <li>closeConn<br>
       If set, a TCP Connection will only serve one HTTP request. Seems to
@@ -4103,12 +4129,6 @@ FW_log($$)
         current month will be shown.
         </li><br>
 
-    <a id="FHEMWEB-attr-fwcompress"></a>
-    <li>fwcompress<br>
-        Enable compressing the HTML data (default is 1, i.e. yes, use 0 to
-        switch it off).
-        </li><br>
-
     <a id="FHEMWEB-attr-extraRooms"></a>
     <li>extraRooms<br>
         Space or newline separated list of dynamic rooms to add to the room
@@ -4121,8 +4141,9 @@ FW_log($$)
 
     <a id="FHEMWEB-attr-forbiddenroom"></a>
     <li>forbiddenroom<br>
-        just like hiddenroom (see below), but accessing the room or the
-        detailed view via direct URL is prohibited.
+        just like <a href="#FHEMWEB-attr-hiddenroom">hiddenroom</a>,
+        but accessing the room or the detailed view via direct URL is
+        prohibited.
         </li><br>
 
     <a id="FHEMWEB-attr-hiddengroup"></a>
@@ -4145,7 +4166,7 @@ FW_log($$)
         values are input, detail and save, in which case the input areas, link
         to the detailed views or save button are hidden (although each aspect
         still can be addressed through URL manipulation).<br>
-        The list can also contain values from the additional "Howto/Wiki/FAQ"
+        The list can also contain values from the additional "Commandref"
         block, and from the bottom of the detail page: devSpecHelp, forumCopy,
         rawDef, style iconFor, style showDSI, delete.
         </li>
@@ -4735,6 +4756,17 @@ FW_log($$)
       aktiviert.
       </li><br>
 
+    <a id="FHEMWEB-attr-allowroom"></a>
+    <li>allowroom<br>
+        Durch Komma getrennte Liste von R&auml;umen, die angezeigt werden.
+        Spezielle R&auml;ume sind bei <a
+        href="#FHEMWEB-attr-hiddenroom">hiddenroom</a> beschrieben.
+        Irgendeinen anderen Raum oder die Detailsicht direkt &uuml;ber dessen
+        URL aufzurufen ist verboten. Wenn <a
+        href="FHEMWEB-attr-forbiddenroom">forbiddenroom</a> ebenfalls gesetzt
+        ist, beschr&auml;nkt forbiddenroom die Liste der erlaubten R&auml;ume.
+        </li><br>
+
      <a id="FHEMWEB-attr-closeConn"></a>
      <li>closeConn<br>
         Falls gesetzt, wird pro TCP Verbindung nur ein HTTP Request
@@ -4973,15 +5005,10 @@ FW_log($$)
 
     <a id="FHEMWEB-attr-forbiddenroom"></a>
     <li>forbiddenroom<br>
-       Wie hiddenroom, aber der Zugriff auf die Raum- oder Detailansicht
-       &uuml;ber direkte URL-Eingabe wird unterbunden.
+       Wie <a href="#FHEMWEB-attr-hiddenroom"hiddenroom</a>, aber der Zugriff
+       auf die Raum- oder Detailansicht &uuml;ber direkte URL-Eingabe wird
+       unterbunden.
        </li><br>
-
-    <a id="FHEMWEB-attr-fwcompress"></a>
-    <li>fwcompress<br>
-        Aktiviert die HTML Datenkompression (Standard ist 1, also ja, 0 stellt
-        die Kompression aus).
-        </li><br>
 
     <a id="FHEMWEB-attr-hiddengroup"></a>
     <li>hiddengroup<br>
@@ -5001,7 +5028,7 @@ FW_log($$)
     <li>hiddenroom<br>
        Eine Komma getrennte Liste, um R&auml;ume zu verstecken, d.h. nicht
        anzuzeigen. Besondere Werte sind input, detail und save. In diesem
-       Fall werden diverse Eingabefelder ausgeblendent. Durch direktes Aufrufen
+       Fall werden diverse Eingabefelder ausgeblendet. Durch direktes Aufrufen
        der URL sind diese R&auml;ume weiterhin erreichbar!<br>
        Ebenso k&ouml;nnen Eintr&auml;ge in den Logfile/Commandref/etc Block
        versteckt werden, oder die Links unten auf der Detailseite: devSpecHelp,
