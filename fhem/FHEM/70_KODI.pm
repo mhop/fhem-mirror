@@ -548,6 +548,21 @@ sub KODI_ResetMediaReadings($)
   readingsBulkUpdate($hash, "currentAudioStream_language", "" );
   readingsBulkUpdate($hash, "currentAudioStream_name", "" );
 
+  readingsBulkUpdate($hash, "art_clearlogo", "" );
+  readingsBulkUpdate($hash, "art_fanart", "" );
+  readingsBulkUpdate($hash, "art_icon", "" );
+  readingsBulkUpdate($hash, "art_landscape", "" );
+  readingsBulkUpdate($hash, "art_poster", "" );
+  readingsBulkUpdate($hash, "art_season.poster", "" );
+  readingsBulkUpdate($hash, "art_season.thumb", "" );
+  readingsBulkUpdate($hash, "art_thumb", "" );
+  readingsBulkUpdate($hash, "art_tvshow.banner", "" );
+  readingsBulkUpdate($hash, "art_tvshow.clearlogo", "" );
+  readingsBulkUpdate($hash, "art_tvshow.fanart", "" );
+  readingsBulkUpdate($hash, "art_tvshow.landscape", "" );
+  readingsBulkUpdate($hash, "art_tvshow.poster", "" );
+  readingsBulkUpdate($hash, "art_tvshow.thumb", "" );
+  
   readingsEndUpdate($hash, 1);
   
   # delete streamdetails readings
@@ -966,16 +981,11 @@ sub KODI_CreateReading($$$) {
   }
   elsif($key eq 'art') {
     foreach my $artkey (keys %{$value}) {
-      my $arrRef = $value->{$artkey};
-      for (my $i = 0; $i <= $#$arrRef; $i++) {
-        my $propRef = $arrRef->[$i];
-        foreach my $propkey (keys %{$propRef}) {
-          readingsBulkUpdate($hash, "sd_" . $mediakey . $i . $propkey, $propRef->{$propkey});
-        }
-      }
+      my $artval = $value->{$artkey};
+      readingsBulkUpdate($hash, "art_" . $artkey, urlDecode($artval));
     }
     
-    # we dont want to create a "streamdetails" reading
+    # we dont want to create an "art" reading
     $key = undef; 
   }
   if(ref($value) eq 'ARRAY') {
