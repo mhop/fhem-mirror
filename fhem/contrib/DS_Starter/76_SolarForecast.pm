@@ -163,10 +163,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.10" => "17.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
+  "2.6.10" => "19.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
                            "aiFannGetConResult: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
                            "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
-                           "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ",
+                           "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ".
+                           "Fix Bat Prognose < 100% wenn Bat voll und PVü > Con, safetyMargin default: 20:20 gesetzt ".
+                           "v1_common_active_pv in FEATURE-REGISTRY ergänzt, Online-Hilfe für v1_common_pv und v1_common_active_pv geändert ",
   "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
                            "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
                            "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
@@ -443,6 +445,7 @@ use constant {
   SOLAPIREPDEF    => 3600,                                                          # default Abrufintervall SolCast API (s)
   SOLARCONSTANT   => 1367.0,                                                        # Solarkonstante W/m²                                                           
   SOLCMAXREQDEF   => 50,                                                            # max. täglich mögliche Requests SolCast API
+  SFTYMARGIN_10   => 10,                                                            # Sicherheitszuschlag 10%
   SFTYMARGIN_20   => 20,                                                            # Sicherheitszuschlag 20%
   SFTYMARGIN_50   => 50,                                                            # Sicherheitszuschlag 50%
   SPACESIZE       => 24,                                                            # default Platz in px über oder unter den Balken
@@ -2247,7 +2250,8 @@ v1_common_pv => sub {
 v1_common_active_pv => sub {
     my ($f) = @_;
     return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },                          
+        @{ $FEATURE_REGISTRY{v1_common}->($f) }, 
+        @{ $FEATURE_BLOCKS{pv}->($f) },        
         @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
         @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
         @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
@@ -14249,7 +14253,7 @@ sub _batChargeMgmt {
       $batinitval->{$bn}{bpinreduced}    = BatteryVal  ($name, $bn, 'bpinreduced',              0);         # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
       $batinitval->{$bn}{befficiency}    = BatteryVal  ($name, $bn, 'befficiency', STOREFFDEF) / 100;       # Speicherwirkungsgrad
       $batinitval->{$bn}{goalwh}         = $batinstcap;
-      $batinitval->{$bn}{lrMargin}       = SFTYMARGIN_50;
+      $batinitval->{$bn}{lrMargin}       = SFTYMARGIN_20;
       $batinitval->{$bn}{otpMargin}      = SFTYMARGIN_20;
 
       # --- RAW (unskaliert) speichern
@@ -14463,6 +14467,15 @@ sub _batChargeMgmt {
           # --- Stundenwerte skaliert: pvfc mit sf_charge, confc mit sf_con
           my $confc = round0 ($sf_con    * $confc_raw);                                         # Entladung proportional zur Kapazität
           my $pvfc  = round0 ($sf_charge * $pvfc_raw);                                          # Ladung proportional zum Defizit
+
+          # FIX: Batterie voll (sf_charge == 0) -> pvfc = 0, aber confc > 0 erzeugt
+          # Phantomentladung obwohl systemweit PV > Verbrauch.
+          # Lösung: Dem vollen Akku nur den Nettoverbrauch belasten,
+          # der NICHT durch systemweites PV gedeckt wird.
+          if (!$sf_charge && $pvfc_raw > 0) {                                                   # V 2.6.10 Fix Bat Prognose < 100% wenn Bat voll und PVü > Con 
+              my $net_confc_raw = max (0, $confc_raw - $pvfc_raw);
+              $confc            = round0 ($sf_con * $net_confc_raw);
+          }
 
           # --- Zeitfenster prüfen
           my ($date)    = (split " ", $nhstt)[0];
@@ -27509,8 +27522,8 @@ sub aiFannDetectDrift {
      
           $data{$name}{neuralnet}{$fanntyp}{DriftRefBias}       = $new_bias;
           $data{$name}{neuralnet}{$fanntyp}{DriftRefSlope}      = $new_slope;
-          $data{$name}{neuralnet}{$fanntyp}{DriftBias}          = 0;
-          $data{$name}{neuralnet}{$fanntyp}{DriftSlope}         = 1;
+          $data{$name}{neuralnet}{$fanntyp}{DriftBias}          = round2 ($bias_live - $new_bias);      # statt 0
+          $data{$name}{neuralnet}{$fanntyp}{DriftSlope}         = round3 ($slope_live / $new_slope);    # statt 1
           $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}    = 0;
           $data{$name}{neuralnet}{$fanntyp}{DriftLastRecalTime} = (timestampToTimestring ($name, $t, $lang))[0];
           
@@ -36430,8 +36443,8 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td>If aiConProfile is not set, the system automatically selects the profile that is most likely to be accurate.                                                 </td></tr>
             <tr><td>                          </td><td><ul> v1_common - Standard household </ul>                                                                                                                    </td></tr>
             <tr><td>                          </td><td><ul> v1_common_active - Standard household with distinct daily rhythms </ul>                                                                                 </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_pv - Household with lower weighting of the PV system </ul>                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active_pv - Household with greater emphasis on the PV system and strong daily rhythm </ul>                                                    </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_pv - Household with PV-controlled load management, i.e. when appliances are actively switched on when there is excess power </ul>             </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active_pv - Household with PV-controlled load management and a distinct daily rhythm </ul>                                                    </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump - Standard household with heat pump  </ul>                                                                                                  </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump_pv - Household with lower weighting of the PV system and heat pump characteristics </ul>                                                    </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Household with greater emphasis on PV system, heat pump, and strong daily rhythm </ul>                                          </td></tr>
@@ -36961,7 +36974,7 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>separately for calculating load clearance and optimized load capacity.                          </td></tr>
             <tr><td>                     </td><td>The first value is the surcharge used to calculate the load release, the second value is the    </td></tr>
             <tr><td>                     </td><td>surcharge used to calculate the optimized load capacity. Both values are percentages.           </td></tr>
-            <tr><td>                     </td><td>Value: <b>0..100[:0..100]</b> (integers)                                                        </td></tr>
+            <tr><td>                     </td><td>Value: integers <b>0..100[:0..100]</b> default: 20:20                                           </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>weightOwnUse</b> </td><td>Optional weighting of the hourly consumption forecast as an additional usable portion for       </td></tr>
             <tr><td>                     </td><td>battery charging in %. Technically, the available PV surplus is increased to calculate the      </td></tr>
@@ -39507,8 +39520,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td>Ist aiConProfile nicht gesetzt, erfolgt durch das System eine automatische Auswahl des wahrscheinlich zutreffendsten Profils.                                </td></tr>
             <tr><td>                          </td><td><ul> v1_common - Standardhaushalt </ul>                                                                                                                      </td></tr>
             <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit ausgeprägten Tagesrhythmen </ul>                                                                                </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit geringerer Gewichtung der PV-Anlage </ul>                                                                                   </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage und starkem Tagesrhythmus </ul>                                                   </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit PV-gesteuerten Lastmanagement, d.h. wenn Verbraucher bei Überschuss aktiv zugeschaltet werden </ul>                         </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit PV-gesteuerten Lastmanagement und starkem Tagesrhythmus </ul>                                                        </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump - Standardhaushalt mit Wärmepumpe  </ul>                                                                                                    </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit geringerer Gewichtung der PV-Anlage und Wärmepumpen Charakteristika </ul>                                                 </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage, Wärmepumpe und starkem Tagesrhythmus </ul>                                     </td></tr>
@@ -40041,7 +40054,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>für die Berechnung der Ladefreigabe und optimierten Ladeleistung angegeben werden.              </td></tr>
             <tr><td>                     </td><td>Der erste Wert ist der Zuschlag bei der Berechnung der Ladefreigabe, der zweite Wert der        </td></tr>
             <tr><td>                     </td><td>Zuschlag bei der Berechnung der optimierten Ladeleistung. Beide Angaben sind Prozentwerte.      </td></tr>
-            <tr><td>                     </td><td>Wert: <b>0..100[:0..100]</b> (Ganzzahlen)                                                       </td></tr>
+            <tr><td>                     </td><td>Wert: Ganzzahlen <b>0..100[:0..100]</b> default: 20:20                                          </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>weightOwnUse</b> </td><td>Optionale Gewichtung der stündlichen Verbrauchsprognose als zusätzlich verwendbaren Anteil zur  </td></tr>
             <tr><td>                     </td><td>Batterieladung in %. Technisch wird der verfügbare PV-Überschuß zur Berechnung der optimierten  </td></tr>
