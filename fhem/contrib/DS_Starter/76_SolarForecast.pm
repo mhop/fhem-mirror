@@ -14461,7 +14461,7 @@ sub _batChargeMgmt {
               $bs->{tompvfc_spent}   = 0;
               $bs->{tomconfc_spent}  = 0;
               $bs->{tompvfc}         = round0 ($sf_charge * $bs->{tompvfc_raw});                # PV → Ladedefizit
-              $bs->{tomconfc}        = round0 ($sf_con    * $bs->{tomconfc_raw});               # Verbrauch → Ladestand
+              $bs->{tomconfc}        = round0 ($sf_con    * $bs->{tomconfc_raw});               # Verbrauch -> Ladestand
           }
           
           # --- Stundenwerte skaliert: pvfc mit sf_charge, confc mit sf_con
@@ -14472,9 +14472,10 @@ sub _batChargeMgmt {
           # Phantomentladung obwohl systemweit PV > Verbrauch.
           # Lösung: Dem vollen Akku nur den Nettoverbrauch belasten,
           # der NICHT durch systemweites PV gedeckt wird.
-          if (!$sf_charge && $pvfc_raw > 0) {                                                   # V 2.6.10 Fix Bat Prognose < 100% wenn Bat voll und PVü > Con 
+          if (!$bdeficit && $pvfc_raw > 0) {                                                    # V 2.6.10 Fix: Batterie hat kein Defizit (voll) -> pvfc=0, nur Nettoverbrauch anrechnen
               my $net_confc_raw = max (0, $confc_raw - $pvfc_raw);
               $confc            = round0 ($sf_con * $net_confc_raw);
+              $pvfc             = 0;
           }
 
           # --- Zeitfenster prüfen
@@ -14819,7 +14820,8 @@ sub __batChargeOptTargetPower {
 
           my $runwh = do {
               if (defined $fc_next_wh)   { $fc_next_wh }
-              elsif ($nhr eq '00')       { $csocwh }
+              #elsif ($nhr eq '00')       { $csocwh }
+              elsif ($nhr eq '00')       { $init_soc_wh }                                                        # V 2.6.10 Fix: aus Prozentwert, konsistent mit LR-Abschnitt
               elsif (defined $transfer)  { delete $trans->{$sbn}{$lfd}{transfer} }
               else                       { $init_soc_wh }
           };
