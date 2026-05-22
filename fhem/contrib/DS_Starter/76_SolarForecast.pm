@@ -163,7 +163,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.10" => "19.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
+  "2.6.10" => "22.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
                            "aiFannGetConResult: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
                            "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
                            "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ".
@@ -860,6 +860,51 @@ my %noise_translations = (                                                      
                   DE => "starkes Rauschen, Messwerte eingeschränkt nutzbar"        },                           
 );
 
+my %epoche_translations = (                                                                  
+  vearly          => { EN => "converges very early",
+                       DE => "sehr früh konvergiert"             },
+  early           => { EN => "converged early",
+                       DE => "früh konvergiert"                  },
+  oklearn         => { EN => "healthy study habits",
+                       DE => "gesundes Lernverhalten"            },
+  late            => { EN => "converges late",
+                       DE => "spät konvergiert"                  },
+  vlate           => { EN => "just under the epoch limit",
+                       DE => "knapp am Epochen-Limit"            },
+  hint1           => { EN => "Learning rate too high: Reduce the learning rate by a factor of 5–10 (e.g., from 0.01 to 0.001–0.002)",
+                       DE => "Lernrate zu hoch: Lernrate um Faktor 5-10 reduzieren (z.B. von 0.01 auf 0.001-0.002)" },                           
+  hint2           => { EN => "Check architecture: Network may be too small for the amount of data; increase the number of neurons in the hidden layers (e.g., 50-25 → 64-32)",
+                       DE => "Architektur prüfen: Netz möglicherweise zu klein für die Datenmenge, Hidden-Layer-Neuronen erhöhen (z.B. 50-25 -> 64-32)" }, 
+  hint3           => { EN => "Restart the training at a different time: the random weight initialization at the start had a significant impact on the results here; restarting the training automatically generates a different initialization and usually leads to significantly better results",
+                       DE => "Training zu einem anderen Zeitpunkt erneut starten: die zufällige Gewichtsinitialisierung beim Start hat das Ergebnis hier stark dominiert, ein neuer Trainingsstart erzeugt automatisch eine andere Initialisierung und führt meist zu einem deutlich besseren Ergebnis" },
+  hint4           => { EN => "Slightly increase the momentum: Raising the value toward 0.9 slows convergence in a controlled manner and often improves generalization",
+                       DE => "Momentum leicht erhöhen: Wert Richtung 0.9 anheben verlangsamt die Konvergenz kontrolliert und verbessert oft die Generalisierung" },
+  hint5           => { EN => "Slightly reduce the learning rate: decrease the current value by a factor of 2-3 (e.g., 0.01 → 0.003–0.005) so that the network can optimize more finely",
+                       DE => "Lernrate leicht reduzieren: aktuellen Wert um Faktor 2-3 verringern (z.B. 0.01 -> 0.003-0.005), damit das Netz feiner optimieren kann" },
+  hint6           => { EN => "Slightly increase the learning rate: multiply the current value by a factor of 1.5–2 (e.g., 0.005 → 0.008–0.01) so that the network converges to a minimum faster",
+                       DE => "Lernrate leicht erhöhen: aktuellen Wert um Faktor 1.5-2 anheben (z.B. 0.005 -> 0.008-0.01), damit das Netz schneller zu einem Minimum findet" },
+  hint7           => { EN => "Change the training algorithm: Use RPROP instead of INCREMENTAL—RPROP automatically adjusts its step size and does not require manual adjustment of the learning rate, which often leads to convergence much faster in cases of slow convergence",
+                       DE => "Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL verwenden - RPROP passt seine Schrittweite automatisch an und kommt ohne manuelle Lernraten-Einstellung aus was bei langsamer Konvergenz oft deutlich schneller zum Ziel führt" },
+  hint8           => { EN => "Significantly increase the learning rate: raise the current value by a factor of 3–5 (e.g., 0.005 → 0.015–0.025); the network is learning too slowly and is not reaching a sufficient minimum within the available epochs",
+                       DE => "Lernrate deutlich erhöhen: aktuellen Wert um Faktor 3-5 anheben (z.B. 0.005 -> 0.015-0.025), das Netz lernt zu langsam und erreicht kein ausreichendes Minimum innerhalb der verfügbaren Epochen" },
+  hint9           => { EN => "Switch the training algorithm to RPROP: RPROP adjusts its step size fully automatically and typically converges 3–10 times faster than INCREMENTAL during slow training without any learning rate tuning",
+                       DE => "Trainingsalgorithmus auf RPROP wechseln: RPROP passt seine Schrittweite vollautomatisch an und konvergiert bei langsamen Trainings typischerweise 3-10x schneller als INCREMENTAL ohne jegliches Lernraten-Tuning" },
+  hint10          => { EN => "Downsizing the architecture: reducing the number of neurons per layer (e.g., 64-32 → 50-25) reduces the number of parameters to be optimized and significantly speeds up convergence, provided that the model quality remains sufficient",
+                       DE => "Architektur verkleinern: weniger Neuronen pro Schicht (z.B. 64-32 -> 50-25) reduziert die Anzahl der zu optimierenden Parameter und beschleunigt die Konvergenz deutlich, sofern die Modellqualität ausreichend bleibt" },
+  hint11          => { EN => "The model memorized training data instead of recognizing general patterns (error rate on unknown test data is %.1f %% higher than on training data): Change the training/test split from 80/20 to 70/30 and/or increase aiControl->aiConBitFailLimit by 20 %%",
+                       DE => "Trainingsdaten wurden auswendig gelernt statt allgemeine Muster zu erkennen (Fehler auf unbekannten Testdaten %.1f %% höher als auf Trainingsdaten): Trainings-/Testaufteilung von 80/20 auf 70/30 ändern und/oder aiControl->aiConBitFailLimit um 20 %% erhöhen" },
+  hint12          => { EN => "unstable validation curve (StdDev/Mean=%.2f): Switch shuffle mode to periodic shuffle ('shuffle_mode=1' and set the shuffle period to 10–20 epochs) to achieve more consistent gradient updates",
+                       DE => "instabiler Validierungsverlauf (StdDev/Mean=%.2f): Shuffle-Modus auf periodisches Shuffle (shuffle_mode=1 umstellen und Shuffle-Periode auf 10-20 Epochen) umstellen, um gleichmäßigere Gradientenaktualisierungen zu erzielen" },
+  hint13          => { EN => "Model scaling is highly distorted (Slope=%.2f) despite an early stop: Check the input data for outliers and normalization errors; verify the min/max scaling of the features",
+                       DE => "Modell-Skalierung stark verzerrt (Slope=%.2f) trotz frühem Stop: Eingangsdaten auf Ausreißer und Normalisierungsfehler prüfen, Min/Max-Skalierung der Features kontrollieren" },     
+  hint14          => { EN => "high RMSE-rel (%.1f %%) despite a late stop: Expand the architecture (e.g., add a hidden layer or increase the number of neurons per layer by 50 %%), as the model lacks sufficient capacity to handle the data complexity",
+                       DE => "hohes RMSE-rel (%.1f %%) trotz spätem Stop: Architektur vergrößern (z.B. eine Hidden-Schicht ergänzen oder Neuronen pro Schicht um 50 %% erhöhen), da das Modell zu wenig Kapazität für die Datenkomplexität hat" },
+  hint15          => { EN => "Prediction quality is low despite stable training (R²=%.2f, ideal value > 0.85): Adjust the bit-fail limit to the recommended value (in Section 'Noise') and try a different training algorithm (e.g., RPROP)",
+                       DE => "Vorhersagequalität trotz stabilem Training gering (R²=%.2f, Idealwert > 0.85): Bit-Fail-Limit auf den empfohlenen Wert (in Bereich 'Rauschen') anpassen und einen anderen Trainingsalgorithmus (z.B. RPROP) ausprobieren" },
+  hint16          => { EN => "[Developer Note] R²=%.2f indicates insufficient input data: relevant input variables may be missing from the feature set, or existing features may have too little explanatory power for the target variable-thoroughly review the feature selection and data set",
+                       DE => "[Entwicklerhinweis] R²=%.2f deutet auf unzureichende Eingangsdaten hin: relevante Eingangsgrößen fehlen möglicherweise im Feature-Set oder vorhandene Features haben zu geringen Erklärungswert für die Zielvariable - Feature-Auswahl und Datenbasis grundlegend überprüfen" },
+); 
+
 my %hqtxt = (                                                                               # Hash (Setup) Texte
   entry  => { EN => qq{<b>Warm welcome!</b><br>
                        The next queries will guide you through the basic installation.<br>
@@ -1035,6 +1080,8 @@ my %hqtxt = (                                                                   
               DE => qq{Einstellhinweise}                                                                                    },  
   rcdfor => { EN => qq{Recommendation for},
               DE => qq{Empfehlung für}                                                                                      },
+  utiopc => { EN => qq{Utilization of production capacity},
+              DE => qq{Epochenausnutzung}                                                                                   },  
   lstrcl => { EN => qq{last recalibration},
               DE => qq{letzte Rekalibrierung}                                                                               }, 
   setof  => { EN => qq{Setting of},
@@ -6916,7 +6963,7 @@ sub __getaiFannState {            ## no critic "not used"
   my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');                      # Bit_Fail_Limit Empfehlung
   
   my $epoch_label      = AiNeuralVal ($name, $fanntyp, 'EpochLabel',   '');
-  my $epoch_hints      = AiNeuralVal ($name, $fanntyp, 'EpochHints',  '-');
+  my $epoch_hints      = AiNeuralVal ($name, $fanntyp, 'EpochHints',   '');
   my $epoch_code       = AiNeuralVal ($name, $fanntyp, 'EpochCode',    '');
   my $epoch_ampel      = AiNeuralVal ($name, $fanntyp, 'EpochAmpel',  '-');
   my $epoch_rel_pct    = AiNeuralVal ($name, $fanntyp, 'EpochRelPct', '-');
@@ -7033,14 +7080,17 @@ sub __getaiFannState {            ## no critic "not used"
   
   # Überblick über die Bewertungen                
   #################################
+  my $show_retreason = $drift_retreason eq '-' 
+                     ? ''
+                     : "(".$hqtxt{hcause}{$lang}.": ".(encode('utf8', $display_reason)).")";
+                     
   my $rating_content = "<b>".$hqtxt{treval}{$lang}.":</b> $modampel ($retran)\n";
-  $rating_content   .= "<b>".$hqtxt{lrnbeh}{$lang}.":</b> $epoch_ampel ".(encode('utf8', $epoch_label))." ($epoch_rel_pct % Epochenausnutzung) \n";
-  $rating_content   .= "<b>".$hqtxt{setins}{$lang}.":</b> ".(encode('utf8', $epoch_hints))."\n";
+  $rating_content   .= "<b>".$hqtxt{lrnbeh}{$lang}.":</b> $epoch_ampel ".(encode('utf8', $epoch_label))." ($epoch_rel_pct % ".$hqtxt{utiopc}{$lang}.") \n";        
+  $rating_content   .= "<b>".$hqtxt{setins}{$lang}.":</b> ".(encode('utf8', $epoch_hints))."\n" if($epoch_hints);
   $rating_content   .= "<b>".$hqtxt{nserat}{$lang}.":</b> ".(encode('utf8', $display_noiselvl))." ($nslvl)\n";                    
   $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
   $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
-                       ":</b> $retrampel $recomd_translated (".$hqtxt{hcause}{$lang}.
-                       ": ".(encode('utf8', $display_reason)).") \n";
+                       ":</b> $retrampel $recomd_translated $show_retreason \n";
   my $rating         = ___aiFannSection (encode('utf8', 'Bewertungsüberblick'), $rating_content, 1);      
 
   # Modellparameter
@@ -7087,7 +7137,7 @@ sub __getaiFannState {            ## no critic "not used"
   my $noise         = ___aiFannSection ($hqtxt{noise}{$lang}, $noise_content, 0);
 
   # Drift
-  #########
+  #########  
   my $drift_content = "<b>".$hqtxt{anawin}{$lang}.":</b> $drift_window h\n";
   $drift_content   .= "<b>Drift RMSE Ratio:</b> $drift_rmserel\n";
   $drift_content   .= "<b>Semantic Ratio:</b> $sem_ratio\n";                              
@@ -7101,8 +7151,7 @@ sub __getaiFannState {            ## no critic "not used"
   $drift_content   .= "<b>Index:</b> $drift_index\n";
   $drift_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
   $drift_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
-                      ":</b> $retrampel $recomd_translated (".$hqtxt{hcause}{$lang}.
-                      ": ".(encode('utf8', $display_reason)).") \n";
+                      ":</b> $retrampel $recomd_translated $show_retreason \n";
   $drift_content   .= "<b>".$hqtxt{lstrcl}{$lang}.":</b> $last_recaltm\n";
   my $drift_title   = $hqtxt{drftid}{$lang}.' ('.$hqtxt{calasf}{$lang}.' '.$hqtxt{modage}{$lang}.' > '.AIMODELMINAGE.' h)';
   my $drift         = ___aiFannSection ($drift_title, $drift_content, 0);    
@@ -26282,8 +26331,19 @@ sub aiFannTrain {
                                               rmse_rel   => $weighted_rmse_rel,
                                               bitfail    => $bitfail,
                                               num_epoch  => $num_epoch,
+                                              lang       => $paref->{lang},
                                             }
                                           );
+                                          
+  my $hints_html = '';
+
+  if (@{$epoch_diag->{epoch_hints}}) {
+      $hints_html = '<ul>'
+                  . join ('', map { '<li>' . $_ . '</li>' } @{$epoch_diag->{epoch_hints}})
+                  . '</ul>';
+  }
+
+$data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints} = $hints_html;
   
   # Retry-Indikator ausführen
   #############################
@@ -26384,7 +26444,7 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{EpochLabel}     = $epoch_diag->{epoch_label};
   $data{$name}{$fanntyp.'temp'}{$attempt}{EpochRelPct}    = $epoch_diag->{epoch_rel_pct};
   $data{$name}{$fanntyp.'temp'}{$attempt}{EpochAmpel}     = $epoch_diag->{epoch_ampel};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints}     = join (' | ', @{$epoch_diag->{epoch_hints}});
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints}     = $hints_html;
   
   my $runtime    = round2 (CurrentVal ($name, $fanntyp.'NNRuntimeTrain', 0));
   my $trainstate = !$err 
@@ -26544,6 +26604,7 @@ sub _aiFannEpochDiagnostic {
   my $rmse_rel     = $paref->{rmse_rel};
   my $bitfail      = $paref->{bitfail};
   my $num_epoch    = $paref->{num_epoch} // AINUMEPOCHS;
+  my $lang         = $paref->{lang};
 
   my $rel         = $best_epoch / $num_epoch;
     
@@ -26562,62 +26623,40 @@ sub _aiFannEpochDiagnostic {
   # --- 1. Relative Epochen-Position
   if ($rel < 0.03) {                                                                  # < 450 Epochen
       $code  = 'very_early';
-      $label = 'sehr früh konvergiert';
+      $label = $epoche_translations{vearly}{$lang};
         
-      push @hints, 'Lernrate zu hoch: Lernrate um Faktor 5-10 reduzieren '
-                  .'(z.B. von 0.01 auf 0.001-0.002)';
-        
-      push @hints, 'Architektur prüfen: Netz möglicherweise zu klein für die '
-                  .'Datenmenge, Hidden-Layer-Neuronen erhöhen (z.B. 50-25 -> 64-32)';
+      push @hints, $epoche_translations{hint1}{$lang};
+      push @hints, $epoche_translations{hint2}{$lang};
         
       if ($best_epoch < 200) {
-          push @hints, 'Seed-Effekt wahrscheinlich: Retry mit anderem Seed wird '
-                      .'empfohlen, da zufällige Initialisierung das Training '
-                      .'vorzeitig dominiert';
+          push @hints, $epoche_translations{hint3}{$lang};
       }
   }
   elsif ($rel < 0.12) {                                                               # 450 – 1800 Epochen
       $code  = 'early';
-      $label = 'früh konvergiert';
+      $label = $epoche_translations{early}{$lang};
         
-      push @hints, 'Lernrate leicht reduzieren: aktuellen Wert um Faktor 2-3 '
-                  .'verringern (z.B. 0.01 -> 0.003-0.005), damit das Netz '
-                  .'feiner optimieren kann';
-        
-      push @hints, 'Momentum leicht erhöhen: Wert Richtung 0.9 anheben '
-                  .'verlangsamt die Konvergenz kontrolliert und verbessert '
-                  .'oft die Generalisierung';
+      push @hints, $epoche_translations{hint4}{$lang};
+      push @hints, $epoche_translations{hint5}{$lang};
   }
   elsif ($rel <= 0.72) {                                                              # 1800 – 10800 Epochen
       $code  = 'ok';
-      $label = 'gesundes Lernverhalten';
+      $label = $epoche_translations{oklearn}{$lang};
   }
   elsif ($rel <= 0.90) {                                                              # 10800 – 13500 Epochen
       $code  = 'late';
-      $label = 'spät konvergiert';
+      $label = $epoche_translations{late}{$lang};
         
-      push @hints, 'Lernrate leicht erhöhen: aktuellen Wert um Faktor 1.5-2 '
-                  .'anheben (z.B. 0.005 -> 0.008-0.01), damit das Netz '
-                  .'schneller zu einem Minimum findet';
-        
-      push @hints, 'Early-Stopping-Patience (AIIMPPATIENCE) erhöhen: '
-                  .'aktuellen Wert um 20-30 % anheben, das Netz braucht '
-                  .'mehr Spielraum ohne Verbesserung';
+      push @hints, $epoche_translations{hint6}{$lang};
+      push @hints, $epoche_translations{hint7}{$lang};
   }
   else {                                                                              # > 13500 Epochen
       $code  = 'very_late';
-      $label = 'knapp am Epochen-Limit';
+      $label = $epoche_translations{vlate}{$lang};
         
-      push @hints, 'Max. Epochen erhöhen: von '.$num_epoch.' auf '
-                  .'20000-25000, das Netz war beim Abbruch noch nicht '
-                  .'vollständig konvergiert';
-        
-      push @hints, 'Lernrate erhöhen: aktuellen Wert um Faktor 2-3 anheben, '
-                  .'um die Konvergenzgeschwindigkeit deutlich zu steigern';
-        
-      push @hints, 'Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL '
-                  .'verwenden, da RPROP ohne Lernraten-Tuning oft deutlich '
-                  .'schneller konvergiert';
+      push @hints, $epoche_translations{hint8}{$lang};
+      push @hints, $epoche_translations{hint9}{$lang};    
+      push @hints, $epoche_translations{hint10}{$lang};
   }
 
   # --- 2. Kombinations-Checks
@@ -26626,21 +26665,14 @@ sub _aiFannEpochDiagnostic {
   if ($overfitting > 0.25) {
       my $pct = round1 ($overfitting * 100);
         
-      push @hints, sprintf 'Trainingsdaten wurden auswendig gelernt statt allgemeine Muster zu erkennen '
-                          .'(Fehler auf unbekannten Testdaten %.1f %% höher als auf Trainingsdaten): '
-                          .'Trainings-/Testaufteilung von 80/20 auf 70/30 '
-                          .'ändern und/oder Bit-Fail-Limit um 20 %% erhöhen', $pct;
+      push @hints, sprintf $epoche_translations{hint11}{$lang}, $pct;
         
       $code = 'overfit' if $code eq 'ok';
   }
 
   # Instabiler Validierungsverlauf
   if ($stability > 0.15) {
-      push @hints, sprintf 'Instabiler Validierungsverlauf (StdDev/Mean=%.2f): '
-                          .'Shuffle-Modus auf periodisches Shuffle (shuffle_mode=1) '
-                          .'umstellen und Shuffle-Periode auf 10-20 Epochen setzen, '
-                          .'um gleichmäßigere Gradientenaktualisierungen zu erzielen',
-                          $stability;
+      push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability;
         
       $code = 'unstable' unless $code =~ /very/;
   }
@@ -26648,28 +26680,18 @@ sub _aiFannEpochDiagnostic {
   # Schlechte Slope in früher Phase -> Datenproblem
   if (($code eq 'very_early' || $code eq 'early')
       && ($slope < 0.6 || $slope > 1.4)) {
-      push @hints, sprintf 'Modell-Skalierung stark verzerrt (Slope=%.2f) trotz '
-                          .'frühem Stop: Eingangsdaten auf Ausreißer und '
-                          .'Normalisierungsfehler prüfen, Min/Max-Skalierung '
-                          .'der Features kontrollieren', $slope;
+      push @hints, sprintf $epoche_translations{hint13}{$lang}, $slope;
   }
 
   # Späte Konvergenz + hoher RMSE -> Architektur zu klein
   if ($code =~ /late/ && $rmse_rel > 20) {
-      push @hints, sprintf 'Hohes RMSE-rel (%.1f %%) trotz spätem Stop: '
-                          .'Architektur vergrößern (z.B. eine Hidden-Schicht '
-                          .'ergänzen oder Neuronen pro Schicht um 50 %% erhöhen), '
-                          .'da das Modell zu wenig Kapazität für die Datenkomplexität '
-                          .'hat', $rmse_rel;
+      push @hints, sprintf $epoche_translations{hint14}{$lang}, $rmse_rel;
   }
 
   # Schlechtes R² trotz gesunder Epochenphase
   if ($r2 < 0.5 && $code eq 'ok') {
-      push @hints, sprintf 'Schwaches R²=%.2f trotz gesunder Epochenphase: '
-                          .'Feature-Auswahl überprüfen, möglicherweise fehlen '
-                          .'relevante Eingangsgrößen oder vorhandene Features '
-                          .'sind zu stark verrauscht (Bit-Fail-Limit auf '
-                          .'BitFailSuggest-Wert anpassen)', $r2;
+      push @hints, sprintf $epoche_translations{hint15}{$lang}, $r2;   
+      push @hints, sprintf $epoche_translations{hint16}{$lang}, $r2;
   }
 
   # --- 3. Ampel
