@@ -25,12 +25,8 @@ use warnings;
 
 use GPUtils         qw(:all);
 
-
-
 use Exporter ('import');
-
 our @EXPORT_OK = qw(test);
-
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 BEGIN {

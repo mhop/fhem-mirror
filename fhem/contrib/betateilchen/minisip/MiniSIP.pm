@@ -36,8 +36,11 @@ use Net::SIP::Packet;
 use Net::SIP::Request;
 use Net::SIP::Response;
 
-use GPUtils qw(GP_Import);
+use Exporter ('import');
+our @EXPORT_OK = qw(_sendmsg);
+our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
+use GPUtils qw(GP_Import);
 # Import from main context
 BEGIN {
 	GP_Import(
