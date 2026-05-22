@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.05.17";
+our $ModulVersion = "26.05.22";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -788,6 +788,7 @@ our %LuaQueryCmd = (
         TodayBytesSentHigh     => { cmd   => "inetstat:status/Today/BytesSentHigh"},
         TodayBytesSentLow      => { cmd   => "inetstat:status/Today/BytesSentLow"},
 
+        box_users              => { cmd   => "boxusers:settings/user/list(name,box_admin_rights,enabled,email,myFritz_boxuser_uid,homeauto_rights,dial_rights,nas_rights,vpn_access)"},
         userProfil             => { cmd   => "user:settings/user/list(name,filter_profile_UID,this_month_time,today_time,type)"},
         userProfilNew          => { cmd   => "user:settings/user/list(name,type)"},
         userTicket             => { cmd   => "userticket:settings/ticket/list(id)"},
@@ -837,6 +838,7 @@ our %LuaQueryCmd = (
 our %FB_Model = (
        '7690'        => { version => "8.22", date => "26.02.2026"},
        '7682'        => { version => "8.03", date => "21.01.2025"},
+       '7632'        => { version => "8.03", date => "21.01.2025"},
        '7590 AX'     => { version => "8.25", date => "26.03.2026"},
        '7590'        => { version => "8.25", date => "26.03.2026"},
        '7583 VDSL'   => { version => "8.20", date => "28.08.2025"},
@@ -845,8 +847,8 @@ our %FB_Model = (
        '7581'        => { version => "7.18", date => "19.08.2024"},
        '7580'        => { version => "7.30", date => "04.09.2023"},
        '7560'        => { version => "7.30", date => "04.09.2023"},
-       '7530'        => { version => "8.10", date => "28.08.2025"},
-       '7530 AX'     => { version => "8.20", date => "08.09.2025"},
+       '7530 AX'     => { version => "8.25", date => "16.04.2026"},
+       '7530'        => { version => "8.25", date => "21.04.2026"},
        '7520 B'      => { version => "8.10", date => "14.08.2025"},
        '7520'        => { version => "8.10", date => "14.08.2025"},
        '7510'        => { version => "8.20", date => "23.09.2025"},
@@ -905,7 +907,7 @@ our %FB_Model = (
 our %RP_Model = (
        'Mesh Set 4200'    => { version => "8.20", date => "20.01.2026"},
        'Mesh Set 1600'    => { version => "8.20", date => "20.01.2026"},
-       'Smart Gateway'    => { version => "8.24", date => "01.02.2026"},
+       'Smart Gateway'    => { version => "8.26", date => "09.04.2026"},
        'Smart Energy 250' => { version => "3.70", date => "06.08.2025"},
        'PowerLine 1260'   => { version => "8.20", date => "12.12.2025"},
        'PowerLine 1260E'  => { version => "8.20", date => "12.12.2025"},
@@ -1112,6 +1114,7 @@ sub Fritz_Get_attrList($@) {
                    $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
                    $retPara .= "box_energyMode,box_globalFilter,"          if ($fwVersion == 0 || $fwVersion >= 721);
                    $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
+                   $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
                    $retPara =~ s/.$/ /;
       $retAttr .= $retPara;
 
@@ -1124,6 +1127,7 @@ sub Fritz_Get_attrList($@) {
                      $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
                      $retPara .= "box_energyMode,box_globalFilter,"          if ($fwVersion == 0 || $fwVersion >= 721);
                      $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
+                     $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
                      $retPara =~ s/.$/ /;
           $retAttr .= $retPara;
         }
@@ -1139,6 +1143,7 @@ sub Fritz_Get_attrList($@) {
                      $retPara .= "box_energyMode,box_globalFilter,"  if ($fwVersion == 0 || $fwVersion >= 721);
                      $retPara .= "box_dns,"                          if ($fwVersion == 0 || $fwVersion >= 731);
                      $retPara .= "box_pwr,"                          if ($fwVersion == 0 || ($fwVersion >= 700 && ($fwVersion < 790 || $fwVersion >= 804)) );
+                     $retPara .= "box_user,"                         if ($fwVersion == 0 || $fwVersion >= 752);
                      $retPara  =~ s/.$/ /;
           $retAttr .= $retPara;
         }
@@ -1150,7 +1155,13 @@ sub Fritz_Get_attrList($@) {
     }
 
     if ($fwVersion == 0 || $fwVersion >= 725) {
-      $retAttr .= "boxUser ";
+      if( exists($hash->{fhem}{intBoxUsers}) && $hash->{fhem}{intBoxUsers} eq "&lt;none&gt;") {
+        $retAttr .= "boxUser ";
+      } elsif (!defined($hash->{fhem}{intBoxUsers}) || $hash->{fhem}{intBoxUsers} eq "") {
+        $retAttr .= "boxUser ";
+      } else {
+        $retAttr .= "boxUser:" . $hash->{fhem}{intBoxUsers} . " ";
+      }
     }
 
     if ($fwVersion == 0 || $fwVersion >= 750) {
@@ -1728,18 +1739,28 @@ sub Fritz_Attr_Modul($@)
 
        if( exists($hash->{fhem}{intBoxUsers}) && $hash->{fhem}{intBoxUsers} ne "&lt;none&gt;" ) {
 
-         if ($hash->{fhem}{intBoxUsers} =~ /$aVal/) {
+         my $showUser = $hash->{fhem}{intBoxUsers};
+            $showUser =~ s/&#160;/ /;
+
+         my $tstUser = $aVal;
+            $tstUser =~ s/\xC2\xA0/&#160;/;
+
+         # Fritz_Log $hash, 2, "attrVal boxUser: $tstUser - $hash->{fhem}{intBoxUsers}";
+
+         if ($hash->{fhem}{intBoxUsers} =~ /$tstUser/) {
            delete $hash->{HINT_BOXUSER} if(exists $hash->{HINT_BOXUSER});
          } else {
            if($hash->{fhem}{intBoxUsers} eq '&lt;pWd&gt;') {
              return "boxUser not supported by $avmModel";
            } else {
-             return "no valid boxUser: $aVal not in user list ( $hash->{fhem}{intBoxUsers} ) for $avmModel";
+             return "no valid boxUser: $aVal not in user list ( $showUser ) for $avmModel";
            }
          }
        } else {
          delete $hash->{HINT_BOXUSER} if(exists $hash->{HINT_BOXUSER});
        }       
+       $aVal =~ s/\xC2\xA0/ /;
+       $hash->{DEVICE_USER} = $aVal;
      }
      if ($cmd eq "del") {
        $hash->{HINT_BOXUSER} = "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)";
@@ -1853,7 +1874,7 @@ sub Fritz_Attr_Modul($@)
 #   }
 
    if ($aName eq "enableBoxReadings") {
-     my @reading_list = qw(box_led box_energyMode box_globalFilter box_vdsl box_dns box_pwr box_guestWlan box_usb box_notify);
+     my @reading_list = qw(box_led box_energyMode box_globalFilter box_vdsl box_dns box_pwr box_guestWlan box_usb box_user box_notify);
      my @para_list    = split(",", $aVal);
 
      if ($cmd eq "set" && $init_done) {
@@ -5509,11 +5530,12 @@ sub Fritz_Get_Modul($@)
      if (($hash->{LUADATA} == 1 || $hash->{LUAQUERY} == 1) && ($hash->{fhem}{fwVersion} >= 700) ){
        $list .= " luaInfo:";
          $list .= "lanDevices,ledSettings,vpnShares,wlanNeighborhood" if $hash->{LUADATA} == 1;
-         $list .= ",mobileInfo,globalFilters"                         if $hash->{LUADATA} == 1 && ($avmModel =~ "Box");
-         $list .= ",smartHomeDevices"                                 if $hash->{LUADATA} == 1 && ($avmModel =~ "Box|Smart");
-         $list .= ",smartHomeAutomation"                              if $hash->{LUADATA} == 1 && ($avmModel =~ "Box|Smart") && ($hash->{fhem}{fwVersion} >= 800);
-         $list .= ",kidProfiles,userInfos"                            if $hash->{LUAQUERY} == 1;
-         $list .= ",docsisInformation"                                if $hash->{LUADATA} == 1 && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]");
+         $list .= ",mobileInfo,globalFilters"                         if $hash->{LUADATA} == 1  && ($avmModel =~ "Box");
+         $list .= ",smartHomeDevices"                                 if $hash->{LUADATA} == 1  && ($avmModel =~ "Box|Smart");
+         $list .= ",smartHomeAutomation"                              if $hash->{LUADATA} == 1  && ($avmModel =~ "Box|Smart") && ($hash->{fhem}{fwVersion} >= 800);
+         $list .= ",kidProfiles"                                      if $hash->{LUAQUERY} == 1 && ($avmModel =~ "Box");
+         $list .= ",userInfos"                                        if $hash->{LUAQUERY} == 1 && ($avmModel =~ "Box") && ($hash->{fhem}{fwVersion} >= 725);
+         $list .= ",docsisInformation"                                if $hash->{LUADATA} == 1  && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]");
 
        $list .= " smartHomePreDef";
      }
@@ -5906,6 +5928,41 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
 
    $$sidNew += $result->{sidNew} if defined $result->{sidNew};
    $$sid    = $result->{sid} if $result->{sid};
+
+   if ($hash->{fhem}{fwVersion} >= 752) {
+     if( exists($result->{box_users}) ) {
+       my $views = $result->{box_users};
+
+       my $bUsers = "";
+       my $doBoxUser = main::AttrVal($name, "enableBoxReadings", "") =~ /box_user/;
+       eval {
+         for (my $cnt = 0; $cnt < @$views; $cnt++) {
+           if ($doBoxUser) {
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_enabled", @$views[$cnt]->{enabled};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_name", @$views[$cnt]->{name};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_myFritz_uid", @$views[$cnt]->{myFritz_boxuser_uid};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_email", @$views[$cnt]->{email};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_admin_rights", @$views[$cnt]->{box_admin_rights};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_homeauto_rights", @$views[$cnt]->{homeauto_rights};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_dial_rights", @$views[$cnt]->{dial_rights};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_nas_rights", @$views[$cnt]->{nas_rights};
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_vpn_access", @$views[$cnt]->{vpn_access};
+           }
+           $bUsers .= @$views[$cnt]->{name} . ",";
+           if (@$views[$cnt]->{name} =~ /(fritz\d+)/) {
+             $hash->{DEFAULT_USER} = $1;
+           }
+         }
+       };
+
+       if ($@) {
+         Fritz_Log $hash, 3, "ERROR: boxUsers - no Users available";
+       } else {
+         $hash->{fhem}{intBoxUsers} = $bUsers if $bUsers ne "";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->intBoxUsers", "$bUsers";
+       }
+     }
+   }
 
    # !!! copes with fw >=6.69 and fw < 7 !!!
    if ( ref $result->{wlanList} ne 'ARRAY' ) {
@@ -8868,7 +8925,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
      } else {
 
-       Fritz_Log $hash, 4, "wrong AVM-Model: $avmModel for docsis informations.";
+       Fritz_Log $hash, 4, "wrong Fritz Device: $avmModel for docsis informations.";
 
      } # end, DOCSIS Informationen FB Cable
 
@@ -9713,10 +9770,6 @@ sub Fritz_Readout_Process($$@)
      elsif ($rName eq "box_model") {
        $hash->{MODEL} = $rValue;
 
-       # chance attrList depending on Fritz Model and Fritz!OS Version
-       my $attrList = Fritz_Get_attrList($hash);
-       main::setDevAttrList($hash->{NAME}, $attrList);
-
        $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
      }
 
@@ -9813,6 +9866,10 @@ sub Fritz_Readout_Process($$@)
    main::readingsEndUpdate( $hash, 1 );
 
    main::readingsSingleUpdate( $hash, "retStat_processReadout", sprintf( "%.2f s", time()-$startTime), 1);
+
+   # chance attrList depending on Fritz Model and Fritz!OS Version
+   my $attrList = Fritz_Get_attrList($hash);
+   main::setDevAttrList($hash->{NAME}, $attrList);
 
    if ( $TR064_chg == 1) {
 
@@ -10337,6 +10394,10 @@ sub Fritz_Readout_API_Check($)
    my $passErr    = "Password or User not correct. Please define the correct credentials.";
    my $osErr      = "Fritz!OS version not be determined. Please define the correct credentials.";
 
+   my $attrList   = "";
+
+   Fritz_Log $hash, 3, "boxUser for checkAPIs: " . $boxUser;
+
    $hash->{MODEL} = $name;
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
@@ -10548,7 +10609,8 @@ sub Fritz_Readout_API_Check($)
        $apiError .= " boxUser:" . $response->status_line;
 
        my $user_content;
-       my $bUsers = '&lt;pWd&gt;';
+       my $bUsers   = '&lt;pWd&gt;';
+          $attrList = "";
 
        if (!$response->is_success) {
 
@@ -10565,19 +10627,20 @@ sub Fritz_Readout_API_Check($)
          # Fritz_Log "boxUser", 3, "FBUser: \n" . $1;
          my $mybody = $1;
 
-         if($mybody =~ /"activeUsers":(.*?);/isg) {
-           $user_content  = '{"pid":"loginPage","users":'. $1;
-           #Fritz_Log "FBUser", 3, "FBUser: \n" . $user_content;
+         if($mybody =~ /("activeUsers":\[\{.*?\}\]),/isg) {
+
+           $user_content = "{" .$1. "}";
+           # Fritz_Log $name, 3, "FBUser: \n" . $user_content;
 
            my $resultData = Fritz_Helper_process_JSON($hash, $user_content, "", "");
 
-           my $cData = $resultData->{users};
+           my $cData = $resultData->{activeUsers};
 
            if (ref($cData) eq "ARRAY") {
              my $nbViews = scalar @$cData;
              for(my $j = 0; $j <= $nbViews - 1; $j++) {
                if (ref(@$cData[$j]) eq 'HASH') { # $hash_ref is reference to hash
-                 $bUsers .= $cData->[$j]->{value} . ";";
+                 $bUsers .= $cData->[$j]->{value} . ",";
                  if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
                    Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
                    $hash->{DEFAULT_USER} = $1;
@@ -10594,9 +10657,15 @@ sub Fritz_Readout_API_Check($)
          $boxUser = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
          Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
 
+         $bUsers =~ s/ /&#160;/g;
+         #Fritz_Log $name, 3, "FBUser: \n" . $bUsers;
+
          Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "$bUsers";
          $hash->{fhem}{intBoxUsers} = $bUsers;
        }
+#       $attrList = Fritz_Get_attrList($hash);
+#       main::setDevAttrList($hash->{NAME}, $attrList);
+       
      } else {
        $boxUser = main::AttrVal( $name, "boxUser", "" );
      }
@@ -10865,7 +10934,7 @@ sub Fritz_Readout_API_Check($)
    # continue apiCheck
 
    # chance attrList depending on Fritz Model and Fritz!OS Version
-   my $attrList = Fritz_Get_attrList($hash);
+   $attrList = Fritz_Get_attrList($hash);
    main::setDevAttrList($hash->{NAME}, $attrList);
 
    # getting TR064 secure port
@@ -10948,6 +11017,12 @@ sub Fritz_Readout_API_Check($)
 
        Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
        Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+
+       if ($hash->{DEFAULT_USER}) {
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_BOXUSER", "Error using default boxUser: $hash->{DEFAULT_USER}. Set the correct one with 'attr " .$name. " boxUser'.");
+       } elsif ( $boxUser eq "" && $hash->{fhem}{intBoxUsers} ne "&lt;none&gt;") {
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)");
+       }
 
      } else {
 
@@ -15825,7 +15900,7 @@ sub Fritz_Get_User_Info_List($) {
    my ($hash) = @_;
    my $name = $hash->{NAME};
 
-   my $queryStr = "&user_info=boxusers:settings/user/list(name,box_admin_rights,enabled,email,myFritz_boxuser_uid,homeauto_rights,dial_rights,nas_rights,vpn_access)";
+   my $queryStr = "&box_users=boxusers:settings/user/list(name,box_admin_rights,enabled,email,myFritz_boxuser_uid,homeauto_rights,dial_rights,nas_rights,vpn_access)";
 
    my $returnStr;
 
@@ -15849,7 +15924,7 @@ sub Fritz_Get_User_Info_List($) {
       Fritz_Log $hash, 5, "evaluating user info: \n" . Fritz_Helper_Dumper($hash, $result->{user_info}, 5);
    };
 
-   my $views = $result->{user_info};
+   my $views = $result->{box_users};
 
 #  border(8),cellspacing(10),cellpadding(20)
    my $tableFormat = main::AttrVal($name, "disableTableFormat", "undef");
@@ -15866,11 +15941,18 @@ sub Fritz_Get_User_Info_List($) {
    $returnStr .= "<td>Aktiv</td><td>Name</td><td>Box-ID</td><td>E-Mail</td><td>Box</td><td>Home</td><td>Dial</td><td>NAS</td><td>VPN</td>\n";
    $returnStr .= "</tr>\n";
 
+   my $bUsers = "";
    eval {
      for (my $cnt = 0; $cnt < @$views; $cnt++) {
        $returnStr .= "<tr>\n";
        $returnStr .= "<td>" . @$views[$cnt]->{enabled} . "</td>";
        $returnStr .= "<td>" . @$views[$cnt]->{name} . "</td>";
+
+       $bUsers .= @$views[$cnt]->{name} . ",";
+       if (@$views[$cnt]->{name} =~ /(fritz\d+)/) {
+         $hash->{DEFAULT_USER} = $1;
+       }
+
        $returnStr .= "<td>" . @$views[$cnt]->{myFritz_boxuser_uid} . "</td>";
        $returnStr .= "<td>" . @$views[$cnt]->{email} . "</td>";
        $returnStr .= "<td>" . @$views[$cnt]->{box_admin_rights} . "</td>";
@@ -15881,6 +15963,14 @@ sub Fritz_Get_User_Info_List($) {
        $returnStr .= "</tr>\n";
      }
    };
+
+   if ($@) {
+     Fritz_Log $hash, 3, "ERROR: boxUsers - no Users available";
+   } else {
+     $hash->{fhem}{intBoxUsers} = $bUsers if $bUsers ne "";
+     my $attrList = Fritz_Get_attrList($hash);
+     main::setDevAttrList($hash->{NAME}, $attrList);
+   }
 
    $returnStr .= "</table>\n";
 
@@ -18971,7 +19061,9 @@ sub Fritz_Helper_Dumper($$;@) {
        <dt>use Data::Dumper</dt>
      </ul>
    </i>
-   It is recommendet to set the attribute boxUser after defining the device.
+   As of Fritz!OS 7.25 —currently applicable only to Fritz!Box devices— a username is strictly required for login.<br>
+   During initialization, the module retrieves the default username of the Fritz!Box and initially sets this as the required username.<br>
+   All available usernames are provided in the selection list for the 'boxUser' attribute. By setting this attribute, you can then specify the username to be used for Fhem.
    <br><br>
 
    <a name="FritzSmartdefine"></a>
@@ -19607,8 +19699,10 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="boxUser"></a>
          <dt><code>attr &lt;name&gt; boxUser &lt;user name&gt;</code></dt>
          <br>
-         Username for TR064 or other web-based access. The current Fritz!OS versions require a user name for login.
-         <br>
+         Username for TR064 or other web-based access. Starting with FRITZ!OS 7.25 —currently for FRITZ!Boxes only— a username is strictly required for login.<br>
+         If the username does not appear in the selection list, please execute `set ... checkApis basic` or 'get ... luaInfo userInfos' and reload the page after the message `check API: done` appears.<br>
+         Alternatively, 'get ... luaInfo userInfos' can be executed. After closing the displayed table, reload the page.<br>
+         The user information is automatically updated with each interval cycle.
       </li><br>
 
       <li><a name="deviceInfo"></a>
@@ -19648,6 +19742,7 @@ sub Fritz_Helper_Dumper($$;@) {
          <b>box_pwr</b> -&gt; activates all readings <b>box_pwr</b><i>...</i> Fritz!OS >= 7.00. ! not available for Cable with Fritz!OS 8.00<br>
          <b>box_guestWlan</b> -&gt; activates all readings <b>box_guestWlan</b><i>...</i> Fritz!OS >= 7.00<br>
          <b>box_usb</b> -&gt; activates all readings <b>box_usb</b><i>...</i> Fritz!OS >= 7.00<br>
+         <b>box_user</b> -&gt; activates all readings <b>box_user</b><i>...</i> Fritz!OS >= 7.52<br>
          <b>box_notify</b> -&gt; activates all readings <b>box_notify</b><i>...</i> Fritz!OS > 7.00<br>
       </li><br>
 
@@ -19989,6 +20084,20 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_vdsl_upStreamRate</b> - Current upstream data rate (Mbps)</li>
       <li><b>box_vdsl_upStreamMaxRate</b> - Maximum upstream data rate (Mbps)</li>
       <br>
+      <li><b>box_user...</b>Readings user informations.  Available when the enableBoxReadings attribute is enabled.</li>
+      <li><b>box_user</b><i>n</i><b>_admin_rights</b></li>
+      <li><b>box_user</b><i>n</i><b>_dial_rights</b></li>
+      <li><b>box_user</b><i>n</i><b>_enabled</b></li>
+      <li><b>box_user</b><i>n</i><b>_homeauto_rights</b></li>
+      <li><b>box_user</b><i>n</i><b>_name</b></li>
+      <li><b>box_user</b><i>n</i><b>_nas_rights</b></li>
+      <li><b>box_user</b><i>n</i><b>_vpn_access</b></li>
+      <br>
+      <li><b>box_sys_Log...</b>Readings System logs. Available when the enableBoxReadings attribute is enabled.</li>
+      <li><b>box_sys_LogNewest</b><i>n</i>Last log date system log.</li>
+      <li><b>box_wlan_LogNewest</b><i>n</i>Last log date WLAN log.</li>
+      <li><b>box_fon_LogNewest</b><i>n</i>Last log date phone log.</li>
+      <br>
 
       <li><b>alarm...</b>Alarm Readings. Available when the enableAlarmInfo attribute is enabled.</li>
       <li><b>alarm</b><i>n</i> - Name of alarm <i>1</i></li>
@@ -20016,11 +20125,6 @@ sub Fritz_Helper_Dumper($$;@) {
 
       <li><b>kidprofile...</b>Readings kidprofile. Available when the enableKidProfiles attribute is enabled.</li>
       <li><b>kidprofile</b><i>n</i>Internet access profiles.</li>
-      <br>
-      <li><b>box_sys_Log...</b>Readings System logs. Available when the enableBoxReadings attribute is enabled.</li>
-      <li><b>box_sys_LogNewest</b><i>n</i>Last log date system log.</li>
-      <li><b>box_wlan_LogNewest</b><i>n</i>Last log date WLAN log.</li>
-      <li><b>box_fon_LogNewest</b><i>n</i>Last log date phone log.</li>
       <br>
 
       <li><b>docsis...</b>Readings docsis. Available when the enableDocsisInfo attribute is enabled</li>
@@ -20298,7 +20402,9 @@ sub Fritz_Helper_Dumper($$;@) {
        <dt>use Data::Dumper</dt>
      </ul>
    </i>
-   Abhängig vom Fritz Device und der Fritz!OS Version ist das Attribut boxUser und ein ggf. ein Passwort über set &lt;name&gt; passwort zu setzen.
+   Ab Fritz!OS 7.25 wird, bisher nur für Fritz!Boxen, zwingend einen Benutzername für das Login verlangt.<br>
+   Das Modul ermittel bei der Initialisierung den standard Benutzernamen der Fritz!Box und definiert diesen zunächst als notwendigen Bentuzernamen.<br>
+   Alle Benutzernamen werden in der Auswahlliste für das Attribut 'boxUser' bereitgestellt. Über das setzen des Attributs kann dann der für Fhem gewünschte Benutzername gesetzt werden.
    <br><br>
 
    <a name="FritzSmartdefine"></a>
@@ -20930,7 +21036,10 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="boxUser"></a>
          <dt><code>attr &lt;name&gt; boxUser &lt;user name&gt;</code></dt>
          <br>
-         Benutzername für den TR064- oder einen anderen webbasierten Zugang. Die aktuellen Fritz!OS Versionen verlangen zwingend einen Benutzername für das Login.
+         Benutzername für den TR064- oder einen anderen webbasierten Zugang. Ab Fritz!OS 7.25 wird, bisher nur für Fritz!Boxen, zwingend einen Benutzername für das Login verlangt.<br>
+         Sollte der Benutzername nicht in der Auswahlliste bereitgestellt werden bitte ein 'set ... checkApis basic' und nach der Meldung 'check API: done' die Seite neu laden.<br>
+         Alternativ kann ein 'get ... luaInfo userInfos' aufgerufen werden. Nach dem schließen der angezeigten Tabelle die Seite neu laden.<br>
+         Die Benutzerinfo wird automatisch mit jedem Intervall durchlauf aktualisiert.<br>
       </li><br>
 
       <li><a name="deviceInfo"></a>
@@ -20973,6 +21082,7 @@ sub Fritz_Helper_Dumper($$;@) {
          <b>box_pwr</b> -&gt; aktiviert alle Readings <b>box_pwr</b><i>...</i> Fritz!OS >= 7.00. Nicht verfügbar für Cable mit Fritz!OS 8.00<br>
          <b>box_guestWlan</b> -&gt; aktiviert alle Readings <b>box_guestWlan</b><i>...</i> Fritz!OS > 7.00<br>
          <b>box_usb</b> -&gt; aktiviert alle Readings <b>box_usb</b><i>...</i> Fritz!OS > 7.00<br>
+         <b>box_user</b> -&gt; aktiviert alle Readings <b>box_user</b><i>...</i> Fritz!OS >= 7.52<br>
          <b>box_notify</b> -&gt; aktiviert alle Readings <b>box_notify</b><i>...</i> Fritz!OS > 7.00<br>
       </li><br>
 
@@ -21313,11 +21423,25 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_usb_</b><i>n</i><b>_devStorageUsed</b></li>
       <li><b>box_usb_</b><i>n</i><b>_devType</b></li>
       <br>
+      <li><b>box_user...</b>Readings Benutzer Informationen. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_user</b><i>n</i><b>_admin_rights</b></li>
+      <li><b>box_user</b><i>n</i><b>_dial_rights</b></li>
+      <li><b>box_user</b><i>n</i><b>_enabled</b></li>
+      <li><b>box_user</b><i>n</i><b>_homeauto_rights</b></li>
+      <li><b>box_user</b><i>n</i><b>_name</b></li>
+      <li><b>box_user</b><i>n</i><b>_nas_rights</b></li>
+      <li><b>box_user</b><i>n</i><b>_vpn_access</b></li>
+      <br>
       <li><b>box_vdsl...</b>Readings VDSL. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_vdsl_downStreamRate</b> - Aktuelle DownStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_downStreamMaxRate</b> - Maximale DownStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamRate</b> - Aktuelle UpStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamMaxRate</b> - Maximale UpStream Datenrate (MBit/s)</li>
+      <br>
+      <li><b>box_sys_Log...</b>Readings System-Logs. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_sys_LogNewest</b><i>n</i>Letztes Log-Datum System-Log</li>
+      <li><b>box_wlan_LogNewest</b><i>n</i>Letztes Log-Datum WLAN-Log</li>
+      <li><b>box_fon_LogNewest</b><i>n</i>Letztes Log-Datum Telefon-Log</li>
       <br>
 
       <li><b>alarm...</b>Readings alarm. Verfügbar, wenn das Attribut enableAlarmInfo aktiviert ist</li>
@@ -21345,12 +21469,6 @@ sub Fritz_Helper_Dumper($$;@) {
 
       <li><b>kidprofile...</b>Readings kidprofile. Verfügbar, wenn das Attribut enableKidProfiles aktiviert ist</li>
       <li><b>kidprofile</b><i>n</i>Internet Zugriffsprofile</li>
-      <br>
-
-      <li><b>box_sys_Log...</b>Readings System-Logs. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
-      <li><b>box_sys_LogNewest</b><i>n</i>Letztes Log-Datum System-Log</li>
-      <li><b>box_wlan_LogNewest</b><i>n</i>Letztes Log-Datum WLAN-Log</li>
-      <li><b>box_fon_LogNewest</b><i>n</i>Letztes Log-Datum Telefon-Log</li>
       <br>
 
       <li><b>docsis...</b>Readings docsis. Verfügbar, wenn das Attribut enabledocsisInfo aktiviert ist</li>
