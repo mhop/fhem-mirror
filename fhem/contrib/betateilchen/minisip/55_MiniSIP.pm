@@ -25,9 +25,9 @@ use warnings;
 
 require FHEM::Core::MiniSIP;
 
-sub ::MiniSIP_Initialize { goto &_Initialize}
+sub ::MiniSIP_Initialize { goto &Initialize}
 
-sub _Initialize($) {
+sub Initialize($) {
   my ($hash) = @_;
   $hash->{parseParams} = 1;
   $hash->{DefFn}    = \&FHEM::Core::MiniSIP::Define;

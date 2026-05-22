@@ -25,9 +25,6 @@ use warnings;
 use POSIX qw(strftime);
 use MIME::Base64;
 use Data::Dumper;
-use HTML::HashTable;
-
-
 use Socket;
 use IO::Socket::INET;
 
@@ -36,8 +33,10 @@ use Net::SIP::Packet;
 use Net::SIP::Request;
 use Net::SIP::Response;
 
+use FHEM::MiniSIP::Utils qw(:all);
+
 use Exporter ('import');
-our @EXPORT_OK = qw(_sendmsg);
+our @EXPORT_OK = qw(sendmsg);
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 use GPUtils qw(GP_Import);
@@ -45,6 +44,7 @@ use GPUtils qw(GP_Import);
 BEGIN {
 	GP_Import(
 	 qw(readingFnAttributes
+	    data
 	    defs
 	    snom
 			selectlist
@@ -58,7 +58,6 @@ BEGIN {
       )
 	);
 }
-
 
 sub Define {
   my ($hash, $a, $h) = @_; #parseParams
@@ -80,6 +79,9 @@ sub Define {
   my $fh = $sock->fileno();
   $hash->{FD} = $fh;
   $selectlist{$fh} = $hash;
+  
+  readingsSingleUpdate($hash,'state','initialized',1);
+
   return undef;
 }
 
@@ -109,18 +111,27 @@ sub Undef {
 sub Set {
   my ($hash,$a,$h) = @_;
   my $name = $hash->{NAME};
+
   my %cmd = ("sendmsg" => "", );
-  
   return ("Unknown argument $a->[1], choose one of ".
         join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
     if(!defined($cmd{$a->[1]}));
 
   if( $a->[1] eq 'sendmsg' ) {
-    my $peer = $a->[2];
-    my $msg  = $a->[3];
-    $msg .= "==";
-    $msg =  decode_base64($msg);
-    _sendmsg($hash,$peer,$msg);
+    my $peer    = $h->{peer};
+    my $type    = $h->{type};
+    my $payload = $h->{msg};
+    my $msg;
+    
+    if ($type eq 'base64') {
+       $payload .= "==";
+       $msg = decode_base64($payload);
+    } elsif ($type eq 'data') {
+       $msg  = $data{$payload};
+    }
+
+#    Debug "sendmsg hash $peer $msg";
+    sendmsg($hash,$peer,$msg);
   }
 
   return undef;
@@ -142,53 +153,20 @@ sub Get {
     if (!$count) {
       return "no peer registered";
     } else {
-      return _makeTablePeers($hash);
+      return makeTableFromPeers($hash);
     }
   }
 }
 
 ###------------------------------------------------------------------
 
-sub _log {
-  my ($hash,$loglevel,$text ) = @_;
-  my $xline       = ( caller(0) )[2];
-  my $xsubroutine = ( caller(1) )[3];
-  my $sub         = ( split( ':', $xsubroutine ) )[2];
-  my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : "minisip";
-  Log3 $hash, $loglevel, "$instName: $sub.$xline " . $text;
-}
-
-sub _makeTablePeers {
-  my ($hash) = @_;
-  my $table = tablify({
-       BORDER      => 1, 
-       DATA        => $hash->{peers},
-       SORTBY      => 'key', 
-       ORDER       => 'asc'}
-   );
-  return "<html>$table</html>";
-}
-
-sub _getpeer {
-  my ($hash,$pkt) = @_;
-  my $contact = $pkt->get_header('contact');
-  my ($peer,$ip,$port) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+):(\d+)/;
-  if ($peer eq '') {
-    $contact = $pkt->get_header('from');
-    ($peer,$ip) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+)/;
-    $contact = $pkt->get_header('via');
-    ($port) = $contact =~ m/\d+\.\d+\.\d+\.\d+:(\d+)/;
-  }
-  return ($peer,$ip,$port);
-}
-
-sub _sendmsg {
+sub sendmsg {
   my ($hash,$peer,$msg) = @_;
   my $name = $hash->{NAME};
 
   my $count = scalar keys %{$hash->{peers}};
   if (!$count) {
-    _log($hash,1,"$name: no peer registered");
+    _log($hash,1,"no peer registered");
     return;
   } elsif (!defined($hash->{peers}->{$peer})) {
     _log($hash,1,"$name: unknown peer >$peer<");
@@ -216,26 +194,6 @@ sub _sendmsg {
   }
 }
 
-sub _reply_200_short {
-  my ($hash,$req) = @_;
-
-  my $res = Net::SIP::Response->new(
-      200,
-      'OK',
-     { 'Via'            => [ $req->get_header('Via') ],
-       'From'           => $req->get_header('From'),
-       'To'             => $req->get_header('To'),
-       'Call-ID'        => $req->get_header('Call-ID'),
-       'CSeq'           => $req->get_header('CSeq'),
-       'Contact'        => $req->get_header('Contact') // $hash->{SIP}->{LOCAL_CONTACT},
-       'Expires'        => 300,
-#       'Expires'        => $req->get_header('Expires') // 300,
-       'Content-Length' => '0',
-     }
-    );
-    return $res;
-}
-
 sub _process {
   my ($hash)  = @_;
   my $name = $hash->{NAME};
@@ -244,50 +202,31 @@ sub _process {
 
   (AttrVal($name,'logFullMessage',0))?
     _log($hash,4,"in:\n".$pkt->as_string):
-    _log($hash,4,"in:  ".(split(/\n/,$pkt->as_string))[0]);
+    _log($hash,4,"in: ".(split(/\n/,$pkt->as_string))[0]);
 
-  #my $method  = $pkt->method(); # funktioniert nicht zuverlässig für MESSAGE
+  #my $method  = $pkt->method(); # not working as expected
     
   my $method =  $pkt->as_string;
   $method    =~ s/^([^ ]*) .*$/$1/s;
 
-  my ($peer,$ip,$port) = _getpeer($hash,$pkt);
+  if ($method ne "SIP/2.0") {
+		(AttrVal($name,'showFullMessage',0))?
+			readingsSingleUpdate($hash, lc($method), $pkt->as_string, 0):
+			readingsSingleUpdate($hash, lc($method), (split(/\n/,$pkt->as_string))[0], 1);
+  } elsif ($pkt->is_response) {
+    return; # end processing if 200 OK received as response
+  }
 
-  (AttrVal($name,'showFullMessage',0))?
-    readingsSingleUpdate($hash, lc($method), $pkt->as_string, 0):
-    readingsSingleUpdate($hash, lc($method), (split(/\n/,$pkt->as_string))[0], 1);
+  my ($peer,$ip,$port) = getpeer($hash,$pkt);
 
   if ($method eq 'REGISTER') {
-#    my $contact = $pkt->get_header('contact');
-#    my ($peer,$ip,$port) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+):(\d+)/;
-    if (defined($peer) && $peer ne '') {
-      my $ts                  = strftime("%a, %d %b %Y %H:%M:%S", localtime(time()));
-      $hash->{peers}->{$peer} = { 'peer'       => $peer,
-                                  'peer_ip'    => $ip,
-                                  'peer_port'  => $port,
-                                  'registered' => $ts,
-                                };
-
-      my $c = $pkt->get_header('contact');
-      $c =~ s/</&lt;/g; $c =~ s/>/&gt;/g; # die <> müssen ersetzt werden, um eine Darstellung im Get zu haben
-      $hash->{peers}->{$peer}->{contact}    = $c if (defined($c) && $c);      
-
-      my $e = $pkt->get_header('expires');
-      $hash->{peers}->{$peer}->{expires}    = $e if (defined($e) && $e);      
-
-      my $u = $pkt->get_header('user_agent');
-      $hash->{peers}->{$peer}->{user_agent} = $u if (defined($u) && $u);
-
-      my $x = $pkt->get_header('x-real-ip');
-      $hash->{peers}->{$peer}->{x_real_ip}  = $x if (defined($x) && $x);
-      #Debug toJSON($hash->{peers}->{$peer});
-    }
+    savepeer($hash,$pkt);
   }
 
   my @known_methods = qw(REGISTER INVITE BYE MESSAGE SUBSCRIBE);
   if (contains_string($method,@known_methods)) {
-    my $resp = _reply_200_short($hash,$pkt);
-    _sendmsg($hash,$peer,$resp->as_string);
+    my $resp = build_200_short($hash,$pkt);
+    sendmsg($hash,$peer,$resp->as_string);
   }
 
   if ($method eq 'INVITE') {
