@@ -1,3 +1,5 @@
+#  $Id$
+
 ################################################################
 #
 #  Copyright notice
@@ -14,14 +16,17 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
 #  See the GNU General Public License V2 for more details.
 #
-#  $Id$
-#
+################################################################
 
 package minisip;
 
 use strict;
 use warnings;
+use POSIX qw(strftime);
+use MIME::Base64;
 use Data::Dumper;
+use HTML::HashTable;
+
 
 use Socket;
 use IO::Socket::INET;
@@ -31,8 +36,6 @@ use Net::SIP::Packet;
 use Net::SIP::Request;
 use Net::SIP::Response;
 
-use Time::HiRes qw(time);
-use Time::Piece;
 use GPUtils qw(GP_Import);
 
 # Import from main context
@@ -42,12 +45,14 @@ BEGIN {
 	    defs
 	    snom
 			selectlist
-			Debug
-		  Log3
 		  AttrVal
-      readingsSingleUpdate
+			Debug
+      FileWrite
+		  Log3
       contains_string
-      FileWrite)
+      readingsSingleUpdate
+      toJSON
+      )
 	);
 }
 
@@ -57,30 +62,35 @@ sub main::minisip_Initialize {
 
 sub _Initialize($) {
   my ($hash) = @_;
-  $hash->{DefFn}   = \&_Define;
-  $hash->{ReadFn}  = \&_Read;
-  $hash->{UndefFn} = \&_Undef;
+  $hash->{parseParams} = 1;
+  $hash->{DefFn}    = \&_Define;
+  $hash->{ReadFn}   = \&_Read;
+  $hash->{UndefFn}  = \&_Undef;
+  $hash->{SetFn}    = \&_Set;
+  $hash->{GetFn}    = \&_Get;
 #  $hash->{AttrFn}  = \&minisip_Attr;
-  $hash->{AttrList}= "disable:1,0 "
+  $hash->{AttrList} = "disable:1,0 "
                     ."logFullMessage:0,1 "
                     ."showFullMessage:0,1 "
                     .$readingFnAttributes;
 }
 
 sub _Define {
-  my ($hash, $def) = @_;
-  my $name = $hash->{NAME};
-  my @a = split("[ \t][ \t]*", $def);
-  my $port = $a[2] || 5060;
+  my ($hash, $a, $h) = @_; #parseParams
+  my $name = $a->[0];
+
+  $hash->{SIP}->{PORT} = $h->{port};
+  $hash->{SIP}->{FROM} = $h->{from};
+  $hash->{SIP}->{LOCAL_CONTACT} = "<sip:$h->{from}>";
+  $hash->{SIP}->{PROTO} = 'udp';
 
   my $sock = IO::Socket::INET->new(
-    LocalPort => $port,
-    Proto     => 'udp',
+    LocalPort => $hash->{SIP}->{PORT},
+    Proto     => $hash->{SIP}->{PROTO},
     Reuse     => 1,
  #   Blocking  => 0
   );
   return "$name: $!" unless $sock;
-  $hash->{PORT} = $port;
   $hash->{SOCK} = $sock;
   my $fh = $sock->fileno();
   $hash->{FD} = $fh;
@@ -94,8 +104,8 @@ sub _Read {
   my $sock = $hash->{SOCK};
   my $iaddr;
   my $peer_addr = $sock->recv($hash->{SIP}->{buf}, 4096);
-  ($hash->{peer}->{port}, $iaddr) = sockaddr_in($peer_addr);
-  $hash->{peer}->{peer_ip} = inet_ntoa($iaddr);
+#  ($hash->{peer}->{port}, $iaddr) = sockaddr_in($peer_addr);
+#  $hash->{peer}->{ip} = inet_ntoa($iaddr);
   _process($hash);
 }
 
@@ -111,6 +121,47 @@ sub _Undef {
   return undef;
 }
 
+sub _Set {
+  my ($hash,$a,$h) = @_;
+  my $name = $hash->{NAME};
+  my %cmd = ("sendmsg" => "", );
+  
+  return ("Unknown argument $a->[1], choose one of ".
+        join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
+    if(!defined($cmd{$a->[1]}));
+
+  if( $a->[1] eq 'sendmsg' ) {
+    my $peer = $a->[2];
+    my $msg  = $a->[3];
+    $msg .= "==";
+    $msg =  decode_base64($msg);
+    _sendmsg($hash,$peer,$msg);
+  }
+
+  return undef;
+}
+
+sub _Get {
+  my ($hash,$a,$h) = @_;
+  my $name = $hash->{NAME};
+  my %cmd = ("peers" => ":noArg", );
+  
+  #Debug Dumper $a->[1];
+
+  return ("Unknown argument $a->[1], choose one of ".
+        join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
+    if(!defined($cmd{$a->[1]}));
+
+  if( $a->[1] eq 'peers' ) {
+    my $count = scalar keys %{$hash->{peers}};
+    if (!$count) {
+      return "no peer registered";
+    } else {
+      return _makeTablePeers($hash);
+    }
+  }
+}
+
 ###------------------------------------------------------------------
 
 sub _log {
@@ -122,22 +173,56 @@ sub _log {
   Log3 $hash, $loglevel, "$instName: $sub.$xline " . $text;
 }
 
+sub _makeTablePeers {
+  my ($hash) = @_;
+  my $table = tablify({
+       BORDER      => 1, 
+       DATA        => $hash->{peers},
+       SORTBY      => 'key', 
+       ORDER       => 'asc'}
+   );
+  return "<html>$table</html>";
+}
+
+sub _getpeer {
+  my ($hash,$pkt) = @_;
+  my $contact = $pkt->get_header('contact');
+  my ($peer,$ip,$port) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+):(\d+)/;
+  if ($peer eq '') {
+    $contact = $pkt->get_header('from');
+    ($peer,$ip) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+)/;
+    $contact = $pkt->get_header('via');
+    ($port) = $contact =~ m/\d+\.\d+\.\d+\.\d+:(\d+)/;
+  }
+  return ($peer,$ip,$port);
+}
+
 sub _sendmsg {
-  my ($hash,$msg) = @_;
+  my ($hash,$peer,$msg) = @_;
   my $name = $hash->{NAME};
 
+  my $count = scalar keys %{$hash->{peers}};
+  if (!$count) {
+    _log($hash,1,"$name: no peer registered");
+    return;
+  } elsif (!defined($hash->{peers}->{$peer})) {
+    _log($hash,1,"$name: unknown peer >$peer<");
+    return;
+  }
+
   (AttrVal($name,'logFullMessage',0))?  
-    _log($hash,4,"Message out:\n$msg"):
-    _log($hash,4,"Message out: ".(split(/\n/,$msg))[0]);
+    _log($hash,4,"out to $peer:\n$msg"):
+    _log($hash,4,"out to $peer: ".(split(/\n/,$msg))[0]);
   
   (AttrVal($name,'showFullMessage',0))?  
      readingsSingleUpdate($hash, "lastMsgOut", $msg, 0):
      readingsSingleUpdate($hash, "lastMsgOut", (split(/\n/,$msg))[0], 1);
 
   my $sock = new IO::Socket::INET (
-    PeerAddr => '192.168.123.20', 
-    PeerPort => '5060',
-    Proto    => 'udp');
+    PeerAddr => $hash->{peers}->{$peer}->{peer_ip},
+    PeerPort => $hash->{peers}->{$peer}->{peer_port},
+    Proto    => $hash->{SIP}->{PROTO});
+
   if($sock) {
     print $sock $msg;
     close($sock);
@@ -146,8 +231,8 @@ sub _sendmsg {
   }
 }
 
-sub reply_200_short {
-  my ($req, $local_contact) = @_;
+sub _reply_200_short {
+  my ($hash,$req) = @_;
 
   my $res = Net::SIP::Response->new(
       200,
@@ -157,8 +242,9 @@ sub reply_200_short {
        'To'             => $req->get_header('To'),
        'Call-ID'        => $req->get_header('Call-ID'),
        'CSeq'           => $req->get_header('CSeq'),
-       'Contact'        => $req->get_header('Contact'),
-       'Expires'        => $req->get_header('Expires') // 3600,
+       'Contact'        => $req->get_header('Contact') // $hash->{SIP}->{LOCAL_CONTACT},
+       'Expires'        => 300,
+#       'Expires'        => $req->get_header('Expires') // 300,
        'Content-Length' => '0',
      }
     );
@@ -172,22 +258,51 @@ sub _process {
   my $pkt     = eval { Net::SIP::Packet->new( $hash->{SIP}->{buf} ) };
 
   (AttrVal($name,'logFullMessage',0))?
-    _log($hash,4,"Message in:\n".$pkt->as_string):
-    _log($hash,4,"Message in:  ".(split(/\n/,$pkt->as_string))[0]);
+    _log($hash,4,"in:\n".$pkt->as_string):
+    _log($hash,4,"in:  ".(split(/\n/,$pkt->as_string))[0]);
 
   #my $method  = $pkt->method(); # funktioniert nicht zuverlässig für MESSAGE
     
   my $method =  $pkt->as_string;
   $method    =~ s/^([^ ]*) .*$/$1/s;
-    
+
+  my ($peer,$ip,$port) = _getpeer($hash,$pkt);
+
   (AttrVal($name,'showFullMessage',0))?
     readingsSingleUpdate($hash, lc($method), $pkt->as_string, 0):
     readingsSingleUpdate($hash, lc($method), (split(/\n/,$pkt->as_string))[0], 1);
 
+  if ($method eq 'REGISTER') {
+#    my $contact = $pkt->get_header('contact');
+#    my ($peer,$ip,$port) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+):(\d+)/;
+    if (defined($peer) && $peer ne '') {
+      my $ts                  = strftime("%a, %d %b %Y %H:%M:%S", localtime(time()));
+      $hash->{peers}->{$peer} = { 'peer'       => $peer,
+                                  'peer_ip'    => $ip,
+                                  'peer_port'  => $port,
+                                  'registered' => $ts,
+                                };
+
+      my $c = $pkt->get_header('contact');
+      $c =~ s/</&lt;/g; $c =~ s/>/&gt;/g; # die <> müssen ersetzt werden, um eine Darstellung im Get zu haben
+      $hash->{peers}->{$peer}->{contact}    = $c if (defined($c) && $c);      
+
+      my $e = $pkt->get_header('expires');
+      $hash->{peers}->{$peer}->{expires}    = $e if (defined($e) && $e);      
+
+      my $u = $pkt->get_header('user_agent');
+      $hash->{peers}->{$peer}->{user_agent} = $u if (defined($u) && $u);
+
+      my $x = $pkt->get_header('x-real-ip');
+      $hash->{peers}->{$peer}->{x_real_ip}  = $x if (defined($x) && $x);
+      #Debug toJSON($hash->{peers}->{$peer});
+    }
+  }
+
   my @known_methods = qw(REGISTER INVITE BYE MESSAGE SUBSCRIBE);
   if (contains_string($method,@known_methods)) {
-    my $resp = reply_200_short($pkt,'<sip:minisip@192.168.123.111>');
-    _sendmsg($hash,$resp->as_string);
+    my $resp = _reply_200_short($hash,$pkt);
+    _sendmsg($hash,$peer,$resp->as_string);
   }
 
   if ($method eq 'INVITE') {
@@ -203,48 +318,6 @@ sub _process {
     my $input = $1 // "?";
     readingsSingleUpdate($hash, "input", $input, 1);
   }
-}
-
-sub _button {
-  my ($key,$command,$color,$label) = @_;
-  my $hash = $defs{minisip};
-
-  $label //= $snom{$key};
-
-  my $from   = 'sip:minisip@192.168.123.111';
-  my $to     = 'sip:snom@192.168.123.20';
-  my $callid = 'cid'.int(rand(1_000_000));
-  my $cseq   = 1;
-  my $branch = 'z9hG4bK'.int(rand(1_000_000));
-
-  my $body = <<"BODY";
-k=$key
-a=message
-c=$command
-o=$color
-l=$label
-n=**
-BODY
-
-  $body =~ s/\n/\r\n/g;
-
-  my $req = Net::SIP::Request->new(
-    'MESSAGE',
-    $to,
-    {
-        'Via'          => "SIP/2.0/UDP 192.168.123.111:5060;branch=$branch",
-        'Max-Forwards' => 70,
-        'From'         => "<$from>;tag=12345",
-        'To'           => "<$to>",
-        'Call-ID'      => $callid,
-        'CSeq'         => "$cseq MESSAGE",
-        'Contact'      => "<$from>",
-        'Subject'      => 'buttons',
-        'Content-Type' => 'application/x-buttons',
-    },
-    $body
-  );
-  _sendmsg($hash,$req->as_string);
 }
 
 1;
