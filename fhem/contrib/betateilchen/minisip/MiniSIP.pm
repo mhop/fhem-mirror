@@ -46,11 +46,13 @@ BEGIN {
 	 qw(readingFnAttributes
 	    data
 	    defs
+	    modules
 	    snom
 			selectlist
 		  AttrVal
 			Debug
       FileWrite
+      IsDisabled
 		  Log3
       contains_string
       readingsSingleUpdate
@@ -62,15 +64,17 @@ BEGIN {
 sub Define {
   my ($hash, $a, $h) = @_; #parseParams
   my $name = $a->[0];
+  return "Only one device with TYPE=MiniSIP can be defined" 
+      if($modules{MiniSIP}{inUse});
 
-  $hash->{SIP}->{PORT} = $h->{port};
-  $hash->{SIP}->{FROM} = $h->{from};
-  $hash->{SIP}->{LOCAL_CONTACT} = "<sip:$h->{from}>";
-  $hash->{SIP}->{PROTO} = 'udp';
+  $hash->{server}->{port} = $h->{port};
+  $hash->{server}->{from} = $h->{from};
+  $hash->{server}->{local} = "<sip:$h->{from}>";
+  $hash->{server}->{proto} = 'udp';
 
   my $sock = IO::Socket::INET->new(
-    LocalPort => $hash->{SIP}->{PORT},
-    Proto     => $hash->{SIP}->{PROTO},
+    LocalPort => $hash->{server}->{port},
+    Proto     => $hash->{server}->{proto},
     Reuse     => 1,
  #   Blocking  => 0
   );
@@ -79,45 +83,35 @@ sub Define {
   my $fh = $sock->fileno();
   $hash->{FD} = $fh;
   $selectlist{$fh} = $hash;
+
+  restore_peers($hash);
   
   readingsSingleUpdate($hash,'state','initialized',1);
-
+  $modules{MiniSIP}{inUse} = 1;
   return undef;
 }
 
 sub Read {
-#  return if(IsDisabled());
   my ($hash) = @_;
+  return if(IsDisabled($hash->{NAME}));
   my $sock = $hash->{SOCK};
-  my $iaddr;
-  my $peer_addr = $sock->recv($hash->{SIP}->{buf}, 4096);
-#  ($hash->{peer}->{port}, $iaddr) = sockaddr_in($peer_addr);
-#  $hash->{peer}->{ip} = inet_ntoa($iaddr);
+  my $res = $sock->recv($hash->{server}->{buf}, 4096);
   _process($hash);
-}
-
-sub Undef {
-  my ($hash, $arg) = @_;
-  my $sock = $hash->{SOCK};
-  if ($sock) {
-    close($sock);
-  }
-  delete $selectlist{$hash->{FD}} if defined $hash->{FD};
-  delete $hash->{peer};
-  delete $hash->{SIP};
-  return undef;
 }
 
 sub Set {
   my ($hash,$a,$h) = @_;
   my $name = $hash->{NAME};
 
-  my %cmd = ("sendmsg" => "", );
+  my %cmd = ("sendmsg"      => "",
+             "backup_peers" => ":noArg", 
+             "restore_peers" => ":noArg", 
+            );
   return ("Unknown argument $a->[1], choose one of ".
         join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
     if(!defined($cmd{$a->[1]}));
 
-  if( $a->[1] eq 'sendmsg' ) {
+  if( $a->[1] eq 'sendmsg' )       {
     my $peer    = $h->{peer};
     my $type    = $h->{type};
     my $payload = $h->{msg};
@@ -133,6 +127,8 @@ sub Set {
 #    Debug "sendmsg hash $peer $msg";
     sendmsg($hash,$peer,$msg);
   }
+  if( $a->[1] eq 'backup_peers' )  { backup_peers($hash); }
+  if( $a->[1] eq 'restore_peers' ) { restore_peers($hash); }
 
   return undef;
 }
@@ -140,7 +136,7 @@ sub Set {
 sub Get {
   my ($hash,$a,$h) = @_;
   my $name = $hash->{NAME};
-  my %cmd = ("peers" => ":noArg", );
+  my %cmd = ("peers" => ":table,json", );
   
   #Debug Dumper $a->[1];
 
@@ -149,13 +145,40 @@ sub Get {
     if(!defined($cmd{$a->[1]}));
 
   if( $a->[1] eq 'peers' ) {
-    my $count = scalar keys %{$hash->{peers}};
-    if (!$count) {
+    if (!havepeer($hash)) {
       return "no peer registered";
-    } else {
-      return makeTableFromPeers($hash);
+    } elsif (lc($a->[2]) eq 'table') {
+      return makeTable($hash,$hash->{peers});
+    } elsif (lc($a->[2]) eq 'json') {
+      return toJSON($hash->{peers});
     }
   }
+}
+
+sub Undef {
+  my ($hash, $arg) = @_;
+  my $sock = $hash->{SOCK};
+  if ($sock) {
+    close($sock);
+  }
+  delete $selectlist{$hash->{FD}} if defined $hash->{FD};
+  delete $hash->{peer};
+  delete $hash->{server};
+  delete $modules{MiniSIP}{inUse};
+  return undef;
+}
+
+sub Delete {
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+  setKeyValue($name,undef);
+  return Undef($hash,$arg);
+}
+
+sub Shutdown {
+  my ($hash) = @_;
+  _log3($hash,4,"ShutdownFn called");
+  backup_peers($hash);
 }
 
 ###------------------------------------------------------------------
@@ -166,16 +189,16 @@ sub sendmsg {
 
   my $count = scalar keys %{$hash->{peers}};
   if (!$count) {
-    _log($hash,1,"no peer registered");
+    _log3($hash,1,"no peer registered");
     return;
   } elsif (!defined($hash->{peers}->{$peer})) {
-    _log($hash,1,"$name: unknown peer >$peer<");
+    _log3($hash,1,"$name: unknown peer >$peer<");
     return;
   }
 
   (AttrVal($name,'logFullMessage',0))?  
-    _log($hash,4,"out to $peer:\n$msg"):
-    _log($hash,4,"out to $peer: ".(split(/\n/,$msg))[0]);
+    _log3($hash,4,"out to $peer:\n$msg"):
+    _log3($hash,4,"out to $peer: ".(split(/\n/,$msg))[0]);
   
   (AttrVal($name,'showFullMessage',0))?  
      readingsSingleUpdate($hash, "lastMsgOut", $msg, 0):
@@ -184,13 +207,13 @@ sub sendmsg {
   my $sock = new IO::Socket::INET (
     PeerAddr => $hash->{peers}->{$peer}->{peer_ip},
     PeerPort => $hash->{peers}->{$peer}->{peer_port},
-    Proto    => $hash->{SIP}->{PROTO});
+    Proto    => $hash->{server}->{proto});
 
   if($sock) {
     print $sock $msg;
     close($sock);
   } else {
-    _log($hash,1,"$!");
+    _log3($hash,1,"$!");
   }
 }
 
@@ -198,11 +221,11 @@ sub _process {
   my ($hash)  = @_;
   my $name = $hash->{NAME};
   
-  my $pkt     = eval { Net::SIP::Packet->new( $hash->{SIP}->{buf} ) };
+  my $pkt     = eval { Net::SIP::Packet->new( $hash->{server}->{buf} ) };
 
   (AttrVal($name,'logFullMessage',0))?
-    _log($hash,4,"in:\n".$pkt->as_string):
-    _log($hash,4,"in: ".(split(/\n/,$pkt->as_string))[0]);
+    _log3($hash,4,"in:\n".$pkt->as_string):
+    _log3($hash,4,"in: ".(split(/\n/,$pkt->as_string))[0]);
 
   #my $method  = $pkt->method(); # not working as expected
     
@@ -217,7 +240,7 @@ sub _process {
     return; # end processing if 200 OK received as response
   }
 
-  my ($peer,$ip,$port) = getpeer($hash,$pkt);
+  my ($peer,$ip,$port) = extract_peer($hash,$pkt,0);
 
   if ($method eq 'REGISTER') {
     savepeer($hash,$pkt);
@@ -238,10 +261,10 @@ sub _process {
 
   if ($method eq 'MESSAGE') {
     my ($info,$user,$header,$body) = $pkt->as_parts;
-    $body =~ m/k=(\d+)/;
-    my $input = $1 // "?";
+    my $input = FHEM::MiniSIP::Utils::parsemsgbody($hash,$peer,$body);
     readingsSingleUpdate($hash, "input", $input, 1);
   }
+  delete $hash->{server}->{buf};
 }
 
 1;

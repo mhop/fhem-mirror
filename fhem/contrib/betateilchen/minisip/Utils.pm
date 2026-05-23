@@ -22,89 +22,216 @@ package FHEM::MiniSIP::Utils;
 
 use strict;
 use warnings;
+use JSON::XS;
+use Data::Dumper;
 
 use Exporter ('import');
-our @EXPORT_OK = qw( _log 
+our @EXPORT_OK = qw( _log3 
                      build_200_short
-                     getpeer
+                     backup_peers
+                     restore_peers
+                     extract_peer
                      havepeer
                      savepeer
-                     makeTableFromPeers
+                     makeTable
                  );
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
 use GPUtils         qw(:all);
 BEGIN {
     GP_Import( qw(
+        AttrVal
         Log3
         Debug
         readingsSingleUpdate
+        toJSON
+        json2nameValue
+        getKeyValue
+        setKeyValue
       )
     );
 };
 
 ###------------------------------------------------------------------
 #
-# sub _log()
+# sub _log3($hash,$loglevel,$text) (exported)
 #
-# log data based on Log3 syntax
+# log extended data based on Log3 syntax
 #
 ###------------------------------------------------------------------
 
-{
-	sub _log {
-		my ($hash,$loglevel,$text ) = @_;
-		my $xline       = ( caller(0) )[2];
-		my $xsubroutine = ( caller(1) )[3];
-		my @sub         = split( '::', $xsubroutine);
-		my $sub         = "$sub[2].$sub[3]";
-		my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : "MiniSIP";
-		Log3 $hash, $loglevel, "$instName: $sub.$xline " . $text;
-	}
+sub _log3 {
+	my ($hash,$loglevel,$text) = @_;
+	my $xline       = ( caller(0) )[2];
+	my $xsubroutine = ( caller(1) )[3]; 
+		 $xsubroutine =~ s/^main:://; 
+	my @sub         = split( '::', $xsubroutine);
+	my $count       = scalar @sub;
+	my $sub         = ($count == 1)
+										? $sub[0]
+										: "$sub[$count-2].$sub[$count-1]";
+	my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : "MiniSIP";
+	Log3 $hash, $loglevel, "$instName: $sub.$xline " . $text;
 }
 
 ###------------------------------------------------------------------
 #
-# sub build_200_short()
+# sub parsemsgbody($hash,$peer,$body) (exported)
+#
+# log extended data based on Log3 syntax
+#
+###------------------------------------------------------------------
+
+sub parsemsgbody {
+	my ($hash,$peer,$body) = @_;
+	my $name      = $hash->{NAME};
+	my $parsetype = $hash->{peers}->{$peer}->{parsetype};
+	my $input;
+
+	my $fn = AttrVal($name,'parseFn',undef);
+
+	if(defined($fn)) {
+		_log3($hash,3,"use external parser: $fn");
+		no strict "refs";
+		eval { $input = &{$fn}($body); };
+		$input = $@ if ($@);
+		use strict "refs";
+		_log3($hash,3,"msg parsed: $input");
+	} elsif ($parsetype eq 'snom') { 
+		($input) = $body =~ m/k=(\d+)/;
+	} elsif ($parsetype eq 'grandstream') {
+		$input = "grandstream dummy";
+	} else {
+		_log3($hash,1,"unknown message type");
+		return undef;
+	}
+	return $input;
+}
+
+###------------------------------------------------------------------
+#
+# sub build_200_short($hash,$req)
 # 
 # build a simple '200 OK' message from incoming packet
 #
 ###------------------------------------------------------------------
 
-{
-	sub build_200_short {
-		my ($hash,$req) = @_;
-	
-		my $res = Net::SIP::Response->new(
-				200,
-				'OK',
-			 { 'Via'            => [ $req->get_header('Via') ],
-				 'From'           => $req->get_header('From'),
-				 'To'             => $req->get_header('To'),
-				 'Call-ID'        => $req->get_header('Call-ID'),
-				 'CSeq'           => $req->get_header('CSeq'),
-				 'Contact'        => $req->get_header('Contact') // $hash->{SIP}->{LOCAL_CONTACT},
-				 'Expires'        => 300,
-	#       'Expires'        => $req->get_header('Expires') // 300,
-				 'Content-Length' => '0',
-			 }
-			);
-			return $res;
-	}
+
+sub build_200_short {
+	my ($hash,$req) = @_;
+
+	my $res = Net::SIP::Response->new(
+			200,
+			'OK',
+		 { 'Via'            => [ $req->get_header('Via') ],
+			 'From'           => $req->get_header('From'),
+			 'To'             => $req->get_header('To'),
+			 'Call-ID'        => $req->get_header('Call-ID'),
+			 'CSeq'           => $req->get_header('CSeq'),
+			 'Contact'        => $req->get_header('Contact') // $hash->{server}->{local},
+			 'Expires'        => 300,
+#       'Expires'        => $req->get_header('Expires') // 300,
+			 'Content-Length' => '0',
+		 }
+		);
+		return $res;
 }
 
-sub havepeer {
+###------------------------------------------------------------------
+#
+# sub backup_peers($hash)
+# 
+# store all registered peers in keystore
+#
+###------------------------------------------------------------------
+
+sub backup_peers {
   my ($hash) = @_;
-  my $count = scalar keys %{$hash->{peers}};
-  return $count;
+  my $name = $hash->{NAME};
+  _log3($hash,4,"backup peers");
+  setKeyValue($name,toJSON($hash->{peers}));
 }
+
+###------------------------------------------------------------------
+#
+# sub restore_peers($hash)
+# 
+# restore peers from keystore
+# a peer will only be restored if
+# - last registration not expired
+# - peer not registered already
+#
+###------------------------------------------------------------------
+
+sub restore_peers {
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  _log3($hash,4,"restore peers");
+
+  my $peers  = getKeyValue($name);
+     $peers  = decode_json($peers);
+
+  my %p = ();
+
+  for my $key (keys %$peers) {
+    my $peer = $peers->{$key};
+    next unless ref $peer eq 'HASH';
+    for my $field (keys %$peer) {
+      my $value = $peer->{$field};
+      $p{$key}{$field} = (defined $value ? $value : 'undef');
+    }
+
+    # check for valid registration based on time and expiry
+    my $ts     = time();
+    my $reg = $p{$key}{registered};
+    my $exp = $p{$key}{expires};
+    if (($reg+$exp) < $ts) {
+      delete $p{$key};
+    }
+  }
+
+  # only add peers that are not registered
+  $hash->{peers}{$_} = $p{$_} for 
+        grep { not exists $hash->{peers}{$_} } keys %p;
+}
+
+###------------------------------------------------------------------
+#
+# sub havepeer($hash;$peer) (exported)
+# 
+# if optional parameter $peer given: check if $peer is registered,
+# return corresponding state of $peer
+#
+# if optional parameter $peer missing: 
+# return current number of registerd peers
+#
+###------------------------------------------------------------------
+
+sub havepeer {
+	my ($hash,$peer) = @_;
+	my $havepeer = 0;
+
+	if (defined($peer) && $peer ne '') {
+		$havepeer = defined($hash->{peers}->{$peer});
+	} else {
+		$havepeer = scalar keys %{$hash->{peers}};
+	}
+	return $havepeer;
+}
+
+###------------------------------------------------------------------
+#
+# sub savepeer($hash,$pkt)
+# 
+# save registered peer into $hash
+#
+###------------------------------------------------------------------
 
 sub savepeer {
   my ($hash,$pkt) = @_;
-  my ($peer,$ip,$port) = getpeer($hash,$pkt);
+  my ($peer,$ip,$port) = extract_peer($hash,$pkt,1);
 
 	if (defined($peer) && $peer ne '') {
-#    my $ts                  = strftime("%a, %d %b %Y %H:%M:%S", localtime(time()));
 		my $ts = time();
 		$hash->{peers}->{$peer} = { 'peer'       => $peer,
 																'peer_ip'    => $ip,
@@ -113,18 +240,20 @@ sub savepeer {
 															};
 
 		my $c = $pkt->get_header('contact');
+		$c //= '';
 		$c =~ s/</&lt;/g; $c =~ s/>/&gt;/g; # die <> müssen ersetzt werden, um eine Darstellung im Get zu haben
 		$hash->{peers}->{$peer}->{contact}    = $c if (defined($c) && $c);      
 
 		my $e = $pkt->get_header('expires');
 		$hash->{peers}->{$peer}->{expires}    = $e if (defined($e) && $e);      
 
-		my $u = $pkt->get_header('user_agent');
+		my $u = $pkt->get_header('user-agent');
 		$hash->{peers}->{$peer}->{user_agent} = $u if (defined($u) && $u);
+		($u) = $u =~ m/^(snom)/i;
+		$hash->{peers}->{$peer}->{parsetype} = $u if (defined($u) && $u);
 
 		my $x = $pkt->get_header('x-real-ip');
 		$hash->{peers}->{$peer}->{x_real_ip}  = $x if (defined($x) && $x);
-		#Debug toJSON($hash->{peers}->{$peer});
 		readingsSingleUpdate($hash,'state',"registered peer: $peer",1);
 	}
 
@@ -132,28 +261,29 @@ sub savepeer {
 
 ###------------------------------------------------------------------
 #
-# sub getpeer()
+# sub extract_peer()
 #
-# get peer data from
+# get peer data from incoming request
 # first try to extract from 'contact' header
 # if not found, try to find data in 'from' and 'via' headers
 #
 ###------------------------------------------------------------------
 
-{
-	sub getpeer {
-		my ($hash,$pkt) = @_;
-		my $contact = $pkt->get_header('contact');
-		my ($peer,$ip,$port) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+):(\d+)/;
-		if ($peer eq '') {
-			$contact = $pkt->get_header('from');
-			($peer,$ip) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+)/;
-			$contact = $pkt->get_header('via');
-			($port) = $contact =~ m/\d+\.\d+\.\d+\.\d+:(\d+)/;
-		}
-		_log($hash,4,"found peer: $peer");
-		return ($peer,$ip,$port);
+sub extract_peer {
+	my ($hash,$pkt,$log) = @_;
+	$log //= 1;
+	my ($peer,$ip,$port,$contact);
+	$contact = $pkt->get_header('contact');
+	if (defined($contact) && $contact ne '') {
+		($peer,$ip,$port) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+):(\d+)/;
+	} else {
+		$contact = $pkt->get_header('from');
+		($peer,$ip) = $contact =~ m/<sip:(.*)@(\d+\.\d+\.\d+\.\d+)/;
+		$contact = $pkt->get_header('via');
+		($port) = $contact =~ m/\d+\.\d+\.\d+\.\d+:(\d+)/;
 	}
+	_log3($hash,4,"found peer: $peer") if $log;
+	return ($peer,$ip,$port);
 }
 
 ###------------------------------------------------------------------
@@ -169,11 +299,11 @@ sub savepeer {
 	my $output;
 	my $depth;
 	
-	sub makeTableFromPeers {
-		my ($hash) = @_;
+	sub makeTable {
+		my ($hash,$data) = @_;
 		my $table = tablify({
 				 BORDER      => 1, 
-				 DATA        => $hash->{peers},
+				 DATA        => $data,
 				 SORTBY      => 'key', 
 				 ORDER       => 'asc'}
 		 );

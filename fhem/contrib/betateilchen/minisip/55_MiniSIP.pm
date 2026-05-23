@@ -30,16 +30,22 @@ sub ::MiniSIP_Initialize { goto &Initialize}
 sub Initialize($) {
   my ($hash) = @_;
   $hash->{parseParams} = 1;
-  $hash->{DefFn}    = \&FHEM::Core::MiniSIP::Define;
-  $hash->{ReadFn}   = \&FHEM::Core::MiniSIP::Read;
-  $hash->{UndefFn}  = \&FHEM::Core::MiniSIP::Undef;
-  $hash->{SetFn}    = \&FHEM::Core::MiniSIP::Set;
-  $hash->{GetFn}    = \&FHEM::Core::MiniSIP::Get;
+  $hash->{DefFn}       = \&FHEM::Core::MiniSIP::Define;
+  $hash->{ReadFn}      = \&FHEM::Core::MiniSIP::Read;
+  $hash->{SetFn}       = \&FHEM::Core::MiniSIP::Set;
+  $hash->{GetFn}       = \&FHEM::Core::MiniSIP::Get;
+  $hash->{ShutdownFn}  = \&FHEM::Core::MiniSIP::Shutdown;
+  $hash->{UndefFn}     = \&FHEM::Core::MiniSIP::Undef;
+  $hash->{DeleteFn}    = \&FHEM::Core::MiniSIP::Delete;
+
 #  $hash->{AttrFn}   = \&FHEM::Core::MiniSIP::Attr;
-  $hash->{AttrList} = "disable:1,0 "
-                    ."logFullMessage:0,1 "
-                    ."showFullMessage:0,1 "
-                    .$::readingFnAttributes;
+  $hash->{AttrList}    = ""
+                        ."logFullMessage:0,1 "
+                        ."showFullMessage:0,1 "
+                        ."parseFn "
+                        ."disable:1,0 "
+                        ."disabledForIntervals "
+                        .$::readingFnAttributes;
 }
 
 1;
