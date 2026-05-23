@@ -96,7 +96,7 @@ sub Read {
   return if(IsDisabled($hash->{NAME}));
   my $sock = $hash->{SOCK};
   my $res = $sock->recv($hash->{server}->{buf}, 4096);
-  _process($hash);
+  processmsg($hash);
 }
 
 sub Set {
@@ -136,9 +136,7 @@ sub Set {
 sub Get {
   my ($hash,$a,$h) = @_;
   my $name = $hash->{NAME};
-  my %cmd = ("peers" => ":table,json", );
-  
-  #Debug Dumper $a->[1];
+  my %cmd = ("peers" => ":table,json",);
 
   return ("Unknown argument $a->[1], choose one of ".
         join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
@@ -217,7 +215,7 @@ sub sendmsg {
   }
 }
 
-sub _process {
+sub processmsg {
   my ($hash)  = @_;
   my $name = $hash->{NAME};
   
