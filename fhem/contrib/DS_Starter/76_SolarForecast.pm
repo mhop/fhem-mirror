@@ -163,13 +163,15 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.10" => "22.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
+  "2.6.10" => "24.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
                            "aiFannGetConResult: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
                            "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
                            "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ".
                            "Fix Bat Prognose < 100% wenn Bat voll und PVü > Con, safetyMargin default: 20:20 gesetzt ".
                            "v1_common_active_pv in FEATURE-REGISTRY ergänzt, Online-Hilfe für v1_common_pv und v1_common_active_pv geändert ".
-                           "Diagnose Lernverhalten eingebaut, aiConHiddenLayers kann nun auch Netze wie 80-3-5 ",
+                           "Diagnose Lernverhalten eingebaut, aiConHiddenLayers kann nun auch Netze wie 80-3-5 ".
+                           "_aiFannApplyBiasCorrection: Einbau OSL-Korrektur, neuer Schlüssel aiCaontrol->aiConTrainLimit ".
+                           "AI mehr Neuronenlayer X-X-X-X... möglich, aiConLearnRate: kleinste Lernrate nun 0.0001 ",
   "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
                            "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
                            "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
@@ -861,48 +863,60 @@ my %noise_translations = (                                                      
 );
 
 my %epoche_translations = (                                                                  
-  vearly          => { EN => "converges very early",
-                       DE => "sehr früh konvergiert"             },
-  early           => { EN => "converged early",
-                       DE => "früh konvergiert"                  },
-  oklearn         => { EN => "healthy study habits",
-                       DE => "gesundes Lernverhalten"            },
-  late            => { EN => "converges late",
-                       DE => "spät konvergiert"                  },
-  vlate           => { EN => "just under the epoch limit",
-                       DE => "knapp am Epochen-Limit"            },
-  hint1           => { EN => "Learning rate too high: Reduce the learning rate (aiControl->aiConLearnRate) by a factor of 5–10 (e.g., from 0.01 to 0.001–0.002)",
-                       DE => "Lernrate zu hoch: Lernrate (aiControl->aiConLearnRate) um Faktor 5-10 reduzieren (z.B. von 0.01 auf 0.001-0.002)" },                           
-  hint2           => { EN => "Check architecture: Network may be too small for the amount of data; increase the number of neurons (aiControl->aiConHiddenLayers) in the hidden layers (e.g., 50-25 → 64-32)",
-                       DE => "Architektur prüfen: Netz möglicherweise zu klein für die Datenmenge, Hidden-Layer-Neuronen (aiControl->aiConHiddenLayers) erhöhen (z.B. 50-25 -> 64-32)" }, 
-  hint3           => { EN => "Restart the training at a different time: the random weight initialization at the start had a significant impact on the results here; restarting the training automatically generates a different initialization and usually leads to significantly better results",
-                       DE => "Training zu einem anderen Zeitpunkt erneut starten: die zufällige Gewichtsinitialisierung beim Start hat das Ergebnis hier stark dominiert, ein neuer Trainingsstart erzeugt automatisch eine andere Initialisierung und führt meist zu einem deutlich besseren Ergebnis" },
-  hint4           => { EN => "Slightly increase the momentum: Raising the value toward 0.9 slows convergence in a controlled manner and often improves generalization (aiControl->aiConMomentum)",
-                       DE => "Momentum leicht erhöhen: Wert Richtung 0.9 anheben verlangsamt die Konvergenz kontrolliert und verbessert oft die Generalisierung (aiControl->aiConMomentum)" },
-  hint5           => { EN => "Slightly reduce the learning rate: decrease the current value by a factor of 2-3 (e.g., 0.01 → 0.003–0.005) so that the network can optimize more finely (aiControl->aiConLearnRate)",
-                       DE => "Lernrate leicht reduzieren: aktuellen Wert um Faktor 2-3 verringern (z.B. 0.01 -> 0.003-0.005), damit das Netz feiner optimieren kann (aiControl->aiConLearnRate)" },
-  hint6           => { EN => "Slightly increase the learning rate: multiply the current value by a factor of 1.5–2 (e.g., 0.005 → 0.008–0.01) so that the network converges to a minimum faster (aiControl->aiConLearnRate)",
-                       DE => "Lernrate leicht erhöhen: aktuellen Wert um Faktor 1.5-2 anheben (z.B. 0.005 -> 0.008-0.01), damit das Netz schneller zu einem Minimum findet (aiControl->aiConLearnRate)" },
-  hint7           => { EN => "Change the training algorithm: Use RPROP instead of INCREMENTAL—RPROP automatically adjusts its step size and does not require manual adjustment of the learning rate, which often leads to convergence much faster in cases of slow convergence (aiControl->aiConTrainAlgo)",
-                       DE => "Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL verwenden - RPROP passt seine Schrittweite automatisch an und kommt ohne manuelle Lernraten-Einstellung aus was bei langsamer Konvergenz oft deutlich schneller zum Ziel führt (aiControl->aiConTrainAlgo)" },
-  hint8           => { EN => "Significantly increase the learning rate: raise the current value by a factor of 3–5 (e.g., 0.005 → 0.015–0.025); the network is learning too slowly and is not reaching a sufficient minimum within the available epochs (aiControl->aiConLearnRate)",
-                       DE => "Lernrate deutlich erhöhen: aktuellen Wert um Faktor 3-5 anheben (z.B. 0.005 -> 0.015-0.025), das Netz lernt zu langsam und erreicht kein ausreichendes Minimum innerhalb der verfügbaren Epochen (aiControl->aiConLearnRate)" },
-  hint9           => { EN => "Switch the training algorithm to RPROP: RPROP adjusts its step size fully automatically and typically converges 3–10 times faster than INCREMENTAL during slow training without any learning rate tuning (aiControl->aiConTrainAlgo)",
-                       DE => "Trainingsalgorithmus auf RPROP wechseln: RPROP passt seine Schrittweite vollautomatisch an und konvergiert bei langsamen Trainings typischerweise 3-10x schneller als INCREMENTAL ohne jegliches Lernraten-Tuning (aiControl->aiConTrainAlgo)" },
-  hint10          => { EN => "Downsizing the architecture: reducing the number of neurons per layer (e.g., 64-32 → 50-25) reduces the number of parameters to be optimized and significantly speeds up convergence, provided that the model quality remains sufficient (aiControl->aiConHiddenLayers)",
-                       DE => "Architektur verkleinern: weniger Neuronen pro Schicht (z.B. 64-32 -> 50-25) reduziert die Anzahl der zu optimierenden Parameter und beschleunigt die Konvergenz deutlich, sofern die Modellqualität ausreichend bleibt (aiControl->aiConHiddenLayers)" },
-  hint11          => { EN => "The model memorized training data instead of recognizing general patterns (error rate on unknown test data is %.1f %% higher than on training data): Change the training/test split from 80/20 to 70/30 and/or reduce the learning rate (aiControl->aiConLearnRate) by a factor of 2 so that the network learns more slowly and more generally",
-                       DE => "Trainingsdaten wurden auswendig gelernt statt allgemeine Muster zu erkennen (Fehler auf unbekannten Testdaten %.1f %% höher als auf Trainingsdaten): Trainings-/Testaufteilung von 80/20 auf 70/30 ändern und/oder Lernrate (aiControl->aiConLearnRate) um Faktor 2 reduzieren damit das Netz langsamer und allgemeiner lernt" },
-  hint12          => { EN => "unstable validation curve (StdDev/Mean=%.2f): Switch shuffle mode to periodic shuffle (aiControl->aiConShuffleMode=1 and set aiControl->aiConShufflePeriod to 10–20 epochs) to achieve more consistent gradient updates",
-                       DE => "instabiler Validierungsverlauf (StdDev/Mean=%.2f): Shuffle-Modus auf periodisches Shuffle (aiControl->aiConShuffleMode=1 und aiControl->aiConShufflePeriod auf 10-20 Epochen) umstellen, um gleichmäßigere Gradientenaktualisierungen zu erzielen" },
-  hint13          => { EN => "Model scaling is highly distorted (Slope=%.2f) despite an early stop: Check the input data for outliers and normalization errors; [Developer Note] verify the min/max scaling of the features",
-                       DE => "Modell-Skalierung stark verzerrt (Slope=%.2f) trotz frühem Stop: Eingangsdaten auf Ausreißer und Normalisierungsfehler prüfen, [Entwicklerhinweis] Min/Max-Skalierung der Features kontrollieren" },     
-  hint14          => { EN => "high RMSE-rel (%.1f %%) despite a late stop: Expand the architecture (e.g., add a hidden layer or increase the number of neurons per layer by 50 %%), as the model lacks sufficient capacity to handle the data complexity (aiControl->aiConHiddenLayers)",
-                       DE => "hohes RMSE-rel (%.1f %%) trotz spätem Stop: Architektur vergrößern (z.B. eine Hidden-Schicht ergänzen oder Neuronen pro Schicht um 50 %% erhöhen), da das Modell zu wenig Kapazität für die Datenkomplexität hat (aiControl->aiConHiddenLayers)" },
-  hint15          => { EN => "Prediction quality is low despite stable training (R²=%.2f, ideal value > 0.85): Adjust the bit-fail limit (aiControl->aiConBitFailLimit) to the recommended value (in Section 'Noise') and try a different training algorithm (e.g., aiControl->aiConTrainAlgo=RPROP)",
-                       DE => "Vorhersagequalität trotz stabilem Training gering (R²=%.2f, Idealwert > 0.85): Bit-Fail-Limit (aiControl->aiConBitFailLimit) auf den empfohlenen Wert (in Bereich 'Rauschen') anpassen und einen anderen Trainingsalgorithmus (z.B. aiControl->aiConTrainAlgo=RPROP) ausprobieren" },
-  hint16          => { EN => "[Developer Note] R²=%.2f indicates insufficient input data: relevant input variables may be missing from the feature set, or existing features may have too little explanatory power for the target variable-thoroughly review the feature selection and data set",
-                       DE => "[Entwicklerhinweis] R²=%.2f deutet auf unzureichende Eingangsdaten hin: relevante Eingangsgrößen fehlen möglicherweise im Feature-Set oder vorhandene Features haben zu geringen Erklärungswert für die Zielvariable - Feature-Auswahl und Datenbasis grundlegend überprüfen" },
+  vearly  => { EN => "converges very early",
+               DE => "sehr früh konvergiert"             },
+  early   => { EN => "converged early",
+               DE => "früh konvergiert"                  },
+  oklearn => { EN => "healthy study habits",
+               DE => "gesundes Lernverhalten"            },
+  late    => { EN => "converges late",
+               DE => "spät konvergiert"                  },
+  vlate   => { EN => "just under the epoch limit",
+               DE => "knapp am Epochen-Limit"            },
+  dead    => { EN => "Network produces constant output and has not learned anything (Model Slope≈0, Validation error lower than Training error): Switch training algorithm to RPROP (aiControl->aiConTrainAlgo=RPROP) - RPROP is immune to this initialization problem. Alternatively increase the learning rate by factor 5-10 or restart training at a different time",
+               DE => "Netz gibt konstanten Ausgabewert aus und hat nichts gelernt (Slope≈0, Validierungsfehler kleiner als Trainingsfehler): Trainingsalgorithmus auf RPROP wechseln (aiControl->aiConTrainAlgo=RPROP) - RPROP ist gegen dieses Initialisierungsproblem immun. Alternativ Lernrate um Faktor 5-10 erhöhen oder Training zu anderem Zeitpunkt neu starten" },  
+  hint1   => { EN => "Learning rate too high: Reduce the learning rate (aiControl->aiConLearnRate) by a factor of 5–10 (e.g., from 0.01 to 0.001–0.002)",
+               DE => "Lernrate zu hoch: Lernrate (aiControl->aiConLearnRate) um Faktor 5-10 reduzieren (z.B. von 0.01 auf 0.001-0.002)" },                           
+  hint2   => { EN => "Check architecture: Network may be too small for the amount of data; increase the number of neurons (aiControl->aiConHiddenLayers) in the hidden layers (e.g., 50-25 → 64-32)",
+               DE => "Architektur prüfen: Netz möglicherweise zu klein für die Datenmenge, Hidden-Layer-Neuronen (aiControl->aiConHiddenLayers) erhöhen (z.B. 50-25 -> 64-32)" }, 
+  hint3   => { EN => "Restart the training at a different time: the random weight initialization at the start had a significant impact on the results here; restarting the training automatically generates a different initialization and usually leads to significantly better results",
+               DE => "Training zu einem anderen Zeitpunkt erneut starten: die zufällige Gewichtsinitialisierung beim Start hat das Ergebnis hier stark dominiert, ein neuer Trainingsstart erzeugt automatisch eine andere Initialisierung und führt meist zu einem deutlich besseren Ergebnis" },
+  hint4   => { EN => "Slightly increase the momentum: Raising the value toward 0.9 slows convergence in a controlled manner and often improves generalization (aiControl->aiConMomentum)",
+               DE => "Momentum leicht erhöhen: Wert Richtung 0.9 anheben verlangsamt die Konvergenz kontrolliert und verbessert oft die Generalisierung (aiControl->aiConMomentum)" },
+  hint5   => { EN => "Slightly reduce the learning rate: decrease the current value by a factor of 2-3 (e.g., 0.01 → 0.003–0.005) so that the network can optimize more finely (aiControl->aiConLearnRate)",
+               DE => "Lernrate leicht reduzieren: aktuellen Wert um Faktor 2-3 verringern (z.B. 0.01 -> 0.003-0.005), damit das Netz feiner optimieren kann (aiControl->aiConLearnRate)" },
+  hint6   => { EN => "Slightly increase the learning rate: multiply the current value by a factor of 1.5–2 (e.g., 0.005 → 0.008–0.01) so that the network converges to a minimum faster (aiControl->aiConLearnRate)",
+               DE => "Lernrate leicht erhöhen: aktuellen Wert um Faktor 1.5-2 anheben (z.B. 0.005 -> 0.008-0.01), damit das Netz schneller zu einem Minimum findet (aiControl->aiConLearnRate)" },
+  hint7   => { EN => "Change the training algorithm: Use RPROP instead of INCREMENTAL—RPROP automatically adjusts its step size and does not require manual adjustment of the learning rate, which often leads to convergence much faster in cases of slow convergence (aiControl->aiConTrainAlgo)",
+               DE => "Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL verwenden - RPROP passt seine Schrittweite automatisch an und kommt ohne manuelle Lernraten-Einstellung aus was bei langsamer Konvergenz oft deutlich schneller zum Ziel führt (aiControl->aiConTrainAlgo)" },
+  hint8   => { EN => "Significantly increase the learning rate: raise the current value by a factor of 3–5 (e.g., 0.005 → 0.015–0.025); the network is learning too slowly and is not reaching a sufficient minimum within the available epochs (aiControl->aiConLearnRate)",
+               DE => "Lernrate deutlich erhöhen: aktuellen Wert um Faktor 3-5 anheben (z.B. 0.005 -> 0.015-0.025), das Netz lernt zu langsam und erreicht kein ausreichendes Minimum innerhalb der verfügbaren Epochen (aiControl->aiConLearnRate)" },
+  hint9   => { EN => "Switch the training algorithm to RPROP: RPROP adjusts its step size fully automatically and typically converges 3–10 times faster than INCREMENTAL during slow training without any learning rate tuning (aiControl->aiConTrainAlgo)",
+               DE => "Trainingsalgorithmus auf RPROP wechseln: RPROP passt seine Schrittweite vollautomatisch an und konvergiert bei langsamen Trainings typischerweise 3-10x schneller als INCREMENTAL ohne jegliches Lernraten-Tuning (aiControl->aiConTrainAlgo)" },
+  hint10  => { EN => "Downsizing the architecture: reducing the number of neurons per layer (e.g., 64-32 → 50-25) reduces the number of parameters to be optimized and significantly speeds up convergence, provided that the model quality remains sufficient (aiControl->aiConHiddenLayers)",
+               DE => "Architektur verkleinern: weniger Neuronen pro Schicht (z.B. 64-32 -> 50-25) reduziert die Anzahl der zu optimierenden Parameter und beschleunigt die Konvergenz deutlich, sofern die Modellqualität ausreichend bleibt (aiControl->aiConHiddenLayers)" },
+  hint11  => { EN => "The model memorized training data instead of recognizing general patterns (error rate on unknown test data is %.1f %% higher than on training data): Change the training/test split from 80/20 to 70/30 and/or reduce the learning rate (aiControl->aiConLearnRate) by a factor of 2 so that the network learns more slowly and more generally",
+               DE => "Trainingsdaten wurden auswendig gelernt statt allgemeine Muster zu erkennen (Fehler auf unbekannten Testdaten %.1f %% höher als auf Trainingsdaten): Trainings-/Testaufteilung von 80/20 auf 70/30 ändern und/oder Lernrate (aiControl->aiConLearnRate) um Faktor 2 reduzieren damit das Netz langsamer und allgemeiner lernt" },
+  hint12  => { EN => "unstable validation curve (StdDev/Mean=%.2f): Switch shuffle mode to periodic shuffle (aiControl->aiConShuffleMode=1 and set aiControl->aiConShufflePeriod to 10–20 epochs) to achieve more consistent gradient updates",
+               DE => "instabiler Validierungsverlauf (StdDev/Mean=%.2f): Shuffle-Modus auf periodisches Shuffle (aiControl->aiConShuffleMode=1 und aiControl->aiConShufflePeriod auf 10-20 Epochen) umstellen, um gleichmäßigere Gradientenaktualisierungen zu erzielen" },
+  hint13  => { EN => "Model scaling is highly distorted (Slope=%.2f) despite an early stop: Check the input data for outliers and normalization errors; [Developer Note] verify the min/max scaling of the features",
+               DE => "Modell-Skalierung stark verzerrt (Slope=%.2f) trotz frühem Stop: Eingangsdaten auf Ausreißer und Normalisierungsfehler prüfen, [Entwicklerhinweis] Min/Max-Skalierung der Features kontrollieren" },     
+  hint14  => { EN => "high RMSE-rel (%.1f %%) despite a late stop: Expand the architecture (e.g., add a hidden layer or increase the number of neurons per layer by 50 %%), as the model lacks sufficient capacity to handle the data complexity (aiControl->aiConHiddenLayers)",
+               DE => "hohes RMSE-rel (%.1f %%) trotz spätem Stop: Architektur vergrößern (z.B. eine Hidden-Schicht ergänzen oder Neuronen pro Schicht um 50 %% erhöhen), da das Modell zu wenig Kapazität für die Datenkomplexität hat (aiControl->aiConHiddenLayers)" },
+  hint15  => { EN => "Prediction quality is low despite stable training (R²=%.2f, ideal value > 0.85): Adjust the bit-fail limit (aiControl->aiConBitFailLimit) to the recommended value (in Section 'Noise') and try a different training algorithm (e.g., aiControl->aiConTrainAlgo=RPROP)",
+               DE => "Vorhersagequalität trotz stabilem Training gering (R²=%.2f, Idealwert > 0.85): Bit-Fail-Limit (aiControl->aiConBitFailLimit) auf den empfohlenen Wert (in Bereich 'Rauschen') anpassen und einen anderen Trainingsalgorithmus (z.B. aiControl->aiConTrainAlgo=RPROP) ausprobieren" },
+  hint16  => { EN => "[Developer Note] R²=%.2f indicates insufficient input data: relevant input variables may be missing from the feature set, or existing features may have too little explanatory power for the target variable-thoroughly review the feature selection and data set",
+               DE => "[Entwicklerhinweis] R²=%.2f deutet auf unzureichende Eingangsdaten hin: relevante Eingangsgrößen fehlen möglicherweise im Feature-Set oder vorhandene Features haben zu geringen Erklärungswert für die Zielvariable - Feature-Auswahl und Datenbasis grundlegend überprüfen" },
+  hint17  => { EN => "Architecture possibly too small for the data volume: the ratio of training samples to network parameters is %.1f (target: 8–20) - try a larger architecture such as %s (aiControl->aiConHiddenLayers)",
+               DE => "Architektur möglicherweise zu klein für die Datenmenge: Verhältnis Trainingsdaten zu Netzparametern ist %.1f (Zielwert: 8–20) - größere Architektur wie z.B. %s versuchen (aiControl->aiConHiddenLayers)" },
+  hint18  => { EN => "Architecture possibly too complex for the data volume: the ratio of training samples to network parameters is only %.1f (target: 8–20) - the network has more degrees of freedom than the data can reliably fill; try a smaller architecture such as %s (aiControl->aiConHiddenLayers)",
+               DE => "Architektur möglicherweise zu komplex für die Datenmenge: Verhältnis Trainingsdaten zu Netzparametern beträgt nur %.1f (Zielwert: 8–20) - das Netz hat mehr Freiheitsgrade als die Daten zuverlässig füllen können; kleinere Architektur wie z.B. %s versuchen (aiControl->aiConHiddenLayers)" },
+  hint19  => { EN => "Recommended learning rate for the suggested architecture %s with %d inputs: %.4f (aiControl->aiConLearnRate)",
+               DE => "Empfohlene Lernrate für die vorgeschlagene Architektur %s mit %d Inputs: %.4f (aiControl->aiConLearnRate)" },
+  hint20  => { EN => "Large dataset (%d records total): if forecast quality suffers from seasonal shifts, limit training to the most recent records (e.g. aiControl->aiConTrainLimit=%d) to focus the model on current consumption patterns",
+               DE => "Große Datenmenge (%d Datensätze gesamt): wenn saisonale Effekte die Prognosequalität beeinträchtigen, Training auf die neuesten Datensätze begrenzen (z.B. aiControl->aiConTrainLimit=%d) um das Modell auf aktuelle Verbrauchsmuster zu fokussieren" },
+  hint21  => { EN => "Dataset too small (%d training records): at least %d records are needed for reliable training - collect more data before adjusting the architecture",
+               DE => "Datenmenge zu gering (%d Trainingsdatensätze): für ein zuverlässiges Training werden mindestens %d Datensätze benötigt - zunächst mehr Daten sammeln bevor die Architektur angepasst wird" },  
 ); 
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -8251,9 +8265,9 @@ sub _attraiControl {                     ## no critic "not used"
       aiConTrainStart    => { comp => '(?:[1-9]|[1-8][0-9]|90):(?:[1-9]|1[0-9]|2[0-3])',           act => 0 },
       aiTreesPV          => { comp => '(1?[1-9]|10|[2-4][0-9]|50)',                                act => 0 },
       aiConActivate      => { comp => '(0|1|2)',                                                   act => 0 },
-      aiConHiddenLayers  => { comp => '(?:[1-9]\d{1,2}-[1-9]\d{0,2}(?:-[1-9]\d{0,2})?)',           act => 0 },
+      aiConHiddenLayers  => { comp => '[1-9]\d{0,2}(?:-[1-9]\d{0,2})*',                            act => 0 },
       aiConTrainAlgo     => { comp => '(RPROP|INCREMENTAL)',                                       act => 0 },
-      aiConLearnRate     => { comp => '(0\.01|0\.05|0\.00[1-5])',                                  act => 0 },
+      aiConLearnRate     => { comp => '(0\.(?:000[1-9]\d*|00[1-9]\d*|0[1-4]\d*|05))',              act => 0 },
       aiConMomentum      => { comp => '(0\.[2-9])',                                                act => 0 },
       aiConShuffleMode   => { comp => '[0-2]',                                                     act => 0 },
       aiConBitFailLimit  => { comp => '0\.(0[5-9]|[1-4]\d|50)',                                    act => 0 },
@@ -8262,7 +8276,8 @@ sub _attraiControl {                     ## no critic "not used"
       aiConSteepness     => { comp => '(0\.[1-9]|1\.[0-5])',                                       act => 0 },
       aiConAlpha         => { comp => '(0(?:\.\d+)?|1)',                                           act => 0 },
       aiConProfile       => { comp => "($rvreg)",                                                  act => 1 },
-      aiConAbsOversample => { comp => '0\.(?:[0-4]\d|50?)',                                        act => 0 },      
+      aiConAbsOversample => { comp => '0\.(?:[0-4]\d|50?)',                                        act => 0 },
+      aiConTrainLimit    => { comp => '\d+',                                                       act => 1 },  
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -9422,6 +9437,12 @@ sub __attrKeyAction {
           if ($akeyval =~ /heatpump/xs) {
               my $hp = isHeatPumpUsed ($name);                                                          # Consumer Nummer , Solltemp falls WP verwendet
               if (!defined $hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
+          }
+      }
+      
+      if ($akey eq 'aiConTrainLimit') {
+          if ($akeyval && $akeyval < AINUMMININPUTS) {
+              return qq{The value '$akeyval' is not valid for key '$akey'. It must be set to '0' or an integer >= }.AINUMMININPUTS;
           }
       }
       
@@ -25051,6 +25072,22 @@ sub aiFannCreateConTrainData {
 
   # Finalisierungen
   ###################
+  # --- Limitierung auf die letzten X Datensätze (0 = deaktiviert)
+  my $limit = CurrentVal ($name, 'aiConTrainLimit', 0);
+
+  if ($limit > 0) {
+      my $n = scalar @training_data;
+
+      if ($n > $limit) {
+          my $drop = $n - $limit;
+
+          debugLog ($paref, 'aiProcess', "AI FANN - limiting training data to newest $limit of $n records");
+
+          splice @training_data, 0, $drop;
+          splice @targets_norm,  0, $drop;
+      }
+  }
+
   my $splice_len = 6;
   
   splice @training_data, 0, $splice_len;                                                                    # sicherstellen, dass training_data > 6 Elemente trainiert wird
@@ -25979,12 +26016,23 @@ sub aiFannTrain {
   $ann->bit_fail_limit              ($bit_fail_limit);
   $ann->hidden_activation_steepness ($hidden_steepness);
   
-  my @steepness = ($hidden_steepness, $hidden_steepness - 0.2, $hidden_steepness - 0.4);               # Hidden 1: schärfer, Hidden 2: glatter  ...
+  #my @steepness = ($hidden_steepness, $hidden_steepness - 0.2, $hidden_steepness - 0.4);               # Hidden 1: schärfer, Hidden 2: glatter  ...
   
-  for my $i (1..$num_hidddenlays) {
-      $ann->layer_activation_steepness($i, max(0.1, $steepness[$i-1]));
+  #for my $i (1..$num_hidddenlays) {
+  #    $ann->layer_activation_steepness($i, max(0.1, $steepness[$i-1]));
+  #}
+  
+  my @steepness_dyn;
+  for my $i (0 .. $num_hidddenlays-1) {                                                                 # Dynamische Steepness-Liste für alle Hidden-Layer erzeugen
+      my $s = $hidden_steepness - 0.2 * $i;
+      push @steepness_dyn, max (0.1, $s);
   }
-  
+
+  for my $i (1 .. $num_hidddenlays) {                                                                   # Steepness für alle Hidden-Layer setzen
+      $ann->layer_activation_steepness($i, $steepness_dyn[$i-1]);
+  }
+
+ 
   my $lr = round5 ($ann->learning_rate);
   my $lm = round1 ($ann->learning_momentum);
   my $ta = $ann->training_algorithm;
@@ -26268,6 +26316,13 @@ sub aiFannTrain {
   my $metrics        = _aiFannSlopeBias (\@targets, \@preds);                               # Modell-Slope und Modell-Bias auf denormalisierten Werten
   my $model_slope    = $metrics->{slope_regres};
   my $model_bias     = $metrics->{bias_regres};
+  my $cal_slope      = 1.0;                                                                 # Schutz gegen degenerierte Werte
+  my $cal_bias       = 0.0;                                                                 # ... default: keine Korrektur
+  
+  if (defined $model_slope && $model_slope > 0.5  && $model_slope < 2.0) {                  # Inverse Kalibrierung: y_true ≈ (y_pred - bias) / slope
+      $cal_slope = 1.0 / $model_slope;                                                      # z.B. 1/0.85 = 1.176
+      $cal_bias  = -$model_bias / $model_slope;                                             # z.B. -159/0.85 = -187 Wh
+  }
   
   my $err_metrics    = _aiFannErrorMetrics (\@targets, \@preds);                            # Fehlermetriken in Originalskala (denormalisiert)
   my $mae            = $err_metrics->{mae};                                                 # MAE (Durchschnitt) Originalskala
@@ -26321,17 +26376,21 @@ sub aiFannTrain {
   
   # Epochen-Diagnose
   ###################
-  my $epoch_diag = _aiFannEpochDiagnostic ( { best_epoch => $best_train_epoch,
-                                              mse_train  => $best_train_mse,
-                                              mse_val    => $mse_val,
-                                              val_std    => $val_std,
-                                              val_mean   => $val_mean,
-                                              slope      => $model_slope,
-                                              r2         => $r2,
-                                              rmse_rel   => $weighted_rmse_rel,
-                                              bitfail    => $bitfail,
-                                              num_epoch  => $num_epoch,
-                                              lang       => $paref->{lang},
+  my $epoch_diag = _aiFannEpochDiagnostic ( { best_epoch         => $best_train_epoch,
+                                              mse_train          => $best_train_mse,
+                                              mse_val            => $mse_val,
+                                              val_std            => $val_std,
+                                              val_mean           => $val_mean,
+                                              slope              => $model_slope,
+                                              r2                 => $r2,
+                                              rmse_rel           => $weighted_rmse_rel,
+                                              bitfail            => $bitfail,
+                                              num_epoch          => $num_epoch,
+                                              num_inputs         => $num_inputs,       
+                                              split_index        => $split_index,      
+                                              num_train_datasets => $num_train_datasets,
+                                              hidden_layers      => $hidden_layers,     
+                                              lang               => $paref->{lang},
                                             }
                                           );
                                           
@@ -26343,7 +26402,7 @@ sub aiFannTrain {
                   . '</ul>';
   }
 
-$data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints} = $hints_html;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints} = $hints_html;
   
   # Retry-Indikator ausführen
   #############################
@@ -26439,6 +26498,9 @@ $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints} = $hints_html;
   $data{$name}{$fanntyp.'temp'}{$attempt}{ShufflePeriod}  = $shuffle_period;
   $data{$name}{$fanntyp.'temp'}{$attempt}{NoiseLevel}     = $noise_flag;
   $data{$name}{$fanntyp.'temp'}{$attempt}{BitFailSuggest} = $bitfail_suggestion;
+  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{CalSlope}       = $cal_slope;                             # Kalibrierungs-Steigung
+  $data{$name}{$fanntyp.'temp'}{$attempt}{CalBias}        = $cal_bias;                              # Kalibrierungs-Offset
   
   $data{$name}{$fanntyp.'temp'}{$attempt}{EpochCode}      = $epoch_diag->{epoch_code};
   $data{$name}{$fanntyp.'temp'}{$attempt}{EpochLabel}     = $epoch_diag->{epoch_label};
@@ -26593,20 +26655,24 @@ return ($flag, $bfl);
 #   ableiten
 ################################################################
 sub _aiFannEpochDiagnostic {
-  my $paref        = shift;
-  my $best_epoch   = $paref->{best_epoch};
-  my $mse_train    = $paref->{mse_train};
-  my $mse_val      = $paref->{mse_val};
-  my $val_std      = $paref->{val_std};
-  my $val_mean     = $paref->{val_mean};
-  my $slope        = $paref->{slope};
-  my $r2           = $paref->{r2};
-  my $rmse_rel     = $paref->{rmse_rel};
-  my $bitfail      = $paref->{bitfail};
-  my $num_epoch    = $paref->{num_epoch} // AINUMEPOCHS;
-  my $lang         = $paref->{lang};
+  my $paref              = shift;
+  my $best_epoch         = $paref->{best_epoch};
+  my $mse_train          = $paref->{mse_train};
+  my $mse_val            = $paref->{mse_val};
+  my $val_std            = $paref->{val_std};
+  my $val_mean           = $paref->{val_mean};
+  my $slope              = $paref->{slope};
+  my $r2                 = $paref->{r2};
+  my $rmse_rel           = $paref->{rmse_rel};
+  my $bitfail            = $paref->{bitfail};
+  my $num_epoch          = $paref->{num_epoch} // AINUMEPOCHS;
+  my $num_inputs         = $paref->{num_inputs};
+  my $split_index        = $paref->{split_index};
+  my $num_train_datasets = $paref->{num_train_datasets};
+  my $hidden_layers      = $paref->{hidden_layers};
+  my $lang               = $paref->{lang};
 
-  my $rel         = $best_epoch / $num_epoch;
+  my $rel = $best_epoch / $num_epoch;
     
   my $overfitting = ($mse_val > 0 && $mse_train > 0)
                   ? ($mse_val - $mse_train) / ($mse_val + 1e-9)
@@ -26621,7 +26687,7 @@ sub _aiFannEpochDiagnostic {
   my @hints;
 
   # --- 1. Relative Epochen-Position
-  if ($rel < 0.03) {                                                                  # < 450 Epochen
+  if ($rel < 0.03) {                                                                    # < 450 Epochen
       $code  = 'very_early';
       $label = $epoche_translations{vearly}{$lang};
         
@@ -26632,25 +26698,25 @@ sub _aiFannEpochDiagnostic {
           push @hints, $epoche_translations{hint3}{$lang};
       }
   }
-  elsif ($rel < 0.12) {                                                               # 450 – 1800 Epochen
+  elsif ($rel < 0.12) {                                                                 # 450 – 1800 Epochen
       $code  = 'early';
       $label = $epoche_translations{early}{$lang};
         
       push @hints, $epoche_translations{hint4}{$lang};
       push @hints, $epoche_translations{hint5}{$lang};
   }
-  elsif ($rel <= 0.72) {                                                              # 1800 – 10800 Epochen
+  elsif ($rel <= 0.72) {                                                                # 1800 – 10800 Epochen
       $code  = 'ok';
       $label = $epoche_translations{oklearn}{$lang};
   }
-  elsif ($rel <= 0.90) {                                                              # 10800 – 13500 Epochen
+  elsif ($rel <= 0.90) {                                                                # 10800 – 13500 Epochen
       $code  = 'late';
       $label = $epoche_translations{late}{$lang};
         
       push @hints, $epoche_translations{hint6}{$lang};
       push @hints, $epoche_translations{hint7}{$lang};
   }
-  else {                                                                              # > 13500 Epochen
+  else {                                                                                # > 13500 Epochen
       $code  = 'very_late';
       $label = $epoche_translations{vlate}{$lang};
         
@@ -26660,41 +26726,50 @@ sub _aiFannEpochDiagnostic {
   }
 
   # --- 2. Kombinations-Checks
-
-  # Overfitting
-  if ($overfitting > 0.25) {
+  # Totes Netz: lernt überhaupt nichts (Slope≈0, Val MSE < Train MSE)
+  if (defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7) {
+      push @hints, $epoche_translations{dead}{$lang};
+      $code = 'very_early';
+  }
+  
+  if ($overfitting > 0.25) {                                                            # Overfitting
       my $pct = round1 ($overfitting * 100);
         
       push @hints, sprintf $epoche_translations{hint11}{$lang}, $pct;
-        
       $code = 'overfit' if $code eq 'ok';
   }
 
-  # Instabiler Validierungsverlauf
-  if ($stability > 0.15) {
-      push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability;
-        
+  if ($stability > 0.15) {                                                              # Instabiler Validierungsverlauf
+      push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability; 
       $code = 'unstable' unless $code =~ /very/;
   }
 
-  # Schlechte Slope in früher Phase -> Datenproblem
-  if (($code eq 'very_early' || $code eq 'early')
+  if (($code eq 'very_early' || $code eq 'early')                                       # Schlechte Slope in früher Phase -> Datenproblem
       && ($slope < 0.6 || $slope > 1.4)) {
       push @hints, sprintf $epoche_translations{hint13}{$lang}, $slope;
   }
 
-  # Späte Konvergenz + hoher RMSE -> Architektur zu klein
-  if ($code =~ /late/ && $rmse_rel > 20) {
+  if ($code =~ /late/ && $rmse_rel > 20) {                                              # Späte Konvergenz + hoher RMSE -> Architektur zu klein
       push @hints, sprintf $epoche_translations{hint14}{$lang}, $rmse_rel;
   }
 
-  # Schlechtes R² trotz gesunder Epochenphase
-  if ($r2 < 0.5 && $code eq 'ok') {
+  if ($r2 < 0.5 && $code eq 'ok') {                                                     # Schlechtes R² trotz gesunder Epochenphase
       push @hints, sprintf $epoche_translations{hint15}{$lang}, $r2;   
       push @hints, sprintf $epoche_translations{hint16}{$lang}, $r2;
   }
+  
+  # --- 3. Architektur-Empfehlung  (vor Ampel-Block einfügen)
+  my $arch_ref = __aiFannArchHint ({ num_inputs         => $num_inputs,
+                                     split_index        => $split_index,
+                                     num_train_datasets => $num_train_datasets,
+                                     hidden_layers      => $hidden_layers,
+                                     epoch_code         => $code,
+                                     lang               => $lang,
+                                   });
 
-  # --- 3. Ampel
+  push @hints, @{$arch_ref->{hints}} if @{$arch_ref->{hints}};
+
+  # --- 4. Ampel
   my $ampel = $code eq 'ok'                                ? 'green'
             : $code =~ /^(early|late|overfit)$/            ? 'yellow'
             : $code =~ /^(very_early|very_late|unstable)$/ ? 'red'
@@ -26706,6 +26781,141 @@ return { epoch_code    => $code,
          epoch_ampel   => $ampel,
          epoch_hints   => \@hints,
        };
+}
+
+################################################################
+#   Architektur-Empfehlung basierend auf Datenmenge,
+#   Inputs und aktuellem Lernverhalten
+################################################################
+sub __aiFannArchHint {
+  my $paref              = shift;
+  my $num_inputs         = $paref->{num_inputs}         // 0;
+  my $split_index        = $paref->{split_index}        // 0;
+  my $num_train_datasets = $paref->{num_train_datasets} // 0;
+  my $hidden_layers      = $paref->{hidden_layers}      // '';
+  my $epoch_code         = $paref->{epoch_code}         // 'ok';
+  my $lang               = $paref->{lang}               // 'EN';
+  
+  my @hints;
+
+  return { hints => \@hints } if !$num_inputs || !$split_index || !$hidden_layers;
+  
+  if ($split_index < AINUMMININPUTS) {                                                              # Datenmenge zu gering
+      push @hints, sprintf $epoche_translations{hint21}{$lang}, $split_index;
+      return { hints => \@hints };                                                                  # weitere Architekturhinweise sinnlos
+  }
+
+  # --- Aktuelle Architektur auswerten
+  my @cur_layers = split /-/, $hidden_layers;
+  my $cur_params = 0;
+  my $prev       = $num_inputs;
+
+  for my $n (@cur_layers) {
+      $cur_params += ($prev + 1) * $n;                                                              # Gewichte + Bias je Schicht
+      $prev        = $n;
+  }
+  
+  $cur_params  += $prev + 1;                                                                        # letzte Hidden → Output + Bias
+  my $cur_ratio = $split_index / ($cur_params || 1);
+
+  # --- Optimale Architektur berechnen                                                              # Ziel: ~10 Trainingsdaten pro Parameter (Mitte des Zielkorridors 8–20)
+  my $target_params = int ($split_index / 10);
+
+  my @nice   = (8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128);                                        # Erste Hidden-Schicht: sqrt(target_params), begrenzt auf num_inputs
+  my $raw_h1 = int (sqrt ($target_params));
+  $raw_h1    = $num_inputs if $raw_h1 > $num_inputs;
+  $raw_h1    = 8 if $raw_h1 < 8;
+
+  my $sug_h1 = (sort { abs($a - $raw_h1) <=> abs($b - $raw_h1) } @nice)[0];                         # Auf nächsten "schönen" Wert runden
+
+  # --- Architekturtiefe je nach Parameteranzahl
+  my $sug_arch;
+
+  if ($target_params < 300) {                                                                       # flach
+      my $h2    = max (8, int ($sug_h1 / 2));
+      $sug_arch = "$sug_h1-$h2";
+  }
+  elsif ($target_params < 1500) {                                                                   # mittel
+      my $h2    = max (8, int ($sug_h1 / 2));
+      my $h3    = int ($h2 / 2);
+      $sug_arch = $h3 >= 8 ? "$sug_h1-$h2-$h3" : "$sug_h1-$h2";
+  }
+  else {                                                                                            # tief
+      my $h2    = max (8, int ($sug_h1 / 2));
+      my $h3    = max (8, int ($h2   / 2));
+      my $h4    = int ($h3 / 2);
+      $sug_arch = $h4 >= 8 ? "$sug_h1-$h2-$h3-$h4" : "$sug_h1-$h2-$h3";
+  }
+
+  # --- Tiefe mindestens so tief wie aktuelle Architektur
+  my $cur_depth = scalar @cur_layers;
+  my $sug_depth = scalar (split /-/, $sug_arch);                                                    # Anzahl Schichten der vorgeschlagenen Architektur
+
+  if ($sug_depth < $cur_depth && $cur_ratio > 10) {                                                 # cur_ratio -> Guard: nur bei zu kleinem Netz
+      my @sug_layers;
+      my $n = $sug_h1;
+
+      for my $i (0 .. $cur_depth-1) {
+          push @sug_layers, max (8, $n);
+          $n = int ($n * 0.6);
+      }
+
+      $sug_arch  = join '-', @sug_layers;
+      $sug_depth = $cur_depth;
+  }
+  
+  # Nach Tiefenkorrektur: resultierendes Ratio prüfen
+  my $sug_params = 0;               
+  my $p          = $num_inputs;
+  
+  for my $n (split /-/, $sug_arch) {
+      $sug_params += ($p + 1) * $n;
+      $p = $n;
+  }
+  
+  $sug_params  += $p + 1;
+  my $sug_ratio = $split_index / ($sug_params || 1);
+
+  if ($sug_ratio < 5) {                                                                             # Falls immer noch unter Ziel: eine Iteration kleiner
+      my @layers = map { max(8, int($_ * 0.6)) } split(/-/, $sug_arch);                             # Alle Schichten um Faktor 0.6 reduzieren
+      $sug_arch  = join ('-', @layers);
+      $sug_depth = scalar @layers;
+  }
+    
+  # --- Empfehlung Lernrate je nach Netztiefe
+  my $sug_lr = $sug_depth == 1 ? 0.0100                                                             # Empfohlene Lernrate je nach Netztiefe
+             : $sug_depth == 2 ? 0.0050
+             : $sug_depth == 3 ? 0.0030
+             :                   0.0015;
+
+  # --- Hinweise ausgeben
+  if ($cur_ratio > 20 && $epoch_code =~ /^(late|very_late|ok)$/) {                                  # Verhältnis zu hoch → Netz zu klein
+      push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
+      push @hints, sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;
+  }
+  elsif ($cur_ratio < 3 && $epoch_code eq 'overfit') {                                              # Verhältnis zu niedrig → Netz zu groß NUR bei gleichzeitigem Qualitätsproblem auslösen
+      push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
+      push @hints, sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;
+  } 
+  elsif ($sug_arch ne $hidden_layers                                                                # Vorschlag weicht deutlich ab, aber Ratio noch im Korridor
+       && ($cur_ratio < 6 || $cur_ratio > 18)
+       && $epoch_code ne 'ok') {
+    if ($cur_ratio > 18) {                                                                          # Netz zu klein für Datenmenge
+        push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
+        push @hints, sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;
+    }
+    else {                                                                                          # Netz zu komplex für Datenmenge
+        push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
+        push @hints, sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;
+    }
+}
+
+  if ($num_train_datasets > 6000) {                                                                 # Großes Dataset → TrainLimit vorschlagen
+      my $suggested_limit = max (2000, int ($num_train_datasets * 0.5 / 100) * 100);                # ~50%, auf 100 gerundet
+      push @hints, sprintf $epoche_translations{hint20}{$lang}, $num_train_datasets, $suggested_limit;
+  }
+
+return { hints => \@hints };
 }
 
 ################################################################################################
@@ -27203,7 +27413,7 @@ sub aiFannGetConResult {
       #debugLog ($paref, 'aiData', "AI FANN - Series data: ".Dumper @flat_targets);   
       #debugLog ($paref, 'aiData', "AI FANN - Lags: ".Dumper $lags);        
 
-      #if ($paref->{debug} =~ /aiData/xs) {
+      #if ($debug =~ /aiData/xs) {
       #    my $inpo = join ", \n", @new_input;
       #    Log3 ($name, 1, "$name DEBUG> AI AI FANN - hod: $hod - Normalized input dataset: \n".
       #                     $inpo);
@@ -27247,9 +27457,11 @@ sub aiFannGetConResult {
       ##########################
       my $confc_final = $alpha * $prediction + (1 - $alpha) * $intlegacyconfc;
       $confc_final    = round0 ($confc_final);
-      
-      debugLog ($paref, 'aiData', "AI FANN con fc - $starttime, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)");
-      
+ 
+      if ($debug =~ /aiData/xs) {
+          my $dthr = (split ':', $starttime, 2)[0];
+          Log3 ($name, 1, "$name DEBUG> AI FANN con fc - $dthr, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)");
+      }       
       
       # Daten speichern
       ###################
@@ -27284,7 +27496,6 @@ sub _aiFannPredict {
   my $maxval    = $data{$name}{neuralnet}{$fanntyp}{MaxVal};                                        # Target Denormalisierungsparameter
   my $fannModel = $data{$name}{neuralnet}{$fanntyp}{FannModel};
   
-  my $len = scalar (@$input);                                                                       # Anzahl Features 
   my $out;
   eval { $out = $fannModel->run ($input) };                                                         # Netz laufen lassen
   
@@ -27299,11 +27510,11 @@ sub _aiFannPredict {
       
       return (0, $bc, $zone);
   }
-                                                                 # Bias Correction
+                                                                 
   my $norm_val   = $out->[0];                                                                       # Ergebnis ist Arrayref mit num_outputs Werten
-  my $denorm_val = _aiFannDenormMinMaxValue   ($norm_val, $minval, $maxval);                        # Denormalisierung mit Min-Max                          
+  my $denorm_val = _aiFannDenormMinMaxValue ($norm_val, $minval, $maxval);                          # Denormalisierung mit Min-Max                          
   $denorm_val    = max (0, $denorm_val);                                                            # Untergrenze schützen
-
+    
 return $denorm_val;
 }
 
@@ -27444,10 +27655,29 @@ sub _aiFannApplyBiasCorrection {
   $clamped_drift_bias = 0                          if(!$drift_enabled);                         # Level-Skalierung Freischaltung              
   $res                = $res + $clamped_drift_bias if($is_baseline);                            # Drift-Bias nur auf Baseline anwenden (bei Freischaltung)
 
+  
+  # --- Statische Trainingskalibrierung (Peak-geschützt) ---                                    
+  # Korrigiert strukturellen Slope-Fehler aus dem Training.
+  # Wird nur auf Grundlast angewendet, nicht auf Peaks,
+  # da cal_slope > 1 Peaks sonst weiter amplifiziert.
+  my $cal_addon = 0;
+  
+  if ($is_baseline) {
+      my $cal_slope = $data{$name}{neuralnet}{$fanntyp}{CalSlope} // 1.0;
+      my $cal_bias  = $data{$name}{neuralnet}{$fanntyp}{CalBias}  // 0.0;
+      
+      if ($cal_slope != 1.0 || $cal_bias != 0.0) {
+          my $cal_val = $cal_slope * $res + $cal_bias;
+          my $maxval  = $data{$name}{neuralnet}{$fanntyp}{MaxVal} // $res;
+          $res        = max (0, min ($maxval, $cal_val));
+          $cal_addon  = 1;
+      }
+  }  
+  
   # --- Bias-Zonenlogik ---
   my $bias_zone = '-';
   
-  if ($is_baseline) {
+  if ($is_baseline && !$cal_addon) {
       if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {            # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
           my $soft_bias = $clamped_bias * $alpha_green;
           $res          = $res + $soft_bias;                                                    # nur additive Basiskorrektur, kein Slope!
@@ -27459,9 +27689,14 @@ sub _aiFannApplyBiasCorrection {
           $bias_zone    = 2;
       }
       else {
-          $bias_zone = 3;                                                                       # --- Zone 3: Rote Zone (Baseline erkannt, aber die Modellqualität ist zu schlecht, um eine additive Bias‑Korrektur zuzulassen)
+          $bias_zone = 3;                                                                       # --- Zone 3: Rote Zone (Baseline erkannt, aber die Modellqualität ist zu schlecht, um eine additive Bias-Korrektur zuzulassen)
       }  
-  }                                                                                             
+  }
+  elsif ($is_baseline && $cal_addon) {
+      $bias_zone = 3;                                                                           # keine additive Bias-Korrektur, StatCal hat bereits korrigiert
+  }
+
+  if ($cal_addon) { $bias_zone .= '+OSL' }                                                      # Anwendung OLS = Ordinary Least Squares = Methode der kleinsten Quadrate
 
   my $corr_val = $res - $val_predict;
 
@@ -27528,11 +27763,14 @@ sub aiFannDetectDrift {
       my $rmse_rel_model   = AiNeuralVal ($name, $fanntyp, 'RmseRel',   30);
       my $bias_model       = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
       my $slope_model      = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
+      
+      my $cal_slope        = AiNeuralVal ($name, $fanntyp, 'CalSlope', 1.0);
+      my $cal_bias         = AiNeuralVal ($name, $fanntyp, 'CalBias',  0.0);
 
       $nn->{DriftRefMae}   = $mae_model;
       $nn->{DriftRefRmse}  = $rmse_rel_model;
-      $nn->{DriftRefBias}  = $bias_model;
-      $nn->{DriftRefSlope} = $slope_model;                                                                  # V 2.6.2
+      $nn->{DriftRefBias}  = ($cal_slope != 1.0 || $cal_bias != 0.0) ? 0.0 : $bias_model;
+      $nn->{DriftRefSlope} = ($cal_slope != 1.0 || $cal_bias != 0.0) ? 1.0 : $slope_model;                 # V 2.6.2
       
       $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
       return $flag;
@@ -27983,7 +28221,7 @@ sub _aiFannSlopeBias {
   return {
       slope_regres => $slope,
       bias_regres  => $bias,
-      (defined $warning ? (warning => $warning) : ()),
+      ($warning ? (warning => $warning) : ()),
   };
 }
 
@@ -36706,13 +36944,13 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * small nets (e.g., 50-25) are quick and easy, but less accurate.  </ul>                                                                                </td></tr>
             <tr><td>                          </td><td><ul> * medium nets (64-32) offer a good compromise between speed and accuracy.  </ul>                                                                        </td></tr>
             <tr><td>                          </td><td><ul> * deep networks (64-32-16) recognize complex patterns better, but are more sensitive to outliers.  </ul>                                                </td></tr>
-            <tr><td>                          </td><td>value range:<b> XY[Y]-X[YY]-X[YY] (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                                 </td></tr>
+            <tr><td>                          </td><td>value range:<b> X[YY]-X[YY]-X[YY]... (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                              </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConLearnRate</b>    </td><td>Determines how strongly the weights of the neural network are adjusted at each training step.                                                                </td></tr>
             <tr><td>                          </td><td><ul> * small (e.g., 0.001): slow, stable learning; low risk of overshoot, but longer training time. </ul>                                                    </td></tr>
             <tr><td>                          </td><td><ul> * medium (e.g., 0.005): good compromise between speed and stability; often a sensible default value </ul>                                               </td></tr>
             <tr><td>                          </td><td><ul> * large (e.g., 0.05): fast learning, but risk of instability or divergence if the steps are too large </ul>                                             </td></tr>
-            <tr><td>                          </td><td>Values:<b> 0.05 | 0.01 | 0.001 - 0.005 </b>, default: 0.005                                                                                                  </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0.0001 - 0.05  </b>, default: 0.005                                                                                                               </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConBitFailLimit</b> </td><td>The bit-fail limit defines the error (within the normal range) at which a training example counts as an 'error'.                                             </td></tr>
             <tr><td>                          </td><td>The smaller the value, the more intense the training and the better the peaks are achieved. Larger values are more robust but less peak-sensitive.           </td></tr>
@@ -36751,6 +36989,10 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * RPROP works stably and automatically with customized step sizes, ideal for reliable training without many parameters </ul>                            </td></tr>
             <tr><td>                          </td><td><ul> * INCREMENTAL learns faster and reacts directly to each example, but is more sensitive to outliers. </ul>                                               </td></tr>
             <tr><td>                          </td><td>Values:<b> RPROP | INCREMENTAL </b>, default: INCREMENTAL                                                                                                    </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConTrainLimit</b>   </td><td>The specified number of the most recent training data records is used for training.                                                                          </td></tr>
+            <tr><td>                          </td><td>The default value of '0' uses all available data records.                                                                                                    </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0 or Integer >= 2000 </b>, default: 0                                                                                                             </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
        </table>
        </ul>
@@ -39783,13 +40025,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * kleine Netze (z.B. 50-25) sind schnell und einfach, aber weniger genau  </ul>                                                                         </td></tr>
             <tr><td>                          </td><td><ul> * mittlere Netze (64-32) bieten einen guten Kompromiss aus Geschwindigkeit und Genauigkeit  </ul>                                                       </td></tr>
             <tr><td>                          </td><td><ul> * tiefe Netze (64-32-16) erkennen komplexe Muster besser, sind aber empfindlicher gegenüber Ausreißern  </ul>                                           </td></tr>
-            <tr><td>                          </td><td>Wertebereich:<b> XY[Y]-X[YY]-X[YY] (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                                </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> X[YY]-X[YY]-X[YY]... (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                             </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConLearnRate</b>    </td><td>Bestimmt, wie stark die Gewichte des neuronalen Netzes bei jedem Traningsschritt angepasst werden.                                                           </td></tr>
             <tr><td>                          </td><td><ul> * Klein (z.B. 0.001): langsames, stabiles Lernen; geringes Risiko von Überschwingen, aber längere Trainingszeit. </ul>                                  </td></tr>
             <tr><td>                          </td><td><ul> * Mittel (z.B. 0.005): guter Kompromiss zwischen Geschwindigkeit und Stabilität; oft ein sinnvoller Standardwert </ul>                                  </td></tr>
             <tr><td>                          </td><td><ul> * Groß (z.B. 0.05): schnelles Lernen, aber Gefahr von Instabilität oder Divergenz, wenn die Schritte zu groß sind </ul>                                 </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0.05 | 0.01 | 0.001 - 0.005 </b>, default: 0.005                                                                                                   </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.0001 - 0.05 </b>, default: 0.005                                                                                                                 </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConBitFailLimit</b> </td><td>Das Bit-Fail-Limit definiert ab welchem Fehler (im Normbereich) ein Trainingsbeispiel als 'Fehler' zählt.                                                    </td></tr>
             <tr><td>                          </td><td>Je kleiner der Wert, desto strenger das Training und desto besser werden Peaks getroffen. Größere Werte sind robuster, aber weniger peak-sensitiv.           </td></tr>
@@ -39828,6 +40070,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * RPROP arbeitet stabil und automatisch mit angepassten Schrittweiten, ideal für zuverlässiges Training ohne viele Parameter </ul>                      </td></tr>
             <tr><td>                          </td><td><ul> * INCREMENTAL lernt schneller und reagiert direkt auf jedes Beispiel, ist aber empfindlicher gegenüber Ausreißern </ul>                                 </td></tr>
             <tr><td>                          </td><td>Werte:<b> RPROP | INCREMENTAL </b>, default: INCREMENTAL                                                                                                     </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConTrainLimit</b>   </td><td>Für das Training wird die angebene Anzahl der neuesten Traningsdatensätze verwendet.                                                                         </td></tr>
+            <tr><td>                          </td><td>Mit dem Standardwert '0' werden alle verfügbaren Datensätze verwendet.                                                                                       </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 oder Ganzzahl >= 2000 </b>, default: 0                                                                                                           </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
         </table>
         </ul>
