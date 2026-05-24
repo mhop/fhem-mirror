@@ -3,15 +3,12 @@
 package main;
 use strict;
 use warnings;
-use Data::Dumper;
 
 sub version_Initialize($$) {
 
   $cmds{version} = {  Fn => "CommandVersion",
                       Hlp=>"[<filter>|revision] [noheader],print SVN version of loaded modules"};
 }
-
-#use vars qw(@ret);
 
 #####################################
 sub
