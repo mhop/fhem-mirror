@@ -3,12 +3,15 @@
 package main;
 use strict;
 use warnings;
+use Data::Dumper;
 
 sub version_Initialize($$) {
 
   $cmds{version} = {  Fn => "CommandVersion",
                       Hlp=>"[<filter>|revision] [noheader],print SVN version of loaded modules"};
 }
+
+#use vars qw(@ret);
 
 #####################################
 sub
@@ -23,6 +26,7 @@ CommandVersion($$)
 
   my @ret;
   my $max = 0;
+  ($max,@ret) = version_getRevFromData($max,@ret);
   my $modpath = (exists($attr{global}{modpath}) ? $attr{global}{modpath} : "");
   my @files = map {$INC{$_}} keys %INC;
   push @files, $0; # path to fhem.pl
@@ -67,6 +71,13 @@ CommandVersion($$)
   @ret = map {/\$Id\: (\S+?) (\d+?) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z \S+?) \$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_} @ret;
   @ret = sort {version_sortModules($a, $b)} grep {($param ne "" ? /$param/ : 1)} @ret;
   return "no loaded modules found that match: $param" if($param ne "" && $param ne "revision" && !@ret);
+  my $ret = (((!$param && !$noheader) || $param eq "revision") ? $fhem_revision : "").
+          ($noheader || !@ret ? "" : sprintf("%-".$max."s %s","File","Rev   Last Change\n\n")).
+          trim(join("\n",  grep (($_ =~ /^fhem.pl|configDB.pm|\d\d_/), @ret))."\n\n".
+               join("\n",  grep (($_ !~ /^fhem.pl|configDB.pm|\d\d_/), @ret))
+          );
+  @ret = ();
+  return $ret;
   return (((!$param && !$noheader) || $param eq "revision") ? $fhem_revision : "").
          ($noheader || !@ret ? "" : sprintf("%-".$max."s %s","File","Rev   Last Change\n\n")).
          trim(join("\n",  grep (($_ =~ /^fhem.pl|configDB.pm|\d\d_/), @ret))."\n\n".
@@ -120,6 +131,20 @@ sub version_getRevFromControls(;$)
     }
   }
   return $revision;
+}
+
+sub version_getRevFromData {
+  my ($max,@ret) = @_;
+  return if (!exists $data{modules}{version});
+  foreach my $key (keys %{$data{modules}{version}}) {
+    my $rev = $data{modules}{version}{$key};
+    if($rev =~ /^\$Id\:[^\$\n\r].+\$/) {
+      $rev =~ s/\s.*\.pm/\ $key\.pm/;
+      push (@ret,$rev);
+      $max = length($key)+3 if($max < length($key)+3);
+    }
+  }
+  return ($max,@ret);
 }
 
 1;
