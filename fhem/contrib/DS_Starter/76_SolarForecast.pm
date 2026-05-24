@@ -917,6 +917,8 @@ my %epoche_translations = (
                DE => "Große Datenmenge (%d Datensätze gesamt): wenn saisonale Effekte die Prognosequalität beeinträchtigen, Training auf die neuesten Datensätze begrenzen (z.B. aiControl->aiConTrainLimit=%d) um das Modell auf aktuelle Verbrauchsmuster zu fokussieren" },
   hint21  => { EN => "Dataset too small (%d training records): at least %d records are needed for reliable training - collect more data before adjusting the architecture",
                DE => "Datenmenge zu gering (%d Trainingsdatensätze): für ein zuverlässiges Training werden mindestens %d Datensätze benötigt - zunächst mehr Daten sammeln bevor die Architektur angepasst wird" },  
+  hint22  => { EN => "With %d inputs and only %d training records the data-to-parameter ratio cannot reach the target range (8–20) with any reasonable architecture - increase aiConTrainLimit or collect more data before tuning the architecture further",
+               DE => "Mit %d Inputs und nur %d Trainingsdaten lässt sich das Daten-zu-Parameter-Verhältnis (Zielwert 8–20) mit keiner sinnvollen Architektur erreichen - aiConTrainLimit erhöhen oder mehr Daten sammeln bevor die Architektur weiter angepasst wird" },
 ); 
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -26016,12 +26018,6 @@ sub aiFannTrain {
   $ann->bit_fail_limit              ($bit_fail_limit);
   $ann->hidden_activation_steepness ($hidden_steepness);
   
-  #my @steepness = ($hidden_steepness, $hidden_steepness - 0.2, $hidden_steepness - 0.4);               # Hidden 1: schärfer, Hidden 2: glatter  ...
-  
-  #for my $i (1..$num_hidddenlays) {
-  #    $ann->layer_activation_steepness($i, max(0.1, $steepness[$i-1]));
-  #}
-  
   my @steepness_dyn;
   for my $i (0 .. $num_hidddenlays-1) {                                                                 # Dynamische Steepness-Liste für alle Hidden-Layer erzeugen
       my $s = $hidden_steepness - 0.2 * $i;
@@ -26389,7 +26385,8 @@ sub aiFannTrain {
                                               num_inputs         => $num_inputs,       
                                               split_index        => $split_index,      
                                               num_train_datasets => $num_train_datasets,
-                                              hidden_layers      => $hidden_layers,     
+                                              hidden_layers      => $hidden_layers, 
+                                              learning_rate      => $learning_rate,
                                               lang               => $paref->{lang},
                                             }
                                           );
@@ -26670,6 +26667,7 @@ sub _aiFannEpochDiagnostic {
   my $split_index        = $paref->{split_index};
   my $num_train_datasets = $paref->{num_train_datasets};
   my $hidden_layers      = $paref->{hidden_layers};
+  my $learning_rate      = $paref->{learning_rate};
   my $lang               = $paref->{lang};
 
   my $rel = $best_epoch / $num_epoch;
@@ -26692,7 +26690,10 @@ sub _aiFannEpochDiagnostic {
       $label = $epoche_translations{vearly}{$lang};
         
       push @hints, $epoche_translations{hint1}{$lang};
-      push @hints, $epoche_translations{hint2}{$lang};
+      
+      unless (defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7) {    # hint2 nur wenn kein totes Netz vorliegt
+          push @hints, $epoche_translations{hint2}{$lang};
+      }
         
       if ($best_epoch < 200) {
           push @hints, $epoche_translations{hint3}{$lang};
@@ -26764,6 +26765,7 @@ sub _aiFannEpochDiagnostic {
                                      num_train_datasets => $num_train_datasets,
                                      hidden_layers      => $hidden_layers,
                                      epoch_code         => $code,
+                                     learning_rate      => $learning_rate,
                                      lang               => $lang,
                                    });
 
@@ -26794,6 +26796,7 @@ sub __aiFannArchHint {
   my $num_train_datasets = $paref->{num_train_datasets} // 0;
   my $hidden_layers      = $paref->{hidden_layers}      // '';
   my $epoch_code         = $paref->{epoch_code}         // 'ok';
+  my $learning_rate      = $paref->{learning_rate};
   my $lang               = $paref->{lang}               // 'EN';
   
   my @hints;
@@ -26823,8 +26826,9 @@ sub __aiFannArchHint {
 
   my @nice   = (8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128);                                        # Erste Hidden-Schicht: sqrt(target_params), begrenzt auf num_inputs
   my $raw_h1 = int (sqrt ($target_params));
+  my $min_h1 = max (8, int ($num_inputs / 8));                                                      # Input-abhängiger Mindestboden
+  $raw_h1    = max ($raw_h1, $min_h1);                  
   $raw_h1    = $num_inputs if $raw_h1 > $num_inputs;
-  $raw_h1    = 8 if $raw_h1 < 8;
 
   my $sug_h1 = (sort { abs($a - $raw_h1) <=> abs($b - $raw_h1) } @nice)[0];                         # Auf nächsten "schönen" Wert runden
 
@@ -26888,25 +26892,37 @@ sub __aiFannArchHint {
              : $sug_depth == 3 ? 0.0030
              :                   0.0015;
 
-  # --- Hinweise ausgeben
+  # Strukturelles Datenproblem: zu wenige Daten für die Inputanzahl
+  my $min_params = ($num_inputs + 1) * 8 + 9;                                                       # minimalste 1-Layer-Architektur mit 8 Neuronen
+  
+  if ($split_index / ($min_params || 1) < 5) {
+      push @hints, sprintf $epoche_translations{hint22}{$lang}, $num_inputs, $split_index;
+      return { hints => \@hints };                                                                  # weitere Architekturhinweise sinnlos
+  }
+  
+  my $lr_hint = (defined $learning_rate && abs($sug_lr - $learning_rate) < 0.0001)                  # Hilfssub-äquivalent: hint19 nur ausgeben wenn Empfehlung von aktueller LR abweicht
+                ? ''
+                : sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;  
+  
+  # --- Hinweise ausgeben  
   if ($cur_ratio > 20 && $epoch_code =~ /^(late|very_late|ok)$/) {                                  # Verhältnis zu hoch → Netz zu klein
       push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
-      push @hints, sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;
+      push @hints, $lr_hint if $lr_hint;                                                            # einfügen Hilfssub-äquivalent: hint19
   }
   elsif ($cur_ratio < 3 && $epoch_code eq 'overfit') {                                              # Verhältnis zu niedrig → Netz zu groß NUR bei gleichzeitigem Qualitätsproblem auslösen
       push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
-      push @hints, sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;
+      push @hints, $lr_hint if $lr_hint;                                                            # einfügen Hilfssub-äquivalent: hint19
   } 
   elsif ($sug_arch ne $hidden_layers                                                                # Vorschlag weicht deutlich ab, aber Ratio noch im Korridor
        && ($cur_ratio < 6 || $cur_ratio > 18)
        && $epoch_code ne 'ok') {
     if ($cur_ratio > 18) {                                                                          # Netz zu klein für Datenmenge
         push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
-        push @hints, sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;
+        push @hints, $lr_hint if $lr_hint;                                                          # einfügen Hilfssub-äquivalent: hint19
     }
     else {                                                                                          # Netz zu komplex für Datenmenge
         push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
-        push @hints, sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;
+        push @hints, $lr_hint if $lr_hint;                                                          # einfügen Hilfssub-äquivalent: hint19
     }
 }
 
