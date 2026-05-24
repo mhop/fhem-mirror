@@ -29,7 +29,6 @@ sub ::MiniSIP_Initialize { goto &Initialize}
 
 sub Initialize($) {
   my ($hash) = @_;
-  $hash->{Version}     = '$Rev$';
   $hash->{parseParams} = 1;
   $hash->{DefFn}       = \&FHEM::Core::MiniSIP::Define;
   $hash->{ReadFn}      = \&FHEM::Core::MiniSIP::Read;

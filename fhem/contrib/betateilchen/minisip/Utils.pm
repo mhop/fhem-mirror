@@ -40,6 +40,7 @@ our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 use GPUtils         qw(:all);
 BEGIN {
     GP_Import( qw(
+        data
         AttrVal
         Log3
         Debug
@@ -51,6 +52,11 @@ BEGIN {
       )
     );
 };
+
+my $p = __PACKAGE__;
+$data{modules}{version}{$p} =
+'$Id$';
+
 
 ###------------------------------------------------------------------
 #
