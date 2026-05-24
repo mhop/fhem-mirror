@@ -62,8 +62,7 @@ BEGIN {
 }
 
 my $p = __PACKAGE__;
-$data{modules}{version}{$p} =
-'$Id$';
+$::data{modules}{version}{$p} = '$Id$';
 
 sub Define {
   my ($hash, $a, $h) = @_; #parseParams
