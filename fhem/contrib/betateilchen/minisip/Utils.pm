@@ -169,6 +169,7 @@ sub restore_peers {
   _log3($hash,4,"restore peers");
 
   my $peers  = getKeyValue($name);
+  return unless (defined($peers));
      $peers  = decode_json($peers);
 
   my %p = ();

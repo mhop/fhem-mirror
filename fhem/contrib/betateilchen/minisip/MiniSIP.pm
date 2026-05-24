@@ -22,7 +22,6 @@ package FHEM::Core::MiniSIP;
 
 use strict;
 use warnings;
-use POSIX qw(strftime);
 use MIME::Base64;
 use Data::Dumper;
 use Socket;
@@ -56,6 +55,7 @@ BEGIN {
 		  Log3
       contains_string
       readingsSingleUpdate
+      setKeyValue
       toJSON
       )
 	);
