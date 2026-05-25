@@ -3840,6 +3840,7 @@ FW_log($$)
   <a id="FHEMWEB-get"></a>
   <b>Get</b>
   <ul>
+    <a id="FHEMWEB-get-icon"></a>
     <li>icon &lt;logical icon&gt;<br>
         returns the absolute path to the logical icon. Example:
         <ul>
@@ -3848,6 +3849,7 @@ FW_log($$)
           </code>
         </ul>
         </li>
+    <a id="FHEMWEB-get-pathlist"></a>
     <li>pathlist<br>
         return FHEMWEB specific directories, where files for given types are
         located</li>
