@@ -1,18 +1,38 @@
 # $Id$
 
-package main;
+package FHEM::version;
 use strict;
 use warnings;
 
-sub version_Initialize($$) {
+# export required functions (easy way)
+sub ::version_Initialize { goto &Initialize }
+sub ::CommandVersions    { goto &CommandVersions }
 
-  $cmds{version} = {  Fn => "CommandVersion",
-                      Hlp=>"[<filter>|revision] [noheader],print SVN version of loaded modules"};
+use GPUtils qw(GP_Import);
+# Import from main context
+BEGIN {
+	GP_Import(
+	 qw(attr
+	    cmds
+	    data
+	    cfgDB_Fileversion
+	    configDBUsed
+	    trim
+	    FileRead
+	    Log3)
+	);
 }
 
 #####################################
+
+sub Initialize($$) {
+
+  $cmds{versions} = {  Fn => "CommandVersions",
+                      Hlp=>"[<filter>|revision] [noheader],print SVN version of loaded modules"};
+}
+
 sub
-CommandVersion($$)
+CommandVersions($$)
 {
   my ($cl, $param) = @_;
 
@@ -23,7 +43,11 @@ CommandVersion($$)
 
   my @ret;
   my $max = 0;
-  ($max,@ret) = version_getRevFromData($max,@ret);
+  
+  # get version infos from packaged modules
+  ($max,@ret) = getRevFromData($max,@ret);
+
+  # get version infos from modules
   my $modpath = (exists($attr{global}{modpath}) ? $attr{global}{modpath} : "");
   my @files = map {$INC{$_}} keys %INC;
   push @files, $0; # path to fhem.pl
@@ -35,7 +59,7 @@ CommandVersion($$)
     my $mod_name = ($fn=~ /[\/\\]([^\/\\]+)$/ ? $1 : $fn);
     next if($param ne "" && $mod_name !~ /$param/);
     next if(grep(/$mod_name/, @ret));
-    Log 4, "Looking for SVN Id in module $mod_name";
+    Log3 (undef,4,"version: Looking for SVN Id in module $mod_name");
 
     $max = length($mod_name) if($max < length($mod_name));
 
@@ -44,7 +68,7 @@ CommandVersion($$)
     if(!open(FH, $fn)) {
       $line = "$fn: $!";
       if(configDBUsed()){
-        Log 4, "Looking for module $mod_name in configDB to find SVN Id";
+        Log3(undef,4,"Looking for module $mod_name in configDB to find SVN Id");
         $line = cfgDB_Fileversion($fn,$line);
       }
     } else {
@@ -61,12 +85,13 @@ CommandVersion($$)
     push @ret, $line;
   }
 
-  my $fhem_revision = version_getRevFromControls();
+  # get FHEM revision
+  my $fhem_revision = getRevFromControls();
 
   $fhem_revision = "Latest Revision: $fhem_revision\n\n" if(defined($fhem_revision) && !$noheader);
 
   @ret = map {/\$Id\: (\S+?) (\d+?) (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z \S+?) \$/ ? sprintf("%-".$max."s %5d %s",$1,$2,$3) : $_} @ret;
-  @ret = sort {version_sortModules($a, $b)} grep {($param ne "" ? /$param/ : 1)} @ret;
+  @ret = sort {sortModules($a, $b)} grep {($param ne "" ? /$param/ : 1)} @ret;
   return "no loaded modules found that match: $param" if($param ne "" && $param ne "revision" && !@ret);
   my $ret = (((!$param && !$noheader) || $param eq "revision") ? $fhem_revision : "").
           ($noheader || !@ret ? "" : sprintf("%-".$max."s %s","File","Rev   Last Change\n\n")).
@@ -75,15 +100,10 @@ CommandVersion($$)
           );
   @ret = ();
   return $ret;
-  return (((!$param && !$noheader) || $param eq "revision") ? $fhem_revision : "").
-         ($noheader || !@ret ? "" : sprintf("%-".$max."s %s","File","Rev   Last Change\n\n")).
-         trim(join("\n",  grep (($_ =~ /^fhem.pl|configDB.pm|\d\d_/), @ret))."\n\n".
-              join("\n",  grep (($_ !~ /^fhem.pl|configDB.pm|\d\d_/), @ret))
-             );
 }
 
 #####################################
-sub version_sortModules($$)
+sub sortModules($$)
 {
     my ($a, $b) = @_;
 
@@ -109,7 +129,7 @@ sub version_sortModules($$)
     return uc($a_vals[0]) cmp uc($b_vals[0]);
 }
 
-sub version_getRevFromControls(;$)
+sub getRevFromControls(;$)
 {
   my ($name) = @_;
   $name //= "fhem";
@@ -117,7 +137,7 @@ sub version_getRevFromControls(;$)
   my $filename = (-e "./$cf") ? "./$cf" : AttrVal("global","modpath",".")."/FHEM/$cf";
   my ($err, @content) = FileRead({FileName => $filename, ForceType => "file"});
   if ($err) {
-    Log 3, "version: unable to open $filename: $err";
+    Log3(undef,3,"version: unable to open $filename: $err");
     return undef;
   }
   my $revision;
@@ -130,7 +150,7 @@ sub version_getRevFromControls(;$)
   return $revision;
 }
 
-sub version_getRevFromData {
+sub getRevFromData {
   my ($max,@ret) = @_;
   return if (!exists $data{modules}{version});
   foreach my $key (keys %{$data{modules}{version}}) {
