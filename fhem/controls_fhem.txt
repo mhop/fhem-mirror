@@ -1,8 +1,8 @@
-REV 31267
+REV 31278
 DIR unused
 UPD 2026-05-23_07:45:04 457064 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2026-04-13_07:45:04 48008 ./MAINTAINER.txt
+UPD 2026-05-25_07:45:04 48068 ./MAINTAINER.txt
 UPD 2026-01-30_07:45:03 47178 ./configDB.pm
 UPD 2023-05-29_07:45:03 21936 ./fhem.cfg.demo
 UPD 2026-03-22_07:45:18 175848 ./fhem.pl
@@ -577,7 +577,7 @@ UPD 2017-03-13_07:45:02 7818 FHEM/98_template.pm
 UPD 2026-02-17_07:45:03 95336 FHEM/98_todoist.pm
 UPD 2024-03-23_07:45:02 24224 FHEM/98_update.pm
 UPD 2017-07-14_07:45:02 1921 FHEM/98_uptime.pm
-UPD 2022-10-29_07:45:03 8074 FHEM/98_version.pm
+UPD 2026-05-25_07:45:04 8904 FHEM/98_version.pm
 UPD 2026-05-06_07:45:04 311997 FHEM/98_vitoconnect.pm
 UPD 2023-01-08_07:45:03 8583 FHEM/98_weblink.pm
 UPD 2025-05-19_07:45:03 78968 FHEM/98_weekprofile.pm
@@ -770,8 +770,8 @@ UPD 2026-05-23_07:45:12 5549224 docs/commandref.html
 UPD 2026-05-23_07:45:16 3538120 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-05-24_07:45:17 329755 docs/commandref_modular.html
-UPD 2026-05-24_07:45:18 341592 docs/commandref_modular_DE.html
+UPD 2026-05-25_07:45:17 329755 docs/commandref_modular.html
+UPD 2026-05-25_07:45:18 341592 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
