@@ -87,7 +87,7 @@ sub Define {
   $hash->{FD} = $fh;
   $selectlist{$fh} = $hash;
 
-  restore_peers($hash);
+  #FHEM::MiniSIP::Utils::restore_peers($hash);
   
   readingsSingleUpdate($hash,'state','initialized',1);
   $modules{MiniSIP}{inUse} = 1;
@@ -127,11 +127,10 @@ sub Set {
        $msg  = $data{$payload};
     }
 
-#    Debug "sendmsg hash $peer $msg";
     sendmsg($hash,$peer,$msg);
   }
-  if( $a->[1] eq 'backup_peers' )  { backup_peers($hash); }
-  if( $a->[1] eq 'restore_peers' ) { restore_peers($hash); }
+  if( $a->[1] eq 'backup_peers' )  { FHEM::MiniSIP::Utils::backup_peers($hash); }
+  if( $a->[1] eq 'restore_peers' ) { FHEM::MiniSIP::Utils::restore_peers($hash); }
 
   return undef;
 }
@@ -139,20 +138,26 @@ sub Set {
 sub Get {
   my ($hash,$a,$h) = @_;
   my $name = $hash->{NAME};
-  my %cmd = ("peers" => ":table,json",);
+  my %cmd = ("peer"  => "",
+             "peers" => ":table,json",
+            );
 
   return ("Unknown argument $a->[1], choose one of ".
         join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
     if(!defined($cmd{$a->[1]}));
 
   if( $a->[1] eq 'peers' ) {
-    if (!havepeer($hash)) {
+    if (!havepeer($hash,undef)) {
       return "no peer registered";
     } elsif (lc($a->[2]) eq 'table') {
-      return makeTable($hash,$hash->{peers});
+      return FHEM::MiniSIP::Utils::makeTable($hash,$hash->{peers});
     } elsif (lc($a->[2]) eq 'json') {
       return toJSON($hash->{peers});
     }
+  }
+  if( $a->[1] eq 'peer' ) {
+    return "no peer given" unless $a->[2];
+    return getpeer($hash,$a->[2]);
   }
 }
 
@@ -179,7 +184,7 @@ sub Delete {
 sub Shutdown {
   my ($hash) = @_;
   _log3($hash,4,"ShutdownFn called");
-  backup_peers($hash);
+  FHEM::MiniSIP::Utils::backup_peers($hash);
 }
 
 ###------------------------------------------------------------------
@@ -188,14 +193,23 @@ sub sendmsg {
   my ($hash,$peer,$msg) = @_;
   my $name = $hash->{NAME};
 
-  my $count = scalar keys %{$hash->{peers}};
-  if (!$count) {
-    _log3($hash,1,"no peer registered");
-    return;
-  } elsif (!defined($hash->{peers}->{$peer})) {
-    _log3($hash,1,"$name: unknown peer >$peer<");
-    return;
+#  my $count = scalar keys %{$hash->{peers}};
+#  if (!$count) {
+#    _log3($hash,1,"no peer registered");
+#    return;
+#  } elsif (!defined($hash->{peers}->{$peer})) {
+#    _log3($hash,1,"$name: unknown peer >$peer<");
+#    return;
+#  }
+
+  if (!havepeer($hash,undef)) {
+    return _log3($hash,1,"no peer registered");
+#    return;
+  } elsif (!havepeer($hash,$peer)) {
+    return _log3($hash,1,"$name: unknown peer >$peer<");
+#    return;
   }
+
 
   (AttrVal($name,'logFullMessage',0))?  
     _log3($hash,4,"out to $peer:\n$msg"):
@@ -241,15 +255,15 @@ sub processmsg {
     return; # end processing if 200 OK received as response
   }
 
-  my ($peer,$ip,$port) = extract_peer($hash,$pkt,0);
+  my ($peer,$ip,$port) = FHEM::MiniSIP::Utils::extract_peer($hash,$pkt,0);
 
   if ($method eq 'REGISTER') {
-    savepeer($hash,$pkt);
+    FHEM::MiniSIP::Utils::savepeer($hash,$pkt);
   }
 
   my @known_methods = qw(REGISTER INVITE BYE MESSAGE SUBSCRIBE);
   if (contains_string($method,@known_methods)) {
-    my $resp = build_200_short($hash,$pkt);
+    my $resp = FHEM::MiniSIP::Utils::build_200_short($hash,$pkt);
     sendmsg($hash,$peer,$resp->as_string);
   }
 

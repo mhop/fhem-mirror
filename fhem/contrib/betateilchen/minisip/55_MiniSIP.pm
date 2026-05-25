@@ -25,7 +25,7 @@ use warnings;
 
 require FHEM::Core::MiniSIP;
 
-sub ::MiniSIP_Initialize { goto &Initialize}
+sub ::MiniSIP_Initialize { goto &Initialize }
 
 sub Initialize($) {
   my ($hash) = @_;
@@ -113,7 +113,8 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
 			Used to backup all registered peers into FHEM keystore.<br>
 			<br>
 			Will be called automatically on FHEM shutdown.
-		</li><br>
+		</li>
+		<br>
 		<a id="MiniSIP-set-restore_peers"></a>
 		<li><b>restore_peers</b><br>
 			Used to restore peers from FHEM keystore.<br>
@@ -123,7 +124,8 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
 			<li>- peer not registered already</li>
 			</ul><br>
 			Will be called automatically on FHEM start.
-		</li><br>
+		</li>
+		<br>
 		<a id="MiniSIP-set-sendmsg"></a>
 		<li><b>sendmsg</b><br>
 			Will be <br>
@@ -137,8 +139,13 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
   <b>Get</b>
   <br><br>
   <ul>
+		<a id="MiniSIP-get-peer"></a>
+		<li><b>peer &lt;peerName&gt;</b><br>
+			Returns peer data for a given peer if the peer exists.
+		</li>
+		<br>
 		<a id="MiniSIP-get-peers"></a>
-		<li>peers [table|json]<br>
+		<li><b>peers [table|json]</b><br>
 			Returns the list of all registered peers.
 		</li>
   </ul>
@@ -158,27 +165,27 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
       Default: 0 (short message)<br>
       <br>
       Note: logging will use loglevel 4 except for errors.
-    </li><br>
-
+    </li>
+    <br>
     <a id="MiniSIP-attr-showFullMessage"></a>
     <li><b>showFullMessage</b> 0|1<br>
       Decides wether the full SIP message will be shown in reading,<br>
       otherwise only the infoline will be stored in a reading.<br>
       Default: 0 (short message)
-    </li><br>
-
+    </li>
+    <br>
     <a id="MiniSIP-attr-parseFn"></a>
     <li><b>parseFn</b><br>
       Defines the name of an alternative function used to parse<br>
-      incoming MESSAGE requests.<br> This function should return<br>
+      incoming MESSAGE requests. This function should return <br>
       a valid value for the reading "input".<br>
       <br>
       <b>The attribut value should contain a package name!</b><br>
       e.g. a function named 'sipParser' in 99_myUtils.pm should be given as<br>
       <br>
       <code>attr &lt;device&gt; parseFn main::sipParser</code><br>
-    </li><br>
-
+    </li>
+    <br>
   </ul>
   <br>
 
@@ -188,13 +195,16 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
     <li><b>input</b><br>
       Contains the input value found in either INVITE or MESSAGE request.
     </li><br>
-    <li><b>state</b><br>
+    <li><b>state</b>
+    <br>
       Contains the input value found in either INVITE or MESSAGE request.
-    </li><br>
+    </li>
+    <br>
     <li><b>REGISTER | INVITE | MESSAGE | SUBSCRIBE | BYE</b><br>
       Contains the SIP message from corresponding request either<br>
       in short or full format, depending on attr 'showFullMessage'.<br>
-    </li><br>
+    </li>
+    <br>
   </ul>
   <br>
 

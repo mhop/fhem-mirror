@@ -26,14 +26,9 @@ use JSON::XS;
 use Data::Dumper;
 
 use Exporter ('import');
-our @EXPORT_OK = qw( _log3 
-                     build_200_short
-                     backup_peers
-                     restore_peers
-                     extract_peer
+our @EXPORT_OK = qw( _log3
+                     getpeer
                      havepeer
-                     savepeer
-                     makeTable
                  );
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
@@ -81,9 +76,47 @@ sub _log3 {
 
 ###------------------------------------------------------------------
 #
-# sub parsemsgbody($hash,$peer,$body) (exported)
+# sub getpeer($hash,$peer) (exported)
 #
-# log extended data based on Log3 syntax
+# get peer data, returns json string
+#
+###------------------------------------------------------------------
+
+sub getpeer {
+  my ($hash,$peer) = @_;
+  return toJSON($hash->{peers}->{$peer}) if exists($hash->{peers}->{$peer});
+  my $err = "MiniSIP: peer $peer does not exist";
+  _log3($hash,1,$err);
+  return $err;
+}
+
+###------------------------------------------------------------------
+#
+# sub havepeer($hash;$peer) (exported)
+# 
+# if optional parameter $peer given: check if $peer is registered,
+# return corresponding state of $peer
+#
+# if optional parameter $peer missing: 
+# return current number of registerd peers
+#
+###------------------------------------------------------------------
+
+sub havepeer {
+	my ($hash,$peer) = @_;
+	my $havepeer = 0;
+
+	if (defined($peer) && $peer ne '') {
+		$havepeer = defined($hash->{peers}->{$peer});
+	} else {
+		$havepeer = scalar keys %{$hash->{peers}};
+	}
+	return $havepeer;
+}
+
+###------------------------------------------------------------------
+#
+# sub parsemsgbody($hash,$peer,$body)
 #
 ###------------------------------------------------------------------
 
@@ -120,7 +153,6 @@ sub parsemsgbody {
 # build a simple '200 OK' message from incoming packet
 #
 ###------------------------------------------------------------------
-
 
 sub build_200_short {
 	my ($hash,$req) = @_;
@@ -203,30 +235,6 @@ sub restore_peers {
 
 ###------------------------------------------------------------------
 #
-# sub havepeer($hash;$peer) (exported)
-# 
-# if optional parameter $peer given: check if $peer is registered,
-# return corresponding state of $peer
-#
-# if optional parameter $peer missing: 
-# return current number of registerd peers
-#
-###------------------------------------------------------------------
-
-sub havepeer {
-	my ($hash,$peer) = @_;
-	my $havepeer = 0;
-
-	if (defined($peer) && $peer ne '') {
-		$havepeer = defined($hash->{peers}->{$peer});
-	} else {
-		$havepeer = scalar keys %{$hash->{peers}};
-	}
-	return $havepeer;
-}
-
-###------------------------------------------------------------------
-#
 # sub savepeer($hash,$pkt)
 # 
 # save registered peer into $hash
@@ -294,7 +302,7 @@ sub extract_peer {
 
 ###------------------------------------------------------------------
 #
-# sub makeTableFromPeers()
+# sub makeTable()
 #
 # make table from hash for peers
 # based on HTML::HashTable
