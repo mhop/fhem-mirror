@@ -1,12 +1,10 @@
 # $Id$
 
-package FHEM::version;
+package FHEM::versions;
 use strict;
 use warnings;
 
-# export required functions (easy way)
 sub ::version_Initialize { goto &Initialize }
-sub ::CommandVersions    { goto &CommandVersions }
 
 use GPUtils qw(GP_Import);
 # Import from main context
@@ -24,10 +22,16 @@ BEGIN {
 }
 
 #####################################
+#
+# 2026-05-25
+# command is registered as "versions" now
+# since FHEM can handle short commands, 
+# "version" should work as well-known
+#
 
 sub Initialize($$) {
 
-  $cmds{versions} = {  Fn => "CommandVersions",
+  $cmds{versions} = {  Fn => "FHEM::versions::CommandVersions",
                       Hlp=>"[<filter>|revision] [noheader],print SVN version of loaded modules"};
 }
 
