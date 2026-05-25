@@ -64,10 +64,11 @@ __END__
 <br><br>
 This FHEM module allows you to create a SIP endpoint capable of  
 processing incoming SIP messages and events.<br>
-This enables you to trigger specific actions by sending some codes from 
+It enables you to trigger specific actions by sending some codes from 
 a registered VoIP phone.<br>
+Furthermore you can send a SIP message to a registered peer.<br>
 <br>
-Two methods are available for receiving such codes:
+Two methods are available for receiving data from sip peers:
 <ul>
   <li><b>Method 1:</b> Simply dialing a 'number' e.g. **55<br>
   This message arrives as a SIP INVITE and generates a value for the 'input' reading.<br>
@@ -137,7 +138,66 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
 		  <br>
 			<code>set &lt;deviceName&gt; sendmsg peer=&lt;peerName&gt; type=&lt;data|base64&gt; msg=&lt;payload&gt;</code><br>
 			<br>
-			... to be completed ...<br>
+
+      This command allows you to send a SIP message to a SIP peer.<br>
+      Two options are available for passing the message:<br>
+      <br>
+      <b>1. type=data (highly recommended!)</b><br>
+      <br>
+      In this case, the generated SIP message is stored in the `%data` hash<br>
+      within FHEM, and the key used to retrieve the data from the hash<br>
+      is passed as a parameter.<br>
+      <br>
+      <b>Example:</b><pre><code>
+my $res = Net::SIP::Response->new(
+  200,
+  'OK',
+  { 'Via'            => [ $req->get_header('Via') ],
+    'From'           => $req->get_header('From'),
+    'To'             => $req->get_header('To'),
+    'Call-ID'        => $req->get_header('Call-ID'),
+    'CSeq'           => $req->get_header('CSeq'),
+    'Contact'        => $req->get_header('Contact'),
+    'Expires'        => 300,
+    'Content-Length' => '0',
+  }
+);
+
+my $uuid = createUniqueId();
+$data{$uuid} = $res->as_string;
+fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=data msg=$uuid");
+</code></pre>
+<br>
+      <b>2. type=base64</b><br>
+      <br>
+      In this case, the generated SIP message is transferred<br>
+      as a base64-coded string without newLine<br>
+      <br>
+      <b>Example:</b><pre><code>
+my $res = Net::SIP::Response->new(
+  200,
+  'OK',
+  { 'Via'            => [ $req->get_header('Via') ],
+    'From'           => $req->get_header('From'),
+    'To'             => $req->get_header('To'),
+    'Call-ID'        => $req->get_header('Call-ID'),
+    'CSeq'           => $req->get_header('CSeq'),
+    'Contact'        => $req->get_header('Contact'),
+    'Expires'        => 300,
+    'Content-Length' => '0',
+  }
+);
+
+# use base64 for transfer with "set ... sendmsg"
+# Important: trailing == must not be transferred!
+#
+my $msg = encode_base64($res->as_string,"");
+$msg =~ s/=//g;
+fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=base64 msg=$msg");
+</code></pre>
+
+
+      <br><br>
 		</li>
 		<br/>
   </ul>
@@ -173,7 +233,7 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
     <li><a href="#disabledForIntervals">disabledForIntervals</a></li><br>
 
     <a id="MiniSIP-attr-logFullMessage"></a>
-    <li><b>logFullMessage</b> 0|1<br>
+    <li><b>logFullMessage</b><br>
 		  <br>
 			<code>attr &lt;deviceName&gt; logFullMessage 0|1</code><br>
 			<br>
@@ -185,7 +245,7 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
     </li>
     <br>
     <a id="MiniSIP-attr-showFullMessage"></a>
-    <li><b>showFullMessage</b> 0|1<br>
+    <li><b>showFullMessage</b><br>
 		  <br>
 			<code>attr &lt;deviceName&gt; showFullMessage 0|1</code><br>
 			<br>
@@ -219,17 +279,15 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
       <br>
       Contains the input value found in either INVITE or MESSAGE request.
     </li><br>
-    <li><b>state</b>
-    <br>
-      Contains the input value found in either INVITE or MESSAGE request.
+    <li><b>state</b><br>
       <br>
-    </li>
-    <br>
+      Contains some more or less useful informations about current state.
+    </li><br>
     <li><b>REGISTER | INVITE | MESSAGE | SUBSCRIBE | BYE</b><br>
+      <br>
       Contains the SIP message from corresponding request either<br>
       in short or full format, depending on attr 'showFullMessage'.
-      <br>
-    </li>
+    </li><br>
     <br>
   </ul>
   <br>
