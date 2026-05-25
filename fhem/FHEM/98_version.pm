@@ -14,6 +14,7 @@ BEGIN {
 	    cmds
 	    data
 	    cfgDB_Fileversion
+      cfgDB_svnId
 	    configDBUsed
 	    trim
 	    FileRead
