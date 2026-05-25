@@ -17,6 +17,7 @@ BEGIN {
       cfgDB_svnId
 	    configDBUsed
 	    trim
+	    AttrVal
 	    FileRead
 	    Log3)
 	);
