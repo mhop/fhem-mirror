@@ -110,6 +110,9 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
   <ul>
 		<a id="MiniSIP-set-backup_peers"></a>
 		<li><b>backup_peers</b><br>
+		  <br>
+			<code>set &lt;deviceName&gt; backup_peers</code><br>
+			<br>
 			Used to backup all registered peers into FHEM keystore.<br>
 			<br>
 			Will be called automatically on FHEM shutdown.
@@ -117,6 +120,9 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
 		<br>
 		<a id="MiniSIP-set-restore_peers"></a>
 		<li><b>restore_peers</b><br>
+		  <br>
+			<code>set &lt;deviceName&gt; restore_peers</code><br>
+			<br>
 			Used to restore peers from FHEM keystore.<br>
 			A peer will only be restored if
 			<ul>
@@ -128,8 +134,10 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
 		<br>
 		<a id="MiniSIP-set-sendmsg"></a>
 		<li><b>sendmsg</b><br>
-			Will be <br>
-			documented later.
+		  <br>
+			<code>set &lt;deviceName&gt; sendmsg peer=&lt;peerName&gt; type=&lt;data|base64&gt; msg=&lt;payload&gt;</code><br>
+			<br>
+			... to be completed ...<br>
 		</li>
 		<br/>
   </ul>
@@ -140,12 +148,18 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
   <br><br>
   <ul>
 		<a id="MiniSIP-get-peer"></a>
-		<li><b>peer &lt;peerName&gt;</b><br>
+		<li><b>peer</b><br>
+		  <br>
+			<code>get &lt;deviceName&gt; peer &lt;peerName&gt;</code><br>
+			<br>
 			Returns peer data for a given peer if the peer exists.
 		</li>
 		<br>
 		<a id="MiniSIP-get-peers"></a>
-		<li><b>peers [table|json]</b><br>
+		<li><b>peers</b><br>
+		  <br>
+			<code>get &lt;deviceName&gt; peers [table|json]</code><br>
+			<br>
 			Returns the list of all registered peers.
 		</li>
   </ul>
@@ -160,6 +174,9 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
 
     <a id="MiniSIP-attr-logFullMessage"></a>
     <li><b>logFullMessage</b> 0|1<br>
+		  <br>
+			<code>attr &lt;deviceName&gt; logFullMessage 0|1</code><br>
+			<br>
       Decides wether the full SIP message will be logged,<br>
       otherwise only the infoline will be logged.<br>
       Default: 0 (short message)<br>
@@ -169,6 +186,9 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
     <br>
     <a id="MiniSIP-attr-showFullMessage"></a>
     <li><b>showFullMessage</b> 0|1<br>
+		  <br>
+			<code>attr &lt;deviceName&gt; showFullMessage 0|1</code><br>
+			<br>
       Decides wether the full SIP message will be shown in reading,<br>
       otherwise only the infoline will be stored in a reading.<br>
       Default: 0 (short message)
@@ -176,6 +196,9 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
     <br>
     <a id="MiniSIP-attr-parseFn"></a>
     <li><b>parseFn</b><br>
+		  <br>
+			<code>attr &lt;deviceName&gt; parseFn &lt;functionName&gt;</code><br>
+			<br>
       Defines the name of an alternative function used to parse<br>
       incoming MESSAGE requests. This function should return <br>
       a valid value for the reading "input".<br>
@@ -193,21 +216,24 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
   <br><br>
   <ul>
     <li><b>input</b><br>
+      <br>
       Contains the input value found in either INVITE or MESSAGE request.
     </li><br>
     <li><b>state</b>
     <br>
       Contains the input value found in either INVITE or MESSAGE request.
+      <br>
     </li>
     <br>
     <li><b>REGISTER | INVITE | MESSAGE | SUBSCRIBE | BYE</b><br>
       Contains the SIP message from corresponding request either<br>
-      in short or full format, depending on attr 'showFullMessage'.<br>
+      in short or full format, depending on attr 'showFullMessage'.
+      <br>
     </li>
     <br>
   </ul>
   <br>
-
+  <br>
 </ul>
 
 =end html
