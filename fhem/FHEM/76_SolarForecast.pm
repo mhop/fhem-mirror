@@ -163,9 +163,19 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
+                           "aiFannGetConResult: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
+                           "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
+                           "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ".
+                           "Fix Bat Prognose < 100% wenn Bat voll und PVü > Con, safetyMargin default: 20:20 gesetzt ".
+                           "v1_common_active_pv in FEATURE-REGISTRY ergänzt, Online-Hilfe für v1_common_pv und v1_common_active_pv geändert ".
+                           "Diagnose Lernverhalten eingebaut, aiConHiddenLayers kann nun auch Netze wie 80-3-5 ".
+                           "_aiFannApplyBiasCorrection: Einbau OSL-Korrektur, neuer Schlüssel aiCaontrol->aiConTrainLimit ".
+                           "AI mehr Neuronenlayer X-X-X-X... möglich, aiConLearnRate: kleinste Lernrate nun 0.0001 ".
+                           "Messagesystem: gelesene Mitteilungen werden auch nach Systemneustart nicht als neu signalisiert ",
   "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
                            "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
-                           "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster aiFannSelectWindow invertiert ".
+                           "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
                            "AI Status Popup Inhalt aufklappbar ",
   "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
                            "___csmSpecificEpieces: stündliche AVG-Aktualisierung auch im laufenden Betrieb, ausgelöst durch einen Stundenwechsel ".
@@ -279,15 +289,6 @@ my %vNotesIntern = (
   "1.58.0" => "06.09.2025  _batChargeMgmt: Code change and new loading feature with Reading Battery_ChargeOptTargetPower_XX ".
                            "ctrlBatSocManagementXX: new parameter safetyMargin ".
                            "edit Comref, delete obsolete Attr graphicBeamHeightLevelX, new parameter setupBatteryDevXX->pinreduced ",
-  "1.57.3" => "26.08.2025  set default Performance Ratio PRDEF to 0.9, prevent crash when Victron API does not return an Array ".
-                           "check global attribute dnsServer in all SF Models, expand plantControl->genPVdeviation for perspective change ".
-                           "Household consumption calculation uniformly converted to vector calculation ".
-                           "new ctrlSpecialReadings->dummyConsumption, _createSummaries: fix calc of surplus ".
-                           "__createOwnSpec: change inputs for ___ghoValForm to prevent failures like https://forum.fhem.de/index.php?msg=1346936 ",
-  "1.57.2" => "15.08.2025  _attrconsumer: The validity of the components of the key etotal is checked ".
-                           "_transferMeterValues: modul accept meter reset > 0 at day start ",
-  "1.57.1" => "10.08.2025  fix warning, Forum: https://forum.fhem.de/index.php?msg=1346055 ",
-  "1.57.0" => "08.08.2025  new option attr graphicControl->scaleMode=X:staple ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -448,6 +449,7 @@ use constant {
   SOLAPIREPDEF    => 3600,                                                          # default Abrufintervall SolCast API (s)
   SOLARCONSTANT   => 1367.0,                                                        # Solarkonstante W/m²                                                           
   SOLCMAXREQDEF   => 50,                                                            # max. täglich mögliche Requests SolCast API
+  SFTYMARGIN_10   => 10,                                                            # Sicherheitszuschlag 10%
   SFTYMARGIN_20   => 20,                                                            # Sicherheitszuschlag 20%
   SFTYMARGIN_50   => 50,                                                            # Sicherheitszuschlag 50%
   SPACESIZE       => 24,                                                            # default Platz in px über oder unter den Balken
@@ -493,6 +495,7 @@ my $weathercache   = $root."/FHEM/FhemUtils/WeatherApi_SolarForecast_";         
 my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
 my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
 my $neuralnet      = $root."/FHEM/FhemUtils/NeuralNet_SolarForecast_";              # Filename-Fragment für Daten des neuronalen Netzes
+my $messagecache   = $root."/FHEM/FhemUtils/Messages_SolarForecast_";               # Filename-Fragment für Nachrichten
 my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename für DWD Stationskatalog
 my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
 my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt)
@@ -835,7 +838,7 @@ my %hrepl = (                                                                # Z
   '\.' => 'k',
 );
 
-my %block_translations = (                                                  # Blockierungsgründe Rekalibrierung = Gründe für Trtraining
+my %block_translations = (                                                                  # Blockierungsgründe Rekalibrierung = Gründe für Trtraining
   negative_slope  => { EN => "unplausible model slope detected",
                        DE => "unplausible Modellsteigung erkannt"            },
   rmse_anomaly    => { EN => "unusually high forecast error",
@@ -850,7 +853,77 @@ my %block_translations = (                                                  # Bl
                        DE => "Modell instabil"                               },                           
 );
 
-my %hqtxt = (                                                                # Hash (Setup) Texte
+my %noise_translations = (                                                                  # Übersetzung Rauschlevel
+  stable     => { EN => "low-noise signal, reliable measurements",
+                  DE => "Signal rauscharm, Messwerte zuverlässig"                  },
+  low        => { EN => "low noise, values still usable", 
+                  DE => "geringes Rauschen, Werte noch verwertbar"                 },
+  borderline => { EN => "noticeable noise; interpret with caution",
+                  DE => "merkliches Rauschen, Interpretation mit Vorsicht"         },
+  noisy      => { EN => "significant noise; limited usability of measured values",
+                  DE => "starkes Rauschen, Messwerte eingeschränkt nutzbar"        },                           
+);
+
+my %epoche_translations = (                                                                  
+  vearly  => { EN => "converges very early",
+               DE => "sehr früh konvergiert"             },
+  early   => { EN => "converged early",
+               DE => "früh konvergiert"                  },
+  oklearn => { EN => "healthy study habits",
+               DE => "gesundes Lernverhalten"            },
+  late    => { EN => "converges late",
+               DE => "spät konvergiert"                  },
+  vlate   => { EN => "just under the epoch limit",
+               DE => "knapp am Epochen-Limit"            },
+  dead    => { EN => "Network produces constant output and has not learned anything (Model Slope≈0, Validation error lower than Training error): Switch training algorithm to RPROP (aiControl->aiConTrainAlgo=RPROP) - RPROP is immune to this initialization problem. Alternatively increase the learning rate by factor 5-10 or restart training at a different time",
+               DE => "Netz gibt konstanten Ausgabewert aus und hat nichts gelernt (Slope≈0, Validierungsfehler kleiner als Trainingsfehler): Trainingsalgorithmus auf RPROP wechseln (aiControl->aiConTrainAlgo=RPROP) - RPROP ist gegen dieses Initialisierungsproblem immun. Alternativ Lernrate um Faktor 5-10 erhöhen oder Training zu anderem Zeitpunkt neu starten" },  
+  hint1   => { EN => "Learning rate too high: Reduce the learning rate (aiControl->aiConLearnRate) by a factor of 5–10 (e.g., from 0.01 to 0.001–0.002)",
+               DE => "Lernrate zu hoch: Lernrate (aiControl->aiConLearnRate) um Faktor 5-10 reduzieren (z.B. von 0.01 auf 0.001-0.002)" },                           
+  hint2   => { EN => "Check architecture: Network may be too small for the amount of data; increase the number of neurons (aiControl->aiConHiddenLayers) in the hidden layers (e.g., 50-25 → 64-32)",
+               DE => "Architektur prüfen: Netz möglicherweise zu klein für die Datenmenge, Hidden-Layer-Neuronen (aiControl->aiConHiddenLayers) erhöhen (z.B. 50-25 -> 64-32)" }, 
+  hint3   => { EN => "Restart the training at a different time: the random weight initialization at the start had a significant impact on the results here; restarting the training automatically generates a different initialization and usually leads to significantly better results",
+               DE => "Training zu einem anderen Zeitpunkt erneut starten: die zufällige Gewichtsinitialisierung beim Start hat das Ergebnis hier stark dominiert, ein neuer Trainingsstart erzeugt automatisch eine andere Initialisierung und führt meist zu einem deutlich besseren Ergebnis" },
+  hint4   => { EN => "Slightly increase the momentum: Raising the value toward 0.9 slows convergence in a controlled manner and often improves generalization (aiControl->aiConMomentum)",
+               DE => "Momentum leicht erhöhen: Wert Richtung 0.9 anheben verlangsamt die Konvergenz kontrolliert und verbessert oft die Generalisierung (aiControl->aiConMomentum)" },
+  hint5   => { EN => "Slightly reduce the learning rate: decrease the current value by a factor of 2-3 (e.g., 0.01 → 0.003–0.005) so that the network can optimize more finely (aiControl->aiConLearnRate)",
+               DE => "Lernrate leicht reduzieren: aktuellen Wert um Faktor 2-3 verringern (z.B. 0.01 -> 0.003-0.005), damit das Netz feiner optimieren kann (aiControl->aiConLearnRate)" },
+  hint6   => { EN => "Slightly increase the learning rate: multiply the current value by a factor of 1.5–2 (e.g., 0.005 → 0.008–0.01) so that the network converges to a minimum faster (aiControl->aiConLearnRate)",
+               DE => "Lernrate leicht erhöhen: aktuellen Wert um Faktor 1.5-2 anheben (z.B. 0.005 -> 0.008-0.01), damit das Netz schneller zu einem Minimum findet (aiControl->aiConLearnRate)" },
+  hint7   => { EN => "Change the training algorithm: Use RPROP instead of INCREMENTAL—RPROP automatically adjusts its step size and does not require manual adjustment of the learning rate, which often leads to convergence much faster in cases of slow convergence (aiControl->aiConTrainAlgo)",
+               DE => "Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL verwenden - RPROP passt seine Schrittweite automatisch an und kommt ohne manuelle Lernraten-Einstellung aus was bei langsamer Konvergenz oft deutlich schneller zum Ziel führt (aiControl->aiConTrainAlgo)" },
+  hint8   => { EN => "Significantly increase the learning rate: raise the current value by a factor of 3–5 (e.g., 0.005 → 0.015–0.025); the network is learning too slowly and is not reaching a sufficient minimum within the available epochs (aiControl->aiConLearnRate)",
+               DE => "Lernrate deutlich erhöhen: aktuellen Wert um Faktor 3-5 anheben (z.B. 0.005 -> 0.015-0.025), das Netz lernt zu langsam und erreicht kein ausreichendes Minimum innerhalb der verfügbaren Epochen (aiControl->aiConLearnRate)" },
+  hint9   => { EN => "Switch the training algorithm to RPROP: RPROP adjusts its step size fully automatically and typically converges 3–10 times faster than INCREMENTAL during slow training without any learning rate tuning (aiControl->aiConTrainAlgo)",
+               DE => "Trainingsalgorithmus auf RPROP wechseln: RPROP passt seine Schrittweite vollautomatisch an und konvergiert bei langsamen Trainings typischerweise 3-10x schneller als INCREMENTAL ohne jegliches Lernraten-Tuning (aiControl->aiConTrainAlgo)" },
+  hint10  => { EN => "Downsizing the architecture: reducing the number of neurons per layer (e.g., 64-32 → 50-25) reduces the number of parameters to be optimized and significantly speeds up convergence, provided that the model quality remains sufficient (aiControl->aiConHiddenLayers)",
+               DE => "Architektur verkleinern: weniger Neuronen pro Schicht (z.B. 64-32 -> 50-25) reduziert die Anzahl der zu optimierenden Parameter und beschleunigt die Konvergenz deutlich, sofern die Modellqualität ausreichend bleibt (aiControl->aiConHiddenLayers)" },
+  hint11  => { EN => "The model memorized training data instead of recognizing general patterns (error rate on unknown test data is %.1f %% higher than on training data): Change the training/test split from 80/20 to 70/30 and/or reduce the learning rate (aiControl->aiConLearnRate) by a factor of 2 so that the network learns more slowly and more generally",
+               DE => "Trainingsdaten wurden auswendig gelernt statt allgemeine Muster zu erkennen (Fehler auf unbekannten Testdaten %.1f %% höher als auf Trainingsdaten): Trainings-/Testaufteilung von 80/20 auf 70/30 ändern und/oder Lernrate (aiControl->aiConLearnRate) um Faktor 2 reduzieren damit das Netz langsamer und allgemeiner lernt" },
+  hint12  => { EN => "unstable validation curve (StdDev/Mean=%.2f): Switch shuffle mode to periodic shuffle (aiControl->aiConShuffleMode=1 and set aiControl->aiConShufflePeriod to 10–20 epochs) to achieve more consistent gradient updates",
+               DE => "instabiler Validierungsverlauf (StdDev/Mean=%.2f): Shuffle-Modus auf periodisches Shuffle (aiControl->aiConShuffleMode=1 und aiControl->aiConShufflePeriod auf 10-20 Epochen) umstellen, um gleichmäßigere Gradientenaktualisierungen zu erzielen" },
+  hint13  => { EN => "Model scaling is highly distorted (Slope=%.2f) despite an early stop: Check the input data for outliers and normalization errors; [Developer Note] verify the min/max scaling of the features",
+               DE => "Modell-Skalierung stark verzerrt (Slope=%.2f) trotz frühem Stop: Eingangsdaten auf Ausreißer und Normalisierungsfehler prüfen, [Entwicklerhinweis] Min/Max-Skalierung der Features kontrollieren" },     
+  hint14  => { EN => "high RMSE-rel (%.1f %%) despite a late stop: Expand the architecture (e.g., add a hidden layer or increase the number of neurons per layer by 50 %%), as the model lacks sufficient capacity to handle the data complexity (aiControl->aiConHiddenLayers)",
+               DE => "hohes RMSE-rel (%.1f %%) trotz spätem Stop: Architektur vergrößern (z.B. eine Hidden-Schicht ergänzen oder Neuronen pro Schicht um 50 %% erhöhen), da das Modell zu wenig Kapazität für die Datenkomplexität hat (aiControl->aiConHiddenLayers)" },
+  hint15  => { EN => "Prediction quality is low despite stable training (R²=%.2f, ideal value > 0.85): Adjust the bit-fail limit (aiControl->aiConBitFailLimit) to the recommended value (in Section 'Noise') and try a different training algorithm (e.g., aiControl->aiConTrainAlgo=RPROP)",
+               DE => "Vorhersagequalität trotz stabilem Training gering (R²=%.2f, Idealwert > 0.85): Bit-Fail-Limit (aiControl->aiConBitFailLimit) auf den empfohlenen Wert (in Bereich 'Rauschen') anpassen und einen anderen Trainingsalgorithmus (z.B. aiControl->aiConTrainAlgo=RPROP) ausprobieren" },
+  hint16  => { EN => "[Developer Note] R²=%.2f indicates insufficient input data: relevant input variables may be missing from the feature set, or existing features may have too little explanatory power for the target variable-thoroughly review the feature selection and data set",
+               DE => "[Entwicklerhinweis] R²=%.2f deutet auf unzureichende Eingangsdaten hin: relevante Eingangsgrößen fehlen möglicherweise im Feature-Set oder vorhandene Features haben zu geringen Erklärungswert für die Zielvariable - Feature-Auswahl und Datenbasis grundlegend überprüfen" },
+  hint17  => { EN => "Architecture possibly too small for the data volume: the ratio of training samples to network parameters is %.1f (target: 8–20) - try a larger architecture such as %s (aiControl->aiConHiddenLayers)",
+               DE => "Architektur möglicherweise zu klein für die Datenmenge: Verhältnis Trainingsdaten zu Netzparametern ist %.1f (Zielwert: 8–20) - größere Architektur wie z.B. %s versuchen (aiControl->aiConHiddenLayers)" },
+  hint18  => { EN => "Architecture possibly too complex for the data volume: the ratio of training samples to network parameters is only %.1f (target: 8–20) - the network has more degrees of freedom than the data can reliably fill; try a smaller architecture such as %s (aiControl->aiConHiddenLayers)",
+               DE => "Architektur möglicherweise zu komplex für die Datenmenge: Verhältnis Trainingsdaten zu Netzparametern beträgt nur %.1f (Zielwert: 8–20) - das Netz hat mehr Freiheitsgrade als die Daten zuverlässig füllen können; kleinere Architektur wie z.B. %s versuchen (aiControl->aiConHiddenLayers)" },
+  hint19  => { EN => "Recommended learning rate for the suggested architecture %s with %d inputs: %.4f (aiControl->aiConLearnRate)",
+               DE => "Empfohlene Lernrate für die vorgeschlagene Architektur %s mit %d Inputs: %.4f (aiControl->aiConLearnRate)" },
+  hint20  => { EN => "Large dataset (%d records total): if forecast quality suffers from seasonal shifts, limit training to the most recent records (e.g. aiControl->aiConTrainLimit=%d) to focus the model on current consumption patterns",
+               DE => "Große Datenmenge (%d Datensätze gesamt): wenn saisonale Effekte die Prognosequalität beeinträchtigen, Training auf die neuesten Datensätze begrenzen (z.B. aiControl->aiConTrainLimit=%d) um das Modell auf aktuelle Verbrauchsmuster zu fokussieren" },
+  hint21  => { EN => "Dataset too small (%d training records): at least %d records are needed for reliable training - collect more data before adjusting the architecture",
+               DE => "Datenmenge zu gering (%d Trainingsdatensätze): für ein zuverlässiges Training werden mindestens %d Datensätze benötigt - zunächst mehr Daten sammeln bevor die Architektur angepasst wird" },  
+  hint22  => { EN => "With %d inputs and only %d training records the data-to-parameter ratio cannot reach the target range (8–20) with any reasonable architecture - increase aiConTrainLimit or collect more data before tuning the architecture further",
+               DE => "Mit %d Inputs und nur %d Trainingsdaten lässt sich das Daten-zu-Parameter-Verhältnis (Zielwert 8–20) mit keiner sinnvollen Architektur erreichen - aiConTrainLimit erhöhen oder mehr Daten sammeln bevor die Architektur weiter angepasst wird" },
+); 
+
+my %hqtxt = (                                                                               # Hash (Setup) Texte
   entry  => { EN => qq{<b>Warm welcome!</b><br>
                        The next queries will guide you through the basic installation.<br>
                        If all entries are made, please check the configuration finally with
@@ -1019,8 +1092,14 @@ my %hqtxt = (                                                                # H
               DE => qq{Rauschen}                                                                                            },  
   nserat => { EN => qq{Noise Rating},
               DE => qq{Rauschen Bewertung}                                                                                  },   
+  lrnbeh => { EN => qq{Learning behavior},
+              DE => qq{Lernverhalten}                                                                                       },
+  setins => { EN => qq{Setup Instructions},
+              DE => qq{Einstellhinweise}                                                                                    },  
   rcdfor => { EN => qq{Recommendation for},
               DE => qq{Empfehlung für}                                                                                      },
+  utiopc => { EN => qq{Utilization of production capacity},
+              DE => qq{Epochenausnutzung}                                                                                   },  
   lstrcl => { EN => qq{last recalibration},
               DE => qq{letzte Rekalibrierung}                                                                               }, 
   setof  => { EN => qq{Setting of},
@@ -1105,8 +1184,8 @@ my %hqtxt = (                                                                # H
               DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                                                     },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Mode:&nbsp;<mode><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Modus:&nbsp;<mode><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden} },
-  dmgsig => { EN => qq{Read messages are not signaled again until a FHEM restart, but are retained if they are relevant.},
-              DE => qq{Gelesene Mitteilungen werden bis zu einem FHEM Neustart nicht wieder signalisiert, bleiben bei Relevanz jedoch erhalten.}                                             },
+  dmgsig => { EN => qq{Read messages are not marked as read again, but remain in the list if they are still relevant.},
+              DE => qq{Gelesene Mitteilungen werden nicht wieder signalisiert, bleiben bei Relevanz jedoch erhalten.}                                                                        },
   nnnact => { EN => qq{the neural network for consumption forecasting is not activated \nswitch on with: attr <NAME> aiControl aiConActivate},
               DE => qq{das neuronale Netz zur Verbrauchsprognose ist nicht aktiviert \neinschalten mit: attr <NAME> aiControl aiConActivate}                                                 },
 );
@@ -1972,7 +2051,8 @@ pv_mittag_peak_boost_special => sub {
     my $amp = 1.5 * ($base + 0.7*$dyn + 0.5*$yday);
 
     # --- Mindestwirkung: verhindert Wegtrainieren ---
-    my $stable = ($amp < 0.05) ? 0.05 : $amp;
+    #my $stable = ($amp < 0.05) ? 0.05 : $amp;
+    my $stable = ($amp < 0.01) ? 0 : $amp;                                              # V 2.6.10
 
     return [$stable];
 },
@@ -2240,7 +2320,8 @@ v1_common_pv => sub {
 v1_common_active_pv => sub {
     my ($f) = @_;
     return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },                          
+        @{ $FEATURE_REGISTRY{v1_common}->($f) }, 
+        @{ $FEATURE_BLOCKS{pv}->($f) },        
         @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
         @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
         @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
@@ -6892,12 +6973,18 @@ sub __getaiFannState {            ## no critic "not used"
   my $rmse_rat = AiNeuralVal ($name, $fanntyp, 'RmseRating',     '-');
   my $bias     = AiNeuralVal ($name, $fanntyp, 'ModelBias',      '-');                              
   my $slope    = AiNeuralVal ($name, $fanntyp, 'ModelSlope',     '-');
-  my $ampel    = AiNeuralVal ($name, $fanntyp, 'ModelAmpel',     '-');
+  my $modampel = AiNeuralVal ($name, $fanntyp, 'ModelAmpel',     '-');
   my $regv     = AiNeuralVal ($name, $fanntyp, 'RegVersion',     '-');                      # verwendete Feature-Registry Version
   my $talgo    = AiNeuralVal ($name, $fanntyp, 'TrainAlgo',      '-');
   my $nslvl    = AiNeuralVal ($name, $fanntyp, 'NoiseLevel',     '-');                      # Rauschbewertung
   my $bflim    = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   '-');                      # Bit_Fail_Limit aktuell
   my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');                      # Bit_Fail_Limit Empfehlung
+  
+  my $epoch_label      = AiNeuralVal ($name, $fanntyp, 'EpochLabel',   '');
+  my $epoch_hints      = AiNeuralVal ($name, $fanntyp, 'EpochHints',   '');
+  my $epoch_code       = AiNeuralVal ($name, $fanntyp, 'EpochCode',    '');
+  my $epoch_ampel      = AiNeuralVal ($name, $fanntyp, 'EpochAmpel',  '-');
+  my $epoch_rel_pct    = AiNeuralVal ($name, $fanntyp, 'EpochRelPct', '-');
   
   my $drift_window     = AiNeuralVal ($name, $fanntyp, 'DriftWindowSize',    '-');          # Zeitfenster auf das sich die Driftwerte beziehen
   my $drift_score      = AiNeuralVal ($name, $fanntyp, 'DriftScore',         '-'); 
@@ -6935,6 +7022,9 @@ sub __getaiFannState {            ## no critic "not used"
       }
   }
   
+  # Anzeige Rauschwert nutzerfreundlich
+  my $display_noiselvl = $noise_translations{$nslvl}{$lang};
+  
   # Anzeige Drift-Flag mutzerfreundlich
   my $display_driftflag = $drift_flag;
   
@@ -6946,15 +7036,21 @@ sub __getaiFannState {            ## no critic "not used"
       }
   }
 
-  my $retrampel = $drift_retrecomd eq 'urgent'  ? FW_makeImage ('10px-kreis-rot.png',   $recomd_translated) :
-                  $drift_retrecomd eq 'advised' ? FW_makeImage ('10px-kreis-gelb.png',  $recomd_translated) :
-                  $drift_retrecomd eq 'none'    ? FW_makeImage ('10px-kreis-gruen.png', $recomd_translated) : 
+  my $retrampel = $drift_retrecomd eq 'urgent'  ? FW_makeImage ('15px-red.png',    $recomd_translated) :
+                  $drift_retrecomd eq 'advised' ? FW_makeImage ('15px-yellow.png', $recomd_translated) :
+                  $drift_retrecomd eq 'none'    ? FW_makeImage ('15px-green.png',  $recomd_translated) : 
                   '';  
   
-  $ampel = $ampel eq 'green'  ? FW_makeImage ('10px-kreis-gruen.png', $retran) : 
-           $ampel eq 'yellow' ? FW_makeImage ('10px-kreis-gelb.png',  $retran) :
-           $ampel eq 'red'    ? FW_makeImage ('10px-kreis-rot.png',   $retran) :
-           $retran;
+  $epoch_ampel  = $epoch_ampel eq 'green'  ? FW_makeImage ('15px-green.png',  $epoch_code) : 
+                  $epoch_ampel eq 'yellow' ? FW_makeImage ('15px-yellow.png', $epoch_code) :
+                  $epoch_ampel eq 'red'    ? FW_makeImage ('15px-red.png',    $epoch_code) :
+                  $epoch_ampel eq 'grey'   ? FW_makeImage ('15px-grey.png',   $epoch_code) :
+                  $epoch_code;
+              
+  $modampel     = $modampel eq 'green'  ? FW_makeImage ('15px-green.png',  $retran) : 
+                  $modampel eq 'yellow' ? FW_makeImage ('15px-yellow.png', $retran) :
+                  $modampel eq 'red'    ? FW_makeImage ('15px-red.png',    $retran) :
+                  $retran;
            
   my $atf  = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 0);
   my $ars  = CurrentVal  ($name, 'conNNGetResultState',      '-');
@@ -6999,6 +7095,21 @@ sub __getaiFannState {            ## no critic "not used"
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
   $aiAlpha = '<b>Alpha:</b> '.$aiAlpha;
   $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;
+  
+  # Überblick über die Bewertungen                
+  #################################
+  my $show_retreason = $drift_retreason eq '-' 
+                     ? ''
+                     : "(".$hqtxt{hcause}{$lang}.": ".(encode('utf8', $display_reason)).")";
+                     
+  my $rating_content = "<b>".$hqtxt{treval}{$lang}.":</b> $modampel ($retran)\n";
+  $rating_content   .= "<b>".$hqtxt{lrnbeh}{$lang}.":</b> $epoch_ampel ".(encode('utf8', $epoch_label))." ($epoch_rel_pct % ".$hqtxt{utiopc}{$lang}.") \n";        
+  $rating_content   .= "<b>".$hqtxt{setins}{$lang}.":</b> ".(encode('utf8', $epoch_hints))."\n" if($epoch_hints);
+  $rating_content   .= "<b>".$hqtxt{nserat}{$lang}.":</b> ".(encode('utf8', $display_noiselvl))." ($nslvl)\n";                    
+  $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
+  $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
+                       ":</b> $retrampel $recomd_translated $show_retreason \n";
+  my $rating         = ___aiFannSection (encode('utf8', 'Bewertungsüberblick'), $rating_content, 1);      
 
   # Modellparameter
   ###################  
@@ -7010,7 +7121,7 @@ sub __getaiFannState {            ## no critic "not used"
   $model_content   .= "<b>".$hqtxt{tralgo}{$lang}.":</b> $talgo, Registry Version=$regv\n";                                                                     # Trainingsalgorithmus
   $model_content   .= "<b>".$hqtxt{rangen}{$lang}.":</b> Mode=$shmode, Period=$shperi\n";                                                                       # Zufallsgenerator
   $model_content   .= "<b>".$hqtxt{modage}{$lang}.":</b> $model_age h\n";                                                                                       # Alter des Modells (Stunden) 
-  my $model         = ___aiFannSection ($hqtxt{nmdpar}{$lang}, $model_content, 1);                                                                                # 1 = standardmäßig offen
+  my $model         = ___aiFannSection ($hqtxt{nmdpar}{$lang}, $model_content, 0);                                                                                # 1 = standardmäßig offen
 
   # Trainingsmetriken
   #####################
@@ -7022,8 +7133,8 @@ sub __getaiFannState {            ## no critic "not used"
   $keyfig_content   .= "<b>Validation Bit_Fail:</b> $bitfai\n";
   $keyfig_content   .= "<b>Model Bias:</b> $bias Wh\n";
   $keyfig_content   .= "<b>Model Slope:</b> $slope\n";
-  $keyfig_content   .= "<b>".$hqtxt{treval}{$lang}.":</b> $ampel\n";                                                                                            # Trainingsbewertung
-  my $keyfig         = ___aiFannSection ($hqtxt{trmetc}{$lang}, $keyfig_content, 1); 
+  $keyfig_content   .= "<b>".$hqtxt{treval}{$lang}.":</b> $modampel\n";                                                                                            # Trainingsbewertung
+  my $keyfig         = ___aiFannSection ($hqtxt{trmetc}{$lang}, $keyfig_content, 0); 
  
   # Fehlermaße der Prognosen
   ############################
@@ -7044,7 +7155,7 @@ sub __getaiFannState {            ## no critic "not used"
   my $noise         = ___aiFannSection ($hqtxt{noise}{$lang}, $noise_content, 0);
 
   # Drift
-  #########
+  #########  
   my $drift_content = "<b>".$hqtxt{anawin}{$lang}.":</b> $drift_window h\n";
   $drift_content   .= "<b>Drift RMSE Ratio:</b> $drift_rmserel\n";
   $drift_content   .= "<b>Semantic Ratio:</b> $sem_ratio\n";                              
@@ -7058,8 +7169,7 @@ sub __getaiFannState {            ## no critic "not used"
   $drift_content   .= "<b>Index:</b> $drift_index\n";
   $drift_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
   $drift_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
-                      ":</b> $retrampel $recomd_translated (".$hqtxt{hcause}{$lang}.
-                      ": ".(encode('utf8', $display_reason)).") \n";
+                      ":</b> $retrampel $recomd_translated $show_retreason \n";
   $drift_content   .= "<b>".$hqtxt{lstrcl}{$lang}.":</b> $last_recaltm\n";
   my $drift_title   = $hqtxt{drftid}{$lang}.' ('.$hqtxt{calasf}{$lang}.' '.$hqtxt{modage}{$lang}.' > '.AIMODELMINAGE.' h)';
   my $drift         = ___aiFannSection ($drift_title, $drift_content, 0);    
@@ -7082,6 +7192,7 @@ sub __getaiFannState {            ## no critic "not used"
   $rs .= $aiAlpha."\n";
   $rs .= $hpinst;
   $rs .= "\n\n";
+  $rs .= $rating;
   $rs .= $model;
   $rs .= $keyfig;
   $rs .= $ermsr;
@@ -8158,9 +8269,9 @@ sub _attraiControl {                     ## no critic "not used"
       aiConTrainStart    => { comp => '(?:[1-9]|[1-8][0-9]|90):(?:[1-9]|1[0-9]|2[0-3])',           act => 0 },
       aiTreesPV          => { comp => '(1?[1-9]|10|[2-4][0-9]|50)',                                act => 0 },
       aiConActivate      => { comp => '(0|1|2)',                                                   act => 0 },
-      aiConHiddenLayers  => { comp => '(?:[1-9]\d{1,2}-[1-9]\d{1,2}(?:-[1-9]\d{0,2})?)',           act => 0 },
+      aiConHiddenLayers  => { comp => '[1-9]\d{0,2}(?:-[1-9]\d{0,2})*',                            act => 0 },
       aiConTrainAlgo     => { comp => '(RPROP|INCREMENTAL)',                                       act => 0 },
-      aiConLearnRate     => { comp => '(0\.01|0\.05|0\.00[1-5])',                                  act => 0 },
+      aiConLearnRate     => { comp => '(0\.(?:000[1-9]\d*|00[1-9]\d*|0[1-4]\d*|05))',              act => 0 },
       aiConMomentum      => { comp => '(0\.[2-9])',                                                act => 0 },
       aiConShuffleMode   => { comp => '[0-2]',                                                     act => 0 },
       aiConBitFailLimit  => { comp => '0\.(0[5-9]|[1-4]\d|50)',                                    act => 0 },
@@ -8169,7 +8280,8 @@ sub _attraiControl {                     ## no critic "not used"
       aiConSteepness     => { comp => '(0\.[1-9]|1\.[0-5])',                                       act => 0 },
       aiConAlpha         => { comp => '(0(?:\.\d+)?|1)',                                           act => 0 },
       aiConProfile       => { comp => "($rvreg)",                                                  act => 1 },
-      aiConAbsOversample => { comp => '0\.(?:[0-4]\d|50?)',                                        act => 0 },      
+      aiConAbsOversample => { comp => '0\.(?:[0-4]\d|50?)',                                        act => 0 },
+      aiConTrainLimit    => { comp => '\d+',                                                       act => 1 },  
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -9332,6 +9444,12 @@ sub __attrKeyAction {
           }
       }
       
+      if ($akey eq 'aiConTrainLimit') {
+          if ($akeyval && $akeyval < AINUMMININPUTS) {
+              return qq{The value '$akeyval' is not valid for key '$akey'. It must be set to '0' or an integer >= }.AINUMMININPUTS;
+          }
+      }
+      
       if ($init_done && $akey eq 'consForecastBase') {
           my $cfbase  = CurrentVal  ($name, 'consForecastBase', '');
           my ($a, $h) = parseParams ($cfbase, ',', '', '->');
@@ -9971,6 +10089,7 @@ sub Shutdown {
   writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name, 'nolog');             # Cache File SolCast API Werte schreiben
   writeCacheToFile ($hash, 'statusapi',      $statcache.$name, 'nolog');             # Status-API Cache sichern
   writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name, 'nolog');             # Weather-API Cache sichern
+  writeCacheToFile ($hash, 'messages',    $messagecache.$name, 'nolog');             # Nachrichten Cache sichern
 
 return;
 }
@@ -10047,6 +10166,7 @@ sub periodicWriteMemcache {
   writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name);             # Cache File Strahlungsdaten-API Werte schreiben
   writeCacheToFile ($hash, 'statusapi',      $statcache.$name);             # Status-API Cache sichern
   writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name);             # Weather-API Cache sichern
+  writeCacheToFile ($hash, 'messages',    $messagecache.$name);             # Nachrichten Cache sichern
 
   $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." whole Operating Memory";
 
@@ -10237,6 +10357,11 @@ sub reloadCacheFiles {
   $paref->{file}      = $neuralnet.$name;                      # AI FANN Daten einlesen wenn vorhanden
   $paref->{cachename} = 'neuralnet';
   $paref->{title}     = 'NeuralNetwork';
+  readCacheFile ($paref);
+  
+  $paref->{file}      = $messagecache.$name;                   # Cache File Messages Daten einlesen wenn vorhanden
+  $paref->{cachename} = 'messages';
+  $paref->{title}     = 'Messages';
   readCacheFile ($paref);
 
   delete $paref->{file};
@@ -10524,7 +10649,6 @@ sub writeCacheToFile {
               }
           }
 
-          # --- Fehlerbehandlung ---
           if ($error) {
               my $msg = qq{ERROR while writing AI FANN data to file "$file": $error};
               Log3($name, 1, "$name - $msg");
@@ -14228,7 +14352,7 @@ sub _batChargeMgmt {
       $batinitval->{$bn}{bpinreduced}    = BatteryVal  ($name, $bn, 'bpinreduced',              0);         # Standardwert bei <=lowSoC -> Anforderungsladung vom Grid
       $batinitval->{$bn}{befficiency}    = BatteryVal  ($name, $bn, 'befficiency', STOREFFDEF) / 100;       # Speicherwirkungsgrad
       $batinitval->{$bn}{goalwh}         = $batinstcap;
-      $batinitval->{$bn}{lrMargin}       = SFTYMARGIN_50;
+      $batinitval->{$bn}{lrMargin}       = SFTYMARGIN_20;
       $batinitval->{$bn}{otpMargin}      = SFTYMARGIN_20;
 
       # --- RAW (unskaliert) speichern
@@ -14436,12 +14560,22 @@ sub _batChargeMgmt {
               $bs->{tompvfc_spent}   = 0;
               $bs->{tomconfc_spent}  = 0;
               $bs->{tompvfc}         = round0 ($sf_charge * $bs->{tompvfc_raw});                # PV → Ladedefizit
-              $bs->{tomconfc}        = round0 ($sf_con    * $bs->{tomconfc_raw});               # Verbrauch → Ladestand
+              $bs->{tomconfc}        = round0 ($sf_con    * $bs->{tomconfc_raw});               # Verbrauch -> Ladestand
           }
           
           # --- Stundenwerte skaliert: pvfc mit sf_charge, confc mit sf_con
           my $confc = round0 ($sf_con    * $confc_raw);                                         # Entladung proportional zur Kapazität
           my $pvfc  = round0 ($sf_charge * $pvfc_raw);                                          # Ladung proportional zum Defizit
+
+          # FIX: Batterie voll (sf_charge == 0) -> pvfc = 0, aber confc > 0 erzeugt
+          # Phantomentladung obwohl systemweit PV > Verbrauch.
+          # Lösung: Dem vollen Akku nur den Nettoverbrauch belasten,
+          # der NICHT durch systemweites PV gedeckt wird.
+          if (!$bdeficit && $pvfc_raw > 0) {                                                    # V 2.6.10 Fix: Batterie hat kein Defizit (voll) -> pvfc=0, nur Nettoverbrauch anrechnen
+              my $net_confc_raw = max (0, $confc_raw - $pvfc_raw);
+              $confc            = round0 ($sf_con * $net_confc_raw);
+              $pvfc             = 0;
+          }
 
           # --- Zeitfenster prüfen
           my ($date)    = (split " ", $nhstt)[0];
@@ -14785,7 +14919,8 @@ sub __batChargeOptTargetPower {
 
           my $runwh = do {
               if (defined $fc_next_wh)   { $fc_next_wh }
-              elsif ($nhr eq '00')       { $csocwh }
+              #elsif ($nhr eq '00')       { $csocwh }
+              elsif ($nhr eq '00')       { $init_soc_wh }                                                        # V 2.6.10 Fix: aus Prozentwert, konsistent mit LR-Abschnitt
               elsif (defined $transfer)  { delete $trans->{$sbn}{$lfd}{transfer} }
               else                       { $init_soc_wh }
           };
@@ -15698,17 +15833,19 @@ sub __calcVectorConsumption {
       $node2bat = 0 if($dc2inv2node && $node2bat > 0);                                      # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
   }
   
-  if ($node2bat > 0) {
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ########################################################################################################################
+  #if ($node2bat > 0) {
       # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
       # - dc2inv2node: Hybrid-Wechselrichter entlädt (Zeitversatz AC/DC-Messung)
       # - node2inv2dc: Wechselrichter lädt (Zeitversatz AC/DC-Messung)
       # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
       # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
       # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
-      if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {
-          $node2bat = 0;
-      }
-  }
+      #if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {
+      #    $node2bat = 0;
+      #}
+  #}
 
   my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                          # Erzeugung Summe im Inverter-Knoten
   $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                        # z.B. Batterie ist voll und SolarLader liefert an Knoten
@@ -17587,13 +17724,19 @@ sub __getCyclesAndRuntime {
   my ($starthour, $startday);
 
   if (isConsumerLogOn ($hash, $c, $pcurr)) {                                                                                             # Verbraucher ist logisch "an"
-        if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'off') {                                                                          # Status im letzen Zyklus war "off"
+        if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'off') {
+            my $prevStartts = ConsumerVal ($name, $c, 'startTime', $t);
+            my $prevDt      = timestringsFromOffset ($name, $prevStartts, 0);
+            my $carryMins   = ($prevDt->{hour} eq $chour)                       # V 2.6.10 Fix für besonderes Timing: Consumer OFF kurz vor dem Stundenwechsel + erster Poll danach findet Consumer bereits wieder ON. Das ist ein seltenes Fenster von wenigen Sekunden – daher tritt es nur sporadisch auf 
+                              ? ConsumerVal ($name, $c, 'minutesOn', 0)
+                              : 0;
+
             $data{$name}{consumers}{$c}{onoff}          = 'on';
-            $data{$name}{consumers}{$c}{startTime}      = $t;                                                                            # startTime ist nicht von "Automatic" abhängig -> nicht identisch mit planswitchon !!!
+            $data{$name}{consumers}{$c}{startTime}      = $t;                   # jetzt erst überschreiben
             $data{$name}{consumers}{$c}{cycleStarttime} = $t;
             $data{$name}{consumers}{$c}{cycleTime}      = 0;
-            $data{$name}{consumers}{$c}{lastMinutesOn}  = ConsumerVal ($name, $c, 'minutesOn', 0);
-            $data{$name}{consumers}{$c}{cycleDayNum}++;                                                                                  # Anzahl der On-Schaltungen am Tag
+            $data{$name}{consumers}{$c}{lastMinutesOn}  = $carryMins;           # statt direkt minutesOn zu lesen
+            $data{$name}{consumers}{$c}{cycleDayNum}++;
         }
         else {
             my $cst = ConsumerVal($name, $c, 'cycleStarttime', $t);
@@ -17609,7 +17752,7 @@ sub __getCyclesAndRuntime {
 
         # --- Stundenwechsel? ---
         if ($chour eq $starthour) {
-            my $runtime                            = round2(($t - $startts) / 60);                                                                
+            my $runtime                            = round2 (($t - $startts) / 60);                                                                
             $data{$name}{consumers}{$c}{minutesOn} = ConsumerVal ($name, $c, 'lastMinutesOn', 0) + $runtime;
         }
         else {
@@ -17629,7 +17772,7 @@ sub __getCyclesAndRuntime {
   }
   else {                                                                                                                                 # Verbraucher soll nicht aktiv sein
       # --- Startzeit auslesen (Default = 1) ---
-      my $startts = ConsumerVal($name, $c, 'startTime', 1);
+      my $startts = ConsumerVal ($name, $c, 'startTime', 1);
       my $dt      = timestringsFromOffset ($name, $startts, 0);  
       $startday   = $dt->{day};                                                                                                          # Tag  (range 01 to 31)
       $starthour  = $dt->{hour};
@@ -19431,9 +19574,9 @@ sub _readSystemMessages {
       $data{$name}{preparedmessages}{$midx}{DE} .= 'Bitte unbedingt diese Attribute im global Device setzen!';
       $data{$name}{preparedmessages}{$midx}{EN}  = "<span style='color: red;'><b>CAUTION:</b></span> These important parameters are not available in the global device: $noloc <br>";
       $data{$name}{preparedmessages}{$midx}{EN} .= 'Please be sure to set these attributes in the global device!';
+      
+      $data{$name}{preparedmessages}{999500}{TS} = time;
   }
-
-  $data{$name}{preparedmessages}{999500}{TS} = time;
 
 return;
 }
@@ -20134,12 +20277,12 @@ sub _graphicHeader {
       my $temptxt  = CurrentVal  ($name, 'outsideTemp',   '-').' &deg;C';
 
       my ($err, $resh) = isWeatherAgeExceeded ($paref);
-      $img = FW_makeImage ('10px-kreis-gruen.png', $htitles{dwfcrsu}{$lang}.' '.$resh->{mosmix}.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
+      $img             = FW_makeImage ('10px-kreis-gruen.png', $htitles{dwfcrsu}{$lang}.' '.$resh->{mosmix}.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
 
       if (!$err && $resh->{exceed}) {
           my $agewfc = $htitles{aswfc2o}{$lang};
           $agewfc    =~ s/<NAME>/$name/xs;
-          $img = FW_makeImage ('10px-kreis-gelb.png', $agewfc.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
+          $img       = FW_makeImage ('10px-kreis-gelb.png', $agewfc.' &#10;'.$htitles{dwdtime}{$lang}.': '.$resh->{fctime});
       }
 
       my $waicon = "<a>$img</a>";                                                                       # Icon Wetterdaten Alter
@@ -20985,8 +21128,8 @@ sub ___ownSpecGetFWwidget {
 
       if ($cakey) {                                                                     # einzelnen Schlüssel eines Composite-Attributs behandeln
           my ($ea, $eh) = parseParams (AttrVal ($name, $elm, ''));
-          my $cakeyval  = $eh->{$cakey};
-          my $kv        = "$cakey=$cakeyval" if(defined $cakeyval);
+          my $cakeyval  = $eh->{$cakey} || '';
+          #my $kv        = "$cakey=$cakeyval" if(defined $cakeyval);
           $widget       = "<div class='fhemWidget' cmd='' reading='' dev='' arg='$arg' current='$cakeyval' type='set $dev attrKeyVal $elm $cakey='></div>";
       }
       else {
@@ -24145,7 +24288,7 @@ return;
 #  3 - Fehler / Problem
 #
 #  Statusspeicher:
-#  $data{$name}{messages}{999999}{RD}:         1 - gelesen, 0 - ungelesen
+#  $data{$name}{messages}{999999}{RD}:         1 - gelesen, undef/0 - ungelesen
 #  $data{$name}{messages}{999000}{TS}:         Timestamp Stand Message File
 #  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
 #  $data{$name}{messages}{999500}{TS}:         Timestamp Stand prepared Messages
@@ -24158,66 +24301,81 @@ sub fillupMessageSystem {
 
   my $otxt   = q{};
   my $ntxt   = q{};
-  my $midx   = 0;
+  my $midx1  = 0;                                                   # Indexzähler bestehende Nachrichten
+  my $midx2  = 0;                                                   # Indexzähler neue Nachrichten
   my $max_sv = 0;
 
   ## Aufnahme Stand für alt/neu Vergleich + Clear Messages
   ##########################################################
   for my $idx (sort keys %{$data{$name}{messages}}) {
-      next if($idx >= IDXLIMIT);
+      next if(!isNumeric($idx) || $idx >= IDXLIMIT);
       $otxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
       $otxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
       $otxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
-
-      delete $data{$name}{messages}{$idx};
+      
+      $midx1 = $idx;
   }
+  
+  #Log3 ($name, 1, "$name - preparedmessages: ". Dumper $data{$name}{preparedmessages}) if($name eq 'SolCast');
+  #Log3 ($name, 1, "$name - filemessages: ". Dumper $data{$name}{filemessages}) if($name eq 'SolCast');
+  #Log3 ($name, 1, "$name - messages: ". Dumper $data{$name}{messages}) if($name eq 'SolCast');
 
-  ## Messages füllen
+  ## Messages neu füllen
   ########################################################################
-  # Integration prepared Messages
-  for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
-      next if($smi >= IDXLIMIT);
-      $midx++;
-      $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
-      $data{$name}{messages}{$midx}{DE} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{DE});
-      $data{$name}{messages}{$midx}{EN} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{EN});
+  if (defined $data{$name}{preparedmessages} || defined $data{$name}{filemessages}) {
+      for my $idx (sort keys %{$data{$name}{messages}}) {
+          next if($idx >= IDXLIMIT);
+          delete $data{$name}{messages}{$idx};
+      } 
+      
+      $midx1 = 0;
+      
+      # --- Integration prepared Messages
+      for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
+          next if($smi >= IDXLIMIT);
+          $midx2++;
+          $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
+          $data{$name}{messages}{$midx2}{DE} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{DE});
+          $data{$name}{messages}{$midx2}{EN} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{EN});
+      }
+
+      # --- Integration File Messages
+      for my $mfi (sort keys %{$data{$name}{filemessages}}) {
+          next if($mfi >= IDXLIMIT);
+          $midx2++;
+          $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
+          $data{$name}{messages}{$midx2}{DE} = $data{$name}{filemessages}{$mfi}{DE};
+          $data{$name}{messages}{$midx2}{EN} = $data{$name}{filemessages}{$mfi}{EN};
+      }
+
+      $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
+      $data{$name}{messages}{999000}{TSNEXT} = $data{$name}{filemessages}{999000}{TSNEXT} // 0;
+      $data{$name}{messages}{999500}{TS}     = $data{$name}{preparedmessages}{999500}{TS} // 0;
+      
+      ## Vergleich auf geänderte Messages
+      #####################################
+      for my $idx (sort keys %{$data{$name}{messages}}) {
+          next if($idx >= IDXLIMIT);
+          $ntxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
+          $ntxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
+          $ntxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
+      }
+
+      if ($ntxt ne $otxt) {                                                                     # es gibt neue Post! bzw. Änderungen -> Read-Bit zurücksetzen
+          $data{$name}{messages}{999999}{RD} = 0;
+      }
   }
 
-  # Integration File Messages
-  for my $mfi (sort keys %{$data{$name}{filemessages}}) {
-      next if($mfi >= IDXLIMIT);
-      $midx++;
-      $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
-      $data{$name}{messages}{$midx}{DE} = $data{$name}{filemessages}{$mfi}{DE};
-      $data{$name}{messages}{$midx}{EN} = $data{$name}{filemessages}{$mfi}{EN};
-  }
-
-  $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
-  $data{$name}{messages}{999000}{TSNEXT} = $data{$name}{filemessages}{999000}{TSNEXT} // 0;
-  $data{$name}{messages}{999500}{TS}     = $data{$name}{preparedmessages}{999500}{TS} // 0;
-
-
-  ## Vergleich auf geänderte Messages
-  #####################################
-  for my $idx (sort keys %{$data{$name}{messages}}) {
-      next if($idx >= IDXLIMIT);
-      $ntxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
-      $ntxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
-      $ntxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
-  }
-
-  if ($ntxt ne $otxt) {                                                                   # es gibt neue Post! bzw. Änderungen -> Read-Bit läschen
-      delete $data{$name}{messages}{999999}{RD};
-  }
-
-  if ($midx && !defined $data{$name}{messages}{999999}{RD}) {                             # RD = Read-Bit (undef -> Messages nicht gelesen)
-      my @aidx   = map { $_ } (1..$midx);                                                 # größte vorhandene Severity finden ...
+  my $midx = max ($midx1, $midx2);
+  
+  if ($midx && ($data{$name}{messages}{999999}{RD} // 0) != 1) {                                # RD = Read-Bit (undef -> Messages nicht gelesen)
+      my @aidx   = map { $_ } (1..$midx);                                                       # größte vorhandene Severity finden ...
       my @values = map { $data{$name}{messages}{$_}{SV} } @aidx;
       $max_sv    = max(@values);
   }
 
-  my $max_icon = $svicons{$max_sv};                                                       # ... und das dazugehörige Icon
-
+  my $max_icon = $svicons{$max_sv};                                                             # ... und das dazugehörige Icon
+  
 return ($max_icon, $midx);
 }
 
@@ -24531,7 +24689,7 @@ sub aiFannEnterTraining {
                                                     );
 
   if (defined $hash->{HELPER}{AINNTRAINBLOCKRUN}) {
-      $data{$name}{current}{conNNTrainstate} = 'is just retrained';
+      $data{$name}{current}{conNNTrainstate}        = 'is just retrained';
       $hash->{HELPER}{AINNTRAINBLOCKRUN}{loglevel}  = 3;                     # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
       debugLog ($paref, 'aiProcess', qq{AI FANN Training for Consumption Forecast BlockingCall PID "$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}" with Timeout }.AINNTRBLTO." s started");
   }
@@ -24551,13 +24709,15 @@ sub aiFannCreateConTrainData {
   my ($msg, $serial, $regv);
   
   my $pv_max_limit = _pvMaxLimit ($name);
+  my $fanntyp      = 'con';                                                                 # FANN Verwendungsart 'consumption' Prognose
 
   if (!$pv_max_limit ) {
       $msg = 'No peak output is provided by the PV system';
       debugLog ($paref, 'aiProcess', "AI FANN - Training aborted: $msg");
 
-      $serial = encode_base64 (Serialize ( { name            => $name,
-                                             conNNTrainstate => "Training aborted: $msg",
+      $serial = encode_base64 (Serialize ( { name                    => $name,
+                                             fanntyp                 => $fanntyp,
+                                             $fanntyp.'NNTrainstate' => "Training aborted: $msg",    
                                            }
                                          ), "");
       return $serial;
@@ -24581,7 +24741,7 @@ sub aiFannCreateConTrainData {
   my $hidden_steepness  = CurrentVal ($name, 'aiConSteepness',           0.9);            # Empfindlichkeit der Neuronen. Niedrigere Werte glätten, höhere Werte schärfen
   my $learning_rate     = CurrentVal ($name, 'aiConLearnRate',         0.005);            # Lernrate: zu klein -> Netz kommt nicht aus dem Bias-Plateau, zu groß -> Overshooting (0.01, 0.005)
   my $learning_momentum = CurrentVal ($name, 'aiConMomentum',            0.5);            # Momentum 
-  my $shuffle_mode      = CurrentVal ($name, 'aiConShuffleMode',           2);            # 0 = chronologisch, 1 = chronologischer Split und AI::FANN internes shuffle, 2 = shuffle vor dem Split und AI::FANN internes shuffle
+  my $shuffle_mode      = CurrentVal ($name, 'aiConShuffleMode',           1);            # 0 = chronologisch, 1 = chronologischer Split und AI::FANN internes shuffle, 2 = shuffle vor dem Split und AI::FANN internes shuffle
   my $talgo             = CurrentVal ($name, 'aiConTrainAlgo', 'INCREMENTAL');            # Trainingsalgorithmus (RPROP INCREMENTAL)
   my $shuffle_period    = CurrentVal ($name, 'aiConShufflePeriod',        10);            # bei shuffle_mode -> alle X Epochen Trainingsdaten AI::FANN intern neu mischen
   my $bit_fail_limit    = CurrentVal ($name, 'aiConBitFailLimit',       0.35);            # Bit-Fail Limit
@@ -24589,7 +24749,6 @@ sub aiFannCreateConTrainData {
   my $oaf               = 'LINEAR';                                                       # Output Activation Function 
   my $mse_error         = 0.001;                                                          # gewünschter Fehler (MSE-Schwelle)
   my $range             = _aiFannAfNormRange ($haf);
-  my $fanntyp           = 'con';                                                          # FANN Verwendungsart 'consumption' Prognose
   
   my $pvrl_prev         = 0;                                                              # virtueller Startwert PV real vor ersten Wert                                                
   
@@ -24733,10 +24892,11 @@ sub aiFannCreateConTrainData {
   my $num_inputs   = scalar @training_data;
 
   if ($num_inputs < $min_required) {
-      $msg = "insufficient number of valid data ($num_inputs < $min_required)";
+      $msg = "insufficient number of valid datasets ($num_inputs < $min_required)";
       debugLog ($paref, 'aiProcess', "AI FANN - Training aborted: $msg");
 
       $serial = encode_base64 (Serialize ( { name                    => $name,
+                                             fanntyp                 => $fanntyp,
                                              $fanntyp.'NNTrainstate' => "Training aborted: $msg",
                                            }
                                          ), "");
@@ -24923,6 +25083,7 @@ sub aiFannCreateConTrainData {
           debugLog ($paref, 'aiProcess', "AI FANN - Training aborted: $msg");
 
           $serial = encode_base64 (Serialize ( { name                    => $name,
+                                                 fanntyp                 => $fanntyp,
                                                  $fanntyp.'NNTrainstate' => "Training aborted: $msg",
                                                }
                                              ), "");
@@ -24936,6 +25097,22 @@ sub aiFannCreateConTrainData {
 
   # Finalisierungen
   ###################
+  # --- Limitierung auf die letzten X Datensätze (0 = deaktiviert)
+  my $limit = CurrentVal ($name, 'aiConTrainLimit', 0);
+
+  if ($limit > 0) {
+      my $n = scalar @training_data;
+
+      if ($n > $limit) {
+          my $drop = $n - $limit;
+
+          debugLog ($paref, 'aiProcess', "AI FANN - limiting training data to newest $limit of $n records");
+
+          splice @training_data, 0, $drop;
+          splice @targets_norm,  0, $drop;
+      }
+  }
+
   my $splice_len = 6;
   
   splice @training_data, 0, $splice_len;                                                                    # sicherstellen, dass training_data > 6 Elemente trainiert wird
@@ -25023,7 +25200,9 @@ sub _aiFannPercentileBasedLimits {
   
   my @outliers = grep { $_ > $p999 } @above;                                         # echte Ausreißer ermitteln (alles > Percentile)
     
-  my $safety     = 1.3;                                                              # 30% Sicherheitsaufschlag
+  my $raw_max    = max (@$tgref);                                                    # max. Targetwert
+  my $overshoot  = $p999 > 0 ? $raw_max / $p999 : 1.0;                               # z.B. 8902/8056 = 1.105
+  my $safety     = max (1.05, $overshoot * 1.05);                                    # V 2.6.10 5% Puffer über dem historischen Maximum
   my $targminval = 0;                                                                # (De)Normalisierung -> Targetgrenze min 
   my $targmaxval = $p999 * $safety;                                     
 
@@ -25032,7 +25211,7 @@ sub _aiFannPercentileBasedLimits {
       $p2 = 'p'.($p2 * 100);
       
       Log3 ($name, 1, sprintf "%s DEBUG> AI FANN - Target-Norm: raw_max=%0.0f, $p1=%0.0f, $p2=%0.0f, targmaxval=%0.0f",
-                               $name, max(@$tgref), $p99, $p999, $targmaxval);
+                               $name, $raw_max, $p99, $p999, $targmaxval);
 
       if (@outliers) {
           my $olist = join (', ', @outliers);
@@ -25691,7 +25870,7 @@ sub aiFannTrainstartAndRetry {
           }     
       }
 
-      $retref->{fannType} = $fanntyp;                                                       # Trainingstyp für Auswertung Rückgabe     
+      $retref->{fanntyp} = $fanntyp;                                                        # Trainingstyp für Auswertung Rückgabe     
   }
   
   my $serial = encode_base64 ( Serialize ($retref), "");
@@ -25862,12 +26041,17 @@ sub aiFannTrain {
   $ann->bit_fail_limit              ($bit_fail_limit);
   $ann->hidden_activation_steepness ($hidden_steepness);
   
-  my @steepness = ($hidden_steepness, $hidden_steepness - 0.2, $hidden_steepness - 0.4);               # Hidden 1: schärfer, Hidden 2: glatter  ...
-  
-  for my $i (1..$num_hidddenlays) {
-      $ann->layer_activation_steepness($i, max(0.1, $steepness[$i-1]));
+  my @steepness_dyn;
+  for my $i (0 .. $num_hidddenlays-1) {                                                                 # Dynamische Steepness-Liste für alle Hidden-Layer erzeugen
+      my $s = $hidden_steepness - 0.2 * $i;
+      push @steepness_dyn, max (0.1, $s);
   }
-  
+
+  for my $i (1 .. $num_hidddenlays) {                                                                   # Steepness für alle Hidden-Layer setzen
+      $ann->layer_activation_steepness($i, $steepness_dyn[$i-1]);
+  }
+
+ 
   my $lr = round5 ($ann->learning_rate);
   my $lm = round1 ($ann->learning_momentum);
   my $ta = $ann->training_algorithm;
@@ -26151,6 +26335,13 @@ sub aiFannTrain {
   my $metrics        = _aiFannSlopeBias (\@targets, \@preds);                               # Modell-Slope und Modell-Bias auf denormalisierten Werten
   my $model_slope    = $metrics->{slope_regres};
   my $model_bias     = $metrics->{bias_regres};
+  my $cal_slope      = 1.0;                                                                 # Schutz gegen degenerierte Werte
+  my $cal_bias       = 0.0;                                                                 # ... default: keine Korrektur
+  
+  if (defined $model_slope && $model_slope > 0.5  && $model_slope < 2.0) {                  # Inverse Kalibrierung: y_true ≈ (y_pred - bias) / slope
+      $cal_slope = 1.0 / $model_slope;                                                      # z.B. 1/0.85 = 1.176
+      $cal_bias  = -$model_bias / $model_slope;                                             # z.B. -159/0.85 = -187 Wh
+  }
   
   my $err_metrics    = _aiFannErrorMetrics (\@targets, \@preds);                            # Fehlermetriken in Originalskala (denormalisiert)
   my $mae            = $err_metrics->{mae};                                                 # MAE (Durchschnitt) Originalskala
@@ -26201,6 +26392,37 @@ sub aiFannTrain {
   # Rauschwertermittlung und Bit-Fail-Limit-Empfehlung
   ######################################################
   my ($noise_flag, $bitfail_suggestion) = _aiFannDetectNoiseLevel (\@targets, $mae, $target_median);
+  
+  # Epochen-Diagnose
+  ###################
+  my $epoch_diag = _aiFannEpochDiagnostic ( { best_epoch         => $best_train_epoch,
+                                              mse_train          => $best_train_mse,
+                                              mse_val            => $mse_val,
+                                              val_std            => $val_std,
+                                              val_mean           => $val_mean,
+                                              slope              => $model_slope,
+                                              r2                 => $r2,
+                                              rmse_rel           => $weighted_rmse_rel,
+                                              bitfail            => $bitfail,
+                                              num_epoch          => $num_epoch,
+                                              num_inputs         => $num_inputs,       
+                                              split_index        => $split_index,      
+                                              num_train_datasets => $num_train_datasets,
+                                              hidden_layers      => $hidden_layers, 
+                                              learning_rate      => $learning_rate,
+                                              lang               => $paref->{lang},
+                                            }
+                                          );
+                                          
+  my $hints_html = '';
+
+  if (@{$epoch_diag->{epoch_hints}}) {
+      $hints_html = '<ul>'
+                  . join ('', map { '<li>' . $_ . '</li>' } @{$epoch_diag->{epoch_hints}})
+                  . '</ul>';
+  }
+
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints} = $hints_html;
   
   # Retry-Indikator ausführen
   #############################
@@ -26297,6 +26519,15 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{NoiseLevel}     = $noise_flag;
   $data{$name}{$fanntyp.'temp'}{$attempt}{BitFailSuggest} = $bitfail_suggestion;
   
+  $data{$name}{$fanntyp.'temp'}{$attempt}{CalSlope}       = $cal_slope;                             # Kalibrierungs-Steigung
+  $data{$name}{$fanntyp.'temp'}{$attempt}{CalBias}        = $cal_bias;                              # Kalibrierungs-Offset
+  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochCode}      = $epoch_diag->{epoch_code};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochLabel}     = $epoch_diag->{epoch_label};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochRelPct}    = $epoch_diag->{epoch_rel_pct};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochAmpel}     = $epoch_diag->{epoch_ampel};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints}     = $hints_html;
+  
   my $runtime    = round2 (CurrentVal ($name, $fanntyp.'NNRuntimeTrain', 0));
   my $trainstate = !$err 
                     ? 'ok' 
@@ -26333,7 +26564,7 @@ sub aiFannFinishTrain {
 
   my $paref   = eval { thaw ($serial) };                          # Deserialisierung
   my $name    = $paref->{name};
-  my $fanntyp = $paref->{fannType};  
+  my $fanntyp = $paref->{fanntyp};  
   my $hash    = $defs{$name};
   my $debug   = getDebug ($hash);  
 
@@ -26350,7 +26581,7 @@ sub aiFannFinishTrain {
   }
   
   if ($debug =~ /aiProcess/xs) {
-      Log3 ($name, 1, "$name DEBUG> AI FANN $fanntyp Training BlockingCall PID '$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}' finished");
+      Log3 ($name, 1, "$name DEBUG> AI FANN $fanntyp Training BlockingCall PID '$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}' finished. Trainstate: $NNTrainstate");
   }
   
   delete($hash->{HELPER}{AINNTRAINBLOCKRUN});
@@ -26381,25 +26612,35 @@ return;
 ################################################################
 sub _aiFannDetectNoiseLevel {
   my ($targets, $mae_live, $median) = @_;
-
+  
   my $n    = @$targets;
   my $flag = 'stable';
   my $bfl  = 0.22;                                                                # Default für stabile Haushalte
-
+  
   return ($flag, $bfl) if $n < 10;
 
-  # --- Volatilität (delta1) ---
+  # --- Schwellenwerte ---
+  my $THR_VOLATILITY  = 0.12;
+  my $THR_ACF1        = 0.25;
+  my $THR_NOISE_RATIO = 0.22;
+
+  # --- Volatilität (delta1) – relativ zum Median ---
   my @deltas;
+  
   for my $i (1 .. $#$targets) {
       push @deltas, abs($targets->[$i] - $targets->[$i-1]);
   }
-  my $volatility = medianArray(\@deltas);
+  
+  my $volatility     = medianArray (\@deltas);
+  my $rel_volatility = $median > 0 ? $volatility / $median : $volatility;
 
   # --- Autokorrelation (ACF1) ---
-  my ($sum_x, $sum_y, $sum_xy, $sum_xx, $sum_yy) = (0,0,0,0,0);
-  for my $i (1 .. $#$targets) {
-      my $x = $targets->[$i];
-      my $y = $targets->[$i-1];
+  my $m = $n - 1;                                                               # V 2.6.10 Anzahl Elemente ist Index - 1
+  my ($sum_x, $sum_y, $sum_xy, $sum_xx, $sum_yy) = (0, 0, 0, 0, 0);
+ 
+ for my $i (1 .. $#$targets) {
+      my $x    = $targets->[$i];
+      my $y    = $targets->[$i-1];
       $sum_x  += $x;
       $sum_y  += $y;
       $sum_xy += $x * $y;
@@ -26407,25 +26648,313 @@ sub _aiFannDetectNoiseLevel {
       $sum_yy += $y * $y;
   }
   
-  my $den  = sqrt(($sum_xx - $sum_x**2/$n) * ($sum_yy - $sum_y**2/$n));
-  my $acf1 = $den > 0 ? ($sum_xy - $sum_x*$sum_y/$n) / $den : 0;
+  my $den  = sqrt(($sum_xx - $sum_x**2/$m) * ($sum_yy - $sum_y**2/$m));
+  my $acf1 = $den > 0 ? ($sum_xy - $sum_x*$sum_y/$m) / $den : 1.0;              # Bei konstanter Reihe ($den == 0): maximale Regelmäßigkeit -> acf1 = 1.0
 
   # --- Noise-Ratio ---
   my $noise_ratio = $median > 0 ? ($mae_live / $median) : 0;
 
-  # --- Score berechnen ---
+  # --- Gewichteter Score ---
+  # noise_ratio ist das stärkste Signal -> doppelte Gewichtung
   my $score = 0;
-  $score++ if $volatility  > 0.12;
-  $score++ if $acf1        < 0.25;
-  $score++ if $noise_ratio > 0.22;
+  $score   += 2 if $noise_ratio    > $THR_NOISE_RATIO;
+  $score   += 1 if $rel_volatility > $THR_VOLATILITY;
+  $score   += 1 if $acf1           < $THR_ACF1;
 
   # --- 4-Stufen-Logik ---
-  if    ($score >= 3) { $flag = 'noisy';      $bfl  = 0.40; }
-  elsif ($score >= 2) { $flag = 'borderline'; $bfl  = 0.34; }
-  elsif ($score >= 1) { $flag = 'low';        $bfl  = 0.28; }
-  else                { $flag = 'stable';     $bfl  = 0.22; }
+  if    ($score >= 4) { $flag = 'noisy';      $bfl = 0.40; }
+  elsif ($score >= 3) { $flag = 'borderline'; $bfl = 0.34; }
+  elsif ($score >= 2) { $flag = 'low';        $bfl = 0.28; }
+  else                { $flag = 'stable';     $bfl = 0.22; }
 
 return ($flag, $bfl);
+}
+
+################################################################
+#   Epochen-Diagnose: Lernverhalten aus $best_epoch
+#   ableiten
+################################################################
+sub _aiFannEpochDiagnostic {
+  my $paref              = shift;
+  my $best_epoch         = $paref->{best_epoch};
+  my $mse_train          = $paref->{mse_train};
+  my $mse_val            = $paref->{mse_val};
+  my $val_std            = $paref->{val_std};
+  my $val_mean           = $paref->{val_mean};
+  my $slope              = $paref->{slope};
+  my $r2                 = $paref->{r2};
+  my $rmse_rel           = $paref->{rmse_rel};
+  my $bitfail            = $paref->{bitfail};
+  my $num_epoch          = $paref->{num_epoch} // AINUMEPOCHS;
+  my $num_inputs         = $paref->{num_inputs};
+  my $split_index        = $paref->{split_index};
+  my $num_train_datasets = $paref->{num_train_datasets};
+  my $hidden_layers      = $paref->{hidden_layers};
+  my $learning_rate      = $paref->{learning_rate};
+  my $lang               = $paref->{lang};
+
+  my $rel = $best_epoch / $num_epoch;
+    
+  my $overfitting = ($mse_val > 0 && $mse_train > 0)
+                  ? ($mse_val - $mse_train) / ($mse_val + 1e-9)
+                  : 0;
+                      
+  my $stability   = ($val_mean > 0)
+                  ? $val_std / ($val_mean + 1e-9)
+                  : 0;
+
+  my $code  = 'ok';
+  my $label = '';
+  my @hints;
+
+  # --- 1. Relative Epochen-Position
+  if ($rel < 0.03) {                                                                    # < 450 Epochen
+      $code  = 'very_early';
+      $label = $epoche_translations{vearly}{$lang};
+        
+      push @hints, $epoche_translations{hint1}{$lang};
+      
+      unless (defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7) {    # hint2 nur wenn kein totes Netz vorliegt
+          push @hints, $epoche_translations{hint2}{$lang};
+      }
+        
+      if ($best_epoch < 200) {
+          push @hints, $epoche_translations{hint3}{$lang};
+      }
+  }
+  elsif ($rel < 0.12) {                                                                 # 450 – 1800 Epochen
+      $code  = 'early';
+      $label = $epoche_translations{early}{$lang};
+        
+      push @hints, $epoche_translations{hint4}{$lang};
+      push @hints, $epoche_translations{hint5}{$lang};
+  }
+  elsif ($rel <= 0.72) {                                                                # 1800 – 10800 Epochen
+      $code  = 'ok';
+      $label = $epoche_translations{oklearn}{$lang};
+  }
+  elsif ($rel <= 0.90) {                                                                # 10800 – 13500 Epochen
+      $code  = 'late';
+      $label = $epoche_translations{late}{$lang};
+        
+      push @hints, $epoche_translations{hint6}{$lang};
+      push @hints, $epoche_translations{hint7}{$lang};
+  }
+  else {                                                                                # > 13500 Epochen
+      $code  = 'very_late';
+      $label = $epoche_translations{vlate}{$lang};
+        
+      push @hints, $epoche_translations{hint8}{$lang};
+      push @hints, $epoche_translations{hint9}{$lang};    
+      push @hints, $epoche_translations{hint10}{$lang};
+  }
+
+  # --- 2. Kombinations-Checks
+  # Totes Netz: lernt überhaupt nichts (Slope≈0, Val MSE < Train MSE)
+  if (defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7) {
+      push @hints, $epoche_translations{dead}{$lang};
+      $code = 'very_early';
+  }
+  
+  if ($overfitting > 0.25) {                                                            # Overfitting
+      my $pct = round1 ($overfitting * 100);
+        
+      push @hints, sprintf $epoche_translations{hint11}{$lang}, $pct;
+      $code = 'overfit' if $code eq 'ok';
+  }
+
+  if ($stability > 0.15) {                                                              # Instabiler Validierungsverlauf
+      push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability; 
+      $code = 'unstable' unless $code =~ /very/;
+  }
+
+  if (($code eq 'very_early' || $code eq 'early')                                       # Schlechte Slope in früher Phase -> Datenproblem
+      && ($slope < 0.6 || $slope > 1.4)) {
+      push @hints, sprintf $epoche_translations{hint13}{$lang}, $slope;
+  }
+
+  if ($code =~ /late/ && $rmse_rel > 20) {                                              # Späte Konvergenz + hoher RMSE -> Architektur zu klein
+      push @hints, sprintf $epoche_translations{hint14}{$lang}, $rmse_rel;
+  }
+
+  if ($r2 < 0.5 && $code eq 'ok') {                                                     # Schlechtes R² trotz gesunder Epochenphase
+      push @hints, sprintf $epoche_translations{hint15}{$lang}, $r2;   
+      push @hints, sprintf $epoche_translations{hint16}{$lang}, $r2;
+  }
+  
+  # --- 3. Architektur-Empfehlung  (vor Ampel-Block einfügen)
+  my $arch_ref = __aiFannArchHint ({ num_inputs         => $num_inputs,
+                                     split_index        => $split_index,
+                                     num_train_datasets => $num_train_datasets,
+                                     hidden_layers      => $hidden_layers,
+                                     epoch_code         => $code,
+                                     learning_rate      => $learning_rate,
+                                     lang               => $lang,
+                                   });
+
+  push @hints, @{$arch_ref->{hints}} if @{$arch_ref->{hints}};
+
+  # --- 4. Ampel
+  my $ampel = $code eq 'ok'                                ? 'green'
+            : $code =~ /^(early|late|overfit)$/            ? 'yellow'
+            : $code =~ /^(very_early|very_late|unstable)$/ ? 'red'
+            :                                                'grey';
+
+return { epoch_code    => $code,
+         epoch_label   => $label,
+         epoch_rel_pct => round1 ($rel * 100),
+         epoch_ampel   => $ampel,
+         epoch_hints   => \@hints,
+       };
+}
+
+################################################################
+#   Architektur-Empfehlung basierend auf Datenmenge,
+#   Inputs und aktuellem Lernverhalten
+################################################################
+sub __aiFannArchHint {
+  my $paref              = shift;
+  my $num_inputs         = $paref->{num_inputs}         // 0;
+  my $split_index        = $paref->{split_index}        // 0;
+  my $num_train_datasets = $paref->{num_train_datasets} // 0;
+  my $hidden_layers      = $paref->{hidden_layers}      // '';
+  my $epoch_code         = $paref->{epoch_code}         // 'ok';
+  my $learning_rate      = $paref->{learning_rate};
+  my $lang               = $paref->{lang}               // 'EN';
+  
+  my @hints;
+
+  return { hints => \@hints } if !$num_inputs || !$split_index || !$hidden_layers;
+  
+  if ($split_index < AINUMMININPUTS) {                                                              # Datenmenge zu gering
+      push @hints, sprintf $epoche_translations{hint21}{$lang}, $split_index, AINUMMININPUTS;
+      return { hints => \@hints };                                                                  # weitere Architekturhinweise sinnlos
+  }
+
+  # --- Aktuelle Architektur auswerten
+  my @cur_layers = split /-/, $hidden_layers;
+  my $cur_params = 0;
+  my $prev       = $num_inputs;
+
+  for my $n (@cur_layers) {
+      $cur_params += ($prev + 1) * $n;                                                              # Gewichte + Bias je Schicht
+      $prev        = $n;
+  }
+  
+  $cur_params  += $prev + 1;                                                                        # letzte Hidden → Output + Bias
+  my $cur_ratio = $split_index / ($cur_params || 1);
+
+  # --- Optimale Architektur berechnen                                                              # Ziel: ~10 Trainingsdaten pro Parameter (Mitte des Zielkorridors 8–20)
+  my $target_params = int ($split_index / 10);
+
+  my @nice   = (8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128);                                        # Erste Hidden-Schicht: sqrt(target_params), begrenzt auf num_inputs
+  my $raw_h1 = int (sqrt ($target_params));
+  my $min_h1 = max (8, int ($num_inputs / 8));                                                      # Input-abhängiger Mindestboden
+  $raw_h1    = max ($raw_h1, $min_h1);                  
+  $raw_h1    = $num_inputs if $raw_h1 > $num_inputs;
+
+  my $sug_h1 = (sort { abs($a - $raw_h1) <=> abs($b - $raw_h1) } @nice)[0];                         # Auf nächsten "schönen" Wert runden
+
+  # --- Architekturtiefe je nach Parameteranzahl
+  my $sug_arch;
+
+  if ($target_params < 300) {                                                                       # flach
+      my $h2    = max (8, int ($sug_h1 / 2));
+      $sug_arch = "$sug_h1-$h2";
+  }
+  elsif ($target_params < 1500) {                                                                   # mittel
+      my $h2    = max (8, int ($sug_h1 / 2));
+      my $h3    = int ($h2 / 2);
+      $sug_arch = $h3 >= 8 ? "$sug_h1-$h2-$h3" : "$sug_h1-$h2";
+  }
+  else {                                                                                            # tief
+      my $h2    = max (8, int ($sug_h1 / 2));
+      my $h3    = max (8, int ($h2   / 2));
+      my $h4    = int ($h3 / 2);
+      $sug_arch = $h4 >= 8 ? "$sug_h1-$h2-$h3-$h4" : "$sug_h1-$h2-$h3";
+  }
+
+  # --- Tiefe mindestens so tief wie aktuelle Architektur
+  my $cur_depth = scalar @cur_layers;
+  my $sug_depth = scalar (split /-/, $sug_arch);                                                    # Anzahl Schichten der vorgeschlagenen Architektur
+
+  if ($sug_depth < $cur_depth && $cur_ratio > 10) {                                                 # cur_ratio -> Guard: nur bei zu kleinem Netz
+      my @sug_layers;
+      my $n = $sug_h1;
+
+      for my $i (0 .. $cur_depth-1) {
+          push @sug_layers, max (8, $n);
+          $n = int ($n * 0.6);
+      }
+
+      $sug_arch  = join '-', @sug_layers;
+      $sug_depth = $cur_depth;
+  }
+  
+  # Nach Tiefenkorrektur: resultierendes Ratio prüfen
+  my $sug_params = 0;               
+  my $p          = $num_inputs;
+  
+  for my $n (split /-/, $sug_arch) {
+      $sug_params += ($p + 1) * $n;
+      $p = $n;
+  }
+  
+  $sug_params  += $p + 1;
+  my $sug_ratio = $split_index / ($sug_params || 1);
+
+  if ($sug_ratio < 5) {                                                                             # Falls immer noch unter Ziel: eine Iteration kleiner
+      my @layers = map { max(8, int($_ * 0.6)) } split(/-/, $sug_arch);                             # Alle Schichten um Faktor 0.6 reduzieren
+      $sug_arch  = join ('-', @layers);
+      $sug_depth = scalar @layers;
+  }
+    
+  # --- Empfehlung Lernrate je nach Netztiefe
+  my $sug_lr = $sug_depth == 1 ? 0.0100                                                             # Empfohlene Lernrate je nach Netztiefe
+             : $sug_depth == 2 ? 0.0050
+             : $sug_depth == 3 ? 0.0030
+             :                   0.0015;
+
+  # Strukturelles Datenproblem: zu wenige Daten für die Inputanzahl
+  my $min_params = ($num_inputs + 1) * 8 + 9;                                                       # minimalste 1-Layer-Architektur mit 8 Neuronen
+  
+  if ($split_index / ($min_params || 1) < 5) {
+      push @hints, sprintf $epoche_translations{hint22}{$lang}, $num_inputs, $split_index;
+      return { hints => \@hints };                                                                  # weitere Architekturhinweise sinnlos
+  }
+  
+  my $lr_hint = (defined $learning_rate && abs($sug_lr - $learning_rate) < 0.0001)                  # Hilfssub-äquivalent: hint19 nur ausgeben wenn Empfehlung von aktueller LR abweicht
+                ? ''
+                : sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;  
+  
+  # --- Hinweise ausgeben  
+  if ($cur_ratio > 20 && $epoch_code =~ /^(late|very_late|ok)$/) {                                  # Verhältnis zu hoch → Netz zu klein
+      push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
+      push @hints, $lr_hint if $lr_hint;                                                            # einfügen Hilfssub-äquivalent: hint19
+  }
+  elsif ($cur_ratio < 3 && $epoch_code eq 'overfit') {                                              # Verhältnis zu niedrig → Netz zu groß NUR bei gleichzeitigem Qualitätsproblem auslösen
+      push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
+      push @hints, $lr_hint if $lr_hint;                                                            # einfügen Hilfssub-äquivalent: hint19
+  } 
+  elsif ($sug_arch ne $hidden_layers                                                                # Vorschlag weicht deutlich ab, aber Ratio noch im Korridor
+       && ($cur_ratio < 6 || $cur_ratio > 18)
+       && $epoch_code ne 'ok') {
+    if ($cur_ratio > 18) {                                                                          # Netz zu klein für Datenmenge
+        push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
+        push @hints, $lr_hint if $lr_hint;                                                          # einfügen Hilfssub-äquivalent: hint19
+    }
+    else {                                                                                          # Netz zu komplex für Datenmenge
+        push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
+        push @hints, $lr_hint if $lr_hint;                                                          # einfügen Hilfssub-äquivalent: hint19
+    }
+}
+
+  if ($num_train_datasets > 6000) {                                                                 # Großes Dataset → TrainLimit vorschlagen
+      my $suggested_limit = max (2000, int ($num_train_datasets * 0.5 / 100) * 100);                # ~50%, auf 100 gerundet
+      push @hints, sprintf $epoche_translations{hint20}{$lang}, $num_train_datasets, $suggested_limit;
+  }
+
+return { hints => \@hints };
 }
 
 ################################################################################################
@@ -26627,6 +27156,7 @@ sub aiFannGetConResult {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $chour   = $paref->{chour};                                                                # aktuelle Stunde (00 .. 23)
+  my $t       = $paref->{t};
   my $debug   = $paref->{debug};
   my $fanntyp = 'con';                                                                          # FANN Verwendungsart 'consumption' Prognose                   
   
@@ -26922,7 +27452,7 @@ sub aiFannGetConResult {
       #debugLog ($paref, 'aiData', "AI FANN - Series data: ".Dumper @flat_targets);   
       #debugLog ($paref, 'aiData', "AI FANN - Lags: ".Dumper $lags);        
 
-      #if ($paref->{debug} =~ /aiData/xs) {
+      #if ($debug =~ /aiData/xs) {
       #    my $inpo = join ", \n", @new_input;
       #    Log3 ($name, 1, "$name DEBUG> AI AI FANN - hod: $hod - Normalized input dataset: \n".
       #                     $inpo);
@@ -26944,20 +27474,33 @@ sub aiFannGetConResult {
       $denorm_val = round0 ($denorm_val);
       $prediction = round0 ($prediction);
       $tc         = round0 ($tc);
+
+      # Fortschreibung der Arrays! mit Horizont-Dämpfung
+      ####################################################
+      my $hist_ref    = _aiFannGetHistoricalReference ($name, $fanntyp, $hod, $t);
+      my $blend_alpha = $hist_ref > 0
+                      ? min (0.8, $num / MAXNEXTHOURS)                                      # maximal 80% historisch
+                      : 0;                                                                  # kein Blending ohne Referenz
+
+      my $forward_val = (1 - $blend_alpha) * $prediction 
+                      +      $blend_alpha  * $hist_ref;
       
-      # Fortschreibung der Arrays!
-      ##############################
-      push @flat_targets,     $prediction;
-      push @temp_norm_values, $temp_norm;                                                    # wichtig: Temperaturreihe auch erweitern
-      push @presence_values,  $presence;                                                     # wichtig: Presence fortschreiben
+      $forward_val    = round0 ($forward_val);
+
+      push @flat_targets,     $forward_val;                                                 # V 2.6.10 statt direkt $prediction
+      push @temp_norm_values, $temp_norm;                                                   # wichtig: Temperaturreihe auch erweitern
+      push @presence_values,  $presence;                                                    # wichtig: Presence fortschreiben
+
       
       # Hybridmodell mit Legacy
       ##########################
       my $confc_final = $alpha * $prediction + (1 - $alpha) * $intlegacyconfc;
       $confc_final    = round0 ($confc_final);
-      
-      debugLog ($paref, 'aiData', "AI FANN con fc - $starttime, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)");
-      
+ 
+      if ($debug =~ /aiData/xs) {
+          my $dthr = (split ':', $starttime, 2)[0];
+          Log3 ($name, 1, "$name DEBUG> AI FANN con fc - $dthr, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)");
+      }       
       
       # Daten speichern
       ###################
@@ -26992,7 +27535,6 @@ sub _aiFannPredict {
   my $maxval    = $data{$name}{neuralnet}{$fanntyp}{MaxVal};                                        # Target Denormalisierungsparameter
   my $fannModel = $data{$name}{neuralnet}{$fanntyp}{FannModel};
   
-  my $len = scalar (@$input);                                                                       # Anzahl Features 
   my $out;
   eval { $out = $fannModel->run ($input) };                                                         # Netz laufen lassen
   
@@ -27007,12 +27549,38 @@ sub _aiFannPredict {
       
       return (0, $bc, $zone);
   }
-                                                                 # Bias Correction
+                                                                 
   my $norm_val   = $out->[0];                                                                       # Ergebnis ist Arrayref mit num_outputs Werten
-  my $denorm_val = _aiFannDenormMinMaxValue   ($norm_val, $minval, $maxval);                        # Denormalisierung mit Min-Max                          
+  my $denorm_val = _aiFannDenormMinMaxValue ($norm_val, $minval, $maxval);                          # Denormalisierung mit Min-Max                          
   $denorm_val    = max (0, $denorm_val);                                                            # Untergrenze schützen
-
+    
 return $denorm_val;
+}
+
+################################################################
+# Historischer Referenzwert: Mittelwert gleiche Stunde
+# der letzten N Tage aus der History
+################################################################
+sub _aiFannGetHistoricalReference {
+  my ($name, $fanntyp, $hod, $t) = @_;
+    
+  my $days  = 7;
+  my $sum   = 0;
+  my $count = 0;
+    
+  for my $d (1 .. $days) {
+      my $dt       = timestringsFromOffset ($name, $t, $d * -86400);  
+      my $past_day = $dt->{day};
+      
+      my $val      = HistoryVal ($name, $past_day, $hod, $fanntyp, undef);
+        
+      if (defined $val && $val >= 0) {
+          $sum   += $val;
+          $count++;
+      }
+  }
+    
+return $count > 0 ? $sum / $count : 0;
 }
 
 ################################################################
@@ -27126,10 +27694,29 @@ sub _aiFannApplyBiasCorrection {
   $clamped_drift_bias = 0                          if(!$drift_enabled);                         # Level-Skalierung Freischaltung              
   $res                = $res + $clamped_drift_bias if($is_baseline);                            # Drift-Bias nur auf Baseline anwenden (bei Freischaltung)
 
+  
+  # --- Statische Trainingskalibrierung (Peak-geschützt) ---                                    
+  # Korrigiert strukturellen Slope-Fehler aus dem Training.
+  # Wird nur auf Grundlast angewendet, nicht auf Peaks,
+  # da cal_slope > 1 Peaks sonst weiter amplifiziert.
+  my $cal_addon = 0;
+  
+  if ($is_baseline) {
+      my $cal_slope = $data{$name}{neuralnet}{$fanntyp}{CalSlope} // 1.0;
+      my $cal_bias  = $data{$name}{neuralnet}{$fanntyp}{CalBias}  // 0.0;
+      
+      if ($cal_slope != 1.0 || $cal_bias != 0.0) {
+          my $cal_val = $cal_slope * $res + $cal_bias;
+          my $maxval  = $data{$name}{neuralnet}{$fanntyp}{MaxVal} // $res;
+          $res        = max (0, min ($maxval, $cal_val));
+          $cal_addon  = 1;
+      }
+  }  
+  
   # --- Bias-Zonenlogik ---
   my $bias_zone = '-';
   
-  if ($is_baseline) {
+  if ($is_baseline && !$cal_addon) {
       if ($slope >= 0.9 && $slope <= 1.1 && $bias_ratio <= 1.0 && $rmse_rel <= 25) {            # --- Zone 1: Grüne Zone (sanfte, baseline-begrenzte Korrektur) ---
           my $soft_bias = $clamped_bias * $alpha_green;
           $res          = $res + $soft_bias;                                                    # nur additive Basiskorrektur, kein Slope!
@@ -27141,49 +27728,18 @@ sub _aiFannApplyBiasCorrection {
           $bias_zone    = 2;
       }
       else {
-          $bias_zone = 3;                                                                       # --- Zone 3: Rote Zone (Baseline erkannt, aber die Modellqualität ist zu schlecht, um eine additive Bias‑Korrektur zuzulassen)
+          $bias_zone = 3;                                                                       # --- Zone 3: Rote Zone (Baseline erkannt, aber die Modellqualität ist zu schlecht, um eine additive Bias-Korrektur zuzulassen)
       }  
-  }                                                                                             
+  }
+  elsif ($is_baseline && $cal_addon) {
+      $bias_zone = 3;                                                                           # keine additive Bias-Korrektur, StatCal hat bereits korrigiert
+  }
+
+  if ($cal_addon) { $bias_zone .= '+OSL' }                                                      # Anwendung OLS = Ordinary Least Squares = Methode der kleinsten Quadrate
 
   my $corr_val = $res - $val_predict;
 
 return ($res, $corr_val, $bias_zone, $drift_zone);
-}
-
-####################################################################################
-# Adaptives Fenster für Drift-Analyse (universell & peak-robust)
-# - Ungewöhnliche Ereignisse (Peaks) → Fenster vergrößern
-# - Schleichende Drift          → Fenster verkleinern
-# - Dauerhafte Drift            → Fenster verkleinern
-# - Sehr stabiles Modell        → Fenster vergrößern
-# - Frisches Modell / fehlende Daten → Standard (96)
-#
-# Schwellenwerte:
-#   drift_score: Peak >2.5 | Dauerhaft >2.0 | Schleichend 1.5–2.0 | Stabil <1.2
-#   sem_ratio:   Anteil der Punkte mit |Fehler| > 0.5 × MAE_model
-#                hoch >0.7 → Fehler weit verbreitet (konstante/dauerhafte Drift)
-#                niedrig <0.4 → Fehler konzentriert auf wenige Punkte (seltene Peaks)
-#   age_hours:   Dauerhafte Drift >72h | Schleichende Drift >48h | Stabil >72h
-####################################################################################
-sub aiFannSelectWindow {
-  my ($name, $fanntyp) = @_;
-
-  my $default     = 96;
-  my $age_hours   = AiNeuralVal($name, $fanntyp, 'ModelAgeHours', undef);
-  my $drift_score = AiNeuralVal($name, $fanntyp, 'DriftScore',    undef);
-  my $sem_ratio   = AiNeuralVal($name, $fanntyp, 'DriftSemRatio', undef);
-
-  if (!defined $age_hours || !defined $drift_score || !defined $sem_ratio) {
-      return $default;
-  }
-  
-  if    ($drift_score > 2.5 && $sem_ratio > 0.7)                                             { return 120 }  # 1) Peak: weit verbreitet → vergrößern
-  elsif ($drift_score > 2.0 && $sem_ratio < 0.4)                                             { return 120 }  # 2) seltene extreme Peaks → vergrößern (retuschieren)
-  elsif ($drift_score > 2.0 && $sem_ratio >= 0.4 && $age_hours > 72)                         { return  48 }  # 3) dauerhafte Drift: viele Punkte betroffen → verkleinern
-  elsif ($drift_score > 1.5 && $drift_score <= 2.0 && $sem_ratio < 0.4 && $age_hours > 48)   { return  72 }  # 4) schleichende Drift → moderat verkleinern
-  elsif ($drift_score < 1.2 && $age_hours > 72)                                              { return 144 }  # 5) stabiles Modell → vergrößern  
-
-return $default;
 }
 
 ###########################################################################
@@ -27198,7 +27754,7 @@ sub aiFannDetectDrift {
   my $debug   = shift;
   my $fanntyp = shift;
 
-  my $window = aiFannSelectWindow ($name, $fanntyp);                                    # optimales Drift-Detct-Fenster ermitteln (vor Löschen Kennwerte)
+  my $window = _aiFannSelectWindow ($name, $fanntyp);                                       # optimales Drift-Detct-Fenster ermitteln (vor Löschen Kennwerte)
 
   my @drift_kpis = qw (
       DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftRefMae DriftIndex
@@ -27246,11 +27802,14 @@ sub aiFannDetectDrift {
       my $rmse_rel_model   = AiNeuralVal ($name, $fanntyp, 'RmseRel',   30);
       my $bias_model       = AiNeuralVal ($name, $fanntyp, 'ModelBias',  0);
       my $slope_model      = AiNeuralVal ($name, $fanntyp, 'ModelSlope', 1);
+      
+      my $cal_slope        = AiNeuralVal ($name, $fanntyp, 'CalSlope', 1.0);
+      my $cal_bias         = AiNeuralVal ($name, $fanntyp, 'CalBias',  0.0);
 
       $nn->{DriftRefMae}   = $mae_model;
       $nn->{DriftRefRmse}  = $rmse_rel_model;
-      $nn->{DriftRefBias}  = $bias_model;
-      $nn->{DriftRefSlope} = $slope_model;                                                                  # V 2.6.2
+      $nn->{DriftRefBias}  = ($cal_slope != 1.0 || $cal_bias != 0.0) ? 0.0 : $bias_model;
+      $nn->{DriftRefSlope} = ($cal_slope != 1.0 || $cal_bias != 0.0) ? 1.0 : $slope_model;                 # V 2.6.2
       
       $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = $flag;
       return $flag;
@@ -27465,8 +28024,8 @@ sub aiFannDetectDrift {
      
           $data{$name}{neuralnet}{$fanntyp}{DriftRefBias}       = $new_bias;
           $data{$name}{neuralnet}{$fanntyp}{DriftRefSlope}      = $new_slope;
-          $data{$name}{neuralnet}{$fanntyp}{DriftBias}          = 0;
-          $data{$name}{neuralnet}{$fanntyp}{DriftSlope}         = 1;
+          $data{$name}{neuralnet}{$fanntyp}{DriftBias}          = round2 ($bias_live - $new_bias);      # statt 0
+          $data{$name}{neuralnet}{$fanntyp}{DriftSlope}         = round3 ($slope_live / $new_slope);    # statt 1
           $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}    = 0;
           $data{$name}{neuralnet}{$fanntyp}{DriftLastRecalTime} = (timestampToTimestring ($name, $t, $lang))[0];
           
@@ -27532,6 +28091,42 @@ sub aiFannDetectDrift {
   }
   
 return $flag;
+}
+
+####################################################################################
+# Adaptives Fenster für Drift-Analyse (universell & peak-robust)
+# - Ungewöhnliche Ereignisse (Peaks) → Fenster vergrößern
+# - Schleichende Drift          → Fenster verkleinern
+# - Dauerhafte Drift            → Fenster verkleinern
+# - Sehr stabiles Modell        → Fenster vergrößern
+# - Frisches Modell / fehlende Daten → Standard (96)
+#
+# Schwellenwerte:
+#   drift_score: Peak >2.5 | Dauerhaft >2.0 | Schleichend 1.5–2.0 | Stabil <1.2
+#   sem_ratio:   Anteil der Punkte mit |Fehler| > 0.5 × MAE_model
+#                hoch >0.7 → Fehler weit verbreitet (konstante/dauerhafte Drift)
+#                niedrig <0.4 → Fehler konzentriert auf wenige Punkte (seltene Peaks)
+#   age_hours:   Dauerhafte Drift >72h | Schleichende Drift >48h | Stabil >72h
+####################################################################################
+sub _aiFannSelectWindow {
+  my ($name, $fanntyp) = @_;
+
+  my $default     = 96;
+  my $age_hours   = AiNeuralVal($name, $fanntyp, 'ModelAgeHours', undef);
+  my $drift_score = AiNeuralVal($name, $fanntyp, 'DriftScore',    undef);
+  my $sem_ratio   = AiNeuralVal($name, $fanntyp, 'DriftSemRatio', undef);
+
+  if (!defined $age_hours || !defined $drift_score || !defined $sem_ratio) {
+      return $default;
+  }
+  
+  if    ($drift_score > 2.5 && $sem_ratio > 0.7)                                             { return 120 }  # 1) Peak: weit verbreitet → vergrößern
+  elsif ($drift_score > 2.0 && $sem_ratio < 0.4)                                             { return 120 }  # 2) seltene extreme Peaks → vergrößern (retuschieren)
+  elsif ($drift_score > 2.0 && $sem_ratio >= 0.4 && $age_hours > 72)                         { return  48 }  # 3) dauerhafte Drift: viele Punkte betroffen → verkleinern
+  elsif ($drift_score > 1.5 && $drift_score <= 2.0 && $sem_ratio < 0.4 && $age_hours > 48)   { return  72 }  # 4) schleichende Drift → moderat verkleinern
+  elsif ($drift_score < 1.2 && $age_hours > 72)                                              { return 144 }  # 5) stabiles Modell → vergrößern  
+
+return $default;
 }
 
 ################################################################
@@ -27665,7 +28260,7 @@ sub _aiFannSlopeBias {
   return {
       slope_regres => $slope,
       bias_regres  => $bias,
-      (defined $warning ? (warning => $warning) : ()),
+      ($warning ? (warning => $warning) : ()),
   };
 }
 
@@ -36350,11 +36945,11 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td>If aiConProfile is not set, the system automatically selects the profile that is most likely to be accurate.                                                 </td></tr>
             <tr><td>                          </td><td><ul> v1_common - Standard household </ul>                                                                                                                    </td></tr>
             <tr><td>                          </td><td><ul> v1_common_active - Standard household with distinct daily rhythms </ul>                                                                                 </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_pv - Household with lower weighting of the PV system </ul>                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active_pv - Household with greater emphasis on the PV system and strong daily rhythm </ul>                                                    </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_pv - Household with PV-controlled load management, i.e. when appliances are actively switched on when there is excess power </ul>             </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active_pv - Household with PV-controlled load management and a distinct daily rhythm </ul>                                                    </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump - Standard household with heat pump  </ul>                                                                                                  </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_pv - Household with lower weighting of the PV system and heat pump characteristics </ul>                                                    </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Household with greater emphasis on PV system, heat pump, and strong daily rhythm </ul>                                          </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_pv - Household with PV-controlled load management and heat pumps characteristics </ul>                                                      </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Household with PV-controlled load management, a heat pump and a distinct daily rhythm </ul>                                     </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Weighting of AI results with conventional (legacy) consumption forecast values.                                                                              </td></tr>
             <tr><td>                          </td><td><ul> * 0 - the AI results are not used, only legacy values. </ul>                                                                                            </td></tr>
@@ -36388,13 +36983,13 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * small nets (e.g., 50-25) are quick and easy, but less accurate.  </ul>                                                                                </td></tr>
             <tr><td>                          </td><td><ul> * medium nets (64-32) offer a good compromise between speed and accuracy.  </ul>                                                                        </td></tr>
             <tr><td>                          </td><td><ul> * deep networks (64-32-16) recognize complex patterns better, but are more sensitive to outliers.  </ul>                                                </td></tr>
-            <tr><td>                          </td><td>value range:<b> XY[Y]-XY[Y]-X[YY] (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                                 </td></tr>
+            <tr><td>                          </td><td>value range:<b> X[YY]-X[YY]-X[YY]... (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                              </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConLearnRate</b>    </td><td>Determines how strongly the weights of the neural network are adjusted at each training step.                                                                </td></tr>
             <tr><td>                          </td><td><ul> * small (e.g., 0.001): slow, stable learning; low risk of overshoot, but longer training time. </ul>                                                    </td></tr>
             <tr><td>                          </td><td><ul> * medium (e.g., 0.005): good compromise between speed and stability; often a sensible default value </ul>                                               </td></tr>
             <tr><td>                          </td><td><ul> * large (e.g., 0.05): fast learning, but risk of instability or divergence if the steps are too large </ul>                                             </td></tr>
-            <tr><td>                          </td><td>Values:<b> 0.05 | 0.01 | 0.001 - 0.005 </b>, default: 0.005                                                                                                  </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0.0001 - 0.05  </b>, default: 0.005                                                                                                               </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConBitFailLimit</b> </td><td>The bit-fail limit defines the error (within the normal range) at which a training example counts as an 'error'.                                             </td></tr>
             <tr><td>                          </td><td>The smaller the value, the more intense the training and the better the peaks are achieved. Larger values are more robust but less peak-sensitive.           </td></tr>
@@ -36413,7 +37008,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * 0 = chronological, reproducible, but susceptible to sequence effects </ul>                                                                            </td></tr>
             <tr><td>                          </td><td><ul> * 1 = chronological split, followed by internal shuffle—good balance between temporal validation and robust training </ul>                              </td></tr>
             <tr><td>                          </td><td><ul> * 2 = complete shuffle before split + internal shuffle - maximum mixing, but temporal structures are lost </ul>                                         </td></tr>
-            <tr><td>                          </td><td>Values:<b> 0 | 1 | 2 </b>, default: 2                                                                                                                        </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0 | 1 | 2 </b>, default: 1                                                                                                                        </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td><b>aiConShufflePeriod</b> </td><td>The shuffle period determines after how many epochs the training data is reshuffled in the background.                                                       </td></tr>
             <tr><td>                          </td><td>The parameter influences how strongly the network sees random sequences and thus generalization vs. stability.                                               </td></tr>
@@ -36433,6 +37028,10 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * RPROP works stably and automatically with customized step sizes, ideal for reliable training without many parameters </ul>                            </td></tr>
             <tr><td>                          </td><td><ul> * INCREMENTAL learns faster and reacts directly to each example, but is more sensitive to outliers. </ul>                                               </td></tr>
             <tr><td>                          </td><td>Values:<b> RPROP | INCREMENTAL </b>, default: INCREMENTAL                                                                                                    </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConTrainLimit</b>   </td><td>The specified number of the most recent training data records is used for training.                                                                          </td></tr>
+            <tr><td>                          </td><td>The default value of '0' uses all available data records.                                                                                                    </td></tr>
+            <tr><td>                          </td><td>Values:<b> 0 or Integer >= 2000 </b>, default: 0                                                                                                             </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
        </table>
        </ul>
@@ -36881,7 +37480,7 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>separately for calculating load clearance and optimized load capacity.                          </td></tr>
             <tr><td>                     </td><td>The first value is the surcharge used to calculate the load release, the second value is the    </td></tr>
             <tr><td>                     </td><td>surcharge used to calculate the optimized load capacity. Both values are percentages.           </td></tr>
-            <tr><td>                     </td><td>Value: <b>0..100[:0..100]</b> (integers)                                                        </td></tr>
+            <tr><td>                     </td><td>Value: integers <b>0..100[:0..100]</b> default: 20:20                                           </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>weightOwnUse</b> </td><td>Optional weighting of the hourly consumption forecast as an additional usable portion for       </td></tr>
             <tr><td>                     </td><td>battery charging in %. Technically, the available PV surplus is increased to calculate the      </td></tr>
@@ -39427,11 +40026,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td>Ist aiConProfile nicht gesetzt, erfolgt durch das System eine automatische Auswahl des wahrscheinlich zutreffendsten Profils.                                </td></tr>
             <tr><td>                          </td><td><ul> v1_common - Standardhaushalt </ul>                                                                                                                      </td></tr>
             <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit ausgeprägten Tagesrhythmen </ul>                                                                                </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit geringerer Gewichtung der PV-Anlage </ul>                                                                                   </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage und starkem Tagesrhythmus </ul>                                                   </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit PV-gesteuerten Lastmanagement, d.h. wenn Verbraucher bei Überschuss aktiv zugeschaltet werden </ul>                         </td></tr>
+            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit PV-gesteuerten Lastmanagement und starkem Tagesrhythmus </ul>                                                        </td></tr>
             <tr><td>                          </td><td><ul> v1_heatpump - Standardhaushalt mit Wärmepumpe  </ul>                                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit geringerer Gewichtung der PV-Anlage und Wärmepumpen Charakteristika </ul>                                                 </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Haushalt mit stärkerer Gewichtung der PV-Anlage, Wärmepumpe und starkem Tagesrhythmus </ul>                                     </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit PV-gesteuerten Lastmanagement und Wärmepumpen Charakteristika </ul>                                                       </td></tr>
+            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Haushalt mit PV-gesteuerten Lastmanagement, Wärmepumpe und starkem Tagesrhythmus </ul>                                          </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                              </td></tr>
             <tr><td>                          </td><td><ul> * 0 - die KI-Ergebnisse werden nicht verwendet, nur Legacy Werte </ul>                                                                                  </td></tr>
@@ -39465,13 +40064,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * kleine Netze (z.B. 50-25) sind schnell und einfach, aber weniger genau  </ul>                                                                         </td></tr>
             <tr><td>                          </td><td><ul> * mittlere Netze (64-32) bieten einen guten Kompromiss aus Geschwindigkeit und Genauigkeit  </ul>                                                       </td></tr>
             <tr><td>                          </td><td><ul> * tiefe Netze (64-32-16) erkennen komplexe Muster besser, sind aber empfindlicher gegenüber Ausreißern  </ul>                                           </td></tr>
-            <tr><td>                          </td><td>Wertebereich:<b> XY[Y]-XY[Y]-X[YY] (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                                </td></tr>
+            <tr><td>                          </td><td>Wertebereich:<b> X[YY]-X[YY]-X[YY]... (X = 1-9, Y = 0-9) </b>, default: 80-40-20                                                                             </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConLearnRate</b>    </td><td>Bestimmt, wie stark die Gewichte des neuronalen Netzes bei jedem Traningsschritt angepasst werden.                                                           </td></tr>
             <tr><td>                          </td><td><ul> * Klein (z.B. 0.001): langsames, stabiles Lernen; geringes Risiko von Überschwingen, aber längere Trainingszeit. </ul>                                  </td></tr>
             <tr><td>                          </td><td><ul> * Mittel (z.B. 0.005): guter Kompromiss zwischen Geschwindigkeit und Stabilität; oft ein sinnvoller Standardwert </ul>                                  </td></tr>
             <tr><td>                          </td><td><ul> * Groß (z.B. 0.05): schnelles Lernen, aber Gefahr von Instabilität oder Divergenz, wenn die Schritte zu groß sind </ul>                                 </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0.05 | 0.01 | 0.001 - 0.005 </b>, default: 0.005                                                                                                   </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0.0001 - 0.05 </b>, default: 0.005                                                                                                                 </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConBitFailLimit</b> </td><td>Das Bit-Fail-Limit definiert ab welchem Fehler (im Normbereich) ein Trainingsbeispiel als 'Fehler' zählt.                                                    </td></tr>
             <tr><td>                          </td><td>Je kleiner der Wert, desto strenger das Training und desto besser werden Peaks getroffen. Größere Werte sind robuster, aber weniger peak-sensitiv.           </td></tr>
@@ -39490,7 +40089,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * 0 = chronologisch, reproduzierbar, aber anfällig für Reihenfolge-Effekte </ul>                                                                        </td></tr>
             <tr><td>                          </td><td><ul> * 1 = chronologischer Split, danach internes Shuffle - gute Balance zwischen zeitlicher Validierung und robustem Training </ul>                         </td></tr>
             <tr><td>                          </td><td><ul> * 2 = vollständiges Shuffle vor dem Split + internes Shuffle - maximale Durchmischung, aber zeitliche Strukturen gehen verloren</ul>                    </td></tr>
-            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2 </b>, default: 2                                                                                                                         </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2 </b>, default: 1                                                                                                                         </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td><b>aiConShufflePeriod</b> </td><td>Die Shuffle-Periode bestimmt, nach wie vielen Epochen die Trainingsdaten im Hintergrund neu gemischt werden.                                                 </td></tr>
             <tr><td>                          </td><td>Der Parameter beeinflusst, wie stark das Netz zufällige Reihenfolgen sieht und damit Generalisation vs. Stabilität.                                          </td></tr>
@@ -39510,6 +40109,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * RPROP arbeitet stabil und automatisch mit angepassten Schrittweiten, ideal für zuverlässiges Training ohne viele Parameter </ul>                      </td></tr>
             <tr><td>                          </td><td><ul> * INCREMENTAL lernt schneller und reagiert direkt auf jedes Beispiel, ist aber empfindlicher gegenüber Ausreißern </ul>                                 </td></tr>
             <tr><td>                          </td><td>Werte:<b> RPROP | INCREMENTAL </b>, default: INCREMENTAL                                                                                                     </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>aiConTrainLimit</b>   </td><td>Für das Training wird die angebene Anzahl der neuesten Traningsdatensätze verwendet.                                                                         </td></tr>
+            <tr><td>                          </td><td>Mit dem Standardwert '0' werden alle verfügbaren Datensätze verwendet.                                                                                       </td></tr>
+            <tr><td>                          </td><td>Werte:<b> 0 oder Ganzzahl >= 2000 </b>, default: 0                                                                                                           </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
         </table>
         </ul>
@@ -39961,7 +40564,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>für die Berechnung der Ladefreigabe und optimierten Ladeleistung angegeben werden.              </td></tr>
             <tr><td>                     </td><td>Der erste Wert ist der Zuschlag bei der Berechnung der Ladefreigabe, der zweite Wert der        </td></tr>
             <tr><td>                     </td><td>Zuschlag bei der Berechnung der optimierten Ladeleistung. Beide Angaben sind Prozentwerte.      </td></tr>
-            <tr><td>                     </td><td>Wert: <b>0..100[:0..100]</b> (Ganzzahlen)                                                       </td></tr>
+            <tr><td>                     </td><td>Wert: Ganzzahlen <b>0..100[:0..100]</b> default: 20:20                                          </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>weightOwnUse</b> </td><td>Optionale Gewichtung der stündlichen Verbrauchsprognose als zusätzlich verwendbaren Anteil zur  </td></tr>
             <tr><td>                     </td><td>Batterieladung in %. Technisch wird der verfügbare PV-Überschuß zur Berechnung der optimierten  </td></tr>
