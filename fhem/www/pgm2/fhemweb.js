@@ -284,7 +284,7 @@ FW_jqueryReadyFn()
   }
 
   $("select[id^=sel_attr],select[id^=sel_set],select[id^=sel_get]")
-  .change(function(){ // online help
+  .click(function(){ // online help
     var val = $(this).val();
     var m = $(this).attr("name").match(/arg.(set|get|attr)(.*)/);
     if(!m)
