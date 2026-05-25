@@ -158,7 +158,7 @@ sub getRevFromControls(;$)
 
 sub getRevFromData {
   my ($max,@ret) = @_;
-  return if (!exists $data{modules}{version});
+  return (0,()) if (!exists $data{modules}{version});
   foreach my $key (keys %{$data{modules}{version}}) {
     my $rev = $data{modules}{version}{$key};
     if($rev =~ /^\$Id\:[^\$\n\r].+\$/) {
