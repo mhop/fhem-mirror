@@ -283,8 +283,9 @@ FW_jqueryReadyFn()
     FW_urlParams[kv[0]] = decodeURIComponent(kv[1]);
   }
 
-  $("select[id^=sel_attr],select[id^=sel_set],select[id^=sel_get]")
-  .click(function(){ // online help
+  function
+  onlineHelp()
+  { // online help
     var val = $(this).val();
     var m = $(this).attr("name").match(/arg.(set|get|attr)(.*)/);
     if(!m)
@@ -293,7 +294,11 @@ FW_jqueryReadyFn()
     var sel=this, devName=m[2], selType=m[1];
     var group = $(this).parent().find(':selected').parent().attr('label');
     FW_displayHelp(devName, sel, selType, val, group);
-  });
+  }
+
+  $("select[id^=sel_attr],select[id^=sel_set],select[id^=sel_get]")
+    .click(onlineHelp) // 144753
+    .change(onlineHelp);
 
   FW_smallScreenCommands();
   FW_inlineModify();
