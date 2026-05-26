@@ -195,6 +195,9 @@
 # 6.05.14   fix: get model for ShellyPro3EM
 #           add some code to catch an auth-error
 # 6.05.15   add: reading 'button_mode' for plug devices
+# 6.05.16   fix: change code to catch an auth-error
+# 6.05.17   add: ShellyEM Gen4
+# 6.05.18   add: Shelly SPSW-201XE15UL
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -217,7 +220,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.15 21.04.2026";
+my $version = "6.05.18 26.05.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -291,11 +294,11 @@ my %shelly_dropdowns = (
 # Device name as given by KB listed as comment
 my %shelly_vendor_ids = (
     # keys: 'Device model' as in KB Device identification
-    # value 0:  the Generation identifier 0=Gen1, others equal to Gen
-    # value 1:  the 'model' attribute used by the Fhem
+    # value 0:  the Generation identifier 1....4 equal to Gen
+    # value 1:  the 'model' attribute used by Fhem
     # value 2:  the 'Device name' as in KB
-    # value 3:  the 'Device Bluetooth ID', Gen3 only
-    # value 4:  plugs only: name of the user-interface
+    # value 3:  the 'Device Bluetooth ID', Gen3+ only
+    # value 4:  plugs only: name of the user-interface; EMs
     ## Gen1 devices
     "SHSW-1"     => [ 1, "shelly1",        "Shelly 1"],   ## no power metering
     "SHSW-PM"    => [ 1, "shelly1pm",      "Shelly 1PM"],
@@ -382,6 +385,7 @@ my %shelly_vendor_ids = (
     "S3SW-001P8EU"    => [ 3, "shellyplus1pm",  "Shelly 1PM Mini Gen3",    0x1016],
     "S3PM-001PCEU16"  => [ 3, "shellypmmini",   "Shelly PM Mini Gen3",     0x1023,   'PM1'],
     ## Gen4 Devices
+    "S4EM-002CXCEU"   => [ 4, "shellyemG4",     "Shelly EM Gen4",          0x1036,   'EM1'],   # added 05/2026
     "S4SW-001X16EU"   => [ 4, "shellyplus1",    "Shelly 1 Gen4",           0x1028],   # added 03/2025
     "S4SW-001P16EU"   => [ 4, "shellyplus1pm",  "Shelly 1PM Gen4",         0x1019],   # added 03/2025
     "S4PL-00116US"    => [ 4, "shellyplugus",   "Shelly Plug US Gen4",     0x1852,   "PLUGS_UI"],   # added 01/2026
@@ -394,6 +398,7 @@ my %shelly_vendor_ids = (
     "S4EM-001PXCEU16" => [ 4, "shellyemmini",   "Shelly EM Mini Gen4",     0x1033,    'EM1'],   # added 03/2025
     ## 2nd Gen PRO devices
     "SPSW-001XE15UL"  => [ 2, "shellypro1",     "Shelly Pro 1 (UL)"],      ## added 03/2026
+    "SPSW-201XE15UL"  => [ 2, "shellypro1",     "Shelly Pro 1 (UL)"],      ## added 05/2026
     "SPSW-001XE16EU"  => [ 2, "shellypro1",     "Shelly Pro 1"],           ## v.0 not listed by KB
     "SPSW-201XE16EU"  => [ 2, "shellypro1",     "Shelly Pro 1 v.1"],
     "SPSW-201PE15UL"  => [ 2, "shellypro1pm",   "Shelly Pro 1PM (UL)"],    ## added 03/2026
@@ -525,6 +530,7 @@ my %shelly_models = (
     "shelly3emG3"   => [0,0,0, 0,3,0,  3,0,2],    # similar to 'shellypro3em'
     "shellyshutter" => [0,1,0, 2,3,2,  0,0,0],     # similar to shellyPlus2PM, but without multimode
     #-- 4nd generation devices (Gen4)
+    "shellyemG4"    => [1,0,0, 0,4,0,  2,0,0],    # similar to 'shellyemG3'
     "shellyplugus"  => [1,0,0, 1,4,-1, 0,0,0],    # illuminance sensor not support yet
     "shellypstrip4" => [4,0,0, 4,4,-4, 0,0,0],    # buttons?
     "shellydimmerg4"=> [0,0,1, 1,4,2,  0,0,0],
@@ -7600,15 +7606,15 @@ sub Shelly_error_handling {
     }elsif( $err =~ /Auth/ ){ # Shelly is protected by User/Password
         $errE = undef;
         $errS = "Authentication required";
+    }elsif( $err =~ /authentication|401/ ){ #401 Unauthorized
+        $errE = $err;
+        $errS = "Error: Authentication";
     }elsif( $err =~ /wrong (value|pct)/ ){
         $errE = $err;
         $errS = "Error";
     }elsif( $err =~ /wrong/ ){
         $errE = $err;
         $errS = "Error: something wrong";
-    }elsif( $err =~ /401/ ){ #401 Unauthorized
-        $errE = $err;
-        $errS = "Error: Authentication";
     }elsif( $err =~ /404/ ){ #404 No Handler / wrong command
         $errE = $err;
         $errS = "Error: No Handler";
