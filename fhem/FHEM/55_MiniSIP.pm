@@ -149,16 +149,14 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
       is passed as a parameter.<br>
       <br>
       <b>Example:</b><pre><code>
+# --- code snippet start
+
 my $res = Net::SIP::Response->new(
   200,
   'OK',
   { 'Via'            => [ $req->get_header('Via') ],
     'From'           => $req->get_header('From'),
-    'To'             => $req->get_header('To'),
-    'Call-ID'        => $req->get_header('Call-ID'),
-    'CSeq'           => $req->get_header('CSeq'),
-    'Contact'        => $req->get_header('Contact'),
-    'Expires'        => 300,
+    ... add more data here ...
     'Content-Length' => '0',
   }
 );
@@ -166,6 +164,8 @@ my $res = Net::SIP::Response->new(
 my $uuid = createUniqueId();
 $data{$uuid} = $res->as_string;
 fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=data msg=$uuid");
+
+# --- code snippet end
 </code></pre>
 <br>
       <b>2. type=base64</b><br>
@@ -174,16 +174,14 @@ fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=data msg=$uuid");
       as a base64-coded string without newLine<br>
       <br>
       <b>Example:</b><pre><code>
+# --- code snippet start
+
 my $res = Net::SIP::Response->new(
   200,
   'OK',
   { 'Via'            => [ $req->get_header('Via') ],
     'From'           => $req->get_header('From'),
-    'To'             => $req->get_header('To'),
-    'Call-ID'        => $req->get_header('Call-ID'),
-    'CSeq'           => $req->get_header('CSeq'),
-    'Contact'        => $req->get_header('Contact'),
-    'Expires'        => 300,
+    ... add more data here ...
     'Content-Length' => '0',
   }
 );
@@ -194,6 +192,8 @@ my $res = Net::SIP::Response->new(
 my $msg = encode_base64($res->as_string,"");
 $msg =~ s/=//g;
 fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=base64 msg=$msg");
+
+# --- code snippet end
 </code></pre>
 
 
