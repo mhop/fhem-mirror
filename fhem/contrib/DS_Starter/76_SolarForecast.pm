@@ -163,7 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.6.10" => "24.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
+  "2.6.11" => "26.05.2026  _saveEnergyConsumption: nutze Logsequenzmanagement für Verbrauchslimitüberschreitung ",
+  "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
                            "aiFannGetConResult: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
                            "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
                            "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ".
@@ -171,7 +172,8 @@ my %vNotesIntern = (
                            "v1_common_active_pv in FEATURE-REGISTRY ergänzt, Online-Hilfe für v1_common_pv und v1_common_active_pv geändert ".
                            "Diagnose Lernverhalten eingebaut, aiConHiddenLayers kann nun auch Netze wie 80-3-5 ".
                            "_aiFannApplyBiasCorrection: Einbau OSL-Korrektur, neuer Schlüssel aiCaontrol->aiConTrainLimit ".
-                           "AI mehr Neuronenlayer X-X-X-X... möglich, aiConLearnRate: kleinste Lernrate nun 0.0001 ",
+                           "AI mehr Neuronenlayer X-X-X-X... möglich, aiConLearnRate: kleinste Lernrate nun 0.0001 ".
+                           "Messagesystem: gelesene Mitteilungen werden auch nach Systemneustart nicht als neu signalisiert ",
   "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
                            "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
                            "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
@@ -494,6 +496,7 @@ my $weathercache   = $root."/FHEM/FhemUtils/WeatherApi_SolarForecast_";         
 my $aitrained      = $root."/FHEM/FhemUtils/AItra_SolarForecast_";                  # Filename-Fragment für AI Trainingsdaten (wird mit Devicename ergänzt)
 my $airaw          = $root."/FHEM/FhemUtils/AIraw_SolarForecast_";                  # Filename-Fragment für AI Input Daten = Raw Trainigsdaten
 my $neuralnet      = $root."/FHEM/FhemUtils/NeuralNet_SolarForecast_";              # Filename-Fragment für Daten des neuronalen Netzes
+my $messagecache   = $root."/FHEM/FhemUtils/Messages_SolarForecast_";               # Filename-Fragment für Nachrichten
 my $dwdcatalog     = $root."/FHEM/FhemUtils/DWDcat_SolarForecast";                  # Filename für DWD Stationskatalog
 my $dwdcatgpx      = $root."/FHEM/FhemUtils/DWDcat_SolarForecast.gpx";              # Export Filename für DWD Stationskatalog im gpx-Format
 my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";             # Filename-Fragment für PV History Exportfile (wird mit Devicename ergänzt)
@@ -1182,8 +1185,8 @@ my %hqtxt = (                                                                   
               DE => qq{Oh nein &#128546;, die Anlagenkonfiguration ist fehlerhaft. Bitte überprüfen Sie die Einstellungen und Hinweise!}                                                     },
   pstate => { EN => qq{Planning&nbsp;status:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Mode:&nbsp;<mode><br>On:&nbsp;<start><br>Off:&nbsp;<stop><br>Remaining lock time:&nbsp;<RLT> seconds},
               DE => qq{Planungsstatus:&nbsp;<pstate><br>Info:&nbsp;<supplmnt><br>Modus:&nbsp;<mode><br>Ein:&nbsp;<start><br>Aus:&nbsp;<stop><br>verbleibende Sperrzeit:&nbsp;<RLT> Sekunden} },
-  dmgsig => { EN => qq{Read messages are not signaled again until a FHEM restart, but are retained if they are relevant.},
-              DE => qq{Gelesene Mitteilungen werden bis zu einem FHEM Neustart nicht wieder signalisiert, bleiben bei Relevanz jedoch erhalten.}                                             },
+  dmgsig => { EN => qq{Read messages are not marked as read again, but remain in the list if they are still relevant.},
+              DE => qq{Gelesene Mitteilungen werden nicht wieder signalisiert, bleiben bei Relevanz jedoch erhalten.}                                                                        },
   nnnact => { EN => qq{the neural network for consumption forecasting is not activated \nswitch on with: attr <NAME> aiControl aiConActivate},
               DE => qq{das neuronale Netz zur Verbrauchsprognose ist nicht aktiviert \neinschalten mit: attr <NAME> aiControl aiConActivate}                                                 },
 );
@@ -10087,6 +10090,7 @@ sub Shutdown {
   writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name, 'nolog');             # Cache File SolCast API Werte schreiben
   writeCacheToFile ($hash, 'statusapi',      $statcache.$name, 'nolog');             # Status-API Cache sichern
   writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name, 'nolog');             # Weather-API Cache sichern
+  writeCacheToFile ($hash, 'messages',    $messagecache.$name, 'nolog');             # Nachrichten Cache sichern
 
 return;
 }
@@ -10163,6 +10167,7 @@ sub periodicWriteMemcache {
   writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name);             # Cache File Strahlungsdaten-API Werte schreiben
   writeCacheToFile ($hash, 'statusapi',      $statcache.$name);             # Status-API Cache sichern
   writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name);             # Weather-API Cache sichern
+  writeCacheToFile ($hash, 'messages',    $messagecache.$name);             # Nachrichten Cache sichern
 
   $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." whole Operating Memory";
 
@@ -10353,6 +10358,11 @@ sub reloadCacheFiles {
   $paref->{file}      = $neuralnet.$name;                      # AI FANN Daten einlesen wenn vorhanden
   $paref->{cachename} = 'neuralnet';
   $paref->{title}     = 'NeuralNetwork';
+  readCacheFile ($paref);
+  
+  $paref->{file}      = $messagecache.$name;                   # Cache File Messages Daten einlesen wenn vorhanden
+  $paref->{cachename} = 'messages';
+  $paref->{title}     = 'Messages';
   readCacheFile ($paref);
 
   delete $paref->{file};
@@ -10640,7 +10650,6 @@ sub writeCacheToFile {
               }
           }
 
-          # --- Fehlerbehandlung ---
           if ($error) {
               my $msg = qq{ERROR while writing AI FANN data to file "$file": $error};
               Log3($name, 1, "$name - $msg");
@@ -19075,7 +19084,15 @@ sub _saveEnergyConsumption {
   }
   
   if ($con >= $conlim) {
-      Log3 ($name, 1, "$name - WARNING - day=$day, hod=$hod - Energy consumption of $con Wh is higher than limit of $conlim Wh and is not saved.");
+      my $verbose = AttrVal ($name, 'verbose', 3);
+      
+      if ($verbose < 4) {
+          my $msg = "WARNING - day=$day, hod=$hod - Energy consumption is higher than limit of $conlim Wh and is not saved. (set verbose 4 for more information)";
+          Log3 ($name, 1, "$name - $msg") if(askLogtime ($name, $msg));
+      }
+      else {
+          Log3 ($name, 4, "$name - WARNING - day=$day, hod=$hod - Energy consumption of $con Wh is higher than limit of $conlim Wh and is not saved.");
+      }
   }
 
   if (int $paref->{minute} > 30 && $con < 0) {                                      # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
@@ -19566,9 +19583,9 @@ sub _readSystemMessages {
       $data{$name}{preparedmessages}{$midx}{DE} .= 'Bitte unbedingt diese Attribute im global Device setzen!';
       $data{$name}{preparedmessages}{$midx}{EN}  = "<span style='color: red;'><b>CAUTION:</b></span> These important parameters are not available in the global device: $noloc <br>";
       $data{$name}{preparedmessages}{$midx}{EN} .= 'Please be sure to set these attributes in the global device!';
+      
+      $data{$name}{preparedmessages}{999500}{TS} = time;
   }
-
-  $data{$name}{preparedmessages}{999500}{TS} = time;
 
 return;
 }
@@ -24280,7 +24297,7 @@ return;
 #  3 - Fehler / Problem
 #
 #  Statusspeicher:
-#  $data{$name}{messages}{999999}{RD}:         1 - gelesen, 0 - ungelesen
+#  $data{$name}{messages}{999999}{RD}:         1 - gelesen, undef/0 - ungelesen
 #  $data{$name}{messages}{999000}{TS}:         Timestamp Stand Message File
 #  $data{$name}{filemessages}{999000}{TSNEXT}: Timestamp nächster Pull Message File
 #  $data{$name}{messages}{999500}{TS}:         Timestamp Stand prepared Messages
@@ -24293,66 +24310,81 @@ sub fillupMessageSystem {
 
   my $otxt   = q{};
   my $ntxt   = q{};
-  my $midx   = 0;
+  my $midx1  = 0;                                                   # Indexzähler bestehende Nachrichten
+  my $midx2  = 0;                                                   # Indexzähler neue Nachrichten
   my $max_sv = 0;
 
   ## Aufnahme Stand für alt/neu Vergleich + Clear Messages
   ##########################################################
   for my $idx (sort keys %{$data{$name}{messages}}) {
-      next if($idx >= IDXLIMIT);
+      next if(!isNumeric($idx) || $idx >= IDXLIMIT);
       $otxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
       $otxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
       $otxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
-
-      delete $data{$name}{messages}{$idx};
+      
+      $midx1 = $idx;
   }
+  
+  #Log3 ($name, 1, "$name - preparedmessages: ". Dumper $data{$name}{preparedmessages}) if($name eq 'SolCast');
+  #Log3 ($name, 1, "$name - filemessages: ". Dumper $data{$name}{filemessages}) if($name eq 'SolCast');
+  #Log3 ($name, 1, "$name - messages: ". Dumper $data{$name}{messages}) if($name eq 'SolCast');
 
-  ## Messages füllen
+  ## Messages neu füllen
   ########################################################################
-  # Integration prepared Messages
-  for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
-      next if($smi >= IDXLIMIT);
-      $midx++;
-      $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
-      $data{$name}{messages}{$midx}{DE} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{DE});
-      $data{$name}{messages}{$midx}{EN} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{EN});
+  if (defined $data{$name}{preparedmessages} || defined $data{$name}{filemessages}) {
+      for my $idx (sort keys %{$data{$name}{messages}}) {
+          next if($idx >= IDXLIMIT);
+          delete $data{$name}{messages}{$idx};
+      } 
+      
+      $midx1 = 0;
+      
+      # --- Integration prepared Messages
+      for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
+          next if($smi >= IDXLIMIT);
+          $midx2++;
+          $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
+          $data{$name}{messages}{$midx2}{DE} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{DE});
+          $data{$name}{messages}{$midx2}{EN} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{EN});
+      }
+
+      # --- Integration File Messages
+      for my $mfi (sort keys %{$data{$name}{filemessages}}) {
+          next if($mfi >= IDXLIMIT);
+          $midx2++;
+          $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
+          $data{$name}{messages}{$midx2}{DE} = $data{$name}{filemessages}{$mfi}{DE};
+          $data{$name}{messages}{$midx2}{EN} = $data{$name}{filemessages}{$mfi}{EN};
+      }
+
+      $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
+      $data{$name}{messages}{999000}{TSNEXT} = $data{$name}{filemessages}{999000}{TSNEXT} // 0;
+      $data{$name}{messages}{999500}{TS}     = $data{$name}{preparedmessages}{999500}{TS} // 0;
+      
+      ## Vergleich auf geänderte Messages
+      #####################################
+      for my $idx (sort keys %{$data{$name}{messages}}) {
+          next if($idx >= IDXLIMIT);
+          $ntxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
+          $ntxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
+          $ntxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
+      }
+
+      if ($ntxt ne $otxt) {                                                                     # es gibt neue Post! bzw. Änderungen -> Read-Bit zurücksetzen
+          $data{$name}{messages}{999999}{RD} = 0;
+      }
   }
 
-  # Integration File Messages
-  for my $mfi (sort keys %{$data{$name}{filemessages}}) {
-      next if($mfi >= IDXLIMIT);
-      $midx++;
-      $data{$name}{messages}{$midx}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
-      $data{$name}{messages}{$midx}{DE} = $data{$name}{filemessages}{$mfi}{DE};
-      $data{$name}{messages}{$midx}{EN} = $data{$name}{filemessages}{$mfi}{EN};
-  }
-
-  $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
-  $data{$name}{messages}{999000}{TSNEXT} = $data{$name}{filemessages}{999000}{TSNEXT} // 0;
-  $data{$name}{messages}{999500}{TS}     = $data{$name}{preparedmessages}{999500}{TS} // 0;
-
-
-  ## Vergleich auf geänderte Messages
-  #####################################
-  for my $idx (sort keys %{$data{$name}{messages}}) {
-      next if($idx >= IDXLIMIT);
-      $ntxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
-      $ntxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
-      $ntxt .= $data{$name}{messages}{$idx}{EN} if(defined $data{$name}{messages}{$idx}{EN});
-  }
-
-  if ($ntxt ne $otxt) {                                                                   # es gibt neue Post! bzw. Änderungen -> Read-Bit läschen
-      delete $data{$name}{messages}{999999}{RD};
-  }
-
-  if ($midx && !defined $data{$name}{messages}{999999}{RD}) {                             # RD = Read-Bit (undef -> Messages nicht gelesen)
-      my @aidx   = map { $_ } (1..$midx);                                                 # größte vorhandene Severity finden ...
+  my $midx = max ($midx1, $midx2);
+  
+  if ($midx && ($data{$name}{messages}{999999}{RD} // 0) != 1) {                                # RD = Read-Bit (undef -> Messages nicht gelesen)
+      my @aidx   = map { $_ } (1..$midx);                                                       # größte vorhandene Severity finden ...
       my @values = map { $data{$name}{messages}{$_}{SV} } @aidx;
       $max_sv    = max(@values);
   }
 
-  my $max_icon = $svicons{$max_sv};                                                       # ... und das dazugehörige Icon
-
+  my $max_icon = $svicons{$max_sv};                                                             # ... und das dazugehörige Icon
+  
 return ($max_icon, $midx);
 }
 
@@ -26804,7 +26836,7 @@ sub __aiFannArchHint {
   return { hints => \@hints } if !$num_inputs || !$split_index || !$hidden_layers;
   
   if ($split_index < AINUMMININPUTS) {                                                              # Datenmenge zu gering
-      push @hints, sprintf $epoche_translations{hint21}{$lang}, $split_index;
+      push @hints, sprintf $epoche_translations{hint21}{$lang}, $split_index, AINUMMININPUTS;
       return { hints => \@hints };                                                                  # weitere Architekturhinweise sinnlos
   }
 
@@ -32145,10 +32177,10 @@ return;
 ################################################################
 sub askLogtime {
     my $name  = shift;
-    my $err   = shift;
+    my $msg   = shift;
     my $delay = shift // LOGDELAY;
 
-    return if(!$err);
+    return if(!$msg);
 
     my $dolog = 1;
 
@@ -32159,10 +32191,10 @@ sub askLogtime {
 
     my $now           = time;
     $data{$name}{log} = {} unless ref $data{$name}{log} eq 'HASH';                           # sicherstellen, dass Struktur existiert
-    my $sha1          = sha1_hex ($err);
+    my $sha1          = sha1_hex ($msg);
 
     if (my $entry = $data{$name}{log}{$sha1}) {
-        $entry->{msg} = $err unless defined $entry->{msg} && $entry->{msg} eq $err;          # falls der gespeicherte Text aus irgendeinem Grund anders ist, aktualisiere ihn
+        $entry->{msg} = $msg unless defined $entry->{msg} && $entry->{msg} eq $msg;          # falls der gespeicherte Text aus irgendeinem Grund anders ist, aktualisiere ihn
 
         if ($entry->{ts} && $entry->{ts} + $delay > $now) {
             $dolog = 0;                                                                      # noch innerhalb der Drosselzeit -> nicht loggen
@@ -32170,7 +32202,7 @@ sub askLogtime {
     }
 
     if ($dolog) {
-        $data{$name}{log}{$sha1} = { ts => $now, msg => $err };                              # Eintrag aktualisieren / anlegen wenn log erlaubt ist
+        $data{$name}{log}{$sha1} = { ts => $now, msg => $msg };                              # Eintrag aktualisieren / anlegen wenn log erlaubt ist
     }
 
 return $dolog;
