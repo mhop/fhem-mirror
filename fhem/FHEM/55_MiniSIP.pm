@@ -195,9 +195,6 @@ fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=base64 msg=$msg");
 
 # --- code snippet end
 </code></pre>
-
-
-      <br><br>
 		</li>
 		<br/>
   </ul>
