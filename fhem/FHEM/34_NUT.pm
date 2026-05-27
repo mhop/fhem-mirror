@@ -3,7 +3,7 @@
 #
 # Abfrage einer UPS über die Network UPS Tools (www.networkupstools.org)
 #
-# 05.08.2015
+# 26.05.2026
 #
 
 # DEFINE bla NUT <upsname> [<host>[:<port>]]
@@ -42,9 +42,11 @@
 
 
 package main;
+
 use strict;
 use warnings;
 use POSIX;
+use DevIo;
 
 
 sub NUT_Initialize($);
@@ -62,8 +64,6 @@ sub NUT_makeReadings($);
 
 sub NUT_Initialize($) {
   my ($hash) = @_;
-
-  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
   $hash->{DefFn}   = "NUT_Define";
   $hash->{UndefFn} = "NUT_Undef";
@@ -129,6 +129,8 @@ sub NUT_Undef($$) {
 
 sub NUT_Ready($) {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
+  return undef if (defined $attr{$name}{disable} and $attr{$name}{disable} == 1);
   return DevIo_OpenDev($hash, 1, "NUT_DevInit");
 }
 
@@ -336,6 +338,7 @@ sub NUT_makeReadings($) {
 1;
 
 =pod
+=item summary    commumication modul for network ups tools  (NUT)
 =begin html
 
 <a name="NUT"></a>
@@ -349,7 +352,7 @@ sub NUT_makeReadings($) {
 
   <br><br>
 
-  <a name=NUTdefine"></a>
+  <a name="NUTdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; NUT &lt;ups&gt; [&lt;host&gt;[:&lt;port&gt;]]</code> <br>
@@ -401,7 +404,7 @@ sub NUT_makeReadings($) {
 
   <br><br>
 
-  <a name=NUTdefine"></a>
+  <a name="NUTdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; NUT &lt;ups&gt; [&lt;host&gt;[:&lt;port&gt;]]</code> <br>
