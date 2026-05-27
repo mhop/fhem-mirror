@@ -8567,7 +8567,9 @@ sub EnOcean_Parse($$) {
           $wakeUpCycle = 1200;
         } elsif ($waitingCmds eq "summerMode") {
           $summerMode = 8;
-          if ($manufID eq '049') {
+          if ($manufID eq '034') {
+            $wakeUpCycle = 14400;
+          } elsif ($manufID eq '049') {
             $wakeUpCycle = 28800;
           } else {
             $wakeUpCycle = 3600;
@@ -8582,7 +8584,9 @@ sub EnOcean_Parse($$) {
           $waitingCmds = "no_change";
           readingsDelete($hash, "waitingCmds");
         }
-        if ($manufID eq '049') {
+        if ($manufID eq '034') {
+          $wakeUpCycle = 14400;
+        } elsif ($manufID eq '049') {
           $wakeUpCycle = 28800;
         } else {
           $wakeUpCycle = 3600;
@@ -8923,7 +8927,8 @@ sub EnOcean_Parse($$) {
       my $temperature = ReadingsVal($name, "temperature", $roomTemp);
       if ($db[0] & 2) {
         if ($setpointTemp == $setpointTempSet) {
-          $setpointTemp = sprintf "%0.1f", ($db[2] * 20 / 255 + 10);
+          #$setpointTemp = sprintf "%0.1f", ($db[2] * 20 / 255 + 10);
+          $setpointTemp = int(($db[2] * 20 / 255 + 10) * 2 + 0.5) / 2;
           if ($setpointTemp != $setpointTempSet) {
             # setpointTempSet has been changed by actuator
             $setpointTempSet = $setpointTemp;
@@ -8931,7 +8936,8 @@ sub EnOcean_Parse($$) {
           }
         } else {
           # setpointTempSet has been changed by Fhem
-          $setpointTemp = sprintf "%0.1f", ($db[2] * 20 / 255 + 10);
+          #$setpointTemp = sprintf "%0.1f", ($db[2] * 20 / 255 + 10);
+          $setpointTemp = int(($db[2] * 20 / 255 + 10) * 2 + 0.5) / 2;
         }
         push @event, "3:setpointTemp:$setpointTemp";
 
@@ -8987,7 +8993,7 @@ sub EnOcean_Parse($$) {
         # action needed?
       }
 
-      Log3 $name, 5, "EnOcean $name EnOcean_parse SPT: $setpointTemp SPTS: $setpointTempSet";
+      Log3 $name, 5, "EnOcean $name EnOcean_parse db2: $db[2] SPT: $setpointTemp SPTS: $setpointTempSet";
 
       my $activatePID = AttrVal($name, 'pidCtrl', 'on') eq 'on' ? 'actuator' : 'stop';
       my $blockKey = ((AttrVal($name, "blockKey", 'no') eq 'yes') ? 1 : 0) << 2;
@@ -8996,7 +9002,7 @@ sub EnOcean_Parse($$) {
       my $measurementCtrl = (AttrVal($name, 'measurementCtrl', 'enable') eq 'enable') ? 0 : 0x40;
       #my $operationMode = ReadingsVal($name, "operationMode", "off");
       my $operationMode = ReadingsVal($name, "operationMode", ((AttrVal($name, 'pidCtrl', 'on') eq 'on') ? 'setpointTemp' : 'setpoint'));
-      my $setpointSummerMode = AttrVal($name, "setpointSummerMode", 100);
+      my $setpointSummerMode = AttrVal($name, "setpointSummerMode", 0);
       my $summerMode = AttrVal($name, "summerMode", "off");
       my $waitingCmds = ReadingsVal($name, "waitingCmds", "no_change");
       my $wakeUpCycle = $wakeUpCycle{AttrVal($name, "wakeUpCycle", 300)};
@@ -9024,7 +9030,7 @@ sub EnOcean_Parse($$) {
       RemoveInternalTimer($hash->{helper}{timer}{alarm}) if(exists $hash->{helper}{timer}{alarm});
       if (AttrVal($name, "signOfLife", 'on') eq 'on') {
         #InternalTimer(gettimeofday() + $wakeUpCycleInv{$wakeUpCycle} * 1.1, "EnOcean_readingsSingleUpdate", $hash->{helper}{timer}{alarm}, 0);
-        my $signOfLifeInterval = AttrVal($name, "signOfLifeInterval", 300);
+        my $signOfLifeInterval = AttrVal($name, "signOfLifeInterval", $wakeUpCycleInv{$wakeUpCycle});
         $signOfLifeInterval = $wakeUpCycleInv{$wakeUpCycle} if ($signOfLifeInterval < $wakeUpCycleInv{$wakeUpCycle});
         @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'no_response_from_actuator', 1, 3, $signOfLifeInterval, 0);
         InternalTimer(gettimeofday() + $signOfLifeInterval * 1.1, "EnOcean_ctrlAlarmEvent", $hash->{helper}{timer}{alarm}, 0);
@@ -20150,7 +20156,7 @@ sub EnOcean_Delete($$) {
     <br><br>
 
     <li>Battery Powered Actuator (EEP A5-20-01)<br>
-        [Kieback&Peter MD15-FTL-xx]<br>
+        [Kieback&Peter MD15-FTL-xx, EUROTRONIC Stella Pro]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -20220,7 +20226,7 @@ sub EnOcean_Delete($$) {
     <br><br>
 
     <li>Heating Radiator Actuating Drive (EEP A5-20-04)<br>
-        [Holter SmartDrive MX]<br>
+        [Holter SmartDrive MX, EUROTRONIC Stella R]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -20294,7 +20300,7 @@ sub EnOcean_Delete($$) {
     <br><br>
 
     <li>Heating Radiator Actuating Drive (EEP A5-20-06)<br>
-        [Micropelt iTRV MVA-005, OPUS Micropelt HOME]<br>
+        [Micropelt iTRV MVA-005/009, OPUS Micropelt HOME, EUROTRONIC Stella R]<br>
     <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -23502,7 +23508,7 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Battery Powered Actuator (EEP A5-20-01)<br>
-         [Kieback&Peter MD15-FTL-xx]<br>
+         [Kieback&Peter MD15-FTL-xx, EUROTRONIC Stella Pro]<br>
      <ul>
        <li>T: t/&#176C SPT: t/&#176C SP: setpoint/%</li>
        <li>actuatorState: obstructed|ok</li>
@@ -23541,7 +23547,7 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Heating Radiator Actuating Drive (EEP A5-20-04)<br>
-        [Holter SmartDrive MX]<br>
+        [Holter SmartDrive MX, EUROTRONIC Stella R]<br>
      <ul>
        <li>T: t/&#176C SPT: t/&#176C SP: setpoint/%</li>
        <li>alarm: no_response_from_actuator|measurement_error|battery_empty|frost_protection|blocked_valve|end_point_detection_error|no_valve|not_taught_in|no_response_from_controller|teach-in_error</li>
@@ -23575,7 +23581,7 @@ sub EnOcean_Delete($$) {
      <br><br>
 
      <li>Heating Radiator Actuating Drive (EEP A5-20-06)<br>
-        [Micropelt iTRV MVA-005, OPUS Micropelt HOME]<br>
+        [Micropelt iTRV MVA-005/009, OPUS Micropelt HOME, , EUROTRONIC Stella R]<br>
      <ul>
        <li>T: t/&#176C SPT: t/&#176C SP: setpoint/%</li>
        <li>alarm: no_response_from_actuator</li>
