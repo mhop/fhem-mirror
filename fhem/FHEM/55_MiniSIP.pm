@@ -54,7 +54,6 @@ sub Initialize($) {
 __END__
 
 =pod
-=item helper
 =item summary    build SIP endpoint to receive and answer SIP requests
 =item summary_DE erstellt einen SIP Endpunkt f&uuml;r SIP Nachrichten
 =begin html
