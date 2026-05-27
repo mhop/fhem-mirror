@@ -163,6 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.6.11" => "26.05.2026  _saveEnergyConsumption: nutze Logsequenzmanagement für Verbrauchslimitüberschreitung ".
+                           "_aiFannApplyBiasCorrection: Anpassung OSL-Gewicht ",
   "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
                            "aiFannGetConResult: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
                            "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
@@ -19083,7 +19085,15 @@ sub _saveEnergyConsumption {
   }
   
   if ($con >= $conlim) {
-      Log3 ($name, 1, "$name - WARNING - day=$day, hod=$hod - Energy consumption of $con Wh is higher than limit of $conlim Wh and is not saved.");
+      my $verbose = AttrVal ($name, 'verbose', 3);
+      
+      if ($verbose < 4) {
+          my $msg = "WARNING - day=$day, hod=$hod - Energy consumption is higher than limit of $conlim Wh and is not saved. (set verbose 4 for more information)";
+          Log3 ($name, 1, "$name - $msg") if(askLogtime ($name, $msg));
+      }
+      else {
+          Log3 ($name, 4, "$name - WARNING - day=$day, hod=$hod - Energy consumption of $con Wh is higher than limit of $conlim Wh and is not saved.");
+      }
   }
 
   if (int $paref->{minute} > 30 && $con < 0) {                                      # V1.32.0 : erst den "eingeschwungenen" Zustand mit mehreren Meßwerten auswerten
@@ -27704,15 +27714,18 @@ sub _aiFannApplyBiasCorrection {
   if ($is_baseline) {
       my $cal_slope = $data{$name}{neuralnet}{$fanntyp}{CalSlope} // 1.0;
       my $cal_bias  = $data{$name}{neuralnet}{$fanntyp}{CalBias}  // 0.0;
-      
+            
       if ($cal_slope != 1.0 || $cal_bias != 0.0) {
-          my $cal_val = $cal_slope * $res + $cal_bias;
-          my $maxval  = $data{$name}{neuralnet}{$fanntyp}{MaxVal} // $res;
-          $res        = max (0, min ($maxval, $cal_val));
-          $cal_addon  = 1;
+          my $cal_val       = $cal_slope * $res + $cal_bias;
+          my $osl_delta     = $cal_val - $res;
+          my $max_osl_delta = 0.15 * $mae;                                                       # max 15% des MAE als Korrekturgrenze
+          $osl_delta        = max (-$max_osl_delta, min ($max_osl_delta, $osl_delta));
+          my $maxval        = $data{$name}{neuralnet}{$fanntyp}{MaxVal} // $res;
+          $res              = max (0, min ($maxval, $res + $osl_delta));
+          $cal_addon        = 1;
       }
   }  
-  
+   
   # --- Bias-Zonenlogik ---
   my $bias_zone = '-';
   
@@ -32168,10 +32181,10 @@ return;
 ################################################################
 sub askLogtime {
     my $name  = shift;
-    my $err   = shift;
+    my $msg   = shift;
     my $delay = shift // LOGDELAY;
 
-    return if(!$err);
+    return if(!$msg);
 
     my $dolog = 1;
 
@@ -32182,10 +32195,10 @@ sub askLogtime {
 
     my $now           = time;
     $data{$name}{log} = {} unless ref $data{$name}{log} eq 'HASH';                           # sicherstellen, dass Struktur existiert
-    my $sha1          = sha1_hex ($err);
+    my $sha1          = sha1_hex ($msg);
 
     if (my $entry = $data{$name}{log}{$sha1}) {
-        $entry->{msg} = $err unless defined $entry->{msg} && $entry->{msg} eq $err;          # falls der gespeicherte Text aus irgendeinem Grund anders ist, aktualisiere ihn
+        $entry->{msg} = $msg unless defined $entry->{msg} && $entry->{msg} eq $msg;          # falls der gespeicherte Text aus irgendeinem Grund anders ist, aktualisiere ihn
 
         if ($entry->{ts} && $entry->{ts} + $delay > $now) {
             $dolog = 0;                                                                      # noch innerhalb der Drosselzeit -> nicht loggen
@@ -32193,7 +32206,7 @@ sub askLogtime {
     }
 
     if ($dolog) {
-        $data{$name}{log}{$sha1} = { ts => $now, msg => $err };                              # Eintrag aktualisieren / anlegen wenn log erlaubt ist
+        $data{$name}{log}{$sha1} = { ts => $now, msg => $msg };                              # Eintrag aktualisieren / anlegen wenn log erlaubt ist
     }
 
 return $dolog;
