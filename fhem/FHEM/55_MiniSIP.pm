@@ -99,7 +99,7 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
   <b>Define</b>
   <br><br>
   <ul>
-    <code>define &lt;name&gt; MiniSIP port=&lt;port&gt; from=&lt;from-uri&gt;</code>
+    <code>define &lt;name&gt; MiniSIP port=&lt;port&gt; from=&lt;from-uri&gt;</code><br>
     <br>
     <li>&lt;port&gt; defines the listen port for this endpoint</li>
     <br>
