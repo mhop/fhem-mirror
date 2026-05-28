@@ -100,6 +100,10 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
   <br><br>
   <ul>
     <code>define &lt;name&gt; MiniSIP port=&lt;port&gt; from=&lt;from-uri&gt;</code>
+    <br>
+    <li>&lt;port&gt; defines the listen port for this endpoint</li>
+    <br>
+    <li>&lt;from-uri&gt; defines the from uri used in SIP requests. eg: minisip@&lt;FHEM-ip&gt;</li> 
     <br><br>
   </ul>
   <br>
@@ -279,7 +283,7 @@ fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=base64 msg=$msg");
       <br>
       Contains some more or less useful informations about current state.
     </li><br>
-    <li><b>REGISTER | INVITE | MESSAGE | SUBSCRIBE | BYE</b><br>
+    <li><b>register | invite | message | subscribe | bye</b><br>
       <br>
       Contains the SIP message from corresponding request either<br>
       in short or full format, depending on attr 'showFullMessage'.
