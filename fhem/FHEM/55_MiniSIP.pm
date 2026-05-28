@@ -43,6 +43,7 @@ sub Initialize($) {
                         ."logFullMessage:0,1 "
                         ."showFullMessage:0,1 "
                         ."parseFn "
+                        ."useAuth:0,1 "
                         ."disable:1,0 "
                         ."disabledForIntervals "
                         .$::readingFnAttributes;
@@ -143,12 +144,8 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
 			<br>
 
       This command allows you to send a SIP message to a SIP peer.<br>
-      Two options are available for passing the message:<br>
-      <br>
-      <b>1. type=data (highly recommended!)</b><br>
-      <br>
-      In this case, the generated SIP message is stored in the `%data` hash<br>
-      within FHEM, and the key used to retrieve the data from the hash<br>
+      The generated SIP message is stored in the `%data` hash within FHEM,
+      and the key used to retrieve the data from the hash<br>
       is passed as a parameter.<br>
       <br>
       <b>Example:</b><pre><code>
@@ -170,36 +167,8 @@ fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=data msg=$uuid");
 
 # --- code snippet end
 </code></pre>
-<br>
-      <b>2. type=base64</b><br>
-      <br>
-      In this case, the generated SIP message is transferred<br>
-      as a base64-coded string without newLine<br>
-      <br>
-      <b>Example:</b><pre><code>
-# --- code snippet start
-
-my $res = Net::SIP::Response->new(
-  200,
-  'OK',
-  { 'Via'            => [ $req->get_header('Via') ],
-    'From'           => $req->get_header('From'),
-    ... add more data here ...
-    'Content-Length' => '0',
-  }
-);
-
-# use base64 for transfer with "set ... sendmsg"
-# Important: trailing == must not be transferred!
-#
-my $msg = encode_base64($res->as_string,"");
-$msg =~ s/=//g;
-fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=base64 msg=$msg");
-
-# --- code snippet end
-</code></pre>
-		</li>
-		<br/>
+    </li>
+		<br>
   </ul>
   <br>
 
