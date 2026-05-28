@@ -326,7 +326,6 @@ $modules{Global}{LOADED} = 1;
 no warnings 'qw';
 my @globalAttrList = qw(
   altitude
-  apiversion
   archivecmd
   archivedir
   archivesort:timestamp,alphanum
@@ -2922,11 +2921,6 @@ getAllSets($;$)
   my ($d, $cl) = @_;
   return "" if(!$defs{$d});      # Just safeguarding
   
-  if(AttrVal("global", "apiversion", 1)> 1) {
-    my @setters= getSetters($defs{$d});
-    return join(" ", @setters);
-  }
-
   my $a2 = CommandSet($cl, "$d ?");
   $a2 =~ s/.*choose one of //;
   $a2 = "" if($a2 =~ /^No set implemented for/);
