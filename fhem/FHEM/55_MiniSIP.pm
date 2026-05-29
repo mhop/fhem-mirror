@@ -34,7 +34,7 @@ sub Initialize($) {
   $hash->{ReadFn}      = \&FHEM::Core::MiniSIP::Read;
   $hash->{SetFn}       = \&FHEM::Core::MiniSIP::Set;
   $hash->{GetFn}       = \&FHEM::Core::MiniSIP::Get;
-#  $hash->{AttrFn}      = \&FHEM::Core::MiniSIP::Attr;
+  $hash->{AttrFn}      = \&FHEM::Core::MiniSIP::Attr;
   $hash->{ShutdownFn}  = \&FHEM::Core::MiniSIP::Shutdown;
   $hash->{UndefFn}     = \&FHEM::Core::MiniSIP::Undef;
   $hash->{DeleteFn}    = \&FHEM::Core::MiniSIP::Delete;
@@ -83,18 +83,30 @@ Two methods are available for receiving data from sip peers:
 The 'input' reading can be evaluated and processed using 'notify', 'DOIF', <br> 
 or any other event-processing mechanisms in FHEM.<br>
 <br>
-The SIP endpoint performs no authentication whatsoever.<br>
-This means that the username and password used for registration<br>
-can be chosen arbitrarily.<br>
-Every incoming SIP request of the types REGISTER, INVITE, MESSAGE, SUBSCRIBE, BYE<br>
-is answered with "200 OK" and subsequently processed.<br>
+The endpoint's default behavior is to not authorize clients.<br>
+Instead, each message is answered with "200 OK".
 <br>
-<b>Prerequisits</b><br>
+Authorization can be enabled by setting the "useAuth" attribute to 1.<br>
 <br>
-This module needs additional perl module Net::SIP (libnet-sip-perl).<br>
-All other dependencies should be fulfilled in a standard FHEM installation.<br>
-
+Currently, this enables authorization for REGISTER and INVITE.<br>
+Credentials (username and password) must be added using <br>
+the 'set ... user_add' command desribed below.<br>
+<br>
+<br>
 <ul>
+  <b>Prerequisits</b><br>
+  <br>
+  This module needs additional perl modules.
+  <pre>
+    <code>Net::SIP     (libnet-sip-perl)</code>
+    <code>JSON::XS     (libjson-xs-perl)</code>
+    <code>MIME::Base64 (libmime-base64-perl)</code> 
+    <code>Digest::MD5  (libdigest-md5-perl)</code>
+  </pre>
+  Most of these requirements (except Net::SIP) should be already<br>
+  fulfilled in a standard FHEM installation.<br>
+  <br>
+  <br>
   <br>
   <a id="MiniSIP-define"></a>
   <b>Define</b>
@@ -140,13 +152,14 @@ All other dependencies should be fulfilled in a standard FHEM installation.<br>
 		<a id="MiniSIP-set-sendmsg"></a>
 		<li><b>sendmsg</b><br>
 		  <br>
-			<code>set &lt;deviceName&gt; sendmsg peer=&lt;peerName&gt; type=&lt;data|base64&gt; msg=&lt;payload&gt;</code><br>
+			<code>set &lt;deviceName&gt; sendmsg peer=&lt;peerName&gt; type=data msg=&lt;payload&gt;</code><br>
 			<br>
-
+			<b>Note:</b> At the moment, only "type=data" is a valid option.<br>
+			Maybe there will be some other types in future, so please use this value anyway.<br>
+			<br>
       This command allows you to send a SIP message to a SIP peer.<br>
-      The generated SIP message is stored in the `%data` hash within FHEM,
-      and the key used to retrieve the data from the hash<br>
-      is passed as a parameter.<br>
+      The generated SIP message is stored in the `%data` hash within FHEM, and the key used<br>
+      to retrieve the data from the hash is passed as a parameter.<br>
       <br>
       <b>Example:</b><pre><code>
 # --- code snippet start
@@ -169,8 +182,37 @@ fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=data msg=$uuid");
 </code></pre>
     </li>
 		<br>
+
+		<a id="MiniSIP-set-user_add"></a>
+		<li><b>user_add</b><br>
+		  <br>
+			<code>set &lt;deviceName&gt; user_add username=&lt;userName&gt; password=&lt;password&gt;</code><br>
+			<br>
+
+      <b>Only useful if attribute 'useAuth' is set to 1.</b><br>
+      <br>
+      This command allows you to store a SIP user into FHEM keystore.<br>
+      SIP clients can use these user-secrets for authenticated REGISTER and INVITE.<br>
+      <br>
+    </li>
+    <br>
+
+		<a id="MiniSIP-set-user_delete"></a>
+		<li><b>user_delete</b><br>
+		  <br>
+			<code>set &lt;deviceName&gt; user_delete username=&lt;userName&gt;</code><br>
+			<br>
+
+      <b>Only useful if attribute 'useAuth' is set to 1.</b><br>
+      <br>
+      This command allows you to delete a SIP user from FHEM keystore.<br>
+      <br>
+    </li>
+    <br>
+
   </ul>
   <br>
+
 
   <a id="MiniSIP-get"></a>
   <b>Get</b>
@@ -179,7 +221,7 @@ fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=data msg=$uuid");
 		<a id="MiniSIP-get-peer"></a>
 		<li><b>peer</b><br>
 		  <br>
-			<code>get &lt;deviceName&gt; peer &lt;peerName&gt;</code><br>
+			<code>get &lt;deviceName&gt; peer peer=&lt;peerName&gt;</code><br>
 			<br>
 			Returns peer data for a given peer if the peer exists.
 		</li>
@@ -190,6 +232,14 @@ fhem("set &lt;deviceName&gt; sendmsg peer=$peer type=data msg=$uuid");
 			<code>get &lt;deviceName&gt; peers [table|json]</code><br>
 			<br>
 			Returns the list of all registered peers.
+		</li>
+		<br>
+		<a id="MiniSIP-get-user_list"></a>
+		<li><b>user_list</b><br>
+		  <br>
+			<code>get &lt;deviceName&gt; user_list</code><br>
+			<br>
+			Returns the list of all registered users peers.
 		</li>
   </ul>
   <br>
