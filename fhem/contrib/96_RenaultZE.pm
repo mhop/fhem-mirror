@@ -38,6 +38,8 @@
 
 ############################################################################################################################
 # Version History
+# v 1.20 Änderungen von Moli 1:1 übernommen
+# v 1.19.1 Moli Fummelt rum, Logfehler weg, neuer API-Key, charge-mod kill
 # v 1.19 add scubscriptions and act accordingly
 # v 1.18 addesa internalTemperature
 # v 1.17 fixed bug xternalTemperature vs externalTemperature
@@ -112,7 +114,7 @@ use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
 
-my $RenaultZE_version ="V1.19 / 25.04.2025";
+my $RenaultZE_version ="V1.19.1 / 23.06.2026";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -175,13 +177,16 @@ sub RenaultZE_Define($$) {
 
 
     $hash->{STATE}        = "defined";
-    $hash->{GIGYA_API}    = '3_7PLksOyBRkHv126x5WhHb-5pqC1qFR8pQjxSeLB6nhAnPERTUlwnYoznHSxwX668';
+    $hash->{GIGYA_API}    = '4_wnKlaC2lVDIOYczsO3pJpg';
+    #$hash->{GIGYA_API}    = '3_7PLksOyBRkHv126x5WhHb-5pqC1qFR8pQjxSeLB6nhAnPERTUlwnYoznHSxwX668';
+    #$hash->{GIGYA_API}    = '3_7PLksOyBRkHv126x5WhHb-5pqC1qFR8pQjxSeLB6nhAnPERTUlwnYoznHSxwX668';
     #$hash->{KAMEREON_API} = 'Ae9FDWugRxZQAGm3Sxgk7uJn6Q4CGEA2';
     #$hash->{KAMEREON_API} = 'VAX7XYKGfa92yMvXculCkEFyfZbuM7Ss';
     #$hash->{KAMEREON_API} = 'YjkKtHmGfaceeuExUDKGxrLZGGvtVS0J';
     $hash->{KAMEREON_API} = 'YjkKtHmGfaceeuExUDKGxrLZGGvtVS0J';
     #$hash->{KAMEREON_API} = 'oF09WnKqvBDcrQzcW1rJNpjIuy7KdGaB';
     $hash->{VERSION}      = $RenaultZE_version;
+
 
     readingsSingleUpdate($hash,"ze_Gigya_JWT_lastCall","0",1) unless (ReadingsVal($name,"ze_Gigya_JWT_lastCall","empty") ne "empty");
     readingsSingleUpdate($hash,"ze_Gigya_JWT_Token","",1)     unless (ReadingsVal($name,"ze_Gigya_JWT_Token","empty") ne "empty");
@@ -527,10 +532,10 @@ sub RenaultZE_Main3($) {
                  $res = RenaultZE_gData_Step1($hash,'hvac-status')				if ($phase eq "1");
                  Log3 $name, 5, "RenaultZE_gData_Step1 - hvac-status - RC=".$res		if ($phase eq "1");
 	      }, undef);
-	      InternalTimer( gettimeofday() + 4, sub() { my $a = 1; 
-                 $res = RenaultZE_gData_Step1($hash,'charge-mode')			if ($model ne "SPRING" and $Conserv eq "yes");
-                 Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res	if ($model ne "SPRING" and $Conserv eq "yes");
-	      }, undef);
+	      #InternalTimer( gettimeofday() + 4, sub() { my $a = 1; 
+              #   $res = RenaultZE_gData_Step1($hash,'charge-mode')			if ($model ne "SPRING" and $Conserv eq "yes");
+              #   Log3 $name, 5, "RenaultZE_gData_Step1 - charge-mode - RC=".$res	if ($model ne "SPRING" and $Conserv eq "yes");
+	      #}, undef);
 	}
 
         if ($key eq "GET_vehicles")
@@ -926,6 +931,11 @@ sub RenaultZE_getAccId_Step2($)
 sub RenaultZE_gData_Step1($$)
 {
     my ($hash,$tree) = @_;
+#charge-mode killswitch
+
+#charge-mode killswitch
+    return "RC=0" if (defined($tree) && $tree eq 'charge-mode');
+
     my $name = $hash->{NAME};
 
     my $v1v2 = "v1";
@@ -1657,10 +1667,10 @@ sub RenaultZE_pp_err($$)
         $output = $output."<tr>";
         $output = $output."<td><b>raw</b></td><td>".$err."</td></tr>";
         foreach my $item( @$mtab ) {
-            $output = $output."<td><b>status</b></td><td>".$item->{status}."</td></tr>";
-            $output = $output."<td><b>code</b></td><td>".$item->{code}."</td></tr>";
-            $output = $output."<td><b>title</b></td><td>".$item->{title}."</td></tr>";
-            $output = $output."<td><b>detail</b></td><td>".$item->{detail}."</td></tr>";
+            $output = $output."<td><b>status</b></td><td>".($item->{status} // "-")."</td></tr>";
+            $output = $output."<td><b>code</b></td><td>".($item->{code} // "-")."</td></tr>";
+            $output = $output."<td><b>title</b></td><td>".($item->{title} // "-")."</td></tr>";
+            $output = $output."<td><b>detail</b></td><td>".($item->{detail} // "-")."</td></tr>";
         }
         $output = $output."</table></body></html>";
     }
