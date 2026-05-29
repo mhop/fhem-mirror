@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.05.22";
+our $ModulVersion = "26.05.27";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -16636,12 +16636,12 @@ sub Fritz_SOAP_Request($$$;@)
          if (!$respData->is_success) {
 
            my $outHash;
-           eval {
-             $outHash = XMLin($respData->decoded_content, StrictMode => 0, KeyAttr => []);
-           };
-           if ($@) {
-             $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:XML-Fault:$@'};
-           } else {
+#           eval {
+#             $outHash = XMLin($respData->decoded_content, StrictMode => 0, KeyAttr => []);
+#           };
+#           if ($@) {
+#             $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:XML-Fault:$@'};
+#           } else {
 
              Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS:\n" . Dumper($outHash);
 
@@ -16650,7 +16650,7 @@ sub Fritz_SOAP_Request($$$;@)
              } else {
                Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS: unhandled error";
              }
-           }
+#           }
 
            $retHash{Error}{$service}{$service_command}{response_error} = $respData->status_line;
            $retHash{Error}{$service}{$service_command}{response_code}  = $respData->code();
