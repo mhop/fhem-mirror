@@ -22,8 +22,7 @@ package FHEM::Core::MiniSIP;
 
 use strict;
 use warnings;
-use MIME::Base64;
-use Data::Dumper;
+
 use Socket;
 use IO::Socket::INET;
 
@@ -62,7 +61,8 @@ BEGIN {
 }
 
 my $p = __PACKAGE__;
-$::data{modules}{version}{$p} = '$Id$';
+$::data{modules}{version}{$p} = 
+'$Id$';
 
 sub Define {
   my ($hash, $a, $h) = @_; #parseParams
@@ -87,7 +87,7 @@ sub Define {
   $hash->{FD} = $fh;
   $selectlist{$fh} = $hash;
 
-  #FHEM::MiniSIP::Utils::restore_peers($hash);
+  FHEM::MiniSIP::Utils::restore_peers($hash);
   
   readingsSingleUpdate($hash,'state','initialized',1);
   $modules{MiniSIP}{inUse} = 1;
@@ -110,9 +110,16 @@ sub Set {
              "backup_peers" => ":noArg", 
              "restore_peers" => ":noArg", 
             );
+
+  %cmd = ( %cmd, 
+           user_add => "", 
+           user_delete => "",
+          ) if AttrVal($name,'useAuth',0);
+
   return ("Unknown argument $a->[1], choose one of ".
         join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
     if(!defined($cmd{$a->[1]}));
+
 
   if( $a->[1] eq 'sendmsg' )       {
     my $peer    = $h->{peer};
@@ -120,10 +127,7 @@ sub Set {
     my $payload = $h->{msg};
     my $msg;
     
-    if ($type eq 'base64') {
-       $payload .= "==";
-       $msg = decode_base64($payload);
-    } elsif ($type eq 'data') {
+    if ($type eq 'data') {
        $msg  = $data{$payload};
     }
 
@@ -131,7 +135,14 @@ sub Set {
   }
   if( $a->[1] eq 'backup_peers' )  { FHEM::MiniSIP::Utils::backup_peers($hash); }
   if( $a->[1] eq 'restore_peers' ) { FHEM::MiniSIP::Utils::restore_peers($hash); }
-
+  if( $a->[1] eq 'user_add')       { 
+    return "username or password missing!" unless ($h->{username} && $h->{password});  
+    return user_add($hash,$h->{username},$h->{password});
+  }
+  if( $a->[1] eq 'user_delete')    { 
+    return "username missing!" unless $h->{username};
+    return user_delete($hash,$h->{username});
+  }
   return undef;
 }
 
@@ -142,10 +153,18 @@ sub Get {
              "peers" => ":table,json",
             );
 
+  %cmd = ( %cmd, 
+           user_list => ":noArg", 
+          ) if AttrVal($name,'useAuth',0);
+
   return ("Unknown argument $a->[1], choose one of ".
         join(" ", map { "$_$cmd{$_}" } sort keys %cmd))
     if(!defined($cmd{$a->[1]}));
 
+  if( $a->[1] eq 'peer' ) {
+    return "no peer given" unless $h->{peer};
+    return getpeer($hash,$h->{peer});
+  }
   if( $a->[1] eq 'peers' ) {
     if (!havepeer($hash,undef)) {
       return "no peer registered";
@@ -155,10 +174,25 @@ sub Get {
       return toJSON($hash->{peers});
     }
   }
-  if( $a->[1] eq 'peer' ) {
-    return "no peer given" unless $a->[2];
-    return getpeer($hash,$a->[2]);
+  if( $a->[1] eq 'user_list' ) {
+    return user_list($hash);
   }
+}
+
+sub Attr { 
+  my ($type, $devName, $attrName, @param) = @_;
+  my $hash = $defs{$devName};
+  my $ret;
+  
+  if($attrName eq "useAuth") {
+    if($type eq "set") {
+      if ($param[0]) {
+        eval "use FHEM::MiniSIP::Auth qw(:all)";
+        return $@ if($@);
+      }
+    } 
+  }
+  return $ret;
 }
 
 sub Undef {
@@ -193,23 +227,11 @@ sub sendmsg {
   my ($hash,$peer,$msg) = @_;
   my $name = $hash->{NAME};
 
-#  my $count = scalar keys %{$hash->{peers}};
-#  if (!$count) {
-#    _log3($hash,1,"no peer registered");
-#    return;
-#  } elsif (!defined($hash->{peers}->{$peer})) {
-#    _log3($hash,1,"$name: unknown peer >$peer<");
-#    return;
-#  }
-
   if (!havepeer($hash,undef)) {
     return _log3($hash,1,"no peer registered");
-#    return;
   } elsif (!havepeer($hash,$peer)) {
     return _log3($hash,1,"$name: unknown peer >$peer<");
-#    return;
   }
-
 
   (AttrVal($name,'logFullMessage',0))?  
     _log3($hash,4,"out to $peer:\n$msg"):
@@ -236,52 +258,73 @@ sub processmsg {
   my ($hash)  = @_;
   my $name = $hash->{NAME};
   
-  my $pkt     = eval { Net::SIP::Packet->new( $hash->{server}->{buf} ) };
+  my $req     = eval { Net::SIP::Packet->new( $hash->{server}->{buf} ) };
+  return unless $req;
 
   (AttrVal($name,'logFullMessage',0))?
-    _log3($hash,4,"in:\n".$pkt->as_string):
-    _log3($hash,4,"in: ".(split(/\n/,$pkt->as_string))[0]);
+    _log3($hash,4,"in:\n".$req->as_string):
+    _log3($hash,4,"in: ".(split(/\n/,$req->as_string))[0]);
 
-  #my $method  = $pkt->method(); # not working as expected
+  #my $method  = $req->method(); # not working as expected
     
-  my $method =  $pkt->as_string;
+  my $method =  $req->as_string;
   $method    =~ s/^([^ ]*) .*$/$1/s;
 
   if ($method ne "SIP/2.0") {
 		(AttrVal($name,'showFullMessage',0))?
-			readingsSingleUpdate($hash, lc($method), $pkt->as_string, 0):
-			readingsSingleUpdate($hash, lc($method), (split(/\n/,$pkt->as_string))[0], 1);
-  } elsif ($pkt->is_response) {
+			readingsSingleUpdate($hash, lc($method), $req->as_string, 0):
+			readingsSingleUpdate($hash, lc($method), (split(/\n/,$req->as_string))[0], 1);
+  } elsif ($req->is_response) {
     return; # end processing if 200 OK received as response
   }
 
-  my ($peer,$ip,$port) = FHEM::MiniSIP::Utils::extract_peer($hash,$pkt,0);
+  my ($peer,$ip,$port) = FHEM::MiniSIP::Utils::extract_peer($hash,$req,0);
 
   if ($method eq 'REGISTER') {
-    FHEM::MiniSIP::Utils::savepeer($hash,$pkt);
-  }
-
-  my @known_methods = qw(REGISTER INVITE BYE MESSAGE SUBSCRIBE);
-  if (contains_string($method,@known_methods)) {
-    my $resp = FHEM::MiniSIP::Utils::build_200_short($hash,$pkt);
-    sendmsg($hash,$peer,$resp->as_string);
-  }
-
-  if ($method eq 'INVITE') {
-    my ($info,$user,$header,$body) = $pkt->as_parts;
-    $user =~ m/sip:([*#\d]+)@/;
-    my $input = $1 // "?";
-    readingsSingleUpdate($hash, "input", $input, 1);
+    FHEM::MiniSIP::Utils::savepeer($hash,$req);
+    if (AttrVal($name,'useAuth',0)) {
+      # with authentication
+      doAuth($hash,$peer,$req);
+      return;
+    }
   }
 
   if ($method eq 'MESSAGE') {
-    my ($info,$user,$header,$body) = $pkt->as_parts;
-    my $input = FHEM::MiniSIP::Utils::parsemsgbody($hash,$peer,$body);
-    readingsSingleUpdate($hash, "input", $input, 1);
+    message2reading($hash,$peer,$req);    
   }
+
+  if ($method eq 'INVITE') {
+    if (AttrVal($name,'useAuth',0)) {
+      # with authentication
+      my $success = doAuth($hash,$peer,$req);
+      invite2reading($hash,$req) if $success;
+      return;
+    } else {
+      invite2reading($hash,$req);    
+    }
+  }
+
+  my @known_methods = qw(REGISTER INVITE MESSAGE SUBSCRIBE BYE);
+  if (contains_string($method,@known_methods)) {
+    my $resp = $req->create_response(200, {}, '');
+    sendmsg($hash,$peer,$resp->as_string);
+  }
+
   delete $hash->{server}->{buf};
 }
 
 1;
 
 #
+
+=pod
+REGISTER — zur Bindung einer Adresse (Anmeldung) an einen Standort (Authentifizierung erforderlich).
+INVITE — zum Aufbau von Sessions, insbesondere bei kostenpflichtigen/benutzerspezifischen Diensten.
+MESSAGE / PUBLISH — für Signalisierung von Nachrichten/Status‑Updates, wenn Schutz nötig.
+SUBSCRIBE / NOTIFY — bei Presence/Event‑Subscriptions (Zugriffssteuerung auf Events).
+
+BYE / CANCEL — beim Beenden/Abbrechen von Sessions (bei dienstekritischen Szenarien).
+UPDATE / INFO / PRACK / REINVITE — für Mid‑dialog Änderungen (Medienänderungen, Re‑INVITE für Hold/Resume).
+OPTIONS — optional, wenn Informationen über Ressourcen nur authentifizierten Clients gezeigt werden.
+REFER — für Call‑Transfer/Weiterleitungen, wenn nur berechtigte Nutzer Zielreferenzen setzen dürfen.
+=cut

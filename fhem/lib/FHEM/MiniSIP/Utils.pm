@@ -29,6 +29,8 @@ use Exporter ('import');
 our @EXPORT_OK = qw( _log3
                      getpeer
                      havepeer
+                     invite2reading
+                     message2reading
                  );
 our %EXPORT_TAGS = (all => [@EXPORT_OK]);
 
@@ -41,7 +43,6 @@ BEGIN {
         Debug
         readingsSingleUpdate
         toJSON
-        json2nameValue
         getKeyValue
         setKeyValue
       )
@@ -49,7 +50,8 @@ BEGIN {
 };
 
 my $p = __PACKAGE__;
-$::data{modules}{version}{$p} = '$Id$';
+$::data{modules}{version}{$p} = 
+'$Id$';
 
 
 ###------------------------------------------------------------------
@@ -72,6 +74,21 @@ sub _log3 {
 										: "$sub[$count-2].$sub[$count-1]";
 	my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : "MiniSIP";
 	Log3 $hash, $loglevel, "$instName: $sub.$xline " . $text;
+}
+
+sub invite2reading {
+  my ($hash,$req) = @_;
+  my ($info,$user,$header,$body) = $req->as_parts;
+  $user =~ m/sip:([*#\d]+)@/;
+  my $input = $1 // "?";
+  readingsSingleUpdate($hash, "input", $input, 1);
+}
+
+sub message2reading {
+  my ($hash,$peer,$req) = @_;
+  my ($info,$user,$header,$body) = $req->as_parts;
+  my $input = parsemsgbody($hash,$peer,$body);
+  readingsSingleUpdate($hash, "input", $input, 1);
 }
 
 ###------------------------------------------------------------------
@@ -148,34 +165,6 @@ sub parsemsgbody {
 
 ###------------------------------------------------------------------
 #
-# sub build_200_short($hash,$req)
-# 
-# build a simple '200 OK' message from incoming packet
-#
-###------------------------------------------------------------------
-
-sub build_200_short {
-	my ($hash,$req) = @_;
-
-	my $res = Net::SIP::Response->new(
-			200,
-			'OK',
-		 { 'Via'            => [ $req->get_header('Via') ],
-			 'From'           => $req->get_header('From'),
-			 'To'             => $req->get_header('To'),
-			 'Call-ID'        => $req->get_header('Call-ID'),
-			 'CSeq'           => $req->get_header('CSeq'),
-			 'Contact'        => $req->get_header('Contact') // $hash->{server}->{local},
-			 'Expires'        => 300,
-#       'Expires'        => $req->get_header('Expires') // 300,
-			 'Content-Length' => '0',
-		 }
-		);
-		return $res;
-}
-
-###------------------------------------------------------------------
-#
 # sub backup_peers($hash)
 # 
 # store all registered peers in keystore
@@ -223,6 +212,7 @@ sub restore_peers {
     my $ts     = time();
     my $reg = $p{$key}{registered};
     my $exp = $p{$key}{expires};
+    $exp //= 0;
     if (($reg+$exp) < $ts) {
       delete $p{$key};
     }
