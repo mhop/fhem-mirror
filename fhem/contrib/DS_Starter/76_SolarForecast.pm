@@ -315,7 +315,7 @@ use constant {
   AITRBLTO        => 7200,                                                          # KI DecTree Training BlockingCall Timeout
   AIASPEAKSFAC    => 1.1,                                                           # Sicherheitsaufschlag auf installiertes PV Peak
   AINUMEPOCHS     => 15000,                                                         # AI::FANN max. Anzahl Trainigs-Epochen
-  AIIMPPATIENCE   => 1000,                                                          # AI::FANN Training - Schwelle Anzahl Epochen ohne Verbesserung für Early Stopping                                                                           
+  AIIMPPATIENCE   => 300,                                                           # AI::FANN Training - Schwelle Anzahl Epochen ohne Verbesserung für Early Stopping                                                                           
   AINNTRBLTO      => 86400,                                                         # Training neuronales Netz BlockingCall Timeout
   AINUMMININPUTS  => 2000,                                                          # Mindestanzahl valider Datensätze für Training AI::FANN
   AIBCTHHLD       => 0.2,                                                           # Schwelle der KI Trainigszeit ab der BlockingCall benutzt wird
@@ -1881,27 +1881,27 @@ lags => sub {
     my ($f) = @_;
     return [
         # Absolute Pegel (bisher nicht genutzt!)
-        $f->{lag1_norm},                                                    # Verbrauch vor 1h
-        $f->{lag2_norm},                                                    # Verbrauch vor 2h
-        $f->{lag24_norm},                                                   # Verbrauch vor 24h (gestern gleiche Stunde)
-        $f->{lag48_norm},                                                   # Verbrauch vor 48h
+        #$f->{lag1_norm},                                                    # Verbrauch vor 1h  -> glättet sehr, lag1 zerstört die Peak-Struktur
+        #$f->{lag2_norm},                                                    # Verbrauch vor 2h -> negativer Einfluß, verstärkt die Glättung
+        #$f->{lag24_norm},                                                   # Verbrauch vor 24h (gestern gleiche Stunde) -> glättet sehr
+        $f->{lag48_norm},                                                   # Verbrauch vor 48h 
         $f->{lag168_norm},                                                  # Verbrauch vor 168h (Vorwoche gleiche Stunde)
         
-        # Kurzfristige Verbrauchsänderung (1h)
-        $f->{delta1_norm_pos},                                              # Verbrauchsanstieg zur Vorstunde
-        $f->{delta1_norm_neg},                                              # Verbrauchsabsenkung zur Vorstunde
-
-        # Tagesmuster (24h)
-        $f->{delta24_norm_pos},                                             # Verbrauchsanstieg zum Vortag (gleiche Stunde)
-        $f->{delta24_norm_neg},                                             # Verbrauchsabsenkung zum Vortag
-        
         # Statistik                   
-        $f->{roll_mean_3_norm},                                             # lokaler Pegel
-        $f->{roll_std_6_norm},                                              # Volatilität
+        #$f->{roll_mean_3_norm},                                             # lokaler Pegel -> negativer Einfluß, macht dein Modell blind für Peaks
+        #$f->{roll_std_6_norm},                                              # Volatilität   -> negativer Einfluß, Modell wird instabiler und glättet stärker
         
         # Abweichung vom lokalen Durchschnitt
         $f->{lag1_spike_pos_norm},                                          # letzte Stunde war Spike nach oben
         $f->{lag1_spike_neg_norm},                                          # letzte Stunde war Spike nach unten
+        
+        # Kurzfristige Verbrauchsänderung (1h)
+        $f->{delta1_norm_pos},                                              # o Verbrauchsanstieg zur Vorstunde
+        $f->{delta1_norm_neg},                                              # o Verbrauchsabsenkung zur Vorstunde
+
+        # Tagesmuster (24h)
+        $f->{delta24_norm_pos},                                             # o Verbrauchsanstieg zum Vortag (gleiche Stunde)
+        $f->{delta24_norm_neg},                                             # o Verbrauchsabsenkung zum Vortag
     ];
 },
 
@@ -1911,8 +1911,8 @@ lags => sub {
 daily_energy_context => sub {
     my ($f) = @_;
     return [
-        $f->{cum_day_norm},                                                 # Wieviel heute schon verbraucht
-        $f->{cum_day_deviation},                                            # Über/Unter Erwartungspfad
+        #$f->{cum_day_norm},                                                 # Wieviel heute schon verbraucht
+        #$f->{cum_day_deviation},                                            # Über/Unter Erwartungspfad
     ];
 },
 
@@ -24971,7 +24971,7 @@ sub aiFannCreateConTrainData {
   
   # Zusammenführen für Training
   ################################
-  for my $i (6 .. $#flat_targets) {                                                                
+  for my $i (6 .. $#flat_targets) {                                                                         # .. bis den Index des letzten Elements                                                       
       my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, \@presence_values, $i, $lagnorm_ref);   # Lags erstellen
    
       my $sigs = _aiFannCreateAddOnSignals ( { lags              => $lags,                                  # diskrete, semantische Zusatzsignale
@@ -25344,45 +25344,59 @@ sub _aiFannBuildLagFeatures {
   my $len_temp = scalar @$temp_norm_series;
   return undef if($i < 6 || $i >= $len_con || $i >= $len_temp);
 
+  # ---------------------------------------------------------
   # Lags - verzögerte Werte einer Zeitreihe
-  my $y_t     = $con_series->[$i];    
-  my $y_t_1   = $con_series->[$i - 1];
-  my $y_t_2   = $con_series->[$i - 2];
+  # $y_t   = letzter bekannter Wert (z.B. hod=8)
+  # $y_t_1 = eine Stunde davor     (z.B. hod=7)
+  # Zielwert ist hod=9, also NICHT in con_series enthalten
+  # ---------------------------------------------------------
+  my $y_t     = $con_series->[$i];                                              # letzter bekannter Wert
+  my $y_t_1   = $con_series->[$i - 1];              
+  my $y_t_2   = $con_series->[$i - 2];                           
   my $y_t_24  = $i >= 24  ? $con_series->[$i - 24]  : undef;
   my $y_t_48  = $i >= 48  ? $con_series->[$i - 48]  : undef;
   my $y_t_168 = $i >= 168 ? $con_series->[$i - 168] : undef;
 
   # --- Deltas
-  my $delta1      = $y_t_1 - $y_t_2;                                            # Trend der letzten Stunde
-  my $delta1_prev = $y_t_2 - ($i >= 3 ? $con_series->[$i-3] : $y_t_2);
-  my $delta24     = defined $y_t_24 ? $y_t_1 - $y_t_24 : undef;                 # Vortag-Differenz ohne Target
+  my $delta1      = $y_t   - $y_t_1;                                            # Trend der letzten Stunde
+  my $delta1_prev = $y_t_1 - $y_t_2;
+  my $delta24     = defined $y_t_24 ? $y_t - $y_t_24 : undef;                   # Vortag-Differenz
   
-  # --- Rolling Mean & Std
-  my @window3 = @{$con_series}[$i-4 .. $i-2];           
-  my @window6 = @{$con_series}[$i-7 .. $i-2];                                                         
+  # ---------------------------------------------------------
+  # Rolling Mean & Std
+  # window3: mean der letzten 3 Stunden vor y_t
+  # window6: std  der letzten 6 Stunden vor y_t
+  # y_t selbst wird NICHT ins Fenster einbezogen
+  # ---------------------------------------------------------
+  my @window3 = @{$con_series}[$i-3 .. $i-1];
+  my @window6 = @{$con_series}[$i-6 .. $i-1];
   my $mean3   = avgArray (\@window3, scalar (@window3)) // 0;
   my $std6    = _aiFannStandardDeviation (\@window6);
   
-  # --- Positive/Negative Deltas
-  my $delta1_pos      = $delta1 > 0 ? $delta1  : 0;
-  my $delta1_neg      = $delta1 < 0 ? -$delta1 : 0;
-  my $delta1_prev_pos = $delta1_prev > 0 ? $delta1_prev : 0; 
+  # ---------------------------------------------------------
+  # Positive/Negative Deltas
+  # ---------------------------------------------------------
+  my $delta1_pos      = $delta1 > 0      ? $delta1       : 0;
+  my $delta1_neg      = $delta1 < 0      ? -$delta1      : 0;
+  my $delta1_prev_pos = $delta1_prev > 0 ? $delta1_prev  : 0;
   my $delta1_prev_neg = $delta1_prev < 0 ? -$delta1_prev : 0;
   my $delta24_pos     = (defined $delta24 && $delta24 > 0) ? $delta24  : 0;
   my $delta24_neg     = (defined $delta24 && $delta24 < 0) ? -$delta24 : 0;
-  
-  my $lag1_vs_mean3  = $y_t_1 - $mean3;                                         # Abweichung letzte Stunde vom 3h-Mittel
-  my $lag1_spike_pos = $lag1_vs_mean3 > 0 ? $lag1_vs_mean3  : 0;
-  my $lag1_spike_neg = $lag1_vs_mean3 < 0 ? -$lag1_vs_mean3 : 0;
 
-  # --- Normalisierung
-  my $lag1_norm   = _aiFannNormMinMaxValue ($y_t_1, $norms->{min}, $norms->{max});
-  my $lag2_norm   = _aiFannNormMinMaxValue ($y_t_2, $norms->{min}, $norms->{max});
-  
-  my $lag24_norm  = defined $y_t_24 
-                  ? _aiFannNormMinMaxValue ($y_t_24, $norms->{min}, $norms->{max}) 
+  my $lag0_vs_mean3  = $y_t - $mean3;                                                   # Spike-Erkennung: y_t vs. mean der letzten 3h
+  my $lag1_spike_pos = $lag0_vs_mean3 > 0 ? $lag0_vs_mean3  : 0;
+  my $lag1_spike_neg = $lag0_vs_mean3 < 0 ? -$lag0_vs_mean3 : 0;
+
+  # ---------------------------------------------------------
+  # Normalisierung
+  # ---------------------------------------------------------
+  my $lag1_norm = _aiFannNormMinMaxValue ($y_t,   $norms->{min}, $norms->{max});
+  my $lag2_norm = _aiFannNormMinMaxValue ($y_t_1, $norms->{min}, $norms->{max});
+
+  my $lag24_norm  = defined $y_t_24
+                  ? _aiFannNormMinMaxValue ($y_t_24,  $norms->{min}, $norms->{max})
                   : 0;
-                        
+
   my $lag48_norm  = defined $y_t_48
                   ? _aiFannNormMinMaxValue ($y_t_48,  $norms->{min}, $norms->{max})
                   : $lag24_norm;
@@ -25390,15 +25404,15 @@ sub _aiFannBuildLagFeatures {
   my $lag168_norm = defined $y_t_168
                   ? _aiFannNormMinMaxValue ($y_t_168, $norms->{min}, $norms->{max})
                   : $lag24_norm;
-                  
-  my $mean3_norm   = _aiFannNormMinMaxValue ($mean3,   $norms->{min},       $norms->{max});
-  my $std6_norm    = _aiFannNormMinMaxValue ($std6,    $norms->{std_min},   $norms->{std_max});
+
+  my $mean3_norm  = _aiFannNormMinMaxValue ($mean3, $norms->{min},     $norms->{max});
+  my $std6_norm   = _aiFannNormMinMaxValue ($std6,  $norms->{std_min}, $norms->{std_max});
 
   my $delta1_norm  = _aiFannNormMinMaxValue ($delta1,  $norms->{delta_min}, $norms->{delta_max});
-  my $delta24_norm = defined $delta24 
-                   ? _aiFannNormMinMaxValue ($delta24, $norms->{delta_min}, $norms->{delta_max}) 
+  my $delta24_norm = defined $delta24
+                   ? _aiFannNormMinMaxValue ($delta24, $norms->{delta_min}, $norms->{delta_max})
                    : 0;
-                        
+
   my $delta1_norm_pos      = _aiFannNormMinMaxValue ($delta1_pos,      $norms->{delta_pos_min}, $norms->{delta_pos_max});
   my $delta1_norm_neg      = _aiFannNormMinMaxValue ($delta1_neg,      $norms->{delta_neg_min}, $norms->{delta_neg_max});
   my $delta1_norm_pos_prev = _aiFannNormMinMaxValue ($delta1_prev_pos, $norms->{delta_pos_min}, $norms->{delta_pos_max});
@@ -25420,22 +25434,13 @@ sub _aiFannBuildLagFeatures {
   my $temp_delta_3h     = $t_t - $t_t_3;
   my $temp_trend        = ($temp_delta_1h + $temp_delta_3h) / 2;
 
-  my $temp_delta_1h_pos = $temp_delta_1h > 0 ? $temp_delta_1h :  0;                         # Positive/Negative Temperatur-Deltas (0..1)
-  my $temp_delta_1h_neg = $temp_delta_1h < 0 ? -$temp_delta_1h : 0;
-
-  my $temp_delta_3h_pos = $temp_delta_3h > 0 ? $temp_delta_3h :  0;
-  my $temp_delta_3h_neg = $temp_delta_3h < 0 ? -$temp_delta_3h : 0;
-
-  my $temp_trend_pos    = $temp_trend > 0 ? $temp_trend : 0;
-  my $temp_trend_neg    = $temp_trend < 0 ? -$temp_trend : 0;
-
-  # Clamping (Temperatur ist bereits normiert)
-  $temp_delta_1h_pos = clampValue ($temp_delta_1h_pos, 0, 1);
-  $temp_delta_1h_neg = clampValue ($temp_delta_1h_neg, 0, 1);
-  $temp_delta_3h_pos = clampValue ($temp_delta_3h_pos, 0, 1);
-  $temp_delta_3h_neg = clampValue ($temp_delta_3h_neg, 0, 1);
-  $temp_trend_pos    = clampValue ($temp_trend_pos,    0, 1);
-  $temp_trend_neg    = clampValue ($temp_trend_neg,    0, 1);
+  # Positive/Negative Temperatur-Deltas (0..1)
+  my $temp_delta_1h_pos = clampValue ($temp_delta_1h > 0 ? $temp_delta_1h  : 0, 0, 1);
+  my $temp_delta_1h_neg = clampValue ($temp_delta_1h < 0 ? -$temp_delta_1h : 0, 0, 1);
+  my $temp_delta_3h_pos = clampValue ($temp_delta_3h > 0 ? $temp_delta_3h  : 0, 0, 1);
+  my $temp_delta_3h_neg = clampValue ($temp_delta_3h < 0 ? -$temp_delta_3h : 0, 0, 1);
+  my $temp_trend_pos    = clampValue ($temp_trend    > 0 ? $temp_trend     : 0, 0, 1);
+  my $temp_trend_neg    = clampValue ($temp_trend    < 0 ? -$temp_trend    : 0, 0, 1);
   
   # ---------------------------------------------------------
   # presence_smooth3/2        -> gleitender 3h/2h-Mittelwert
@@ -25451,21 +25456,19 @@ sub _aiFannBuildLagFeatures {
 
   my $presence_smooth2 = ($v0 + $v1) / 2;
   my $presence_smooth3 = ($v0 + $v1 + $v2) / 3;
-  
-  my $prev = $i > 0 ? $presence_values->[$i-1] : $presence_values->[$i];
-  my $curr = $presence_values->[$i];
 
-  my $presence_transition_up   = ($prev == 0 && $curr == 1) ? 1 : 0;
-  my $presence_transition_down = ($prev == 1 && $curr == 0) ? 1 : 0;
+  my $presence_transition_up   = ($v1 == 0 && $v0 == 1) ? 1 : 0;                            # Heimkehr  in letzter Stunde
+  my $presence_transition_down = ($v1 == 1 && $v0 == 0) ? 1 : 0;                            # Verlassen in letzter Stunde
   
   # ---------------------------------------------------------
   # WW-Zyklus Erkennung Prefilter
+  # Spike-Prüfung auf y_t vs. y_t_1 (aktuellster Sprung)
   # ---------------------------------------------------------
-  my $spike        = ($y_t_1 - $y_t_2) > 1000 ? 1 : 0;                                                              # Sprung in der Vergangenheit
-  my $plateau      = ($y_t_1 > $y_t_2 * 0.8 && $y_t_2 > ($i >= 3 ? $con_series->[$i-3] : $y_t_2) * 0.8) ? 1 : 0;
-  my $stable       = $std6_norm < 0.15 ? 1 : 0;                                                                     # Stabilität (WW glatt, Kochen unruhig)
-  my $ww_prefilter = ($spike && $plateau && $stable) ? 1 : 0;                                                       # Warmwasser-Zyklus erkannt
-
+  my $spike        = ($y_t - $y_t_1) > 1000 ? 1 : 0;                                        # Sprung in der Vergangenheit
+  my $plateau      = ($y_t > $y_t_1 * 0.8 && $y_t_1 > $y_t_2 * 0.8) ? 1 : 0;
+  my $stable       = $std6_norm < 0.15 ? 1 : 0;                                             # Stabilität (WW glatt, Kochen unruhig)
+  my $ww_prefilter = ($spike && $plateau && $stable) ? 1 : 0;                               # Warmwasser-Zyklus erkannt
+    
   return {
       lag1_norm                => $lag1_norm,
       lag2_norm                => $lag2_norm,
@@ -26289,10 +26292,11 @@ sub aiFannTrain {
       #####################################################
       my $mae_tolerance   = $best_val_mae   * 0.05;
       my $medae_tolerance = $best_val_medae * 0.05;
+      my $mse_ceiling     = $best_val_mse   * 1.25;                                     # NEU: MSE darf max. 25% über bestem Val-MSE liegen (anpassbar)
       my $bitfail_gain    = 1;
       my $reason          = '';
       my $improved        = 0;
-      my $snapshot_saved  = 0;                                                                             # pro Epoche zurücksetzen
+      my $snapshot_saved  = 0;                                                          # pro Epoche zurücksetzen
 
       # Zweig 1: echte metrische Verbesserung
       if ($mse_val         <  $best_val_mse   - 1e-6
@@ -26306,7 +26310,9 @@ sub aiFannTrain {
           $snap_metric_count++;
       }
       # Zweig 2: Weighted-RMSE-Proxy verbessert sich
-      elsif ($weighted_rmse_proxy < $best_weighted_rmse_proxy - 1e-6) {
+      # nur wenn Val MSE nicht mehr als 25% (anpassbar) über bestem Val MSE liegt (Schutz vor Overfitting)
+      elsif ($weighted_rmse_proxy < $best_weighted_rmse_proxy - 1e-6
+             && $mse_val          < $mse_ceiling) {
           $reason                 = 'weighted rmse improved';
           $snap_rmse_proxy_last   = $epoch;          
           $improved               = 1;
@@ -26336,17 +26342,21 @@ sub aiFannTrain {
       }
 
       if ($improved) {
-          $best_val_mse             = $mse_val;
+          if ($reason eq 'metric improved') {                                           # $best_val_mse NUR in Zweig 1 (metric improved) aktualisieren
+              $best_val_mse = $mse_val;
+          }
+          
+          $best_val_mae             = $mae_val    if($mae_val   < $best_val_mae);       # MAE/MedAE nur aktualisieren wenn sie sich verbessert haben (strikt monoton fallend)
+          $best_val_medae           = $medae_val  if($medae_val < $best_val_medae);
+          
           $best_weighted_rmse_proxy = $weighted_rmse_proxy;
-          $best_val_mae             = $mae_val;
-          $best_val_medae           = $medae_val;
           $best_train_mse           = $mse_train;
           $best_train_epoch         = $epoch;
           $best_bit_fail            = $bit_fail_val;
           $snapshot_saved_overall   = 1;
           $since_improve            = 0;
 
-          $ann->save ($snapshot);                                           # bestes Modell IMMER speichern
+          $ann->save ($snapshot);                                                       # bestes Modell IMMER speichern
           $snapshot_saved = 1;
 
           if ($debug =~ /aiProcess/xs) {
@@ -26817,12 +26827,16 @@ sub _aiFannEpochDiagnostic {
 
   my $rel = $best_epoch / $num_epoch;
     
-  my $overfitting = ($mse_val > 0 && $mse_train > 0)
-                  ? ($mse_val - $mse_train) / ($mse_val + 1e-9)
-                  : 0;
+  my $ratio = ($mse_train > 0)
+            ? ($mse_val / $mse_train)
+            : 999;
+                  
+  # Normierung auf 0..1
+  my $overfitting = ($ratio - 1) / 30;                                                  # 30 = obere Ratio-Grenze für Verbrauchsdaten
+  $overfitting    = clampValue ($overfitting, 0, 1);
                       
   my $stability   = ($val_mean > 0)
-                  ? $val_std / ($val_mean + 1e-9)
+                  ? $val_std / $val_mean
                   : 0;
   
   $r2       = round2 ($r2);
@@ -27162,8 +27176,8 @@ sub _aiFannRetrainIndicator {
   
   # Limits  
   # Overfitting-Grenzen                                                         # Diese Werte sind solide und konservativ.
-  my $lim_ratio          = 2.5;                                                 # Val MSE darf max. 2.5 x so groß sein wie Train MSE
-  my $lim_diff           = 0.005;
+  my $lim_ratio          = 6.5;                                                 # erhöht von 2.5: frühe Snapshots durch MSE-Ceiling erzeugen strukturell höhere Ratios
+  my $lim_diff           = 0.005;                                               # MSE-Differenz
   my $lim_valstd         = $valmean > 0 ? 0.25 * $valmean : 1e-6;
   
   # Modellgüte-Grenzen (Originalskala)
@@ -27179,7 +27193,7 @@ sub _aiFannRetrainIndicator {
   
   # P95 / P99
   my $lim_p95_error      = 4 * $mae;
-  my $lim_p99_error      = 8 * $mae;                                            # Sehr gut. Das ist ein robuster, praxisnaher Grenzwert
+  my $lim_p99_error      = 3 * $lim_p95_error;                                  # P99-Limit: 3x P95-Limit statt 8*MAE; P99 bleibt nur weiche Score-Komponente, kein harter Retrain-Trigger
   
   # BitFail
   my $lim_bitfail        = 5;                                                   # Sehr gut. BitFail ist ein harter Indikator für grobe Fehler.
@@ -27219,7 +27233,7 @@ sub _aiFannRetrainIndicator {
                                     || $model_slope     < $lim_slope_min
                                     || $model_slope     > $lim_slope_max
                                     || abs($model_bias) > $lim_bias
-                                    || ($rmse_rel       > $lim_rmse_rel && ($p95_error > $lim_p95_error ||  $p99_error  > $lim_p99_error))
+                                    || ($rmse_rel       > $lim_rmse_rel && $p95_error > $lim_p95_error)    # P99 aus hartem Trigger entfernt
                                  );
 
   my $ampel = $quality eq 'Retrain'    ? 'red' 
@@ -27274,14 +27288,14 @@ sub _aiFannRetrainIndicator {
                       "Bias=$model_bias (limit=+-$lim_bias) \n".
                       "R2=$r2 \n".
                       "P95=$p95_error (limit=$lim_p95_error) \n".
-                      "P99=$p99_error (limit=$lim_p99_error) \n".
+                      "P99=$p99_error \n".
                       
                       "-- Robustness Indicators: -- \n".
                       "RMSE relative=$rmse_rel (limit=$lim_rmse_rel) \n".
                       "BitFail=$bitfail (limit=$lim_bitfail) \n".
                       "BitFailRate=$bitfail_rate (limit=$lim_bitfail_rate) \n".
                       
-                      "Forecast Quality Score=$score \n".
+                      "Forecast Quality Score=$score (limit=$profileweights{$profile}{thd_retrain}) \n".
                       "-> Retrain decision=$quality");
   }                            
 
@@ -28639,7 +28653,7 @@ sub _aiDrift_safety_blocked {
   
   my @targets = @$targets;
     
-  return 'no_data' unless(@targets && @targets > 10);                                                       # --- Safety: Targets müssen existieren und ausreichend groß sein ---
+  return 'no_data' unless(@targets && @targets > 6);                                                       # --- Safety: Targets müssen existieren und ausreichend groß sein ---
 
   # --- Kritischer Fehler: negative slope_drift (invertierte Dynamik)
   if ($slope_drift < 0 || $slope_live < 0) {
