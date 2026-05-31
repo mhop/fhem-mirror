@@ -898,8 +898,8 @@ my %epoche_translations = (
                DE => "Architektur prüfen: Netz möglicherweise zu klein für die Datenmenge, Hidden-Layer-Neuronen (aiControl->aiConHiddenLayers) erhöhen (z.B. 50-25 -> 64-32)" }, 
   hint3   => { EN => "Restart the training at a different time: the random weight initialization at the start had a significant impact on the results here; restarting the training automatically generates a different initialization and usually leads to significantly better results",
                DE => "Training zu einem anderen Zeitpunkt erneut starten: die zufällige Gewichtsinitialisierung beim Start hat das Ergebnis hier stark dominiert, ein neuer Trainingsstart erzeugt automatisch eine andere Initialisierung und führt meist zu einem deutlich besseren Ergebnis" },
-  hint4   => { EN => "Slightly increase the momentum: Raising the value toward 0.9 slows convergence in a controlled manner and often improves generalization (aiControl->aiConMomentum)",
-               DE => "Momentum leicht erhöhen: Wert Richtung 0.9 anheben verlangsamt die Konvergenz kontrolliert und verbessert oft die Generalisierung (aiControl->aiConMomentum)" },
+  hint4   => { EN => "Check momentum: if the current value is above 0.7, reduce by 0.1–0.2 (e.g. 0.8 → 0.6) – high momentum can cause the network to overshoot the optimal minimum and contribute to early convergence (aiControl->aiConMomentum)",
+               DE => "Momentum prüfen: liegt der aktuelle Wert über 0.7, um 0.1–0.2 reduzieren (z.B. 0.8 → 0.6) – ein hohes Momentum kann das Netz über das optimale Minimum hinausschießen lassen und zu früher Konvergenz beitragen (aiControl->aiConMomentum)" }, 
   hint5   => { EN => "Slightly reduce the learning rate: decrease the current value by a factor of 2-3 (e.g., 0.01 → 0.003–0.005) so that the network can optimize more finely (aiControl->aiConLearnRate)",
                DE => "Lernrate leicht reduzieren: aktuellen Wert um Faktor 2-3 verringern (z.B. 0.01 -> 0.003-0.005), damit das Netz feiner optimieren kann (aiControl->aiConLearnRate)" },
   hint6   => { EN => "Slightly increase the learning rate: multiply the current value by a factor of 1.5–2 (e.g., 0.005 → 0.008–0.01) so that the network converges to a minimum faster (aiControl->aiConLearnRate)",
@@ -1911,8 +1911,8 @@ lags => sub {
 daily_energy_context => sub {
     my ($f) = @_;
     return [
-        #$f->{cum_day_norm},                                                 # Wieviel heute schon verbraucht
-        #$f->{cum_day_deviation},                                            # Über/Unter Erwartungspfad
+        $f->{cum_day_norm},                                                 # Wieviel heute schon verbraucht
+        $f->{cum_day_deviation},                                            # Über/Unter Erwartungspfad
     ];
 },
 
@@ -26858,8 +26858,12 @@ sub _aiFannEpochDiagnostic {
         
       push @hints, $epoche_translations{hint1}{$lang};
       
+      my $ratio_ok = !defined $cur_ratio || $cur_ratio >= 5;                            # hint2 nur wenn kein totes Netz UND Architektur nicht schon zu komplex
+      
       unless (defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7) {    # hint2 nur wenn kein totes Netz vorliegt
-          push @hints, $epoche_translations{hint2}{$lang};
+          if ($ratio_ok) {
+             push @hints, $epoche_translations{hint2}{$lang};                           # zu klein
+          }
       }
         
       if ($best_epoch < 200) {
@@ -26918,7 +26922,8 @@ sub _aiFannEpochDiagnostic {
   }
   
   if ($code =~ /late/ && $rmse_rel > $rmse_rel_warn                                     # Späte Konvergenz + hoher RMSE → Architektur zu klein
-      && (!defined $cur_ratio || $cur_ratio >= 5)) {                                    # Guard: NICHT feuern wenn Netz bereits zu komplex für Datenmenge (ratio < 5)
+      && (!defined $cur_ratio                                                           # Guard: kein ratio verfügbar → feuern
+      ||  ($cur_ratio >= 5 && $cur_ratio <= 20))) {                                     # Guard: nur im normalen Bereich (nicht zu komplex, nicht schon hint17-Territorium)
       push @hints, sprintf $epoche_translations{hint14}{$lang}, $rmse_rel;
   }
 
