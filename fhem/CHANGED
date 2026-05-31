@@ -1,52 +1,54 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
- - bugfix: 72_FritzSmart: kleinere verbose Korrektur.
- - change: 76_SolarForecast: Version 2.6.11
- - bugfix: 34_NUT: versucht keine Verbindung mehr, wenn disabled==1
+ - feature: 55_MiniSIP: add authentication
+ - bugfix:  72_FritzSmart: kleinere verbose Korrektur.
+ - change:  76_SolarForecast: Version 2.6.11
+ - bugfix:  34_NUT: versucht keine Verbindung mehr, wenn disabled==1
  - feature: 55_MiniSIP: added to repository
  - feature: 76_SolarForecast: Version 2.6.10
- - bugfix: 72_FritzSmart: weitere Fehlerkorrekturen in der Attribut Bearbeitung.
+ - bugfix:  72_FritzSmart: weitere Fehlerkorrekturen 
+                           in der Attribut Bearbeitung.
  - feature: 72_FritzSmart: neues box Reading: box_user...
                            Aktivierbar mit enableBoxReadings.
- - bugfix: 72_FritzSmart: Fehlerkorrekturen in der Attribut Bearbeitung.
- - change: 76_SolarForecast: Version 2.6.9
+ - bugfix:  72_FritzSmart: Fehlerkorrekturen in der Attribut Bearbeitung.
+ - change:  76_SolarForecast: Version 2.6.9
  - feature: 76_SolarForecast: Version 2.6.8
- - bugfix: 72_FritzSmart: Fehlerkorrekturen und Härtung der Fehlerbehandlung.
+ - bugfix:  72_FritzSmart: Fehlerkorrekturen und Härtung der Fehlerbehandlung.
  - feature: 72_FritzSmart: attr <name> enablePowerLine 0|1
- - bugfix: 73_PRESENCE2.pm: Parameterprüfung bei #netcat' entfernt
-           'unsinnigen' state Eintrag bei deaktivieren vo 'disable' entfernt
+ - bugfix:  73_PRESENCE2.pm: Parameterprüfung bei #netcat' entfernt
+            'unsinnigen' state Eintrag bei deaktivieren von 'disable' entfernt
  - feature: 33_ReadingsProxy: enhanced April 2026 version (forum #144287)
- - bugfix: 98_vitoconnect: Fix schedule setter. Stop retry on VALIDATION_ERROR
- - bugfix: 76_SolarForecast: Version 2.6.5
- - change: 76_SolarForecast: Version 2.6.4
+ - bugfix:  98_vitoconnect: Fix schedule setter. Stop retry on VALIDATION_ERROR
+ - bugfix:  76_SolarForecast: Version 2.6.5
+ - change:  76_SolarForecast: Version 2.6.4
  - bugfix:  73_DepartureBnT: Error handling improved
  - feature: 73_DepartureBnT: New Atrribute ZoomOffset for map
- - change: 76_SolarForecast: Version 2.6.3
- - bugfix: 72_FritzSmart: call/ring/dectRing
+ - change:  76_SolarForecast: Version 2.6.3
+ - bugfix:  72_FritzSmart: call/ring/dectRing
  - feature: 76_SolarForecast: Version 2.6.2
- - bugfix: 72_FritzSmart: Fehlerkorrekturen.
+ - bugfix:  72_FritzSmart: Fehlerkorrekturen.
  - feature: 72_FritzSmart: set ... diversity ist jetzt set ... callHandling.
  - feature: 76_SolarForecast: Version 2.6.1
  - feature: 70_SVDRP: added PLAY
- - bugfix: 72_FritzSmart: Fehlerkorrektur.
+ - bugfix:  72_FritzSmart: Fehlerkorrektur.
  - feature: 76_SolarForecast: Version 2.5.1
- - bugfix: 72_FritzSmart: weitere Fehlerkorrektur. Besonderheiten FritzOS.
- - bugfix: 72_FritzSmart: Fehlerkorrektur weil Mist gebaut. Sorry.
- - bugfix: 72_FritzSmart: Fehlerkorrekturen, SOAP::Lite komplett ersetzt.
- - featrure: 72_FritzSmart: Ermitteln FB User und setzten von fritz.... als
+ - bugfix:  72_FritzSmart: weitere Fehlerkorrektur. Besonderheiten FritzOS.
+ - bugfix:  72_FritzSmart: Fehlerkorrektur weil Mist gebaut. Sorry.
+ - bugfix:  72_FritzSmart: Fehlerkorrekturen, SOAP::Lite komplett ersetzt.
+ - feature: 72_FritzSmart: Ermitteln FB User und setzten von fritz.... als
              standard User, solange kein User uber Attr boxUser defniert ist.
              Gilt nur für Fritz!Devices mit Beutzerverwaltung.
  - feature: 93_DbRep: consider attr limit for output in all relevant command
- - bugfix: 72_FritzSmart: Fehlerkorrekturen
- - change: 49_SSCam: set compatibility for latest surveillance station version
+ - bugfix:  72_FritzSmart: Fehlerkorrekturen
+ - change:  49_SSCam: set compatibility for latest surveillance station version
  - change:  88_HMCCU: Fixed unreachable devices after CCU start
  - feature: 89_FULLY: add some options, intented for use in js/VoiceCommands
  - feature: 76_SolarForecast: Version 2.4.0
- - bugfix: 72_FritzSmart: Typo in commandRef, Fehlerkorrektur
- - bugfix: 72_FritzSmart: Warning in Log Auswertung
- - new: 72_FritzSmart: Umgestellt aud Perl Package Technologie.
+ - bugfix:  72_FritzSmart: Typo in commandRef, Fehlerkorrektur
+ - bugfix:  72_FritzSmart: Warning in Log Auswertung
+ - new:     72_FritzSmart: Umgestellt aud Perl Package Technologie.
                        Fehlerkorrekturen aus altem Modul 72_FRITZBOX
- - change: 72_FRITZBOX: die Entwicklung wird im Modul 72_FritzSmart.pm
+ - change:  72_FRITZBOX: die Entwicklung wird im Modul 72_FritzSmart.pm
            weiter geführt
  - bugfix:  70_PylonLowVoltage: addressing batteries with address 9 and above
  - bugfix:  73_DepartureBnT : FTUI Widget Departure_concat without blanks
