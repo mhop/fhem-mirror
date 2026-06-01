@@ -758,6 +758,7 @@ FW_addToWritebuffer($$@)
     }
   }
   $defs{$hash->{SNAME}}{BYTES_WRITTEN} += length($txt);
+  $hash->{LASTACCESS} = time(); #144802
   return addToWritebuffer($hash, $txt, $callback, $nolimit);
 }
 
