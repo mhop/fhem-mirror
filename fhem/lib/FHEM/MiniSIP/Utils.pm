@@ -262,7 +262,9 @@ sub savepeer {
 
 		my $x = $pkt->get_header('x-real-ip');
 		$hash->{peers}->{$peer}->{x_real_ip}  = $x if (defined($x) && $x);
-		readingsSingleUpdate($hash,'state',"registered peer: $peer",1);
+
+		my $text = $e ? '' : 'un'; 
+		readingsSingleUpdate($hash,'state',$text."registered peer: $peer",1);
 	}
 
 }
