@@ -27,6 +27,7 @@ use Data::Dumper;
 
 use Exporter ('import');
 our @EXPORT_OK = qw( _log3
+                     gen_tag
                      getpeer
                      havepeer
                      invite2reading
@@ -75,6 +76,8 @@ sub _log3 {
 	my $instName = ( ref($hash) eq "HASH" ) ? $hash->{NAME} : "MiniSIP";
 	Log3 $hash, $loglevel, "$instName: $sub.$xline " . $text;
 }
+
+sub gen_tag { return int(rand(1_000_000)); }
 
 sub invite2reading {
   my ($hash,$req) = @_;
@@ -154,6 +157,7 @@ sub parsemsgbody {
 		_log3($hash,3,"msg parsed: $input");
 	} elsif ($parsetype eq 'snom') { 
 		($input) = $body =~ m/k=(\d+)/;
+		$input .= " $peer" if AttrVal($name,'addPeerToInput',0);
 	} elsif ($parsetype eq 'grandstream') {
 		$input = "grandstream dummy";
 	} else {

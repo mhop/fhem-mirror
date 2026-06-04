@@ -40,6 +40,7 @@ sub Initialize($) {
   $hash->{DeleteFn}    = \&FHEM::Core::MiniSIP::Delete;
 
   $hash->{AttrList}    = ""
+                        ."addPeerToInput:0,1 "
                         ."logFullMessage:0,1 "
                         ."showFullMessage:0,1 "
                         ."parseFn "
