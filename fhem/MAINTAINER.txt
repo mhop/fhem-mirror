@@ -672,8 +672,10 @@ contrib/deprecated/20_FRM_LCD.pm ntruchsess       (deprecated)
 contrib/deprecated/70_Pushalot.pm Talkabout       (deprecated)
 contrib/deprecated/95_PachLog.pm  rudolfkoenig/orphan (deprecated)
 contrib/DoorPi/70_DoorPi.pm  pahenning            Automatisierung
-contrib/fhemweb_iconAnimated.js    schwatter      Frontends
-contrib/fhemweb_minichart.js    schwatter         Frontends
+contrib/fhemweb_iconAnimated.js   schwatter       Frontends
+contrib/fhemweb_minichart.js      schwatter       Frontends
+contrib/fhemweb_shutter_h.js      schwatter       Frontends
+contrib/fhemweb_shutter_v.js      schwatter       Frontends
 contrib/Infratec/*           Wzut                 Bastelecke
 contrib/META.json.full.txt   rudolfkoenig/orphan  FHEM Development
 contrib/META.json.txt        rudolfkoenig/orphan  FHEM Development
