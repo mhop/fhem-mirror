@@ -1,4 +1,4 @@
-FW_version["fhemweb_shutter_h.js"] = "$Id: fhemweb_shutter_h.js 0.8.0 schwatter $";
+FW_version["fhemweb_shutter_h.js"] = "$Id: fhemweb_shutter_h.js 0.8.1 schwatter $";
 FW_widgets['shutter_h'] = { createFn: window.controlShutterHCreate };
 
 function controlShutterHCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -78,12 +78,12 @@ function controlShutterHCreate(elName, devName, vArr, currVal, set, params, cmd)
             .shutter-h-preview-window {
                 width: 24px !important;
                 height: 30px !important;
-                background: rgba(255, 255, 255, 0.3) !important; 
                 border: 1px solid rgba(120, 120, 120, 0.5) !important;
                 border-radius: 3px !important;
                 position: relative !important;
                 overflow: hidden !important;
                 flex-shrink: 0 !important;
+                transition: background-color 0.2s ease-out !important;
             }
             .shutter-h-preview-lamellas {
                 position: absolute !important;
@@ -156,6 +156,10 @@ function controlShutterHCreate(elName, devName, vArr, currVal, set, params, cmd)
         const p = Math.min(Math.max(parseInt(percent) || 0, 0), 100);
         const invertedHeight = 100 - p;
         animLamellas.css('height', invertedHeight + '%');
+
+        // Helligkeits-Übergang für den Fenster-Hintergrund berechnen (von 30 bis 255)
+        const brightness = Math.round(30 + (p * 2.25));
+        animWindow.css('background-color', `rgb(${brightness}, ${brightness}, ${brightness})`);
     }
 
     function applyNewValue(val) {
