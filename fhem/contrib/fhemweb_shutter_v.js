@@ -1,4 +1,4 @@
-FW_version["fhemweb_shutter_v.js"] = "$Id: fhemweb_shutter_v.js 0.8.1 schwatter $";
+FW_version["fhemweb_shutter_v.js"] = "$Id: fhemweb_shutter_v.js 0.8.2 schwatter $";
 FW_widgets['shutter_v'] = { createFn: window.controlShutterVCreate };
 
 function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -207,12 +207,16 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
         e.preventDefault(); e.stopPropagation();
         handleSizingFromEvent(e);
 
-        $(window).on('mousemove.shuttervdrag touchmove.shuttervdrag', function(ev) {
+        // Sicherer, gerätespezifischer Namensraum für die globalen Events
+        const moveNamespace = `mousemove.shuttervdrag-${dev} touchmove.shuttervdrag-${dev}`;
+        const upNamespace = `mouseup.shuttervdrag-${dev} touchend.shuttervdrag-${dev}`;
+
+        $(window).on(moveNamespace, function(ev) {
             handleSizingFromEvent(ev);
         });
 
-        $(window).on('mouseup.shuttervdrag touchend.shuttervdrag', function(ev) {
-            $(window).off('.shuttervdrag');
+        $(window).on(upNamespace, function(ev) {
+            $(window).off(`.shuttervdrag-${dev}`);
             
             sendCmdToFhem('position', currentInternalPercent);
 
