@@ -1,4 +1,4 @@
-FW_version["fhemweb_shutter_v.js"] = "$Id: fhemweb_shutter_v.js 0.8.0 schwatter $";
+FW_version["fhemweb_shutter_v.js"] = "$Id: fhemweb_shutter_v.js 0.8.1 schwatter $";
 FW_widgets['shutter_v'] = { createFn: window.controlShutterVCreate };
 
 function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -82,7 +82,6 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
             .shutter-v-touch-window {
                 width: 60px !important;
                 height: 100px !important;
-                background: rgba(255, 255, 255, 0.15) !important; 
                 border: 2px solid rgba(120, 120, 120, 0.5) !important;
                 border-radius: 5px !important;
                 position: relative !important;
@@ -91,6 +90,7 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
                 cursor: ns-resize !important;
                 user-select: none !important;
                 -webkit-user-select: none !important;
+                transition: background-color 0.2s ease-out !important;
             }
             .shutter-v-preview-lamellas {
                 position: absolute !important;
@@ -113,10 +113,10 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
                 text-align: center !important;
                 font-size: 11px !important;
                 font-weight: bold !important;
-                color: #fff !important;
-                text-shadow: 1px 1px 3px rgba(0,0,0,0.9), -1px -1px 3px rgba(0,0,0,0.9) !important;
+                text-shadow: 1px 1px 2px rgba(120,120,120,0.4) !important;
                 pointer-events: none !important;
                 z-index: 10 !important;
+                transition: color 0.1s ease-out !important;
             }
         `)
         .appendTo('head');
@@ -147,13 +147,21 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
 
     let currentInternalPercent = parseInt(currVal) || 0;
 
-    // --- Optische Aktualisierung ---
     function updateVisualShutter(percent) {
         const p = Math.min(Math.max(parseInt(percent) || 0, 0), 100);
         currentInternalPercent = p;
         const invertedHeight = 100 - p;
         animLamellas.css('height', invertedHeight + '%');
         valDisplay.text(`${p}%`);
+
+        const brightness = Math.round(30 + (p * 2.25)); 
+        animWindow.css('background-color', `rgb(${brightness}, ${brightness}, ${brightness})`);
+
+        if (p < 50) {
+            valDisplay.css('color', 'rgb(255, 255, 255)');
+        } else {
+            valDisplay.css('color', 'rgb(0, 0, 0)');
+        }
     }
 
     // --- FHEM API ---
