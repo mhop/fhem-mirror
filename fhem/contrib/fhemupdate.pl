@@ -185,4 +185,5 @@ chdir("$homedir");
 print "generating SVNLOG\n";
 system("sh mksvnlog.sh > SVNLOG");
 system("cp SVNLOG $destdir");
+system("cd $destdir; tar cfz fhemupdate.tar.gz fhemupdate");
 print "fhemupdate.pl END: ".localtime()."\n";
