@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  98_vitoconnect: Error handling bugfix von R. Bergmann. Danke!
  - feature: 55_MiniSIP: add authentication
  - bugfix:  72_FritzSmart: kleinere verbose Korrektur.
  - change:  76_SolarForecast: Version 2.6.11
