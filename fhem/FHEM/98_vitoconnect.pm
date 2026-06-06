@@ -101,6 +101,7 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.1.3"  => "04.06.2026  Bugfix-Fork von v1.1.3 durch R. Bergmann [RB-FIX-01] Parsing-Stride 4->6 in getErrorCode korrigiert; [RB-FIX-02] BlockingGet-Cache verhindert FHEM-Freeze; [RB-FIX-03] ReadFn toter Code entfernt",
   "1.1.2"  => "04.05.2026  Fix schedule setter: support both API format and reading format, stop retry on VALIDATION_ERROR",
   "1.1.1"  => "25.02.2026  Small fixes",
   "1.1.0"  => "24.02.2026  Small adaptions to SVG",
@@ -174,6 +175,12 @@ my $featureURL     = "$apiBaseURL/iot/v2/features/";
 my $authorizeURL  = "$iamBaseURL/idp/v3/authorize";
 my $tokenURL      = "$iamBaseURL/idp/v3/token";
 my $errorURL_V3   = "$apiBaseURL/service-documents/v3/error-database";
+
+# [RB-FIX-02] Modul-globaler Cache für Error-Code-Texte.
+# Verhindert wiederholte HttpUtils_BlockingGet-Aufrufe für dieselben Codes.
+# Der Cache bleibt für die gesamte Laufzeit des FHEM-Prozesses erhalten.
+# Schlüssel: Viessmann-Code (z.B. "S.134"), Wert: Beschreibungstext
+my %vitoconnect_errorcode_cache;
 
 my $RequestListMapping; # Über das Attribut Mapping definierte Readings zum überschreiben der RequestList
 my %translations;       # Über das Attribut translations definierte Readings zum überschreiben der RequestList
@@ -1967,7 +1974,9 @@ sub vitoconnect_Initialize {
     $hash->{SetFn}   = \&vitoconnect_Set;       # set-Befehle
     $hash->{GetFn}   = \&vitoconnect_Get;       # get-Befehle
     $hash->{AttrFn}  = \&vitoconnect_Attr;      # Attribute setzen/ändern/löschen
-    $hash->{ReadFn}  = \&vitoconnect_Read;
+    # [RB-FIX-03] $hash->{ReadFn} = \&vitoconnect_Read; ENTFERNT.
+    # vitoconnect_Read existiert nicht und ReadFn wird für reine HTTP-Module
+    # nie aufgerufen (kein Filehandle $hash->{FD}). Toter Code.
     $hash->{FW_detailFn} = \&vitoconnect_FW_detailFn;
     #$hash->{FW_summaryFn} = \&vitoconnect_FW_detailFn;
     $hash->{AttrList} =
@@ -1989,7 +1998,6 @@ sub vitoconnect_Initialize {
       eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
     return;
 }
-
 
 #####################################################################################################################
 # wird beim 'define' eines Gerätes aufgerufen
@@ -4611,13 +4619,34 @@ sub vitoconnect_getErrorCode {
   my @values = split(/, /, $comma_separated_string);
   my @entries;
 
-  for (my $i = 0; $i < @values; $i += 4) {
-    my $source     = $values[$i];
-    my $code       = $values[$i + 1];
-    my $category   = $values[$i + 2];
-    my $ts_raw     = $values[$i + 3];
+  # [RB-FIX-01] Schrittweite von 4 auf 6 korrigiert.
+  # Jeder Eintrag in *.raw.entries besteht aus exakt 6 Feldern:
+  #   [0] source   z.B. "customer"
+  #   [1] count    z.B. "1" oder "54"
+  #   [2] bus      z.B. "OwnBus", "CanInternal"
+  #   [3] code     z.B. "S.134", "I.114", "F.256"   ← der eigentliche Fehlercode
+  #   [4] category z.B. "status", "info", "service"
+  #   [5] ts_raw   z.B. "2026-06-04T06:40:54.000Z"  ← ISO-Timestamp
+  # Originalfehler: $i += 4 versetzt die Zuordnung nach dem ersten Eintrag,
+  # sodass Timestamps als Codes und Codes als Timestamps behandelt wurden.
+  for (my $i = 0; $i + 5 < @values; $i += 6) {
+    my $source     = $values[$i];      # z.B. "customer"
+    my $count      = $values[$i + 1];  # z.B. "1" oder "54"
+    my $bus        = $values[$i + 2];  # z.B. "OwnBus", "CanInternal"
+    my $code       = $values[$i + 3];  # z.B. "S.134" ← Fehlercode
+    my $category   = $values[$i + 4];  # z.B. "status", "info"
+    my $ts_raw     = $values[$i + 5];  # z.B. "2026-06-04T06:40:54.000Z"
 
-    $ts_raw =~ s/Z$//;
+    # [RB-FIX-01] Sicherheitscheck: Fehlerhaft geparste / unvollständige Einträge überspringen
+    next unless defined $code && defined $ts_raw && defined $category;
+
+    # [RB-FIX-01] Nur syntaktisch gültige Viessmann-Codes verarbeiten.
+    # Gültige Codes beginnen mit F. S. I. P. oder A. gefolgt von Ziffern/Buchstaben.
+    # Ohne diesen Filter wurden im Original "1", "OwnBus", ISO-Timestamps etc.
+    # als Codes an die API geschickt – alle mit 404 als Antwort.
+    next unless $code =~ /^[FISPA]\./;
+
+    $ts_raw =~ s/\.\d+Z?$//;    # RB: Entferne Millisekunden und 'Z' am Ende, falls vorhanden, war vorher    $ts_raw =~ s/Z$//;
     my $t;
     eval { $t = Time::Piece->strptime($ts_raw, "%Y-%m-%dT%H:%M:%S") };
     my $timestamp = $t ? $t->strftime("%d.%m.%Y %H:%M:%S") : $ts_raw;
@@ -4625,26 +4654,60 @@ sub vitoconnect_getErrorCode {
     my $severity = $severity_translations{$category} if uc($language) eq 'DE';
     $severity //= vitoconnect_mapSeverityPrefix($code);
 
-    my $text = vitoconnect_mapCodeText($code);
-    $text = "Unbekannter Code ($code)" if $text =~ /^Unbekannter Fehlercode/;
+    # [RB-FIX-02] Drei-stufige Textauflösung ohne wiederholtes Blocking:
+    #
+    #   Stufe 1: Modul-globaler Cache — O(1), kein HTTP, kein Blocking
+    #   Stufe 2: Lokale Code-Tabelle vitoconnect_mapCodeText() — kein HTTP
+    #   Stufe 3: API-Call (HttpUtils_BlockingGet) — NUR wenn Stufen 1+2 keinen
+    #            Treffer liefern UND der Code noch nicht im Cache ist.
+    #            Das Ergebnis (auch "unbekannt") wird gecacht, sodass jeder
+    #            Code maximal einmal pro FHEM-Prozesslaufzeit blockierend
+    #            abgerufen wird. Im Normalbetrieb nach dem ersten Zyklus:
+    #            ausschließlich Cache-Hits, 0ms Blocking.
+    my $text;
 
-    my $url = "$errorURL_V3?materialNumber=$materialNumber&errorCode=$code&countryCode=${\uc($language)}&languageCode=${\lc($language)}";
-    my $param = {
-      url     => $url,
-      hash    => $hash,
-      timeout => $hash->{timeout},
-      method  => "GET",
-      sslargs => { SSL_verify_mode => 0 },
-    };
+    if (exists $vitoconnect_errorcode_cache{$code}) {
+      # Stufe 1: Cache-Treffer
+      $text = $vitoconnect_errorcode_cache{$code};
+      Log3($name, 5, "$name: [RB-FIX-02] Cache-Treffer fuer Code '$code': $text");
 
-    Log3($name, 5, "$name: API call for $code via $url");
-    my ($err, $msg) = HttpUtils_BlockingGet($param);
-    my $decode_json = eval { JSON->new->decode($msg) };
+    } else {
+      # Stufe 2: Lokale Tabelle prüfen
+      my $local_text = vitoconnect_mapCodeText($code);
 
-    if (!$err && !$decode_json->{statusCode} && ref($decode_json->{faultCodes}) eq 'ARRAY' && @{$decode_json->{faultCodes}}) {
-      my $api_text = $decode_json->{faultCodes}[0]{systemCharacteristics};
-      $api_text =~ s/<\/?(p|q)>//g if defined $api_text;
-      $text = $api_text if defined $api_text && $api_text ne '';
+      if ($local_text !~ /^Unbekannter Fehlercode/) {
+        # Lokal gefunden – kein HTTP-Call nötig, Ergebnis cachen
+        $text = $local_text;
+        $vitoconnect_errorcode_cache{$code} = $text;
+        Log3($name, 5, "$name: [RB-FIX-02] Lokal gefunden fuer Code '$code': $text (gecacht)");
+
+      } else {
+        # Stufe 3: API-Call – einmalig und blockierend, Ergebnis wird gecacht
+        # Hinweis: Im Idealfall sollte dies durch HttpUtils_NonblockingGet oder
+        # BlockingCall ersetzt werden. Als pragmatischer Fix: durch den Cache
+        # tritt das Blocking pro Code nur einmal auf statt bei jedem Zyklus.
+        $text = "Unbekannter Code ($code)";
+        my $url = "$errorURL_V3?materialNumber=$materialNumber&errorCode=$code&countryCode=${\uc($language)}&languageCode=${\lc($language)}";
+        my $param = {
+          url     => $url,
+          hash    => $hash,
+          timeout => $hash->{timeout},
+          method  => "GET",
+          sslargs => { SSL_verify_mode => 0 },
+        };
+        Log3($name, 4, "$name: [RB-FIX-02] Einmaliger API-Call fuer unbekannten Code '$code' (wird danach gecacht)");
+        my ($err, $msg) = HttpUtils_BlockingGet($param);
+        my $decode_json = eval { JSON->new->decode($msg) };
+
+        if (!$err && !$decode_json->{statusCode} && ref($decode_json->{faultCodes}) eq 'ARRAY' && @{$decode_json->{faultCodes}}) {
+          my $api_text = $decode_json->{faultCodes}[0]{systemCharacteristics};
+          $api_text =~ s/<\/?(p|q)>//g if defined $api_text;
+          $text = $api_text if defined $api_text && $api_text ne '';
+        }
+        # Ergebnis cachen – auch wenn API 404 zurückgab (verhindert Retry)
+        $vitoconnect_errorcode_cache{$code} = $text;
+        Log3($name, 4, "$name: [RB-FIX-02] Code '$code' gecacht mit Text: $text");
+      }
     }
 
     push @entries, {
