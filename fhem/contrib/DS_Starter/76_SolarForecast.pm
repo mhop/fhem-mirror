@@ -39,7 +39,7 @@ use POSIX;
 use GPUtils qw(GP_Import GP_Export);                                                 # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
 use Time::HiRes qw(gettimeofday tv_interval);
 use Math::Trig;
-use List::Util qw(sum min max shuffle);
+use List::Util qw(sum min max shuffle any);
 use Scalar::Util qw(blessed weaken);
 use Encode;
 use Color;
@@ -163,7 +163,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.7.0"  => "27.05.2026  _aiFannBuildLagFeatures: erweiterte Lag Erstellung, nicht kompatibel mit Vorgänger Version ", 
+  "2.7.0"  => "06.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
+                           "verbesserter Snap-Guard und Retrainidicator, Hint-Korrektur, Div0-Fix ".
+                           "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ",                           
   "2.6.11" => "26.05.2026  _saveEnergyConsumption: nutze Logsequenzmanagement für Verbrauchslimitüberschreitung ".
                            "_aiFannApplyBiasCorrection: Anpassung OSL-Gewicht ",
   "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
@@ -177,7 +179,7 @@ my %vNotesIntern = (
                            "AI mehr Neuronenlayer X-X-X-X... möglich, aiConLearnRate: kleinste Lernrate nun 0.0001 ".
                            "Messagesystem: gelesene Mitteilungen werden auch nach Systemneustart nicht als neu signalisiert ",
   "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
-                           "_aiDrift_safety_blocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
+                           "_aiFannDriftSafetyBlocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
                            "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
                            "AI Status Popup Inhalt aufklappbar ",
   "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
@@ -1880,28 +1882,31 @@ seasonality => sub {
 lags => sub {
     my ($f) = @_;
     return [
-        # Absolute Pegel (bisher nicht genutzt!)
-        #$f->{lag1_norm},                                                    # Verbrauch vor 1h  -> glättet sehr, lag1 zerstört die Peak-Struktur
-        #$f->{lag2_norm},                                                    # Verbrauch vor 2h -> negativer Einfluß, verstärkt die Glättung
-        #$f->{lag24_norm},                                                   # Verbrauch vor 24h (gestern gleiche Stunde) -> glättet sehr
-        $f->{lag48_norm},                                                   # Verbrauch vor 48h 
+        # --- Struktur-Lags (wochenzyklische Muster) ---
+        $f->{lag48_norm},                                                   # Verbrauch vor 48h
         $f->{lag168_norm},                                                  # Verbrauch vor 168h (Vorwoche gleiche Stunde)
-        
-        # Statistik                   
-        #$f->{roll_mean_3_norm},                                             # lokaler Pegel -> negativer Einfluß, macht dein Modell blind für Peaks
-        #$f->{roll_std_6_norm},                                              # Volatilität   -> negativer Einfluß, Modell wird instabiler und glättet stärker
-        
-        # Abweichung vom lokalen Durchschnitt
-        $f->{lag1_spike_pos_norm},                                          # letzte Stunde war Spike nach oben
-        $f->{lag1_spike_neg_norm},                                          # letzte Stunde war Spike nach unten
-        
-        # Kurzfristige Verbrauchsänderung (1h)
-        $f->{delta1_norm_pos},                                              # o Verbrauchsanstieg zur Vorstunde
-        $f->{delta1_norm_neg},                                              # o Verbrauchsabsenkung zur Vorstunde
 
-        # Tagesmuster (24h)
-        $f->{delta24_norm_pos},                                             # o Verbrauchsanstieg zum Vortag (gleiche Stunde)
-        $f->{delta24_norm_neg},                                             # o Verbrauchsabsenkung zum Vortag
+        # --- Spike-Erkennung (Abweichung vom lokalen Mittelwert) ---
+        $f->{lag1_spike_pos_norm},                                          # y_t übertrifft 3h-Mittelwert (laufender Spike)
+        $f->{lag1_spike_neg_norm},                                          # y_t unterschreitet 3h-Mittelwert (laufender Einbruch)
+        #$f->{lag2_spike_pos_norm},                                          # y_t_1 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
+        #$f->{lag2_spike_neg_norm},                                          # y_t_1 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
+
+        # --- Kurzfristige Dynamik ---
+        $f->{delta1_norm_pos},                                              # Verbrauchsanstieg zur Vorstunde
+        $f->{delta1_norm_neg},                                              # Verbrauchsabsenkung zur Vorstunde
+        $f->{delta24_norm_pos},                                             # Verbrauchsanstieg zum Vortag (gleiche Stunde)
+        $f->{delta24_norm_neg},                                             # Verbrauchsabsenkung zum Vortag
+
+        # --- Rolling-Fenster (Volatilität, Peak-Niveau) ---
+        #$f->{roll_min_6_norm},                                              # Tiefstwert der letzten 6h (Grundlastniveau)
+        #$f->{roll_max_6_norm},                                              # Höchstwert der letzten 6h (Peak-Niveau)
+        #$f->{roll_range_6_norm},                                            # Spannweite der letzten 6h (Volatilität ohne Glättung)
+
+        # --- Verbrauchsregime ---
+        #$f->{is_low_cons_regime},                                           # y_t <= P25: Grundlast / Nacht / abwesend
+        #$f->{is_high_cons_regime},                                          # y_t >= P75: Peak / Kochen / Geräte an
+        #$f->{is_transition_regime},                                         # P25 < y_t < P75: normaler Betrieb
     ];
 },
 
@@ -2287,11 +2292,16 @@ semantics_heatpump_boost_special => sub {                                       
 sandbox => sub {
     my ($f) = @_;
     return [
-        $f->{lag1_norm},                                                    # Verbrauch vor 1h
-        $f->{lag2_norm},                                                    # Verbrauch vor 2h
-        $f->{lag24_norm},                                                   # Verbrauch vor 24h (gestern gleiche Stunde)
-        $f->{lag48_norm},                                                   # Verbrauch vor 48h
-        $f->{lag168_norm},                                                  # Verbrauch vor 168h (Vorwoche gleiche Stunde)
+        $f->{lag2_spike_pos_norm},                                          # y_t_1 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
+        $f->{lag2_spike_neg_norm},                                          # y_t_1 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
+
+        $f->{roll_min_6_norm},                                              # Tiefstwert der letzten 6h (Grundlastniveau)
+        $f->{roll_max_6_norm},                                              # Höchstwert der letzten 6h (Peak-Niveau)
+        $f->{roll_range_6_norm},                                            # Spannweite der letzten 6h (Volatilität ohne Glättung)
+
+        $f->{is_low_cons_regime},                                           # y_t <= P25: Grundlast / Nacht / abwesend
+        $f->{is_high_cons_regime},                                          # y_t >= P75: Peak / Kochen / Geräte an
+        $f->{is_transition_regime},                                         # P25 < y_t < P75: normaler Betrieb
     ];
 },
 
@@ -2423,7 +2433,7 @@ v1_heatpump_active_pv => sub {
 v1_sandbox => sub {
     my ($f) = @_;
     return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },
+        @{ $FEATURE_REGISTRY{v1_common_active}->($f) },
         @{ $FEATURE_BLOCKS{sandbox}->($f) },        
     ];
 },
@@ -3749,12 +3759,16 @@ sub Get {
 
   my $type = $hash->{TYPE};
 
-  my @pha  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{pvhist}};
   my @cla  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{circular}};
   my @vcm  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{consumers}};
   my @vba  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{batteries}};
   my @vin  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{inverters}};
   my @vpn  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{producers}};
+  my @pha  = map {sprintf "%02d", $_} sort {$a<=>$b} keys %{$data{$name}{pvhist}};
+  
+  unshift (@pha, 'exportToCsv');
+  unshift (@pha, '#');
+  
   my @vst  = sort keys %{$data{$name}{strings}};
 
   my $gol  = join ",", @gsopt;                                                       # Optionen der Grafikselektion
@@ -3765,6 +3779,8 @@ sub Get {
   my $inl  = join ",", @vin;
   my $pnl  = join ",", @vpn;
   my $str  = join ",", @vst;
+  
+  my $anum = scalar @pha + 1;
 
   my $getlist = "Unknown argument $opt, choose one of ".
                 "Select...:noArg ".
@@ -3780,7 +3796,7 @@ sub Get {
                 "html:$gol ".
                 "nextHours:noArg ".
                 "pvCircular:#,$cll ".
-                "pvHistory:#,exportToCsv,$pvl ".
+                "pvHistory:widgetList,$anum,select,$pvl,2,textField,filter&nbsp;parameters&nbsp;e.g.&nbsp;day=04&nbsp;hod=11&nbsp;key=conlegfc ".
                 "rooftopData:noArg ".
                 "radiationApiData:noArg ".
                 "statusApiData:noArg ".
@@ -3800,8 +3816,6 @@ sub Get {
   my $vdtoptnum = 1 + scalar (split ',', $vdtopt);
   
   $getlist .= "valDecTree:widgetList,$vdtoptnum,select,$vdtopt,2,textField,fill&nbsp;in&nbsp;only&nbsp;if&nbsp;arguments&nbsp;are&nbsp;needed ";
-
-  #$getlist .= "valDecTree:$vdtopt ";
 
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
@@ -6330,8 +6344,8 @@ sub _getlistPVHistory {
   my $name  = $paref->{name};
   my $arg   = $paref->{arg};
   my $hash  = $defs{$name};
-
-  my $ret = listDataPool   ($hash, 'pvhist', $arg);
+  
+  my $ret = listDataPool ($hash, 'pvhist', $arg);
   return if(!$ret);
 
   $ret   .= lineFromSpaces ($ret, 20);
@@ -24992,15 +25006,12 @@ sub aiFannCreateConTrainData {
       if ($debug =~ /aiProcess/xs) {
           if ($i > $#flat_targets - 20) {                                                                   # nur die letzten 20 Punkte loggen
               Log3 ($name, 1, sprintf (
-                    "%s - DBG F[%d]: lag1=%0.3f hppf=%0.3f lag24=%0.3f d1p=%0.3f d1n=%0.3f rollstd=%0.3f up=%d down=%d upS=%0.3f downS=%0.3f vol=%d pvX=%d break=%d",
+                    "%s - DBG F[%d]: hppf=%0.3f d1p=%0.3f d1n=%0.3f up=%d down=%d upS=%0.3f downS=%0.3f vol=%d pvX=%d break=%d",
                     $name,
                     $i,
-                    $lags->{lag1_norm},
                     $sigs->{hp_power_factor},
-                    $lags->{lag24_norm},
                     $lags->{delta1_norm_pos},
                     $lags->{delta1_norm_neg},
-                    $lags->{roll_std_6_norm},
                     $sigs->{trend_up_norm},
                     $sigs->{trend_down_norm},
                     $sigs->{trend_up_strength},
@@ -25057,15 +25068,14 @@ sub aiFannCreateConTrainData {
                          presence_smooth2         => $lags->{presence_smooth2},                 # Anwesenheitsglättung über 2h (0..1)                         
                          presence_transition_up   => $lags->{presence_transition_up},           # Anwesenheit 0->1 Übergang (Impuls)
                          presence_transition_down => $lags->{presence_transition_down},         # Anwesenheit 1->0 Übergang (Impuls)
-                         
-                         lag1_norm                => $lags->{lag1_norm},                        # Verbrauch vor 1h (normalisiert)                        
-                         lag2_norm                => $lags->{lag2_norm},                        # Verbrauch vor 2h (normalisiert)                                                         
-                         lag24_norm               => $lags->{lag24_norm},                       # Verbrauch vor 24h (normalisiert)
+                                                                                                       
                          lag48_norm               => $lags->{lag48_norm},                       # Verbrauch vor 48h (normalisiert)
                          lag168_norm              => $lags->{lag168_norm},                      # Verbrauch vor 168h = 7d (normalisiert)
 
-                         lag1_spike_pos_norm      => $lags->{lag1_spike_pos_norm},              # letzte Stunde war Spike nach oben
-                         lag1_spike_neg_norm      => $lags->{lag1_spike_neg_norm},              # letzte Stunde war Spike nach unten
+                         lag1_spike_pos_norm      => $lags->{lag1_spike_pos_norm},              # letzte Stunde war Spike nach oben (laufender Spike)
+                         lag1_spike_neg_norm      => $lags->{lag1_spike_neg_norm},              # letzte Stunde war Spike nach unten (laufender Einbruch)
+                         lag2_spike_pos_norm      => $lags->{lag2_spike_pos_norm},              # vorletzte Stunde war Spike nach oben (Spike klingt ab / hält an)
+                         lag2_spike_neg_norm      => $lags->{lag2_spike_neg_norm},              # vorletzte Stunde war Spike nach unten  (Einbruch klingt ab / hält an)                         
                          
                          cum_day_norm             => $sigs->{cum_day_norm},                     # kumulierter Tagesverbrauch (normiert)
                          cum_day_deviation        => $sigs->{cum_day_deviation},                # Abweichung Verbrauch vom erwarteten Tagespfad
@@ -25076,10 +25086,15 @@ sub aiFannCreateConTrainData {
                          delta1_norm_neg          => $lags->{delta1_norm_neg},                  # Negative 1h-Änderung
                          delta24_norm_pos         => $lags->{delta24_norm_pos},                 # Positive 24h-Änderung
                          delta24_norm_neg         => $lags->{delta24_norm_neg},                 # Negative 24h-Änderung
-                         
-                         roll_mean_3_norm         => $lags->{roll_mean_3_norm},                 # 3h gleitender Mittelwert (normalisiert)
-                         roll_std_6_norm          => $lags->{roll_std_6_norm},                  # 6h gleitende Standardabweichung (Volatilität)
-                         
+  
+                         roll_min_6_norm          => $lags->{roll_min_6_norm},                  # Tiefstwert der letzten 6h (Grundlastniveau)
+                         roll_max_6_norm          => $lags->{roll_max_6_norm},                  # Höchstwert der letzten 6h (Peak-Niveau)
+                         roll_range_6_norm        => $lags->{roll_range_6_norm},                # Spannweite der letzten 6h (Volatilität ohne Glättung)
+
+                         is_low_cons_regime       => $lags->{is_low_cons_regime},               # y_t <= P25: Grundlast / Nacht / abwesend
+                         is_high_cons_regime      => $lags->{is_high_cons_regime},              # y_t >= P75: Peak / Kochen / Geräte an
+                         is_transition_regime     => $lags->{is_transition_regime},             # P25 < y_t < P75: normaler Betrieb
+  
                          temp_norm_lag1h          => $lags->{temp_norm_lag1h},                  # Temperatur vor 1h (normalisiert)
                          temp_norm_lag3h          => $lags->{temp_norm_lag3h},                  # Temperatur vor 3h (normalisiert)
                          temp_norm_lag24h         => $lags->{temp_norm_lag24h},                 # Temperatur vor 24h (normalisiert)
@@ -25291,6 +25306,8 @@ sub _aiFannCreateLagNorms {
   my ($targref, $targminval, $targmaxval) = @_;              
     
   my (@dseries, @dpos, @dneg, @rstds);
+  my (@rmins, @rmaxs, @rranges);
+  my (@d24pos, @d24neg);
   
   for my $i (1 .. $#$targref) {                                                      # Deltas zwischen aufeianderfolgenden Zielwerten bestimmen
       my $d = $targref->[$i] - $targref->[$i-1];
@@ -25298,32 +25315,77 @@ sub _aiFannCreateLagNorms {
       push @dpos,   ($d > 0 ? $d : 0); 
       push @dneg,   ($d < 0 ? -$d : 0);
   }
-
-  my ($delta_norm_ref, $dmin, $dmax)        = _aiFannNormalizeMinMax (\@dseries);
-  my ($dpos_norm_ref, $dpos_min, $dpos_max) = _aiFannNormalizeMinMax (\@dpos);
-  my ($dneg_norm_ref, $dneg_min, $dneg_max) = _aiFannNormalizeMinMax (\@dneg);
+  
+  for my $i (24 .. $#$targref) {
+      my $d = $targref->[$i] - $targref->[$i - 24];
+      push @d24pos, ($d > 0 ? $d  : 0);
+      push @d24neg, ($d < 0 ? -$d : 0);
+  }
   
   for my $i (6 .. $#$targref) {                                                     # Rolling-Std-Normierung aus @Targets ableiten
       my @w = @{$targref}[$i-6 .. $i-1];
       push @rstds, _aiFannStandardDeviation (\@w);
+      
+      my $rmin = min (@w);
+      my $rmax = max (@w);
+      push @rmins,   $rmin;
+      push @rmaxs,   $rmax;
+      push @rranges, $rmax - $rmin;
   }
-
+  
+  # Regime-Schwellen aus Zielwert-Verteilung (im Originalbereich)
+  my @sorted_targ = sort { $a <=> $b } @$targref;
+  my $n_targ      = scalar @sorted_targ;
+  my $p25_targ    = $sorted_targ[ int(0.25 * $n_targ) ];                            # unteres Quartil
+  my $p75_targ    = $sorted_targ[ int(0.75 * $n_targ) ];                            # oberes Quartil
+  
+  # --- Normierungen
+  my ($delta_norm_ref, $dmin, $dmax)              = _aiFannNormalizeMinMax (\@dseries);
+  my ($dpos_norm_ref, $dpos_min, $dpos_max)       = _aiFannNormalizeMinMax (\@dpos);
+  my ($dneg_norm_ref, $dneg_min, $dneg_max)       = _aiFannNormalizeMinMax (\@dneg);
+  
+  my (undef, $d24pos_min, $d24pos_max)            = _aiFannNormalizeMinMax (\@d24pos);
+  my (undef, $d24neg_min, $d24neg_max)            = _aiFannNormalizeMinMax (\@d24neg);
+  
+  my ($rmin_norm_ref,   $rmin_min,   $rmin_max)   = _aiFannNormalizeMinMax (\@rmins);
+  my ($rmax_norm_ref,   $rmax_min,   $rmax_max)   = _aiFannNormalizeMinMax (\@rmaxs);
+  my ($rrange_norm_ref, $rrange_min, $rrange_max) = _aiFannNormalizeMinMax (\@rranges);
+  
   my ($std_norm_ref, $smin, $smax) = _aiFannNormalizeMinMax (\@rstds);
   
+  # --- Return-Hash
   my %lag_norms = (
-      min            => $targminval,
-      max            => $targmaxval,
-      mean           => avgArray ($targref, scalar @$targref),                      # Mittelwert für cum_day Normierung
+      min             => $targminval,
+      max             => $targmaxval,
+      mean            => avgArray ($targref, scalar @$targref),                         # Mittelwert für cum_day Normierung
+            
+      delta_min       => $dmin,
+      delta_max       => $dmax,
       
-      delta_min      => $dmin,
-      delta_max      => $dmax,
-      delta_pos_min  => $dpos_min,
-      delta_pos_max  => $dpos_max,
-      delta_neg_min  => $dneg_min,
-      delta_neg_max  => $dneg_max,
+      delta_pos_min   => $dpos_min,
+      delta_pos_max   => $dpos_max,
+      delta_neg_min   => $dneg_min,
+      delta_neg_max   => $dneg_max,
       
-      std_min        => $smin,
-      std_max        => $smax,
+      delta24_pos_min => $d24pos_min,
+      delta24_pos_max => $d24pos_max,
+      delta24_neg_min => $d24neg_min,
+      delta24_neg_max => $d24neg_max,
+      
+      std_min         => $smin,
+      std_max         => $smax,
+      
+      rmin_min        => $rmin_min,
+      rmin_max        => $rmin_max,
+      
+      rmax_min        => $rmax_min,
+      rmax_max        => $rmax_max,
+      
+      rrange_min      => $rrange_min,
+      rrange_max      => $rrange_max,
+      
+      regime_low_thresh  => $p25_targ,                                                  # unterhalb = Grundlast
+      regime_high_thresh => $p75_targ,                                                  # oberhalb  = Peak-Regime
   );
   
 return \%lag_norms;
@@ -25363,15 +25425,32 @@ sub _aiFannBuildLagFeatures {
   my $delta24     = defined $y_t_24 ? $y_t - $y_t_24 : undef;                   # Vortag-Differenz
   
   # ---------------------------------------------------------
+  # Verbrauchsregime: aktueller Verbrauch relativ zur
+  # historischen Verteilung (Perzentil-basiert)
+  # low:        y_t <= P25  (Grundlast, Nacht, abwesend)
+  # high:       y_t >= P75  (Peak, Kochen, Geräte an)
+  # transition: dazwischen  (normaler Betrieb)
+  # ---------------------------------------------------------
+  my $regime_low   = (defined $norms->{regime_low_thresh}  && $y_t <= $norms->{regime_low_thresh})  ? 1 : 0;
+  my $regime_high  = (defined $norms->{regime_high_thresh} && $y_t >= $norms->{regime_high_thresh}) ? 1 : 0;
+  my $regime_trans = ($regime_low == 0 && $regime_high == 0)                                        ? 1 : 0;
+  
+  # ---------------------------------------------------------
   # Rolling Mean & Std
   # window3: mean der letzten 3 Stunden vor y_t
   # window6: std  der letzten 6 Stunden vor y_t
   # y_t selbst wird NICHT ins Fenster einbezogen
   # ---------------------------------------------------------
-  my @window3 = @{$con_series}[$i-3 .. $i-1];
-  my @window6 = @{$con_series}[$i-6 .. $i-1];
-  my $mean3   = avgArray (\@window3, scalar (@window3)) // 0;
-  my $std6    = _aiFannStandardDeviation (\@window6);
+  my @window3      = @{$con_series}[$i-3 .. $i-1];
+  my @window3_prev = @{$con_series}[$i-4 .. $i-2];                              # 3h-Fenster vor y_t_1
+  my @window6      = @{$con_series}[$i-6 .. $i-1];
+  my $mean3        = avgArray (\@window3, scalar (@window3)) // 0;
+  my $mean3_prev   = avgArray (\@window3_prev, 3) // 0;
+  my $std6         = _aiFannStandardDeviation (\@window6);
+  
+  my $rmin6        = min (@window6);
+  my $rmax6        = max (@window6);
+  my $rrange6      = $rmax6 - $rmin6;
   
   # ---------------------------------------------------------
   # Positive/Negative Deltas
@@ -25383,56 +25462,59 @@ sub _aiFannBuildLagFeatures {
   my $delta24_pos     = (defined $delta24 && $delta24 > 0) ? $delta24  : 0;
   my $delta24_neg     = (defined $delta24 && $delta24 < 0) ? -$delta24 : 0;
 
-  my $lag0_vs_mean3  = $y_t - $mean3;                                                   # Spike-Erkennung: y_t vs. mean der letzten 3h
-  my $lag1_spike_pos = $lag0_vs_mean3 > 0 ? $lag0_vs_mean3  : 0;
-  my $lag1_spike_neg = $lag0_vs_mean3 < 0 ? -$lag0_vs_mean3 : 0;
+  my $lag1_vs_mean3  = $y_t - $mean3;                                           # Spike-Erkennung: y_t vs. mean der letzten 3h
+  my $lag1_spike_pos = $lag1_vs_mean3 > 0 ? $lag1_vs_mean3  : 0;
+  my $lag1_spike_neg = $lag1_vs_mean3 < 0 ? -$lag1_vs_mean3 : 0;
+  
+  my $lag2_vs_mean3  = $y_t_1 - $mean3_prev;
+  my $lag2_spike_pos = $lag2_vs_mean3 > 0 ? $lag2_vs_mean3  : 0;
+  my $lag2_spike_neg = $lag2_vs_mean3 < 0 ? -$lag2_vs_mean3 : 0;
 
   # ---------------------------------------------------------
   # Normalisierung
   # ---------------------------------------------------------
-  my $lag1_norm = _aiFannNormMinMaxValue ($y_t,   $norms->{min}, $norms->{max});
-  my $lag2_norm = _aiFannNormMinMaxValue ($y_t_1, $norms->{min}, $norms->{max});
-
-  my $lag24_norm  = defined $y_t_24
-                  ? _aiFannNormMinMaxValue ($y_t_24,  $norms->{min}, $norms->{max})
-                  : 0;
-
   my $lag48_norm  = defined $y_t_48
                   ? _aiFannNormMinMaxValue ($y_t_48,  $norms->{min}, $norms->{max})
-                  : $lag24_norm;
+                  : 0;
 
   my $lag168_norm = defined $y_t_168
                   ? _aiFannNormMinMaxValue ($y_t_168, $norms->{min}, $norms->{max})
-                  : $lag24_norm;
-
-  my $mean3_norm  = _aiFannNormMinMaxValue ($mean3, $norms->{min},     $norms->{max});
-  my $std6_norm   = _aiFannNormMinMaxValue ($std6,  $norms->{std_min}, $norms->{std_max});
-
-  my $delta1_norm  = _aiFannNormMinMaxValue ($delta1,  $norms->{delta_min}, $norms->{delta_max});
+                  : 0;
+                  
   my $delta24_norm = defined $delta24
                    ? _aiFannNormMinMaxValue ($delta24, $norms->{delta_min}, $norms->{delta_max})
                    : 0;
 
-  my $delta1_norm_pos      = _aiFannNormMinMaxValue ($delta1_pos,      $norms->{delta_pos_min}, $norms->{delta_pos_max});
-  my $delta1_norm_neg      = _aiFannNormMinMaxValue ($delta1_neg,      $norms->{delta_neg_min}, $norms->{delta_neg_max});
-  my $delta1_norm_pos_prev = _aiFannNormMinMaxValue ($delta1_prev_pos, $norms->{delta_pos_min}, $norms->{delta_pos_max});
-  my $delta1_norm_neg_prev = _aiFannNormMinMaxValue ($delta1_prev_neg, $norms->{delta_neg_min}, $norms->{delta_neg_max});
-  my $delta24_norm_pos     = _aiFannNormMinMaxValue ($delta24_pos,     $norms->{delta_pos_min}, $norms->{delta_pos_max});
-  my $delta24_norm_neg     = _aiFannNormMinMaxValue ($delta24_neg,     $norms->{delta_neg_min}, $norms->{delta_neg_max});
-  my $lag1_spike_pos_norm  = _aiFannNormMinMaxValue ($lag1_spike_pos,  0, $norms->{max} - $norms->{min});
-  my $lag1_spike_neg_norm  = _aiFannNormMinMaxValue ($lag1_spike_neg,  0, $norms->{max} - $norms->{min});
+  my $std6_norm    = _aiFannNormMinMaxValue ($std6,  $norms->{std_min}, $norms->{std_max});
+  my $delta1_norm  = _aiFannNormMinMaxValue ($delta1,  $norms->{delta_min}, $norms->{delta_max});
+
+  my $delta1_norm_pos      = _aiFannNormMinMaxValue ($delta1_pos,      $norms->{delta_pos_min},   $norms->{delta_pos_max});
+  my $delta1_norm_neg      = _aiFannNormMinMaxValue ($delta1_neg,      $norms->{delta_neg_min},   $norms->{delta_neg_max});
+  my $delta1_norm_pos_prev = _aiFannNormMinMaxValue ($delta1_prev_pos, $norms->{delta_pos_min},   $norms->{delta_pos_max});
+  my $delta1_norm_neg_prev = _aiFannNormMinMaxValue ($delta1_prev_neg, $norms->{delta_neg_min},   $norms->{delta_neg_max});
+  my $delta24_norm_pos     = _aiFannNormMinMaxValue ($delta24_pos,     $norms->{delta24_pos_min}, $norms->{delta24_pos_max});
+  my $delta24_norm_neg     = _aiFannNormMinMaxValue ($delta24_neg,     $norms->{delta24_neg_min}, $norms->{delta24_neg_max});
+
+  my $lag1_spike_pos_norm  = _aiFannNormMinMaxValue ($lag1_spike_pos, 0, $norms->{max} - $norms->{min});
+  my $lag1_spike_neg_norm  = _aiFannNormMinMaxValue ($lag1_spike_neg, 0, $norms->{max} - $norms->{min});
+  my $lag2_spike_pos_norm  = _aiFannNormMinMaxValue ($lag2_spike_pos, 0, $norms->{max} - $norms->{min});
+  my $lag2_spike_neg_norm  = _aiFannNormMinMaxValue ($lag2_spike_neg, 0, $norms->{max} - $norms->{min});
+  
+  my $roll_min_6_norm      = _aiFannNormMinMaxValue ($rmin6,   $norms->{rmin_min},   $norms->{rmin_max});
+  my $roll_max_6_norm      = _aiFannNormMinMaxValue ($rmax6,   $norms->{rmax_min},   $norms->{rmax_max});
+  my $roll_range_6_norm    = _aiFannNormMinMaxValue ($rrange6, $norms->{rrange_min}, $norms->{rrange_max});
   
   # ---------------------------------------------------------
   # Temperatur-Lags
   # ---------------------------------------------------------
-  my $t_t     = $temp_norm_series->[$i];
-  my $t_t_1   = $temp_norm_series->[$i - 1];
-  my $t_t_3   = $i >= 3  ? $temp_norm_series->[$i - 3]  : $t_t_1;
-  my $t_t_24  = $i >= 24 ? $temp_norm_series->[$i - 24] : $t_t_1;
+  my $t_t           = $temp_norm_series->[$i];
+  my $t_t_1         = $temp_norm_series->[$i - 1];
+  my $t_t_3         = $i >= 3  ? $temp_norm_series->[$i - 3]  : $t_t_1;
+  my $t_t_24        = $i >= 24 ? $temp_norm_series->[$i - 24] : $t_t_1;
 
-  my $temp_delta_1h     = $t_t - $t_t_1;                                                    # Temperatur-Deltas (noch im -1..1 Raum)
-  my $temp_delta_3h     = $t_t - $t_t_3;
-  my $temp_trend        = ($temp_delta_1h + $temp_delta_3h) / 2;
+  my $temp_delta_1h = $t_t - $t_t_1;                                                        # Temperatur-Deltas (noch im -1..1 Raum)
+  my $temp_delta_3h = $t_t - $t_t_3;
+  my $temp_trend    = ($temp_delta_1h + $temp_delta_3h) / 2;
 
   # Positive/Negative Temperatur-Deltas (0..1)
   my $temp_delta_1h_pos = clampValue ($temp_delta_1h > 0 ? $temp_delta_1h  : 0, 0, 1);
@@ -25450,9 +25532,6 @@ sub _aiFannBuildLagFeatures {
   my $v0 = $presence_values->[$i];
   my $v1 = $i > 0 ? $presence_values->[$i-1] : $v0;
   my $v2 = $i > 1 ? $presence_values->[$i-2] : $v1;
-  my $v3 = $i > 2 ? $presence_values->[$i-3] : $v2;
-  my $v4 = $i > 3 ? $presence_values->[$i-4] : $v3;
-  my $v5 = $i > 4 ? $presence_values->[$i-5] : $v4;
 
   my $presence_smooth2 = ($v0 + $v1) / 2;
   my $presence_smooth3 = ($v0 + $v1 + $v2) / 3;
@@ -25470,26 +25549,27 @@ sub _aiFannBuildLagFeatures {
   my $ww_prefilter = ($spike && $plateau && $stable) ? 1 : 0;                               # Warmwasser-Zyklus erkannt
     
   return {
-      lag1_norm                => $lag1_norm,
-      lag2_norm                => $lag2_norm,
-      lag24_norm               => $lag24_norm,
       lag48_norm               => $lag48_norm,
       lag168_norm              => $lag168_norm,
       
       lag1_spike_pos_norm      => $lag1_spike_pos_norm,
       lag1_spike_neg_norm      => $lag1_spike_neg_norm,
+      lag2_spike_pos_norm      => $lag2_spike_pos_norm,
+      lag2_spike_neg_norm      => $lag2_spike_neg_norm,
       
       delta1_norm              => $delta1_norm,
       delta24_norm             => $delta24_norm,
       delta1_norm_pos          => $delta1_norm_pos,
       delta1_norm_neg          => $delta1_norm_neg,
-      delta24_norm_pos         => $delta24_norm_pos,
       delta1_norm_pos_prev     => $delta1_norm_pos_prev, 
       delta1_norm_neg_prev     => $delta1_norm_neg_prev,
+      delta24_norm_pos         => $delta24_norm_pos,
       delta24_norm_neg         => $delta24_norm_neg,
       
-      roll_mean_3_norm         => $mean3_norm,
       roll_std_6_norm          => $std6_norm,
+      roll_min_6_norm          => $roll_min_6_norm,
+      roll_max_6_norm          => $roll_max_6_norm,
+      roll_range_6_norm        => $roll_range_6_norm,
       
       temp_norm_lag1h          => $t_t_1,
       temp_norm_lag3h          => $t_t_3,
@@ -25507,6 +25587,10 @@ sub _aiFannBuildLagFeatures {
       presence_transition_down => $presence_transition_down,
       
       ww_prefilter             => $ww_prefilter,
+      
+      is_low_cons_regime       => $regime_low,
+      is_high_cons_regime      => $regime_high,
+      is_transition_regime     => $regime_trans,
   };
 }
 
@@ -27531,17 +27615,20 @@ sub aiFannGetConResult {
                             presence_transition_up   => $lags->{presence_transition_up},            # Anwesenheit 0->1 Übergang (Impuls)
                             presence_transition_down => $lags->{presence_transition_down},          # Anwesenheit 1->0 Übergang (Impuls)
 
-                            lag1_norm                => $lags->{lag1_norm},                         # Verbrauch vor 1h (normalisiert)
-                            lag2_norm                => $lags->{lag2_norm},                         # Verbrauch vor 2h (normalisiert)
-                            lag24_norm               => $lags->{lag24_norm},                        # Verbrauch vor 24h (normalisiert)
                             lag48_norm               => $lags->{lag48_norm},                        # Verbrauch vor 48h (normalisiert)
                             lag168_norm              => $lags->{lag168_norm},                       # Verbrauch vor 168h = 7d (normalisiert)
 
-                            lag1_spike_pos_norm      => $lags->{lag1_spike_pos_norm},               # letzte Stunde war Spike nach oben
-                            lag1_spike_neg_norm      => $lags->{lag1_spike_neg_norm},               # letzte Stunde war Spike nach unten
+                            lag1_spike_pos_norm      => $lags->{lag1_spike_pos_norm},               # letzte Stunde war Spike nach oben (laufender Spike)
+                            lag1_spike_neg_norm      => $lags->{lag1_spike_neg_norm},               # letzte Stunde war Spike nach unten (laufender Einbruch)
+                            lag2_spike_pos_norm      => $lags->{lag2_spike_pos_norm},               # vorletzte Stunde war Spike nach oben (Spike klingt ab / hält an)
+                            lag2_spike_neg_norm      => $lags->{lag2_spike_neg_norm},               # vorletzte Stunde war Spike nach unten  (Einbruch klingt ab / hält an)
                             
                             cum_day_norm             => $sigs->{cum_day_norm},                      # kumulierter Tagesverbrauch (normiert)
                             cum_day_deviation        => $sigs->{cum_day_deviation},                 # Abweichung Verbrauch vom erwarteten Tagespfad
+
+                            is_low_cons_regime       => $lags->{is_low_cons_regime},                # y_t <= P25: Grundlast / Nacht / abwesend
+                            is_high_cons_regime      => $lags->{is_high_cons_regime},               # y_t >= P75: Peak / Kochen / Geräte an
+                            is_transition_regime     => $lags->{is_transition_regime},              # P25 < y_t < P75: normaler Betrieb
                          
                             delta1_norm              => $lags->{delta1_norm},                       # Änderung ggü. Vorstunde (normalisiert)
                             delta24_norm             => $lags->{delta24_norm},                      # Änderung ggü. Vortag (normalisiert)
@@ -27550,8 +27637,9 @@ sub aiFannGetConResult {
                             delta24_norm_pos         => $lags->{delta24_norm_pos},                  # Positive 24h-Änderung
                             delta24_norm_neg         => $lags->{delta24_norm_neg},                  # Negative 24h-Änderung
 
-                            roll_mean_3_norm         => $lags->{roll_mean_3_norm},                  # 3h gleitender Mittelwert (normalisiert)
-                            roll_std_6_norm          => $lags->{roll_std_6_norm},                   # 6h gleitende Standardabweichung (Volatilität)
+                            roll_min_6_norm          => $lags->{roll_min_6_norm},                   # Tiefstwert der letzten 6h (Grundlastniveau)
+                            roll_max_6_norm          => $lags->{roll_max_6_norm},                   # Höchstwert der letzten 6h (Peak-Niveau)
+                            roll_range_6_norm        => $lags->{roll_range_6_norm},                 # Spannweite der letzten 6h (Volatilität ohne Glättung)
 
                             temp_norm_lag1h          => $lags->{temp_norm_lag1h},                   # Temperatur vor 1h (normalisiert)
                             temp_norm_lag3h          => $lags->{temp_norm_lag3h},                   # Temperatur vor 3h (normalisiert)
@@ -28017,7 +28105,9 @@ sub aiFannDetectDrift {
       return $flag;
   }
       
-  my @tail_idx = @post_train_idx[-$window .. -1];
+  my @tail_idx = @post_train_idx > $window
+               ? @post_train_idx[-$window .. -1]
+               : @post_train_idx;
 
   my (@targets, @preds);
   my (@slope_list, @bias_live_list);
@@ -28034,7 +28124,11 @@ sub aiFannDetectDrift {
       my $a   = $rec->{$fanntyp};
       my $p   = $rec->{$fanntyp.'aifc'};
 
-      next unless(defined $a && defined $p && $a >= 0 && $p >= 0);
+      # --- Safety: Werte müssen definiert und positiv sein
+      #next unless (defined $a && defined $p && $a >= 0 && $p >= 0);
+      next unless (defined $a && defined $p);
+      next unless (isNumeric($a) && isNumeric($p));
+      next unless ($a >= 0 && $p >= 0);
 
       push @targets,    $a;
       push @preds,      $p;
@@ -28057,14 +28151,22 @@ sub aiFannDetectDrift {
 
       $prev_bias_live_hour = $bias_smooth;
   }
+  
+  # --- Safety: Targets/Preds müssen existieren und gleich lang sein ---
+  unless (@targets > 1 && @targets == @preds) {
+      $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = 'no_valid_data';
+      return 'no_valid_data';
+  }
+                                                             
+  my @bias_last24 = @bias_live_list > 24                                            # Bias Varianz über die letzten 24h -> keine Peak-Dominanz über 96h
+                  ? @bias_live_list[-24 .. -1] 
+                  : @bias_live_list;  
 
-  my @bias_last24 = @bias_live_list[-24 .. -1];                                    # Bias Varianz über die letzten 24h -> keine Peak-Dominanz über 96h                           
-  
   # --- Varianz berechnen
-  my $slope_var = _aiSampleVariance (\@slope_list);
-  my $bias_var  = _aiSampleVariance (\@bias_last24);
+  my $slope_var = _aiFannSampleVariance (\@slope_list);
+  my $bias_var  = _aiFannSampleVariance (\@bias_last24);
   
-  my $bias_var_norm = $ref_mae > 0 ? $bias_var / ($ref_mae ** 2) : $bias_var;
+  my $bias_var_norm = $ref_mae > 0 ? (($bias_var // 0) / ($ref_mae ** 2)) : ($bias_var // 0);
 
 
   # --- Basis-Fehlermetriken ---
@@ -28077,10 +28179,16 @@ sub aiFannDetectDrift {
   
   my $drift_score = $mae_live / $ref_mae;
 
-  # --- Slope/Bias Live ---
+  # --- Regression (Slope/Bias Live) ---
   my $metrics     = _aiFannSlopeBias (\@targets, \@preds);                         # Regression - Slope und Bias auf denormalisierten Werten
   my $slope_live  = $metrics->{slope_regres};
   my $bias_live   = $metrics->{bias_regres};
+  
+  # --- Safety: Regression muss definiert sein ---
+  unless (defined $slope_live && defined $bias_live) {
+      $data{$name}{neuralnet}{$fanntyp}{DriftFlag} = 'regression_invalid';
+      return 'regression_invalid';
+  }
 
   my $bias_model  = AiNeuralVal ($name, $fanntyp, 'ModelBias',              500);  
   my $slope_model = AiNeuralVal ($name, $fanntyp, 'ModelSlope',               1);
@@ -28110,14 +28218,17 @@ sub aiFannDetectDrift {
   for my $i (0 .. $#targets) {
       my $a = $targets[$i];
       my $p = $preds[$i];
+      
+      next unless defined $a && defined $p;
 
       $semantics_active++ if(abs($p - $a) > $sem_threshold);
       $peak_active++      if($a > $peak_threshold);
   }
 
-  my $n_tgt      = @targets;
+  my $n_tgt = @targets;
+  
   my $sem_ratio  = $semantics_active / $n_tgt;
-  my $peak_ratio = $peak_active / $n_tgt;
+  my $peak_ratio = $peak_active      / $n_tgt;
 
   # --- Ampel-Logik (modellskaliert) ---
   my $slope_penalty = $slope_rel_drift < 0.3                                    # Quadratisch mit Schwellwert
@@ -28172,24 +28283,23 @@ sub aiFannDetectDrift {
 
   $data{$name}{neuralnet}{$fanntyp}{DriftZone3Hours}++;
   
-  my $block_reason = _aiDrift_safety_blocked ( {  name            => $name,                         # prüfen ob Rekalibrierung vorgenommen werden darf
-                                                  fanntyp         => $fanntyp,
-                                                  median          => $median,
-                                                  targets         => \@targets,
-                                                  slope_live      => $slope_live,
-                                                  slope_drift     => $slope_drift,
-                                                  bias_live       => $bias_live,
-                                                  rmse_rel_ratio  => $rmse_rel_ratio,
-                                                  drift_score     => $drift_score,
-                                                  slope_rel_drift => $slope_rel_drift,
-                                                  bias_drift_norm => $bias_drift_norm,
-                                                  bias_var_norm   => $bias_var_norm,
-                                                  slope_var       => $slope_var,
-                                                  sem_ratio       => $sem_ratio,
-                                                  peak_ratio      => $peak_ratio,
-                                                  debug           => $debug,
-                                               }
-                                             );
+  my $block_reason = _aiFannDriftSafetyBlocked ( { name            => $name,                        # prüfen ob Rekalibrierung vorgenommen werden darf
+                                                   fanntyp         => $fanntyp,
+                                                   median          => $median,
+                                                   targets         => \@targets,
+                                                   slope_live      => $slope_live,
+                                                   slope_drift     => $slope_drift,
+                                                   bias_live       => $bias_live,
+                                                   rmse_rel_ratio  => $rmse_rel_ratio,
+                                                   drift_score     => $drift_score,
+                                                   slope_rel_drift => $slope_rel_drift,
+                                                   bias_drift_norm => $bias_drift_norm,
+                                                   bias_var_norm   => $bias_var_norm,
+                                                   slope_var       => $slope_var,
+                                                   sem_ratio       => $sem_ratio,
+                                                   peak_ratio      => $peak_ratio,
+                                                   debug           => $debug,
+                                                } );
 
   if (!$block_reason) {                                                                             # Rekalibrierung
       my $drifthzn3th = ($flag eq 'severe') ? 4 : DRIFTHZN3TH;                                      # V 2.6.2 - 4h bei severe, sonst 8h -> schnellere Rekalibrierung nur bei schwerem Drift
@@ -28311,6 +28421,182 @@ sub _aiFannSelectWindow {
   elsif ($drift_score < 1.2 && $age_hours > 72)                                              { return 144 }  # 5) stabiles Modell → vergrößern  
 
 return $default;
+}
+
+###########################################################################
+#   Stichprobenvarianz berechnen
+###########################################################################
+sub _aiFannSampleVariance {
+  my ($arr_ref) = @_;
+  return unless($arr_ref);
+
+  my @vals = grep { defined $_ } @$arr_ref;
+  return unless @vals > 1;
+
+  my $n    = @vals;
+  my $mean = sum(@vals) / $n;
+
+  my $sq_sum = 0;
+  $sq_sum   += ($_ - $mean) ** 2 for @vals;
+
+return $sq_sum / ($n - 1);
+}
+
+################################################################
+#  Drift-Sicherheitslogik
+#  Verhindert falsche Rekalibrierungen durch:
+#  - PV-Nachtwerte
+#  - Ausreißer
+#  - API-/Sensorfehler
+#  - instabile Drift
+#  - schlechte Modelle ohne Drift          
+################################################################
+sub _aiFannDriftSafetyBlocked {                  
+  my $paref           = shift;
+  my $name            = $paref->{name};
+  my $fanntyp         = $paref->{fanntyp};
+  my $median          = $paref->{median};
+  my $targets         = $paref->{targets};                                                                  # Array-Ref
+  my $slope_live      = $paref->{slope_live};
+  my $slope_drift     = $paref->{slope_drift};
+  my $bias_live       = $paref->{bias_live};
+  my $rmse_rel_ratio  = $paref->{rmse_rel_ratio};
+  my $drift_score     = $paref->{drift_score};
+  my $slope_rel_drift = $paref->{slope_rel_drift};
+  my $bias_drift_norm = $paref->{bias_drift_norm};
+  my $bias_var_norm   = $paref->{bias_var_norm};
+  my $slope_var       = $paref->{slope_var};
+  my $peak_ratio      = $paref->{peak_ratio};
+  my $sem_ratio       = $paref->{sem_ratio};
+  my $debug           = $paref->{debug};
+  
+  my @targets = @$targets;
+    
+  return 'no_data' unless(@targets && @targets > 6);                                                       # --- Safety: Targets müssen existieren und ausreichend groß sein ---
+
+  # --- Kritischer Fehler: negative slope_drift (invertierte Dynamik)
+  if ($slope_drift < 0 || $slope_live < 0) {
+      return 'negative_slope_drift';
+  }
+  
+  if (abs($slope_live) < 0.25 && $sem_ratio > 0.75) {
+      return 'slope_critical';
+  }
+
+  # --- Dynamischer Nacht-Detektor ---
+  my $quant30 = CircularVal($name, 99, $fanntyp.'_quantile30', 0);
+  my $quant90 = CircularVal($name, 99, $fanntyp.'_quantile90', 0);
+
+  my $night_count = 0;
+  my $night_slice = @targets < 6 ? 0 : -6;
+  for my $tgt (@targets[$night_slice .. -1]) {                                                              # letzte 6 Stunden
+      $night_count++ if($tgt < $quant30 * 1.15);
+  }
+
+  if ($night_count >= 5 && $peak_ratio < 0.02 && $sem_ratio < 0.05) {                                       # 5 von 6 Stunden = Nacht
+      return 'low_load_phase';
+  }
+  
+  my $median_load     = $median || 1;  
+  my $slope_var_limit = 0.00002 * ($median_load ** 2) + 0.02;                                               # dynamische Schwelle für Slope-Varianz
+  my $rmse_limit      = 3.0 + ($median_load / 800);
+  
+  # --- Datenfehler / API-Fehler erkennen
+  if ((abs($slope_live) < 0.20             || $slope_live > 1.8)  && 
+      ($slope_var > $slope_var_limit * 1.5 || $sem_ratio > 0.7)   &&
+       $peak_ratio < 0.15                                         &&
+       $sem_ratio  <= 0.75) {                                     
+      return 'slope_implausible';
+  }
+               
+  # --- RMSE‑Limit steigt automatisch, wenn viele Peaks, viele semantische Abweichungen, hohe Varianz | RMSE‑Limit sinkt bei Grundlast → Nachtfehler werden erkannt
+  my $sem_contrib = $sem_ratio < 0.5 
+                  ? $sem_ratio * 0.8 
+                  : 0.4 - ($sem_ratio - 0.5) * 0.3;                                                         # ab 0.5 sinkt der Beitrag wieder
+  $sem_contrib = max (0, $sem_contrib);
+
+  my $rmse_dynamic_limit = 4.0 
+                         + ($peak_ratio * 1.0) 
+                         + $sem_contrib 
+                         + min (0.5, ($slope_var // 0) * 0.5);
+
+  if ($rmse_rel_ratio > $rmse_dynamic_limit) {                                                              
+      return 'rmse_anomaly';
+  }
+
+  my $bias_limit = max (
+      $quant30     * 1.2,                                                                                   # Grundlast + 20%
+      $median_load * 0.5,                                                                                   # 50% der Medianlast
+  );
+  
+  $bias_limit = max ($bias_limit, $quant90 * 0.3);
+  
+  if (defined $bias_live && abs($bias_live) > $bias_limit && $peak_ratio < 0.10) {
+      return 'bias_implausible';                                                                            # BiasLive extrem hoch → Sensor-/API-Fehler
+  }
+
+  # --- Modell schlecht, aber NICHT driftend
+  if ($drift_score        > (1.8 + $sem_ratio  * 0.5) 
+      && $rmse_rel_ratio  > (1.5 + $peak_ratio * 1.5) 
+      && $slope_rel_drift > 0.1 
+      && $slope_rel_drift < 0.3 
+      && $bias_drift_norm < 0.4
+     ) { return 'model_bad_but_stable'; }
+
+  # --- Instabile Drift (Ausreißer)
+  # Wenn Slope/Bias extrem schwanken → keine Rekalibrierung
+  if (defined $slope_var && $slope_var > $slope_var_limit) {
+      return 'unstable_slope';
+  }
+  
+  if ($rmse_rel_ratio > $rmse_limit && $bias_var_norm > 3.0) {
+      return "unstable_bias";
+  }
+  
+  # --- Debug-Ausgabe ---  
+  if ($debug =~ /aiProcess_long/xs) {
+      my $rmse_margin = $rmse_dynamic_limit - $rmse_rel_ratio;                                              # positiv = sicher, negativ = wäre geblockt
+
+      Log3 ($name, 1, sprintf (
+          "%s DEBUG> DRIFT SAFETY [%s]: block=none\n".
+          "  -- RMSE Analysis --\n".
+          "     rmse_rel_ratio=%.3f | dynamic_limit=%.3f | margin=%.3f %s\n".
+          "     Limit Composition: base=4.0 | peak_part=%.3f (peak_ratio=%.3f) | ".
+                                   "sem_part=%.3f (sem_ratio=%.3f) | ".
+                                   "var_part=%.3f (slope_var=%.5f)\n".
+          "  -- Slope Analysis --\n".
+          "     slope_live=%.3f | slope_drift=%.3f | slope_rel_drift=%.3f | slope_var=%.5f\n".
+          "     slope_var_limit=%.5f | var_ratio=%.2f %s\n".
+          "  -- Bias Analysis --\n".
+          "     bias_live=%.1f | bias_limit=%.1f | bias_ratio=%.2f %s\n".
+          "     quant30=%.1f | quant90=%.1f | median_load=%.1f\n".
+          "  -- Context --\n".
+          "     drift_score=%.3f | bias_drift_norm=%.3f | bias_var_norm=%.3f\n".
+          "     peak_ratio=%.3f | sem_ratio=%.3f",
+          $name, $fanntyp,
+          # RMSE
+          $rmse_rel_ratio, $rmse_dynamic_limit, $rmse_margin,
+          ($rmse_margin < 0 ? '!! EXCEEDED !!' : $rmse_margin < 0.3  ? '!! BARELY !!' : 'ok'),
+          $peak_ratio * 1.0, $peak_ratio,
+          $sem_contrib, $sem_ratio,
+          min (0.5, ($slope_var // 0) * 0.5), ($slope_var // 0),
+          # Slope
+          $slope_live, $slope_drift, $slope_rel_drift, $slope_var,
+          $slope_var_limit,
+          (($slope_var // 0) > 0 ? $slope_var / $slope_var_limit : 0),
+          (defined $slope_var && $slope_var > $slope_var_limit ? '!! ABOUT LIMIT !!' : 'ok'),
+          # Bias
+          $bias_live // 0, $bias_limit,
+          (defined $bias_live && $bias_limit > 0 ? abs($bias_live) / $bias_limit : 0),
+          (defined $bias_live && abs($bias_live) > $bias_limit ? '!! ABOUT LIMIT !!' : 'ok'),
+          $quant30, $quant90, $median_load,
+          # Kontext
+          $drift_score, $bias_drift_norm, $bias_var_norm,
+          $peak_ratio, $sem_ratio,
+      ));
+  }
+  
+return 0;                                                                                                   # 0 = kein Block, Rekalibrierung erlaubt
 }
 
 ################################################################
@@ -28612,178 +28898,6 @@ sub _aiFannWeightedRmse {
   };
 }
 
-###########################################################################
-#   Varianz berechnen
-###########################################################################
-sub _aiSampleVariance {
-  my ($arr_ref) = @_;
-  return unless($arr_ref && @$arr_ref > 1);
-
-  my $n    = @$arr_ref;
-  my $mean = sum (@$arr_ref) / $n;
-
-  my $sq_sum = 0;
-  $sq_sum   += ($_ - $mean) ** 2 for @$arr_ref;
-
-return $sq_sum / ($n - 1);                                              # Stichprobenvarianz
-}
-
-################################################################
-#  Drift-Sicherheitslogik
-#  Verhindert falsche Rekalibrierungen durch:
-#  - PV-Nachtwerte
-#  - Ausreißer
-#  - API-/Sensorfehler
-#  - instabile Drift
-#  - schlechte Modelle ohne Drift          
-################################################################
-sub _aiDrift_safety_blocked {                  
-  my $paref           = shift;
-  my $name            = $paref->{name};
-  my $fanntyp         = $paref->{fanntyp};
-  my $median          = $paref->{median};
-  my $targets         = $paref->{targets};                                                                  # Array-Ref
-  my $slope_live      = $paref->{slope_live};
-  my $slope_drift     = $paref->{slope_drift};
-  my $bias_live       = $paref->{bias_live};
-  my $rmse_rel_ratio  = $paref->{rmse_rel_ratio};
-  my $drift_score     = $paref->{drift_score};
-  my $slope_rel_drift = $paref->{slope_rel_drift};
-  my $bias_drift_norm = $paref->{bias_drift_norm};
-  my $bias_var_norm   = $paref->{bias_var_norm};
-  my $slope_var       = $paref->{slope_var};
-  my $peak_ratio      = $paref->{peak_ratio};
-  my $sem_ratio       = $paref->{sem_ratio};
-  my $debug           = $paref->{debug};
-  
-  my @targets = @$targets;
-    
-  return 'no_data' unless(@targets && @targets > 6);                                                       # --- Safety: Targets müssen existieren und ausreichend groß sein ---
-
-  # --- Kritischer Fehler: negative slope_drift (invertierte Dynamik)
-  if ($slope_drift < 0 || $slope_live < 0) {
-      return 'negative_slope_drift';
-  }
-  
-  if (abs($slope_live) < 0.25 && $sem_ratio > 0.75) {
-      return 'slope_critical';
-  }
-
-  # --- Dynamischer Nacht-Detektor ---
-  my $quant30 = CircularVal($name, 99, $fanntyp.'_quantile30', 0);
-  my $quant90 = CircularVal($name, 99, $fanntyp.'_quantile90', 0);
-
-  my $night_count = 0;
-  for my $tgt (@targets[-6 .. -1]) {                                                                        # letzte 6 Stunden
-      $night_count++ if($tgt < $quant30 * 1.15);
-  }
-
-  if ($night_count >= 5 && $peak_ratio < 0.02 && $sem_ratio < 0.05) {                                       # 5 von 6 Stunden = Nacht
-      return 'low_load_phase';
-  }
-  
-  my $median_load     = $median || 1;  
-  my $slope_var_limit = 0.00002 * ($median_load ** 2) + 0.02;                                               # dynamische Schwelle für Slope-Varianz
-  my $rmse_limit      = 3.0 + ($median_load / 800);
-  
-  # --- Datenfehler / API-Fehler erkennen
-  if ((abs($slope_live) < 0.20             || $slope_live > 1.8)  && 
-      ($slope_var > $slope_var_limit * 1.5 || $sem_ratio > 0.7)   &&
-       $peak_ratio < 0.15                                         &&
-       $sem_ratio  <= 0.75) {                                     
-      return 'slope_implausible';
-  }
-               
-  # --- RMSE‑Limit steigt automatisch, wenn viele Peaks, viele semantische Abweichungen, hohe Varianz | RMSE‑Limit sinkt bei Grundlast → Nachtfehler werden erkannt
-  my $sem_contrib = $sem_ratio < 0.5 
-                  ? $sem_ratio * 0.8 
-                  : 0.4 - ($sem_ratio - 0.5) * 0.3;                                                         # ab 0.5 sinkt der Beitrag wieder
-  $sem_contrib = max (0, $sem_contrib);
-
-  my $rmse_dynamic_limit = 4.0 
-                         + ($peak_ratio * 1.0) 
-                         + $sem_contrib 
-                         + min (0.5, $slope_var * 0.5);
-
-  if ($rmse_rel_ratio > $rmse_dynamic_limit) {                                                              
-      return 'rmse_anomaly';
-  }
-
-  my $bias_limit = max (
-      $quant30     * 1.2,                                                                                   # Grundlast + 20%
-      $median_load * 0.5,                                                                                   # 50% der Medianlast
-  );
-  
-  $bias_limit = max ($bias_limit, $quant90 * 0.3);
-  
-  if (defined $bias_live && abs($bias_live) > $bias_limit && $peak_ratio < 0.10) {
-      return 'bias_implausible';                                                                            # BiasLive extrem hoch → Sensor-/API-Fehler
-  }
-
-  # --- Modell schlecht, aber NICHT driftend
-  if ($drift_score        > (1.8 + $sem_ratio  * 0.5) 
-      && $rmse_rel_ratio  > (1.5 + $peak_ratio * 1.5) 
-      && $slope_rel_drift > 0.1 
-      && $slope_rel_drift < 0.3 
-      && $bias_drift_norm < 0.4
-     ) { return 'model_bad_but_stable'; }
-
-  # --- Instabile Drift (Ausreißer)
-  # Wenn Slope/Bias extrem schwanken → keine Rekalibrierung
-  if (defined $slope_var && $slope_var > $slope_var_limit) {
-      return 'unstable_slope';
-  }
-  
-  if ($rmse_rel_ratio > $rmse_limit && $bias_var_norm > 3.0) {
-      return "unstable_bias";
-  }
-  
-  # --- Debug-Ausgabe ---  
-  if ($debug =~ /aiProcess_long/xs) {
-      my $rmse_margin = $rmse_dynamic_limit - $rmse_rel_ratio;                                              # positiv = sicher, negativ = wäre geblockt
-
-      Log3 ($name, 1, sprintf (
-          "%s DEBUG> DRIFT SAFETY [%s]: block=none\n".
-          "  -- RMSE Analysis --\n".
-          "     rmse_rel_ratio=%.3f | dynamic_limit=%.3f | margin=%.3f %s\n".
-          "     Limit Composition: base=4.0 | peak_part=%.3f (peak_ratio=%.3f) | ".
-                                   "sem_part=%.3f (sem_ratio=%.3f) | ".
-                                   "var_part=%.3f (slope_var=%.5f)\n".
-          "  -- Slope Analysis --\n".
-          "     slope_live=%.3f | slope_drift=%.3f | slope_rel_drift=%.3f | slope_var=%.5f\n".
-          "     slope_var_limit=%.5f | var_ratio=%.2f %s\n".
-          "  -- Bias Analysis --\n".
-          "     bias_live=%.1f | bias_limit=%.1f | bias_ratio=%.2f %s\n".
-          "     quant30=%.1f | quant90=%.1f | median_load=%.1f\n".
-          "  -- Context --\n".
-          "     drift_score=%.3f | bias_drift_norm=%.3f | bias_var_norm=%.3f\n".
-          "     peak_ratio=%.3f | sem_ratio=%.3f",
-          $name, $fanntyp,
-          # RMSE
-          $rmse_rel_ratio, $rmse_dynamic_limit, $rmse_margin,
-          ($rmse_margin < 0 ? '!! EXCEEDED !!' : $rmse_margin < 0.3  ? '!! BARELY !!' : 'ok'),
-          $peak_ratio * 1.0, $peak_ratio,
-          $sem_contrib, $sem_ratio,
-          min (0.5, $slope_var * 0.5), $slope_var,
-          # Slope
-          $slope_live, $slope_drift, $slope_rel_drift, $slope_var,
-          $slope_var_limit,
-          ($slope_var > 0 ? $slope_var / $slope_var_limit : 0),
-          ($slope_var > $slope_var_limit ? '!! ABOUT LIMIT !!' : 'ok'),
-          # Bias
-          $bias_live // 0, $bias_limit,
-          (defined $bias_live && $bias_limit > 0 ? abs($bias_live) / $bias_limit : 0),
-          (defined $bias_live && abs($bias_live) > $bias_limit ? '!! ABOUT LIMIT !!' : 'ok'),
-          $quant30, $quant90, $median_load,
-          # Kontext
-          $drift_score, $bias_drift_norm, $bias_var_norm,
-          $peak_ratio, $sem_ratio,
-      ));
-  }
-  
-return 0;                                                                                                   # 0 = kein Block, Rekalibrierung erlaubt
-}
-
 ###############################################################
 #    Festelegung des Normalisierungsbereiches nach
 #    Aktivierungsfunktion 
@@ -29033,7 +29147,7 @@ return ($norm_ref);
 #   return - Arreyref normalisierter Daten
 ###############################################################
 sub _aiFannNormalizeMinMax {
-  my ($data) = @_;                      # Arrayref mit Werten eines Features
+  my ($data) = @_;                                                                      # Arrayref mit Werten eines Features
 
   my ($min, $max) = _aiFannComputeMinMax ($data);
   my $range       = $max - $min;
@@ -29048,11 +29162,11 @@ return ($norm_ref, $min, $max);
 ###############################################################    
 sub _aiFannNormMinMaxValue {
   my ($val, $min, $max) = @_;
-  return 0 if !defined $val || $max == $min;                     # Schutz gegen Division durch 0                                   
+  return 0 if !defined $val || !defined $min || !defined $max || $max == $min;          # Schutz gegen Division durch 0                                   
     
   my $ret = ($val - $min) / ($max - $min);
   
-  $ret = 0 if $ret < 0;                                          # Clamp auf 0..1
+  $ret = 0 if $ret < 0;                                                                 # Clamp auf 0..1
   $ret = 1 if $ret > 1;
   
 return $ret;
@@ -29063,7 +29177,7 @@ return $ret;
 #  return - Arreyref normalisierter Daten im Bereich -1..1
 ###############################################################
 sub _aiFannNormalizeMinMaxSymmetric {
-  my ($data) = @_;                      # Arrayref mit Werten eines Features
+  my ($data) = @_;                                                                      # Arrayref mit Werten eines Features
 
   my ($min, $max) = _aiFannComputeMinMax ($data);
   my $range       = $max - $min;
@@ -29792,41 +29906,41 @@ return;
 sub listDataPool {
   my $hash = shift;
   my $htol = shift;
-  my $par  = shift // q{};
+  my $arg  = shift // q{};
 
   my $name = $hash->{NAME};
   my ($sq, $h);
 
   if ($htol eq "pvhist") {
-      $sq = _listDataPoolPvHist ($hash, $par);
+      $sq = _listDataPoolPvHist ($hash, $arg);
   }
 
   if ($htol =~ /consumers|inverters|producers|strings|batteries/xs) {
-      $sq = _listDataPoolVarious ($hash, $htol, $par);
+      $sq = _listDataPoolVarious ($hash, $htol, $arg);
   }
 
   if ($htol eq "circular") {
-      $sq = _listDataPoolCircular ($hash, $par);
+      $sq = _listDataPoolCircular ($hash, $arg);
   }
 
   if ($htol eq "nexthours") {
-      $sq = _listDataPoolNextHours ($name, $par);
+      $sq = _listDataPoolNextHours ($name, $arg);
   }
 
   if ($htol eq "qualities") {
-      $sq = _listDataPoolQualities ($name, $par);
+      $sq = _listDataPoolQualities ($name, $arg);
   }
 
   if ($htol eq "current") {
-      $sq = _listDataPoolCurrent ($name, $par);
+      $sq = _listDataPoolCurrent ($name, $arg);
   }
 
   if ($htol =~ /radiationApiData|weatherApiData|statusApiData/xs) {
-      $sq = _listDataPoolApiData ($name, $htol, $par);
+      $sq = _listDataPoolApiData ($name, $htol, $arg);
   }
 
   if ($htol eq "aiRawData") {
-      $sq = _listDataPoolAiRawData ($name, $par);
+      $sq = _listDataPoolAiRawData ($name, $arg);
   }
 
 return $sq;
@@ -29837,345 +29951,347 @@ return $sq;
 ################################################################
 sub _listDataPoolPvHist {
   my $hash = shift;
-  my $par  = shift // q{};
+  my $arg  = shift // q{};
 
   my $name = $hash->{NAME};
 
   my ($sq, $h, $hexp);
   my $export = q{};
 
-  if ($par eq 'exportToCsv') {
-      $export = 'csv';
-      $par    = q{};
-  }
+  if ( $arg =~ /=/ ) { $arg =~ s/,(?=[A-Za-z_][A-Za-z0-9_]*=)/ /g; }
+  else               { $arg =~ s/,/ /g; }
 
+  $arg              = trim ($arg);                                                  # trim it
+  my ($aref, $href) = parseParams ($arg);
+  
+  my $daa  = $aref->[0]   // q{};                                                   # direktes Tagesargument 
+  my $hod  = $href->{hod} // q{};                                                   # Parameter hod (Komma getrennte Liste)
+  my $day  = $href->{day} // q{};                                                   # Parameter day (Komma getrennte Liste)
+  my $key  = $href->{key} // q{};                                                   # Parameter key (Komma getrennte Liste)
+  
+  my @days = split (',', $day);                                                     # Paramterliste "Tag"
+  my @hods = split (',', $hod);                                                     # Paramterliste "Stunde des Tages"
+  my @keys = split (',', $key);                                                     # Paramterliste "Schlüssel"
+    
+  if ($daa eq 'exportToCsv') {                                                      # exportToCsv ausphasen
+      $export = 'csv';
+      $daa    = q{};
+  }
+  
+  push (@days, $daa) if($daa);                                                      # direktes Tagesargument zur Tagesliste hinzufügen
+
+  # ---------------------------------------------------------------------------------------------------------
+  
   my $sub = sub {
-      my $day = shift;
+      my ($day, $hodsref, $keysref) = @_;                                          
       my $ret;
 
-      for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {
-          if (!isNumeric ($key)) {                                                  # bereinigen
+      for my $key (sort {$a<=>$b} keys %{$h->{$day}}) {                                             # für die Stunde des Tages selektieren
+          # ----- Bereinigung -----------------------------------------------------
+          if (!isNumeric ($key)) {                                                                 
               delete $data{$name}{pvhist}{$day}{$key};
               Log3 ($name, 2, qq{$name - INFO - invalid hour=$key (day=$day) was deleted from pvHistory storage});
               next;
           }
           
-          my $pvrl         = HistoryVal ($name, $day, $key, 'pvrl',           '-');
-          my $pvrlvd       = HistoryVal ($name, $day, $key, 'pvrlvd',         '-');
-          my $pvfc         = HistoryVal ($name, $day, $key, 'pvfc',           '-');
-          my $pvapifcraw   = HistoryVal ($name, $day, $key, 'pvapifcraw',     '-');
-          my $gcons        = HistoryVal ($name, $day, $key, 'gcons',          '-');
-          my $con          = HistoryVal ($name, $day, $key, 'con',            '-');
-          my $confc        = HistoryVal ($name, $day, $key, 'confc',          '-');
-          my $conaifc      = HistoryVal ($name, $day, $key, 'conaifc',        '-');
-          my $conbiascorr  = HistoryVal ($name, $day, $key, 'conbiascorr',    '-');
-          my $conlegfc     = HistoryVal ($name, $day, $key, 'conlegfc',       '-');
-          my $gfeedin      = HistoryVal ($name, $day, $key, 'gfeedin',        '-');
-          my $wid          = HistoryVal ($name, $day, $key, 'weatherid',      '-');
-          my $wcc          = HistoryVal ($name, $day, $key, 'wcc',            '-');
-          my $windspeed    = HistoryVal ($name, $day, $key, 'windspeed',      '-');
-          my $wind_fast    = HistoryVal ($name, $day, $key, 'windspeed_fast', '-');
-          my $rr1c         = HistoryVal ($name, $day, $key, 'rr1c',           '-');
-          my $temp         = HistoryVal ($name, $day, $key, 'temp',           '-');
-          my $pvcorrf      = HistoryVal ($name, $day, $key, 'pvcorrf',        '-');
-          my $dayname      = HistoryVal ($name, $day, $key, 'dayname',        '-');
-          my $rad1h        = HistoryVal ($name, $day, $key, 'rad1h',          '-');
-          my $sunaz        = HistoryVal ($name, $day, $key, 'sunaz',          '-');
-          my $sunalt       = HistoryVal ($name, $day, $key, 'sunalt',         '-');
-          my $don          = HistoryVal ($name, $day, $key, 'DoN',            '-');
-          my $conprc       = HistoryVal ($name, $day, $key, 'conprice',       '-');
-          my $feedprc      = HistoryVal ($name, $day, $key, 'feedprice',      '-');
-          my $socprogwhsum = HistoryVal ($name, $day, $key, 'socprogwhsum',   '-');
-          my $socwhsum     = HistoryVal ($name, $day, $key, 'socwhsum',       '-');
-          my $pd           = HistoryVal ($name, $day, $key, 'plantderated',   '-');
-          my $presence     = HistoryVal ($name, $day, $key, 'presence',       '-');  
-          my $holiday      = HistoryVal ($name, $day, $key, 'holiday',        '-');     
-          my $comforttemp  = HistoryVal ($name, $day, $key, 'comforttemp',    '-');
-          my $hpcsm        = HistoryVal ($name, $day, $key, 'hpcsm',          '-'); 
-          my $bevcsm       = HistoryVal ($name, $day, $key, 'bevcsm',         '-');   
+          # ----- hod-Filter anwenden ---------------------------------------------
+          next if @$hodsref && !any { $_ eq $key } @$hodsref;
 
-          if ($export eq 'csv') {
-              $hexp->{$day}{$key}{PVreal}              = $pvrl;
-              $hexp->{$day}{$key}{PVrealValid}         = $pvrlvd;
-              $hexp->{$day}{$key}{PVforecast}          = $pvfc;
-              $hexp->{$day}{$key}{PVapiForecastRaw}    = $pvapifcraw;
-              $hexp->{$day}{$key}{GridConsumption}     = $gcons;
-              $hexp->{$day}{$key}{Consumption}         = $con;
-              $hexp->{$day}{$key}{confc}               = $confc;
-              $hexp->{$day}{$key}{conaifc}             = $conaifc;
-              $hexp->{$day}{$key}{conbiascorr}         = $conbiascorr;
-              $hexp->{$day}{$key}{conlegfc}            = $conlegfc;
-              $hexp->{$day}{$key}{GridFeedIn}          = $gfeedin;
-              $hexp->{$day}{$key}{WeatherId}           = $wid;
-              $hexp->{$day}{$key}{CloudCover}          = $wcc;
-              $hexp->{$day}{$key}{WindSpeed}           = $windspeed;
-              $hexp->{$day}{$key}{WindSpeedFast}       = $wind_fast;
-              $hexp->{$day}{$key}{TotalPrecipitation}  = $rr1c;
-              $hexp->{$day}{$key}{Temperature}         = $temp;
-              $hexp->{$day}{$key}{PVCorrectionFactor}  = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[0];
-              $hexp->{$day}{$key}{Quality}             = $pvcorrf eq '-' ? '' : (split "/", $pvcorrf)[1];
-              $hexp->{$day}{$key}{DayName}             = $dayname;
-              $hexp->{$day}{$key}{GlobalRadiation }    = $rad1h;
-              $hexp->{$day}{$key}{SunAzimuth}          = $sunaz;
-              $hexp->{$day}{$key}{SunAltitude}         = $sunalt;
-              $hexp->{$day}{$key}{DayOrNight}          = $don;
-              $hexp->{$day}{$key}{PurchasePrice}       = $conprc;
-              $hexp->{$day}{$key}{FeedInPrice}         = $feedprc;
-              $hexp->{$day}{$key}{BatterySocWhSum}     = $socwhsum;
-              $hexp->{$day}{$key}{BatteryProgSocWhSum} = $socprogwhsum;
-              $hexp->{$day}{$key}{PlantDerated}        = $pd;
-              $hexp->{$day}{$key}{Presence}            = $presence;
-              $hexp->{$day}{$key}{ComfortTemp}         = $comforttemp;
-              $hexp->{$day}{$key}{Holiday}             = $holiday;
-              $hexp->{$day}{$key}{HeatPumpNumber}      = $hpcsm;
-              $hexp->{$day}{$key}{BevNumber}           = $bevcsm;
+          # ----- alle Felder in %entry sammeln -----------------------------------
+          my %entry;
+
+          $entry{pvrl}           = HistoryVal ($name, $day, $key, 'pvrl',           '-');
+          $entry{pvrlvd}         = HistoryVal ($name, $day, $key, 'pvrlvd',         '-');
+          $entry{pvfc}           = HistoryVal ($name, $day, $key, 'pvfc',           '-');
+          $entry{pvapifcraw}     = HistoryVal ($name, $day, $key, 'pvapifcraw',     '-');
+          $entry{gcons}          = HistoryVal ($name, $day, $key, 'gcons',          '-');
+          $entry{con}            = HistoryVal ($name, $day, $key, 'con',            '-');
+          $entry{confc}          = HistoryVal ($name, $day, $key, 'confc',          '-');
+          $entry{conaifc}        = HistoryVal ($name, $day, $key, 'conaifc',        '-');
+          $entry{conbiascorr}    = HistoryVal ($name, $day, $key, 'conbiascorr',    '-');
+          $entry{conlegfc}       = HistoryVal ($name, $day, $key, 'conlegfc',       '-');
+          $entry{gfeedin}        = HistoryVal ($name, $day, $key, 'gfeedin',        '-');
+          $entry{weatherid}      = HistoryVal ($name, $day, $key, 'weatherid',      '-');
+          $entry{wcc}            = HistoryVal ($name, $day, $key, 'wcc',            '-');
+          $entry{windspeed}      = HistoryVal ($name, $day, $key, 'windspeed',      '-');
+          $entry{windspeed_fast} = HistoryVal ($name, $day, $key, 'windspeed_fast', '-');
+          $entry{rr1c}           = HistoryVal ($name, $day, $key, 'rr1c',           '-');
+          $entry{temp}           = HistoryVal ($name, $day, $key, 'temp',           '-');
+          $entry{pvcorrf}        = HistoryVal ($name, $day, $key, 'pvcorrf',        '-');
+          $entry{dayname}        = HistoryVal ($name, $day, $key, 'dayname',        '-');
+          $entry{rad1h}          = HistoryVal ($name, $day, $key, 'rad1h',          '-');
+          $entry{sunaz}          = HistoryVal ($name, $day, $key, 'sunaz',          '-');
+          $entry{sunalt}         = HistoryVal ($name, $day, $key, 'sunalt',         '-');
+          $entry{DoN}            = HistoryVal ($name, $day, $key, 'DoN',            '-');
+          $entry{conprice}       = HistoryVal ($name, $day, $key, 'conprice',       '-');
+          $entry{feedprice}      = HistoryVal ($name, $day, $key, 'feedprice',      '-');
+          $entry{socprogwhsum}   = HistoryVal ($name, $day, $key, 'socprogwhsum',   '-');
+          $entry{socwhsum}       = HistoryVal ($name, $day, $key, 'socwhsum',       '-');
+          $entry{plantderated}   = HistoryVal ($name, $day, $key, 'plantderated',   '-');
+          $entry{presence}       = HistoryVal ($name, $day, $key, 'presence',       '-');
+          $entry{holiday}        = HistoryVal ($name, $day, $key, 'holiday',        '-');
+          $entry{comforttemp}    = HistoryVal ($name, $day, $key, 'comforttemp',    '-');
+          $entry{hpcsm}          = HistoryVal ($name, $day, $key, 'hpcsm',          '-');
+          $entry{bevcsm}         = HistoryVal ($name, $day, $key, 'bevcsm',         '-');
+
+          for my $in (1..MAXINVERTER) {                                                                 # + alle Inverter
+              my $inf = sprintf "%02d", $in;
+              $entry{"etotali${inf}"} = HistoryVal ($name, $day, $key, 'etotali'.$inf, '-');
+              $entry{"pvrl${inf}"}    = HistoryVal ($name, $day, $key, 'pvrl'.$inf,    '-');
           }
 
-          my ($inve, $invl);
-          for my $in (1..MAXINVERTER) {                                              # + alle Inverter
-              $in       = sprintf "%02d", $in;
-              my $etoti = HistoryVal ($name, $day, $key, 'etotali'.$in, '-');
-              my $pvrli = HistoryVal ($name, $day, $key, 'pvrl'.$in,    '-');
+          for my $pn (1..MAXPRODUCER) {                                                                 # + alle Producer
+              my $pnf = sprintf "%02d", $pn;
+              $entry{"etotalp${pnf}"} = HistoryVal ($name, $day, $key, 'etotalp'.$pnf, '-');
+              $entry{"pprl${pnf}"}    = HistoryVal ($name, $day, $key, 'pprl'.$pnf,    '-');
+          }
 
-              if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"Etotal${in}"} = $etoti;
-                  $hexp->{$day}{$key}{"PVreal${in}"} = $pvrli;
+          for my $bn (1..MAXBATTERIES) {                                                                # + alle Batterien
+              my $bnf = sprintf "%02d", $bn;
+              $entry{"batintotal${bnf}"}  = HistoryVal ($name, $day, $key, 'batintotal'.$bnf,  '-');
+              $entry{"batouttotal${bnf}"} = HistoryVal ($name, $day, $key, 'batouttotal'.$bnf, '-');
+              $entry{"batin${bnf}"}       = HistoryVal ($name, $day, $key, 'batin'.$bnf,       '-');
+              $entry{"batout${bnf}"}      = HistoryVal ($name, $day, $key, 'batout'.$bnf,      '-');
+              $entry{"batmaxsoc${bnf}"}   = HistoryVal ($name, $day, $key, 'batmaxsoc'.$bnf,   '-');
+              $entry{"batsetsoc${bnf}"}   = HistoryVal ($name, $day, $key, 'batsetsoc'.$bnf,   '-');
+              $entry{"batprogsoc${bnf}"}  = HistoryVal ($name, $day, $key, 'batprogsoc'.$bnf,  '-');
+              $entry{"batsoc${bnf}"}      = HistoryVal ($name, $day, $key, 'batsoc'.$bnf,      '-');
+              $entry{"lcintimebat${bnf}"} = HistoryVal ($name, $day, $key, 'lcintimebat'.$bnf, '-');
+              $entry{"strategybat${bnf}"} = HistoryVal ($name, $day, $key, 'strategybat'.$bnf, '-');
+          }
+
+          for my $c (1..MAXCONSUMER) {                                                                  # + alle Consumer
+              my $cf = sprintf "%02d", $c;
+              for my $field (qw (cyclescsm csmt csme minutescsm hourscsme avgcycmntscsm
+                                bevcsmSoC bevcsmTargSoC bevcsmBatCap bevcsmPwr) ) {
+                  my $fkey = "${field}${cf}";
+                  $entry{$fkey} = HistoryVal ($name, $day, $key, $fkey, undef);
+              }
+          }
+
+          # ----- Key-Filter anwenden ---------------------------------------------
+          if (@$keysref) {
+              my %keep = map { $_ => 1 } @$keysref;
+              %entry   = map { $_ => $entry{$_} } grep { $keep{$_} } keys %entry;
+          }
+
+          # -----------------------------------------------------------------------
+          #                        CSV-Export
+          # -----------------------------------------------------------------------
+          if ($export eq 'csv') {                                                                   
+              my %csvmap = (                                                                            # Mapping interner Schlüssel -> CSV-Spaltenname
+                  pvrl           => 'PVreal',
+                  pvrlvd         => 'PVrealValid',
+                  pvfc           => 'PVforecast',
+                  pvapifcraw     => 'PVapiForecastRaw',
+                  gcons          => 'GridConsumption',
+                  con            => 'Consumption',
+                  confc          => 'confc',
+                  conaifc        => 'conaifc',
+                  conbiascorr    => 'conbiascorr',
+                  conlegfc       => 'conlegfc',
+                  gfeedin        => 'GridFeedIn',
+                  weatherid      => 'WeatherId',
+                  wcc            => 'CloudCover',
+                  windspeed      => 'WindSpeed',
+                  windspeed_fast => 'WindSpeedFast',
+                  rr1c           => 'TotalPrecipitation',
+                  temp           => 'Temperature',
+                  dayname        => 'DayName',
+                  rad1h          => 'GlobalRadiation',
+                  sunaz          => 'SunAzimuth',
+                  sunalt         => 'SunAltitude',
+                  DoN            => 'DayOrNight',
+                  conprice       => 'PurchasePrice',
+                  feedprice      => 'FeedInPrice',
+                  socwhsum       => 'BatterySocWhSum',
+                  socprogwhsum   => 'BatteryProgSocWhSum',
+                  plantderated   => 'PlantDerated',
+                  presence       => 'Presence',
+                  comforttemp    => 'ComfortTemp',
+                  holiday        => 'Holiday',
+                  hpcsm          => 'HeatPumpNumber',
+                  bevcsm         => 'BevNumber',
+              );
+
+              # --- dynamische Felder ergänzen ---------------------------------
+              for my $in (1..MAXINVERTER) {
+                  my $inf = sprintf "%02d", $in;
+                  $csvmap{"etotali${inf}"} = "Etotal${inf}";
+                  $csvmap{"pvrl${inf}"}    = "PVreal${inf}";
+              }
+              for my $pn (1..MAXPRODUCER) {
+                  my $pnf = sprintf "%02d", $pn;
+                  $csvmap{"etotalp${pnf}"} = "Etotal${pnf}";
+                  $csvmap{"pprl${pnf}"}    = "PPreal${pnf}";
+              }
+              for my $bn (1..MAXBATTERIES) {
+                  my $bnf = sprintf "%02d", $bn;
+                  $csvmap{"batintotal${bnf}"}  = "BatteryInTotal${bnf}";
+                  $csvmap{"batouttotal${bnf}"} = "BatteryOutTotal${bnf}";
+                  $csvmap{"batin${bnf}"}       = "BatteryIn${bnf}";
+                  $csvmap{"batout${bnf}"}      = "BatteryOut${bnf}";
+                  $csvmap{"batmaxsoc${bnf}"}   = "BatteryMaxSoc${bnf}";
+                  $csvmap{"batsetsoc${bnf}"}   = "BatterySetSoc${bnf}";
+                  $csvmap{"batprogsoc${bnf}"}  = "BatteryProgSoc${bnf}";
+                  $csvmap{"batsoc${bnf}"}      = "BatterySoc${bnf}";
+                  $csvmap{"lcintimebat${bnf}"} = "BatteryLCinTime${bnf}";
+                  $csvmap{"strategybat${bnf}"} = "BatteryStrategy${bnf}";
+              }
+              for my $c (1..MAXCONSUMER) {
+                  my $cf = sprintf "%02d", $c;
+                  $csvmap{"cyclescsm${cf}"}     = "CyclesCsm${cf}";
+                  $csvmap{"csmt${cf}"}          = "Csmt${cf}";
+                  $csvmap{"csme${cf}"}          = "Csme${cf}";
+                  $csvmap{"minutescsm${cf}"}    = "MinutesCsm${cf}";
+                  $csvmap{"hourscsme${cf}"}     = "HoursCsme${cf}";
+                  $csvmap{"avgcycmntscsm${cf}"} = "AvgCycleMinutesCsm${cf}";
+                  $csvmap{"bevcsmSoC${cf}"}     = "BEVcsmSoC${cf}";
+                  $csvmap{"bevcsmTargSoC${cf}"} = "BEVcsmTargSoC${cf}";
+                  $csvmap{"bevcsmBatCap${cf}"}  = "BEVcsmBatCap${cf}";
+                  $csvmap{"bevcsmPwr${cf}"}     = "BEVcsmPwr${cf}";
               }
 
-              $inve .= ', ' if($inve);
-              $inve .= "etotali${in}: $etoti";
-              $invl .= ', ' if($invl);
-              $invl .= "pvrl${in}: $pvrli";
+              for my $fkey (keys %entry) {
+                  my $ckey = $csvmap{$fkey} // $fkey;                             # Fallback: interner Name
+
+                  if ($fkey eq 'pvcorrf') {
+                      $hexp->{$day}{$key}{PVCorrectionFactor} = $entry{pvcorrf} eq '-' ? '' : (split '/', $entry{pvcorrf})[0];
+                      $hexp->{$day}{$key}{Quality}            = $entry{pvcorrf} eq '-' ? '' : (split '/', $entry{pvcorrf})[1];
+                      next;
+                  }
+
+                  my $val = $entry{$fkey} // '-';
+                  $val    = qq{"$val"} if $fkey =~ /^(?:hpcsm|bevcsm)$/;         # Anführungszeichen wie bisher
+                  
+                  $hexp->{$day}{$key}{$ckey} = $val;
+              }
           }
 
-          my ($prde, $prdl);
-          for my $pn (1..MAXPRODUCER) {                                              # + alle Producer
-              $pn       = sprintf "%02d", $pn;
-              my $etotp = HistoryVal ($name, $day, $key, 'etotalp'.$pn, '-');
-              my $pprl  = HistoryVal ($name, $day, $key, 'pprl'.$pn,    '-');
 
-              if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"Etotal${pn}"} = $etotp;
-                  $hexp->{$day}{$key}{"PPreal${pn}"} = $pprl;
+          # -----------------------------------------------------------------------
+          #                        Textausgabe ($ret)
+          # -----------------------------------------------------------------------
+          # Prinzip:
+          #   - $line->( Liste von Schlüsseln ) gibt eine formatierte Zeile aus,
+          #     aber NUR für Schlüssel die in %entry existieren (nach Key-Filter).
+          #   - Skalare Felder: qw (schlüssel1 schlüssel2 ...)
+          #   - Indizierte Felder (Inverter/Producer/Batterie/Consumer) werden per
+          #     map über 1..MAXxxx erzeugt: map { sprintf "%02d", $_ } 1..MAXINVERTER
+          #   - hod=99 ist der Tages-Summensatz, hod=01..24 sind Stundensätze.
+          #     Manche Felder existieren nur in Stunden (!= 99) oder nur im
+          #     Tagessatz (== 99) und werden mit if ($key ne/eq '99') geschützt.
+          #
+          # Neues Feld einfügen:
+          #   1. Skalar (z.B. 'newfield'):
+          #      a) Im Sammelblock oben:  $entry{newfield} = HistoryVal(...,'newfield','-');
+          #      b) Hier an passender Stelle in die zugehörige $line->( qw(...) )-Liste eintragen.
+          #   2. Indiziert (z.B. 'newfieldsXX' pro Batterie):
+          #      a) Im Sammelblock oben in der Batterie-Schleife ergänzen.
+          #      b) Hier analog zu den bestehenden map-Blöcken eine neue Zeile einfügen:
+          #         $ret .= $line->(map { my $bnf = sprintf "%02d",$_; "newfields${bnf}" } 1..MAXBATTERIES);
+          # -----------------------------------------------------------------------
+          $ret .= "\n      " if $ret;
+          $ret .= "$key => ";
+
+          my $line = sub {                                                                                  # Gibt eine Ausgabezeile zurück.
+              my @pairs;                                                                                    # Schlüssel die nach Key-Filter in %entry fehlen, werden still übersprungen.
+                                                                                                            # Rückgabe: "k1: v1, k2: v2\n" oder '' wenn nichts übrig bleibt.
+              for my $k (@_) {
+                  push @pairs, "$k: $entry{$k}" if exists $entry{$k};
               }
 
-              $prde .= ', ' if($prde);
-              $prde .= "etotalp${pn}: $etotp";
-              $prdl .= ', ' if($prdl);
-              $prdl .= "pprl${pn}: $pprl";
+              return @pairs ? (join(', ', @pairs)."\n            ") : '';
+          };
+
+          # --- PV-Erzeugung (Summenfelder, alle hod) ----------------------------
+          $ret .= $line->(qw (pvapifcraw pvfc pvrl pvrlvd plantderated rad1h));
+
+          # --- Inverter (etotali nur Stunden, pvrl alle hod) --------------------
+          if ($key ne '99') {                                                                               # Gesamtertrag je Inverter – nur Stundensätze
+              $ret .= $line->(map { my $inf = sprintf "%02d", $_; "etotali${inf}" } 1..MAXINVERTER);
           }
+          $ret .= $line->(map { my $inf = sprintf "%02d", $_; "pvrl${inf}"    } 1..MAXINVERTER);            # PV-Leistung je Inverter – alle hod
 
-          my ($btotin, $batin, $btotout, $batout, $batmsoc, $batssoc, $batprogsoc, $batsoc, $lcintime, $lcstrategy);
-          for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
-              $bn             = sprintf "%02d", $bn;
-              my $hbtotin     = HistoryVal ($name, $day, $key, 'batintotal'.$bn,  '-');
-              my $hbtotout    = HistoryVal ($name, $day, $key, 'batouttotal'.$bn, '-');
-              my $hbatin      = HistoryVal ($name, $day, $key, 'batin'.$bn,       '-');
-              my $hbatout     = HistoryVal ($name, $day, $key, 'batout'.$bn,      '-');
-              my $hbatmsoc    = HistoryVal ($name, $day, $key, 'batmaxsoc'.$bn,   '-');
-              my $hbatssoc    = HistoryVal ($name, $day, $key, 'batsetsoc'.$bn,   '-');
-              my $hbatprogsoc = HistoryVal ($name, $day, $key, 'batprogsoc'.$bn,  '-');
-              my $hbatsoc     = HistoryVal ($name, $day, $key, 'batsoc'.$bn,      '-');
-              my $intime      = HistoryVal ($name, $day, $key, 'lcintimebat'.$bn, '-');
-              my $strategy    = HistoryVal ($name, $day, $key, 'strategybat'.$bn, '-');
-
-              if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"BatteryInTotal${bn}"}  = $hbtotin;
-                  $hexp->{$day}{$key}{"BatteryOutTotal${bn}"} = $hbtotout;
-                  $hexp->{$day}{$key}{"BatteryIn${bn}"}       = $hbatin;
-                  $hexp->{$day}{$key}{"BatteryOut${bn}"}      = $hbatout;
-                  $hexp->{$day}{$key}{"BatteryMaxSoc${bn}"}   = $hbatmsoc;
-                  $hexp->{$day}{$key}{"BatterySetSoc${bn}"}   = $hbatssoc;
-                  $hexp->{$day}{$key}{"BatteryProgSoc${bn}"}  = $hbatprogsoc;
-                  $hexp->{$day}{$key}{"BatterySoc${bn}"}      = $hbatsoc;
-                  $hexp->{$day}{$key}{"BatteryLCinTime${bn}"} = $intime;
-                  $hexp->{$day}{$key}{"BatteryStrategy${bn}"} = $strategy;
-              }
-
-              $btotin     .= ', ' if($btotin);
-              $btotin     .= "batintotal${bn}: $hbtotin";
-              $btotout    .= ', ' if($btotout);
-              $btotout    .= "batouttotal${bn}: $hbtotout";
-              $batin      .= ', ' if($batin);
-              $batin      .= "batin${bn}: $hbatin";
-              $batout     .= ', ' if($batout);
-              $batout     .= "batout${bn}: $hbatout";
-              $batmsoc    .= ', ' if($batmsoc);
-              $batmsoc    .= "batmaxsoc${bn}: $hbatmsoc";
-              $batssoc    .= ', ' if($batssoc);
-              $batssoc    .= "batsetsoc${bn}: $hbatssoc";
-              $batprogsoc .= ', ' if($batprogsoc);
-              $batprogsoc .= "batprogsoc${bn}: $hbatprogsoc";
-              $batsoc     .= ', ' if($batsoc);
-              $batsoc     .= "batsoc${bn}: $hbatsoc";
-              $lcintime   .= ', ' if($lcintime);
-              $lcintime   .= "lcintimebat${bn}: $intime";
-              $lcstrategy .= ', ' if($lcstrategy);
-              $lcstrategy .= "strategybat${bn}: $strategy";
+          # --- Producer (etotalp nur Stunden, pprl alle hod) -------------------
+          if ($key ne '99') {                                                                               # Gesamtertrag je Producer – nur Stundensätze
+              $ret .= $line->(map { my $pnf = sprintf "%02d", $_; "etotalp${pnf}" } 1..MAXPRODUCER);
           }
+          $ret .= $line->(map { my $pnf = sprintf "%02d", $_; "pprl${pnf}"    } 1..MAXPRODUCER);            # Leistung je Producer – alle hod
 
-          $ret .= "\n      " if($ret);
-          $ret .= $key." => ";
-          $ret .= "pvapifcraw: $pvapifcraw, pvfc: $pvfc, pvrl: $pvrl, pvrlvd: $pvrlvd, plantderated: $pd, rad1h: $rad1h";
-          $ret .= "\n            ";
-          $ret .= $inve            if($inve && $key ne '99');
-          $ret .= "\n            " if($inve && $key ne '99');
-          $ret .= $invl            if($invl);
-          $ret .= "\n            " if($invl);
-          $ret .= $prde            if($prde && $key ne '99');
-          $ret .= "\n            " if($prde && $key ne '99');
-          $ret .= $prdl            if($prdl);
-          $ret .= "\n            " if($prdl);
-          $ret .= "conlegfc: $conlegfc, conaifc: $conaifc, confc: $confc, conbiascorr: $conbiascorr, con: $con, gcons: $gcons, conprice: $conprc";
-          $ret .= "\n            ";
-          $ret .= "gfeedin: $gfeedin, feedprice: $feedprc";
-          $ret .= "\n            ";
-          $ret .= "DoN: $don, sunaz: $sunaz, sunalt: $sunalt";
-          $ret .= "\n            ";
+          # --- Verbrauch --------------------------------------------------------
+          $ret .= $line->(qw (conlegfc conaifc confc conbiascorr con gcons conprice));
 
+          # --- Einspeisung ------------------------------------------------------
+          $ret .= $line->(qw (gfeedin feedprice));
+
+          # --- Sonnenstand / Tag-Nacht ------------------------------------------
+          $ret .= $line->(qw(DoN sunaz sunalt));
+
+          # --- Batterien (feldweise über alle Batterien, nur Stundensätze) ------
+          # Jede Zeile enthält dasselbe Feld für alle Batterien (bat..01, bat..02, ...).
+          # Für neue Batteriefelder: analog eine map-Zeile ergänzen (nur != 99 oder auch == 99).
           if ($key ne '99') {
-              $ret .= $btotin;
-              $ret .= "\n            ";
-              $ret .= $btotout;
-              $ret .= "\n            ";
-
-              $ret .= $batprogsoc.", socprogwhsum: $socprogwhsum";
-              $ret .= "\n            ";
-              $ret .= $batsoc.", socwhsum: $socwhsum";
-              $ret .= "\n            ";
-              $ret .= $lcintime;
-              $ret .= "\n            ";
-              $ret .= $lcstrategy;
-              $ret .= "\n            ";
+              $ret .= $line->(map { my $bnf = sprintf "%02d", $_; "batintotal${bnf}"  } 1..MAXBATTERIES);   # Gesamtenergie Eingang
+              $ret .= $line->(map { my $bnf = sprintf "%02d", $_; "batouttotal${bnf}" } 1..MAXBATTERIES);   # Gesamtenergie Ausgang
+              $ret .= $line->((map { my $bnf = sprintf "%02d", $_; "batprogsoc${bnf}" } 1..MAXBATTERIES),   # Prog-SoC + Tages-WhSumme
+                              'socprogwhsum');
+              $ret .= $line->((map { my $bnf = sprintf "%02d", $_; "batsoc${bnf}"     } 1..MAXBATTERIES),   # Ist-SoC  + Tages-WhSumme
+                              'socwhsum');
+              $ret .= $line->(map { my $bnf = sprintf "%02d", $_; "lcintimebat${bnf}" } 1..MAXBATTERIES);   # Ladezeit
+              $ret .= $line->(map { my $bnf = sprintf "%02d", $_; "strategybat${bnf}" } 1..MAXBATTERIES);   # Ladestrategie
           }
-          
-          $ret .= $batin;
-          $ret .= "\n            ";
-          $ret .= $batout;
-          $ret .= "\n            ";
 
+          # --- Batterieflüsse (alle hod) ----------------------------------------
+          $ret .= $line->(map { my $bnf = sprintf "%02d", $_; "batin${bnf}"   } 1..MAXBATTERIES);           # Ladeleistung
+          $ret .= $line->(map { my $bnf = sprintf "%02d", $_; "batout${bnf}"  } 1..MAXBATTERIES);           # Entladeleistung
+
+          # --- Batterie-SoC-Grenzen (nur Tagessatz hod=99) ---------------------
           if ($key eq '99') {
-              $ret .= $batmsoc;
-              $ret .= "\n            ";
-              $ret .= $batssoc;
-              $ret .= "\n            ";
+              $ret .= $line->(map { my $bnf = sprintf "%02d", $_; "batmaxsoc${bnf}" } 1..MAXBATTERIES);     # Max-SoC Grenze
+              $ret .= $line->(map { my $bnf = sprintf "%02d", $_; "batsetsoc${bnf}" } 1..MAXBATTERIES);     # Set-SoC Grenze
           }
-          
+
+          # --- Wetterdaten und Haushaltsparameter (nur Stundensätze) -----------
           if ($key ne '99') {
-              $ret .= "weatherid: $wid, ";
-              $ret .= "wcc: $wcc, ";
-              $ret .= "windspeed: $windspeed, windspeed_fast: $wind_fast, ";
-              $ret .= "rr1c: $rr1c, ";
-              $ret .= "pvcorrf: $pvcorrf ";
-              $ret .= "temp: $temp, ";
-              $ret .= "comforttemp: $comforttemp, ";
-              $ret .= "presence: $presence ";
-              $ret .= "\n            ";
-              $ret .= "hpcsm: $hpcsm, bevcsm: $bevcsm ";              
+              $ret .= $line->(qw (weatherid wcc windspeed windspeed_fast rr1c pvcorrf temp comforttemp presence));
+              $ret .= $line->(qw (hpcsm bevcsm));
           }
-          
+
+          # --- Tagesfelder (nur hod=99) -----------------------------------------
           if ($key eq '99') {
-              $ret .= "dayname: $dayname, holiday: $holiday";
+              $ret .= $line->(qw (dayname holiday));
           }
 
-          my $csm;
-          for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
-              $c           = sprintf "%02d", $c;
-              my $nl       = 0;
-              my $csmc     = HistoryVal ($name, $day, $key, "cyclescsm${c}",      undef);
-              my $csmt     = HistoryVal ($name, $day, $key, "csmt${c}",           undef);
-              my $csme     = HistoryVal ($name, $day, $key, "csme${c}",           undef);
-              my $csmm     = HistoryVal ($name, $day, $key, "minutescsm${c}",     undef);
-              my $csmh     = HistoryVal ($name, $day, $key, "hourscsme${c}",      undef);
-              my $csma     = HistoryVal ($name, $day, $key, "avgcycmntscsm${c}",  undef);
-              my $evsoc    = HistoryVal ($name, $day, $key, "bevcsmSoC${c}",      undef);   
-              my $evtgtsoc = HistoryVal ($name, $day, $key, "bevcsmTargSoC${c}",  undef);     
-              my $evbatcap = HistoryVal ($name, $day, $key, "bevcsmBatCap${c}",   undef);
-              my $evcurpwr = HistoryVal ($name, $day, $key, "bevcsmPwr${c}",      undef);
+          # --- Consumer (pro Consumer eine Zeile, nur Felder mit echtem Wert) ---
+          # Felder ohne Wert (undef / '' / '-') werden still unterdrückt.
+          # Tagesfelder (cyclescsm, hourscsme, avgcycmntscsm) nur bei hod=99.
+          # Neues Consumerfeld einfügen: in die passende qw()-Liste unten eintragen
+          # UND im Sammelblock oben in der Consumer-Schleife per HistoryVal ergänzen.
+          for my $c (1..MAXCONSUMER) {
+              my $cf = sprintf "%02d", $c;
+              my @cfields;
 
-              if ($export eq 'csv') {
-                  $hexp->{$day}{$key}{"CyclesCsm${c}"}          = $csmc     // '-';
-                  $hexp->{$day}{$key}{"Csmt${c}"}               = $csmt     // '-';
-                  $hexp->{$day}{$key}{"Csme${c}"}               = $csme     // '-';
-                  $hexp->{$day}{$key}{"MinutesCsm${c}"}         = $csmm     // '-';
-                  $hexp->{$day}{$key}{"HoursCsme${c}"}          = $csmh     // '-';
-                  $hexp->{$day}{$key}{"AvgCycleMinutesCsm${c}"} = $csma     // '-';
-                  $hexp->{$day}{$key}{"BEVcsmSoC${c}"}          = $evsoc    // '-';
-                  $hexp->{$day}{$key}{"BEVcsmTargSoC${c}"}      = $evtgtsoc // '-';
-                  $hexp->{$day}{$key}{"BEVcsmBatCap${c}"}       = $evbatcap // '-';
-                  $hexp->{$day}{$key}{"BEVcsmPwr${c}"}          = $evcurpwr // '-';
+              if ($key eq '99') {                                                                           # Tageswerte: Zyklen, Energie, BEV-Daten
+                  @cfields = map { "${_}${cf}" }
+                             qw (cyclescsm csmt csme hourscsme avgcycmntscsm
+                                bevcsmSoC bevcsmTargSoC bevcsmBatCap bevcsmPwr);
+              }
+              else {                                                                                        # Stundenwerte: Energie, Minuten, BEV-Daten
+                  @cfields = map { "${_}${cf}" }
+                             qw (csmt csme minutescsm bevcsmSoC 
+                                 bevcsmTargSoC bevcsmBatCap bevcsmPwr);
               }
 
-              if (defined $csmc) {
-                  $csm .= "cyclescsm${c}: $csmc";
-                  $nl   = 1;
-              }
+              my @show = grep { defined $entry{$_} && $entry{$_} ne '' && $entry{$_} ne '-' } @cfields;
 
-              if (defined $csmt) {
-                  $csm .= ", " if($nl);
-                  $csm .= "csmt${c}: $csmt";
-                  $nl   = 1;
+              if (@show) {
+                  $ret .= join(', ', map { "$_: $entry{$_}" } @show);
+                  $ret .= "\n            ";
               }
-
-              if (defined $csme) {
-                  $csm .= ", " if($nl);
-                  $csm .= "csme${c}: $csme";
-                  $nl   = 1;
-              }
-
-              if (defined $csmm) {
-                  $csm .= ", " if($nl);
-                  $csm .= "minutescsm${c}: $csmm";
-                  $nl   = 1;
-              }
-
-              if (defined $csmh) {
-                  $csm .= ", " if($nl);
-                  $csm .= "hourscsme${c}: $csmh";
-                  $nl   = 1;
-              }
-
-              if (defined $csma) {
-                  $csm .= ", " if($nl);
-                  $csm .= "avgcycmntscsm${c}: $csma";
-                  $nl   = 1;
-              }
-              
-              if (defined $evsoc) {
-                  $csm .= ", " if($nl);
-                  $csm .= "bevcsmSoC${c}: $evsoc";
-                  $nl   = 1;
-              }
-              
-              if (defined $evtgtsoc) {
-                  $csm .= ", " if($nl);
-                  $csm .= "bevcsmTargSoC${c}: $evtgtsoc";
-                  $nl   = 1;
-              }
-              
-              if (defined $evbatcap) {
-                  $csm .= ", " if($nl);
-                  $csm .= "bevcsmBatCap${c}: $evbatcap";
-                  $nl   = 1;
-              }
-              
-              if (defined $evcurpwr) {
-                  $csm .= ", " if($nl);
-                  $csm .= "bevcsmPwr${c}: $evcurpwr";
-                  $nl   = 1;
-              }
-
-              $csm .= "\n            " if($nl);
-          }
-
-          if ($csm) {
-              $ret .= "\n            ";
-              $ret .= $csm;
-          }
-          else {
-              $ret .= "\n            ";
           }
       }
+      
       return $ret;
   };
 
@@ -30188,14 +30304,15 @@ sub _listDataPoolPvHist {
   }
 
   for my $idx (sort keys %{$h}) {
-      if (!isNumeric ($idx)) {                                                   # bereinigen
+      if (!isNumeric ($idx)) {                                                  # bereinigen
           delete $data{$name}{pvhist}{$idx};
           Log3 ($name, 2, qq{$name - INFO - invalid key "$idx" was deleted from pvHistory storage});
           next;
       }
+         
+      next if @days && !any { $_ eq $idx } @days;                               # ist Tag in Tagesliste enthalten? 
       
-      next if($par && $idx ne $par);
-      my $content = $sub->($idx) // 'no content';
+      my $content = $sub->($idx, \@hods, \@keys) // 'no content';
       $sq .= $idx." => ".$content."\n";
   }
 
@@ -36715,14 +36832,20 @@ to ensure that the system configuration is correct.
     <ul>
       <a id="SolarForecast-get-pvHistory"></a>
       <li><b>pvHistory </b> <br><br>
-      Displays or exports the contents of the pvHistory data memory sorted by date and hour. <br>
-      The selection list can be used to jump to a specific day. The drop-down list contains the days currently
-      available in the memory.
-      Without an argument, the entire data storage is listed.
-      The 'exportToCsv' specification exports the entire content of the pvHistory to a CSV file. <br>
-
-      The hour specifications refer to the respective hour of the day, e.g. the hour 09 refers to the time from
-      08 o'clock to 09 o'clock. The hour '99' contains daily values.
+      Displays or exports the contents of the pvHistory data store, sorted by date and time. <br>
+      The drop-down list allows you to select a specific date. The drop-down list contains the dates currently
+      available in memory.
+      If no other arguments are provided, the entire data store is listed.
+      The 'exportToCsv' option exports the entire contents of pvHistory - or, if filter parameters are specified, a subset of its 
+      contents - to a CSV file. <br><br>
+      
+      The filter parameters can be used to filter only specific days, selected hours, or specific fields. These 
+      specifications can be passed to the filter keys as a comma-separated list, for example:  <br><br>
+      
+           <ul><i> day=1,2,4 hod=12,13,99 key=pvfc,pvrl    </i></ul>   <br>
+           
+      The hour values refer to the respective hour of the day (hod). For example, hour 09 refers to the 
+      time from 8:00 a.m. to 9:00 a.m. Hour '99' contains daily values.
       <br><br>
 
       <ul>
@@ -39797,14 +39920,20 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
     <ul>
       <a id="SolarForecast-get-pvHistory"></a>
       <li><b>pvHistory </b> <br><br>
-      Zeigt oder exportiert den Inhalt des pvHistory Datenspeichers sortiert nach dem Tagesdatum und Stunde. <br>
+      Zeigt oder exportiert den Inhalt des pvHistory Datenspeichers sortiert nach Tagesdatum und Stunde. <br>
       Mit der Auswahlliste kann ein bestimmter Tag angesprungen werden. Die Drop-Down Liste enthält die aktuell
       im Speicher verfügbaren Tage.
-      Ohne Argument wird der gesamte Datenspeicher gelistet.
-      Die Angabe 'exportToCsv' exportiert den gesamten Inhalt der pvHistory in eine CSV-Datei. <br>
-
-      Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages, z.B. bezieht sich die Stunde 09 auf die Zeit
-      von 08 Uhr bis 09 Uhr. Die Stunde '99' enthält Tageswerte.
+      Ohne weitere Argumente wird der gesamte Datenspeicher gelistet.
+      Die Angabe 'exportToCsv' exportiert den gesamten Inhalt, oder bei Angabe von Filterparametern einen Teilinhalt der pvHistory 
+      in eine CSV-Datei. <br><br>
+      
+      Mit den Filterparamtern können nur bestimmte Tage, ausgewählte Stunden oder bestimmte Felder gefiltert werden. Diese 
+      Angaben können als Komma getrennte Liste den Filterschlüsseln übergeben werden, zum Beispiel:  <br><br>
+      
+           <ul><i> day=1,2,4 hod=12,13,99 key=pvfc,pvrl    </i></ul>   <br>
+           
+      Die Stundenangaben beziehen sich auf die jeweilige Stunde des Tages (hod). Zum Beispiel bezieht sich die Stunde 09 auf die 
+      Zeit von 8:00 Uhr bis 9:00 Uhr. Die Stunde '99' enthält Tageswerte.
       <br><br>
 
       <ul>
