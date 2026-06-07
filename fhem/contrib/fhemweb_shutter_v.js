@@ -1,4 +1,4 @@
-FW_version["fhemweb_shutter_v.js"] = "$Id: fhemweb_shutter_v.js 0.8.3 schwatter $";
+FW_version["fhemweb_shutter_v.js"] = "$Id: fhemweb_shutter_v.js 0.8.4 schwatter $";
 FW_widgets['shutter_v'] = { createFn: window.controlShutterVCreate };
 
 function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -91,10 +91,9 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
                 user-select: none !important;
                 -webkit-user-select: none !important;
                 transition: background-color 0.2s ease-out !important;
-                /* Ermöglicht die Erkennung der Bildschirmgrenzen */
-                view-timeline: --shutterVisible block;
+                overflow: hidden !important; /* Wieder sicher aktiviert für die Lamellen */
             }
-            .shutter-v-preview-lamellas {
+            .shutter-v-preview-lamelines { /* umbenannt zur Sicherheit vor Altresten */
                 position: absolute !important;
                 top: 0 !important;
                 left: 0 !important;
@@ -106,7 +105,6 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
                 transition: height 0.2s ease-out !important; 
                 background-image: linear-gradient(rgba(0,0,0,0.3) 1px, transparent 1px) !important;
                 background-size: 100% 6px !important;
-                border-radius: 3px !important;
             }
             .shutter-v-val-overlay {
                 position: absolute !important;
@@ -121,11 +119,9 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
                 z-index: 10 !important;
                 transition: color 0.1s ease-out !important;
             }
-            /* Die schwebende Bubble */
+            /* Die absolut immunisierte Bubble im Body-Bereich */
             .shutter-v-popup-indicator {
                 position: absolute !important;
-                left: 50% !important;
-                transform: translateX(-50%) !important;
                 background: #2f80ed !important;
                 color: #fff !important;
                 padding: 4px 8px !important;
@@ -134,13 +130,10 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
                 font-weight: bold !important;
                 box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
                 pointer-events: none !important;
-                z-index: 9999 !important;
+                z-index: 99999 !important;
                 display: none;
                 white-space: nowrap !important;
-                
-                /* Automatische Ausrichtung an Bildschirmgrenzen via CSS Timeline */
-                animation: boundaryFlip linear both;
-                animation-timeline: --shutterVisible;
+                transform: translateX(-50%) !important;
             }
             .shutter-v-popup-indicator::after {
                 content: '' !important;
@@ -151,53 +144,19 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
                 display: block !important;
                 width: 0 !important;
             }
-
-            /* Zustand: Popup soll standardmäßig OBEN sein (0-50%) */
-            .shutter-v-popup-pos-up {
-                top: -45px !important;
-                animation-range: entry-crossing 0% exit-crossing 15%;
-            }
-            .shutter-v-popup-pos-up::after {
+            /* Pfeil zeigt nach unten (wenn oben platziert) */
+            .shutter-v-popup-arrow-down::after {
                 bottom: -5px !important;
                 top: auto !important;
                 border-width: 5px 5px 0 !important;
                 border-color: #2f80ed transparent !important;
             }
-
-            /* Zustand: Popup soll standardmäßig UNTEN sein (51-100%) */
-            .shutter-v-popup-pos-down {
-                top: 115px !important;
-                animation-range: entry-crossing 85% exit-crossing 100%;
-            }
-            .shutter-v-popup-pos-down::after {
+            /* Pfeil zeigt nach oben (wenn unten platziert) */
+            .shutter-v-popup-arrow-up::after {
                 top: -5px !important;
                 bottom: auto !important;
                 border-width: 0 5px 5px !important;
                 border-color: transparent transparent #2f80ed !important;
-            }
-
-            /* CSS-Animation für den Fall, dass das Widget an den Browserrand stößt */
-            @keyframes boundaryFlip {
-                /* Kollision am oberen Bildschirmrand -> nach unten beamen */
-                0% {
-                    top: 115px !important;
-                }
-                0%::after {
-                    top: -5px !important;
-                    bottom: auto !important;
-                    border-width: 0 5px 5px !important;
-                    border-color: transparent transparent #2f80ed !important;
-                }
-                /* Kollision am unteren Bildschirmrand -> nach oben beamen */
-                100% {
-                    top: -45px !important;
-                }
-                100%::after {
-                    bottom: -5px !important;
-                    top: auto !important;
-                    border-width: 5px 5px 0 !important;
-                    border-color: #2f80ed transparent !important;
-                }
             }
         `)
         .appendTo('head');
@@ -213,9 +172,9 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
     wrapper.on('click', function(e) { e.stopPropagation(); });
 
     const animWindow = $('<div/>', { class: 'shutter-v-touch-window' }).appendTo(wrapper);
-    const animLamellas = $('<div/>', { class: 'shutter-v-preview-lamellas' }).appendTo(animWindow);
+    const animLamellas = $('<div/>', { class: 'shutter-v-preview-lamelines' }).appendTo(animWindow);
     const valDisplay = $('<div/>', { class: 'shutter-v-val-overlay', text: '0%' }).appendTo(animWindow);
-    const popupIndicator = $('<div/>', { class: 'shutter-v-popup-indicator', text: '0%' }).appendTo(animWindow);
+    const popupIndicator = $('<div/>', { class: 'shutter-v-popup-indicator', text: '0%' }).appendTo('body');
     const btnColumn = $('<div/>', { class: 'shutter-v-btn-column' }).appendTo(wrapper);
 
     const iconUp   = '<svg viewBox="0 0 24 24"><path d="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"/></svg>';
@@ -235,12 +194,6 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
         animLamellas.css('height', invertedHeight + '%');
         valDisplay.text(`${p}%`);
         popupIndicator.text(`${p}%`);
-
-        if (p <= 50) {
-            popupIndicator.addClass('shutter-v-popup-pos-up').removeClass('shutter-v-popup-pos-down');
-        } else {
-            popupIndicator.addClass('shutter-v-popup-pos-down').removeClass('shutter-v-popup-pos-up');
-        }
 
         const brightness = Math.round(30 + (p * 2.25)); 
         animWindow.css('background-color', `rgb(${brightness}, ${brightness}, ${brightness})`);
@@ -274,7 +227,7 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
     btnStop.on('click', function(e) { e.preventDefault(); e.stopPropagation(); sendCmdToFhem('stop'); });
     btnDown.on('click', function(e) { e.preventDefault(); e.stopPropagation(); sendCmdToFhem('close'); });
 
-    // --- Touch / Drag Logik direkt auf dem Rollo-Fenster ---
+    // --- Dynamische, skin-sichere Positionierungs-Logik ---
     function handleSizingFromEvent(e) {
         const rect = animWindow[0].getBoundingClientRect();
         const isTouch = !!(e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length) || !!(e.touches && e.touches.length);
@@ -292,7 +245,38 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
         updateVisualShutter(percent);
 
         if (isTouch) {
-            popupIndicator.show();
+            // Absolute Koordinaten auf der Gesamten Seite ermitteln
+            const windowCenterX = rect.left + window.scrollX + (rect.width / 2);
+            const windowTopY = rect.top + window.scrollY;
+            
+            let finalTop = windowTopY - 45; // Standard: Oben (-45px)
+            let useBottomLayout = (percent > 50); // Ab 51% nach unten wandern
+            
+            // Browsergrenzen prüfen (Platz nach oben/unten im aktuellen Viewport)
+            const spaceAbove = rect.top;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            
+            if (!useBottomLayout && spaceAbove < 50) {
+                // Eigentlich oben geplant, aber am oberen Rand -> nach unten zwingen
+                useBottomLayout = true;
+            } else if (useBottomLayout && spaceBelow < 50) {
+                // Eigentlich unten geplant, aber am unteren Rand -> nach oben zwingen
+                useBottomLayout = false;
+            }
+
+            // Finale Zuweisung basierend auf der Entscheidung
+            if (useBottomLayout) {
+                finalTop = rect.bottom + window.scrollY + 15; // Unten platzieren (+15px Puffer)
+                popupIndicator.addClass('shutter-v-popup-arrow-up').removeClass('shutter-v-popup-arrow-down');
+            } else {
+                popupIndicator.addClass('shutter-v-popup-arrow-down').removeClass('shutter-v-popup-arrow-up');
+            }
+
+            popupIndicator.css({
+                display: 'block',
+                top: finalTop + 'px',
+                left: windowCenterX + 'px'
+            });
         } else {
             popupIndicator.hide();
         }
@@ -302,7 +286,6 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
         e.preventDefault(); e.stopPropagation();
         handleSizingFromEvent(e);
 
-        // Sicherer, gerätespezifischer Namensraum für die globalen Events
         const moveNamespace = `mousemove.shuttervdrag-${dev} touchmove.shuttervdrag-${dev}`;
         const upNamespace = `mouseup.shuttervdrag-${dev} touchend.shuttervdrag-${dev}`;
 
@@ -312,9 +295,8 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
 
         $(window).on(upNamespace, function(ev) {
             $(window).off(`.shuttervdrag-${dev}`);
-
             popupIndicator.hide();
-
+            
             sendCmdToFhem('position', currentInternalPercent);
 
             if (interactionTimeout) clearTimeout(interactionTimeout);
@@ -333,7 +315,6 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
         hiddenUpdateDiv.id = informId;
         hiddenUpdateDiv.style.display = 'none';
         hiddenUpdateDiv.setAttribute('informId', informId);
-        
         hiddenUpdateDiv.setValueFn = function(newValue) {
             if (!isUserInteracting) {
                 updateVisualShutter(newValue);
