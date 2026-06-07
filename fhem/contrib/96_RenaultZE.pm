@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.21 new GIGY_API key
 # v 1.20 Änderungen von Moli 1:1 übernommen
 # v 1.19.1 Moli Fummelt rum, Logfehler weg, neuer API-Key, charge-mod kill
 # v 1.19 add scubscriptions and act accordingly
@@ -177,7 +178,8 @@ sub RenaultZE_Define($$) {
 
 
     $hash->{STATE}        = "defined";
-    $hash->{GIGYA_API}    = '4_wnKlaC2lVDIOYczsO3pJpg';
+    #    $hash->{GIGYA_API}    = '4_wnKlaC2lVDIOYczsO3pJpg';
+    $hash->{GIGYA_API}    = '3_VgdkgtIRH3AdHvJm-cjV2ug2EFE0lxt0IJzMC4MFqZjFpn_GYFXVdNZ19L7wZX0N';
     #$hash->{GIGYA_API}    = '3_7PLksOyBRkHv126x5WhHb-5pqC1qFR8pQjxSeLB6nhAnPERTUlwnYoznHSxwX668';
     #$hash->{GIGYA_API}    = '3_7PLksOyBRkHv126x5WhHb-5pqC1qFR8pQjxSeLB6nhAnPERTUlwnYoznHSxwX668';
     #$hash->{KAMEREON_API} = 'Ae9FDWugRxZQAGm3Sxgk7uJn6Q4CGEA2';
