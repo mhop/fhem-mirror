@@ -130,7 +130,7 @@ function controlShutterVCreate(elName, devName, vArr, currVal, set, params, cmd)
                 font-weight: bold !important;
                 box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
                 pointer-events: none !important;
-                z-index: 99999 !important;
+                z-index: 10 !important;
                 display: none;
                 white-space: nowrap !important;
                 transform: translateX(-50%) !important;
