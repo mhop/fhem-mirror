@@ -22,6 +22,7 @@ package FHEM::Core::MiniSIP;
 
 use strict;
 use warnings;
+use Data::Dumper;
 
 use Socket;
 use IO::Socket::INET;
@@ -70,12 +71,14 @@ sub Define {
   return "Only one device with TYPE=MiniSIP can be defined" 
       if($modules{MiniSIP}{inUse});
 
-  $hash->{server}->{port} = $h->{port};
-  $hash->{server}->{from} = $h->{from};
+  $hash->{server}->{from}  = $h->{from};
+  $hash->{server}->{host}  = (split(/@/,$h->{from}))[1];
+  $hash->{server}->{port}  = $h->{port};
   $hash->{server}->{local} = "<sip:$h->{from}>";
   $hash->{server}->{proto} = 'udp';
 
   my $sock = IO::Socket::INET->new(
+    LocalAddr => $hash->{server}->{host},
     LocalPort => $hash->{server}->{port},
     Proto     => $hash->{server}->{proto},
     Reuse     => 1,
@@ -86,6 +89,9 @@ sub Define {
   my $fh = $sock->fileno();
   $hash->{FD} = $fh;
   $selectlist{$fh} = $hash;
+
+  my $leg = Net::SIP::Leg->new( sock => $sock );
+  $hash->{server}->{leg} = $leg;
 
   FHEM::MiniSIP::Utils::restore_peers($hash);
   
@@ -223,6 +229,25 @@ sub Shutdown {
 
 ###------------------------------------------------------------------
 
+
+sub ntf_body_1 {
+  my $body   = <<"BODY";
+Messages-Waiting: yes
+Message-Account: sip:12345\@192.168.123.254
+Voice-Message: 1/1 (1/0)
+BODY
+  return $body;
+}
+
+sub ntf_body_0 {
+  my $body   = <<"BODY";
+Messages-Waiting: yes
+Message-Account: sip:12345\@192.168.123.254
+Voice-Message: 0/0 (0/0)
+BODY
+  return $body;
+}
+
 sub sendmsg {
   my ($hash,$peer,$msg) = @_;
   my $name = $hash->{NAME};
@@ -293,6 +318,16 @@ sub processmsg {
     message2reading($hash,$peer,$req);    
   }
 
+  if ($method eq 'SUBSCRIBE') {
+    $hash->{peers}{$peer}{subscribe} = $req;
+    my $resp = $req->create_response(200, {}, '');
+    sendmsg($hash,$peer,$resp->as_string);
+
+    send_notify_for_subscribe($hash,$peer,$req);
+    
+    return;
+  }
+  
   if ($method eq 'INVITE') {
     if (AttrVal($name,'useAuth',0)) {
       # with authentication
@@ -306,7 +341,7 @@ sub processmsg {
 
   my @known_methods = qw(REGISTER INVITE MESSAGE SUBSCRIBE BYE);
   if (contains_string($method,@known_methods)) {
-    my $resp = $req->create_response(200, {}, '');
+    my $resp = $req->create_response(200, {'contact',$req->get_header('contact'),'expires',$req->get_header('expires')}, '');
     sendmsg($hash,$peer,$resp->as_string);
   }
 
