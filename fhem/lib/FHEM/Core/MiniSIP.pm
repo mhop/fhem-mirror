@@ -229,25 +229,6 @@ sub Shutdown {
 
 ###------------------------------------------------------------------
 
-
-sub ntf_body_1 {
-  my $body   = <<"BODY";
-Messages-Waiting: yes
-Message-Account: sip:12345\@192.168.123.254
-Voice-Message: 1/1 (1/0)
-BODY
-  return $body;
-}
-
-sub ntf_body_0 {
-  my $body   = <<"BODY";
-Messages-Waiting: yes
-Message-Account: sip:12345\@192.168.123.254
-Voice-Message: 0/0 (0/0)
-BODY
-  return $body;
-}
-
 sub sendmsg {
   my ($hash,$peer,$msg) = @_;
   my $name = $hash->{NAME};
@@ -311,6 +292,12 @@ sub processmsg {
       # with authentication
       doAuth($hash,$peer,$req);
       return;
+    } else {
+      my $resp = $req->create_response(200, 
+                                       { 'contact',$req->get_header('contact'),
+                                         'expires',$req->get_header('expires') },
+                                       '');
+      sendmsg($hash,$peer,$resp->as_string);
     }
   }
 
@@ -339,9 +326,9 @@ sub processmsg {
     }
   }
 
-  my @known_methods = qw(REGISTER INVITE MESSAGE SUBSCRIBE BYE);
+  my @known_methods = qw(INVITE MESSAGE SUBSCRIBE BYE);
   if (contains_string($method,@known_methods)) {
-    my $resp = $req->create_response(200, {'contact',$req->get_header('contact'),'expires',$req->get_header('expires')}, '');
+    my $resp = $req->create_response(200, {}, '');
     sendmsg($hash,$peer,$resp->as_string);
   }
 
