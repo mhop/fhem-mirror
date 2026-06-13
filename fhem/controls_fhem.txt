@@ -1,4 +1,4 @@
-REV 31350
+REV 31353
 DIR unused
 UPD 2026-06-07_07:45:03 457492 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -771,8 +771,8 @@ UPD 2026-05-30_07:45:12 5558044 docs/commandref.html
 UPD 2026-05-28_07:45:15 3539249 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-06-12_07:45:16 330289 docs/commandref_modular.html
-UPD 2026-06-12_07:45:17 342101 docs/commandref_modular_DE.html
+UPD 2026-06-13_07:45:17 330289 docs/commandref_modular.html
+UPD 2026-06-13_07:45:18 342101 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -797,7 +797,7 @@ UPD 2026-02-16_07:45:03 3932 lib/FHEM/Automation/ShuttersControl/Window/Attr.pm
 UPD 2026-02-16_07:45:03 2249 lib/FHEM/Automation/ShuttersControl/Window/Readings.pm
 UPD 2026-03-30_07:45:03 4190 lib/FHEM/Core/Authentication/HeaderPolicy.pm
 UPD 2021-05-19_07:45:07 5977 lib/FHEM/Core/Authentication/Passwords.pm
-UPD 2026-05-30_07:45:04 8695 lib/FHEM/Core/MiniSIP.pm
+UPD 2026-06-13_07:45:03 9532 lib/FHEM/Core/MiniSIP.pm
 UPD 2020-06-29_07:45:03 1765 lib/FHEM/Core/Timer/Helper.pm
 UPD 2021-05-26_07:45:02 6647 lib/FHEM/Core/Timer/Register.pm
 UPD 2021-04-26_07:45:03 8936 lib/FHEM/Core/Utils/FHEMbackup.pm
