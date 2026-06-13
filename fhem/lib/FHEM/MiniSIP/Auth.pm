@@ -156,8 +156,11 @@ sub doAuth {
   my $expected = compute_response($ha1, $method, $uri, $nonce, $nc, $cnonce, $qop);
   if (lc($expected) eq lc($response)) {
     # Auth success - proceed processing (e.g. 200 OK)
-    my $response = $req->create_response(200, {}, '');
-		sendmsg($hash,$peer,$response->as_string);
+    my $resp = $req->create_response(200, 
+                                       { 'contact',$req->get_header('contact'),
+                                         'expires',$req->get_header('expires') },
+                                       '');
+		sendmsg($hash,$peer,$resp->as_string);
     delete $hash->{server}->{buf};
   	return 1;
   } else {
