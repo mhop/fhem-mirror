@@ -645,6 +645,10 @@ FHEM/lib/SHC_packet_layout.xml  breaker27         Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
+lib/FHEM/AlexaCookieService/Client.pm sidey            FHEM Development
+lib/FHEM/AlexaCookieService/EchodeviceImport.pm sidey  FHEM Development
+lib/FHEM/AlexaCookieService/State.pm sidey             FHEM Development
+
 lib/FHEM/Core/Timer/Helper.pm    sidey            FHEM Development
 lib/FHEM/Core/Timer/Register.pm  Beta-User        FHEM Development
 lib/FHEM/SynoModules/*           DS_Starter       Sonstiges
