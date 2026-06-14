@@ -585,6 +585,7 @@ FHEM/98_uptime.pm            betateilchen         Sonstiges
 FHEM/98_Verkehrsinfo.pm      martins              Unterstützende Dienste
 FHEM/98_version.pm           betateilchen         Sonstiges
 FHEM/98_vitoconnect.pm       stefanru             Heizungssteuerung/Raumklima
+FHEM/98_WebAuth.pm           Sidey                Automatisierung
 FHEM/98_weblink.pm           rudolfkoenig         Frontends/FHEMWEB
 FHEM/98_WeekdayTimer.pm      Beta-User            Unterstützende Dienste/Kalendermodule
 FHEM/98_weekprofile.pm       risiko               Frontends
@@ -644,7 +645,7 @@ FHEM/lib/SHC_packet_layout.xml  breaker27         Sonstige Systeme
 FHEM/lib/SWAP/*              justme1968           Sonstige Systeme
 FHEM/lib/UPnP/*              Reinerlein           Multimedia
 
-lib/FHEM/Core/Timer/Helper.pm    sidey79          FHEM Development
+lib/FHEM/Core/Timer/Helper.pm    sidey            FHEM Development
 lib/FHEM/Core/Timer/Register.pm  Beta-User        FHEM Development
 lib/FHEM/SynoModules/*           DS_Starter       Sonstiges
 lib/FHEM/Text/Unicode.pm         Adimarantis      FHEM Development
