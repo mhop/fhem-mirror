@@ -1,8 +1,8 @@
-REV 31356
+REV 31360
 DIR unused
-UPD 2026-06-07_07:45:03 457492 ./CHANGED
+UPD 2026-06-15_07:45:03 457565 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
-UPD 2026-06-05_07:45:04 48188 ./MAINTAINER.txt
+UPD 2026-06-15_07:45:03 48471 ./MAINTAINER.txt
 UPD 2026-01-30_07:45:03 47178 ./configDB.pm
 UPD 2023-05-29_07:45:03 21936 ./fhem.cfg.demo
 UPD 2026-05-29_07:45:18 175712 ./fhem.pl
@@ -536,6 +536,7 @@ UPD 2017-05-20_07:45:02 36736 FHEM/98_UbiquitiMP.pm
 UPD 2015-07-28_14:05:31 3492 FHEM/98_UbiquitiOut.pm
 UPD 2019-02-08_07:45:02 31487 FHEM/98_Verkehrsinfo.pm
 UPD 2021-03-28_07:45:04 28050 FHEM/98_WOL.pm
+UPD 2026-06-15_07:45:03 21657 FHEM/98_WebAuth.pm
 UPD 2025-01-21_07:45:03 72186 FHEM/98_WeekdayTimer.pm
 UPD 2020-08-03_07:45:02 3963 FHEM/98_XmlList.pm
 UPD 2018-07-15_07:45:03 56393 FHEM/98_alarmclock.pm
@@ -767,12 +768,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2026-05-30_07:45:12 5558044 docs/commandref.html
-UPD 2026-05-28_07:45:15 3539249 docs/commandref_DE.html
+UPD 2026-06-15_07:45:10 5562139 docs/commandref.html
+UPD 2026-06-15_07:45:14 3539482 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-06-14_07:45:17 330289 docs/commandref_modular.html
-UPD 2026-06-14_07:45:19 342101 docs/commandref_modular_DE.html
+UPD 2026-06-15_07:45:16 330630 docs/commandref_modular.html
+UPD 2026-06-15_07:45:17 342444 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -780,6 +781,9 @@ UPD 2015-07-28_14:05:35 178876 docs/forum_22336.jpg
 UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
 UPD 2025-10-15_07:45:04 33600 lib/FHEM/APIs/Weather/OpenWeatherMapAPI.pm
 UPD 2025-10-15_07:45:04 38777 lib/FHEM/APIs/Weather/wundergroundAPI.pm
+UPD 2026-06-15_07:45:03 2462 lib/FHEM/AlexaCookieService/Client.pm
+UPD 2026-06-15_07:45:03 1315 lib/FHEM/AlexaCookieService/EchodeviceImport.pm
+UPD 2026-06-15_07:45:03 1887 lib/FHEM/AlexaCookieService/State.pm
 UPD 2026-02-16_07:45:03 76647 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2026-02-16_07:45:03 2735 lib/FHEM/Automation/ShuttersControl/Dev.pm
 UPD 2026-02-16_07:45:03 11902 lib/FHEM/Automation/ShuttersControl/Dev/Attr.pm
