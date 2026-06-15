@@ -198,6 +198,8 @@
 # 6.05.16   fix: change code to catch an auth-error
 # 6.05.17   add: ShellyEM Gen4
 # 6.05.18   add: Shelly SPSW-201XE15UL
+# 6.05.19   fix: key of S3SN-0U53X
+#           add: readings 'relay' and 'source' for ShellyPro3EM prooutput addon
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -220,7 +222,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.18 26.05.2026";
+my $version = "6.05.19 15.06.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -368,7 +370,7 @@ my %shelly_vendor_ids = (
     "S3SW-0A2X4EUL"   => [ 3, "shelly2LG3",     "Shelly 2L Gen3",          0x1013],   # added 12/2025
     "S3SN-0024X"      => [ 3, "shellyplusi4",   "Shelly i4 Gen3",          0x1812],   ## (AC), new
     "S3SN-0U12A"      => [ 3, "generic",        "Shelly H&T Gen3",         0x1809],   ## new, not yet implemented
-    "S3SN-0053X"      => [ 3, "shellypill",     "The Pill by Shelly",      0x1829],   # added 01/2026 # (AC), new
+    "S3SN-0U53X"      => [ 3, "shellypill",     "The Pill by Shelly",      0x1829],   # added 01/2026 # (AC), new
     "S3DM-0010WW"     => [ 3, "shellyplus010v", "Shelly Dimmer 0/1-10V PM Gen3",0x1072], ## new
     "S3PL-00112EU"    => [ 3, "shellyplusplug", "Shelly Plug S MTR Gen3",  0x1805,   "PLUGS_UI"],   # added 10/2024
     "S3DM-0A101WWL"   => [ 3, "shellyprodm1pm", "Shelly Dimmer Gen3",      0x1073],   # added 01/2025
@@ -4723,7 +4725,7 @@ sub Shelly_status2G {
      Shelly_getProperties($hash);
   }
 
-  # mofify number of channels for multi-mode devices
+  # modify number of channels for multi-mode devices
   if( $chnls[8] > 0 ){
      if( $mode eq "relay" ){
          $chnls[1]=0;
@@ -4920,6 +4922,14 @@ sub Shelly_status2G {
     }
     #set state for multichannel relay-devices to "OK"
     readingsBulkUpdateMonitored($hash,"state",($channels == 1)?$ison:"OK");
+  }
+  if( ReadingsVal($name,'addon','none') eq "prooutput" ){
+        $ison = $jhash->{"switch:100"}{output};
+        $ison =~ s/0|(false)/off/;
+        $ison =~ s/1|(true)/on/;
+        Log3 $name,4,"[Shelly_status2G:switch] Setting state of relay for device $name to \'$ison\'";
+        readingsBulkUpdateMonitored($hash,"relay",$ison);
+        readingsBulkUpdateMonitored($hash,"source",$jhash->{"switch:100"}{source});
   }
   ############ processing roller states and position ###############################
   $channels = $chnls[1]; # number of rollers
@@ -5550,20 +5560,25 @@ sub Shelly_settings2G {
         }
 
         ### look if an addon is present:
-        if( $jhash->{sys}{device}{addon_type} ){
-            readingsBulkUpdateMonitored($hash,"addon",$jhash->{sys}{device}{addon_type} );
+        my $addon_type=$jhash->{sys}{device}{addon_type};
+        if( defined $addon_type ){
+            readingsBulkUpdateMonitored($hash,"addon",$addon_type);
+            ### temperature sensors 
+            if( $addon_type eq 'sensor' ){
+              Log3 $name,5,"[Shelly_settings2G:config] $name: processing add-on sensors";  #5
+              for( my $sid=100; $sid<=105; $sid++ ){
+                next if( !defined($jhash->{"temperature:$sid"}{name} ));
+                my $jvalue= $jhash->{"temperature:$sid"}{name};
+                my $fid=$sid-100;
+                readingsBulkUpdateMonitored($hash,"temperature_$fid\_name",$jvalue);
+              }
+            # Shelly Pro 3 EM Switch-Addon:
+            }elsif( $addon_type eq 'prooutput' ){
+              # set properties
+              $hash->{props}{relay} = 1; # may be overwritten somewhere
+            }
         }elsif(ReadingsVal($name,"addon",undef)){
             fhem("deletereading $name addon");
-        }
-        ### temperature sensors   # 2G:addon
-        if( $jhash->{sys}{device}{addon_type} ){
-        Log3 $name,5,"[Shelly_settings2G:config] $name: processing add-on sensors";  #5
-          for( my $sid=100; $sid<=105; $sid++ ){
-            next if( !defined($jhash->{"temperature:$sid"}{name} ));
-            my $jvalue= $jhash->{"temperature:$sid"}{name};
-            my $fid=$sid-100;
-            readingsBulkUpdateMonitored($hash,"temperature_$fid\_name",$jvalue);
-          }
         }
 
         ### look if device is walldisplay with thermostat
