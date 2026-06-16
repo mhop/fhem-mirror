@@ -84,6 +84,10 @@ sub make_nonce {
   my $raw    = md5_hex(time() . $secret . rand());
   my $nonce  = encode_base64($raw, '');
   $data{nonce}{$nonce} = time();
+  my $n = $data{nonce};
+  foreach my $key (keys %{$n}) {
+    delete $data{nonce}{$key} if ( time() - $data{nonce}{$key} > $NONCE_TTL );
+  }
   return $nonce;
 }
 
