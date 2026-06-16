@@ -83,10 +83,10 @@ sub make_nonce {
   my $secret = rand() . $$ . time();
   my $raw    = md5_hex(time() . $secret . rand());
   my $nonce  = encode_base64($raw, '');
-  $data{nonce}{$nonce} = time();
-  my $n = $data{nonce};
+  $data{minisip}{nonce}{$nonce} = time();
+  my $n = $data{minisip}{nonce};
   foreach my $key (keys %{$n}) {
-    delete $data{nonce}{$key} if ( time() - $data{nonce}{$key} > $NONCE_TTL );
+    delete $data{minisip}{nonce}{$key} if ( time() - $data{minisip}{nonce}{$key} > $NONCE_TTL );
   }
   return $nonce;
 }
@@ -105,8 +105,8 @@ sub send_401_nonce {
 sub valid_nonce {
   my ($nonce) = @_;
   return 0 unless defined $nonce;
-  return 0 unless exists($data{nonce}{$nonce});
-  my $created = $data{nonce}{$nonce};
+  return 0 unless exists($data{minisip}{nonce}{$nonce});
+  my $created = $data{minisip}{nonce}{$nonce};
   return 0 if time() - $created > $NONCE_TTL;
   return 1;
 }
