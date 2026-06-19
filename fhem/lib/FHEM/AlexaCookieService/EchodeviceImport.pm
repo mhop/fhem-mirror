@@ -18,6 +18,15 @@ sub export_name_for_hash {
   return $hash->{NR} . 'result.json';
 }
 
+sub export_name_for_device {
+  my ($name) = @_;
+
+  return if !$name;
+
+  no warnings 'once';
+  return export_name_for_hash($main::defs{$name});
+}
+
 sub validate_target {
   my ($hash) = @_;
 
@@ -48,6 +57,15 @@ sub trigger_import {
   }
 
   return;
+}
+
+sub trigger_import_for_device {
+  my ($name, %args) = @_;
+
+  return q[missing echodevice name] if !$name;
+
+  no warnings 'once';
+  return trigger_import($main::defs{$name}, %args);
 }
 
 1;
