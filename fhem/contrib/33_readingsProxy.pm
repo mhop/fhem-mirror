@@ -135,6 +135,8 @@ readingsProxy_update($$$$)
   if( $devname eq $primaryDevname && $reading eq $primaryReading) {
     my $value_fn = AttrVal( $name, "valueFn", "" );
     if( $value_fn =~ m/^{.*}$/s ) {
+      my $DEVICE = $devname;
+      my $READING = $reading;
       my $VALUE = $value;
       my $LASTCMD = ReadingsVal($name,"lastCmd",undef);
 
