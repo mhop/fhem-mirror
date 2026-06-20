@@ -163,9 +163,15 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.7.0"  => "06.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
+  "2.7.0"  => "20.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
                            "verbesserter Snap-Guard und Retrainidicator, Hint-Korrektur, Div0-Fix ".
-                           "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ",                           
+                           "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ".
+                           "Reading Tomorrow_ConsumptionForecast entfernt, neuer _aiFannFeatureBuilder ersetzt FEATURE-REGISTRY ".
+                           "Umstellung aiControl->aiConProfile auf Flags (bisherige Profile behalten Gültigkeit) ".
+                           "neue lag2_spike Features aus sandbox in BLOCKS->lags aktiviert, _aiFannEpochDiagnostic: Hints erweitert ".
+                           "delConsumerFromMem: Aufnahme neuer Schlüssel, _attrconsumer: Integration des Fingerprint-Guard ".
+                           "neue WP-Werte csmXX_(off|heating|defrost|hotwater|cooling|pool|poolheating)_minutes ".
+                           "neuer Schlüssel aiControl->opmode für Consumer 'heatpump', Definition mehrere WP-Consumer nun möglich ",                           
   "2.6.11" => "26.05.2026  _saveEnergyConsumption: nutze Logsequenzmanagement für Verbrauchslimitüberschreitung ".
                            "_aiFannApplyBiasCorrection: Anpassung OSL-Gewicht ",
   "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
@@ -281,19 +287,6 @@ my %vNotesIntern = (
   "1.59.0" => "06.10.2025  new sub __normIconInnerScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
   "1.58.8" => "06.10.2025  __batChargeOptTargetPower: minor Code change ",
   "1.58.7" => "05.10.2025  fix negative SoC forecast when using optPower Forum: https://forum.fhem.de/index.php?msg=1348954 ",
-  "1.58.6" => "03.10.2025  __batChargeMgmt code changed, new sub ___batChargeSaveResults, remove reading Battery_ChargeRecommended_XX ".
-                           "_calcReadingsTomorrowPVFc: bugfix generating readings of tomorrow ".
-                           "__batChargeOptTargetPower: complete rework, Attr ctrlBatSocManagementXX new keys 'loadStrategy', 'weightOwnUse' ".
-                           "new battery key setupBatteryDevXX->efficiency ",
-  "1.58.5" => "24.09.2025  __batChargeOptTargetPower: fix if battery load control is deactivated ",
-  "1.58.4" => "23.09.2025  __batChargeOptTargetPower: user a better surplus value, excess based on average removed & some other code optimization ",
-  "1.58.3" => "17.09.2025  __batChargeOptTargetPower: minor code change, consider bpinmax & lcintime ",
-  "1.58.2" => "11.09.2025  __batChargeOptTargetPower: a lot of Code improvements, Attr flowGraphicControl->shiftx: unrestrict possible values ",
-  "1.58.1" => "08.09.2025  edit comref, ctrlBatSocManagementXX->safetyMargin: Separate specification of surcharges for calculation of load ".
-                           "clearance and performance optimization ",
-  "1.58.0" => "06.09.2025  _batChargeMgmt: Code change and new loading feature with Reading Battery_ChargeOptTargetPower_XX ".
-                           "ctrlBatSocManagementXX: new parameter safetyMargin ".
-                           "edit Comref, delete obsolete Attr graphicBeamHeightLevelX, new parameter setupBatteryDevXX->pinreduced ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -315,7 +308,7 @@ use constant {
   ACTCOLINVBAT    => '#00e000',                                                     # default Färbung aktiver Batterie-Wechselrichter ohne Solarzellen
   AINUMTREES      => 10,                                                            # Anzahl der Entscheidungsbäume im Ensemble
   AITRBLTO        => 7200,                                                          # KI DecTree Training BlockingCall Timeout
-  AIASPEAKSFAC    => 1.1,                                                           # Sicherheitsaufschlag auf installiertes PV Peak
+  AIASPEAKSFAC    => 1.05,                                                          # Sicherheitsaufschlag auf installiertes PV Peak
   AINUMEPOCHS     => 15000,                                                         # AI::FANN max. Anzahl Trainigs-Epochen
   AIIMPPATIENCE   => 300,                                                           # AI::FANN Training - Schwelle Anzahl Epochen ohne Verbesserung für Early Stopping                                                                           
   AINNTRBLTO      => 86400,                                                         # Training neuronales Netz BlockingCall Timeout
@@ -397,6 +390,8 @@ use constant {
   HISTHOURDEF     => 2,                                                             # default Anzeige vorangegangene Stunden
   HOURCOUNT       => 24,                                                            # default Stundenbalken in Grafik
   HOMEICONDEF     => 'control_building_control@grey',                               # default Home-Icon
+  HPOPMODEDEF     => 'off',                                                         # WP default Operation Mode
+  HPOPMODES       => 'off|heating|defrost|hotwater|cooling|pool|poolheating',       # WP mögliche Operating Modes
   
   INFINITE        => ~0 >> 1,                                                       # "Unendlich"
   INPUTSIZE       => 10,                                                            # default Breite eines Textfeldes in graphicHeaderOwnspec
@@ -648,6 +643,9 @@ my %intrptcatic = (                                                           # 
   '3' => 'Code return false',
 );
 
+my %fann_valid_versions = map { $_ => 1 } qw(v1 v2);                          # valide CON-Trainingsversionen
+my %fann_valid_flags    = map { $_ => 1 } qw(active pv heatpump bev);         # valide Flags für Profil-Synthese CON-Training
+
 my %profileweights = (                                                        # Gewichte für FANN Training und Inferenz profilabhängig     
   v1_sandbox            => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
   v1_common             => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
@@ -894,6 +892,12 @@ my %epoche_translations = (
                DE => "knapp am Epochen-Limit"            },
   dead    => { EN => "Network produces constant output and has not learned anything (Model Slope≈0, Validation error lower than Training error): Switch training algorithm to RPROP (aiControl->aiConTrainAlgo=RPROP) - RPROP is immune to this initialization problem. Alternatively increase the learning rate by factor 5-10 or restart training at a different time",
                DE => "Netz gibt konstanten Ausgabewert aus und hat nichts gelernt (Slope≈0, Validierungsfehler kleiner als Trainingsfehler): Trainingsalgorithmus auf RPROP wechseln (aiControl->aiConTrainAlgo=RPROP) - RPROP ist gegen dieses Initialisierungsproblem immun. Alternativ Lernrate um Faktor 5-10 erhöhen oder Training zu anderem Zeitpunkt neu starten" },  
+  deadlow => { EN => "Network is not learning (Slope≈0) and learning rate is already very low (%.5f): increase learning rate by factor 10-50 (e.g. to 0.001-0.01), or switch training algorithm to RPROP (aiControl->aiConTrainAlgo=RPROP) - RPROP is more robust against initialization issues and does not require manual learning rate tuning.",
+               DE => "Netz lernt nichts (Slope≈0) und Lernrate ist bereits sehr niedrig (%.5f): Lernrate um Faktor 10-50 erhöhen (z.B. auf 0.001-0.01), alternativ Trainingsalgorithmus auf RPROP wechseln (aiControl->aiConTrainAlgo=RPROP) - RPROP ist gegen Initialisierungsprobleme robuster und benötigt keine manuelle Lernraten-Anpassung." },  
+  afsym   => { EN => "SIGMOID maps all inputs to 0..1 only. A slope below 0.75 or weak R² despite healthy training may indicate insufficient gradient dynamics, especially with delta-features or high load dynamics (heat pump/EV). Try: aiConActFunc SIGMOID_SYMMETRIC. ",
+               DE => "Die Aktivierungsfunktion SIGMOID bildet alle Inputs auf 0..1 ab. Slope < 0.75 oder schwaches R² bei gesundem Training kann auf unzureichende Gradientendynamik hinweisen, besonders wenn Delta-Features oder hohe Lastdynamik (WP/EV) vorliegen. Versuch: aiConActFunc SIGMOID_SYMMETRIC." },
+  afasym  => { EN => "SIGMOID_SYMMETRIC is active but the network shows dead learning behavior (Slope≈0). For predominantly non-negative features without EV/heat pump, SIGMOID may converge more reliably. Try: aiConActFunc SIGMOID. ",
+               DE => "SIGMOID_SYMMETRIC ist aktiv, aber das Netz zeigt totes Lernverhalten (Slope≈0). Bei überwiegend nicht-negativen Features ohne EV/WP kann SIGMOID stabiler konvergieren. Versuch: aiConActFunc SIGMOID. " },
   hint1   => { EN => "Learning rate too high: Reduce the learning rate (aiControl->aiConLearnRate) by a factor of 5–10 (e.g., from 0.01 to 0.001–0.002)",
                DE => "Lernrate zu hoch: Lernrate (aiControl->aiConLearnRate) um Faktor 5-10 reduzieren (z.B. von 0.01 auf 0.001-0.002)" },                           
   hint2   => { EN => "Check architecture: Network may be too small for the amount of data; increase the number of neurons (aiControl->aiConHiddenLayers) in the hidden layers (e.g., 50-25 → 64-32)",
@@ -938,6 +942,8 @@ my %epoche_translations = (
                DE => "Datenmenge zu gering (%d Trainingsdatensätze): für ein zuverlässiges Training werden mindestens %d Datensätze benötigt - zunächst mehr Daten sammeln bevor die Architektur angepasst wird" },  
   hint22  => { EN => "With %d inputs and only %d training records the data-to-parameter ratio cannot reach the target range (8–20) with any reasonable architecture - increase aiConTrainLimit or collect more data before tuning the architecture further",
                DE => "Mit %d Inputs und nur %d Trainingsdaten lässt sich das Daten-zu-Parameter-Verhältnis (Zielwert 8–20) mit keiner sinnvollen Architektur erreichen - aiConTrainLimit erhöhen oder mehr Daten sammeln bevor die Architektur weiter angepasst wird" },
+  hint23  => { EN => "Convergence is happening early with already conservative momentum/learning rate: to allow more useful epochs before early-stopping kicks in, try reducing aiConSteepness slightly (e.g. by 0.1) for slower, finer convergence - going too low can cause the network to stop learning entirely (Slope≈0); alternatively, slightly increasing hidden layer size/depth (aiConHiddenLayers) adds learning capacity but may require more training data",
+               DE => "Konvergenz erfolgt früh, Momentum/Lernrate sind bereits konservativ: um mehr nützliche Epochen vor dem Early-Stopping zu ermöglichen, aiConSteepness leicht reduzieren (z.B. um 0.1) für langsamere, feinere Konvergenz - bei zu niedrigen aiConSteepness-Wert kann das Netz komplett aufhören zu lernen (Slope≈0); alternativ Hidden-Layer-Größe/Tiefe (aiConHiddenLayers) leicht erhöhen für mehr Lernkapazität, was aber ggf. mehr Trainingsdaten erfordert" }
 ); 
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -952,7 +958,19 @@ my %hqtxt = (                                                                   
                        Sind alle Eingaben vorgenommen, pr&uuml;fen sie bitte die Konfiguration abschlie&szlig;end mit
                        "set LINK plantConfiguration check" oder mit Druck auf das angebotene Icon.<br>
                        Korrigieren sie bitte eventuelle Fehler und beachten sie m&ouml;gliche Hinweise.<br>
-                       (Die Anzeigesprache kann mit dem Attribut "ctrlLanguage" umgestellt werden.)<hr><br>}                },
+                       (Die Anzeigesprache kann mit dem Attribut "ctrlLanguage" umgestellt werden.)<hr><br>}                               },
+  acsmfp => { EN => "Changing the device or one of the identity-defining keys (type, switchdev, ".
+                    "opmode, evid) of an existing consumer is not permitted. \nThis would silently corrupt ".
+                    "historical data (pvHistory) and AI training data already recorded for '<ANAME>', since that ".
+                    "data is keyed only by consumer number, not by device identity.\n\n".
+                    "Please delete attribute '<ANAME>' first (this safely removes its history) and define it ".
+                    "again with the new device/keys. The consumer number may be reused immediately afterwards.",
+              DE => "Das Ändern des Geräts oder eines der identitätsbestimmenden Schlüssel (type, switchdev, ".
+                    "opmode, evid) eines bestehenden Verbrauchers ist nicht zulässig. \nDies würde stillschweigend ".
+                    "historische Daten (pvHistory) und bereits für '<ANAME>' aufgezeichnete KI-Trainingsdaten beschädigen, da diese ".
+                    "Daten nur anhand der Verbrauchernummer und nicht anhand der Geräteidentität indiziert sind.\n\n".
+                    "Bitte zunächst das Attribut '<ANAME>' löschen (dadurch wird dessen Verlauf sicher entfernt) und erneut mit dem neuen Gerät ".
+                    "bzw. den neuen Schlüsseln definieren. Die Verbrauchernummer kann unmittelbar danach wiederverwendet werden." },
   cfd    => { EN => qq{Please enter at least one weather forecast device with "attr LINK setupWeatherDev1"},
               DE => qq{Bitte geben sie mindestens ein Wettervorhersage Device mit "attr LINK setupWeatherDev1" an}          },
   crd    => { EN => qq{Please select the radiation forecast service with "attr LINK setupRadiationAPI"},
@@ -1743,8 +1761,20 @@ my %hfspvh = (
       $hfspvh{'etotali'.$in}{fpar}     = undef;
   }
   
+  my @hpopm = split /\|/, HPOPMODES;
+  
   for my $cn (1..MAXCONSUMER) {
       $cn = sprintf "%02d", $cn;
+      
+      # --- heatpump OpMode-Keys
+      for my $s (@hpopm) {
+          $hfspvh{"csm${cn}_${s}_minutes"}{fn}       = \&_saveHistP2;                       
+          $hfspvh{"csm${cn}_${s}_minutes"}{storname} = "csm${cn}_${s}_minutes";
+          $hfspvh{"csm${cn}_${s}_minutes"}{validkey} = undef;
+          $hfspvh{"csm${cn}_${s}_minutes"}{fpar}     = undef;
+      }                                                                                         
+
+      # --- BEV Consumer-Keys      
       $hfspvh{'bevcsmSoC'.$cn}{fn}       = \&_saveHistP2;                       # BEV aktueller SoC
       $hfspvh{'bevcsmSoC'.$cn}{storname} = 'bevcsmSoC'.$cn;
       $hfspvh{'bevcsmSoC'.$cn}{validkey} = undef;
@@ -1889,8 +1919,8 @@ lags => sub {
         # --- Spike-Erkennung (Abweichung vom lokalen Mittelwert) ---
         $f->{lag1_spike_pos_norm},                                          # y_t übertrifft 3h-Mittelwert (laufender Spike)
         $f->{lag1_spike_neg_norm},                                          # y_t unterschreitet 3h-Mittelwert (laufender Einbruch)
-        #$f->{lag2_spike_pos_norm},                                          # y_t_1 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
-        #$f->{lag2_spike_neg_norm},                                          # y_t_1 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
+        $f->{lag2_spike_pos_norm},                                          # y_t_1 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
+        $f->{lag2_spike_neg_norm},                                          # y_t_1 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
 
         # --- Kurzfristige Dynamik ---
         $f->{delta1_norm_pos},                                              # Verbrauchsanstieg zur Vorstunde
@@ -1898,12 +1928,12 @@ lags => sub {
         $f->{delta24_norm_pos},                                             # Verbrauchsanstieg zum Vortag (gleiche Stunde)
         $f->{delta24_norm_neg},                                             # Verbrauchsabsenkung zum Vortag
 
-        # --- Rolling-Fenster (Volatilität, Peak-Niveau) ---
+        # --- Rolling-Fenster (Volatilität, Peak-Niveau) Block im nächsten Schritt aktivieren ---
         #$f->{roll_min_6_norm},                                              # Tiefstwert der letzten 6h (Grundlastniveau)
         #$f->{roll_max_6_norm},                                              # Höchstwert der letzten 6h (Peak-Niveau)
         #$f->{roll_range_6_norm},                                            # Spannweite der letzten 6h (Volatilität ohne Glättung)
 
-        # --- Verbrauchsregime ---
+        # --- Verbrauchsregime Block im nächsten Schritt aktivieren ---
         #$f->{is_low_cons_regime},                                           # y_t <= P25: Grundlast / Nacht / abwesend
         #$f->{is_high_cons_regime},                                          # y_t >= P75: Peak / Kochen / Geräte an
         #$f->{is_transition_regime},                                         # P25 < y_t < P75: normaler Betrieb
@@ -2292,149 +2322,16 @@ semantics_heatpump_boost_special => sub {                                       
 sandbox => sub {
     my ($f) = @_;
     return [
-        $f->{lag2_spike_pos_norm},                                          # y_t_1 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
-        $f->{lag2_spike_neg_norm},                                          # y_t_1 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
+        #$f->{lag2_spike_pos_norm},                                          # y_t_1 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
+        #$f->{lag2_spike_neg_norm},                                          # y_t_1 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
 
-        $f->{roll_min_6_norm},                                              # Tiefstwert der letzten 6h (Grundlastniveau)
-        $f->{roll_max_6_norm},                                              # Höchstwert der letzten 6h (Peak-Niveau)
-        $f->{roll_range_6_norm},                                            # Spannweite der letzten 6h (Volatilität ohne Glättung)
+        #$f->{roll_min_6_norm},                                              # Tiefstwert der letzten 6h (Grundlastniveau)
+        #$f->{roll_max_6_norm},                                              # Höchstwert der letzten 6h (Peak-Niveau)
+        #$f->{roll_range_6_norm},                                            # Spannweite der letzten 6h (Volatilität ohne Glättung)
 
-        $f->{is_low_cons_regime},                                           # y_t <= P25: Grundlast / Nacht / abwesend
-        $f->{is_high_cons_regime},                                          # y_t >= P75: Peak / Kochen / Geräte an
-        $f->{is_transition_regime},                                         # P25 < y_t < P75: normaler Betrieb
-    ];
-},
-
-);
-
-###################################################################################
-#                                 AI FEATURE_REGISTRY
-# Semantische Features sind Feature-Kombinationen, die 
-# explizite Bedeutung tragen, indem sie physikalische, 
-# zeitliche oder verhaltensbezogene Zusammenhänge kodieren.
-###################################################################################
-my %FEATURE_REGISTRY;
-
-%FEATURE_REGISTRY = (
-
-# --------------------------------------------------------
-# v0: Basis-Features
-# --------------------------------------------------------
-v0_base => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_BLOCKS{time_base}->($f) },
-        @{ $FEATURE_BLOCKS{seasonality}->($f) },
-        @{ $FEATURE_BLOCKS{weather_pv}->($f) },
-        @{ $FEATURE_BLOCKS{lags}->($f) },
-        @{ $FEATURE_BLOCKS{daily_energy_context}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_human_rhythm}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_presence}->($f) },
-    ];
-},
-
-# --------------------------------------------------------
-# v1_common – Standardhaushalt (ohne PV Semantik)
-# --------------------------------------------------------
-v1_common => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v0_base}->($f) },
-        @{ $FEATURE_BLOCKS{trends}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_rueckfall}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_cold}->($f) },
-    ];
-},
-
-# --------------------------------------------------------
-# v1_common_active – Standardhaushalt (ohne PV) +
-#                    erweiterter Tagestythmus
-# --------------------------------------------------------
-v1_common_active => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
-    ];
-},
-
-# --------------------------------------------------------
-# v1_common_pv – Standardhaushalt (inkl. PV-Semantik)
-# --------------------------------------------------------
-v1_common_pv => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },
-        @{ $FEATURE_BLOCKS{pv}->($f) },
-        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost}->($f) },
-    ];
-},
-  
-# --------------------------------------------------------
-# v1_common_pv_active – Standardhaushalt (inkl. PV) +
-#                       erweiterter Tagestythmus
-# --------------------------------------------------------
-v1_common_active_pv => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) }, 
-        @{ $FEATURE_BLOCKS{pv}->($f) },        
-        @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
-        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
-        @{ $FEATURE_BLOCKS{sandbox}->($f) },
-    ];
-},
-  
-# --------------------------------------------------------
-# v1_heatpump – WP
-# --------------------------------------------------------  
-v1_heatpump => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },
-        @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
-    ];
-},
-
-# --------------------------------------------------------
-# v1_heatpump_pv – WP + PV
-# --------------------------------------------------------  
-v1_heatpump_pv => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },
-        @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) },
-        @{ $FEATURE_BLOCKS{pv}->($f) },
-        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost}->($f) },
-    ];
-},
-
-# --------------------------------------------------------
-# v1_heatpump_active_pv – WP + PV Semantik
-# --------------------------------------------------------  
-v1_heatpump_active_pv => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v1_common}->($f) },
-        @{ $FEATURE_BLOCKS{heatpump_base}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_heatpump_boost_special}->($f) },
-        @{ $FEATURE_BLOCKS{pv}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_pv}->($f) },
-        @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) },
-        @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) },
-    ];
-},
-
-# --------------------------------------------------------
-# v1_sandbox – Tests
-# --------------------------------------------------------  
-v1_sandbox => sub {
-    my ($f) = @_;
-    return [
-        @{ $FEATURE_REGISTRY{v1_common_active}->($f) },
-        @{ $FEATURE_BLOCKS{sandbox}->($f) },        
+        #$f->{is_low_cons_regime},                                           # y_t <= P25: Grundlast / Nacht / abwesend
+        #$f->{is_high_cons_regime},                                          # y_t >= P75: Peak / Kochen / Geräte an
+        #$f->{is_transition_regime},                                         # P25 < y_t < P75: normaler Betrieb
     ];
 },
 
@@ -3469,12 +3366,12 @@ sub _setreset {                          ## no critic "not used"
 
       if ($c) {
           $paref->{c} = $c;
-          delConsumerFromMem ($paref);                                               # spezifischen Consumer aus History löschen
+          delConsumerFromMem ($paref);                                               # spezifischen Consumer aus Speichern löschen
       }
       else {
           for my $c (keys %{$data{$name}{consumers}}) {
               $paref->{c} = $c;
-              delConsumerFromMem ($paref);                                           # alle Consumer aus History löschen
+              delConsumerFromMem ($paref);                                           # alle Consumer aus Speichern löschen
           }
       }
 
@@ -7336,8 +7233,10 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', "Zeigt, um wie viel sich das Modellniveau seit der letzten Rekalibrierung verschoben hat."))."\n";
       $note .= "\n";
       
-      $note .= (encode('utf8', "<b>Score</b> → Verhältnis des aktuellen MAE zum Referenz-MAE."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert 1.0 = kein Drift, Wert > 2.0 = stark erhöhter Vorhersagefehler."))."\n";
+      $note .= (encode('utf8', "<b>Score</b> → Verhältnis des aktuellen Vorhersagefehlers (MAE) zum Fehler beim Training."))."\n";
+      $note .= $spc3.(encode('utf8', "Modell arbeitet wie beim Training, Wert > 2.0 = deutlich höherer Fehler als erwartet."))."\n";
+      $note .= $spc3.(encode('utf8', "<b>Wichtig:</b> Ein hoher Score bedeutet nicht zwingend ein schlechtes Modell – er steigt auch bei unvorhersehbaren Verbrauchsspitzen (Waschmaschine, Trockner, Abwesenheit),"))."\n";
+      $note .= $spc3.(encode('utf8', "die im Training nicht oder kaum vertreten waren. Entscheidend für die Modellbewertung ist der DriftIndex, der solche Ausreißer bereits herausrechnet."))."\n";
       $note .= "\n";
       
       $note .= (encode('utf8', "<b>Index</b> → Aggregierter Gesamtindikator aus Score, RMSE Ratio, Slope und Bias."))."\n";
@@ -7471,6 +7370,12 @@ sub ___aiFannExplainKeyFigures {
       
       $note .= (encode('utf8', "<b>Score</b> → Ratio of the current MAE to the reference MAE."))."\n";
       $note .= $spc3.(encode('utf8', "Value 1.0 = no drift, value > 2.0 = significantly increased prediction error."))."\n";
+      $note .= "\n";
+      
+      $note .= (encode('utf8', "<b>Score</b> → Ratio of the current prediction error (MAE) to the error during training."))."\n";
+      $note .= $spc3.(encode('utf8', "Model performs as it did during training; a value > 2.0 indicates a significantly higher error than expected.")). "\n";
+      $note .= $spc3.(encode('utf8', "<b>Important:</b> A high score does not necessarily mean a bad model – it also increases during unpredictable consumption spikes (washing machine, dryer, absence),"))."\n";
+      $note .= $spc3.(encode('utf8', "which were not or hardly represented in training. The DriftIndex, which already accounts for such outliers, is decisive for the model evaluation."))."\n";
       $note .= "\n";
       
       $note .= (encode('utf8', "<b>Index</b> → Aggregate composite indicator based on score, RMSE ratio, slope, and bias."))."\n";
@@ -7845,7 +7750,8 @@ sub Attr {
       name  => $name,
       cmd   => $cmd,
       aName => $aName,
-      aVal  => $aVal
+      aVal  => $aVal,
+      lang  => getLang ($hash),
   };
 
   $aName = 'consumer' if($aName =~ /consumer?(\d+)$/xs);
@@ -7868,6 +7774,7 @@ sub _attrconsumer {                      ## no critic "not used"
   my $aName = $paref->{aName};
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
+  my $lang  = $paref->{lang};
 
   return if(!$init_done);                                                                  # Forum: https://forum.fhem.de/index.php/topic,117864.msg1159959.html#msg1159959
 
@@ -7901,6 +7808,9 @@ sub _attrconsumer {                      ## no critic "not used"
       pvshare         => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
       swprio          => { comp => '(100|[1-9]?[0-9])',               must => 0, act => 0 },
       exclgroup       => { comp => '[1-9]\d*',                        must => 0, act => 0 },
+      
+      # --- nur für heatpump (musts in __attrKeyAction checken)
+      opmode          => { comp => '.*',                              must => 0, act => 1 },
       
       # --- nur für bev (musts in __attrKeyAction checken)
       batCap          => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh))',  must => 0, act => 1 },
@@ -7948,6 +7858,19 @@ sub _attrconsumer {                      ## no critic "not used"
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
       }
+      
+      # --- Identitätsschutz: sinnstiftende Änderung an bestehendem Consumer verhindern
+      my $oldval = AttrVal ($name, $aName, undef);                                                              # Attributstand VOR dieser Änderung
+
+      if (defined $oldval && $oldval ne $aVal) {
+          my (undef, $oldcodev, $oldh) = isDeviceValid ( { name => $name, obj => $oldval, method => 'string' } );
+
+          if (__consumerIdentityFp ($codev, $h) ne __consumerIdentityFp ($oldcodev, $oldh)) {
+              my $out = encode ("utf8", $hqtxt{acsmfp}{$lang});
+              $out =~ s/<ANAME>/$aName/g;
+              return $out;
+          }
+      }
   }
   else {
       my $day = strftime "%d", localtime(time);                                                    # aktueller Tag  (range 01 to 31)
@@ -7968,6 +7891,22 @@ sub _attrconsumer {                      ## no critic "not used"
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
 
 return;
+}
+
+################################################################
+#  Fingerprint der identitätsstiftenden Consumer-Schlüssel
+#  (nur Schlüssel, die festlegen WELCHES physische Gerät bzw.
+#  WELCHE Datenquelle hinter dem Consumer steht)
+################################################################
+sub __consumerIdentityFp {
+  my ($codev, $h) = @_;
+  $h //= {};
+
+  return join '|', ($codev          // ''),
+                   ($h->{type}      // ''),
+                   ($h->{switchdev} // ''),
+                   ($h->{opmode}    // ''),                                 # eigenständiges Device:Reading möglich
+                   ($h->{evid}      // '');                                 # eigenständiges Device:Reading möglich
 }
 
 ################################################################
@@ -8310,11 +8249,8 @@ sub _attraiControl {                     ## no critic "not used"
                 THRESHOLD
                 THRESHOLD_SYMMETRIC
               );
-              
-  my @rv = sort keys %profileweights;
-              
+                         
   my $afreg = join ('|', @af); 
-  my $rvreg = join ('|', @rv); 
 
   my $valid = {
       aiStorageDuration  => { comp => '\d+',                                                       act => 0 },
@@ -8332,7 +8268,7 @@ sub _attraiControl {                     ## no critic "not used"
       aiConActFunc       => { comp => "($afreg)",                                                  act => 0 },
       aiConSteepness     => { comp => '(0\.[1-9]|1\.[0-5])',                                       act => 0 },
       aiConAlpha         => { comp => '(0(?:\.\d+)?|1)',                                           act => 0 },
-      aiConProfile       => { comp => "($rvreg)",                                                  act => 1 },
+      aiConProfile       => { comp => '[a-z0-9,]+',                                                act => 1 },
       aiConAbsOversample => { comp => '0\.(?:[0-4]\d|50?)',                                        act => 0 },
       aiConTrainLimit    => { comp => '\d+',                                                       act => 1 },  
   };
@@ -8343,10 +8279,25 @@ sub _attraiControl {                     ## no critic "not used"
       ## 1. Durchlauf - Prüfungen
       #############################
       for my $key (keys %{$h}) {
-          return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);                      # Absturzschutz!
+          return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);         # Absturzschutz!
 
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
+          }
+          
+          # aiConProfile: Sonderbehandlung – Profilname ODER Flag-Liste
+          if ($key eq 'aiConProfile') {
+              my $val           = $h->{$key};
+              my $is_profile    = grep /^$val$/, keys %profileweights;                                      # bekannter Profilname
+              next if $is_profile;
+              
+              my ($synth, $err) = __aiFannSynthesizeProfile ($name, $val);                                  # Flag-Liste synthetisieren
+            
+              if ($err) {
+                  return "The key 'aiConProfile=$val' is not valid: $err";
+              }
+              
+              next;
           }
 
           my $comp = $valid->{$key}{comp};
@@ -8362,12 +8313,26 @@ sub _attraiControl {                     ## no critic "not used"
       for my $av (keys %{$valid}) {
           delete $data{$name}{current}{$av};
       }
-
+      
       for my $key (keys %{$h}) {
+          if ($key eq 'aiConProfile') {
+              my $val = $h->{$key};
+            
+              if (grep /^$val$/, keys %profileweights) {
+                  $data{$name}{current}{aiConProfile} = $val;                                   # direkt übernehmen
+              }
+              else {
+                  my ($synth, undef) = __aiFannSynthesizeProfile ($name, $val);
+                  $data{$name}{current}{aiConProfile} = $synth;                                 # Synthese speichern
+              }
+          
+              next;
+          }
+          
           $data{$name}{current}{$key} = $h->{$key};
       }
   }
-  else {                                                                  # Current Keys mit Attribut löschen
+  else {                                                                                    # Current Keys mit Attribut löschen
       for my $av (keys %{$valid}) {
           delete $data{$name}{current}{$av};
       }
@@ -9492,7 +9457,7 @@ sub __attrKeyAction {
       
       if ($init_done && $akey eq 'aiConProfile') {
           if ($akeyval =~ /heatpump/xs) {
-              my $hp = isHeatPumpUsed ($name);                                                          # Consumer Nummer , Solltemp falls WP verwendet
+              my $hp = isHeatPumpUsed ($name);                                                          # Consumer Nummer, Solltemp falls WP verwendet
               if (!defined $hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
           }
       }
@@ -9595,8 +9560,8 @@ sub __attrKeyAction {
               return "The consumer type '$akeyval' isn't allowed!";
           }
           
-          # --- Negativtest: diese Schlüssel dürfen nur bei type=bev vorkommen
-          if ($akeyval ne 'bev') {
+          # --- Negativtest: diese Schlüssel dürfen nur bei bestimmten type vorkommen
+          if ($akeyval ne 'bev') {                                                                      # Exklusivschlüssel bev
               my @dont = qw(batCap currSoC targetSoC evid timeOfDeparture);
               my $chk  = 0;
               
@@ -9604,6 +9569,16 @@ sub __attrKeyAction {
                   $chk = 1 if(exists $pphash->{$k});
                   return qq{The key '$k' isn't allowed for consumer type=$akeyval.} if($chk);
               }
+          }
+          
+          if ($akeyval ne 'heatpump') {                                                                 # Exklusivschlüssel heatpump
+              my @dont = qw(opmode);
+              my $chk  = 0;    
+
+              for my $k (@dont) {
+                  $chk = 1 if(exists $pphash->{$k});
+                  return qq{The key '$k' isn't allowed for consumer type=$akeyval.} if($chk);
+              }              
           }
           
           # --- Checks Consumer E-Auto / Wallbox
@@ -9618,13 +9593,7 @@ sub __attrKeyAction {
           }
                 
           # --- Checks Consumer Wärmepumpe
-          if ($akeyval eq 'heatpump') {
-              my $hp = isHeatPumpUsed ($name);                                                       
-              
-              if (defined $hp && $aName ne 'consumer'.$hp) {                                           # andere heatpump bereits definiert? -> kann nur eine WP geben
-                  return qq{A 'heatpump' type consumer ($hp) has already been defined.};
-              }
-              
+          if ($akeyval eq 'heatpump') {              
               if ($pphash->{power} == 0) {
                   return qq{For the consumer type 'heatpump' the rated power value must be specified as not equal to 0.};
               }
@@ -9654,6 +9623,22 @@ sub __attrKeyAction {
           }
           else {
               return "The mode '$akeyval' is not allowed!";
+          }
+      }
+      elsif ($akey eq 'opmode') {
+          if ($akeyval =~ /.*:.*/xs) {
+              my ($dv, $rd) = split ':', $akeyval;
+              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+              return $err if($err);
+
+              my $opmode = ReadingsVal ($dv, $rd, '');
+              my $poom   = HPOPMODES;
+              if ($opmode !~ /^(?:$poom)$/xs) {
+                  return "The reading '$rd' of device '$dv' is invalid or does not contain a valid opmode";
+              }
+          }
+          else {
+              return "The value '$akey=$akeyval' is not valid. Please consider the commandref.";
           }
       }
       
@@ -9860,6 +9845,47 @@ sub __attrKeyAction {
   }
 
 return $err;
+}
+
+################################################################
+#   Synthetisiert kanonischen Profilnamen aus Flag-String
+#   Input:  "v1,heatpump,active,pv"  (beliebige Reihenfolge)
+#   Return: ("v1_heatpump_active_pv", undef) oder (undef, $err)
+################################################################
+sub __aiFannSynthesizeProfile {
+  my ($name, $flag_str) = @_;
+        
+  my $version = 'v1';                                                       # Default
+  my %seen;
+    
+  for my $token (split /[\s,]+/, lc($flag_str)) {
+      return (undef, "duplicate token '$token'") if $seen{$token};     
+      $seen{$token} = 1;
+      
+      if    ($fann_valid_versions{$token}) { $version = $token }            # nur versions-Tokens setzen $version
+      elsif ($fann_valid_flags{$token})    { }                              # %seen bereits oben gesetzt
+      else  { return (undef, "unknown token '$token'") }
+  }
+    
+  # kanonische Reihenfolge inkl. version
+  my @parts = ($version);                                                   # version ist immer erstes Element
+  
+  if (!$seen{heatpump} &&                                                   # Standardhaushalt ist immer Basis
+      !$seen{bev}) {
+      push @parts, 'common';                                             
+  }
+  
+  push @parts, 'heatpump' if $seen{heatpump};
+  push @parts, 'active'   if $seen{active};
+  push @parts, 'pv'       if $seen{pv};
+  push @parts, 'bev'      if $seen{bev};
+    
+  my $profile = join ('_', @parts);
+    
+  return (undef, "profile '$profile' not defined in profileweights")
+      if !exists $profileweights{$profile};
+    
+return ($profile, undef);
 }
 
 ################################################################
@@ -10312,14 +10338,29 @@ sub delConsumerFromMem {
           delete $data{$name}{pvhist}{$d}{$i}{"csmt${c}"};
           delete $data{$name}{pvhist}{$d}{$i}{"csme${c}"};
           delete $data{$name}{pvhist}{$d}{$i}{"minutescsm${c}"};
+          
+          delete $data{$name}{pvhist}{$d}{$i}{"bevcsmSoC${c}"};
+          delete $data{$name}{pvhist}{$d}{$i}{"bevcsmTargSoC${c}"};
+          delete $data{$name}{pvhist}{$d}{$i}{"bevcsmBatCap${c}"};
+          delete $data{$name}{pvhist}{$d}{$i}{"bevcsmPwr${c}"};
       }
   }
   
-  for my $ridx (sort keys %{ $data{$name}{aidectree}{airaw} // {} }) {          # Consumer aus AI Raw Data löschen 
-      next unless (defined $ridx 
-                   && length $ridx 
-                   && defined $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c});
-      delete $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c};
+  for my $key (keys %{$data{$name}{circular}{99}}) {                            # consumerspezifische Schlüssel aus Circular entfernen
+      next if $key !~ /^accum_csm${c}_\w+_seconds$/xs;
+      delete $data{$name}{circular}{99}{$key};
+  }
+  
+  delete $data{$name}{current}{"csm${c}_active_opmode"};                        # aktiven Opmode entfernen
+  
+  for my $ridx (sort keys %{ $data{$name}{aidectree}{airaw} // {} }) {          # Consumer aus AI Raw Data löschen
+      my $row = $data{$name}{aidectree}{airaw}{$ridx};
+
+      my @ckeys = ("csme${c}", "bevcsmSoC${c}", "bevcsmTargSoC${c}",
+                   "bevcsmBatCap${c}", "bevcsmPwr${c}");
+
+      next if !grep { defined $row->{$_} } @ckeys;                              # keiner der Keys vorhanden -> Zeile betrifft Consumer $c nicht
+      delete @{$row}{@ckeys};                                                   # alle vorhandenen Keys in einem Rutsch entfernen
       $dosave = 1;
   }
   
@@ -11133,6 +11174,9 @@ sub centralTask {
           }
       }
   }
+  
+  readingsDelete ($hash, 'Tomorrow_ConsumptionForecast');               # 07.06.
+  
   ##########################################################################################################################
 
   if (!CurrentVal ($name, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -11209,13 +11253,13 @@ sub centralTask {
   _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
   _transferEnvironmentValues  ($centpars);                                            # Umweltsensorik einsammeln
   _transferHolidayValues      ($centpars);                                            # Wochentage, Feiertage und Urlaubstage einsammeln
-    
-  $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
-  
+      
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
   _batChargeMgmt              ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
 
+  $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
+  
   _calcConsForecast           ($centpars);                                            # Verbrauchsprognose
   
   _evaluateTrigger            ($centpars);                                            # Schwellenwerte der Trigger bewerten und signalisieren
@@ -11522,7 +11566,7 @@ sub _collectAllRegConsumers {
       }
       
       # --- Löschen relevanter Schlüssel
-      my @delkeys = qw (sunriseshift sunsetshift icon batCap currSoC targetSoC evid timeOfDeparture);
+      my @delkeys = qw (sunriseshift sunsetshift icon batCap currSoC targetSoC evid timeOfDeparture opmode);
       delete @{$data{$name}{consumers}{$c}}{@delkeys};
 
       # --- Neuanlage Consumer Hash-Werte
@@ -11577,13 +11621,16 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{batCap}            = $hc->{batCap}       if(defined $hc->{batCap});
       $data{$name}{consumers}{$c}{currSoC}           = $hc->{currSoC}      if(defined $hc->{currSoC});
       $data{$name}{consumers}{$c}{targetSoC}         = $hc->{targetSoC}    if(defined $hc->{targetSoC});    # optionale Angabe             
-      $data{$name}{consumers}{$c}{timeOfDeparture}   = q{}                 if(defined $hc->{bev});          # optionale Angabe     
+      $data{$name}{consumers}{$c}{timeOfDeparture}   = q{}                 if(defined $hc->{bev});          # optionale Angabe 
+
+      # --- nur für heatpump
+      $data{$name}{consumers}{$c}{opmode}            = $hc->{opmode}       if(defined $hc->{opmode});       # optionale Angabe 
   }
   
-  if (@hp) { $data{$name}{current}{heatpumpInstalled} = join ",", @hp; }                                    # mehrere Wärmepumpen möglich
+  if (@hp) { $data{$name}{current}{heatpumpInstalled} = join (",", @hp); }                                  # mehrere Wärmepumpen möglich
   else     { delete $data{$name}{current}{heatpumpInstalled};          }
   
-  if (@ev) { $data{$name}{current}{bevInstalled} = join ",", @ev; }                                         # mehrere BEV möglich
+  if (@ev) { $data{$name}{current}{bevInstalled} = join (",", @ev); }                                       # mehrere BEV möglich
   else     { delete $data{$name}{current}{bevInstalled};          }
   
   $data{$name}{current}{consumerCollected} = 1;
@@ -11649,7 +11696,7 @@ sub _specialActivities {
   ##################################
   $chour    = int $chour;
   $minute   = int $minute;
-  my $aitrh = CurrentVal ($name, 'aiTrainStart', AITRSTARTDEF);                                   # Stunde f. Start AI-Training
+  my $aitrh = CurrentVal ($name, 'aiTrainStart', AITRSTARTDEF);                                 # Stunde f. Start AI-Training
 
   ## Task 1
   ###########
@@ -11659,8 +11706,8 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 started");
 
-          __deleteEveryHourControls ($paref);                                                     # Sperrsignale der Stundenwerte-Steuerung löschen
-
+          __deleteEveryHourControls      ($paref);                                              # Sperrsignale der Stundenwerte-Steuerung löschen
+                 
           Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
       }
   }
@@ -11676,7 +11723,7 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
 
-          $date = timestringsFromOffset ($name, $t, -7200)->{date};                               # Vortag (2 h Differenz reichen aus)
+          $date = timestringsFromOffset ($name, $t, -7200)->{date};                             # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
 
           $pvfc = ReadingsNum ($name, "Today_Hour24_PVforecast", 0);
@@ -13925,6 +13972,9 @@ sub _transferEnvironmentValues {
           $data{$name}{circular}{99}{accum_presence_seconds} = 0;
       }  
   }
+  else {
+      delete $data{$name}{circular}{99}{accum_presence_seconds};                                    # Dauerwert entfernen wenn kein presence
+  }
   
   # --- Komforttemperatur auslesen
   my $cft  = CurrentVal ($name, 'comforttemp', HPCOMFTEMP); 
@@ -15829,10 +15879,6 @@ sub _createSummaries {
   storeReading ('Today_PVreal',                        (round0 ($todaySumRe->{PV})).            ' Wh');
   storeReading ('NextHours_Sum04_ConsumptionForecast', (round0 ($next4HoursSum->{Consumption})).' Wh');
   storeReading ('RestOfDayConsumptionForecast',        (round0 ($restOfDaySum->{Consumption})). ' Wh');
-  
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ######################################################################################################################## 
-  storeReading ('Tomorrow_ConsumptionForecast', (round0 ($tomorrowSum->{Consumption})).  ' Wh');   # <- zu eliminieren   14.04.
 
 return;
 }
@@ -15984,6 +16030,7 @@ sub _manageConsumerData {
       __getCyclesAndRuntime   ($paref);                                             # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln
       __reviewSwitchTime      ($paref);                                             # Planungsdaten überprüfen und ggf. neu planen
       __remainConsumerTime    ($paref);                                             # Restlaufzeit Verbraucher ermitteln
+      __hpConsumerOpmode      ($paref);                                             # Operation Mode von WP-Verbrauchern behandeln
       
       # --- Durchschnittsverbrauch / Betriebszeit ermitteln + speichern
       ###################################################################
@@ -17901,6 +17948,76 @@ sub __remainConsumerTime {
   if (isInTimeframe($hash, $c) && (($planstate =~ /started/xs && isConsumerPhysOn($hash, $c)) | $planstate =~ /interrupt|continu/xs)) {
       my $remainTime                                 = $stopts - $t ;
       $data{$name}{consumers}{$c}{remainTime} = round0 ($remainTime / 60) if($remainTime > 0);
+  }
+
+return;
+}
+
+################################################################
+#  Funktion liefert den Operation Mode eines WP-Verbrauchers
+#  opmode kann sein:
+#    off|heating|defrost|hotwater|cooling|pool|poolheating
+################################################################
+sub __hpConsumerOpmode {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $ctype = $paref->{ctype};
+  my $c     = $paref->{consumer};
+  my $t     = $paref->{t}; 
+  my $day   = $paref->{day};
+  my $chour = $paref->{chour};
+  
+  return if $ctype ne 'heatpump';                                                           # Verarbeitung nur für WP
+
+  my $msg;
+  my $hod      = sprintf "%02d", ($chour + 1);
+  my $om       = ConsumerVal ($name, $c, 'opmode', ' : ');                                  # Consumer Operation Mode
+  my $opmode   = HPOPMODEDEF;
+  my @hpStates = split /\|/, HPOPMODES;
+
+  my ($dv, $rd) = split ':', $om;
+  my ($err)     = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+
+  if ($err) {
+      $msg = "consumer >$c< - The device '$dv' defined in consumer key 'opmode' doesn't exist. Fall back to $opmode mode.";
+      Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
+  }
+  else {
+      $opmode = ReadingsVal ($dv, $rd, '');
+
+      if (!grep { $_ eq $opmode } @hpStates) {
+          $msg = "consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to ".HPOPMODEDEF." mode.";
+          Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
+          $opmode = HPOPMODEDEF;                                                            # Fallback bei unbekanntem/leerem Wert
+      }
+  }
+  
+  # --- Akkumulation Sekunden mit gleichem Status in der laufenden Stunde  
+  $data{$name}{current}{"csm${c}_active_opmode"} = $opmode;                                 # aktiven Opmode 
+
+  my $last_check = CircularVal ($name, 99, 'last_transfer', $t);
+  my $delta      = $t - $last_check;
+  my $dt         = timestringsFromOffset ($name, $last_check, 0);
+  my $lchkhour   = $dt->{hour};
+
+  debugLog ($paref, 'collectData_long', "collect HP-state data - hour=$chour, last check hour=$lchkhour, delta=$delta, dev=$dv, rdg=$rd, opmode=$opmode");
+
+  for my $s (@hpStates) {
+      my $key = "accum_csm${c}_${s}_seconds";
+
+      if ($chour == $lchkhour) {
+          my $secs  = CircularVal ($name, 99, $key, 0);
+          $secs    += $delta if $s eq $opmode;                                              # nur der aktive Status akkumuliert Zeit
+          $data{$name}{circular}{99}{$key} = $secs;
+      }
+      else {
+          $data{$name}{circular}{99}{$key} = 0;                                             # neue Stunde -> Reset
+      }
+
+      my $secs    = $data{$name}{circular}{99}{$key};                                       # Sekunden -> Minuten
+      my $minutes = $secs ? sprintf ("%.1f", $secs / 60) : 0;
+
+      writeToHistory ( { paref => $paref, key => "csm${c}_${s}_minutes", val => $minutes, day => $day, hour => $hod } );
   }
 
 return;
@@ -24546,8 +24663,9 @@ sub __aiAddRawData {
   my $dayname  = $paref->{dayname};
   my $ydayname = $paref->{ydayname};
 
-  my $hash = $defs{$name};
-
+  my $hash     = $defs{$name};
+  my @hpStates = split /\|/, HPOPMODES; 
+  
   delete $data{$name}{current}{aitrawstate};
 
   my ($err, $minutes_on_wp);
@@ -24631,7 +24749,12 @@ sub __aiAddRawData {
               if (defined $evsoc)    { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmSoC'.$c}     = round0 ($evsoc) } 
               if (defined $evtgtsoc) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmTargSoC'.$c} = round0 ($evtgtsoc) }  
               if (defined $evbatcap) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmBatCap'.$c}  = round0 ($evbatcap) } 
-              if (defined $evcurpwr) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmPwr'.$c}     = round0 ($evcurpwr) }               
+              if (defined $evcurpwr) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmPwr'.$c}     = round0 ($evcurpwr) } 
+
+              for my $s (@hpStates) {                                                                           # WP Opmode-Minuten je Status
+                  my $hpmin = HistoryVal ($name, $pvd, $hod, "csm${c}_${s}_minutes", undef);
+                  if (defined $hpmin) { $data{$name}{aidectree}{airaw}{$ridx}{"csm${c}_${s}_minutes"} = $hpmin }
+              }              
           }
   
           $dosave++;
@@ -24953,7 +25076,7 @@ sub aiFannCreateConTrainData {
   my $num_inputs   = scalar @training_data;
 
   if ($num_inputs < $min_required) {
-      $msg = "insufficient number of valid datasets ($num_inputs < $min_required)";
+      $msg = "insufficient number of valid datasets ($num_inputs < $min_required). Be patient until the system has collected more data points (24 per day).";
       debugLog ($paref, 'aiProcess', "AI FANN - Training aborted: $msg");
 
       $serial = encode_base64 (Serialize ( { name                    => $name,
@@ -24981,12 +25104,12 @@ sub aiFannCreateConTrainData {
    
   # Lag Normierungen erstellen
   ##############################
-  my $lagnorm_ref = _aiFannCreateLagNorms (\@flat_targets, $targminval, $targmaxval);                                     
+  my $lagnorm_ref = _aiFannCreateLagNorms (\@flat_targets, $targminval, $targmaxval, $range);                                     
   
   # Zusammenführen für Training
   ################################
   for my $i (6 .. $#flat_targets) {                                                                         # .. bis den Index des letzten Elements                                                       
-      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, \@presence_values, $i, $lagnorm_ref);   # Lags erstellen
+      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, \@presence_values, $i, $lagnorm_ref, $range);   # Lags erstellen
    
       my $sigs = _aiFannCreateAddOnSignals ( { lags              => $lags,                                  # diskrete, semantische Zusatzsignale
                                                pv_norm           => $pv_norm_values[$i],
@@ -25039,10 +25162,10 @@ sub aiFannCreateConTrainData {
           }
       }  
       
-      # Kombinatorik durch FEATURE_REGISTRY 
+      # Kombinatorik in _aiFannFeatureBuilder 
       #######################################
       $profile     = _aiFannSelectProfile ($name);                                              # verwendete Feature-Registry Version
-      my $semantic = _aiFannFeatureBuilder ($profile,                                          
+      my $features = _aiFannFeatureBuilder ($profile,                                          
                        { pv_norm                  => $pv_norm_values[$i],
                          rr1c_norm                => $rr1c_norm->[$i],                          # Niederschlag, numerisch min-max normalisiert
                          temp_norm                => $temp_norm_values[$i],
@@ -25150,7 +25273,7 @@ sub aiFannCreateConTrainData {
                        }
                      );
                                                
-      unless ($semantic) {
+      unless ($features) {
           $msg = 'ERROR in FANN Feature Registry Builder Version: $bv'; 
           debugLog ($paref, 'aiProcess', "AI FANN - Training aborted: $msg");
 
@@ -25162,7 +25285,7 @@ sub aiFannCreateConTrainData {
           return $serial;          
       }
       else {
-          push @{ $training_data[$i] }, @{$semantic}; 
+          push @{ $training_data[$i] }, @{$features}; 
       }       
   }
 
@@ -25303,7 +25426,7 @@ return ($targminval, $targmaxval);
 #    Normierungen für Target Lag-Features erstellen
 ################################################################
 sub _aiFannCreateLagNorms {            
-  my ($targref, $targminval, $targmaxval) = @_;              
+  my ($targref, $targminval, $targmaxval, $range) = @_;              
     
   my (@dseries, @dpos, @dneg, @rstds);
   my (@rmins, @rmaxs, @rranges);
@@ -25322,7 +25445,7 @@ sub _aiFannCreateLagNorms {
       push @d24neg, ($d < 0 ? -$d : 0);
   }
   
-  for my $i (6 .. $#$targref) {                                                     # Rolling-Std-Normierung aus @Targets ableiten
+  for my $i (6 .. $#$targref) {                                                                 # Rolling-Std-Normierung aus @Targets ableiten
       my @w = @{$targref}[$i-6 .. $i-1];
       push @rstds, _aiFannStandardDeviation (\@w);
       
@@ -25336,11 +25459,17 @@ sub _aiFannCreateLagNorms {
   # Regime-Schwellen aus Zielwert-Verteilung (im Originalbereich)
   my @sorted_targ = sort { $a <=> $b } @$targref;
   my $n_targ      = scalar @sorted_targ;
-  my $p25_targ    = $sorted_targ[ int(0.25 * $n_targ) ];                            # unteres Quartil
-  my $p75_targ    = $sorted_targ[ int(0.75 * $n_targ) ];                            # oberes Quartil
+  my $p25_targ    = $sorted_targ[ int(0.25 * $n_targ) ];                                        # unteres Quartil
+  my $p75_targ    = $sorted_targ[ int(0.75 * $n_targ) ];                                        # oberes Quartil
   
   # --- Normierungen
-  my ($delta_norm_ref, $dmin, $dmax)              = _aiFannNormalizeMinMax (\@dseries);
+  my ($delta_norm_ref, $dmin, $dmax)              = ($range eq '-11')                           # range-abhängig (Elemente in @dseries können negativ sein)
+                                                  ? _aiFannNormalizeMinMaxSymmetric (\@dseries)
+                                                  : _aiFannNormalizeMinMax          (\@dseries);
+  
+  # Alle anderen bleiben _aiFannNormalizeMinMax – sie sind strukturell ≥ 0:
+  # dpos, dneg, d24pos, d24neg, rstds, rmins, rmaxs, rranges -> immer korrekt 0..1
+             
   my ($dpos_norm_ref, $dpos_min, $dpos_max)       = _aiFannNormalizeMinMax (\@dpos);
   my ($dneg_norm_ref, $dneg_min, $dneg_max)       = _aiFannNormalizeMinMax (\@dneg);
   
@@ -25351,7 +25480,7 @@ sub _aiFannCreateLagNorms {
   my ($rmax_norm_ref,   $rmax_min,   $rmax_max)   = _aiFannNormalizeMinMax (\@rmaxs);
   my ($rrange_norm_ref, $rrange_min, $rrange_max) = _aiFannNormalizeMinMax (\@rranges);
   
-  my ($std_norm_ref, $smin, $smax) = _aiFannNormalizeMinMax (\@rstds);
+  my ($std_norm_ref, $smin, $smax)                = _aiFannNormalizeMinMax (\@rstds);
   
   # --- Return-Hash
   my %lag_norms = (
@@ -25399,7 +25528,7 @@ return \%lag_norms;
 # $temp_norm_series - Arrayref normierter Temperaturen
 ################################################################
 sub _aiFannBuildLagFeatures {
-  my ($con_series, $temp_norm_series, $presence_values, $i, $norms) = @_;
+  my ($con_series, $temp_norm_series, $presence_values, $i, $norms, $range) = @_;
 
   # Sicherheitsprüfung: genug Historie vorhanden?
   my $len_con  = scalar @$con_series;
@@ -25480,14 +25609,18 @@ sub _aiFannBuildLagFeatures {
   my $lag168_norm = defined $y_t_168
                   ? _aiFannNormMinMaxValue ($y_t_168, $norms->{min}, $norms->{max})
                   : 0;
-                  
+  
+  my $delta1_norm  = ($range eq '-11')
+                   ? _aiFannNormMinMaxValueSymmetric ($delta1,  $norms->{delta_min}, $norms->{delta_max})
+                   : _aiFannNormMinMaxValue          ($delta1,  $norms->{delta_min}, $norms->{delta_max});
+
   my $delta24_norm = defined $delta24
-                   ? _aiFannNormMinMaxValue ($delta24, $norms->{delta_min}, $norms->{delta_max})
+                   ? ( ($range eq '-11')
+                       ? _aiFannNormMinMaxValueSymmetric ($delta24, $norms->{delta_min}, $norms->{delta_max})
+                       : _aiFannNormMinMaxValue          ($delta24, $norms->{delta_min}, $norms->{delta_max}) )
                    : 0;
 
-  my $std6_norm    = _aiFannNormMinMaxValue ($std6,  $norms->{std_min}, $norms->{std_max});
-  my $delta1_norm  = _aiFannNormMinMaxValue ($delta1,  $norms->{delta_min}, $norms->{delta_max});
-
+  my $std6_norm            = _aiFannNormMinMaxValue ($std6,            $norms->{std_min},         $norms->{std_max});
   my $delta1_norm_pos      = _aiFannNormMinMaxValue ($delta1_pos,      $norms->{delta_pos_min},   $norms->{delta_pos_max});
   my $delta1_norm_neg      = _aiFannNormMinMaxValue ($delta1_neg,      $norms->{delta_neg_min},   $norms->{delta_neg_max});
   my $delta1_norm_pos_prev = _aiFannNormMinMaxValue ($delta1_prev_pos, $norms->{delta_pos_min},   $norms->{delta_pos_max});
@@ -25761,7 +25894,7 @@ return $sigs;
 }
 
 ################################################################
-#   selektiert die relevante FEATURE-REGISTRY Version
+#   selektiert die relevante Profilversion
 ################################################################
 sub _aiFannSelectProfile {                                        
   my ($name) = @_;
@@ -25775,7 +25908,7 @@ sub _aiFannSelectProfile {
             
   my $profile = CurrentVal ($name, 'aiConProfile', $frvdef);                # überschreiben durch aiConProfile
   
-  if (!grep /^$profile$/, keys %FEATURE_REGISTRY) {
+  if (!grep /^$profile$/, keys %profileweights) {   
       Log3 ($name, 1, "$name - ERROR - selected AI FANN profile is invalid, fallback to $frvdef done");
       $profile = $frvdef;
   }
@@ -26621,8 +26754,10 @@ sub aiFannTrain {
                                               num_train_datasets => $num_train_datasets,
                                               hidden_layers      => $hidden_layers, 
                                               learning_rate      => $learning_rate,
+                                              learning_momentum  => $learning_momentum,
                                               cur_ratio          => $cur_ratio,
                                               profile            => $profile,
+                                              haf                => $haf,
                                               lang               => $paref->{lang},
                                             }
                                           );
@@ -26905,8 +27040,10 @@ sub _aiFannEpochDiagnostic {
   my $num_train_datasets = $paref->{num_train_datasets};
   my $hidden_layers      = $paref->{hidden_layers};
   my $learning_rate      = $paref->{learning_rate};
+  my $learning_momentum  = $paref->{learning_momentum};
   my $cur_ratio          = $paref->{cur_ratio};
   my $profile            = $paref->{profile};
+  my $haf                = $paref->{haf};
   my $lang               = $paref->{lang};
 
   my $rel = $best_epoch / $num_epoch;
@@ -26930,6 +27067,7 @@ sub _aiFannEpochDiagnostic {
   my $r2_threshold   = $profileweights{$profile}{r2_thld};
   my $slope_warn_min = $profileweights{$profile}{slope_warn_min};
   my $rmse_rel_warn  = $profileweights{$profile}{rmse_rel_warn};  
+  my $is_dead_net    = defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7;
 
   my $code  = 'ok';
   my $label = '';
@@ -26940,11 +27078,11 @@ sub _aiFannEpochDiagnostic {
       $code  = 'very_early';
       $label = $epoche_translations{vearly}{$lang};
         
-      push @hints, $epoche_translations{hint1}{$lang};
+      push @hints, $epoche_translations{hint1}{$lang} unless $is_dead_net;
       
       my $ratio_ok = !defined $cur_ratio || $cur_ratio >= 5;                            # hint2 nur wenn kein totes Netz UND Architektur nicht schon zu komplex
       
-      unless (defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7) {    # hint2 nur wenn kein totes Netz vorliegt
+      unless ($is_dead_net) {                                                           # hint2 nur wenn kein totes Netz vorliegt
           if ($ratio_ok) {
              push @hints, $epoche_translations{hint2}{$lang};                           # zu klein
           }
@@ -26957,9 +27095,14 @@ sub _aiFannEpochDiagnostic {
   elsif ($rel < 0.12) {                                                                 # 450 – 1800 Epochen
       $code  = 'early';
       $label = $epoche_translations{early}{$lang};
+      
+      my $hint4_fires = $learning_momentum >  0.7;
+      my $hint5_fires = $learning_rate     >= 0.01;
         
-      push @hints, $epoche_translations{hint4}{$lang};
-      push @hints, $epoche_translations{hint5}{$lang};
+      push @hints, $epoche_translations{hint4}{$lang} if $hint4_fires;
+      push @hints, $epoche_translations{hint5}{$lang} if $hint5_fires;
+      
+      push @hints, $epoche_translations{hint23}{$lang} unless ($hint4_fires || $hint5_fires);
   }
   elsif ($rel <= 0.72) {                                                                # 1800 – 10800 Epochen
       $code  = 'ok';
@@ -26983,8 +27126,14 @@ sub _aiFannEpochDiagnostic {
 
   # --- 2. Kombinations-Checks
   # Totes Netz: lernt überhaupt nichts (Slope≈0, Val MSE < Train MSE)
-  if (defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7) {
-      push @hints, $epoche_translations{dead}{$lang};
+  if ($is_dead_net) {
+      if ($learning_rate < 0.001 && $learning_momentum < 0.6) {
+          push @hints, sprintf $epoche_translations{deadlow}{$lang}, $learning_rate;
+      }
+      else {
+          push @hints, $epoche_translations{dead}{$lang};
+      }
+      
       $code = 'very_early';
   }
   
@@ -27027,8 +27176,29 @@ sub _aiFannEpochDiagnostic {
                                    });
 
   push @hints, @{$arch_ref->{hints}} if @{$arch_ref->{hints}};
+  
+  # --- 4. Aktivierungsfunktion Empfehlung
+  if (defined $haf) {
+      if ($haf !~ /SYMMETRIC/xs) {
+          # Kandidat für Wechsel zu SYMMETRIC:
+          # - Netz lernt grundsätzlich (kein totes Netz)
+          # - kein relevantes Overfitting
+          # - Slope zu flach ODER R² schwach trotz gesunder Epochenphase
+          my $af_candidate = $code eq 'ok'
+                          && !$is_dead_net
+                          && $overfitting < 0.15
+                          && ($slope      < 0.75 || ($r2 < 0.75 && $rmse_rel > $rmse_rel_warn));
 
-  # --- 4. Ampel
+          push @hints, $epoche_translations{afsym}{$lang} if $af_candidate;
+      }
+      else {                                                                                # SYMMETRIC aktiv aber totes Netz -> Wechsel zurück zu SIGMOID
+          if ($is_dead_net) {
+              push @hints, $epoche_translations{afasym}{$lang};
+          }
+      }
+  }
+
+  # --- 5. Ampel
   my $ampel = $code eq 'ok'                                ? 'green'
             : $code =~ /^(early|late|overfit)$/            ? 'yellow'
             : $code =~ /^(very_early|very_late|unstable)$/ ? 'red'
@@ -27170,18 +27340,20 @@ sub __aiFannArchHint {
       push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
       push @hints, $lr_hint if $lr_hint;                                                            # einfügen Hilfssub-äquivalent: hint19
   } 
-  elsif ($sug_arch ne $hidden_layers                                                                # Vorschlag weicht deutlich ab, aber Ratio noch im Korridor
-       && ($cur_ratio < 6 || $cur_ratio > 18)
-       && $epoch_code ne 'ok') {
-    if ($cur_ratio > 18) {                                                                          # Netz zu klein für Datenmenge
-        push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
-        push @hints, $lr_hint if $lr_hint;                                                          # einfügen Hilfssub-äquivalent: hint19
-    }
-    else {                                                                                          # Netz zu komplex für Datenmenge
-        push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
-        push @hints, $lr_hint if $lr_hint;                                                          # einfügen Hilfssub-äquivalent: hint19
-    }
-}
+  elsif ($sug_arch ne $hidden_layers
+         && ($cur_ratio < 6 || $cur_ratio > 18)
+         && $epoch_code ne 'ok') {
+      if ($cur_ratio > 18) {
+          push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch
+              if($sug_params > $cur_params);
+          push @hints, $lr_hint if($lr_hint && $sug_params > $cur_params);
+      }
+      else {
+          push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch
+              if $sug_params < $cur_params;
+          push @hints, $lr_hint if $lr_hint && $sug_params < $cur_params;
+      }
+  }
 
   if ($num_train_datasets > 6000) {                                                                 # Großes Dataset → TrainLimit vorschlagen
       my $suggested_limit = max (2000, int ($num_train_datasets * 0.5 / 100) * 100);                # ~50%, auf 100 gerundet
@@ -27563,7 +27735,7 @@ sub aiFannGetConResult {
       ## Lag-Features erzeugen
       ##########################
       my $i    = @flat_targets - 1;
-      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, \@presence_values, $i, $lagnorm_ref);
+      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, \@presence_values, $i, $lagnorm_ref, $range);
       next if(!$lags);      
      
       # diskrete, semantische Zusatzsignale
@@ -27585,10 +27757,10 @@ sub aiFannGetConResult {
       ###########################
       my @new_input = ();
       
-      # Kombinatorik durch FEATURE_REGISTRY 
+      # Kombinatorik in _aiFannFeatureBuilder 
       #######################################
       my $profile  = _aiFannSelectProfile ($name);                                                  # verwendete Feature-Registry Version
-      my $semantic = _aiFannFeatureBuilder ($profile, {                                    
+      my $features = _aiFannFeatureBuilder ($profile, {                                    
                             pv_norm                  => $pv_norm,                                   # PV-Ertrag (min-max normalisiert)
                             rr1c_norm                => $rr1c_norm,                                 # Niederschlag (min-max normalisiert)
                             temp_norm                => $temp_norm,                                 # Außentemperatur (min-max normalisiert)
@@ -27696,14 +27868,14 @@ sub aiFannGetConResult {
                         }       
                     );
       
-      unless ($semantic) {
+      unless ($features) {
           $msg = 'ERROR in FANN Feature Registry Builder Version: $bv'; 
           $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg; 
 
           return $msg;           
       }
       else {
-          push @new_input, @{$semantic};
+          push @new_input, @{$features};
       }
 
       #debugLog ($paref, 'aiData', "AI FANN - new_input: ".Dumper @new_input);
@@ -28931,26 +29103,108 @@ return $range;
 sub _pvMaxLimit {            
   my ($name) = @_;              
     
-  my $aspeak       = CurrentVal ($name, 'allstringspeak',   0);                     # PV Anlage Peakleistung (W)
-  my $pvInvCapSum  = CurrentVal ($name, 'pvInverterCapSum', 0);                     # Summe Inverterleistungen mit PV Generatoren
+  my $aspeak       = CurrentVal ($name, 'allstringspeak',   0);                             # PV Anlage Peakleistung (W)
+  my $pvInvCapSum  = CurrentVal ($name, 'pvInverterCapSum', 0);                             # Summe Inverterleistungen mit PV Generatoren
   my $pv_max_limit = min ($aspeak, $pvInvCapSum);
   
 return $pv_max_limit;
 }
 
 ###############################################################
-#           AI REGISTRY Builder
-# im Aufrufer: 
-# my $semantic = _aiFannFeatureBuilder ('v3', \%features);
-# $semantic ist ein Arrayref: [ 0.3, 0.7, 1, 0, 0.12, ... ]
-# push @array, @{$semantic}; 
+#  AI REGISTRY Builder – baut Feature-Vektor aus Profil
+#  Aufruf: my $features = _aiFannFeatureBuilder ($profile, \%f)
+#  Return: Arrayref [ 0.3, 0.7, 1, 0, 0.12, ... ]
 ###############################################################
 sub _aiFannFeatureBuilder {
-  my ($version, $f) = @_;
-  
-  my $builder = $FEATURE_REGISTRY{$version};
+  my ($profile, $f) = @_;
+    
+  my $flags = {                                                                             # parsen in Flags
+      active   => ($profile =~ /active/   ? 1 : 0),
+      pv       => ($profile =~ /pv/       ? 1 : 0),
+      heatpump => ($profile =~ /heatpump/ ? 1 : 0),
+      bev      => ($profile =~ /bev/      ? 1 : 0),
+  };
+    
+  my @features;
 
-return $builder->($f);   
+  # --------------------------------------------------------
+  # Basis-Features
+  # --------------------------------------------------------
+  push @features, @{ $FEATURE_BLOCKS{time_base}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{seasonality}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{weather_pv}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{lags}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{daily_energy_context}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{semantics_presence}->($f) };
+    
+  # --------------------------------------------------------
+  # v1_common – Standardhaushalt (ohne PV Semantik)
+  # --------------------------------------------------------
+  push @features, @{ $FEATURE_BLOCKS{trends}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{semantics_rueckfall}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{semantics_cold}->($f) };
+    
+  # --------------------------------------------------------
+  # v1_common_active – erweiterter Tagestythmus
+  # --------------------------------------------------------
+  if ($flags->{active}) {                                                                   # starker Tagesrhythmus
+      push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) };
+  }
+  
+  # --------------------------------------------------------
+  # v1_common_pv – Standardhaushalt (inkl. PV-Semantik)
+  # v1_common_pv_active – Standardhaushalt (inkl. PV) +
+  #                       erweiterter Tagestythmus
+  # --------------------------------------------------------
+  if ($flags->{pv}) {
+      push @features, @{ $FEATURE_BLOCKS{pv}->($f) };
+        
+      if ($flags->{active}) {                                                               # starker Tagesrhythmus
+          push @features, @{ $FEATURE_BLOCKS{semantics_pv}->($f) };
+          push @features, @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) };
+      }
+      else {                                                                                # normaler Tagesrhythmus
+          push @features, @{ $FEATURE_BLOCKS{pv_mittag_peak_boost}->($f) };
+      }
+  }
+    
+  # --------------------------------------------------------
+  # v1_heatpump – WP
+  # v1_heatpump_active - WP dynamic
+  # --------------------------------------------------------  
+  if ($flags->{heatpump}) {
+      push @features, @{ $FEATURE_BLOCKS{heatpump_base}->($f) };
+      
+      if ($flags->{pv} && $flags->{active}) {                                               # WP + PV + starker Tagesrhythmus
+          push @features, @{ $FEATURE_BLOCKS{semantics_heatpump_boost_special}->($f) };
+      }  
+      elsif ($flags->{pv}) {                                                                # WP + PV
+          push @features, @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) };
+      }
+  }
+    
+  # --------------------------------------------------------
+  # --- bev - noch zu implementieren
+  # --------------------------------------------------------
+  if ($flags->{bev}) {
+      push @features, @{ $FEATURE_BLOCKS{bev_base}->($f) };         
+       
+      if ($flags->{pv}) {
+          push @features, @{ $FEATURE_BLOCKS{bev_pv_smart_charge}->($f) };
+      }
+  }
+    
+  # --------------------------------------------------------
+  # v1_sandbox Äquivalent – Tests
+  # sandbox wird nicht über Flags gesteuert sondern bleibt
+  # --------------------------------------------------------
+  if ($profile eq 'v1_sandbox') {
+      push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) };
+      push @features, @{ $FEATURE_BLOCKS{sandbox}->($f) };
+  }
+    
+return \@features;
 }
 
 ###############################################################
@@ -29956,7 +30210,8 @@ sub _listDataPoolPvHist {
   my $name = $hash->{NAME};
 
   my ($sq, $h, $hexp);
-  my $export = q{};
+  my $export   = q{};
+  my @hpStates = split /\|/, HPOPMODES;
 
   if ( $arg =~ /=/ ) { $arg =~ s/,(?=[A-Za-z_][A-Za-z0-9_]*=)/ /g; }
   else               { $arg =~ s/,/ /g; }
@@ -30062,9 +30317,15 @@ sub _listDataPoolPvHist {
 
           for my $c (1..MAXCONSUMER) {                                                                  # + alle Consumer
               my $cf = sprintf "%02d", $c;
+              
               for my $field (qw (cyclescsm csmt csme minutescsm hourscsme avgcycmntscsm
                                 bevcsmSoC bevcsmTargSoC bevcsmBatCap bevcsmPwr) ) {
                   my $fkey = "${field}${cf}";
+                  $entry{$fkey} = HistoryVal ($name, $day, $key, $fkey, undef);
+              }
+              
+              for my $s (@hpStates) {                                                                   # + WP Opmode-Minuten je Status (nur Stundensätze, kein calc99)
+                  my $fkey = "csm${cf}_${s}_minutes";
                   $entry{$fkey} = HistoryVal ($name, $day, $key, $fkey, undef);
               }
           }
@@ -30150,10 +30411,14 @@ sub _listDataPoolPvHist {
                   $csvmap{"bevcsmTargSoC${cf}"} = "BEVcsmTargSoC${cf}";
                   $csvmap{"bevcsmBatCap${cf}"}  = "BEVcsmBatCap${cf}";
                   $csvmap{"bevcsmPwr${cf}"}     = "BEVcsmPwr${cf}";
+                  
+                  for my $s (@hpStates) {                                                               # + WP Opmode-Minuten je Status
+                      $csvmap{"csm${cf}_${s}_minutes"} = "Csm${cf}" . ucfirst ($s) . "Minutes";
+                  }
               }
 
               for my $fkey (keys %entry) {
-                  my $ckey = $csvmap{$fkey} // $fkey;                             # Fallback: interner Name
+                  my $ckey = $csvmap{$fkey} // $fkey;                                                   # Fallback: interner Name
 
                   if ($fkey eq 'pvcorrf') {
                       $hexp->{$day}{$key}{PVCorrectionFactor} = $entry{pvcorrf} eq '-' ? '' : (split '/', $entry{pvcorrf})[0];
@@ -30162,16 +30427,16 @@ sub _listDataPoolPvHist {
                   }
 
                   my $val = $entry{$fkey} // '-';
-                  $val    = qq{"$val"} if $fkey =~ /^(?:hpcsm|bevcsm)$/;         # Anführungszeichen wie bisher
+                  $val    = qq{"$val"} if $fkey =~ /^(?:hpcsm|bevcsm)$/;                                # Anführungszeichen wie bisher
                   
                   $hexp->{$day}{$key}{$ckey} = $val;
               }
           }
 
 
-          # -----------------------------------------------------------------------
+          # -----------------------------------------------------------------------------------------------------
           #                        Textausgabe ($ret)
-          # -----------------------------------------------------------------------
+          # -----------------------------------------------------------------------------------------------------
           # Prinzip:
           #   - $line->( Liste von Schlüsseln ) gibt eine formatierte Zeile aus,
           #     aber NUR für Schlüssel die in %entry existieren (nach Key-Filter).
@@ -30190,7 +30455,7 @@ sub _listDataPoolPvHist {
           #      a) Im Sammelblock oben in der Batterie-Schleife ergänzen.
           #      b) Hier analog zu den bestehenden map-Blöcken eine neue Zeile einfügen:
           #         $ret .= $line->(map { my $bnf = sprintf "%02d",$_; "newfields${bnf}" } 1..MAXBATTERIES);
-          # -----------------------------------------------------------------------
+          # -----------------------------------------------------------------------------------------------------
           $ret .= "\n      " if $ret;
           $ret .= "$key => ";
 
@@ -30270,7 +30535,7 @@ sub _listDataPoolPvHist {
           # UND im Sammelblock oben in der Consumer-Schleife per HistoryVal ergänzen.
           for my $c (1..MAXCONSUMER) {
               my $cf = sprintf "%02d", $c;
-              my @cfields;
+              my (@cfields, @hpfields);
 
               if ($key eq '99') {                                                                           # Tageswerte: Zyklen, Energie, BEV-Daten
                   @cfields = map { "${_}${cf}" }
@@ -30278,9 +30543,10 @@ sub _listDataPoolPvHist {
                                 bevcsmSoC bevcsmTargSoC bevcsmBatCap bevcsmPwr);
               }
               else {                                                                                        # Stundenwerte: Energie, Minuten, BEV-Daten
-                  @cfields = map { "${_}${cf}" }
-                             qw (csmt csme minutescsm bevcsmSoC 
-                                 bevcsmTargSoC bevcsmBatCap bevcsmPwr);
+                  @cfields  = map { "${_}${cf}" }
+                              qw (csmt csme minutescsm bevcsmSoC 
+                                  bevcsmTargSoC bevcsmBatCap bevcsmPwr);
+                  @hpfields = map { "csm${cf}_${_}_minutes" } @hpStates;                                    # WP Opmode-Minuten, separat behandelt
               }
 
               my @show = grep { defined $entry{$_} && $entry{$_} ne '' && $entry{$_} ne '-' } @cfields;
@@ -30288,6 +30554,24 @@ sub _listDataPoolPvHist {
               if (@show) {
                   $ret .= join(', ', map { "$_: $entry{$_}" } @show);
                   $ret .= "\n            ";
+              }
+
+              if (@hpfields) {
+                  my @hpshow = grep { defined $entry{$_} && $entry{$_} ne '' && $entry{$_} ne '-' } @hpfields;
+
+                  if (@hpshow) {                                                                            # nur bei WP-Consumer überhaupt befüllt
+                      my $mid   = int( (@hpshow + 1) / 2 );                                                 # erste/zweite Hälfte aufteilen
+                      my @line1 = @hpshow[0 .. $mid-1];
+                      my @line2 = @hpshow[$mid .. $#hpshow];
+
+                      $ret .= join (', ', map { "$_: $entry{$_}" } @line1);
+                      $ret .= "\n            ";
+
+                      if (@line2) {
+                          $ret .= join(', ', map { "$_: $entry{$_}" } @line2);
+                          $ret .= "\n            ";
+                      }
+                  }
               }
           }
       }
@@ -30839,8 +31123,9 @@ sub _listDataPoolAiRawData {
   my $name = shift;
   my $par  = shift // 0;
 
-  my $h      = $data{$name}{aidectree}{airaw};
-  my $maxcnt = keys %{$h};
+  my $h         = $data{$name}{aidectree}{airaw};
+  my $maxcnt    = keys %{$h};
+   my @hpStates = split /\|/, HPOPMODES;
 
   if (!$maxcnt) {
       return qq{aiRawData values cache is empty.};
@@ -30852,9 +31137,9 @@ sub _listDataPoolAiRawData {
   
   my @last;
   if ($par) { @last = (sort keys %{$h})[-$par .. -1]; }
-  else      { @last = sort keys %{$h};                } 
-  
-  my $sq = "<b>Below are</b> $count <b>of a total of</b> $maxcnt <b>records are displayed.</b> \n";
+  else      { @last = sort keys %{$h};                }
+
+  my $sq = "<b>Below are</b> $count <b>of a total of</b> $maxcnt <b>records are displayed.</b> \n";  
 
   for my $idx (@last) {
       my $hod           = AiRawdataVal ($name, $idx, 'hod',            '-');
@@ -30880,7 +31165,9 @@ sub _listDataPoolAiRawData {
       my $hpcsm         = AiRawdataVal ($name, $idx, 'hpcsm',          '-');
       my $bevcsm        = AiRawdataVal ($name, $idx, 'bevcsm',         '-');
       
-      my $csm;
+      my ($csm, $hpm);
+      my $hpmCnt = 0; 
+      
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
           $c           = sprintf "%02d", $c;
           my $csme     = AiRawdataVal ($name, $idx, 'csme'.$c,          undef);
@@ -30913,8 +31200,23 @@ sub _listDataPoolAiRawData {
               $csm .= ", " if($csm);
               $csm .= "bevcsmPwr${c}: $evcurpwr";
           }
+          
+          for my $s (@hpStates) {                                                       # WP Opmode-Minuten je Status
+              my $hpmin = AiRawdataVal ($name, $idx, "csm${c}_${s}_minutes", undef);
+              next if(!defined $hpmin);
+
+              if ($hpm) {
+                  $hpm .= ($hpmCnt % 6 == 0) ? "\n              " : ", ";               # alle 6 Einträge neue Zeile
+              }
+              $hpm .= "csm${c}_${s}_minutes: $hpmin";
+              $hpmCnt++;
+          }
       }
 
+
+      # ---------------
+      # --- Ausgabe
+      # ---------------
       $sq .= "\n";
       $sq .= "$idx => hod: $hod, dayname: $nod, sunaz: $sunaz, sunalt: $sunalt, rad1h: $rad1h, wcc: $wcc, weatherid: $wid, ";
       $sq .= "rr1c: $rr1c, temp: $temp, socwhsum: $socwhsum ";
@@ -30928,6 +31230,11 @@ sub _listDataPoolAiRawData {
       if (defined $csm) {
           $sq .= ", ";
           $sq .= $csm; 
+      }
+      
+      if (defined $hpm) {
+          $sq .= "\n              ";
+          $sq .= $hpm;
       }
   }
 
@@ -32736,7 +33043,7 @@ sub getConsumerPlanningMode {
   ## Mode kann über Device:Reading gesteuert sein
   #################################################
   my ($dv, $rd) = split ':', $cplmode;
-  my ($err)     = isDeviceValid ( { name => $hash->{NAME}, obj => $dv, method => 'string' } );
+  my ($err)     = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
 
   if ($err) {
       Log3 ($name, 1, "$name - ERROR - consumer >$c< - The device '$dv' in consumer key 'mode' doesn't exist. Fall back to ".DEFCMODE." mode.") if(askLogtime ($name, $err));
@@ -33550,14 +33857,14 @@ return $holiday;
 }
 
 ################################################################
-#  liefert die Consumernummer der Wärmepumpe(n) falls vorhanden
+#  liefert die Consumernummer(n) der definierten Wärmepumpe(n)
 ################################################################
 sub isHeatPumpUsed {
   my $name = shift;
   
   my $hp = CurrentVal ($name, 'heatpumpInstalled', undef);  
   
-return $hp;
+return $hp;                                                                             # Consumernummern mit Komma getrennt
 }
 
 ################################################################
@@ -36850,7 +37157,7 @@ to ensure that the system configuration is correct.
 
       <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+         <colgroup> <col width="22%"> <col width="78%"> </colgroup>
             <tr><td> <b>batintotalXX</b>    </td><td>total battery XX charge (Wh) at the beginning of the hour                                                                </td></tr>
             <tr><td> <b>batinXX</b>         </td><td>Charge of battery XX within the hour (Wh)                                                                                </td></tr>
             <tr><td> <b>batouttotalXX</b>   </td><td>total battery XX discharge (Wh) at the beginning of the hour                                                             </td></tr>
@@ -36871,6 +37178,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>conlegfc</b>        </td><td>conventional energy consumption forecast without AI (Wh)                                                                 </td></tr>
             <tr><td> <b>con</b>             </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Price for the purchase of one kWh. The currency of the price is defined in the setupMeterDev.                            </td></tr>
+            <tr><td> <b>csmXX_&lt;OPM&gt;_minutes</b> </td><td>The number of minutes within the hour during which ConsumerXX was in &lt;OPM&gt; mode.                         </td></tr>
+            <tr><td>                        </td><td>Operating modes can be: off, heating, defrost, hotwater, cooling, pool, poolheating                                      </td></tr>
             <tr><td> <b>csmtXX</b>          </td><td>total energy consumption (Wh) by ConsumerXX at the start of the hour                                                     </td></tr>
             <tr><td> <b>csmeXX</b>          </td><td>Energy consumption (Wh) of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                        </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
@@ -37247,16 +37556,13 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> * 2 - Training mode with a maximum of 1 training repetition is activated. The AI consumption forecast is not used. </ul>                                </td></tr>
             <tr><td>                          </td><td>Values:<b> 0 | 1 | 2</b>, default: 0                                                                                                                         </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
-            <tr><td> <b>aiConProfile</b>      </td><td>Selection of household characteristics. The selectable profiles reinforce or emphasize certain specific characteristics in the household.                    </td></tr>
-            <tr><td>                          </td><td>The version designation is merely a guideline. You should set the version that achieves the best results.                                                    </td></tr>
-            <tr><td>                          </td><td>If aiConProfile is not set, the system automatically selects the profile that is most likely to be accurate.                                                 </td></tr>
-            <tr><td>                          </td><td><ul> v1_common - Standard household </ul>                                                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active - Standard household with distinct daily rhythms </ul>                                                                                 </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_pv - Household with PV-controlled load management, i.e. when appliances are actively switched on when there is excess power </ul>             </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active_pv - Household with PV-controlled load management and a distinct daily rhythm </ul>                                                    </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump - Standard household with heat pump  </ul>                                                                                                  </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_pv - Household with PV-controlled load management and heat pumps characteristics </ul>                                                      </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Household with PV-controlled load management, a heat pump and a distinct daily rhythm </ul>                                     </td></tr>
+            <tr><td> <b>aiConProfile</b>      </td><td>Selecting household attributes. The available flags are specified as a comma-separated list. The flags are merely a guide and                                </td></tr>
+            <tr><td>                          </td><td>highlight or emphasize certain specific aspects of the budget. You should specify the flags that produce the best results during training.                   </td></tr>
+            <tr><td>                          </td><td>If aiConProfile is not set, the system automatically selects the profile that is most likely to be applicable.                                               </td></tr>
+            <tr><td>                          </td><td><ul> v1 - Standard Household Version 1 </ul>                                                                                                                 </td></tr>
+            <tr><td>                          </td><td><ul> active - Households with distinct daily and/or consumption patterns </ul>                                                                               </td></tr>
+            <tr><td>                          </td><td><ul> pv - Household with PV-controlled load management, i.e., when appliances are actively switched on when there is excess power </ul>                      </td></tr>
+            <tr><td>                          </td><td><ul> heatpump - Household with a heat pump  </ul>                                                                                                            </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Weighting of AI results with conventional (legacy) consumption forecast values.                                                                              </td></tr>
             <tr><td>                          </td><td><ul> * 0 - the AI results are not used, only legacy values. </ul>                                                                                            </td></tr>
@@ -37345,7 +37651,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 aiConHiddenLayers=50-25 aiConTrainStart=5:2
+         attr &lt;name&gt; aiControl aiConProfile=v1,active,pv aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 aiConHiddenLayers=50-25 aiConTrainStart=5:2
        </ul>
 
        </li>
@@ -37662,9 +37968,12 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>Maximum power consumption of the heat pump in W. The value must not be 0.                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Unlike other consumers, this information must be provided even if the default is to be used. By creating a suitable userReadings,                  </td></tr>
-            <tr><td>                       </td><td>you can control whether you want to combine the running times for heating and cooling operation, hot water production, and heating element         </td></tr>
-            <tr><td>                       </td><td>operation, or whether you want to separate the running times for heating and cooling operation exclusively as times for heating.                   </td></tr>
+            <tr><td> <b>opmode</b>         </td><td>Defines a &lt;Device&gt;:&lt;Reading&gt; combination that provides the heat pump's current operating mode.                                         </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
+            <tr><td>                       </td><td>The return value must be exactly one of the following: <b>off heating defrost hotwater cooling pool poolheating </b>                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Compressor operating status. The syntax remains as specified above.                                                                                </td></tr>
+            <tr><td>                       </td><td>Unlike other consumers, this information is required even if you intend to use the default value.                                                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
          </table>
          </ul>
@@ -39938,7 +40247,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+         <colgroup> <col width="22%"> <col width="78%"> </colgroup>
             <tr><td> <b>batintotalXX</b>    </td><td>Gesamtladung der Batterie XX (Wh) zu Beginn der Stunde                                                 </td></tr>
             <tr><td> <b>batinXX</b>         </td><td>Ladung der Batterie XX innerhalb der Stunde (Wh)                                                       </td></tr>
             <tr><td> <b>batouttotalXX</b>   </td><td>Gesamtentladung der Batterie XX (Wh) zu Beginn der Stunde                                              </td></tr>
@@ -39959,6 +40268,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>conlegfc</b>        </td><td>herkömmlich ohne KI prognostizierter Energieverbrauch (Wh)                                             </td></tr>
             <tr><td> <b>con</b>             </td><td>realer Energieverbrauch (Wh) des Hauses                                                                </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.                 </td></tr>
+            <tr><td> <b>csmXX_&lt;OPM&gt;_minutes</b> </td><td>Minuten innerhalb der Stunde, in denen sich ConsumerXX im Betriebsmodus &lt;OPM&gt; befand.  </td></tr>
+            <tr><td>                        </td><td>Betriebsmodus kann sein: off heating defrost hotwater cooling pool poolheating                         </td></tr>
             <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total (Wh) von ConsumerXX zum Beginn der Stunde                                       </td></tr>
             <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch (Wh) von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)       </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                          </td></tr>
@@ -40334,16 +40645,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> * 2 - der Trainingsmodus mit max. 1 Trainingswiederholung ist aktiviert. Die KI-Verbrauchsprognose wird nicht verwendet </ul>                           </td></tr>
             <tr><td>                          </td><td>Werte:<b> 0 | 1 | 2</b>, default: 0                                                                                                                          </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
-            <tr><td> <b>aiConProfile</b>      </td><td>Auswahl der Eigenschaften des Haushalts. Die auswählbaren Profile verstärken bzw. betonen bestimmte Spezifika im Haushalt.                                   </td></tr>
-            <tr><td>                          </td><td>Die Versionsbezeichnung ist lediglich ein Anhaltspunkt. Man sollte die Version einstellen, mit der die besten Ergebnisse erzielt werden.                     </td></tr>
+            <tr><td> <b>aiConProfile</b>      </td><td>Auswahl der Eigenschaften des Haushalts. Die möglichen Flags werden als Komma getrennte Liste angegeben. Die Flags sind lediglich ein Anhaltspunkt und       </td></tr>
+            <tr><td>                          </td><td>verstärken bzw. betonen bestimmte Spezifika des Haushalts. Man sollte die Flags angeben, mit denen die besten Ergebnisse im Training erzielt werden.         </td></tr>
             <tr><td>                          </td><td>Ist aiConProfile nicht gesetzt, erfolgt durch das System eine automatische Auswahl des wahrscheinlich zutreffendsten Profils.                                </td></tr>
-            <tr><td>                          </td><td><ul> v1_common - Standardhaushalt </ul>                                                                                                                      </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active - Standardhaushalt mit ausgeprägten Tagesrhythmen </ul>                                                                                </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_pv - Haushalt mit PV-gesteuerten Lastmanagement, d.h. wenn Verbraucher bei Überschuss aktiv zugeschaltet werden </ul>                         </td></tr>
-            <tr><td>                          </td><td><ul> v1_common_active_pv - Haushalt mit PV-gesteuerten Lastmanagement und starkem Tagesrhythmus </ul>                                                        </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump - Standardhaushalt mit Wärmepumpe  </ul>                                                                                                    </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_pv - Haushalt mit PV-gesteuerten Lastmanagement und Wärmepumpen Charakteristika </ul>                                                       </td></tr>
-            <tr><td>                          </td><td><ul> v1_heatpump_active_pv - Haushalt mit PV-gesteuerten Lastmanagement, Wärmepumpe und starkem Tagesrhythmus </ul>                                          </td></tr>
+            <tr><td>                          </td><td><ul> v1 - Standardhaushalt version 1 </ul>                                                                                                                   </td></tr>
+            <tr><td>                          </td><td><ul> active - Haushalt mit ausgeprägten Tages- und/oder Verbrauchsrhythmen </ul>                                                                             </td></tr>
+            <tr><td>                          </td><td><ul> pv - Haushalt mit PV-gesteuerten Lastmanagement, d.h. wenn Verbraucher bei Überschuss aktiv zugeschaltet werden </ul>                                   </td></tr>
+            <tr><td>                          </td><td><ul> heatpump - Haushalt mit Wärmepumpe  </ul>                                                                                                               </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                              </td></tr>
             <tr><td>                          </td><td><ul> * 0 - die KI-Ergebnisse werden nicht verwendet, nur Legacy Werte </ul>                                                                                  </td></tr>
@@ -40432,7 +40740,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; aiControl aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 aiConHiddenLayers=50-25 aiConTrainStart=5:2
+         attr &lt;name&gt; aiControl aiConProfile=v1,active,pv aiTrainStart=7 aiStorageDuration=3000 aiTreesPV=3 aiConHiddenLayers=50-25 aiConTrainStart=5:2
        </ul>
 
        </li>
@@ -40751,9 +41059,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme der Wärmepumpe in W. Der Wert darf nicht! 0 sein.                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>swstate</b>        </td><td>Abweichend von anderen Consumern ist die Angabe verpflichtend, auch wenn der default verwendet werden soll. Durch Erstellung eines passenden       </td></tr>
-            <tr><td>                       </td><td>userReadings kann gesteuert werden, ob man sowohl Laufzeiten für Heiz- und Kühlbetrieb, Warmwassererzeugung und Heizstabbetrieb zusammenfassen     </td></tr>
-            <tr><td>                       </td><td>will, oder ob man ausschließlich die Laufzeiten des Heiz- und Kühlbetriebs als Zeiten für die Heizung separieren möchte.                           </td></tr>
+            <tr><td> <b>opmode</b>         </td><td>Definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche den aktuellen Betriebsmodus der Wärmepumpe liefert.                               </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
+            <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating </b>                                  </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>swstate</b>        </td><td>Schaltstatus des Kompressors. Die Syntax bleibt wie oben angegeben.                                                                                </td></tr>
+            <tr><td>                       </td><td>Abweichend von anderen Consumern ist die Angabe verpflichtend, auch wenn der default verwendet werden soll.                                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
          </table>
          </ul>
