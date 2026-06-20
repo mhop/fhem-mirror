@@ -7906,7 +7906,6 @@ sub __consumerIdentityFp {
                    ($h->{type}      // ''),
                    ($h->{switchdev} // ''),
                    ($h->{opmode}    // ''),                                 # eigenständiges Device:Reading möglich
-                   ($h->{evid}      // '');                                 # eigenständiges Device:Reading möglich
 }
 
 ################################################################
