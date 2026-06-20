@@ -960,13 +960,13 @@ my %hqtxt = (                                                                   
                        Korrigieren sie bitte eventuelle Fehler und beachten sie m&ouml;gliche Hinweise.<br>
                        (Die Anzeigesprache kann mit dem Attribut "ctrlLanguage" umgestellt werden.)<hr><br>}                               },
   acsmfp => { EN => "Changing the device or one of the identity-defining keys (type, switchdev, ".
-                    "opmode, evid) of an existing consumer is not permitted. \nThis would silently corrupt ".
+                    "opmode) of an existing consumer is not permitted. \nThis would silently corrupt ".
                     "historical data (pvHistory) and AI training data already recorded for '<ANAME>', since that ".
                     "data is keyed only by consumer number, not by device identity.\n\n".
                     "Please delete attribute '<ANAME>' first (this safely removes its history) and define it ".
                     "again with the new device/keys. The consumer number may be reused immediately afterwards.",
               DE => "Das Ändern des Geräts oder eines der identitätsbestimmenden Schlüssel (type, switchdev, ".
-                    "opmode, evid) eines bestehenden Verbrauchers ist nicht zulässig. \nDies würde stillschweigend ".
+                    "opmode) eines bestehenden Verbrauchers ist nicht zulässig. \nDies würde stillschweigend ".
                     "historische Daten (pvHistory) und bereits für '<ANAME>' aufgezeichnete KI-Trainingsdaten beschädigen, da diese ".
                     "Daten nur anhand der Verbrauchernummer und nicht anhand der Geräteidentität indiziert sind.\n\n".
                     "Bitte zunächst das Attribut '<ANAME>' löschen (dadurch wird dessen Verlauf sicher entfernt) und erneut mit dem neuen Gerät ".
