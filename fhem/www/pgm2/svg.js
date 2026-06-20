@@ -292,8 +292,6 @@ sv_menu(evt, embed)
 
     }, embed);
 
-  function pad0(v) { return (v < 10 ? '0'+v  :v); }
-
   function
   mousemove(e)
   {
@@ -345,20 +343,20 @@ sv_menu(evt, embed)
     } else {
       var d = new Date((((xRaw-par.x_min)/par.t_mul)+par.x_off) * 1000);
       if(par.t_mul < 0.0001) {           // Year
-        ts =(pad0(d.getMonth()+1))+"."+pad0(d.getDate()+"."+(d.getYear()+1900));
+        ts = new Intl.DateTimeFormat(navigator.language).format(d); //#144915
       } else if(par.t_mul < 0.001) {     // Month
-        ts = (pad0(d.getMonth()+1))+"."+pad0(d.getDate())+
-                ". "+pad0(d.getHours())+":"+pad0(d.getMinutes());
+        ts = new Intl.DateTimeFormat(navigator.language,
+                { month: '2-digit', day: '2-digit',
+                  hour: 'numeric', minute: 'numeric'}).format(d);
       } else {
-        ts = pad0(d.getHours())+":"+pad0(d.getMinutes());
+        ts = new Intl.DateTimeFormat(navigator.language,
+                { hour: 'numeric', minute: 'numeric'}).format(d);
       }
     }
 
     $(par.circle).attr("cx", xRaw).attr("cy", yRaw);
-    var yd = Math.floor(yRaw / 20)*20 - 50;
-
     $(par.div).html(ts+" "+y)
-              .css({ left:xRaw-20, top:yd });
+              .css({ left:xRaw+20, top:0 });
   }
 
   function
