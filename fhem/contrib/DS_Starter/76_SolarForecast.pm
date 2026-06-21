@@ -7821,7 +7821,7 @@ sub _attrconsumer {                      ## no critic "not used"
       exclgroup       => { comp => '[1-9]\d*',                        must => 0, act => 0 },
       
       # --- nur für heatpump (musts in __attrKeyAction checken)
-      opmode          => { comp => '.*',                              must => 1, act => 1 },
+      opmode          => { comp => '.*',                              must => 0, act => 1 },
       
       # --- nur für bev (musts in __attrKeyAction checken)
       batCap          => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh))',  must => 0, act => 1 },
