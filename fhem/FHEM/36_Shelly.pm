@@ -200,6 +200,7 @@
 # 6.05.18   add: Shelly SPSW-201XE15UL
 # 6.05.19   fix: key of S3SN-0U53X
 #           add: readings 'relay' and 'source' for ShellyPro3EM prooutput addon
+# 6.05.20   add: commands 'on', 'off' etc for ShellyPro3EM prooutput addon
 
 # outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
@@ -222,7 +223,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.19 15.06.2026";
+my $version = "6.05.20 21.06.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -1384,6 +1385,9 @@ sub Shelly_getProperties {
         $hash->{props}{input}  =$chnls[5];
         $hash->{props}{button} =0;
      }
+     # modify number of relay for ShellyPro3EM with prooutput-Addon
+     $hash->{props}{relay}  = 1   if( ReadingsVal($name,'addon','none') eq 'prooutput' );
+  #   $hash->{props}{relay}  = 1   if( $name eq 'Y173' ); # for debugging
 
      # modify number of channels for Shelly Pro RGBW PM (has 2 profiles with multi use of components )
      if( $model eq "shellyprorgbwpm" ){
@@ -2500,8 +2504,9 @@ sub Shelly_Set ($@) {
                                     if( ReadingsVal($name,"model_function","unknown") eq "plug" );
       # most of devices, except roller, metering
       $newkeys .= $shelly_dropdowns{Onoff}
-                                    if( ($mode ne "thermostat" && $mode ne "roller" && $shelly_models{$model}[0]>0) ||
-                                                             $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 );
+                                    if( ($mode ne "thermostat" && $mode ne "roller" && $shelly_models{$model}[0]>0 ) ||
+                                                             $shelly_models{$model}[2]>0 || $shelly_models{$model}[7]>0 ||
+                                                             ReadingsVal($name,'addon','none') eq 'prooutput'  );
       $newkeys .= $shelly_dropdowns{Therm}
                                     if( $model =~ /walldisplay/ );
       # multichannel devices / relay and light only
@@ -2877,9 +2882,11 @@ my $cmd_orig=$cmd;
   $subs="";
   if( $cmd =~ /^(?:toggle|pctD|brightness|(?:on|off|dim)(?:-for-timer)?)$/ ){
      if( $hash->{props}{namespace} !~ /relay|light|color/ ){ # not for rollers
+        if( ReadingsVal($name,'addon','none' ) !~ /prooutput/ ){
           $msg = "Error: forbidden command  \'$cmd\' for device $name";
           Log3 $name,1,"[Shelly_Set] $msg";
           return $msg;
+        }
      }
      if( !defined($channel) ){
         $channel = AttrVal($name,"defchannel",undef);
@@ -2971,10 +2978,13 @@ my $cmd_orig=$cmd;
     # $cmd = is 'on' or 'off'  or  'on&timer=...' or 'off&timer=....' or 'dim&timer=....'
 
     $cmd .="&transition=$transit" if( $transit );
-
+    my $comp = $URLnamespaces{ $hash->{props}{namespace} }[ ($hash->{GEN}>1?1:0) ];
+    if( ReadingsVal($name,'addon','none') eq 'prooutput' ){
+        $channel=100;
+        $comp="Switch";
+    }
     Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd";#4
    # Log3 $name,0,"[Shelly_Set] $name ".$hash->{props}{namespace}."  ".($hash->{props}{gen}?1:0);
-    my $comp = $URLnamespaces{ $hash->{props}{namespace} }[ ($hash->{GEN}>1?1:0) ];
     if( $hash->{GEN}>1 ){ #Gen2+
         # translate Gen1-commands to Gen2
         $cmd =~ s/\?/\&/g;
