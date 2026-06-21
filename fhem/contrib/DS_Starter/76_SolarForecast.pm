@@ -9629,8 +9629,11 @@ sub __attrKeyAction {
                   return qq{For the consumer type 'heatpump' the rated power value must be specified as not equal to 0.};
               }
               
-              if (!defined $pphash->{etotal} || !defined $pphash->{pcurr} || !defined $pphash->{swstate}) {
-                  return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate' and 'pcurr' to be defined.};
+              if (   !defined $pphash->{etotal} 
+                  || !defined $pphash->{pcurr} 
+                  || !defined $pphash->{swstate}
+                  || !defined $pphash->{opmode} ) {
+                  return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate', 'opmode' and 'pcurr' to be defined.};
               }        
           }
       }
