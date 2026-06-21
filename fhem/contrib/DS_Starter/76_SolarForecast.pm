@@ -171,7 +171,8 @@ my %vNotesIntern = (
                            "neue lag2_spike Features aus sandbox in BLOCKS->lags aktiviert, _aiFannEpochDiagnostic: Hints erweitert ".
                            "delConsumerFromMem: Aufnahme neuer Schlüssel, _attrconsumer: Integration des Fingerprint-Guard ".
                            "neue WP-Werte csmXX_(off|heating|defrost|hotwater|cooling|pool|poolheating)_minutes ".
-                           "neuer Schlüssel aiControl->opmode für Consumer 'heatpump', Definition mehrere WP-Consumer nun möglich ",                           
+                           "neuer Schlüssel aiControl->opmode für Consumer 'heatpump', Definition mehrere WP-Consumer nun möglich ".
+                           "verbesserte Prüfung des Objektes 'Weather Properties' im Anlagencheck ",                           
   "2.6.11" => "26.05.2026  _saveEnergyConsumption: nutze Logsequenzmanagement für Verbrauchslimitüberschreitung ".
                            "_aiFannApplyBiasCorrection: Anpassung OSL-Gewicht ",
   "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
@@ -656,6 +657,16 @@ my %profileweights = (                                                        # 
   v1_heatpump_active    => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
   v1_heatpump_pv        => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
   v1_heatpump_active_pv => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
+
+  # --- BEV-Varianten (Startwerte, gespiegelt von common/heatpump; nach erstem realen Training rekalibrieren) ---
+  v1_bev                       => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_active_bev                => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_pv_bev                    => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_active_pv_bev             => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_heatpump_bev              => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
+  v1_heatpump_active_bev       => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
+  v1_heatpump_pv_bev           => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
+  v1_heatpump_active_pv_bev    => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
 );
 
 my %hset = (                                                                  # Hash der Set-Funktion
@@ -7810,7 +7821,7 @@ sub _attrconsumer {                      ## no critic "not used"
       exclgroup       => { comp => '[1-9]\d*',                        must => 0, act => 0 },
       
       # --- nur für heatpump (musts in __attrKeyAction checken)
-      opmode          => { comp => '.*',                              must => 0, act => 1 },
+      opmode          => { comp => '.*',                              must => 1, act => 1 },
       
       # --- nur für bev (musts in __attrKeyAction checken)
       batCap          => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh))',  must => 0, act => 1 },
@@ -7860,16 +7871,10 @@ sub _attrconsumer {                      ## no critic "not used"
       }
       
       # --- Identitätsschutz: sinnstiftende Änderung an bestehendem Consumer verhindern
-      my $oldval = AttrVal ($name, $aName, undef);                                                              # Attributstand VOR dieser Änderung
-
-      if (defined $oldval && $oldval ne $aVal) {
-          my (undef, $oldcodev, $oldh) = isDeviceValid ( { name => $name, obj => $oldval, method => 'string' } );
-
-          if (__consumerIdentityFp ($codev, $h) ne __consumerIdentityFp ($oldcodev, $oldh)) {
-              my $out = encode ("utf8", $hqtxt{acsmfp}{$lang});
-              $out =~ s/<ANAME>/$aName/g;
-              return $out;
-          }
+      if ( __consumerIdentityFp ($name, $aName, $aVal, $codev, $h) ) {  
+          my $out = encode ("utf8", $hqtxt{acsmfp}{$lang});
+          $out =~ s/<ANAME>/$aName/g;
+          return $out;
       }
   }
   else {
@@ -7897,15 +7902,36 @@ return;
 #  Fingerprint der identitätsstiftenden Consumer-Schlüssel
 #  (nur Schlüssel, die festlegen WELCHES physische Gerät bzw.
 #  WELCHE Datenquelle hinter dem Consumer steht)
-################################################################
+################################################################        
 sub __consumerIdentityFp {
-  my ($codev, $h) = @_;
-  $h //= {};
-
-  return join '|', ($codev          // ''),
-                   ($h->{type}      // ''),
-                   ($h->{switchdev} // ''),
-                   ($h->{opmode}    // ''),                                 # eigenständiges Device:Reading möglich
+  my ($name, $aName, $aVal, $codev, $h) = @_;
+  $h     //= {};
+  $codev //= '';
+  
+  my $delreq = 0;                                                           # Löschrequest
+  my $oldval = AttrVal ($name, $aName, undef);                              # Attributstand VOR dieser Änderung
+  
+  if (!defined $oldval || $oldval eq $aVal) { return $delreq };
+  
+  my (undef, $oldcodev, $oldh) = isDeviceValid ( { name => $name, obj => $oldval, method => 'string' } );
+  $oldh     //= {};
+  $oldcodev //= '';
+  
+  my @fpkeys = qw(type switchdev opmode);
+  
+  $delreq = 1 if $codev ne $oldcodev;
+  
+  for my $k (@fpkeys) {
+      my $newset = defined $h->{$k}    && $h->{$k}    ne '';
+      my $oldset = defined $oldh->{$k} && $oldh->{$k} ne '';
+      
+      next if !$oldset;                                                    # alt nicht gesetzt -> egal was neu ist, immer ok
+      
+      $delreq = 1 if !$newset;                                             # alt gesetzt, neu entfernt -> Löschrequest
+      $delreq = 1 if $newset && $oldh->{$k} ne $h->{$k};                   # beide gesetzt, unterschiedlich -> Löschrequest
+  }
+  
+return $delreq;
 }
 
 ################################################################
@@ -25536,7 +25562,7 @@ sub _aiFannBuildLagFeatures {
 
   # ---------------------------------------------------------
   # Lags - verzögerte Werte einer Zeitreihe
-  # $y_t   = letzter bekannter Wert (z.B. hod=8)
+  # $y_t   = letzter bekannter Wert (z.B. hod=8) -> ist letzte abgeschlossene Stunde!
   # $y_t_1 = eine Stunde davor     (z.B. hod=7)
   # Zielwert ist hod=9, also NICHT in con_series enthalten
   # ---------------------------------------------------------
@@ -25915,6 +25941,103 @@ sub _aiFannSelectProfile {
   $profile = $frvdef if($profile =~ /heatpump/xs && !defined $hp);          # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
       
 return $profile;
+}
+
+###############################################################
+#  AI REGISTRY Builder – baut Feature-Vektor aus Profil
+#  Aufruf: my $features = _aiFannFeatureBuilder ($profile, \%f)
+#  Return: Arrayref [ 0.3, 0.7, 1, 0, 0.12, ... ]
+###############################################################
+sub _aiFannFeatureBuilder {
+  my ($profile, $f) = @_;
+    
+  my $flags = {                                                                             # parsen in Flags
+      active   => ($profile =~ /active/   ? 1 : 0),
+      pv       => ($profile =~ /pv/       ? 1 : 0),
+      heatpump => ($profile =~ /heatpump/ ? 1 : 0),
+      bev      => ($profile =~ /bev/      ? 1 : 0),
+  };
+    
+  my @features;
+
+  # --------------------------------------------------------
+  # Basis-Features
+  # --------------------------------------------------------
+  push @features, @{ $FEATURE_BLOCKS{time_base}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{seasonality}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{weather_pv}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{lags}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{daily_energy_context}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{semantics_presence}->($f) };
+    
+  # --------------------------------------------------------
+  # v1_common – Standardhaushalt (ohne PV Semantik)
+  # --------------------------------------------------------
+  push @features, @{ $FEATURE_BLOCKS{trends}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{semantics_rueckfall}->($f) };
+  push @features, @{ $FEATURE_BLOCKS{semantics_cold}->($f) };
+    
+  # --------------------------------------------------------
+  # v1_common_active – erweiterter Tagestythmus
+  # --------------------------------------------------------
+  if ($flags->{active}) {                                                                   # starker Tagesrhythmus
+      push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) };
+  }
+  
+  # --------------------------------------------------------
+  # v1_common_pv – Standardhaushalt (inkl. PV-Semantik)
+  # v1_common_pv_active – Standardhaushalt (inkl. PV) +
+  #                       erweiterter Tagestythmus
+  # --------------------------------------------------------
+  if ($flags->{pv}) {
+      push @features, @{ $FEATURE_BLOCKS{pv}->($f) };
+        
+      if ($flags->{active}) {                                                               # starker Tagesrhythmus
+          push @features, @{ $FEATURE_BLOCKS{semantics_pv}->($f) };
+          push @features, @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) };
+      }
+      else {                                                                                # normaler Tagesrhythmus
+          push @features, @{ $FEATURE_BLOCKS{pv_mittag_peak_boost}->($f) };
+      }
+  }
+    
+  # --------------------------------------------------------
+  # v1_heatpump – WP
+  # v1_heatpump_active - WP dynamic
+  # --------------------------------------------------------  
+  if ($flags->{heatpump}) {
+      push @features, @{ $FEATURE_BLOCKS{heatpump_base}->($f) };
+      
+      if ($flags->{pv} && $flags->{active}) {                                               # WP + PV + starker Tagesrhythmus
+          push @features, @{ $FEATURE_BLOCKS{semantics_heatpump_boost_special}->($f) };
+      }  
+      elsif ($flags->{pv}) {                                                                # WP + PV
+          push @features, @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) };
+      }
+  }
+    
+  # --------------------------------------------------------
+  # --- bev - noch zu implementieren
+  # --------------------------------------------------------
+  if ($flags->{bev}) {
+      push @features, @{ $FEATURE_BLOCKS{bev_base}->($f) };         
+       
+      if ($flags->{pv}) {
+          push @features, @{ $FEATURE_BLOCKS{bev_pv_smart_charge}->($f) };
+      }
+  }
+    
+  # --------------------------------------------------------
+  # v1_sandbox Äquivalent – Tests
+  # sandbox wird nicht über Flags gesteuert sondern bleibt
+  # --------------------------------------------------------
+  if ($profile eq 'v1_sandbox') {
+      push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) };
+      push @features, @{ $FEATURE_BLOCKS{sandbox}->($f) };
+  }
+    
+return \@features;
 }
 
 ###########################################################################
@@ -29110,103 +29233,6 @@ return $pv_max_limit;
 }
 
 ###############################################################
-#  AI REGISTRY Builder – baut Feature-Vektor aus Profil
-#  Aufruf: my $features = _aiFannFeatureBuilder ($profile, \%f)
-#  Return: Arrayref [ 0.3, 0.7, 1, 0, 0.12, ... ]
-###############################################################
-sub _aiFannFeatureBuilder {
-  my ($profile, $f) = @_;
-    
-  my $flags = {                                                                             # parsen in Flags
-      active   => ($profile =~ /active/   ? 1 : 0),
-      pv       => ($profile =~ /pv/       ? 1 : 0),
-      heatpump => ($profile =~ /heatpump/ ? 1 : 0),
-      bev      => ($profile =~ /bev/      ? 1 : 0),
-  };
-    
-  my @features;
-
-  # --------------------------------------------------------
-  # Basis-Features
-  # --------------------------------------------------------
-  push @features, @{ $FEATURE_BLOCKS{time_base}->($f) };
-  push @features, @{ $FEATURE_BLOCKS{seasonality}->($f) };
-  push @features, @{ $FEATURE_BLOCKS{weather_pv}->($f) };
-  push @features, @{ $FEATURE_BLOCKS{lags}->($f) };
-  push @features, @{ $FEATURE_BLOCKS{daily_energy_context}->($f) };
-  push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm}->($f) };
-  push @features, @{ $FEATURE_BLOCKS{semantics_presence}->($f) };
-    
-  # --------------------------------------------------------
-  # v1_common – Standardhaushalt (ohne PV Semantik)
-  # --------------------------------------------------------
-  push @features, @{ $FEATURE_BLOCKS{trends}->($f) };
-  push @features, @{ $FEATURE_BLOCKS{semantics_rueckfall}->($f) };
-  push @features, @{ $FEATURE_BLOCKS{semantics_cold}->($f) };
-    
-  # --------------------------------------------------------
-  # v1_common_active – erweiterter Tagestythmus
-  # --------------------------------------------------------
-  if ($flags->{active}) {                                                                   # starker Tagesrhythmus
-      push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) };
-  }
-  
-  # --------------------------------------------------------
-  # v1_common_pv – Standardhaushalt (inkl. PV-Semantik)
-  # v1_common_pv_active – Standardhaushalt (inkl. PV) +
-  #                       erweiterter Tagestythmus
-  # --------------------------------------------------------
-  if ($flags->{pv}) {
-      push @features, @{ $FEATURE_BLOCKS{pv}->($f) };
-        
-      if ($flags->{active}) {                                                               # starker Tagesrhythmus
-          push @features, @{ $FEATURE_BLOCKS{semantics_pv}->($f) };
-          push @features, @{ $FEATURE_BLOCKS{pv_mittag_peak_boost_special}->($f) };
-      }
-      else {                                                                                # normaler Tagesrhythmus
-          push @features, @{ $FEATURE_BLOCKS{pv_mittag_peak_boost}->($f) };
-      }
-  }
-    
-  # --------------------------------------------------------
-  # v1_heatpump – WP
-  # v1_heatpump_active - WP dynamic
-  # --------------------------------------------------------  
-  if ($flags->{heatpump}) {
-      push @features, @{ $FEATURE_BLOCKS{heatpump_base}->($f) };
-      
-      if ($flags->{pv} && $flags->{active}) {                                               # WP + PV + starker Tagesrhythmus
-          push @features, @{ $FEATURE_BLOCKS{semantics_heatpump_boost_special}->($f) };
-      }  
-      elsif ($flags->{pv}) {                                                                # WP + PV
-          push @features, @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) };
-      }
-  }
-    
-  # --------------------------------------------------------
-  # --- bev - noch zu implementieren
-  # --------------------------------------------------------
-  if ($flags->{bev}) {
-      push @features, @{ $FEATURE_BLOCKS{bev_base}->($f) };         
-       
-      if ($flags->{pv}) {
-          push @features, @{ $FEATURE_BLOCKS{bev_pv_smart_charge}->($f) };
-      }
-  }
-    
-  # --------------------------------------------------------
-  # v1_sandbox Äquivalent – Tests
-  # sandbox wird nicht über Flags gesteuert sondern bleibt
-  # --------------------------------------------------------
-  if ($profile eq 'v1_sandbox') {
-      push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) };
-      push @features, @{ $FEATURE_BLOCKS{sandbox}->($f) };
-  }
-    
-return \@features;
-}
-
-###############################################################
 #      Berechnung Standardabweichung
 ############################################################### 
 sub _aiFannStandardDeviation {
@@ -31569,15 +31595,21 @@ sub checkPlantConfig {
                   $result->{'Weather Properties'}{fault}   = 1;
               }
               else {
-                  $mosm = AttrVal ($fcname, 'forecastRefresh', 6) == 6 ? 'MOSMIX_L' : 'MOSMIX_S';
+                  my $fcrefresh = AttrVal ($fcname, 'forecastRefresh', 6);
+                  $mosm         = $fcrefresh == 6 ? 'MOSMIX_L' : 'MOSMIX_S';
 
                   if ($mosm eq 'MOSMIX_L') {
                       $result->{'Weather Properties'}{state}   = $info;
                       $result->{'Weather Properties'}{result} .= qq(The device "$fcname" uses "$mosm" which is only updated by DWD every 6 hours. <br>);
                       $result->{'Weather Properties'}{info}    = 1;
                   }
-
-                  #$result->{'Weather Properties'}{result} .= $hqtxt{fulfd}{$lang}." ($hqtxt{attrib}{$lang}: setupWeatherDev$step)<br>";
+                  else {                                                                # MOSMIX_S Verwendung
+                      if ($fcrefresh > 1) {
+                          $result->{'Weather Properties'}{state}   = $warn;
+                          $result->{'Weather Properties'}{result} .= qq(The device "$fcname" uses "$mosm" but attribute forecastRefresh=$fcrefresh. Set it to value "1" to avoid using outdated data. <br>);
+                          $result->{'Weather Properties'}{warn}    = 1;                          
+                      }
+                  }
               }
               
               if (!$result->{'Weather Properties'}{warn} && !$result->{'Weather Properties'}{fault}) {
@@ -31586,7 +31618,7 @@ sub checkPlantConfig {
 
               $result->{'Weather Properties'}{note} .= qq{checked parameters and attributes of device "$fcname": <br>};
               $result->{'Weather Properties'}{note} .= 'forecastProperties -> '.join (',', @dweattrmust).'<br>';
-              $result->{'Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
+              $result->{'Weather Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to "1" for using MOSMIX_S if possible' : '').'<br>';
               $result->{'Weather Properties'}{note} .= 'forecastDays <br>';
           }
           else {
@@ -31666,7 +31698,7 @@ sub checkPlantConfig {
       $result->{'DWD Radiation Properties'}{note} .= qq{<br>checked parameters and attributes device "$raname": <br>};
       $result->{'DWD Radiation Properties'}{note} .= 'forecastProperties -> '.join (',', @draattrmust).'<br>';
       $result->{'DWD Radiation Properties'}{note} .= 'forecastDays <br>';
-      $result->{'DWD Radiation Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to below "6" if possible' : '').'<br>';
+      $result->{'DWD Radiation Properties'}{note} .= 'forecastRefresh '.($mosm eq 'MOSMIX_L' ? '-> set attribute to "1" for using MOSMIX_S if possible' : '').'<br>';
   }
 
   ## Check Rooftop und Roof Ident Pair Settings (SolCast)
@@ -37561,7 +37593,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> v1 - Standard Household Version 1 </ul>                                                                                                                 </td></tr>
             <tr><td>                          </td><td><ul> active - Households with distinct daily and/or consumption patterns </ul>                                                                               </td></tr>
             <tr><td>                          </td><td><ul> pv - Household with PV-controlled load management, i.e., when appliances are actively switched on when there is excess power </ul>                      </td></tr>
-            <tr><td>                          </td><td><ul> heatpump - Household with a heat pump  </ul>                                                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> heatpump - Household with heat pump(s) </ul>                                                                                                            </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Weighting of AI results with conventional (legacy) consumption forecast values.                                                                              </td></tr>
             <tr><td>                          </td><td><ul> * 0 - the AI results are not used, only legacy values. </ul>                                                                                            </td></tr>
@@ -37967,7 +37999,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>Maximum power consumption of the heat pump in W. The value must not be 0.                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>opmode</b>         </td><td>Defines a &lt;Device&gt;:&lt;Reading&gt; combination that provides the heat pump's current operating mode.                                         </td></tr>
+            <tr><td> <b>opmode</b>         </td><td>Defines a &lt;Device&gt;:&lt;Reading&gt; combination that provides the heat pump's current operating mode (Required Information).                  </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
             <tr><td>                       </td><td>The return value must be exactly one of the following: <b>off heating defrost hotwater cooling pool poolheating </b>                               </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
@@ -39445,6 +39477,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>forecastDays</b>            </td><td>2                                                                  </td></tr>
             <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet,FF                           </td></tr>
             <tr><td> <b>forecastResolution</b>      </td><td>1                                                                  </td></tr>
+            <tr><td> <b>forecastRefresh</b>         </td><td>1 (for MOSMIX_S) or 6 (for MOSMIX_L)                               </td></tr>
             <tr><td> <b>forecastStation</b>         </td><td>&lt;Station code of the evaluated DWD station&gt;                  </td></tr>
          </table>
        </ul>
@@ -40650,7 +40683,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> v1 - Standardhaushalt version 1 </ul>                                                                                                                   </td></tr>
             <tr><td>                          </td><td><ul> active - Haushalt mit ausgeprägten Tages- und/oder Verbrauchsrhythmen </ul>                                                                             </td></tr>
             <tr><td>                          </td><td><ul> pv - Haushalt mit PV-gesteuerten Lastmanagement, d.h. wenn Verbraucher bei Überschuss aktiv zugeschaltet werden </ul>                                   </td></tr>
-            <tr><td>                          </td><td><ul> heatpump - Haushalt mit Wärmepumpe  </ul>                                                                                                               </td></tr>
+            <tr><td>                          </td><td><ul> heatpump - Haushalt mit Wärmepumpe(n)  </ul>                                                                                                            </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                              </td></tr>
             <tr><td>                          </td><td><ul> * 0 - die KI-Ergebnisse werden nicht verwendet, nur Legacy Werte </ul>                                                                                  </td></tr>
@@ -41058,9 +41091,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme der Wärmepumpe in W. Der Wert darf nicht! 0 sein.                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>opmode</b>         </td><td>Definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche den aktuellen Betriebsmodus der Wärmepumpe liefert.                               </td></tr>
+            <tr><td> <b>opmode</b>         </td><td>Definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche den aktuellen Betriebsmodus der Wärmepumpe liefert (Pflichtangabe).               </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
-            <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating </b>                                  </td></tr>
+            <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating </b>                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Schaltstatus des Kompressors. Die Syntax bleibt wie oben angegeben.                                                                                </td></tr>
             <tr><td>                       </td><td>Abweichend von anderen Consumern ist die Angabe verpflichtend, auch wenn der default verwendet werden soll.                                        </td></tr>
@@ -42538,6 +42571,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
              <tr><td> <b>forecastDays</b>            </td><td>2                                                   </td></tr>
              <tr><td> <b>forecastProperties</b>      </td><td>TTT,Neff,RR1c,ww,SunUp,SunRise,SunSet,FF            </td></tr>
              <tr><td> <b>forecastResolution</b>      </td><td>1                                                   </td></tr>
+             <tr><td> <b>forecastRefresh</b>         </td><td>1 (für MOSMIX_S) oder 6 (für MOSMIX_L)              </td></tr>
              <tr><td> <b>forecastStation</b>         </td><td>&lt;Stationscode der ausgewerteten DWD Station&gt;  </td></tr>
           </table>
        </ul>
