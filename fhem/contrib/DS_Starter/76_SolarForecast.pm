@@ -7925,10 +7925,16 @@ sub __consumerIdentityFp {
       my $newset = defined $h->{$k}    && $h->{$k}    ne '';
       my $oldset = defined $oldh->{$k} && $oldh->{$k} ne '';
       
-      next if !$oldset;                                                    # alt nicht gesetzt -> egal was neu ist, immer ok
+      next if !$oldset;                                                     # alt nicht gesetzt -> egal was neu ist, immer ok
       
-      $delreq = 1 if !$newset;                                             # alt gesetzt, neu entfernt -> Löschrequest
-      $delreq = 1 if $newset && $oldh->{$k} ne $h->{$k};                   # beide gesetzt, unterschiedlich -> Löschrequest
+      $delreq = 1 if !$newset;                                              # alt gesetzt, neu entfernt -> Löschrequest
+      
+      if ($newset && $oldh->{$k} ne $h->{$k}) {                             # beide gesetzt, unterschiedlich -> Device Änderung prüfen
+          my $olddev = (split ":", $oldh->{$k}, 2)[0];
+          my $newdev = (split ":", $h->{$k}, 2)[0];
+          
+          $delreq = 1 if $newdev ne $olddev;                                # Devices unterschiedlich -> Löschrequest              
+      }
   }
   
 return $delreq;
