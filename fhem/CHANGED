@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  72_FritzSmart: Fehlerkorrekt prüfen Parameter bei set...call
  - new:     98_WebAuth: Module for support of WebAuthn via reverseproxy.
  - bugfix:  98_vitoconnect: Error handling bugfix von R. Bergmann. Danke!
  - feature: 55_MiniSIP: add authentication
