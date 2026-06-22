@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.05.27";
+our $ModulVersion = "26.06.22";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -485,12 +485,10 @@ our %TR064   = (
 our %JavaScript = (
         aura                  => { 800 => "generic?ui=aura",
                                    810 => "generic/aura"},
-        books                 => { 800 => "phonebook/books",
+        phonebook             => { 800 => "phonebook/books",
                                    810 => "dino/phonebook/books"},
         box                   => { 800 => "generic?ui=box",
                                    810 => "generic/box"},
-        boxname               => { 800 => "misc/boxname",
-                                   810 => "dino/misc/boxname"},
         boxnotifications      => { 800 => "boxnotifications",
                                    810 => "dino/boxnotifications"},
         boxusers              => { 800 => "generic?ui=boxusers",
@@ -519,6 +517,18 @@ our %JavaScript = (
                                    810 => "dino/eventlog"},
         eventlog_groups       => { 800 => "eventlog/groups",
                                    810 => "dino/eventlog/groups"},
+        eventlog_groups_all   => { 800 => "eventlog/groups/all",
+                                   810 => "dino/eventlog/groups/all"},
+        eventlog_groups_sys   => { 800 => "eventlog/groups/sys",
+                                   810 => "dino/eventlog/groups/sys"},
+        eventlog_groups_net   => { 800 => "eventlog/groups/net",
+                                   810 => "dino/eventlog/groups/net"},
+        eventlog_groups_fon   => { 800 => "eventlog/groups/fon",
+                                   810 => "dino/eventlog/groups/fon"},
+        eventlog_groups_wlan  => { 800 => "eventlog/groups/wlan",
+                                   810 => "dino/eventlog/groups/wlan"},
+        eventlog_groups_usb   => { 800 => "eventlog/groups/usb",
+                                   810 => "dino/eventlog/groups/usb"},
         eth_ports             => { 800 => "generic?ui=eth_ports",
                                    810 => "generic/eth_ports"},
         emailnotify           => { 800 => "generic?ui=emailnotify",
@@ -527,8 +537,6 @@ our %JavaScript = (
                                    810 => "dino/errorreport"},
         forwardrules          => { 800 => "generic?ui=forwardrules",
                                    810 => "generic/forwardrules"},
-        handsets              => { 800 => "misc/handsets",
-                                   810 => "dino/misc/handsets"},
         hybridcfg             => { 800 => "generic?ui=hybridcfg",
                                    810 => "generic/hybridcfg"},
         igdforwardrules       => { 800 => "generic?ui=igdforwardrules",
@@ -553,6 +561,16 @@ our %JavaScript = (
                                    810 => "media"},
         misc                  => { 800 => "misc",
                                    810 => "dino/misc"},
+        misc_boxname          => { 800 => "misc/boxname",
+                                   810 => "dino/misc/boxname"},
+        misc_configuration    => { 800 => "misc/configuration",
+                                   810 => "dino/misc/configuration"},
+        misc_handsets         => { 800 => "misc/handsets",
+                                   810 => "dino/misc/handsets"},
+        misc_updatestatus     => { 800 => "misc/updateStatus",
+                                   810 => "dino/misc/updateStatus"},
+        misc_wan_status       => { 800 => "misc/wanStatus",
+                                   810 => "dino/misc/wanStatus"},
         mobiled               => { 800 => "generic?ui=mobiled",
                                    810 => "generic/mobiled"},
         monitor_datasets      => { 800 => "monitor/datasets"},
@@ -587,6 +605,8 @@ our %JavaScript = (
                                    810 => "generic/providerlist"},
         remoteman             => { 800 => "generic?ui=remoteman",
                                    810 => "generic/remoteman"},
+        setup                 => { 800 => "setup",
+                                   810 => "setup"},
         sip                   => { 800 => "generic?ui=sip",
                                    810 => "generic/sip"},
         smarthome_overview    => { 800 => "smarthome/overview",
@@ -607,6 +627,8 @@ our %JavaScript = (
                                    810 => "smarthome/overview/globals"},
         storage               => { 800 => "storage",
                                    810 => "storage"},
+        storagenasrights      => { 800 => "storagenasrights",
+                                   810 => "dino/storagenasrights"},
         tam                   => { 800 => "generic?ui=tam",
                                    810 => "generic/tam"},
         telcfg                => { 800 => "generic?ui=telcfg",
@@ -623,8 +645,6 @@ our %JavaScript = (
                                    810 => "generic/uimodlogic"},
         updatecheck           => { 800 => "generic?ui=updatecheck",
                                    810 => "generic/updatecheck"},
-        updatestatus          => { 800 => "misc/updateStatus",
-                                   810 => "dino/misc/updateStatus"},
         umts                  => { 800 => "generic?ui=umts",
                                    810 => "generic/umts"},
         usb                   => { 800 => "usb",
@@ -647,8 +667,6 @@ our %JavaScript = (
                                    810 => "generic/wlan"},
         wlan_light            => { 800 => "generic?ui=wlan_light",
                                    810 => "generic/wlan_light"},
-        wlan_status           => { 800 => "misc/wanStatus",
-                                   810 => "dino/misc/wanStatus"},
         wlan_timer            => { 800 => "timermix/WLANTimer",
                                    810 => "dino/timermix/WLANTimer"}
 );
@@ -3212,7 +3230,7 @@ sub Fritz_Set_Modul($$@)
 
        if (int @val > 0 && int @val <= 3) {
 
-         $retMsg = "ERROR: Parameter '$val[0]' not a valid phone number.";
+         $retMsg = "ERROR: Parameter 1 '$val[0]' not a valid phone number.";
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) unless $val[0] =~ /^[\d\*\#+,]+$/;
 
          $retMsg = "";
@@ -3220,33 +3238,44 @@ sub Fritz_Set_Modul($$@)
          my $dectID   = undef;
          my $ansID    = undef;
 
-         if(defined($val[1])) {
+         if(@val >= 2) {
             ($duration) = $val[1] =~ /^dur:(\d+)$/;
            (($duration) = $val[1] =~ /^(\d+)$/) if (!defined($duration));
            (($dectID)   = $val[1] =~ /^dectID:(\d+)$/) if (!defined($duration));
-           if(int @val == 2) {
-             $retMsg = "ERROR: Parameter '$val[1]' not a valid duration or dect ID." if (!$duration && !$dectID);
+
+           if(int @val >= 2 && !defined($duration) && !defined($dectID)) {
+             $retMsg = "ERROR: Parameter 2 '$val[1]' not a valid duration or dect ID.";
+             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
            }
          }
 
-         if(defined($val[2])) {
+         # return "dur:" . (defined($duration)?$duration:"undef") ." dectID:". (defined($dectID)?$dectID:"undef");
+
+         if(@val == 3) {
            (($dectID)   = $val[2] =~ /^dectID:(\d+)$/) if (!defined($dectID));
            (($duration) = $val[2] =~ /^dur:(\d+)$/)  if (!defined($duration));
 
-           # $retMsg = "ERROR: Parameter '$val[2]' not a valid duration." if (!defined($duration));
-           $retMsg = "ERROR: Parameter '$val[2]' not a valid dect ID." if (!defined($dectID));
+           if (!defined($duration) || !defined($dectID)) {
+             $retMsg =  "ERROR: Parameter 3 '$val[2]' not a valid duration." if(!defined($duration));
+             $retMsg .= "ERROR: Parameter 3 '$val[2]' not a valid dect ID." if (!defined($dectID));
+             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+           }
          }
 
-         $duration = "60" if (!$duration || $duration < 1 || $duration > 60);
-         $dectID   = ""   if (!$dectID);
+         # return "dur:" . (defined($duration)?$duration:"undef") ." dectID:". (defined($dectID)?$dectID:"undef");
 
-         if($dectID ne "" && main::AttrVal($name, "disableDectInfo", "0") eq "1") {
-           $retMsg = "ERROR: Attribut disableDectInfo is set. dectID is not a valid parameter.";
+         $duration = "60" if (!defined($duration) || $duration < 1 || $duration > 60);
+         $dectID   = ""   if (!defined($dectID));
 
-         } else {
+         if($dectID  >= 1) {
+           if( main::AttrVal($name, "disableDectInfo", "0") eq "1") {
+             $retMsg = "ERROR: Attribut disableDectInfo is set. dectID is not a valid parameter.";
 
-           $ansID = main::ReadingsVal($name, "dect" .$dectID. "_device", undef);
-           $retMsg = "ERROR: Parameter '$dectID' not a valid dect ID." if(!defined($ansID) && $retMsg eq "");
+           } else {
+
+             $ansID = main::ReadingsVal($name, "dect" .$dectID. "_device", undef);
+             $retMsg = "ERROR: Parameter '$dectID' not a valid dect ID." if(!defined($ansID) && $retMsg eq "");
+           }
          }
 
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) if ($retMsg ne "");
@@ -19051,14 +19080,14 @@ sub Fritz_Helper_Dumper($$;@) {
    <br>
    <i>The modul uses the Perl moduls<br>
      <ul>
-       <dt>MIME::Base</dt>
+       <dt>MIME::Base64</dt>
        <dt>IO::Socket</dt>
        <dt>Net::Ping</dt>
        <dt>JSON</dt>
        <dt>LWP::UserAgent</dt>
        <dt>URI::Escape</dt>
-       <dt>use XML::Simple</dt>
-       <dt>use Data::Dumper</dt>
+       <dt>XML::Simple</dt>
+       <dt>Data::Dumper</dt>
      </ul>
    </i>
    As of Fritz!OS 7.25 —currently applicable only to Fritz!Box devices— a username is strictly required for login.<br>
@@ -20392,14 +20421,14 @@ sub Fritz_Helper_Dumper($$;@) {
    <br>
    <i>Das Modul nutzt folgende Perlmodule:<br>
      <ul>
-       <dt>MIME::Base</dt>
+       <dt>MIME::Base64</dt>
        <dt>IO::Socket</dt>
        <dt>Net::Ping</dt>
        <dt>JSON</dt>
        <dt>LWP::UserAgent</dt>
        <dt>URI::Escape</dt>
-       <dt>use XML::Simple</dt>
-       <dt>use Data::Dumper</dt>
+       <dt>XML::Simple</dt>
+       <dt>Data::Dumper</dt>
      </ul>
    </i>
    Ab Fritz!OS 7.25 wird, bisher nur für Fritz!Boxen, zwingend einen Benutzername für das Login verlangt.<br>
