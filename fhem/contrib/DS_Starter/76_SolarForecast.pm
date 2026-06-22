@@ -163,6 +163,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.8.0"  => "22.06.2026  BEV Implementierung, Leakage Problematik beseitigt ",
   "2.7.0"  => "20.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
                            "verbesserter Snap-Guard und Retrainidicator, Hint-Korrektur, Div0-Fix ".
                            "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ".
@@ -1928,10 +1929,10 @@ lags => sub {
         $f->{lag168_norm},                                                  # Verbrauch vor 168h (Vorwoche gleiche Stunde)
 
         # --- Spike-Erkennung (Abweichung vom lokalen Mittelwert) ---
-        $f->{lag1_spike_pos_norm},                                          # y_t übertrifft 3h-Mittelwert (laufender Spike)
-        $f->{lag1_spike_neg_norm},                                          # y_t unterschreitet 3h-Mittelwert (laufender Einbruch)
-        $f->{lag2_spike_pos_norm},                                          # y_t_1 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
-        $f->{lag2_spike_neg_norm},                                          # y_t_1 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
+        $f->{lag1_spike_pos_norm},                                          # y_t_1 übertrifft 3h-Mittelwert (laufender Spike)
+        $f->{lag1_spike_neg_norm},                                          # y_t_1 unterschreitet 3h-Mittelwert (laufender Einbruch)
+        $f->{lag2_spike_pos_norm},                                          # y_t_2 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
+        $f->{lag2_spike_neg_norm},                                          # y_t_2 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
 
         # --- Kurzfristige Dynamik ---
         $f->{delta1_norm_pos},                                              # Verbrauchsanstieg zur Vorstunde
@@ -1939,15 +1940,15 @@ lags => sub {
         $f->{delta24_norm_pos},                                             # Verbrauchsanstieg zum Vortag (gleiche Stunde)
         $f->{delta24_norm_neg},                                             # Verbrauchsabsenkung zum Vortag
 
-        # --- Rolling-Fenster (Volatilität, Peak-Niveau) Block im nächsten Schritt aktivieren ---
-        #$f->{roll_min_6_norm},                                              # Tiefstwert der letzten 6h (Grundlastniveau)
-        #$f->{roll_max_6_norm},                                              # Höchstwert der letzten 6h (Peak-Niveau)
-        #$f->{roll_range_6_norm},                                            # Spannweite der letzten 6h (Volatilität ohne Glättung)
+        # --- Rolling-Fenster (Volatilität, Peak-Niveau) ---
+        $f->{roll_min_6_norm},                                              # Tiefstwert der letzten 6h (Grundlastniveau)
+        $f->{roll_max_6_norm},                                              # Höchstwert der letzten 6h (Peak-Niveau)
+        $f->{roll_range_6_norm},                                            # Spannweite der letzten 6h (Volatilität ohne Glättung)
 
-        # --- Verbrauchsregime Block im nächsten Schritt aktivieren ---
-        #$f->{is_low_cons_regime},                                           # y_t <= P25: Grundlast / Nacht / abwesend
-        #$f->{is_high_cons_regime},                                          # y_t >= P75: Peak / Kochen / Geräte an
-        #$f->{is_transition_regime},                                         # P25 < y_t < P75: normaler Betrieb
+        # --- Verbrauchsregime ---
+        $f->{is_low_cons_regime},                                           # y_t_1 <= P25: Grundlast / Nacht / abwesend
+        $f->{is_high_cons_regime},                                          # y_t_1 >= P75: Peak / Kochen / Geräte an
+        $f->{is_transition_regime},                                         # P25 < y_t_1 < P75: normaler Betrieb
     ];
 },
 
@@ -2328,21 +2329,38 @@ semantics_heatpump_boost_special => sub {                                       
 },
 
 # --------------------------------------------------------
+# Semantik: BEV Ladevorgang (Basis)
+# Alle Werte sind Lag1 (Vorstunde)
+# --------------------------------------------------------
+bev_base => sub {
+    my ($f) = @_;
+    return [
+        $f->{bev_active_lag1},                                          # mind. ein EV lud in der Vorstunde
+        $f->{bev_load_lag1_norm},                                       # geladene Energiemenge Vorstunde (normiert)
+        $f->{bev_n_active_lag1_norm},                                   # Anteil gleichzeitig ladender EVs Vorstunde
+        $f->{bev_soc_deficit_lag1_norm},                                # mittleres SoC-Defizit zum Ende der Vorstunde
+    ];
+},
+
+# --------------------------------------------------------
+# Semantik: BEV + PV-gesteuertes Lademanagement
+# --------------------------------------------------------
+bev_pv_smart_charge => sub {
+    my ($f) = @_;
+    return [
+        softplus($f->{pv_norm} * $f->{bev_active_lag1}),                # Ladefortsetzung bei PV-Überschuss
+        softplus($f->{pv_norm} * $f->{bev_soc_deficit_lag1_norm}),      # PV-Überschuss trifft offenen Ladebedarf
+        softplus($f->{pv_drop} * $f->{bev_active_lag1}),                # Lastabwurf bei PV-Einbruch während Ladung
+    ];
+},
+
+# --------------------------------------------------------
 # Sandbox für neue Features
 # --------------------------------------------------------
 sandbox => sub {
     my ($f) = @_;
     return [
-        #$f->{lag2_spike_pos_norm},                                          # y_t_1 übertraf 3h-Mittelwert davor (Spike klingt ab / hält an)
-        #$f->{lag2_spike_neg_norm},                                          # y_t_1 unterschritt 3h-Mittelwert davor (Einbruch klingt ab / hält an)
 
-        #$f->{roll_min_6_norm},                                              # Tiefstwert der letzten 6h (Grundlastniveau)
-        #$f->{roll_max_6_norm},                                              # Höchstwert der letzten 6h (Peak-Niveau)
-        #$f->{roll_range_6_norm},                                            # Spannweite der letzten 6h (Volatilität ohne Glättung)
-
-        #$f->{is_low_cons_regime},                                           # y_t <= P25: Grundlast / Nacht / abwesend
-        #$f->{is_high_cons_regime},                                          # y_t >= P75: Peak / Kochen / Geräte an
-        #$f->{is_transition_regime},                                         # P25 < y_t < P75: normaler Betrieb
     ];
 },
 
@@ -9488,8 +9506,13 @@ sub __attrKeyAction {
       
       if ($init_done && $akey eq 'aiConProfile') {
           if ($akeyval =~ /heatpump/xs) {
-              my $hp = isHeatPumpUsed ($name);                                                          # Consumer Nummer, Solltemp falls WP verwendet
-              if (!defined $hp) {return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.};}
+              my $hp = isHeatPumpUsed ($name);                                             
+              if (!defined $hp) { return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.} }
+          }
+          
+          if ($akeyval =~ /bev/xs) {
+              my $ev = isBevUsed ($name);                                                       
+              if (!defined $ev) { return qq{No Consumer type 'bev' is defined. Please define it with the consumerXX attribute first.} }
           }
       }
       
@@ -24924,7 +24947,7 @@ sub aiFannCreateConTrainData {
   my $name  = $paref->{name}; 
   my $debug = $paref->{debug}; 
 
-  my ($msg, $serial, $profile);
+  my ($msg, $serial);
   
   my $pv_max_limit = _pvMaxLimit ($name);
   my $fanntyp      = 'con';                                                                 # FANN Verwendungsart 'consumption' Prognose
@@ -24952,6 +24975,7 @@ sub aiFannCreateConTrainData {
   my (@month_cos_values, @sunaz_sin_values, @sunaz_cos_values, @wcc_norm_values, @isday_values);
   my (@day_hour_norm_values, @night_hour_norm_values, @inthod_values);
   my (@presence_values, @holiday_values);
+  my (@bev_active_values, @bev_load_values, @bev_n_active_values, @bev_soc_deficit_norm_values);
   
   # einstellbare Parameter
   ##########################
@@ -25021,19 +25045,22 @@ sub aiFannCreateConTrainData {
       my $temp      = clampValue ($rec->{temp}, -40, 40);
       my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                  # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend'
       my $holiday   = defined $rec->{holiday}  ? $rec->{holiday}  : 0;                  # nicht definierte Feiertage/Uerlaub als 0 belegen
+      my $bev_sig   = __aiFannBevConsumerAggregate ($rec);                              # BEV Aggregate
+
       
       # Ableitungen und Normierungen
       ################################
-      my $hour_norm         = ($inthod - 1) / 24;                                       # Stunde des Tages normiert 0..1
-      my $isday             = $sunalt > 0 ? 1 : 0; 
-      my $sunalt_norm       = _aiFannNormSunalt ($sunalt,    $range);                   # Sonnenaltitude symmetrisch oder asymmetriech normalisieren
-      my $wcc_norm          = _aiFannNormWcc    ($wcc,       $range);                   # Bewölkung symmetrisch oder asymmetriech normalisieren
-      my $temp_norm         = _aiFannNormTemp   ($temp,      $range);                   # Temperatur symmetrisch oder asymmetriech normalisieren
-      my $temp_comfort_norm = _aiFannNormTemp   ($comftemp,  $range);                   # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
-      my $pv_norm           = _aiFannNormPv     ($pvrl,      $pv_max_limit, $range);    # PV symmetrisch oder asymmetriech normalisieren
-      my $pv_norm_prev      = _aiFannNormPv     ($pvrl_prev, $pv_max_limit, $range);
-      my $day_hour_norm     = $isday  ? $hour_norm : 0;                                 # Tagstunden normiert, sonst 0
-      my $night_hour_norm   = !$isday ? $hour_norm : 0;                                 # Nachtstunden normiert, sonst 0  
+      my $hour_norm           = ($inthod - 1) / 24;                                             # Stunde des Tages normiert 0..1
+      my $isday                = $sunalt > 0 ? 1 : 0; 
+      my $sunalt_norm          = _aiFannNormSunalt ($sunalt,    $range);                        # Sonnenaltitude symmetrisch oder asymmetriech normalisieren
+      my $wcc_norm             = _aiFannNormWcc    ($wcc,       $range);                        # Bewölkung symmetrisch oder asymmetriech normalisieren
+      my $temp_norm            = _aiFannNormTemp   ($temp,      $range);                        # Temperatur symmetrisch oder asymmetriech normalisieren
+      my $temp_comfort_norm    = _aiFannNormTemp   ($comftemp,  $range);                        # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
+      my $pv_norm              = _aiFannNormPv     ($pvrl,      $pv_max_limit, $range);         # PV symmetrisch oder asymmetriech normalisieren
+      my $pv_norm_prev         = _aiFannNormPv     ($pvrl_prev, $pv_max_limit, $range);
+      my $bev_soc_deficit_norm = _aiFannNormBevSocDeficit ($bev_sig->{soc_deficit}, $range);
+      my $day_hour_norm        = $isday  ? $hour_norm : 0;                                      # Tagstunden normiert, sonst 0
+      my $night_hour_norm      = !$isday ? $hour_norm : 0;                                      # Nachtstunden normiert, sonst 0  
       
       $pvrl_prev = $pvrl;                                                               # pvrl ist Vorgänger für nächsten loop
       
@@ -25065,28 +25092,32 @@ sub aiFannCreateConTrainData {
       
       # Daten für FeatureBuilder vorbereiten
       ######################################## 
-      push @weekday_values,           $weekday;      
-      push @sunalt_norm_values,       $sunalt_norm;
-      push @hour_norm_values,         $hour_norm;
-      push @hod_sin_values,           $hod_sin;
-      push @hod_cos_values,           $hod_cos;
-      push @wday_sin_values,          $wday_sin;  
-      push @wday_cos_values,          $wday_cos;
-      push @month_sin_values,         $month_sin; 
-      push @month_cos_values,         $month_cos;
-      push @sunaz_sin_values,         $sunaz_sin;
-      push @sunaz_cos_values,         $sunaz_cos;
-      push @wcc_norm_values,          $wcc_norm;
-      push @temp_norm_values,         $temp_norm;
-      push @temp_comfort_norm_values, $temp_comfort_norm;
-      push @pv_norm_values,           $pv_norm;
-      push @pv_norm_prev_values,      $pv_norm_prev;
-      push @isday_values,             $isday;
-      push @day_hour_norm_values,     $day_hour_norm;
-      push @night_hour_norm_values,   $night_hour_norm;
-      push @inthod_values,            $inthod - 1;
-      push @presence_values,          $presence;
-      push @holiday_values,           $holiday;
+      push @weekday_values,              $weekday;      
+      push @sunalt_norm_values,          $sunalt_norm;
+      push @hour_norm_values,            $hour_norm;
+      push @hod_sin_values,              $hod_sin;
+      push @hod_cos_values,              $hod_cos;
+      push @wday_sin_values,             $wday_sin;  
+      push @wday_cos_values,             $wday_cos;
+      push @month_sin_values,            $month_sin; 
+      push @month_cos_values,            $month_cos;
+      push @sunaz_sin_values,            $sunaz_sin;
+      push @sunaz_cos_values,            $sunaz_cos;
+      push @wcc_norm_values,             $wcc_norm;
+      push @temp_norm_values,            $temp_norm;
+      push @temp_comfort_norm_values,    $temp_comfort_norm;
+      push @pv_norm_values,              $pv_norm;
+      push @pv_norm_prev_values,         $pv_norm_prev;
+      push @isday_values,                $isday;
+      push @day_hour_norm_values,        $day_hour_norm;
+      push @night_hour_norm_values,      $night_hour_norm;
+      push @inthod_values,               $inthod - 1;
+      push @presence_values,             $presence;
+      push @holiday_values,              $holiday;
+      push @bev_active_values,           $bev_sig->{active};
+      push @bev_load_values,             $bev_sig->{load};
+      push @bev_n_active_values,         $bev_sig->{n_active_ratio};
+      push @bev_soc_deficit_norm_values, $bev_soc_deficit_norm;
                                 
       # Zielwert
       ############
@@ -25122,11 +25153,10 @@ sub aiFannCreateConTrainData {
   }
   
   # Min-Max 0..1|-1..1 Normierung Input Features
-  ################################################
-  my ($rr1c_norm,  $rr1min, $rr1max) = ($range eq '-11') 
-                                       ? _aiFannNormalizeMinMaxSymmetric (\@rr1cs)
-                                       : _aiFannNormalizeMinMax          (\@rr1cs);
-                                       
+  # (nur Werte, die negativ werden könnten symmetrisch normieren)
+  ################################################################
+  my ($rr1c_norm, $rr1min, $rr1max)             = _aiFannNormalizeMinMax (\@rr1cs);          
+  my ($bev_load_norm, $bevloadmin, $bevloadmax) = _aiFannNormalizeMinMax (\@bev_load_values);   
   
   # Min-Max Normierung für Zielwert(e)
   ######################################
@@ -25138,13 +25168,43 @@ sub aiFannCreateConTrainData {
    
   # Lag Normierungen erstellen
   ##############################
-  my $lagnorm_ref = _aiFannCreateLagNorms (\@flat_targets, $targminval, $targmaxval, $range);                                     
+  my $lagnorm_ref = _aiFannCreateLagNorms (\@flat_targets, $targminval, $targmaxval, $range);   
+
+  # Profil einmalig bestimmen
+  #############################
+  my $profile = CurrentVal ($name, 'aiConProfile', undef);                                                  # verwendete Feature-Registry Version
+
+  if (!$profile) {
+      my @flags;
+      push @flags, 'heatpump' if defined isHeatPumpUsed ($name);
+      push @flags, 'bev'      if defined isBevUsed      ($name);
+
+      my ($synth, $err) = __aiFannSynthesizeProfile ($name, join (',', @flags) || 'v1');
+
+      if ($err) {
+          Log3 ($name, 1, "$name - ERROR - profile auto-detection failed: $err – using v1_common");
+          $profile = 'v1_common';
+      }
+      else {
+          $profile = $synth;
+      }
+  } 
   
   # Zusammenführen für Training
   ################################
-  for my $i (6 .. $#flat_targets) {                                                                         # .. bis den Index des letzten Elements                                                       
-      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, \@presence_values, $i, $lagnorm_ref, $range);   # Lags erstellen
-   
+  for my $i (6 .. $#flat_targets) {                                                                         # .. bis den Index des letzten Elements                                                        
+      my $lags = _aiFannBuildLagFeatures ( { con_series                  => \@flat_targets,
+                                             temp_norm_series            => \@temp_norm_values,
+                                             presence_values             => \@presence_values,
+                                             i                           => $i,
+                                             norms                       => $lagnorm_ref,
+                                             range                       => $range,
+                                             bev_active_series           => \@bev_active_values,
+                                             bev_load_norm_series        => $bev_load_norm,
+                                             bev_n_active_series         => \@bev_n_active_values,
+                                             bev_soc_deficit_norm_series => \@bev_soc_deficit_norm_values,      
+                                           } ); 
+
       my $sigs = _aiFannCreateAddOnSignals ( { lags              => $lags,                                  # diskrete, semantische Zusatzsignale
                                                pv_norm           => $pv_norm_values[$i],
                                                pv_norm_prev      => $pv_norm_prev_values[$i],
@@ -25197,113 +25257,117 @@ sub aiFannCreateConTrainData {
       }  
       
       # Kombinatorik in _aiFannFeatureBuilder 
-      #######################################
-      $profile     = _aiFannSelectProfile ($name);                                              # verwendete Feature-Registry Version
+      #######################################                                           
       my $features = _aiFannFeatureBuilder ($profile,                                          
-                       { pv_norm                  => $pv_norm_values[$i],
-                         rr1c_norm                => $rr1c_norm->[$i],                          # Niederschlag, numerisch min-max normalisiert
-                         temp_norm                => $temp_norm_values[$i],
-                         wcc_norm                 => $wcc_norm_values[$i],
-                         sunalt_norm              => $sunalt_norm_values[$i],                   # Sonnenaltitude normalisiert im Bereich 0..+1
-                         isday                    => $isday_values[$i],                         # Tag / Nacht (0|1)
-                         holiday                  => $holiday_values[$i],                       # Feiertag / Urlaub
-                         hour_norm                => $hour_norm_values[$i],                     # Stunde des Tages normiert 0..1
-                         day_hour_norm            => $day_hour_norm_values[$i],                 # Tagstunden normiert, sonst 0
-                         night_hour_norm          => $night_hour_norm_values[$i],               # Nachtstunden normiert, sonst 0 
+                       { pv_norm                   => $pv_norm_values[$i],
+                         rr1c_norm                 => $rr1c_norm->[$i],                         # Niederschlag, numerisch min-max normalisiert
+                         temp_norm                 => $temp_norm_values[$i],
+                         wcc_norm                  => $wcc_norm_values[$i],
+                         sunalt_norm               => $sunalt_norm_values[$i],                  # Sonnenaltitude normalisiert im Bereich 0..+1
+                         isday                     => $isday_values[$i],                        # Tag / Nacht (0|1)
+                         holiday                   => $holiday_values[$i],                      # Feiertag / Urlaub
+                         hour_norm                 => $hour_norm_values[$i],                    # Stunde des Tages normiert 0..1
+                         day_hour_norm             => $day_hour_norm_values[$i],                # Tagstunden normiert, sonst 0
+                         night_hour_norm           => $night_hour_norm_values[$i],              # Nachtstunden normiert, sonst 0 
                          
-                         hod_sin                  => $hod_sin_values[$i],                       # Stunde des Tages zyklisch
-                         hod_cos                  => $hod_cos_values[$i],                       # Stunde des Tages zyklisch
-                         wday_sin                 => $wday_sin_values[$i],                      # Wochentag in zyklischer Struktur (0..6)
-                         wday_cos                 => $wday_cos_values[$i],                      # Wochentag in zyklischer Struktur (0..6)
-                         month_sin                => $month_sin_values[$i],                     # Monat, zyklische Struktur (Dezember <-> Januar)
-                         month_cos                => $month_cos_values[$i],                     # Monat, zyklische Struktur (Dezember <-> Januar)
-                         sunaz_sin                => $sunaz_sin_values[$i],                     # Sonnenazimut zyklisch
-                         sunaz_cos                => $sunaz_cos_values[$i],                     # Sonnenazimut zyklisch
+                         hod_sin                   => $hod_sin_values[$i],                      # Stunde des Tages zyklisch
+                         hod_cos                   => $hod_cos_values[$i],                      # Stunde des Tages zyklisch
+                         wday_sin                  => $wday_sin_values[$i],                     # Wochentag in zyklischer Struktur (0..6)
+                         wday_cos                  => $wday_cos_values[$i],                     # Wochentag in zyklischer Struktur (0..6)
+                         month_sin                 => $month_sin_values[$i],                    # Monat, zyklische Struktur (Dezember <-> Januar)
+                         month_cos                 => $month_cos_values[$i],                    # Monat, zyklische Struktur (Dezember <-> Januar)
+                         sunaz_sin                 => $sunaz_sin_values[$i],                    # Sonnenazimut zyklisch
+                         sunaz_cos                 => $sunaz_cos_values[$i],                    # Sonnenazimut zyklisch
                          
-                         presence                 => $presence_values[$i],                      # Anwesenheit
-                         presence_smooth3         => $lags->{presence_smooth3},                 # Anwesenheitsglättung über 3h (0..1)                 
-                         presence_smooth2         => $lags->{presence_smooth2},                 # Anwesenheitsglättung über 2h (0..1)                         
-                         presence_transition_up   => $lags->{presence_transition_up},           # Anwesenheit 0->1 Übergang (Impuls)
-                         presence_transition_down => $lags->{presence_transition_down},         # Anwesenheit 1->0 Übergang (Impuls)
+                         presence                  => $presence_values[$i],                     # Anwesenheit
+                         presence_smooth3          => $lags->{presence_smooth3},                # Anwesenheitsglättung über 3h (0..1)                 
+                         presence_smooth2          => $lags->{presence_smooth2},                # Anwesenheitsglättung über 2h (0..1)                         
+                         presence_transition_up    => $lags->{presence_transition_up},          # Anwesenheit 0->1 Übergang (Impuls)
+                         presence_transition_down  => $lags->{presence_transition_down},        # Anwesenheit 1->0 Übergang (Impuls)
                                                                                                        
-                         lag48_norm               => $lags->{lag48_norm},                       # Verbrauch vor 48h (normalisiert)
-                         lag168_norm              => $lags->{lag168_norm},                      # Verbrauch vor 168h = 7d (normalisiert)
+                         lag48_norm                => $lags->{lag48_norm},                      # Verbrauch vor 48h (normalisiert)
+                         lag168_norm               => $lags->{lag168_norm},                     # Verbrauch vor 168h = 7d (normalisiert)
 
-                         lag1_spike_pos_norm      => $lags->{lag1_spike_pos_norm},              # letzte Stunde war Spike nach oben (laufender Spike)
-                         lag1_spike_neg_norm      => $lags->{lag1_spike_neg_norm},              # letzte Stunde war Spike nach unten (laufender Einbruch)
-                         lag2_spike_pos_norm      => $lags->{lag2_spike_pos_norm},              # vorletzte Stunde war Spike nach oben (Spike klingt ab / hält an)
-                         lag2_spike_neg_norm      => $lags->{lag2_spike_neg_norm},              # vorletzte Stunde war Spike nach unten  (Einbruch klingt ab / hält an)                         
+                         lag1_spike_pos_norm       => $lags->{lag1_spike_pos_norm},             # letzte Stunde war Spike nach oben (laufender Spike)
+                         lag1_spike_neg_norm       => $lags->{lag1_spike_neg_norm},             # letzte Stunde war Spike nach unten (laufender Einbruch)
+                         lag2_spike_pos_norm       => $lags->{lag2_spike_pos_norm},             # vorletzte Stunde war Spike nach oben (Spike klingt ab / hält an)
+                         lag2_spike_neg_norm       => $lags->{lag2_spike_neg_norm},             # vorletzte Stunde war Spike nach unten  (Einbruch klingt ab / hält an)                         
                          
-                         cum_day_norm             => $sigs->{cum_day_norm},                     # kumulierter Tagesverbrauch (normiert)
-                         cum_day_deviation        => $sigs->{cum_day_deviation},                # Abweichung Verbrauch vom erwarteten Tagespfad
+                         cum_day_norm              => $sigs->{cum_day_norm},                    # kumulierter Tagesverbrauch (normiert)
+                         cum_day_deviation         => $sigs->{cum_day_deviation},               # Abweichung Verbrauch vom erwarteten Tagespfad
                          
-                         delta1_norm              => $lags->{delta1_norm},                      # Änderung ggü. Vorstunde (normalisiert)
-                         delta24_norm             => $lags->{delta24_norm},                     # Änderung ggü. Vortag (normalisiert)
-                         delta1_norm_pos          => $lags->{delta1_norm_pos},                  # Positive 1h-Änderung
-                         delta1_norm_neg          => $lags->{delta1_norm_neg},                  # Negative 1h-Änderung
-                         delta24_norm_pos         => $lags->{delta24_norm_pos},                 # Positive 24h-Änderung
-                         delta24_norm_neg         => $lags->{delta24_norm_neg},                 # Negative 24h-Änderung
+                         delta1_norm               => $lags->{delta1_norm},                     # Änderung ggü. Vorstunde (normalisiert)
+                         delta24_norm              => $lags->{delta24_norm},                    # Änderung ggü. Vortag (normalisiert)
+                         delta1_norm_pos           => $lags->{delta1_norm_pos},                 # Positive 1h-Änderung
+                         delta1_norm_neg           => $lags->{delta1_norm_neg},                 # Negative 1h-Änderung
+                         delta24_norm_pos          => $lags->{delta24_norm_pos},                # Positive 24h-Änderung
+                         delta24_norm_neg          => $lags->{delta24_norm_neg},                # Negative 24h-Änderung
   
-                         roll_min_6_norm          => $lags->{roll_min_6_norm},                  # Tiefstwert der letzten 6h (Grundlastniveau)
-                         roll_max_6_norm          => $lags->{roll_max_6_norm},                  # Höchstwert der letzten 6h (Peak-Niveau)
-                         roll_range_6_norm        => $lags->{roll_range_6_norm},                # Spannweite der letzten 6h (Volatilität ohne Glättung)
+                         roll_min_6_norm           => $lags->{roll_min_6_norm},                 # Tiefstwert der letzten 6h (Grundlastniveau)
+                         roll_max_6_norm           => $lags->{roll_max_6_norm},                 # Höchstwert der letzten 6h (Peak-Niveau)
+                         roll_range_6_norm         => $lags->{roll_range_6_norm},               # Spannweite der letzten 6h (Volatilität ohne Glättung)
 
-                         is_low_cons_regime       => $lags->{is_low_cons_regime},               # y_t <= P25: Grundlast / Nacht / abwesend
-                         is_high_cons_regime      => $lags->{is_high_cons_regime},              # y_t >= P75: Peak / Kochen / Geräte an
-                         is_transition_regime     => $lags->{is_transition_regime},             # P25 < y_t < P75: normaler Betrieb
-  
-                         temp_norm_lag1h          => $lags->{temp_norm_lag1h},                  # Temperatur vor 1h (normalisiert)
-                         temp_norm_lag3h          => $lags->{temp_norm_lag3h},                  # Temperatur vor 3h (normalisiert)
-                         temp_norm_lag24h         => $lags->{temp_norm_lag24h},                 # Temperatur vor 24h (normalisiert)
+                         is_low_cons_regime        => $lags->{is_low_cons_regime},              # y_t_1 <= P25: Grundlast / Nacht / abwesend
+                         is_high_cons_regime       => $lags->{is_high_cons_regime},             # y_t_1 >= P75: Peak / Kochen / Geräte an
+                         is_transition_regime      => $lags->{is_transition_regime},            # P25 < y_t_1 < P75: normaler Betrieb
+
+                         bev_active_lag1           => $lags->{bev_active_lag1},                 # mind. ein EV lud in der Vorstunde (binär)
+                         bev_load_lag1_norm        => $lags->{bev_load_lag1_norm},              # geladene Energiemenge Vorstunde (normiert, Arrayref-Deref!)
+                         bev_n_active_lag1_norm    => $lags->{bev_n_active_lag1_norm},          # Anteil gleichzeitig ladender EVs Vorstunde (bereits 0..1, kein eigener Norm-Schritt)
+                         bev_soc_deficit_lag1_norm => $lags->{bev_soc_deficit_lag1_norm},       # mittleres SoC-Defizit zum Ende der Vorstunde
+
+                         temp_norm_lag1h           => $lags->{temp_norm_lag1h},                 # Temperatur vor 1h (normalisiert)
+                         temp_norm_lag3h           => $lags->{temp_norm_lag3h},                 # Temperatur vor 3h (normalisiert)
+                         temp_norm_lag24h          => $lags->{temp_norm_lag24h},                # Temperatur vor 24h (normalisiert)
                          
-                         temp_delta_1h_pos        => $lags->{temp_delta_1h_pos},                # Positive Temperaturänderung 1h
-                         temp_delta_1h_neg        => $lags->{temp_delta_1h_neg},                # Negative Temperaturänderung 1h
-                         temp_delta_3h_pos        => $lags->{temp_delta_3h_pos},                # Positive Temperaturänderung 3h
-                         temp_delta_3h_neg        => $lags->{temp_delta_3h_neg},                # Negative Temperaturänderung 3h
-                         temp_trend_pos           => $lags->{temp_trend_pos},                   # Aufwärtstrend Temperatur
-                         temp_trend_neg           => $lags->{temp_trend_neg},                   # Abwärtstrend Temperatur                
+                         temp_delta_1h_pos         => $lags->{temp_delta_1h_pos},               # Positive Temperaturänderung 1h
+                         temp_delta_1h_neg         => $lags->{temp_delta_1h_neg},               # Negative Temperaturänderung 1h
+                         temp_delta_3h_pos         => $lags->{temp_delta_3h_pos},               # Positive Temperaturänderung 3h
+                         temp_delta_3h_neg         => $lags->{temp_delta_3h_neg},               # Negative Temperaturänderung 3h
+                         temp_trend_pos            => $lags->{temp_trend_pos},                  # Aufwärtstrend Temperatur
+                         temp_trend_neg            => $lags->{temp_trend_neg},                  # Abwärtstrend Temperatur                
                          
-                         trend_break              => $sigs->{trend_break},                      # Trendwechsel (binär)
-                         trend_up_norm            => $sigs->{trend_up_norm},                    # Aufwärtstrend Stärke (normalisiert)
-                         trend_down_norm          => $sigs->{trend_down_norm},                  # Abwärtstrend Stärke (normalisiert)
-                         trend_up_strength        => $sigs->{trend_up_strength},                # Starker Aufwärtstrend
-                         trend_down_strength      => $sigs->{trend_down_strength},              # Starker Abwärtstrend
+                         trend_break               => $sigs->{trend_break},                     # Trendwechsel (binär)
+                         trend_up_norm             => $sigs->{trend_up_norm},                   # Aufwärtstrend Stärke (normalisiert)
+                         trend_down_norm           => $sigs->{trend_down_norm},                 # Abwärtstrend Stärke (normalisiert)
+                         trend_up_strength         => $sigs->{trend_up_strength},               # Starker Aufwärtstrend
+                         trend_down_strength       => $sigs->{trend_down_strength},             # Starker Abwärtstrend
                          
-                         pv_jump                  => $sigs->{pv_jump},                          # Plötzlicher PV-Anstieg
-                         cold_trigger             => $sigs->{cold_trigger},                     # Kälte-Trigger (binär)
-                         heat_trigger             => $sigs->{heat_trigger},                     # Hitze-Trigger (binär)
-                         volatility_flag          => $sigs->{volatility_flag},                  # Hohe Lastvolatilität
-                         pv_consumption_cross     => $sigs->{pv_consumption_cross},             # PV-Erzeugung > Verbrauch
-                         pv_drop                  => $sigs->{pv_drop},                          # PV-Einbruch
+                         pv_jump                   => $sigs->{pv_jump},                         # Plötzlicher PV-Anstieg
+                         cold_trigger              => $sigs->{cold_trigger},                    # Kälte-Trigger (binär)
+                         heat_trigger              => $sigs->{heat_trigger},                    # Hitze-Trigger (binär)
+                         volatility_flag           => $sigs->{volatility_flag},                 # Hohe Lastvolatilität
+                         pv_consumption_cross      => $sigs->{pv_consumption_cross},            # PV-Erzeugung > Verbrauch
+                         pv_drop                   => $sigs->{pv_drop},                         # PV-Einbruch
                          
-                         hour_class_morning       => $sigs->{hour_class_morning},               # Morgenstunden (Flag)
-                         hour_class_evening       => $sigs->{hour_class_evening},               # Abendstunden (Flag)
-                         hour_class_lateevening   => $sigs->{hour_class_lateevening},           # Spätabend (Flag)
-                         hour_class_midnight      => $sigs->{hour_class_midnight},              # Mitternacht (Flag)
-                         hour_class_night         => $sigs->{hour_class_night},                 # Nachtstunden (Flag)
-                         hour_class_noon          => $sigs->{hour_class_noon},                  # Mittagsstunden (Flag)
+                         hour_class_morning        => $sigs->{hour_class_morning},              # Morgenstunden (Flag)
+                         hour_class_evening        => $sigs->{hour_class_evening},              # Abendstunden (Flag)
+                         hour_class_lateevening    => $sigs->{hour_class_lateevening},          # Spätabend (Flag)
+                         hour_class_midnight       => $sigs->{hour_class_midnight},             # Mitternacht (Flag)
+                         hour_class_night          => $sigs->{hour_class_night},                # Nachtstunden (Flag)
+                         hour_class_noon           => $sigs->{hour_class_noon},                 # Mittagsstunden (Flag)
                          
-                         day_class_weekend        => $sigs->{day_class_weekend},                # Wochenende (Flag)
-                         day_class_workday        => $sigs->{day_class_workday},                # Arbeitstag (Flag)
+                         day_class_weekend         => $sigs->{day_class_weekend},               # Wochenende (Flag)
+                         day_class_workday         => $sigs->{day_class_workday},               # Arbeitstag (Flag)
                          
-                         heating_degree_norm      => $sigs->{heating_degree_norm},              # Heizgradtage (Heizlast) 
-                         cooling_degree_norm      => $sigs->{cooling_degree_norm},              # Kühlgradtage (Kühllast)
+                         heating_degree_norm       => $sigs->{heating_degree_norm},             # Heizgradtage (Heizlast) 
+                         cooling_degree_norm       => $sigs->{cooling_degree_norm},             # Kühlgradtage (Kühllast)
                          
-                         hp_heating_mode          => $sigs->{hp_heating_mode},                  # Wärmepumpe im Heizmodus
-                         hp_cooling_mode          => $sigs->{hp_cooling_mode},                  # Wärmepumpe im Kühlmodus
+                         hp_heating_mode           => $sigs->{hp_heating_mode},                 # Wärmepumpe im Heizmodus
+                         hp_cooling_mode           => $sigs->{hp_cooling_mode},                 # Wärmepumpe im Kühlmodus
                          
-                         ww_morning               => $sigs->{ww_morning},                       # Warmwasser morgens
-                         ww_evening               => $sigs->{ww_evening},                       # Warmwasser abends
-                         ww_cold_boost            => $sigs->{ww_cold_boost},                    # Kältebedingter WW-Boost
-                         ww_pv_boost              => $sigs->{ww_pv_boost},                      # PV-optimierter WW-Boost                         
-                         ww_cycle_flag            => $sigs->{ww_cycle_flag},                    # WW-Zyklus aktiv
+                         ww_morning                => $sigs->{ww_morning},                      # Warmwasser morgens
+                         ww_evening                => $sigs->{ww_evening},                      # Warmwasser abends
+                         ww_cold_boost             => $sigs->{ww_cold_boost},                   # Kältebedingter WW-Boost
+                         ww_pv_boost               => $sigs->{ww_pv_boost},                     # PV-optimierter WW-Boost                         
+                         ww_cycle_flag             => $sigs->{ww_cycle_flag},                   # WW-Zyklus aktiv
                          
-                         cop_proxy                => $sigs->{cop_proxy},                        # COP-Schätzwert (linear zur Temperatur)
-                         cop_inverse              => $sigs->{cop_inverse},                      # Inverser COP (Strombedarf)
-                         hp_power_factor          => $sigs->{hp_power_factor},                  # Kombinierte WP-Leistungssemantik     
+                         cop_proxy                 => $sigs->{cop_proxy},                       # COP-Schätzwert (linear zur Temperatur)
+                         cop_inverse               => $sigs->{cop_inverse},                     # Inverser COP (Strombedarf)
+                         hp_power_factor           => $sigs->{hp_power_factor},                 # Kombinierte WP-Leistungssemantik     
                          
-                         frost_protect            => $sigs->{frost_protect},                    # Frostschutz aktiv (binär)
-                         frost_load               => $sigs->{frost_load},                       # Frostschutz-Last (kontinuierlich) 
+                         frost_protect             => $sigs->{frost_protect},                   # Frostschutz aktiv (binär)
+                         frost_load                => $sigs->{frost_load},                      # Frostschutz-Last (kontinuierlich) 
                        }
                      );
                                                
@@ -25397,10 +25461,54 @@ sub aiFannCreateConTrainData {
   $paref->{maxval}            = $targmaxval;                              # Target Denormalisierungsparameter
   $paref->{rr1min}            = $rr1min;
   $paref->{rr1max}            = $rr1max;
+  $paref->{bevloadmin}        = $bevloadmin;
+  $paref->{bevloadmax}        = $bevloadmax;
 
   $serial = aiFannTrainstartAndRetry ($paref);
 
 return $serial;
+}
+
+###############################################################
+#  Aggregiert BEV-Rohdaten eines Stundendatensatzes (rec)
+#  soc_deficit: pro EV auf 0..1 geflooret BEVOR die Mittelung
+#  über mehrere EVs erfolgt, damit ein bereits volles EV (Defizit
+#  rechnerisch negativ) nicht das reale Ladebeduerfnis eines
+#  zweiten EVs im selben Haushalt kompensiert/verwaesserrt.
+#  Rueckgabewert ist die rohe Aggregation, NICHT netzwerkfertig
+#  normiert -> dafuer _aiFannNormBevSocDeficit im Hauptloop.
+###############################################################
+sub __aiFannBevConsumerAggregate {
+  my ($rec) = @_;                                                               # Stundendatensatz Referenz
+
+  my @ids = $rec->{bevcsm} ? (split /\s*,\s*/, $rec->{bevcsm}) : ();            # alle definierten BEV Consumer als Array
+
+  my ($load, $n_active, $n_reporting, $deficit_sum) = (0, 0, 0, 0);
+
+  for my $id (@ids) {                                                           
+      my $e = $rec->{"csme$id"};                                                # Energieverbrauch des BEV in der Stunde
+
+      if (defined $e && $e > 0) {
+          $load += $e;
+          $n_active++;
+      }
+
+      my $soc  = $rec->{"bevcsmSoC$id"};                                        # aktueller SoC des BEV
+      my $tsoc = $rec->{"bevcsmTargSoC$id"};                                    # Ziel-SoC
+
+      next if !defined $soc || !defined $tsoc;                                  # keine Telemetrie diese Stunde -> ignorieren
+
+      $n_reporting++;
+      $deficit_sum += clampValue ((($tsoc - $soc) / 100), 0, 1);                # Floor pro EV, siehe Kommentar oben
+  }
+
+  my $n = scalar @ids;                                                          # Anzahl BEV-Consumer
+
+  return { active         => $n_active ? 1 : 0,
+           load           => $load,
+           n_active_ratio => $n ? ($n_active / $n) : 0,
+           soc_deficit    => $n_reporting ? ($deficit_sum / $n_reporting) : 0,
+         };
 }
 
 ################################################################
@@ -25562,7 +25670,17 @@ return \%lag_norms;
 # $temp_norm_series - Arrayref normierter Temperaturen
 ################################################################
 sub _aiFannBuildLagFeatures {
-  my ($con_series, $temp_norm_series, $presence_values, $i, $norms, $range) = @_;
+  my $paref                       = shift;
+  my $con_series                  = $paref->{con_series};
+  my $temp_norm_series            = $paref->{temp_norm_series};
+  my $presence_values             = $paref->{presence_values};
+  my $i                           = $paref->{i}; 
+  my $norms                       = $paref->{norms};
+  my $range                       = $paref->{range};
+  my $bev_active_series           = $paref->{bev_active_series};
+  my $bev_load_norm_series        = $paref->{bev_load_norm_series};
+  my $bev_n_active_series         = $paref->{bev_n_active_series};
+  my $bev_soc_deficit_norm_series = $paref->{bev_soc_deficit_norm_series};
 
   # Sicherheitsprüfung: genug Historie vorhanden?
   my $len_con  = scalar @$con_series;
@@ -25571,32 +25689,23 @@ sub _aiFannBuildLagFeatures {
 
   # ---------------------------------------------------------
   # Lags - verzögerte Werte einer Zeitreihe
-  # $y_t   = letzter bekannter Wert (z.B. hod=8) -> ist letzte abgeschlossene Stunde!
+  # $y_t   = letzter bekannter Wert (z.B. hod=8)
   # $y_t_1 = eine Stunde davor     (z.B. hod=7)
   # Zielwert ist hod=9, also NICHT in con_series enthalten
   # ---------------------------------------------------------
   my $y_t     = $con_series->[$i];                                              # letzter bekannter Wert
   my $y_t_1   = $con_series->[$i - 1];              
-  my $y_t_2   = $con_series->[$i - 2];                           
+  my $y_t_2   = $con_series->[$i - 2];
+  my $y_t_3   = $con_series->[$i - 3];                                          
   my $y_t_24  = $i >= 24  ? $con_series->[$i - 24]  : undef;
+  my $y_t_25  = $i >= 25  ? $con_series->[$i - 25]  : undef;
   my $y_t_48  = $i >= 48  ? $con_series->[$i - 48]  : undef;
   my $y_t_168 = $i >= 168 ? $con_series->[$i - 168] : undef;
 
-  # --- Deltas
-  my $delta1      = $y_t   - $y_t_1;                                            # Trend der letzten Stunde
-  my $delta1_prev = $y_t_1 - $y_t_2;
-  my $delta24     = defined $y_t_24 ? $y_t - $y_t_24 : undef;                   # Vortag-Differenz
-  
-  # ---------------------------------------------------------
-  # Verbrauchsregime: aktueller Verbrauch relativ zur
-  # historischen Verteilung (Perzentil-basiert)
-  # low:        y_t <= P25  (Grundlast, Nacht, abwesend)
-  # high:       y_t >= P75  (Peak, Kochen, Geräte an)
-  # transition: dazwischen  (normaler Betrieb)
-  # ---------------------------------------------------------
-  my $regime_low   = (defined $norms->{regime_low_thresh}  && $y_t <= $norms->{regime_low_thresh})  ? 1 : 0;
-  my $regime_high  = (defined $norms->{regime_high_thresh} && $y_t >= $norms->{regime_high_thresh}) ? 1 : 0;
-  my $regime_trans = ($regime_low == 0 && $regime_high == 0)                                        ? 1 : 0;
+  # --- Deltas                                           
+  my $delta1      = $y_t_1 - $y_t_2;                                            # Trend der letzten Stunde
+  my $delta1_prev = $y_t_2 - $y_t_3;                                                             
+  my $delta24     = defined $y_t_25 ? $y_t_1 - $y_t_25 : undef;                 # Vortag-Differenz
   
   # ---------------------------------------------------------
   # Rolling Mean & Std
@@ -25625,11 +25734,11 @@ sub _aiFannBuildLagFeatures {
   my $delta24_pos     = (defined $delta24 && $delta24 > 0) ? $delta24  : 0;
   my $delta24_neg     = (defined $delta24 && $delta24 < 0) ? -$delta24 : 0;
 
-  my $lag1_vs_mean3  = $y_t - $mean3;                                           # Spike-Erkennung: y_t vs. mean der letzten 3h
+  my $lag1_vs_mean3  = $y_t_1 - $mean3;                                          # Spike-Erkennung: y_t_1 vs. mean der letzten 3h
   my $lag1_spike_pos = $lag1_vs_mean3 > 0 ? $lag1_vs_mean3  : 0;
   my $lag1_spike_neg = $lag1_vs_mean3 < 0 ? -$lag1_vs_mean3 : 0;
   
-  my $lag2_vs_mean3  = $y_t_1 - $mean3_prev;
+  my $lag2_vs_mean3  = $y_t_2 - $mean3_prev;                                     
   my $lag2_spike_pos = $lag2_vs_mean3 > 0 ? $lag2_vs_mean3  : 0;
   my $lag2_spike_neg = $lag2_vs_mean3 < 0 ? -$lag2_vs_mean3 : 0;
 
@@ -25672,6 +25781,17 @@ sub _aiFannBuildLagFeatures {
   my $roll_range_6_norm    = _aiFannNormMinMaxValue ($rrange6, $norms->{rrange_min}, $norms->{rrange_max});
   
   # ---------------------------------------------------------
+  # Verbrauchsregime: aktueller Verbrauch relativ zur
+  # historischen Verteilung (Perzentil-basiert)
+  # low:        y_t_1 <= P25  (Grundlast, Nacht, abwesend)
+  # high:       y_t_1 >= P75  (Peak, Kochen, Geräte an)
+  # transition: dazwischen  (normaler Betrieb)
+  # ---------------------------------------------------------
+  my $regime_low   = (defined $norms->{regime_low_thresh}  && $y_t_1 <= $norms->{regime_low_thresh})  ? 1 : 0; 
+  my $regime_high  = (defined $norms->{regime_high_thresh} && $y_t_1 >= $norms->{regime_high_thresh}) ? 1 : 0;
+  my $regime_trans = ($regime_low == 0 && $regime_high == 0)                                          ? 1 : 0;
+  
+  # ---------------------------------------------------------
   # Temperatur-Lags
   # ---------------------------------------------------------
   my $t_t           = $temp_norm_series->[$i];
@@ -25692,6 +25812,18 @@ sub _aiFannBuildLagFeatures {
   my $temp_trend_neg    = clampValue ($temp_trend    < 0 ? -$temp_trend    : 0, 0, 1);
   
   # ---------------------------------------------------------
+  # BEV-Lags (Lag1 - vorherige Stunde)
+  # csmeXX der Stunde $i geht additiv in con_series->[$i] (=y_t)
+  # ein -> direkte Verwendung wäre Leakage, analog zum
+  # delta1/delta24-y_t-Bug. Daher ausschliesslich Lag1 (Stunde
+  # $i-1), nie die Stunde von $i selbst.
+  # ---------------------------------------------------------
+  my $bev_active_lag1           = $bev_active_series->[$i - 1]           // 0;
+  my $bev_load_lag1_norm        = $bev_load_norm_series->[$i - 1]        // 0;
+  my $bev_n_active_lag1_norm    = $bev_n_active_series->[$i - 1]         // 0;
+  my $bev_soc_deficit_lag1_norm = $bev_soc_deficit_norm_series->[$i - 1] // 0;
+  
+  # ---------------------------------------------------------
   # presence_smooth3/2        -> gleitender 3h/2h-Mittelwert
   # $presence_transition_up   -> 'Heimkehr'
   # $presence_transition_down -> 'Haus wird verlassen'
@@ -25710,54 +25842,59 @@ sub _aiFannBuildLagFeatures {
   # WW-Zyklus Erkennung Prefilter
   # Spike-Prüfung auf y_t vs. y_t_1 (aktuellster Sprung)
   # ---------------------------------------------------------
-  my $spike        = ($y_t - $y_t_1) > 1000 ? 1 : 0;                                        # Sprung in der Vergangenheit
-  my $plateau      = ($y_t > $y_t_1 * 0.8 && $y_t_1 > $y_t_2 * 0.8) ? 1 : 0;
+  my $spike        = ($y_t_1 - $y_t_2) > 1000 ? 1 : 0;                                      # Sprung in der Vergangenheit
+  my $plateau      = ($y_t_1 > $y_t_2 * 0.8 && $y_t_2 > $y_t_3 * 0.8);                      
   my $stable       = $std6_norm < 0.15 ? 1 : 0;                                             # Stabilität (WW glatt, Kochen unruhig)
   my $ww_prefilter = ($spike && $plateau && $stable) ? 1 : 0;                               # Warmwasser-Zyklus erkannt
     
   return {
-      lag48_norm               => $lag48_norm,
-      lag168_norm              => $lag168_norm,
+      lag48_norm                => $lag48_norm,
+      lag168_norm               => $lag168_norm,
       
-      lag1_spike_pos_norm      => $lag1_spike_pos_norm,
-      lag1_spike_neg_norm      => $lag1_spike_neg_norm,
-      lag2_spike_pos_norm      => $lag2_spike_pos_norm,
-      lag2_spike_neg_norm      => $lag2_spike_neg_norm,
+      lag1_spike_pos_norm       => $lag1_spike_pos_norm,
+      lag1_spike_neg_norm       => $lag1_spike_neg_norm,
+      lag2_spike_pos_norm       => $lag2_spike_pos_norm,
+      lag2_spike_neg_norm       => $lag2_spike_neg_norm,
       
-      delta1_norm              => $delta1_norm,
-      delta24_norm             => $delta24_norm,
-      delta1_norm_pos          => $delta1_norm_pos,
-      delta1_norm_neg          => $delta1_norm_neg,
-      delta1_norm_pos_prev     => $delta1_norm_pos_prev, 
-      delta1_norm_neg_prev     => $delta1_norm_neg_prev,
-      delta24_norm_pos         => $delta24_norm_pos,
-      delta24_norm_neg         => $delta24_norm_neg,
+      delta1_norm               => $delta1_norm,
+      delta24_norm              => $delta24_norm,
+      delta1_norm_pos           => $delta1_norm_pos,
+      delta1_norm_neg           => $delta1_norm_neg,
+      delta1_norm_pos_prev      => $delta1_norm_pos_prev, 
+      delta1_norm_neg_prev      => $delta1_norm_neg_prev,
+      delta24_norm_pos          => $delta24_norm_pos,
+      delta24_norm_neg          => $delta24_norm_neg,
       
-      roll_std_6_norm          => $std6_norm,
-      roll_min_6_norm          => $roll_min_6_norm,
-      roll_max_6_norm          => $roll_max_6_norm,
-      roll_range_6_norm        => $roll_range_6_norm,
+      roll_std_6_norm           => $std6_norm,
+      roll_min_6_norm           => $roll_min_6_norm,
+      roll_max_6_norm           => $roll_max_6_norm,
+      roll_range_6_norm         => $roll_range_6_norm,
       
-      temp_norm_lag1h          => $t_t_1,
-      temp_norm_lag3h          => $t_t_3,
-      temp_norm_lag24h         => $t_t_24,
-      temp_delta_1h_pos        => $temp_delta_1h_pos,
-      temp_delta_1h_neg        => $temp_delta_1h_neg,
-      temp_delta_3h_pos        => $temp_delta_3h_pos,
-      temp_delta_3h_neg        => $temp_delta_3h_neg,
-      temp_trend_pos           => $temp_trend_pos,
-      temp_trend_neg           => $temp_trend_neg,
+      temp_norm_lag1h           => $t_t_1,
+      temp_norm_lag3h           => $t_t_3,
+      temp_norm_lag24h          => $t_t_24,
+      temp_delta_1h_pos         => $temp_delta_1h_pos,
+      temp_delta_1h_neg         => $temp_delta_1h_neg,
+      temp_delta_3h_pos         => $temp_delta_3h_pos,
+      temp_delta_3h_neg         => $temp_delta_3h_neg,
+      temp_trend_pos            => $temp_trend_pos,
+      temp_trend_neg            => $temp_trend_neg,
       
-      presence_smooth3         => $presence_smooth3,
-      presence_smooth2         => $presence_smooth2,
-      presence_transition_up   => $presence_transition_up,
-      presence_transition_down => $presence_transition_down,
+      presence_smooth3          => $presence_smooth3,
+      presence_smooth2          => $presence_smooth2,
+      presence_transition_up    => $presence_transition_up,
+      presence_transition_down  => $presence_transition_down,
       
-      ww_prefilter             => $ww_prefilter,
+      ww_prefilter              => $ww_prefilter,
+       
+      is_low_cons_regime        => $regime_low,
+      is_high_cons_regime       => $regime_high,
+      is_transition_regime      => $regime_trans,
       
-      is_low_cons_regime       => $regime_low,
-      is_high_cons_regime      => $regime_high,
-      is_transition_regime     => $regime_trans,
+      bev_active_lag1           => $bev_active_lag1,
+      bev_load_lag1_norm        => $bev_load_lag1_norm,
+      bev_n_active_lag1_norm    => $bev_n_active_lag1_norm,
+      bev_soc_deficit_lag1_norm => $bev_soc_deficit_lag1_norm,
   };
 }
 
@@ -25925,31 +26062,6 @@ sub _aiFannCreateAddOnSignals {
   $sigs->{cum_day_deviation} = $cum_deviation;
 
 return $sigs;
-}
-
-################################################################
-#   selektiert die relevante Profilversion
-################################################################
-sub _aiFannSelectProfile {                                        
-  my ($name) = @_;
-
-  my $hp = isHeatPumpUsed ($name);
- 
- # defaults
-  my $frvdef = defined $hp 
-               ? 'v1_heatpump'                                              # Haushalt mit Wärmepumpe
-               : 'v1_common';                                               # Standardhaushalt
-            
-  my $profile = CurrentVal ($name, 'aiConProfile', $frvdef);                # überschreiben durch aiConProfile
-  
-  if (!grep /^$profile$/, keys %profileweights) {   
-      Log3 ($name, 1, "$name - ERROR - selected AI FANN profile is invalid, fallback to $frvdef done");
-      $profile = $frvdef;
-  }
-  
-  $profile = $frvdef if($profile =~ /heatpump/xs && !defined $hp);          # Rückfall wenn explizit '*heatpump*' gewählt, aber keine WP als Consumer definiert
-      
-return $profile;
 }
 
 ###############################################################
@@ -26955,6 +27067,8 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{MaxVal}         = $maxval;                                         # Target Denormalisierungsparameter
   $data{$name}{$fanntyp.'temp'}{$attempt}{rr1Min}         = $rr1min;
   $data{$name}{$fanntyp.'temp'}{$attempt}{rr1Max}         = $rr1max;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{bevloadmin}     = $paref->{bevloadmin};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{bevloadmax}     = $paref->{bevloadmax};
   $data{$name}{$fanntyp.'temp'}{$attempt}{lagNorms}       = encode_base64 (Serialize ( $paref->{lagnorm_ref} ), "");    # Serialisierung
   $data{$name}{$fanntyp.'temp'}{$attempt}{FannBlob}       = $blob;                                                      # BLOB im Hash ablegen
   
@@ -27741,7 +27855,15 @@ sub aiFannGetConResult {
                                                                   t     => $paref->{t},
                                                                   limit => 600,
                                                                 }
-                                                              );                                # $fanntyp + Temperaturen aus History lesen                     
+                                                              );                                # $fanntyp + Temperaturen aus History lesen    
+  
+  my ($bev_active_ref, $bev_load_raw_ref, $bev_n_active_ref, $bev_soc_deficit_norm_ref) =
+      __aiFannBevHistArray ( { name    => $name,
+                               fanntyp => $fanntyp,
+                               range   => $range,
+                               t       => $paref->{t},
+                               limit   => 600,
+                             } );                                                               # BEV Aggregationen aus pvHistory lesen                                     
 
   my @flat_targets     = @$targetref;
   my @temps            = @$tempsref;
@@ -27750,14 +27872,40 @@ sub aiFannGetConResult {
 
   # Lag-Norms auslesen
   ######################
-  if (!defined $data{$name}{neuralnet}{con} || !defined $data{$name}{neuralnet}{con}{lagNorms}) {
+  if (!defined $data{$name}{neuralnet}{$fanntyp} || !defined $data{$name}{neuralnet}{$fanntyp}{lagNorms}) {
       $msg = 'Lag-Norms is not available. New training is required.'; 
       $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
       
       return $msg;
   }
   
-  my $lagnorm_ref = Deserialize ($name, $data{$name}{neuralnet}{con}{lagNorms});              # Norms müssen IMMER die Norms aus dem Training bleiben.    
+  my $lagnorm_ref = Deserialize ($name, $data{$name}{neuralnet}{$fanntyp}{lagNorms});           # Norms müssen IMMER die Norms aus dem Training bleiben.
+  
+  my $bevloadmin_inf = $data{$name}{neuralnet}{$fanntyp}{bevloadmin} // 0;                      # BEV-Load normieren mit gespeicherten Trainingsgrenzen (analog rr1c_norm)
+  my $bevloadmax_inf = $data{$name}{neuralnet}{$fanntyp}{bevloadmax} // 1;
+  my @bev_load_norm  = map { _aiFannNormMinMaxValue ($_, $bevloadmin_inf, $bevloadmax_inf) } @$bev_load_raw_ref;
+
+  # Profil einmalig bestimmen
+  #############################
+  my $profile = CurrentVal ($name, 'aiConProfile', undef);                                      # verwendete Feature-Registry Version
+
+  if (!$profile) {
+      my @flags;
+      push @flags, 'heatpump' if defined isHeatPumpUsed ($name);
+      push @flags, 'bev'      if defined isBevUsed      ($name);
+
+      my ($synth, $err) = __aiFannSynthesizeProfile ($name, join (',', @flags) || 'v1');
+
+      if ($err) {
+          Log3 ($name, 1, "$name - ERROR - profile auto-detection failed: $err – using v1_common");
+          $profile = 'v1_common';
+      }
+      else {
+          $profile = $synth;
+      }
+  }
+
+  debugLog ($paref, 'aiData', "AI FANN - using profile: $profile");  
   
   # Rohdaten in Reihenfolge extrahieren und vorbereiten
   #######################################################
@@ -27836,6 +27984,7 @@ sub aiFannGetConResult {
       my $day_hour_norm      = $isday  ? $hour_norm : 0;                                 # Tagstunden normiert, sonst 0
       my $night_hour_norm    = !$isday ? $hour_norm : 0;                                 # Nachtstunden normiert, sonst 0 
       
+      
       # Monat 1..12 -> 0..11
       my $month0 = $month - 1;    
       my ($month_sin, $month_cos) = _aiFannEncodeCyclic ($month0,  12, $range);        # Monat, zyklische Struktur (0 .. 11)
@@ -27855,18 +28004,24 @@ sub aiFannGetConResult {
       
       # Min-Max 0..1|-1..1 Normierung
       #################################
-      my $rr1c_norm = ($range eq '-11')
-                      ? _aiFannNormMinMaxValueSymmetric ($rr1c,
-                                                         $data{$name}{neuralnet}{con}{rr1Min},
-                                                         $data{$name}{neuralnet}{con}{rr1Max})
-                      : _aiFannNormMinMaxValue          ($rr1c,
-                                                         $data{$name}{neuralnet}{con}{rr1Min},
-                                                         $data{$name}{neuralnet}{con}{rr1Max});         # Niederschlag, numerisch min-max normalisiert
-
+      my $rr1c_norm = _aiFannNormMinMaxValue ($rr1c, $data{$name}{neuralnet}{$fanntyp}{rr1Min},
+                                                     $data{$name}{neuralnet}{$fanntyp}{rr1Max}
+                                              );                                            # Niederschlag, numerisch min-max normalisiert  
+                                              
       ## Lag-Features erzeugen
       ##########################
       my $i    = @flat_targets - 1;
-      my $lags = _aiFannBuildLagFeatures (\@flat_targets, \@temp_norm_values, \@presence_values, $i, $lagnorm_ref, $range);
+      my $lags = _aiFannBuildLagFeatures ( { con_series                  => \@flat_targets,
+                                             temp_norm_series            => \@temp_norm_values,
+                                             presence_values             => \@presence_values,
+                                             i                           => $i,
+                                             norms                       => $lagnorm_ref,
+                                             range                       => $range,
+                                             bev_active_series           => $bev_active_ref,
+                                             bev_load_norm_series        => \@bev_load_norm,
+                                             bev_n_active_series         => $bev_n_active_ref,
+                                             bev_soc_deficit_norm_series => $bev_soc_deficit_norm_ref,      
+                                           } );      
       next if(!$lags);      
      
       # diskrete, semantische Zusatzsignale
@@ -27890,112 +28045,116 @@ sub aiFannGetConResult {
       
       # Kombinatorik in _aiFannFeatureBuilder 
       #######################################
-      my $profile  = _aiFannSelectProfile ($name);                                                  # verwendete Feature-Registry Version
       my $features = _aiFannFeatureBuilder ($profile, {                                    
-                            pv_norm                  => $pv_norm,                                   # PV-Ertrag (min-max normalisiert)
-                            rr1c_norm                => $rr1c_norm,                                 # Niederschlag (min-max normalisiert)
-                            temp_norm                => $temp_norm,                                 # Außentemperatur (min-max normalisiert)
-                            wcc_norm                 => $wcc_norm,                                  # Bewölkungsgrad (min-max normalisiert)
-                            sunalt_norm              => $sunalt_norm,                               # Sonnenhöhe 0..1 (unterhalb Horizont = 0)
-                            isday                    => $isday,                                     # Tag/Nacht-Flag (1 = Tag)
-                            holiday                  => $holiday,                                   # Feiertag / Urlaub
-                            hour_norm                => $hour_norm,                                 # Stunde des Tages 0..1
-                            day_hour_norm            => $day_hour_norm,                             # Normierte Tagesstunden (sonst 0)
-                            night_hour_norm          => $night_hour_norm,                           # Normierte Nachtstunden (sonst 0)
+                            pv_norm                     => $pv_norm,                                    # PV-Ertrag (min-max normalisiert)
+                            rr1c_norm                   => $rr1c_norm,                                  # Niederschlag (min-max normalisiert)
+                            temp_norm                   => $temp_norm,                                  # Außentemperatur (min-max normalisiert)
+                            wcc_norm                    => $wcc_norm,                                   # Bewölkungsgrad (min-max normalisiert)
+                            sunalt_norm                 => $sunalt_norm,                                # Sonnenhöhe 0..1 (unterhalb Horizont = 0)
+                            isday                       => $isday,                                      # Tag/Nacht-Flag (1 = Tag)
+                            holiday                     => $holiday,                                    # Feiertag / Urlaub
+                            hour_norm                   => $hour_norm,                                  # Stunde des Tages 0..1
+                            day_hour_norm               => $day_hour_norm,                              # Normierte Tagesstunden (sonst 0)
+                            night_hour_norm             => $night_hour_norm,                            # Normierte Nachtstunden (sonst 0)
 
-                            hod_sin                  => $hod_sin,                                   # Stunde des Tages (sinusförmig zyklisch)
-                            hod_cos                  => $hod_cos,                                   # Stunde des Tages (cosinusförmig zyklisch)
-                            wday_sin                 => $wday_sin,                                  # Wochentag zyklisch (sin)
-                            wday_cos                 => $wday_cos,                                  # Wochentag zyklisch (cos)
-                            month_sin                => $month_sin,                                 # Monat zyklisch (sin)
-                            month_cos                => $month_cos,                                 # Monat zyklisch (cos)
-                            sunaz_sin                => $sunaz_sin,                                 # Sonnenazimut zyklisch (sin)
-                            sunaz_cos                => $sunaz_cos,                                 # Sonnenazimut zyklisch (cos)
+                            hod_sin                     => $hod_sin,                                    # Stunde des Tages (sinusförmig zyklisch)
+                            hod_cos                     => $hod_cos,                                    # Stunde des Tages (cosinusförmig zyklisch)
+                            wday_sin                    => $wday_sin,                                   # Wochentag zyklisch (sin)
+                            wday_cos                    => $wday_cos,                                   # Wochentag zyklisch (cos)
+                            month_sin                   => $month_sin,                                  # Monat zyklisch (sin)
+                            month_cos                   => $month_cos,                                  # Monat zyklisch (cos)
+                            sunaz_sin                   => $sunaz_sin,                                  # Sonnenazimut zyklisch (sin)
+                            sunaz_cos                   => $sunaz_cos,                                  # Sonnenazimut zyklisch (cos)
 
-                            presence                 => $presence,                                  # Anwesenheit (0/1, Vergangenheit = 1)
-                            presence_smooth3         => $lags->{presence_smooth3},                  # Anwesenheitsglättung über 3h (0..1)
-                            presence_smooth2         => $lags->{presence_smooth2},                  # Anwesenheitsglättung über 2h (0..1)
-                            presence_transition_up   => $lags->{presence_transition_up},            # Anwesenheit 0->1 Übergang (Impuls)
-                            presence_transition_down => $lags->{presence_transition_down},          # Anwesenheit 1->0 Übergang (Impuls)
+                            presence                    => $presence,                                   # Anwesenheit (0/1, Vergangenheit = 1)
+                            presence_smooth3            => $lags->{presence_smooth3},                   # Anwesenheitsglättung über 3h (0..1)
+                            presence_smooth2            => $lags->{presence_smooth2},                   # Anwesenheitsglättung über 2h (0..1)
+                            presence_transition_up      => $lags->{presence_transition_up},             # Anwesenheit 0->1 Übergang (Impuls)
+                            presence_transition_down    => $lags->{presence_transition_down},           # Anwesenheit 1->0 Übergang (Impuls)
 
-                            lag48_norm               => $lags->{lag48_norm},                        # Verbrauch vor 48h (normalisiert)
-                            lag168_norm              => $lags->{lag168_norm},                       # Verbrauch vor 168h = 7d (normalisiert)
+                            lag48_norm                  => $lags->{lag48_norm},                         # Verbrauch vor 48h (normalisiert)
+                            lag168_norm                 => $lags->{lag168_norm},                        # Verbrauch vor 168h = 7d (normalisiert)
 
-                            lag1_spike_pos_norm      => $lags->{lag1_spike_pos_norm},               # letzte Stunde war Spike nach oben (laufender Spike)
-                            lag1_spike_neg_norm      => $lags->{lag1_spike_neg_norm},               # letzte Stunde war Spike nach unten (laufender Einbruch)
-                            lag2_spike_pos_norm      => $lags->{lag2_spike_pos_norm},               # vorletzte Stunde war Spike nach oben (Spike klingt ab / hält an)
-                            lag2_spike_neg_norm      => $lags->{lag2_spike_neg_norm},               # vorletzte Stunde war Spike nach unten  (Einbruch klingt ab / hält an)
+                            lag1_spike_pos_norm         => $lags->{lag1_spike_pos_norm},                # letzte Stunde war Spike nach oben (laufender Spike)
+                            lag1_spike_neg_norm         => $lags->{lag1_spike_neg_norm},                # letzte Stunde war Spike nach unten (laufender Einbruch)
+                            lag2_spike_pos_norm         => $lags->{lag2_spike_pos_norm},                # vorletzte Stunde war Spike nach oben (Spike klingt ab / hält an)
+                            lag2_spike_neg_norm         => $lags->{lag2_spike_neg_norm},                # vorletzte Stunde war Spike nach unten  (Einbruch klingt ab / hält an)
                             
-                            cum_day_norm             => $sigs->{cum_day_norm},                      # kumulierter Tagesverbrauch (normiert)
-                            cum_day_deviation        => $sigs->{cum_day_deviation},                 # Abweichung Verbrauch vom erwarteten Tagespfad
+                            cum_day_norm                => $sigs->{cum_day_norm},                       # kumulierter Tagesverbrauch (normiert)
+                            cum_day_deviation           => $sigs->{cum_day_deviation},                  # Abweichung Verbrauch vom erwarteten Tagespfad
 
-                            is_low_cons_regime       => $lags->{is_low_cons_regime},                # y_t <= P25: Grundlast / Nacht / abwesend
-                            is_high_cons_regime      => $lags->{is_high_cons_regime},               # y_t >= P75: Peak / Kochen / Geräte an
-                            is_transition_regime     => $lags->{is_transition_regime},              # P25 < y_t < P75: normaler Betrieb
+                            is_low_cons_regime          => $lags->{is_low_cons_regime},                 # y_t_1 <= P25: Grundlast / Nacht / abwesend
+                            is_high_cons_regime         => $lags->{is_high_cons_regime},                # y_t_1 >= P75: Peak / Kochen / Geräte an
+                            is_transition_regime        => $lags->{is_transition_regime},               # P25 < y_t_1 < P75: normaler Betrieb
+                            
+                            bev_active_lag1             => $lags->{bev_active_lag1},
+                            bev_load_lag1_norm          => $lags->{bev_load_lag1_norm},
+                            bev_n_active_lag1_norm      => $lags->{bev_n_active_lag1_norm},
+                            bev_soc_deficit_lag1_norm   => $lags->{bev_soc_deficit_lag1_norm},
                          
-                            delta1_norm              => $lags->{delta1_norm},                       # Änderung ggü. Vorstunde (normalisiert)
-                            delta24_norm             => $lags->{delta24_norm},                      # Änderung ggü. Vortag (normalisiert)
-                            delta1_norm_pos          => $lags->{delta1_norm_pos},                   # Positive 1h-Änderung
-                            delta1_norm_neg          => $lags->{delta1_norm_neg},                   # Negative 1h-Änderung
-                            delta24_norm_pos         => $lags->{delta24_norm_pos},                  # Positive 24h-Änderung
-                            delta24_norm_neg         => $lags->{delta24_norm_neg},                  # Negative 24h-Änderung
+                            delta1_norm                 => $lags->{delta1_norm},                        # Änderung ggü. Vorstunde (normalisiert)
+                            delta24_norm                => $lags->{delta24_norm},                       # Änderung ggü. Vortag (normalisiert)
+                            delta1_norm_pos             => $lags->{delta1_norm_pos},                    # Positive 1h-Änderung
+                            delta1_norm_neg             => $lags->{delta1_norm_neg},                    # Negative 1h-Änderung
+                            delta24_norm_pos            => $lags->{delta24_norm_pos},                   # Positive 24h-Änderung
+                            delta24_norm_neg            => $lags->{delta24_norm_neg},                   # Negative 24h-Änderung
 
-                            roll_min_6_norm          => $lags->{roll_min_6_norm},                   # Tiefstwert der letzten 6h (Grundlastniveau)
-                            roll_max_6_norm          => $lags->{roll_max_6_norm},                   # Höchstwert der letzten 6h (Peak-Niveau)
-                            roll_range_6_norm        => $lags->{roll_range_6_norm},                 # Spannweite der letzten 6h (Volatilität ohne Glättung)
+                            roll_min_6_norm             => $lags->{roll_min_6_norm},                    # Tiefstwert der letzten 6h (Grundlastniveau)
+                            roll_max_6_norm             => $lags->{roll_max_6_norm},                    # Höchstwert der letzten 6h (Peak-Niveau)
+                            roll_range_6_norm           => $lags->{roll_range_6_norm},                  # Spannweite der letzten 6h (Volatilität ohne Glättung)
 
-                            temp_norm_lag1h          => $lags->{temp_norm_lag1h},                   # Temperatur vor 1h (normalisiert)
-                            temp_norm_lag3h          => $lags->{temp_norm_lag3h},                   # Temperatur vor 3h (normalisiert)
-                            temp_norm_lag24h         => $lags->{temp_norm_lag24h},                  # Temperatur vor 24h (normalisiert)
+                            temp_norm_lag1h             => $lags->{temp_norm_lag1h},                    # Temperatur vor 1h (normalisiert)
+                            temp_norm_lag3h             => $lags->{temp_norm_lag3h},                    # Temperatur vor 3h (normalisiert)
+                            temp_norm_lag24h            => $lags->{temp_norm_lag24h},                   # Temperatur vor 24h (normalisiert)
 
-                            temp_delta_1h_pos        => $lags->{temp_delta_1h_pos},                 # Positive Temperaturänderung 1h
-                            temp_delta_1h_neg        => $lags->{temp_delta_1h_neg},                 # Negative Temperaturänderung 1h
-                            temp_delta_3h_pos        => $lags->{temp_delta_3h_pos},                 # Positive Temperaturänderung 3h
-                            temp_delta_3h_neg        => $lags->{temp_delta_3h_neg},                 # Negative Temperaturänderung 3h
-                            temp_trend_pos           => $lags->{temp_trend_pos},                    # Aufwärtstrend Temperatur
-                            temp_trend_neg           => $lags->{temp_trend_neg},                    # Abwärtstrend Temperatur
+                            temp_delta_1h_pos           => $lags->{temp_delta_1h_pos},                  # Positive Temperaturänderung 1h
+                            temp_delta_1h_neg           => $lags->{temp_delta_1h_neg},                  # Negative Temperaturänderung 1h
+                            temp_delta_3h_pos           => $lags->{temp_delta_3h_pos},                  # Positive Temperaturänderung 3h
+                            temp_delta_3h_neg           => $lags->{temp_delta_3h_neg},                  # Negative Temperaturänderung 3h
+                            temp_trend_pos              => $lags->{temp_trend_pos},                     # Aufwärtstrend Temperatur
+                            temp_trend_neg              => $lags->{temp_trend_neg},                     # Abwärtstrend Temperatur
 
-                            trend_break              => $sigs->{trend_break},                       # Trendwechsel (binär)
-                            trend_up_norm            => $sigs->{trend_up_norm},                     # Aufwärtstrend Stärke (normalisiert)
-                            trend_down_norm          => $sigs->{trend_down_norm},                   # Abwärtstrend Stärke (normalisiert)
-                            trend_up_strength        => $sigs->{trend_up_strength},                 # Starker Aufwärtstrend
-                            trend_down_strength      => $sigs->{trend_down_strength},               # Starker Abwärtstrend
+                            trend_break                 => $sigs->{trend_break},                        # Trendwechsel (binär)
+                            trend_up_norm               => $sigs->{trend_up_norm},                      # Aufwärtstrend Stärke (normalisiert)
+                            trend_down_norm             => $sigs->{trend_down_norm},                    # Abwärtstrend Stärke (normalisiert)
+                            trend_up_strength           => $sigs->{trend_up_strength},                  # Starker Aufwärtstrend
+                            trend_down_strength         => $sigs->{trend_down_strength},                # Starker Abwärtstrend
 
-                            pv_jump                  => $sigs->{pv_jump},                           # Plötzlicher PV-Anstieg
-                            cold_trigger             => $sigs->{cold_trigger},                      # Kälte-Trigger (binär)
-                            heat_trigger             => $sigs->{heat_trigger},                      # Hitze-Trigger (binär)
-                            volatility_flag          => $sigs->{volatility_flag},                   # Hohe Lastvolatilität
-                            pv_consumption_cross     => $sigs->{pv_consumption_cross},              # PV-Erzeugung > Verbrauch
-                            pv_drop                  => $sigs->{pv_drop},                           # PV-Einbruch
+                            pv_jump                     => $sigs->{pv_jump},                            # Plötzlicher PV-Anstieg
+                            cold_trigger                => $sigs->{cold_trigger},                       # Kälte-Trigger (binär)
+                            heat_trigger                => $sigs->{heat_trigger},                       # Hitze-Trigger (binär)
+                            volatility_flag             => $sigs->{volatility_flag},                    # Hohe Lastvolatilität
+                            pv_consumption_cross        => $sigs->{pv_consumption_cross},               # PV-Erzeugung > Verbrauch
+                            pv_drop                     => $sigs->{pv_drop},                            # PV-Einbruch
 
-                            hour_class_morning       => $sigs->{hour_class_morning},                # Morgenstunden (Flag)
-                            hour_class_evening       => $sigs->{hour_class_evening},                # Abendstunden (Flag)
-                            hour_class_lateevening   => $sigs->{hour_class_lateevening},            # Spätabend (Flag)
-                            hour_class_midnight      => $sigs->{hour_class_midnight},               # Mitternacht (Flag)
-                            hour_class_night         => $sigs->{hour_class_night},                  # Nachtstunden (Flag)
-                            hour_class_noon          => $sigs->{hour_class_noon},                   # Mittagsstunden (Flag)
+                            hour_class_morning          => $sigs->{hour_class_morning},                 # Morgenstunden (Flag)
+                            hour_class_evening          => $sigs->{hour_class_evening},                 # Abendstunden (Flag)
+                            hour_class_lateevening      => $sigs->{hour_class_lateevening},             # Spätabend (Flag)
+                            hour_class_midnight         => $sigs->{hour_class_midnight},                # Mitternacht (Flag)
+                            hour_class_night            => $sigs->{hour_class_night},                   # Nachtstunden (Flag)
+                            hour_class_noon             => $sigs->{hour_class_noon},                    # Mittagsstunden (Flag)
 
-                            day_class_weekend        => $sigs->{day_class_weekend},                 # Wochenende (Flag)
-                            day_class_workday        => $sigs->{day_class_workday},                 # Arbeitstag (Flag)
+                            day_class_weekend           => $sigs->{day_class_weekend},                  # Wochenende (Flag)
+                            day_class_workday           => $sigs->{day_class_workday},                  # Arbeitstag (Flag)
 
-                            heating_degree_norm      => $sigs->{heating_degree_norm},               # Heizgradtage (Heizlast)
-                            cooling_degree_norm      => $sigs->{cooling_degree_norm},               # Kühlgradtage (Kühllast)
+                            heating_degree_norm         => $sigs->{heating_degree_norm},                # Heizgradtage (Heizlast)
+                            cooling_degree_norm         => $sigs->{cooling_degree_norm},                # Kühlgradtage (Kühllast)
 
-                            hp_heating_mode          => $sigs->{hp_heating_mode},                   # Wärmepumpe im Heizmodus
-                            hp_cooling_mode          => $sigs->{hp_cooling_mode},                   # Wärmepumpe im Kühlmodus
+                            hp_heating_mode             => $sigs->{hp_heating_mode},                    # Wärmepumpe im Heizmodus
+                            hp_cooling_mode             => $sigs->{hp_cooling_mode},                    # Wärmepumpe im Kühlmodus
 
-                            ww_morning               => $sigs->{ww_morning},                        # Warmwasser morgens
-                            ww_evening               => $sigs->{ww_evening},                        # Warmwasser abends
-                            ww_cold_boost            => $sigs->{ww_cold_boost},                     # Kältebedingter WW-Boost
-                            ww_pv_boost              => $sigs->{ww_pv_boost},                       # PV-optimierter WW-Boost
-                            ww_cycle_flag            => $sigs->{ww_cycle_flag},                     # WW-Zyklus aktiv
+                            ww_morning                  => $sigs->{ww_morning},                         # Warmwasser morgens
+                            ww_evening                  => $sigs->{ww_evening},                         # Warmwasser abends
+                            ww_cold_boost               => $sigs->{ww_cold_boost},                      # Kältebedingter WW-Boost
+                            ww_pv_boost                 => $sigs->{ww_pv_boost},                        # PV-optimierter WW-Boost
+                            ww_cycle_flag               => $sigs->{ww_cycle_flag},                      # WW-Zyklus aktiv
 
-                            cop_proxy                => $sigs->{cop_proxy},                         # COP-Schätzwert (linear zur Temperatur)
-                            cop_inverse              => $sigs->{cop_inverse},                       # Inverser COP (Strombedarf)
-                            hp_power_factor          => $sigs->{hp_power_factor},                   # Kombinierte WP-Leistungssemantik
+                            cop_proxy                   => $sigs->{cop_proxy},                          # COP-Schätzwert (linear zur Temperatur)
+                            cop_inverse                 => $sigs->{cop_inverse},                        # Inverser COP (Strombedarf)
+                            hp_power_factor             => $sigs->{hp_power_factor},                    # Kombinierte WP-Leistungssemantik
 
-                            frost_protect            => $sigs->{frost_protect},                     # Frostschutz aktiv (binär)
-                            frost_load               => $sigs->{frost_load},                        # Frostschutz-Last (kontinuierlich)                       
+                            frost_protect               => $sigs->{frost_protect},                      # Frostschutz aktiv (binär)
+                            frost_load                  => $sigs->{frost_load},                         # Frostschutz-Last (kontinuierlich)                       
                         }       
                     );
       
@@ -28051,6 +28210,11 @@ sub aiFannGetConResult {
       push @flat_targets,     $forward_val;                                                 # V 2.6.10 statt direkt $prediction
       push @temp_norm_values, $temp_norm;                                                   # wichtig: Temperaturreihe auch erweitern
       push @presence_values,  $presence;                                                    # wichtig: Presence fortschreiben
+      
+      push @$bev_active_ref,           0;                                                   # BEV-Zukunftswerte: kein Ladezustand bekannt -> neutral (0)
+      push @bev_load_norm,             0;
+      push @$bev_n_active_ref,         0;
+      push @$bev_soc_deficit_norm_ref, 0;
 
       
       # Hybridmodell mit Legacy
@@ -28082,6 +28246,92 @@ sub aiFannGetConResult {
   setTimeTracking ($name, $cst, $fanntyp.'NNLastGetResultTime');                            # Laufzeit ermitteln
   
 return;
+}
+
+###############################################################
+#  Liefert BEV-Aggregat-Arrays aus pvHistory, synchron zur
+#  Iteration von getPvHistTargetArray (gleiche Filterkriterien,
+#  gleiche Reihenfolge, gleicher Cutoff) damit Indexausrichtung
+#  zu @flat_targets gewährleistet ist.
+#
+#  Filterkriterium: dieselbe Zeile muss par1 (='con') >= 0
+#  haben, damit der Index identisch zu @flat_targets bleibt.
+#
+#  Return: (\@active, \@load_raw, \@n_active, \@soc_deficit_norm)
+###############################################################
+sub __aiFannBevHistArray {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $t       = $paref->{t}     // time;
+  my $limit   = $paref->{limit} // 200;
+  my $range   = $paref->{range};
+  my $fanntyp = $paref->{fanntyp};
+
+  my (@active, @load_raw, @n_active, @soc_deficit_norm);
+
+  return (\@active, \@load_raw, \@n_active, \@soc_deficit_norm)
+      unless exists $data{$name}{pvhist};
+  
+  # --- Cache-Objekt initialisieren ---
+  my $hash  = $defs{$name};
+  my $cache = $hash->{'.pvHistCache'} //= LRU_cache_create ('pvHistCache', 'pvHistory Cache', CACHEPVHMS);
+
+  # --- Zeitkontext über TS_OFFSET_CACHE (stabil & gecacht) ---        
+  my $dt   = timestringsFromOffset ($name, $t, 0);  
+  my $year = $dt->{year};
+  my $mon  = $dt->{month};
+  my $mday = $dt->{day};
+  my $hour = $dt->{hour};
+
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'BEVHISTARR',                                                     # Cache Key ID
+                       $name, $year, $mon, $mday, $hour, $limit;
+
+  # --- Cache-Hit? ---
+  if (my $cached = LRU_get ($name, $cache, $key)) {
+      return @$cached;                                                                  # (\@p1, \@p2, \@p3, \@p4)
+  }
+
+  # --- Kein Cache-Hit → Originalberechnung ---
+  # --- identische Tagesreihenfolge wie getPvHistTargetArray ---
+  my $ph = $data{$name}{pvhist};
+  
+  my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;
+  my @days_upto  = sort { $a <=> $b } grep { $_ <= $mday } keys %$ph;
+
+  for my $day (@days_after, @days_upto) {
+      for my $hod (sort { $a <=> $b } keys %{ $ph->{$day} }) {
+          next if $hod < 1 || $hod > 24;
+          last if ($day == $mday && $hod == $hour + 1);
+
+          my $rec = $ph->{$day}{$hod};
+
+          next unless defined $rec->{$fanntyp};                                             # identisches Filterkriterium wie getPvHistTargetArray
+          next unless $rec->{$fanntyp} >= 0;
+
+          my $bev_sig          = __aiFannBevConsumerAggregate ($rec);
+          my $soc_deficit_norm = _aiFannNormBevSocDeficit ($bev_sig->{soc_deficit}, $range);
+
+          push @active,           $bev_sig->{active};
+          push @load_raw,         $bev_sig->{load};
+          push @n_active,         $bev_sig->{n_active_ratio};
+          push @soc_deficit_norm, $soc_deficit_norm;
+      }
+  }
+
+  # --- Limit anwenden (identisch zu getPvHistTargetArray) ---
+  my $n   = scalar @active;
+  my $min = $n < $limit ? $n : $limit;
+
+  @active           = @active          [-$min .. -1];
+  @load_raw         = @load_raw        [-$min .. -1];
+  @n_active         = @n_active        [-$min .. -1];
+  @soc_deficit_norm = @soc_deficit_norm[-$min .. -1];
+  
+  # --- Ergebnis cachen ---
+  LRU_insert ($name, $cache, $key, [ \@active, \@load_raw, \@n_active, \@soc_deficit_norm ]);
+
+return (\@active, \@load_raw, \@n_active, \@soc_deficit_norm);
 }
 
 ################################################################
@@ -29411,8 +29661,28 @@ sub _aiFannNormPv {
   my $pv_max_limit = shift;
   my $range        = shift // '01';
   
-  if ($range eq '-11') { return ($pv / $pv_max_limit) * 2 - 1 }                       # [-1 .. 1] für SYMMETRIC
-  else                 { return $pv / $pv_max_limit; }                                # [0 .. 1] für ASYMMETRIC
+  if ($range eq '-11') { return ($pv / $pv_max_limit) * 2 - 1 }                     # [-1 .. 1] für SYMMETRIC
+  else                 { return $pv / $pv_max_limit; }                              # [0 .. 1] für ASYMMETRIC
+}
+
+###############################################################
+#   Normierung BEV SoC-Defizit (Ziel-SoC minus aktueller SoC)
+#   Eingang bereits Anteil ca. 0..1 (Prozentpunkte/100), analog
+#   wcc/temp/pv: fester physikalischer Wertebereich, daher KEINE
+#   datensatzweite Min-Max nötig, sondern Norm pro Record wie
+#   bei den anderen festbereichigen Features.
+#   $range aktuell ungenutzt (Platzhalter): non-negative Arrays
+#   bleiben laut SYMMETRIC-Prinzip immer 0..1, nur @dseries
+#   (delta1, delta24) erhalten symmetrische Normierung.
+###############################################################
+sub _aiFannNormBevSocDeficit {
+  my ($val, $range) = @_;
+  return 0 if !defined $val;
+
+  $val = 0 if $val < 0;                                                             # Sicherheitsclamp (Restschutz, siehe Aggregat-Funktion)
+  $val = 1 if $val > 1;
+
+return $val;
 }
 
 ###############################################################
