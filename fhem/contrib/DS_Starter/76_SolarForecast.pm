@@ -394,6 +394,7 @@ use constant {
   HOURCOUNT       => 24,                                                            # default Stundenbalken in Grafik
   HOMEICONDEF     => 'control_building_control@grey',                               # default Home-Icon
   HPOPMODEDEF     => 'off',                                                         # WP default Operation Mode
+  HPDEFMODULATN   => 100,                                                           # WP default Modulation (%)
   HPOPMODES       => 'off|heating|defrost|hotwater|cooling|pool|poolheating',       # WP mögliche Operating Modes
   
   INFINITE        => ~0 >> 1,                                                       # "Unendlich"
@@ -909,6 +910,8 @@ my %epoche_translations = (
                DE => "Die Aktivierungsfunktion SIGMOID bildet alle Inputs auf 0..1 ab. Slope < 0.75 oder schwaches R² bei gesundem Training kann auf unzureichende Gradientendynamik hinweisen, besonders wenn Delta-Features oder hohe Lastdynamik (WP/EV) vorliegen. Versuch: aiConActFunc SIGMOID_SYMMETRIC." },
   afasym  => { EN => "SIGMOID_SYMMETRIC is active but the network shows dead learning behavior (Slope≈0). For predominantly non-negative features without EV/heat pump, SIGMOID may converge more reliably. Try: aiConActFunc SIGMOID. ",
                DE => "SIGMOID_SYMMETRIC ist aktiv, aber das Netz zeigt totes Lernverhalten (Slope≈0). Bei überwiegend nicht-negativen Features ohne EV/WP kann SIGMOID stabiler konvergieren. Versuch: aiConActFunc SIGMOID. " },
+  afelliot=> { EN => "SIGMOID_SYMMETRIC is active but Slope is still flat (Slope=%.2f). ELLIOT_SYMMETRIC has a less saturating activation curve and may better capture load peaks (heat pump / EV). Try: aiConActFunc ELLIOT_SYMMETRIC. Keep all other parameters unchanged for a clean comparison.",
+               DE => "SIGMOID_SYMMETRIC ist aktiv, aber die Slope ist weiterhin flach (Slope=%.2f). ELLIOT_SYMMETRIC hat eine weniger sättigende Aktivierungskurve und kann Lastspitzen (WP/EV) besser abbilden. Versuch: aiConActFunc ELLIOT_SYMMETRIC. Alle anderen Parameter unverändert lassen für einen sauberen Vergleich." },
   hint1   => { EN => "Learning rate too high: Reduce the learning rate (aiControl->aiConLearnRate) by a factor of 5–10 (e.g., from 0.01 to 0.001–0.002)",
                DE => "Lernrate zu hoch: Lernrate (aiControl->aiConLearnRate) um Faktor 5-10 reduzieren (z.B. von 0.01 auf 0.001-0.002)" },                           
   hint2   => { EN => "Check architecture: Network may be too small for the amount of data; increase the number of neurons (aiControl->aiConHiddenLayers) in the hidden layers (e.g., 50-25 → 64-32)",
@@ -7844,6 +7847,7 @@ sub _attrconsumer {                      ## no critic "not used"
       
       # --- nur für heatpump (musts in __attrKeyAction checken)
       opmode          => { comp => '.*',                              must => 0, act => 1 },
+      modulation      => { comp => '.*',                              must => 0, act => 1 },
       
       # --- nur für bev (musts in __attrKeyAction checken)
       batCap          => { comp => '(?:\d+$|(?!\d+(?:\.\d+)?:)[^:]+:(?:k?Wh))',  must => 0, act => 1 },
@@ -9630,7 +9634,7 @@ sub __attrKeyAction {
           }
           
           if ($akeyval ne 'heatpump') {                                                                 # Exklusivschlüssel heatpump
-              my @dont = qw(opmode);
+              my @dont = qw(opmode modulation);
               my $chk  = 0;    
 
               for my $k (@dont) {
@@ -9659,8 +9663,9 @@ sub __attrKeyAction {
               if (   !defined $pphash->{etotal} 
                   || !defined $pphash->{pcurr} 
                   || !defined $pphash->{swstate}
-                  || !defined $pphash->{opmode} ) {
-                  return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate', 'opmode' and 'pcurr' to be defined.};
+                  || !defined $pphash->{opmode} 
+                  || !defined $pphash->{modulation} ) {
+                  return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate', 'opmode', 'modulation' and 'pcurr' to be defined.};
               }        
           }
       }
@@ -9686,17 +9691,31 @@ sub __attrKeyAction {
               return "The mode '$akeyval' is not allowed!";
           }
       }
-      elsif ($akey eq 'opmode') {
+      elsif ($akey eq 'opmode' || $akey eq 'modulation') {
           if ($akeyval =~ /.*:.*/xs) {
-              my ($dv, $rd) = split ':', $akeyval;
-              ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
-              return $err if($err);
+              if ($akey eq 'opmode') { 
+                  my ($dv, $rd) = split ':', $akeyval;
+                  ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+                  return $err if($err);
 
-              my $opmode = ReadingsVal ($dv, $rd, '');
-              my $poom   = HPOPMODES;
-              if ($opmode !~ /^(?:$poom)$/xs) {
-                  return "The reading '$rd' of device '$dv' is invalid or does not contain a valid opmode";
+                  my $opmode = ReadingsVal ($dv, $rd, '');
+                  my $poom   = HPOPMODES;
+                  
+                  if ($opmode !~ /^(?:$poom)$/xs) {
+                      return "The reading '$rd' of device '$dv' is invalid or does not contain a valid $akey";
+                  }
               }
+              elsif ($akey eq 'modulation') { 
+                  my ($dv, $rd) = split ':', $akeyval;
+                  ($err)        = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+                  return $err if($err);
+
+                  my $modulation = ReadingsVal ($dv, $rd, '');
+                                 
+                  if (!isNumeric($modulation)) {
+                      return "The reading '$rd' of device '$dv' is invalid or does not contain a valid $akey";
+                  }
+              }              
           }
           else {
               return "The value '$akey=$akeyval' is not valid. Please consider the commandref.";
@@ -10413,6 +10432,7 @@ sub delConsumerFromMem {
   }
   
   delete $data{$name}{current}{"csm${c}_active_opmode"};                        # aktiven Opmode entfernen
+  delete $data{$name}{current}{"csm${c}_active_modulation"};                    # aktive Modulation entfernen
   
   for my $ridx (sort keys %{ $data{$name}{aidectree}{airaw} // {} }) {          # Consumer aus AI Raw Data löschen
       my $row = $data{$name}{aidectree}{airaw}{$ridx};
@@ -11640,7 +11660,7 @@ sub _collectAllRegConsumers {
       }
       
       # --- Löschen relevanter Schlüssel
-      my @delkeys = qw (sunriseshift sunsetshift icon batCap currSoC targetSoC evid timeOfDeparture opmode);
+      my @delkeys = qw (sunriseshift sunsetshift icon batCap currSoC targetSoC evid timeOfDeparture opmode modulation);
       delete @{$data{$name}{consumers}{$c}}{@delkeys};
 
       # --- Neuanlage Consumer Hash-Werte
@@ -11698,7 +11718,8 @@ sub _collectAllRegConsumers {
       $data{$name}{consumers}{$c}{timeOfDeparture}   = q{}                 if(defined $hc->{bev});          # optionale Angabe 
 
       # --- nur für heatpump
-      $data{$name}{consumers}{$c}{opmode}            = $hc->{opmode}       if(defined $hc->{opmode});       # optionale Angabe 
+      $data{$name}{consumers}{$c}{opmode}            = $hc->{opmode}       if(defined $hc->{opmode}); 
+      $data{$name}{consumers}{$c}{modulation}        = $hc->{modulation}   if(defined $hc->{modulation}); 
   }
   
   if (@hp) { $data{$name}{current}{heatpumpInstalled} = join (",", @hp); }                                  # mehrere Wärmepumpen möglich
@@ -18055,38 +18076,61 @@ sub __hpConsumerOpmode {
   return if $ctype ne 'heatpump';                                                           # Verarbeitung nur für WP
 
   my $msg;
-  my $hod        = sprintf "%02d", ($chour + 1);
-  my $om         = ConsumerVal ($name, $c, 'opmode',   ' : ');                              # Consumer Operation Mode
-  my $modulation = ConsumerVal ($name, $c, 'modulation', 100);                              # Modulationsgrad in % (0-100)
+  my $hod        = sprintf "%02d", ($chour + 1) % 24;
+  my $om         = ConsumerVal ($name, $c, 'opmode',     ' : ');                            # Consumer Operation Mode
+  my $md         = ConsumerVal ($name, $c, 'modulation', ' : ');                            # Modulationsgrad in % (0-100)
   my $opmode     = HPOPMODEDEF;
+  my $modulation = HPDEFMODULATN;
   my @hpStates   = split /\|/, HPOPMODES;
   
-  my ($dv, $rd)  = split ':', $om;
-  my ($err)      = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+  # --- opmode Device prüfen
+  my ($dvo, $rdo) = split ':', $om;
+  my ($err)       = isDeviceValid ( { name => $name, obj => $dvo, method => 'string' } );
   
   if ($err) {
-      my $msg = "consumer >$c< - The device '$dv' defined in consumer key 'opmode' doesn't exist. Fall back to $opmode mode.";
+      my $msg = "consumer >$c< - The device '$dvo' defined in consumer key 'opmode' doesn't exist. Fall back to $opmode mode.";
       Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
   }
   else {
-      $opmode = ReadingsVal ($dv, $rd, '');
+      $opmode = ReadingsVal ($dvo, $rdo, '');
       
       if (!grep { $_ eq $opmode } @hpStates) {
-          $msg = "consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to ".HPOPMODEDEF." mode.";
+          $msg = "consumer >$c< - The reading '$rdo' of device '$dvo' is invalid or doesn't contain a valid mode. Fall back to ".HPOPMODEDEF." mode.";
           Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
           $opmode = HPOPMODEDEF;                                                            # Fallback bei unbekanntem/leerem Wert
       }
   }
-
+  
+  # --- modulation Device prüfen
+  my ($dvm, $rdm) = split ':', $md;
+  ($err)          = isDeviceValid ( { name => $name, obj => $dvm, method => 'string' } );
+  
+  if ($err) {
+      my $msg = "consumer >$c< - The device '$dvm' defined in consumer key 'modulation' doesn't exist. Fall back to $modulation % modulation.";
+      Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
+  }
+  else {
+      $modulation = ReadingsNum ($dvm, $rdm, '');
+      
+      if (!isNumeric($modulation)) {
+          $msg = "consumer >$c< - The reading '$rdm' of device '$dvm' is invalid or doesn't contain a valid modulation. Fall back to ".HPDEFMODULATN."% modulation.";
+          Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
+          $modulation = HPDEFMODULATN;                                                                # Fallback bei unbekanntem/leerem Wert
+      }
+      
+      $modulation = clampValue ($modulation, 0, 100);
+  }
+  
   # --- Akkumulation gewichteter Sekunden (Zeit × Modulation%) mit gleichem Status in der laufenden Stunde
-  $data{$name}{current}{"csm${c}_active_opmode"} = $opmode;                                 # aktiver Opmode
+  $data{$name}{current}{"csm${c}_active_opmode"}     = $opmode;                             # aktiver Opmode
+  $data{$name}{current}{"csm${c}_active_modulation"} = $modulation;                         # aktive Modulation
   
   my $last_check = CircularVal ($name, 99, 'last_transfer', $t);
   my $delta      = $t - $last_check;
   my $dt         = timestringsFromOffset ($name, $last_check, 0);
   my $lchkhour   = $dt->{hour};
   
-  debugLog ($paref, 'collectData_long', "collect HP-state data - hour=$chour, last check hour=$lchkhour, delta=$delta, dev=$dv, rdg=$rd, opmode=$opmode, modulation=$modulation");
+  debugLog ($paref, 'collectData_long', "collect HP-state data - hour=$chour, last check hour=$lchkhour, delta=$delta, opmode=$dvo:$rdo -> $opmode, modulation=$dvm:$rdm -> $modulation");
 
   for my $s (@hpStates) {
       my $key = "accum_csm${c}_${s}_wseconds";                                              # gewichtete Sekunden (wsec = sec × mod/100)
@@ -27466,22 +27510,33 @@ sub _aiFannEpochDiagnostic {
   
   # --- 4. Aktivierungsfunktion Empfehlung
   if (defined $haf) {
-      if ($haf !~ /SYMMETRIC/xs) {
-          # Kandidat für Wechsel zu SYMMETRIC:
-          # - Netz lernt grundsätzlich (kein totes Netz)
-          # - kein relevantes Overfitting
-          # - Slope zu flach ODER R² schwach trotz gesunder Epochenphase
-          my $af_candidate = $code eq 'ok'
-                          && !$is_dead_net
-                          && $overfitting < 0.15
-                          && ($slope      < 0.75 || ($r2 < 0.75 && $rmse_rel > $rmse_rel_warn));
-
-          push @hints, $epoche_translations{afsym}{$lang} if $af_candidate;
-      }
-      else {                                                                                # SYMMETRIC aktiv aber totes Netz -> Wechsel zurück zu SIGMOID
+      if ($haf =~ /ELLIOT_SYMMETRIC/xs) {                                               # ELLIOT_SYMMETRIC aktiv aber totes Netz -> zurück zu SIGMOID
           if ($is_dead_net) {
               push @hints, $epoche_translations{afasym}{$lang};
           }
+          elsif (   $code        eq  'ok'
+                 && $overfitting <   0.15
+                 && $slope       <   0.75) {
+              push @hints, $epoche_translations{hint7}{$lang};                          # RPROP empfehlen
+          }
+      }
+      elsif ($haf =~ /SYMMETRIC/xs) {                                                   # SIGMOID_SYMMETRIC aktiv
+          if ($is_dead_net) {                                                            # Totes Netz -> zurück zu SIGMOID
+              push @hints, $epoche_translations{afasym}{$lang};
+          }
+          elsif (   $code       eq  'ok'                                                # Gesundes Training, aber Slope flach
+                 && $overfitting <   0.15
+                 && $slope       <   0.75) {
+              push @hints, sprintf $epoche_translations{afelliot}{$lang}, $slope;
+          }
+      }
+      else {                                                                             # Nicht-symmetrische AF (SIGMOID, ELLIOT)
+          my $af_candidate = $code      eq  'ok'
+                          && !$is_dead_net
+                          && $overfitting <   0.15
+                          && ($slope      <   0.75 || ($r2 < 0.75 && $rmse_rel > $rmse_rel_warn));
+
+          push @hints, $epoche_translations{afsym}{$lang} if $af_candidate;
       }
   }
 
@@ -38139,7 +38194,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                                        </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                                      </td></tr>
             <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating rod                                                                                                       </td></tr>
-            <tr><td>                       </td><td><b>heatpump</b>       - Consumer is a heat pump. (**)                                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>heatpump</b>       - Consumer is a heat pump or an air conditioner (**)                                                                              </td></tr>
             <tr><td>                       </td><td><b>washingmachine</b> - Consumer is a washing machine                                                                                                   </td></tr>            
             <tr><td>                       </td><td><b>other</b>          - Consumer is none of the above types                                                                                             </td></tr>
             <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                                 </td></tr>
@@ -38345,13 +38400,16 @@ to ensure that the system configuration is correct.
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
             <tr><td> <b>etotal</b>         </td><td>The key is a required field.                                                                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>The key is a required field.                                                                                                                       </td></tr>
+            <tr><td> <b>modulation</b>     </td><td>defines a &lt;Device&gt;:&lt;Reading&gt; combination that returns the current modulation as a percentage (required).                               </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b> - Return value: numeric value <b>0..100</b>                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>power</b>          </td><td>Maximum power consumption of the heat pump in W. The value must not be 0.                                                                          </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>opmode</b>         </td><td>Defines a &lt;Device&gt;:&lt;Reading&gt; combination that provides the heat pump's current operating mode (Required Information).                  </td></tr>
+            <tr><td> <b>opmode</b>         </td><td>defines a &lt;Device&gt;:&lt;Reading&gt; combination that provides the current operating mode (Required Information).                              </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
             <tr><td>                       </td><td>The return value must be exactly one of the following: <b>off heating defrost hotwater cooling pool poolheating </b>                               </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>The key is a required field.                                                                                                                       </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>power</b>          </td><td>Maximum power consumption in W. The value must not be 0.                                                                                           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Compressor operating status. The syntax remains as specified above.                                                                                </td></tr>
             <tr><td>                       </td><td>Unlike other consumers, this information is required even if you intend to use the default value.                                                  </td></tr>
@@ -41233,7 +41291,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>dishwasher</b>     - Verbraucher ist eine Spülmaschine                                                                                          </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Verbraucher ist ein Wäschetrockner                                                                                         </td></tr>
             <tr><td>                       </td><td><b>heater</b>         - Verbraucher ist ein Heizstab                                                                                               </td></tr>
-            <tr><td>                       </td><td><b>heatpump</b>       - Verbraucher ist eine Wärmepumpe (**)                                                                                       </td></tr>    
+            <tr><td>                       </td><td><b>heatpump</b>       - Verbraucher ist eine Wärmepumpe oder ein Klimagerät (**)                                                                   </td></tr>    
             <tr><td>                       </td><td><b>washingmachine</b> - Verbraucher ist eine Waschmaschine                                                                                         </td></tr>
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                              </td></tr>
             <tr><td>                       </td><td><b>noSchedule</b>     - für den Verbraucher erfolgt keine Einplanung oder automatische Schaltung.                                                  </td></tr>
@@ -41440,13 +41498,16 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <colgroup> <col width="12%"> <col width="88%"> </colgroup>
             <tr><td> <b>etotal</b>         </td><td>der Schlüssel ist Pflichtangabe                                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>pcurr</b>          </td><td>der Schlüssel ist Pflichtangabe                                                                                                                    </td></tr>
+            <tr><td> <b>modulation</b>     </td><td>definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche die aktuelle Modulation in % liefert (Pflichtangabe).                             </td></tr>
+            <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b> - Rückgabe: numerischer Wert <b>0..100</b>                                                           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme der Wärmepumpe in W. Der Wert darf nicht! 0 sein.                                                                       </td></tr>
-            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>opmode</b>         </td><td>Definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche den aktuellen Betriebsmodus der Wärmepumpe liefert (Pflichtangabe).               </td></tr>
+            <tr><td> <b>opmode</b>         </td><td>definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche den aktuellen Betriebsmodus liefert (Pflichtangabe).                              </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
             <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating </b>                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>pcurr</b>          </td><td>der Schlüssel ist Pflichtangabe                                                                                                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme in W. Der Wert darf nicht! 0 sein.                                                                                      </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Schaltstatus des Kompressors. Die Syntax bleibt wie oben angegeben.                                                                                </td></tr>
             <tr><td>                       </td><td>Abweichend von anderen Consumern ist die Angabe verpflichtend, auch wenn der default verwendet werden soll.                                        </td></tr>
