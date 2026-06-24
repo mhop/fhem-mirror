@@ -18088,7 +18088,7 @@ sub __hpConsumerOpmode {
   my ($err)       = isDeviceValid ( { name => $name, obj => $dvo, method => 'string' } );
   
   if ($err) {
-      my $msg = "consumer >$c< - The device '$dvo' defined in consumer key 'opmode' doesn't exist. Fall back to $opmode mode.";
+      my $msg = "consumer >$c< - Consumer key 'opmode' is not set or the device '$dvo' in that key doesn't exist. Fall back to $opmode mode.";
       Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
   }
   else {
@@ -18105,8 +18105,8 @@ sub __hpConsumerOpmode {
   my ($dvm, $rdm) = split ':', $md;
   ($err)          = isDeviceValid ( { name => $name, obj => $dvm, method => 'string' } );
   
-  if ($err) {
-      my $msg = "consumer >$c< - The device '$dvm' defined in consumer key 'modulation' doesn't exist. Fall back to $modulation % modulation.";
+  if ($err) {                      
+      my $msg = "consumer >$c< - Consumer key 'modulation' is not set or the device '$dvm' in that key doesn't exist.. Fall back to $modulation % modulation.";
       Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
   }
   else {
@@ -27955,12 +27955,12 @@ sub aiFannGetConResult {
                                                               );                                # $fanntyp + Temperaturen aus History lesen    
   
   my ($bev_active_ref, $bev_load_raw_ref, $bev_n_active_ref, $bev_soc_deficit_norm_ref) =
-      __aiFannBevHistArray ( { name    => $name,
-                               fanntyp => $fanntyp,
-                               range   => $range,
-                               t       => $paref->{t},
-                               limit   => 600,
-                             } );                                                               # BEV Aggregationen aus pvHistory lesen                                     
+      _aiFannBevHistArray ( { name    => $name,
+                              fanntyp => $fanntyp,
+                              range   => $range,
+                              t       => $paref->{t},
+                              limit   => 600,
+                            } );                                                               # BEV Aggregationen aus pvHistory lesen                                     
 
   my @flat_targets     = @$targetref;
   my @temps            = @$tempsref;
@@ -28356,7 +28356,7 @@ return;
 #
 #  Return: (\@active, \@load_raw, \@n_active, \@soc_deficit_norm)
 ###############################################################
-sub __aiFannBevHistArray {
+sub _aiFannBevHistArray {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $t       = $paref->{t}     // time;
