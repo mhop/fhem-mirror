@@ -163,7 +163,8 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.0"  => "22.06.2026  BEV Implementierung, Leakage Problematik beseitigt ",
+  "2.8.0"  => "24.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
+                           "__hpConsumerOpmode: Umstellung modus-minutes nach points ",
   "2.7.0"  => "20.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
                            "verbesserter Snap-Guard und Retrainidicator, Hint-Korrektur, Div0-Fix ".
                            "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ".
@@ -504,8 +505,6 @@ my $pvhexprtcsv    = $root."/FHEM/FhemUtils/PVH_Export_SolarForecast_";         
 
 my @dweattrmust    = qw(TTT Neff RR1c ww SunUp SunRise SunSet FF);                  # Werte die im Attr forecastProperties des Weather-DWD_Opendata Devices mindestens gesetzt sein müssen
 my @draattrmust    = qw(Rad1h);                                                     # Werte die im Attr forecastProperties des Radiation-DWD_Opendata Devices mindestens gesetzt sein müssen
-my @ctypes         = qw(dishwasher dryer washingmachine heater charger other
-                        heatpump bev noSchedule);                                   # erlaubte Consumer Typen
 
 my $messagefile    = MSGFILEPROD;
                                                                                     # mögliche Debug-Module
@@ -649,25 +648,25 @@ my %fann_valid_versions = map { $_ => 1 } qw(v1 v2);                          # 
 my %fann_valid_flags    = map { $_ => 1 } qw(active pv heatpump bev);         # valide Flags für Profil-Synthese CON-Training
 
 my %profileweights = (                                                        # Gewichte für FANN Training und Inferenz profilabhängig     
-  v1_sandbox            => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common             => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_active      => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_pv          => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_active_pv   => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_heatpump           => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
-  v1_heatpump_active    => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
-  v1_heatpump_pv        => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
-  v1_heatpump_active_pv => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
+  v1_sandbox            => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_common             => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_common_active      => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_common_pv          => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_common_active_pv   => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_heatpump           => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_active    => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_pv        => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_active_pv => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
 
   # --- BEV-Varianten (Startwerte, gespiegelt von common/heatpump; nach erstem realen Training rekalibrieren) ---
-  v1_bev                       => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_active_bev                => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_pv_bev                    => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_active_pv_bev             => { slope_min => 0.15, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_heatpump_bev              => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
-  v1_heatpump_active_bev       => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
-  v1_heatpump_pv_bev           => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
-  v1_heatpump_active_pv_bev    => { slope_min => 0.7,  bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.7,  z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.50, slope_warn_min => 0.60, rmse_rel_warn => 20 },
+  v1_bev                       => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_active_bev                => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_pv_bev                    => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_active_pv_bev             => { slope_min => 0.40, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.25, slope_warn_min => 0.35, rmse_rel_warn => 35 },
+  v1_heatpump_bev              => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_active_bev       => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_pv_bev           => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_active_pv_bev    => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
 );
 
 my %hset = (                                                                  # Hash der Set-Funktion
@@ -955,7 +954,9 @@ my %epoche_translations = (
   hint22  => { EN => "With %d inputs and only %d training records the data-to-parameter ratio cannot reach the target range (8–20) with any reasonable architecture - increase aiConTrainLimit or collect more data before tuning the architecture further",
                DE => "Mit %d Inputs und nur %d Trainingsdaten lässt sich das Daten-zu-Parameter-Verhältnis (Zielwert 8–20) mit keiner sinnvollen Architektur erreichen - aiConTrainLimit erhöhen oder mehr Daten sammeln bevor die Architektur weiter angepasst wird" },
   hint23  => { EN => "Convergence is happening early with already conservative momentum/learning rate: to allow more useful epochs before early-stopping kicks in, try reducing aiConSteepness slightly (e.g. by 0.1) for slower, finer convergence - going too low can cause the network to stop learning entirely (Slope≈0); alternatively, slightly increasing hidden layer size/depth (aiConHiddenLayers) adds learning capacity but may require more training data",
-               DE => "Konvergenz erfolgt früh, Momentum/Lernrate sind bereits konservativ: um mehr nützliche Epochen vor dem Early-Stopping zu ermöglichen, aiConSteepness leicht reduzieren (z.B. um 0.1) für langsamere, feinere Konvergenz - bei zu niedrigen aiConSteepness-Wert kann das Netz komplett aufhören zu lernen (Slope≈0); alternativ Hidden-Layer-Größe/Tiefe (aiConHiddenLayers) leicht erhöhen für mehr Lernkapazität, was aber ggf. mehr Trainingsdaten erfordert" }
+               DE => "Konvergenz erfolgt früh, Momentum/Lernrate sind bereits konservativ: um mehr nützliche Epochen vor dem Early-Stopping zu ermöglichen, aiConSteepness leicht reduzieren (z.B. um 0.1) für langsamere, feinere Konvergenz - bei zu niedrigen aiConSteepness-Wert kann das Netz komplett aufhören zu lernen (Slope≈0); alternativ Hidden-Layer-Größe/Tiefe (aiConHiddenLayers) leicht erhöhen für mehr Lernkapazität, was aber ggf. mehr Trainingsdaten erfordert" },
+  hint24  => { EN => "High momentum (%.2f) likely amplifies shuffle-event overshooting (validation loss jumps at each shuffle boundary): reduce momentum to 0.4–0.5 (aiControl->aiConMomentum). This stabilizes the validation curve and typically improves Slope, as the optimizer can settle into narrower minima without bouncing out on each data reshuffle.",
+               DE => "Hohes Momentum (%.2f) verstärkt wahrscheinlich Shuffle-Event-Overshooting (Validierungsfehler springt an jedem Shuffle-Ereignis nach oben): Momentum auf 0.4–0.5 reduzieren (aiControl->aiConMomentum). Dies stabilisiert den Validierungsverlauf und verbessert typischerweise die Slope, da der Optimizer in engere Minima einsinken kann ohne bei jedem Datenshuffle herauszuschießen." },
 ); 
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -1609,7 +1610,7 @@ my %weather_ids = (
   '199' => { s => '1', icon => 'weather_night_thunderstorm',        txtd => 'Gewitter mit Graupel oder Hagel',                                          txte => 'Thunderstorm with sleet or hail'                                            },
 );
 
-my %hef = (                                                                      # Energiedaktoren für Verbrauchertypen
+my %hef = (                                                                      # Energiefaktoren für Verbrauchertypen
   "heater"         => { f => 1.00, m => 1.00, l => 1.00, mt => 240         },
   "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },    # f   = Faktor Energieverbrauch in erster Stunde (wichtig auch für Kalkulation in __calcEnergyPieces !)
   "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
@@ -1619,7 +1620,10 @@ my %hef = (                                                                     
   "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
   "heatpump"       => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
   "bev"            => { f => 1.00, m => 1.00, l => 1.00, mt => 600         },
+  "dehydrator"     => { f => 1.00, m => 1.00, l => 1.00, mt => 600         },
 );
+
+my @ctypes = sort keys (%hef);                                                  # erlaubte Consumer Typen                                   
 
 my %hcsr = (                                                                                                                                                                 # Funktiontemplate zur Erstellung optionaler Statistikreadings
   currentAPIinterval          => { fnr => 1, fn => \&StatusAPIVal,    par => '',                     par1 => '',                  unit => '',     def => 0           },      # par = Parameter zur spezifischen Verwendung
@@ -1780,10 +1784,10 @@ my %hfspvh = (
       
       # --- heatpump OpMode-Keys
       for my $s (@hpopm) {
-          $hfspvh{"csm${cn}_${s}_minutes"}{fn}       = \&_saveHistP2;                       
-          $hfspvh{"csm${cn}_${s}_minutes"}{storname} = "csm${cn}_${s}_minutes";
-          $hfspvh{"csm${cn}_${s}_minutes"}{validkey} = undef;
-          $hfspvh{"csm${cn}_${s}_minutes"}{fpar}     = undef;
+          $hfspvh{"csm${cn}_${s}_points"}{fn}       = \&_saveHistP2;                       
+          $hfspvh{"csm${cn}_${s}_points"}{storname} = "csm${cn}_${s}_points";
+          $hfspvh{"csm${cn}_${s}_points"}{validkey} = undef;
+          $hfspvh{"csm${cn}_${s}_points"}{fpar}     = undef;
       }                                                                                         
 
       # --- BEV Consumer-Keys      
@@ -11234,6 +11238,19 @@ sub centralTask {
   
   readingsDelete ($hash, 'Tomorrow_ConsumptionForecast');               # 07.06.
   
+  if (isHeatPumpUsed($name) && !CurrentVal($name, 'airaw_hp_cleanup_done', 0)) {             # 23.06.
+    my @hpStates = split /\|/, HPOPMODES; 
+    for my $idx (keys %{$data{$name}{aidectree}{airaw}}) {
+        for my $s (@hpStates) {
+            for my $ci (1..MAXCONSUMER) {
+                my $c = sprintf "%02d", $ci;
+                delete $data{$name}{aidectree}{airaw}{$idx}{"csm${c}_${s}_minutes"};
+            }
+        }
+    }
+    $data{$name}{current}{airaw_hp_cleanup_done} = 1;               # läuft nur einmal pro Session
+  }
+                   
   ##########################################################################################################################
 
   if (!CurrentVal ($name, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
@@ -18010,73 +18027,85 @@ sub __remainConsumerTime {
 return;
 }
 
-################################################################
-#  Funktion liefert den Operation Mode eines WP-Verbrauchers
+#####################################################################
+#  Funktion berechnet die nach Modulationsgrad und Zeit 
+#  gewichteten Operation Mode eines WP-Verbrauchers nach einem
+#  Punktesystem.
+#  
+#  points += (delta_sekunden × modulation%) / 100 / 60
+#
+#  Damit gilt: 60 min @ 100% → 60 Punkte, 60 min @ 50% → 30 Punkte, 
+#              5 min @ 100% → 5 Punkte, 5 min @ 50% → 2,5 Punkte
+#  
 #  opmode kann sein:
 #    off|heating|defrost|hotwater|cooling|pool|poolheating
-################################################################
+#
+# Der Energieanteil eines Modus ergibt sich als:
+#  points_modus / sum(points_alle_nicht-off_Modi) * csmeX
+#####################################################################
 sub __hpConsumerOpmode {
   my $paref = shift;
   my $name  = $paref->{name};
   my $ctype = $paref->{ctype};
   my $c     = $paref->{consumer};
-  my $t     = $paref->{t}; 
+  my $t     = $paref->{t};
   my $day   = $paref->{day};
   my $chour = $paref->{chour};
-  
+
   return if $ctype ne 'heatpump';                                                           # Verarbeitung nur für WP
 
   my $msg;
-  my $hod      = sprintf "%02d", ($chour + 1);
-  my $om       = ConsumerVal ($name, $c, 'opmode', ' : ');                                  # Consumer Operation Mode
-  my $opmode   = HPOPMODEDEF;
-  my @hpStates = split /\|/, HPOPMODES;
-
-  my ($dv, $rd) = split ':', $om;
-  my ($err)     = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
-
+  my $hod        = sprintf "%02d", ($chour + 1);
+  my $om         = ConsumerVal ($name, $c, 'opmode',   ' : ');                              # Consumer Operation Mode
+  my $modulation = ConsumerVal ($name, $c, 'modulation', 100);                              # Modulationsgrad in % (0-100)
+  my $opmode     = HPOPMODEDEF;
+  my @hpStates   = split /\|/, HPOPMODES;
+  
+  my ($dv, $rd)  = split ':', $om;
+  my ($err)      = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
+  
   if ($err) {
-      $msg = "consumer >$c< - The device '$dv' defined in consumer key 'opmode' doesn't exist. Fall back to $opmode mode.";
+      my $msg = "consumer >$c< - The device '$dv' defined in consumer key 'opmode' doesn't exist. Fall back to $opmode mode.";
       Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
   }
   else {
       $opmode = ReadingsVal ($dv, $rd, '');
-
+      
       if (!grep { $_ eq $opmode } @hpStates) {
           $msg = "consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to ".HPOPMODEDEF." mode.";
           Log3 ($name, 1, "$name - ERROR - $msg") if(askLogtime ($name, $msg));
           $opmode = HPOPMODEDEF;                                                            # Fallback bei unbekanntem/leerem Wert
       }
   }
-  
-  # --- Akkumulation Sekunden mit gleichem Status in der laufenden Stunde  
-  $data{$name}{current}{"csm${c}_active_opmode"} = $opmode;                                 # aktiven Opmode 
 
+  # --- Akkumulation gewichteter Sekunden (Zeit × Modulation%) mit gleichem Status in der laufenden Stunde
+  $data{$name}{current}{"csm${c}_active_opmode"} = $opmode;                                 # aktiver Opmode
+  
   my $last_check = CircularVal ($name, 99, 'last_transfer', $t);
   my $delta      = $t - $last_check;
   my $dt         = timestringsFromOffset ($name, $last_check, 0);
   my $lchkhour   = $dt->{hour};
-
-  debugLog ($paref, 'collectData_long', "collect HP-state data - hour=$chour, last check hour=$lchkhour, delta=$delta, dev=$dv, rdg=$rd, opmode=$opmode");
+  
+  debugLog ($paref, 'collectData_long', "collect HP-state data - hour=$chour, last check hour=$lchkhour, delta=$delta, dev=$dv, rdg=$rd, opmode=$opmode, modulation=$modulation");
 
   for my $s (@hpStates) {
-      my $key = "accum_csm${c}_${s}_seconds";
-
+      my $key = "accum_csm${c}_${s}_wseconds";                                              # gewichtete Sekunden (wsec = sec × mod/100)
+      
       if ($chour == $lchkhour) {
-          my $secs  = CircularVal ($name, 99, $key, 0);
-          $secs    += $delta if $s eq $opmode;                                              # nur der aktive Status akkumuliert Zeit
-          $data{$name}{circular}{99}{$key} = $secs;
+          my $wsecs  = CircularVal ($name, 99, $key, 0);
+          $wsecs    += $delta * $modulation / 100 if $s eq $opmode;                         # nur der aktive Status akkumuliert gewichtete Zeit
+          $data{$name}{circular}{99}{$key} = $wsecs;
       }
       else {
           $data{$name}{circular}{99}{$key} = 0;                                             # neue Stunde -> Reset
       }
-
-      my $secs    = $data{$name}{circular}{99}{$key};                                       # Sekunden -> Minuten
-      my $minutes = $secs ? sprintf ("%.1f", $secs / 60) : 0;
-
-      writeToHistory ( { paref => $paref, key => "csm${c}_${s}_minutes", val => $minutes, day => $day, hour => $hod } );
+      
+      my $wsecs  = $data{$name}{circular}{99}{$key};
+      my $points = $wsecs ? sprintf ("%.1f", $wsecs / 60) : 0;                              # gewichtete Sekunden -> Punkte (max. 60)
+      
+      writeToHistory ( { paref => $paref, key => "csm${c}_${s}_points", val => $points, day => $day, hour => $hod } );
   }
-
+  
 return;
 }
 
@@ -24809,8 +24838,8 @@ sub __aiAddRawData {
               if (defined $evcurpwr) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmPwr'.$c}     = round0 ($evcurpwr) } 
 
               for my $s (@hpStates) {                                                                           # WP Opmode-Minuten je Status
-                  my $hpmin = HistoryVal ($name, $pvd, $hod, "csm${c}_${s}_minutes", undef);
-                  if (defined $hpmin) { $data{$name}{aidectree}{airaw}{$ridx}{"csm${c}_${s}_minutes"} = $hpmin }
+                  my $hppnt = HistoryVal ($name, $pvd, $hod, "csm${c}_${s}_points", undef);
+                  if (defined $hppnt) { $data{$name}{aidectree}{airaw}{$ridx}{"csm${c}_${s}_points"} = $hppnt }
               }              
           }
   
@@ -25693,7 +25722,7 @@ sub _aiFannBuildLagFeatures {
   # $y_t_1 = eine Stunde davor     (z.B. hod=7)
   # Zielwert ist hod=9, also NICHT in con_series enthalten
   # ---------------------------------------------------------
-  my $y_t     = $con_series->[$i];                                              # letzter bekannter Wert
+  #my $y_t     = $con_series->[$i];                                              # wegen Data Leakage nicht mehr verwendet
   my $y_t_1   = $con_series->[$i - 1];              
   my $y_t_2   = $con_series->[$i - 2];
   my $y_t_3   = $con_series->[$i - 3];                                          
@@ -25709,9 +25738,9 @@ sub _aiFannBuildLagFeatures {
   
   # ---------------------------------------------------------
   # Rolling Mean & Std
-  # window3: mean der letzten 3 Stunden vor y_t
-  # window6: std  der letzten 6 Stunden vor y_t
-  # y_t selbst wird NICHT ins Fenster einbezogen
+  # window3: mean der letzten 3 Stunden vor y_t_1
+  # window6: std  der letzten 6 Stunden vor y_t_1
+  # y_t_1 selbst wird NICHT ins Fenster einbezogen
   # ---------------------------------------------------------
   my @window3      = @{$con_series}[$i-3 .. $i-1];
   my @window3_prev = @{$con_series}[$i-4 .. $i-2];                              # 3h-Fenster vor y_t_1
@@ -25738,7 +25767,7 @@ sub _aiFannBuildLagFeatures {
   my $lag1_spike_pos = $lag1_vs_mean3 > 0 ? $lag1_vs_mean3  : 0;
   my $lag1_spike_neg = $lag1_vs_mean3 < 0 ? -$lag1_vs_mean3 : 0;
   
-  my $lag2_vs_mean3  = $y_t_2 - $mean3_prev;                                     
+  my $lag2_vs_mean3  = $y_t_1 - $mean3_prev;                                     # $y_t_1 = $con_series->[$i-1], außerhalb des Fensters  
   my $lag2_spike_pos = $lag2_vs_mean3 > 0 ? $lag2_vs_mean3  : 0;
   my $lag2_spike_neg = $lag2_vs_mean3 < 0 ? -$lag2_vs_mean3 : 0;
 
@@ -25840,7 +25869,7 @@ sub _aiFannBuildLagFeatures {
   
   # ---------------------------------------------------------
   # WW-Zyklus Erkennung Prefilter
-  # Spike-Prüfung auf y_t vs. y_t_1 (aktuellster Sprung)
+  # Spike-Prüfung auf y_t_1 vs. y_t_2 (aktuellster Sprung)
   # ---------------------------------------------------------
   my $spike        = ($y_t_1 - $y_t_2) > 1000 ? 1 : 0;                                      # Sprung in der Vergangenheit
   my $plateau      = ($y_t_1 > $y_t_2 * 0.8 && $y_t_2 > $y_t_3 * 0.8);                      
@@ -27341,7 +27370,7 @@ sub _aiFannEpochDiagnostic {
       $code  = 'early';
       $label = $epoche_translations{early}{$lang};
       
-      my $hint4_fires = $learning_momentum >  0.7;
+      my $hint4_fires = $learning_momentum >= 0.65;
       my $hint5_fires = $learning_rate     >= 0.01;
         
       push @hints, $epoche_translations{hint4}{$lang} if $hint4_fires;
@@ -27388,9 +27417,22 @@ sub _aiFannEpochDiagnostic {
       push @hints, sprintf $epoche_translations{hint11}{$lang}, $pct;
       $code = 'overfit' if $code eq 'ok';
   }
-
+  
+  if (   $stability          >  0.05                                                    # Momentum-getriebene Oszillation + flache Slope ...
+      && $stability          <= 0.15                                                    # (moderate Instabilität, die hint12 noch nicht auslöst, aber Slope drückt)
+      && $learning_momentum  >= 0.65
+      && $slope              <  $slope_warn_min
+      && !$is_dead_net) {
+      push @hints, sprintf $epoche_translations{hint24}{$lang}, $learning_momentum;
+  }
+  
   if ($stability > 0.15) {                                                              # Instabiler Validierungsverlauf
-      push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability; 
+      push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability;
+    
+      if ($learning_momentum >= 0.65) {                                                 # Hohe Momentum ist wahrscheinlich primärer Treiber der Instabilität
+          push @hints, sprintf $epoche_translations{hint24}{$lang}, $learning_momentum;
+      }
+    
       $code = 'unstable' unless $code =~ /very/;
   }
 
@@ -30629,7 +30671,7 @@ sub _listDataPoolPvHist {
               }
               
               for my $s (@hpStates) {                                                                   # + WP Opmode-Minuten je Status (nur Stundensätze, kein calc99)
-                  my $fkey = "csm${cf}_${s}_minutes";
+                  my $fkey = "csm${cf}_${s}_points";
                   $entry{$fkey} = HistoryVal ($name, $day, $key, $fkey, undef);
               }
           }
@@ -30717,7 +30759,7 @@ sub _listDataPoolPvHist {
                   $csvmap{"bevcsmPwr${cf}"}     = "BEVcsmPwr${cf}";
                   
                   for my $s (@hpStates) {                                                               # + WP Opmode-Minuten je Status
-                      $csvmap{"csm${cf}_${s}_minutes"} = "Csm${cf}" . ucfirst ($s) . "Minutes";
+                      $csvmap{"csm${cf}_${s}_points"} = "Csm${cf}" . ucfirst ($s) . "Points";
                   }
               }
 
@@ -30850,7 +30892,7 @@ sub _listDataPoolPvHist {
                   @cfields  = map { "${_}${cf}" }
                               qw (csmt csme minutescsm bevcsmSoC 
                                   bevcsmTargSoC bevcsmBatCap bevcsmPwr);
-                  @hpfields = map { "csm${cf}_${_}_minutes" } @hpStates;                                    # WP Opmode-Minuten, separat behandelt
+                  @hpfields = map { "csm${cf}_${_}_points" } @hpStates;                                    # WP Opmode-Minuten, separat behandelt
               }
 
               my @show = grep { defined $entry{$_} && $entry{$_} ne '' && $entry{$_} ne '-' } @cfields;
@@ -31125,6 +31167,31 @@ sub _listDataPoolCircular {
           my $conq90      = CircularVal ($name, $idx, 'con_quantile90',           '-');
           my $ltransfer   = CircularVal ($name, $idx, 'last_transfer',            '-');
           my $accum_secs  = CircularVal ($name, $idx, 'accum_presence_seconds',   '-');
+          
+          # --- accum_csm wseconds (WP Opmode gewichtete Sekunden)
+          my @hpStates = split /\|/, HPOPMODES;
+          my $hpwsec;
+          
+          for my $cn (1..MAXCONSUMER) {
+              $cn        = sprintf "%02d", $cn;
+              my $kcount = 0;
+              my $cnwsec;
+              
+              for my $s (@hpStates) {
+                  my $key = "accum_csm${cn}_${s}_wseconds";
+                  my $val = CircularVal ($name, $idx, $key, undef);
+                  next if !defined $val;
+                  
+                  $cnwsec  .= ', '       if( $cnwsec && $kcount % 4 != 0);
+                  $cnwsec  .= "\n      " if( $cnwsec && $kcount % 4 == 0);
+                  $cnwsec  .= "${key}: $val";
+                  $kcount++;
+              }
+              
+              next if !$cnwsec;
+              $hpwsec .= "\n      " if($hpwsec);
+              $hpwsec .= $cnwsec;
+          }
 
           for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
               $bn          = sprintf "%02d", $bn;
@@ -31168,6 +31235,7 @@ sub _listDataPoolCircular {
           $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, aiRulesNumber: $airn \n";
           $sq .= "      conNNRuntimeTrain: $nnrtt, conNNTrainLastFinishTs: $nntlfts \n";
           $sq .= "      last_transfer: $ltransfer, accum_presence_seconds: $accum_secs \n";
+          $sq .= "      $hpwsec\n" if($hpwsec);
           $sq .= "      attrInvChangedTs: $aicts \n";
       }
   }
@@ -31506,13 +31574,13 @@ sub _listDataPoolAiRawData {
           }
           
           for my $s (@hpStates) {                                                       # WP Opmode-Minuten je Status
-              my $hpmin = AiRawdataVal ($name, $idx, "csm${c}_${s}_minutes", undef);
-              next if(!defined $hpmin);
+              my $hppnt = AiRawdataVal ($name, $idx, "csm${c}_${s}_points", undef);
+              next if(!defined $hppnt);
 
               if ($hpm) {
                   $hpm .= ($hpmCnt % 6 == 0) ? "\n              " : ", ";               # alle 6 Einträge neue Zeile
               }
-              $hpm .= "csm${c}_${s}_minutes: $hpmin";
+              $hpm .= "csm${c}_${s}_points: $hppnt";
               $hpmCnt++;
           }
       }
@@ -37488,8 +37556,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>conlegfc</b>        </td><td>conventional energy consumption forecast without AI (Wh)                                                                 </td></tr>
             <tr><td> <b>con</b>             </td><td>real energy consumption (Wh) of the house                                                                                </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Price for the purchase of one kWh. The currency of the price is defined in the setupMeterDev.                            </td></tr>
-            <tr><td> <b>csmXX_&lt;OPM&gt;_minutes</b> </td><td>The number of minutes within the hour during which ConsumerXX was in &lt;OPM&gt; mode.                         </td></tr>
-            <tr><td>                        </td><td>Operating modes can be: off, heating, defrost, hotwater, cooling, pool, poolheating                                      </td></tr>
+            <tr><td> <b>csmXX_&lt;mode&gt;_points</b> </td><td>weighted operating points of load XX in &lt;mode&gt; for each hour                                             </td></tr>
+            <tr><td>                        </td><td>&lt;mode&gt; can be: off heating defrost hotwater cooling pool poolheating                                               </td></tr>
             <tr><td> <b>csmtXX</b>          </td><td>total energy consumption (Wh) by ConsumerXX at the start of the hour                                                     </td></tr>
             <tr><td> <b>csmeXX</b>          </td><td>Energy consumption (Wh) of ConsumerXX in the hour of the day (hour 99 = daily energy consumption)                        </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Number of active cycles of ConsumerXX of the day                                                                         </td></tr>
@@ -37544,7 +37612,9 @@ to ensure that the system configuration is correct.
 
       <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>accum_presence_seconds</b> </td><td>accumulated seconds with status 'Presence' of residents in the current evaluation cycle (auxiliary value)             </td></tr>
+            <tr><td> <b>accum_csmXX_&lt;mode&gt;_wseconds</b> </td><td>accumulated seconds for Consumer XX in operating mode &lt;mode&gt; (auxiliary value)                       </td></tr>
             <tr><td> <b>aihit</b>                  </td><td>Delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)                                             </td></tr>
             <tr><td> <b>attrInvChangedTs</b>       </td><td>Time stamp of the last change to the inverter device definition                                                       </td></tr>
             <tr><td> <b>batinXX</b>                </td><td>Battery XX charge (Wh)                                                                                                </td></tr>
@@ -37570,7 +37640,6 @@ to ensure that the system configuration is correct.
             <tr><td> <b>initdaybatouttotXX</b>     </td><td>initial value of the total energy drawn from the battery XX at the beginning of the current day. (Wh)                 </td></tr>
             <tr><td> <b>lastTsMaxSocRchdXX</b>     </td><td>Time stamp of last achievement of battery XX SoC >= maxSoC (default 95%)                                              </td></tr>
             <tr><td> <b>last_transfer</b>          </td><td>Timestamp of the last data transfer in the central loop                                                               </td></tr>
-            <tr><td> <b>accum_presence_seconds</b> </td><td>accumulated seconds with status 'Presence' of residents in the current evaluation cycle (auxiliary value)             </td></tr>
             <tr><td> <b>nextTsMaxSocChgeXX</b>     </td><td>Time stamp by which the battery XX should reach maxSoC at least once                                                  </td></tr>
             <tr><td> <b>pprlXX</b>                 </td><td>Energy generation of producer XX (see attribute setupOtherProducerXX) in the last 24 hours (Wh)                       </td></tr>
             <tr><td> <b>presence</b>               </td><td>time-weighted attendance status of household residents                                                                </td></tr>
@@ -38066,6 +38135,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>type</b>           </td><td>Type of consumer. The following types are allowed:                                                                                                      </td></tr>
             <tr><td>                       </td><td><b>bev</b>            - Consumer is an electric car (*)                                                                                                 </td></tr>
             <tr><td>                       </td><td><b>charger</b>        - Consumer is a general-purpose charging device                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>dehydrator</b>     - Consumer is a dehydrator (e.g., a fruit dryer)                                                                                  </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                                        </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                                      </td></tr>
             <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating rod                                                                                                       </td></tr>
@@ -40580,8 +40650,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>conlegfc</b>        </td><td>herkömmlich ohne KI prognostizierter Energieverbrauch (Wh)                                             </td></tr>
             <tr><td> <b>con</b>             </td><td>realer Energieverbrauch (Wh) des Hauses                                                                </td></tr>
             <tr><td> <b>conprice</b>        </td><td>Preis für den Bezug einer kWh. Die Einheit des Preises ist im setupMeterDev definiert.                 </td></tr>
-            <tr><td> <b>csmXX_&lt;OPM&gt;_minutes</b> </td><td>Minuten innerhalb der Stunde, in denen sich ConsumerXX im Betriebsmodus &lt;OPM&gt; befand.  </td></tr>
-            <tr><td>                        </td><td>Betriebsmodus kann sein: off heating defrost hotwater cooling pool poolheating                         </td></tr>
+            <tr><td> <b>csmXX_&lt;mode&gt;_points</b> </td><td>gewichtete Betriebspunkte des Verbrauchers XX im Modus &lt;mode&gt; für die jeweilige Stunde </td></tr>
+            <tr><td>                        </td><td>&lt;mode&gt; kann sein: off heating defrost hotwater cooling pool poolheating                          </td></tr>
             <tr><td> <b>csmtXX</b>          </td><td>Energieverbrauch total (Wh) von ConsumerXX zum Beginn der Stunde                                       </td></tr>
             <tr><td> <b>csmeXX</b>          </td><td>Energieverbrauch (Wh) von ConsumerXX in der Stunde des Tages (Stunde 99 = Tagesenergieverbrauch)       </td></tr>
             <tr><td> <b>cyclescsmXX</b>     </td><td>Anzahl aktive Zyklen von ConsumerXX des Tages                                                          </td></tr>
@@ -40637,7 +40707,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
          <table>
-         <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+         <colgroup> <col width="25%"> <col width="75%"> </colgroup>
+            <tr><td> <b>accum_presence_seconds</b> </td><td>akkumulierte Sekunden mit Status 'Anwesenheit' der Bewohner im laufenden Bewertungszyklus (Hilfswert)                     </td></tr>
+            <tr><td> <b>accum_csmXX_&lt;mode&gt;_wseconds</b> </td><td>akkumulierte Sekunden des Consumer XX im Betriebsmodus &lt;mode&gt; (Hilfswert)                                </td></tr>
             <tr><td> <b>aihit</b>                  </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                                                </td></tr>
             <tr><td> <b>attrInvChangedTs</b>       </td><td>Zeitstempel der letzten Änderung der Inverter Gerätedefinition                                                            </td></tr>
             <tr><td> <b>batinXX</b>                </td><td>Ladung der Batterie XX (Wh)                                                                                               </td></tr>
@@ -40663,7 +40735,6 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>initdaybatouttotXX</b>     </td><td>initialer Wert der total aus der Batterie XX entnommenen Energie zu Beginn des aktuellen Tages (Wh)                       </td></tr>
             <tr><td> <b>lastTsMaxSocRchdXX</b>     </td><td>Zeitstempel des letzten Erreichens von Batterie XX SoC >= maxSoC (default 95%)                                            </td></tr>       
             <tr><td> <b>last_transfer</b>          </td><td>Zeitstempel des letzten Datentransfers in der Zentralschleife                                                             </td></tr>
-            <tr><td> <b>accum_presence_seconds</b> </td><td>akkumulierte Sekunden mit Status 'Anwesenheit' der Bewohner im laufenden Bewertungszyklus (Hilfswert)                     </td></tr>
             <tr><td> <b>nextTsMaxSocChgeXX</b>     </td><td>Zeitstempel bis zu dem die Batterie XX mindestens einmal maxSoC erreichen soll                                            </td></tr>
             <tr><td> <b>pprlXX</b>                 </td><td>Energieerzeugung des Produzenten XX (siehe Attribut setupOtherProducerXX) der letzten 24 Stunden (Wh)                     </td></tr>
             <tr><td> <b>presence</b>               </td><td>zeitlich gewichteter Anwesenheitsstatus der Bewohner des Haushalts                                                        </td></tr>
@@ -41158,6 +41229,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>type</b>           </td><td>Typ des Verbrauchers. Folgende Typen sind erlaubt:                                                                                                 </td></tr>
             <tr><td>                       </td><td><b>bev</b>            - Verbraucher ist ein E-Auto (*)                                                                                             </td></tr>
             <tr><td>                       </td><td><b>charger</b>        - Verbraucher ist eine allgemeine Ladeeinrichtung                                                                            </td></tr>
+            <tr><td>                       </td><td><b>dehydrator</b>     - Verbraucher ist eine Dörrmaschine (z.B. Trockengerät für Obst)                                                             </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Verbraucher ist eine Spülmaschine                                                                                          </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Verbraucher ist ein Wäschetrockner                                                                                         </td></tr>
             <tr><td>                       </td><td><b>heater</b>         - Verbraucher ist ein Heizstab                                                                                               </td></tr>
