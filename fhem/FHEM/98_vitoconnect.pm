@@ -53,6 +53,9 @@ sub vitoconnect_getGwCallback;          # Gateway-Serial speichern, Anwort von A
 sub vitoconnect_getInstallation;        # Abfrage Install-ID
 sub vitoconnect_getInstallationCallback;# Install-ID speichern, Antwort von Abfrage Install-ID
 
+sub vitoconnect_getInstallationFeatures;        # Abruf Installation Features
+sub vitoconnect_getInstallationFeaturesCallback;# Installation Features speichern
+
 sub vitoconnect_getDevice;              # Abfrage Device-ID
 sub vitoconnect_getDeviceCallback;      # Device-ID speichern, Anwort von Abfrage Device-ID
 
@@ -73,7 +76,9 @@ sub vitoconnect_GetHtml;                # Return html for ftui
 
 sub vitoconnect_mapCodeText;            # Resolve Message/Error code for OneBase not in API
 sub vitoconnect_mapSeverityPrefix;      # Resolve Severity for OneBase not in API
-sub vitoconnect_getErrorCode;           # Resolve Error code 
+sub vitoconnect_getErrorCode;           # Resolve Error code
+sub vitoconnect_incrementApiCallsToday; # API-Call-Counter mit Tageswechsel
+sub vitoconnect_calcAccountUsage;       # Summe apiCallsToday ueber alle Devices eines Accounts
 
 sub vitoconnect_StoreKeyValue;          # Werte verschlüsselt speichern
 sub vitoconnect_ReadKeyValue;           # verschlüsselte Werte auslesen
@@ -101,7 +106,11 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
-  "1.1.3"  => "04.06.2026  Bugfix-Fork von v1.1.3 durch R. Bergmann [RB-FIX-01] Parsing-Stride 4->6 in getErrorCode korrigiert; [RB-FIX-02] BlockingGet-Cache verhindert FHEM-Freeze; [RB-FIX-03] ReadFn toter Code entfernt",
+  "1.1.7"  => "26.06.2026  24h-Cleanup laeuft jetzt fuer alle Listen-Typen (errors/info/status/service/unknown), auch wenn Type aktuell leer ist. Behebt Stale-Eintraege in unknown.list aus Stride-Bug-Zeit. Leere Liste leert das Reading sauber.",
+  "1.1.6"  => "26.06.2026  Neue Readings: apiQuotaUsedPercent (vom 1450er-Tageslimit der Viessmann-API), apiCallsTodayAccount (Summe ueber alle Devices mit gleichem apiKey, nur bei Multi-Device). Warnlog bei Quota >= 80%.",
+  "1.1.5"  => "26.06.2026  Neue Features: apiCallsToday/apiCallsLastDay Counter, currentError Reading (aktive F-Codes aus errors.raw). Anchor-Toter-Code in getResourceCallback entfernt. Forward-Declarations getInstallationFeatures ergaenzt.",
+  "1.1.4"  => "26.06.2026  Code-Bereinigung: Praezedenz-Bug in errorHandling, decode_json undef-Schutz in action, my-if Severity-Scope, Sprache-Default EN, toter getPowerLast-Block entfernt, Object-Type Ref-Schutz, Grammatik 429-Meldung",
+  "1.1.3"  => "04.06.2026  [RB-FIX-01] Parsing-Stride 4->6 in getErrorCode korrigiert; [RB-FIX-02] BlockingGet-Cache verhindert FHEM-Freeze; [RB-FIX-03] ReadFn toter Code entfernt",
   "1.1.2"  => "04.05.2026  Fix schedule setter: support both API format and reading format, stop retry on VALIDATION_ERROR",
   "1.1.1"  => "25.02.2026  Small fixes",
   "1.1.0"  => "24.02.2026  Small adaptions to SVG",
@@ -166,6 +175,11 @@ my %vNotesIntern = (
   "0.1.0"  => "12.12.2024  first release with Version. "
 );
 
+# PKCE-Parameter, kein OAuth-Client-Secret im klassischen Sinn trotz Variablennamen.
+# Identischer String fuer code_challenge (in getCode) und code_verifier (in getAccessToken),
+# entspricht Viessmanns offizieller Getting-Started-Anleitung
+# (https://documentation.viessmann.com/static/getting-started). Viessmann validiert nur
+# dass beide Strings gleich sind - sogar "abc" wuerde laut Forum funktionieren.
 my $client_secret = "2e21faa1-db2c-4d0b-a10f-575fd372bc8c-575fd372bc8c";
 my $callback_uri  = "http://localhost:4200/";
 my $apiBaseURL    = "https://api.viessmann-climatesolutions.com";
@@ -175,6 +189,15 @@ my $featureURL     = "$apiBaseURL/iot/v2/features/";
 my $authorizeURL  = "$iamBaseURL/idp/v3/authorize";
 my $tokenURL      = "$iamBaseURL/idp/v3/token";
 my $errorURL_V3   = "$apiBaseURL/service-documents/v3/error-database";
+
+# Tageslimit der Viessmann IoT-API.
+# Quelle: requestCountLimit-Feld im 429-RATE_LIMIT_EXCEEDED-Response der API
+# und Q&A-Sticky von CustomerCareMichael (Viessmann) im Developer-Forum:
+# https://community.viessmann.de/t5/Konnektivitaet/Q-amp-A-Viessmann-API/m-p/127660
+# Hinweis: Viessmann nutzt ein Sliding-Window; clientseitig approximieren wir
+# das mit einem Tageszaehler (0-Uhr-Reset). Wert ist hartkodiert weil offiziell
+# in der API-Response selbst dokumentiert.
+my $API_DAILY_LIMIT = 1450;
 
 # [RB-FIX-02] Modul-globaler Cache für Error-Code-Texte.
 # Verhindert wiederholte HttpUtils_BlockingGet-Aufrufe für dieselben Codes.
@@ -4234,6 +4257,9 @@ sub vitoconnect_getResourceCallback {
            return;
         }
 
+        # Erfolgreicher Resource-Read (nicht 4xx/5xx) -> API-Call-Counter inkrementieren
+        vitoconnect_incrementApiCallsToday($hash);
+
         if ($hash->{".logResponseOnce"} ) {
             my $dir         = path(AttrVal("global","logdir","log"));   # Verzeichnis
             my $file        = $dir->child("resource_".$gw.".json");             # Dateiname
@@ -4245,10 +4271,14 @@ sub vitoconnect_getResourceCallback {
         }
         
         $hash->{".response_$gw"} = $response_body;
-        
+
         Log(5,$name.", translations count:".scalar keys %translations);
         Log(5,$name.", RequestListMapping count:".scalar keys %$RequestListMapping);
-        
+
+        # currentError-Tracking: vor der Feature-Schleife resetten, getErrorCode setzt
+        # bei aktiven F-Codes auf 1; nach der Schleife wird ggf. currentError geleert.
+        $hash->{".errors_seen_in_cycle"} = 0;
+
         readingsBeginUpdate($hash);
         foreach ( @{ $items->{data} } ) {
             my $feature    = $_;
@@ -4347,6 +4377,9 @@ sub vitoconnect_getResourceCallback {
                     # Iteriere durch die Schlüssel des Hashes
                     foreach my $hash_key (sort keys %$Value) {
                         my $hash_value = $Value->{$hash_key};
+                        # Schutz gegen verschachtelte Refs (würden als HASH(0x...) stringifizieren)
+                        # und undef-Warnings. Skalare bleiben unverändert (auch "0" und "").
+                        $hash_value = ref($hash_value) ? '' : ($hash_value // '');
                         $comma_separated_string .= $hash_value . ", ";
                     }
                     # Entferne das letzte Komma und Leerzeichen
@@ -4396,17 +4429,26 @@ sub vitoconnect_getResourceCallback {
             }
         }
 
+        # currentError leeren wenn dieser Cycle KEINE aktiven F-Codes hatte
+        # (entweder kein errors.raw.entries im Response oder Liste war leer).
+        # Trigger nur bei Wertaenderung damit Notifys nicht spammen.
+        if (!$hash->{".errors_seen_in_cycle"}) {
+            my $old = ReadingsVal($name, "currentError", "");
+            if ($old ne "") {
+                readingsBulkUpdate($hash, "currentError", "");
+                Log3($name, 4, "$name: currentError cleared (no active F-codes this cycle)");
+            }
+        }
+
         readingsBulkUpdate($hash,"state","last update: ".TimeNow().""); # Reading 'state'
         readingsEndUpdate( $hash, 1 );  # Readings schreiben
         
-        # NEU: jetzt alle relevanten Readings finden und Sub wie früher aufrufen
+        # Power-Readings (z.B. *.dayValueReadAt) brauchen Spezial-Handling:
+        # die Tageswerte stehen in *.day als CSV, getPowerLast schreibt sie
+        # in *.day.asSingleValue zum Loggen einzelner Tage.
         foreach my $Reading (keys %{ $hash->{READINGS} }) {
          if ($Reading =~ m/dayValueReadAt$/) {
-           my ($featureBase) = $Reading =~ /^(.*)\.dayValueReadAt$/;
-           # passenden Feature-Block im bereits vorhandenen $items suchen
-           my ($feature) = grep { $_->{feature} eq $featureBase } @{ $items->{data} };
-           my $anchor = $feature->{timestamp};
-           vitoconnect_getPowerLast($hash,$name,$Reading,$anchor);
+           vitoconnect_getPowerLast($hash,$name,$Reading);
          }
         }
     }
@@ -4425,68 +4467,6 @@ sub vitoconnect_getResourceCallback {
 #####################################################################################################################
 # Implementierung power readings die nur sehr selten kommen in ein logbares reading füllen (asSingleValue)
 #####################################################################################################################
-#sub vitoconnect_getPowerLast {
-#    my ($hash, $name, $Reading, $anchor) = @_;
-#
-#    # Basename ohne letztes Suffix
-#    $Reading =~ s/\.[^.]*$//;
-#
-#    # Werte-Liste (robust gegen Leerzeichen, als Zahl)
-#    my $raw = ReadingsVal($name, $Reading.".day", "");
-#    my @values = map { 0+$_ } split(/\s*,\s*/, $raw);
-#
-#    # Basisdatum = dayValueReadAt (Kalendertag der Ablesung)
-#    #my $timestamp = ReadingsVal($name, $Reading.".dayValueReadAt", "");
-#    #return if (!$timestamp || $timestamp eq "");
-#    #my $baseDate = Time::Piece->strptime(substr($timestamp, 0, 10), '%Y-%m-%d');
-#    #my $one_day  = 24 * 60 * 60;
-#
-#    # Basisdatum = übergebener Snapshot-Timestamp
-#    return if (!$anchor || $anchor eq "");
-#    my $baseDate = Time::Piece->strptime(substr($anchor, 0, 10), '%Y-%m-%d');
-#    my $one_day  = 24 * 60 * 60;
-#
-#    # Zielreading und letzter gespeicherter Zeitstempel
-#    my $targetReading = $Reading.".day.asSingleValue";
-#    my $readingLastTimestamp = ReadingsTimestamp($name, $targetReading, "0000-00-00 00:00:00");
-#    my $lastTS = time_str2num($readingLastTimestamp);
-#
-#    Log3($name, 5, "$name -setpower: target=$targetReading lastTS='$readingLastTimestamp' (num=$lastTS), baseDate=".$baseDate->ymd);
-#
-#    readingsBeginUpdate($hash);
-#    
-#    # Älteste -> Neueste, Index 0 (aktueller Tag) wird implizit übersprungen
-#    for (my $i = $#values; $i >= 1; $i--) {
-#        my $dayDate     = $baseDate - ($one_day * $i);   # i Tage vor baseDate
-#        my $readingDate = $dayDate->ymd . " 23:59:59";
-#        my $readingTS   = time_str2num($readingDate);
-#        my $newVal      = $values[$i];
-#
-#        Log3($name, 4, "$name - candidate i=$i date=$readingDate val=$newVal lastTS=$lastTS");
-#
-#        # Nur schreiben, wenn wirklich neuer Tag
-#        # Nur schreiben, wenn wirklich neuer Tag UND keine gleiches-Datum-Updates
-#        if ($readingTS > $lastTS) {
-#            # Wert mit Tag-Zuordnung
-#            readingsBulkUpdate($hash, $targetReading, $newVal, undef, $readingDate);
-#        
-#            # Snapshot-Zeitpunkt (ISO) – Zeitpunkt der Ablesung
-#            my $snapReading = $targetReading . ".snapshotTimestamp";
-#            readingsBulkUpdate($hash, $snapReading, $anchor);
-#        
-#            # Tag-Zuordnung separat sichtbar
-#            my $tsReading = $targetReading . ".timestamp";
-#            readingsBulkUpdate($hash, $tsReading, $readingDate);
-#        
-#            $lastTS = $readingTS;
-#        } else {
-#            Log3($name, 4, "$name - skip (not newer) dayTS=$readingTS <= lastTS=$lastTS");
-#        }
-#    }
-#    
-#    readingsEndUpdate($hash, 1);
-#    return;
-#}
 sub vitoconnect_getPowerLast {
     my ($hash, $name, $Reading) = @_;
 
@@ -4604,7 +4584,8 @@ sub vitoconnect_mapSeverityPrefix {
 
 sub vitoconnect_getErrorCode {
   my ($hash, $name, $comma_separated_string) = @_;
-  my $language = AttrVal('global', 'language', 0);
+  my $language = AttrVal('global', 'language', 'EN');
+  $language = 'EN' unless $language =~ /^[A-Za-z]{2}$/;  # numeric fallback (0) and other garbage -> EN
   my %severity_translations = (
     'note'          => 'Hinweis',
     'warning'       => 'Warnung',
@@ -4651,7 +4632,8 @@ sub vitoconnect_getErrorCode {
     eval { $t = Time::Piece->strptime($ts_raw, "%Y-%m-%dT%H:%M:%S") };
     my $timestamp = $t ? $t->strftime("%d.%m.%Y %H:%M:%S") : $ts_raw;
 
-    my $severity = $severity_translations{$category} if uc($language) eq 'DE';
+    my $severity;
+    $severity = $severity_translations{$category} if uc($language) eq 'DE';
     $severity //= vitoconnect_mapSeverityPrefix($code);
 
     # [RB-FIX-02] Drei-stufige Textauflösung ohne wiederholtes Blocking:
@@ -4737,9 +4719,14 @@ sub vitoconnect_getErrorCode {
 
   my $now = time();
 
-  foreach my $type (keys %grouped) {
+  # Cleanup laeuft fuer alle bekannten Listen-Typen, auch wenn aktuell keine
+  # Eintraege fuer den Type gekommen sind. Sonst werden Stale-Eintraege in
+  # device.messages.unknown.list (oder anderen Listen) nie ausgeraeumt.
+  # Alterungsregel: Eintrag bleibt nur wenn Auftritts-Timestamp < 24h alt ODER
+  # aktuell im API-Response (raw_keys) vorhanden.
+  foreach my $type (qw(errors info status service unknown)) {
     my %raw_keys;
-    foreach my $entry (@{ $grouped{$type} }) {
+    foreach my $entry (@{ $grouped{$type} // [] }) {
       my $key = "$entry->{timestamp}|$entry->{code}";
       $raw_keys{$key} = 1;
     }
@@ -4758,7 +4745,7 @@ sub vitoconnect_getErrorCode {
       }
     }
 
-    foreach my $entry (@{ $grouped{$type} }) {
+    foreach my $entry (@{ $grouped{$type} // [] }) {
       my $key = "$entry->{timestamp}|$entry->{code}";
       $existing_map{$key} = "$entry->{timestamp} - $entry->{code} - $entry->{text}" unless exists $existing_map{$key};
     }
@@ -4772,8 +4759,41 @@ sub vitoconnect_getErrorCode {
       $b_epoch <=> $a_epoch;
     } values %existing_map;
 
-    my $joined = join("\n", @final) . "\n";
-    readingsBulkUpdate($hash, "device.messages.$type.list", $joined);
+    # Wenn map leer: Reading nur leeren wenn es schon existiert (sonst pollution).
+    # Existing-Schluessel exakt vergleichen weil ReadingsVal default "" zurueckgibt
+    # auch bei nicht-existentem Reading.
+    if (@final == 0) {
+      if (exists $hash->{READINGS}{"device.messages.$type.list"}) {
+        readingsBulkUpdate($hash, "device.messages.$type.list", "");
+      }
+    } else {
+      my $joined = join("\n", @final) . "\n";
+      readingsBulkUpdate($hash, "device.messages.$type.list", $joined);
+    }
+  }
+
+  # currentError: aktuell aktive F-Codes (deduped, kommagetrennt).
+  # errors.raw.entries enthaelt nur aktive Fehler - die API entfernt behobene
+  # Codes selbst. Kein 24h-Cutoff: ein langlebiger Fehler (z.B. F.11 Druck zu
+  # niedrig) soll auch nach Tagen in currentError stehen bleiben.
+  # Reset bei abwesendem errors-Cycle erfolgt im Caller (getResourceCallback)
+  # ueber $hash->{".errors_seen_in_cycle"}.
+  if (exists $grouped{errors} && ref($grouped{errors}) eq 'ARRAY' && @{$grouped{errors}}) {
+    $hash->{".errors_seen_in_cycle"} = 1;
+    my %seen;
+    my @active_codes;
+    foreach my $entry (@{ $grouped{errors} }) {
+      my $code = $entry->{code};
+      next unless defined $code && $code =~ /^F\./;
+      next if $seen{$code}++;  # Dedup
+      push @active_codes, $code;
+    }
+    my $current_error_str = join(",", @active_codes);
+    my $old = ReadingsVal($name, "currentError", "");
+    if ($current_error_str ne $old) {
+      readingsBulkUpdate($hash, "currentError", $current_error_str);
+      Log3($name, 4, "$name: currentError change '$old' -> '$current_error_str'");
+    }
   }
 
   return;
@@ -4825,7 +4845,7 @@ sub vitoconnect_action {
     Log3($name,3,$name.", vitoconnect_action data=".$param->{data}); # change back to 3
 #   https://wiki.fhem.de/wiki/HttpUtils#HttpUtils_BlockingGet
     my ($err, $msg) = HttpUtils_BlockingGet($param);
-    my $decode_json = eval { decode_json($msg) };
+    my $decode_json = eval { decode_json($msg) } // {};
 
     if ((defined($err) && $err ne "") || (defined($decode_json->{statusCode}) && $decode_json->{statusCode} ne "")) {
         $retry_count++;
@@ -4872,6 +4892,8 @@ sub vitoconnect_action {
     }
 
         readingsSingleUpdate($hash,"Aktion_Status","OK: ".$opt." ".$Text,1);    # Reading 'Aktion_Status' setzen
+        # Erfolgreicher Set-Call (POST) -> API-Call-Counter inkrementieren
+        vitoconnect_incrementApiCallsToday($hash);
         #Log3($name,1,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt: ".$err." :: ".$msg); # TODO: Wieder weg machen $err
         Log3($name,3,$name.",vitoconnect_action: set name:".$name." opt:".$opt." text:".$Text.", korrekt ausgefuehrt"); 
         
@@ -4911,6 +4933,88 @@ sub vitoconnect_action {
 
 
 #####################################################################################################################
+# Summe der apiCallsToday-Werte aller vitoconnect-Devices mit gleichem apiKey.
+# Bei Multi-Device-Setups teilen sich alle Devices des gleichen Accounts das
+# 1450er-Tageslimit. Disabled Devices zaehlen nicht (deren Counter steht still).
+#####################################################################################################################
+sub vitoconnect_calcAccountUsage {
+    my ($hash) = @_;
+    my $myKey = $hash->{apiKey} // "";
+    return 0 if $myKey eq "";
+
+    my $sum = 0;
+    foreach my $devName (devspec2array("TYPE=vitoconnect")) {
+        my $dev = $defs{$devName} or next;
+        next if (($dev->{apiKey} // "") ne $myKey);
+        $sum += ReadingsVal($devName, "apiCallsToday", 0);
+    }
+    return $sum;
+}
+
+
+#####################################################################################################################
+# API-Call-Zaehler fuer heute fuehren, Tageswechsel automatisch erkennen.
+# Wird nach jedem erfolgreichen Resource-Read und nach jeder erfolgreichen
+# Set-Action aufgerufen. Bei Tageswechsel wird der alte Wert nach apiCallsLastDay
+# verschoben und der Counter zurueckgesetzt.
+# Zusaetzlich werden apiCallsTodayAccount (Summe ueber alle Devices mit gleichem
+# apiKey, nur wenn >=2 Devices) und apiQuotaUsedPercent (Prozent vom 1450er-Limit)
+# berechnet.
+# readingsSingleUpdate ist nesting-safe (kein Begin/End-Block).
+#####################################################################################################################
+sub vitoconnect_incrementApiCallsToday {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    my $today     = localtime()->ymd;  # z.B. "2026-06-26"
+    my $last_date = ReadingsVal($name, ".apiCallsToday_lastdate", "");
+
+    if ($last_date ne $today) {
+        # Tageswechsel: alten Wert mit Datum nach LastDay schieben, Today auf 1.
+        # Bei FHEM-Downtime > 24h ist $last_date evtl. nicht "gestern" - das
+        # Datum wird mitgespeichert damit man im Plot sieht von wann der Wert ist.
+        my $old_count = 0 + ReadingsVal($name, "apiCallsToday", 0);
+        readingsSingleUpdate($hash, "apiCallsLastDay",      $old_count, 1);
+        readingsSingleUpdate($hash, "apiCallsLastDay_date", $last_date, 1) if $last_date ne "";
+        readingsSingleUpdate($hash, "apiCallsToday",        1,          1);
+        readingsSingleUpdate($hash, ".apiCallsToday_lastdate", $today,  0);
+        Log3($name, 4, "$name - Tageswechsel: apiCallsToday=1, apiCallsLastDay=$old_count (vom $last_date)");
+    } else {
+        # Selber Tag: inkrementieren
+        my $new_count = 1 + (0 + ReadingsVal($name, "apiCallsToday", 0));
+        readingsSingleUpdate($hash, "apiCallsToday", $new_count, 1);
+    }
+
+    # Account-Summe nur wenn mehrere Devices den gleichen apiKey nutzen
+    # (Single-Device-Setup: apiCallsToday == Account-Summe, redundant).
+    my $myKey = $hash->{apiKey} // "";
+    my $deviceCount = 0;
+    if ($myKey ne "") {
+        foreach my $devName (devspec2array("TYPE=vitoconnect")) {
+            my $dev = $defs{$devName} or next;
+            $deviceCount++ if (($dev->{apiKey} // "") eq $myKey);
+        }
+    }
+
+    my $quotaBase;  # Wert auf den sich die Quota-Prozent beziehen
+    if ($deviceCount >= 2) {
+        my $accountSum = vitoconnect_calcAccountUsage($hash);
+        readingsSingleUpdate($hash, "apiCallsTodayAccount", $accountSum, 1);
+        $quotaBase = $accountSum;
+    } else {
+        $quotaBase = 0 + ReadingsVal($name, "apiCallsToday", 0);
+    }
+
+    # Quota in Prozent vom Tageslimit (1450, siehe Modul-Header).
+    my $percent = int($quotaBase * 100 / $API_DAILY_LIMIT);
+    readingsSingleUpdate($hash, "apiQuotaUsedPercent", $percent, 1);
+    Log3($name, 3, "$name - WARNUNG: API-Quota bei ${percent}% (>= 80%)") if $percent >= 80;
+
+    return;
+}
+
+
+#####################################################################################################################
 # Errors bearbeiten
 #####################################################################################################################
 sub vitoconnect_errorHandling {
@@ -4920,7 +5024,7 @@ sub vitoconnect_errorHandling {
     
     #Log3 $name, 1, "$name - errorHandling StatusCode: $items->{statusCode} ";
     
-        if (defined $items->{statusCode} && !$items->{statusCode} eq "")    {
+        if (defined $items->{statusCode} && $items->{statusCode} ne "")    {
             Log3 $name, 4, "$name - statusCode: " . ($items->{statusCode} // 'undef') . " "
                          . "errorType: " . ($items->{errorType} // 'undef') . " "
                          . "message: " . ($items->{message} // 'undef') . " "
@@ -4951,9 +5055,9 @@ sub vitoconnect_errorHandling {
             }
             elsif ( $items->{statusCode} eq "429" ) {
                 # RATE_LIMIT_EXCEEDED
-                readingsSingleUpdate($hash,"state","Anzahl der möglichen API Calls in überschritten!",1);
+                readingsSingleUpdate($hash,"state","Anzahl der möglichen API Calls überschritten!",1);
                 Log3 $name, 1,
-                  "$name - Anzahl der möglichen API Calls in überschritten! Caller Name: $hash->{NAME}, memoryadress: $hash";
+                  "$name - Anzahl der möglichen API Calls überschritten! Caller Name: $hash->{NAME}, memoryadress: $hash";
                 InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
