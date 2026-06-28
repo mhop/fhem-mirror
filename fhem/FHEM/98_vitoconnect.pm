@@ -106,6 +106,8 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.1.9"  => "28.06.2026  Neues Reading apiQuotaUsedPercentLastDay - zeigt im Nachhinein wie nah man gestern am 1450/Tag-Limit war. Bei Multi-Device basiert auf apiCallsLastDayAccount, sonst auf apiCallsLastDay.",
+  "1.1.8"  => "28.06.2026  Neues Reading apiCallsLastDayAccount fuer Multi-Device-Symmetrie zu apiCallsTodayAccount (Summe der gestrigen Calls ueber alle Devices mit gleichem apiKey). Live-berechnet, kann in den ersten Minuten nach Mitternacht kurz inkonsistent sein.",
   "1.1.7"  => "26.06.2026  24h-Cleanup laeuft jetzt fuer alle Listen-Typen (errors/info/status/service/unknown), auch wenn Type aktuell leer ist. Behebt Stale-Eintraege in unknown.list aus Stride-Bug-Zeit. Leere Liste leert das Reading sauber.",
   "1.1.6"  => "26.06.2026  Neue Readings: apiQuotaUsedPercent (vom 1450er-Tageslimit der Viessmann-API), apiCallsTodayAccount (Summe ueber alle Devices mit gleichem apiKey, nur bei Multi-Device). Warnlog bei Quota >= 80%.",
   "1.1.5"  => "26.06.2026  Neue Features: apiCallsToday/apiCallsLastDay Counter, currentError Reading (aktive F-Codes aus errors.raw). Anchor-Toter-Code in getResourceCallback entfernt. Forward-Declarations getInstallationFeatures ergaenzt.",
@@ -4933,12 +4935,14 @@ sub vitoconnect_action {
 
 
 #####################################################################################################################
-# Summe der apiCallsToday-Werte aller vitoconnect-Devices mit gleichem apiKey.
-# Bei Multi-Device-Setups teilen sich alle Devices des gleichen Accounts das
-# 1450er-Tageslimit. Disabled Devices zaehlen nicht (deren Counter steht still).
+# Summe eines Readings (apiCallsToday oder apiCallsLastDay) ueber alle vitoconnect-Devices
+# mit gleichem apiKey. Bei Multi-Device-Setups teilen sich alle Devices des gleichen
+# Accounts das 1450er-Tageslimit. Disabled Devices zaehlen nicht (deren Counter steht still).
+# Optionaler Parameter $reading (default "apiCallsToday") fuer Wiederverwendung.
 #####################################################################################################################
 sub vitoconnect_calcAccountUsage {
-    my ($hash) = @_;
+    my ($hash, $reading) = @_;
+    $reading //= "apiCallsToday";
     my $myKey = $hash->{apiKey} // "";
     return 0 if $myKey eq "";
 
@@ -4946,7 +4950,7 @@ sub vitoconnect_calcAccountUsage {
     foreach my $devName (devspec2array("TYPE=vitoconnect")) {
         my $dev = $defs{$devName} or next;
         next if (($dev->{apiKey} // "") ne $myKey);
-        $sum += ReadingsVal($devName, "apiCallsToday", 0);
+        $sum += ReadingsVal($devName, $reading, 0);
     }
     return $sum;
 }
@@ -4957,9 +4961,11 @@ sub vitoconnect_calcAccountUsage {
 # Wird nach jedem erfolgreichen Resource-Read und nach jeder erfolgreichen
 # Set-Action aufgerufen. Bei Tageswechsel wird der alte Wert nach apiCallsLastDay
 # verschoben und der Counter zurueckgesetzt.
-# Zusaetzlich werden apiCallsTodayAccount (Summe ueber alle Devices mit gleichem
-# apiKey, nur wenn >=2 Devices) und apiQuotaUsedPercent (Prozent vom 1450er-Limit)
-# berechnet.
+# Zusaetzlich werden apiCallsTodayAccount + apiCallsLastDayAccount (Summen ueber
+# alle Devices mit gleichem apiKey, nur wenn >=2 Devices) und apiQuotaUsedPercent
+# (Prozent vom 1450er-Limit, bezogen auf Account-Summe bei Multi-Device, sonst
+# auf eigenen apiCallsToday) sowie apiQuotaUsedPercentLastDay (Prozent vom
+# Vortag, gleiche Scope-Logik) berechnet.
 # readingsSingleUpdate ist nesting-safe (kein Begin/End-Block).
 #####################################################################################################################
 sub vitoconnect_incrementApiCallsToday {
@@ -4996,19 +5002,32 @@ sub vitoconnect_incrementApiCallsToday {
         }
     }
 
-    my $quotaBase;  # Wert auf den sich die Quota-Prozent beziehen
+    my $quotaBase;          # Wert auf den sich apiQuotaUsedPercent bezieht
+    my $quotaBaseLastDay;   # Wert auf den sich apiQuotaUsedPercentLastDay bezieht
     if ($deviceCount >= 2) {
         my $accountSum = vitoconnect_calcAccountUsage($hash);
         readingsSingleUpdate($hash, "apiCallsTodayAccount", $accountSum, 1);
-        $quotaBase = $accountSum;
+        # apiCallsLastDayAccount: Summe der LastDay-Werte aller Devices im Account.
+        # Wird live berechnet, kann in den ersten Minuten nach Mitternacht
+        # kurz inkonsistent sein bis alle Devices den Tageswechsel durchgemacht haben.
+        my $accountLastDaySum = vitoconnect_calcAccountUsage($hash, "apiCallsLastDay");
+        readingsSingleUpdate($hash, "apiCallsLastDayAccount", $accountLastDaySum, 1);
+        $quotaBase        = $accountSum;
+        $quotaBaseLastDay = $accountLastDaySum;
     } else {
-        $quotaBase = 0 + ReadingsVal($name, "apiCallsToday", 0);
+        $quotaBase        = 0 + ReadingsVal($name, "apiCallsToday",   0);
+        $quotaBaseLastDay = 0 + ReadingsVal($name, "apiCallsLastDay", 0);
     }
 
     # Quota in Prozent vom Tageslimit (1450, siehe Modul-Header).
     my $percent = int($quotaBase * 100 / $API_DAILY_LIMIT);
     readingsSingleUpdate($hash, "apiQuotaUsedPercent", $percent, 1);
     Log3($name, 3, "$name - WARNUNG: API-Quota bei ${percent}% (>= 80%)") if $percent >= 80;
+
+    # Gleiche Logik fuer den Vortag: zeigt im Nachhinein wie nah man am Limit war.
+    # Kein Warnlog, weil rein historisch.
+    my $percentLastDay = int($quotaBaseLastDay * 100 / $API_DAILY_LIMIT);
+    readingsSingleUpdate($hash, "apiQuotaUsedPercentLastDay", $percentLastDay, 1);
 
     return;
 }
