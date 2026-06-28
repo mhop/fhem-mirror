@@ -134,7 +134,8 @@ readingsProxy_update($$$$)
   
   if( $devname eq $primaryDevname && $reading eq $primaryReading) {
     my $value_fn = AttrVal( $name, "valueFn", "" );
-    if( $value_fn =~ m/^{.*}$/s ) {
+    if ( $value_fn =~ m/^{.*}$/s ) {
+      my $NAME = $name;
       my $DEVICE = $devname;
       my $READING = $reading;
       my $VALUE = $value;
@@ -282,6 +283,7 @@ readingsProxy_Set($@)
   if( $set_fn =~ m/^{.*}$/s ) {
     my $CMD = $a[0];
     my $DEVICE = $primaryDevname;
+    my $NAME = $name;
     my $READING = $primaryReading;
     my $ARGS = join(" ", @a[1..$#a]);
 
@@ -335,6 +337,7 @@ readingsProxy_Get($@)
   my $get_fn = AttrVal( $hash->{NAME}, "getFn", "" );
   if( $get_fn =~ m/^{.*}$/s ) {
     my $CMD = $a[0];
+    my $NAME = $name;
     my $DEVICE = $primaryDevname;
     my $READING = $primaryReading;
     my $ARGS = join(" ", @a[1..$#a]);
@@ -367,6 +370,7 @@ readingsProxy_Attr($$$;$)
     if( $attrName eq 'getFn' || $attrName eq 'setFn' || $attrName eq 'valueFn' ) {
       my %specials= (
         "%CMD" => $name,
+        "%NAME" => $name,
         "%DEVICE" => $name,
         "%READING" => $name,
         "%ARGS" => $name,
@@ -468,7 +472,7 @@ __END__
       <a id="readingsProxy-attr-getFn"></a>
       <li>getFn<br>
         Perl expresion that will return the get command forwarded to the parent device.
-        Has access to $DEVICE, $READING, $CMD and $ARGS.<br>
+        Has access to $DEVICE, $READING, $CMD, $ARGS and $NAME.<br>
         <code>undef</code>: do nothing<br>
         <code>""</code>: pass through<br>
         <code>(&lt;value&gt;,1)</code>: directly return &lt;value&gt;, don't call parent getFn<br>
@@ -477,7 +481,7 @@ __END__
       <a id="readingsProxy-attr-setFn"></a>
       <li>setFn<br>
         Perl expresion that will return the set command forwarded to the parent device.
-        Has access to $CMD, $DEVICE, $READING and $ARGS.<br>
+        Has access to $CMD, $DEVICE, $READING, $ARGS and $NAME.<br>
         <code>undef</code>: do nothing<br>
         <code>""</code>: pass through<br>
         everything else: use the provided function<br>
@@ -486,7 +490,7 @@ __END__
       <a id="readingsProxy-attr-valueFn"></a>
       <li>valueFn<br>
         Perl expresion that will return the value that should be used for the reading.
-        Has access to $LASTCMD, $DEVICE, $READING and $VALUE.<br>
+        Has access to $LASTCMD, $DEVICE, $READING, $VALUE and $NAME.<br>
         <code>undef</code>: do nothing<br>
         <code>""</code>: pass through<br>
         <code>(&lt;value&gt;,1)</code>: directly return &lt;value&gt;, don't call parent getFn<br>
