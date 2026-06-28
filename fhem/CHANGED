@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 98_vitoconnect: Weitere Readings für api-calls und api-quota
  - feature: 98_vitoconnect: Bugfixes und api-calls und api-quota
  - bugfix:  72_FritzSmart: Fehlerkorrekt prüfen Parameter bei set...call
  - new:     98_WebAuth: Module for support of WebAuthn via reverseproxy.
