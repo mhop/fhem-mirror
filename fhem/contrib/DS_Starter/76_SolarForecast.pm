@@ -895,6 +895,17 @@ my %noise_translations = (                                                      
                   DE => "starkes Rauschen, Messwerte eingeschränkt nutzbar"        },                           
 );
 
+my %retrain_translations = (                                                                  # Übersetzung RetrainIndicator
+  critical   => { EN => "architecture too large for dataset, unstable training likely",
+                  DE => "Architektur zu groß für den Datensatz, Training wahrscheinlich instabil"                                        },
+  caution    => { EN => "architecture slightly oversized for dataset", 
+                  DE => "Die Architektur ist für den Datensatz etwas überdimensioniert."                                                 },
+  notice     => { EN => "architecture likely too small, larger network may capture more patterns",
+                  DE => "Die Architektur ist wahrscheinlich zu klein; ein größeres Netzwerk könnte möglicherweise mehr Muster erfassen." },
+  info       => { EN => "architecture conservative, slightly larger network could be tried",
+                  DE => "Architektur: konservativ; ein etwas größeres Netzwerk könnte ausprobiert werden"                                },                           
+);
+
 my %epoche_translations = (                                                                  
   vearly  => { EN => "converges very early",
                DE => "sehr früh konvergiert"             },
@@ -7318,7 +7329,7 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', "7 < DPR < 20 → das Netz hat genug Freiheitsgrade um zu lernen, wird aber durch ausreichend Daten zuverlässig kontrolliert"))."\n";
       $note .= $spc3.(encode('utf8', "DPR > 30 → deutet darauf hin, dass die Architektur für die vorhandene Datenmenge zu klein gewählt wurde und ein größeres Netz möglicherweise mehr Muster erfassen könnte"))."\n";
 	  $note .= $spc3.(encode('utf8', '<b>Hinweis:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'Bei automatischer Architekturwahl wird die erste Konfiguration gewählt, die einen DPR ≥ 8 erreicht.'))."\n";
+      $note .= $spc6.(encode('utf8', 'Bei automatischer Architekturwahl wird die erste Konfiguration gewählt, die einen DPR ≥ 7 erreicht.'))."\n";
       $note .= $spc6.(encode('utf8', 'Legt der Anwender die Architektur manuell fest, dient der angezeigte DPR-Wert zur Orientierung, ob die Wahl zur aktuellen Datenlage passt.'))."\n";
       $note .= "\n";      
       
@@ -7457,6 +7468,16 @@ sub ___aiFannExplainKeyFigures {
       $note .= $spc3.(encode('utf8', '⚠️ R² ist sehr empfindlich gegenüber Ausreißern und Varianz in den Daten.'))."\n";
   }
   elsif ($lang eq 'EN') {
+      $note .= (encode('utf8', "<b>Data-Parameter-Ratio (DPR)</b> → Describes the relationship between the number of training data points and the number of free parameters (weights + bias) in the neural network."))."\n";
+      $note .= $spc3.(encode('utf8', "It is a measure of how well the network is determined by the available data and is calculated using <i>DPR = training data sets / network parameters </i>"))."\n";
+      $note .= $spc3.(encode('utf8', "DPR < 5 → is considered critical: the network is underdetermined and prone to unstable training or dead neurons"))."\n";
+      $note .= $spc3.(encode('utf8', "7 < DPR < 20 → The network has enough freedom to learn, but is reliably controlled through sufficient data."))."\n";
+      $note .= $spc3.(encode('utf8', "DPR > 30 → suggests that the architecture was chosen to be too small for the existing data set and that a larger network might be able to detect more patterns"))."\n";
+	  $note .= $spc3.(encode('utf8', '<b>Note:</b>'))."\n";
+      $note .= $spc6.(encode('utf8', 'When architecture selection is automatic, the first configuration that achieves a DPR ≥ 7 is selected.'))."\n";
+      $note .= $spc6.(encode('utf8', 'If the user defines the architecture manually, the displayed DPR value serves as a guide to determine whether the choice is appropriate given the current data situation.'))."\n";
+      $note .= "\n";      
+
       $note .= (encode('utf8', "<b>Semantic Ratio</b> → Indicates how many data points in the current evaluation window were predicted with significant error—relative to the model's typical accuracy."))."\n";
       $note .= $spc3.(encode('utf8', "Wert < 0.4 → Only a few data points deviate significantly. The model is generally accurate; individual outliers distort the picture—which is typical for rare peaks or brief disturbances."))."\n";
       $note .= $spc3.(encode('utf8', "Wert > 0.4 - 0.7 → Unclear image—neither a distinct drift nor isolated peaks."))."\n";
@@ -27326,7 +27347,8 @@ sub aiFannTrain {
                                                  rmse           => $weighted_rmse,                                                   
                                                  rmse_rel       => $weighted_rmse_rel, 
                                                  profile        => $profile,
-                                                 debug          => $debug 
+                                                 debug          => $debug,
+                                                 lang           => $paref->{lang},
                                                } 
                                              );
                                                
@@ -27852,48 +27874,40 @@ sub __aiFannArchHint {
 
   return { hints => \@hints } if !$num_inputs || !$split_index || !$hidden_layers;
   
-  if ($split_index < AINUMMININPUTS) {                                                              # Datenmenge zu gering
+  if ($split_index < AINUMMININPUTS) {
       push @hints, sprintf $epoche_translations{hint21}{$lang}, $split_index, AINUMMININPUTS;
-      return { hints => \@hints };                                                                  # weitere Architekturhinweise sinnlos
+      return { hints => \@hints };
   }
 
   # --- Aktuelle Architektur auswerten
   my @cur_layers = split /-/, $hidden_layers;
-  my $cur_params = 0;
-  my $prev       = $num_inputs;
+  my $cur_params = __aiFannEstimateParams ($num_inputs, $hidden_layers);            
+  my $cur_ratio  = $split_index / ($cur_params || 1);
 
-  for my $n (@cur_layers) {
-      $cur_params += ($prev + 1) * $n;                                                              # Gewichte + Bias je Schicht
-      $prev        = $n;
-  }
-  
-  $cur_params  += $prev + 1;                                                                        # letzte Hidden → Output + Bias
-  my $cur_ratio = $split_index / ($cur_params || 1);
+  # --- Optimale Architektur berechnen
+  my $target_params = int ($split_index / 10);                                      # Ziel: ~10 Trainingsdaten pro Parameter (Mitte des Zielkorridors 8–20)
 
-  # --- Optimale Architektur berechnen                                                              # Ziel: ~10 Trainingsdaten pro Parameter (Mitte des Zielkorridors 8–20)
-  my $target_params = int ($split_index / 10);
-
-  my @nice   = (8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128);                                        # Erste Hidden-Schicht: sqrt(target_params), begrenzt auf num_inputs
+  my @nice   = (8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128);                        # Erste Hidden-Schicht: sqrt(target_params), begrenzt auf num_inputs
   my $raw_h1 = int (sqrt ($target_params));
-  my $min_h1 = max (8, int ($num_inputs / 8));                                                      # Input-abhängiger Mindestboden
+  my $min_h1 = max (8, int ($num_inputs / 8));                                      # Input-abhängiger Mindestboden
   $raw_h1    = max ($raw_h1, $min_h1);                  
   $raw_h1    = $num_inputs if $raw_h1 > $num_inputs;
 
-  my $sug_h1 = (sort { abs($a - $raw_h1) <=> abs($b - $raw_h1) } @nice)[0];                         # Auf nächsten "schönen" Wert runden
+  my $sug_h1 = (sort { abs($a - $raw_h1) <=> abs($b - $raw_h1) } @nice)[0];         # Auf nächsten "schönen" Wert runden
 
   # --- Architekturtiefe je nach Parameteranzahl
   my $sug_arch;
 
-  if ($target_params < 300) {                                                                       # flach
+  if ($target_params < 300) {                                                       # flach
       my $h2    = max (8, int ($sug_h1 / 2));
       $sug_arch = "$sug_h1-$h2";
   }
-  elsif ($target_params < 1500) {                                                                   # mittel
+  elsif ($target_params < 1500) {                                                   # mittel
       my $h2    = max (8, int ($sug_h1 / 2));
       my $h3    = int ($h2 / 2);
       $sug_arch = $h3 >= 8 ? "$sug_h1-$h2-$h3" : "$sug_h1-$h2";
   }
-  else {                                                                                            # tief
+  else {                                                                            # tief
       my $h2    = max (8, int ($sug_h1 / 2));
       my $h3    = max (8, int ($h2   / 2));
       my $h4    = int ($h3 / 2);
@@ -27902,9 +27916,9 @@ sub __aiFannArchHint {
 
   # --- Tiefe mindestens so tief wie aktuelle Architektur
   my $cur_depth = scalar @cur_layers;
-  my $sug_depth = scalar (split /-/, $sug_arch);                                                    # Anzahl Schichten der vorgeschlagenen Architektur
+  my $sug_depth = scalar (split /-/, $sug_arch);                                    # Anzahl Schichten der vorgeschlagenen Architektur
 
-  if ($sug_depth < $cur_depth && $cur_ratio > 10) {                                                 # cur_ratio -> Guard: nur bei zu kleinem Netz
+  if ($sug_depth < $cur_depth && $cur_ratio > 10) {                                 # cur_ratio -> Guard: nur bei zu kleinem Netz
       my @sug_layers;
       my $n = $sug_h1;
 
@@ -27917,72 +27931,73 @@ sub __aiFannArchHint {
       $sug_depth = $cur_depth;
   }
   
-  # Nach Tiefenkorrektur: resultierendes Ratio prüfen
-  my $sug_params = 0;               
-  my $p          = $num_inputs;
-  
-  for my $n (split /-/, $sug_arch) {
-      $sug_params += ($p + 1) * $n;
-      $p = $n;
-  }
-  
-  $sug_params  += $p + 1;
-  my $sug_ratio = $split_index / ($sug_params || 1);
+  # --- DPR-Validierung der vorgeschlagenen Architektur
+  my $sug_params = __aiFannEstimateParams ($num_inputs, $sug_arch);                 # ersetzt manuellen Berechnungsblock
+  my $sug_ratio  = $split_index / ($sug_params || 1);
 
-  if ($sug_ratio < 5) {                                                                             # Falls immer noch unter Ziel: eine Iteration kleiner
-      my @layers = map { max(8, int($_ * 0.6)) } split(/-/, $sug_arch);                             # Alle Schichten um Faktor 0.6 reduzieren
+  if ($sug_ratio < 5) {                                                             # Fallback: alle Schichten um Faktor 0.6 reduzieren
+      my @layers = map { max(8, int($_ * 0.6)) } split(/-/, $sug_arch);
       $sug_arch  = join ('-', @layers);
       $sug_depth = scalar @layers;
+      $sug_params = __aiFannEstimateParams ($num_inputs, $sug_arch);
+      $sug_ratio  = $split_index / ($sug_params || 1);
   }
-    
-  # --- Empfehlung Lernrate je nach Netztiefe
-  my $sug_lr = $sug_depth == 1 ? 0.0100                                                             # Empfohlene Lernrate je nach Netztiefe
+
+  # --- Sicherheitscheck: Vorschlag nur ausgeben wenn DPR-sicher
+  my $sug_dpr_safe = $sug_ratio >= 5;                                               # Guard verhindert Empfehlung toter Netze
+
+  my $sug_lr = $sug_depth == 1 ? 0.0100                                             # Empfohlene Lernrate je nach Netztiefe
              : $sug_depth == 2 ? 0.0050
              : $sug_depth == 3 ? 0.0030
              :                   0.0015;
 
-  # Strukturelles Datenproblem: zu wenige Daten für die Inputanzahl
-  my $min_params = ($num_inputs + 1) * 8 + 9;                                                       # minimalste 1-Layer-Architektur mit 8 Neuronen
+  my $min_params = ($num_inputs + 1) * 8 + 9;                                       # minimalste 1-Layer-Architektur mit 8 Neuronen
   
   if ($split_index / ($min_params || 1) < 5) {
       push @hints, sprintf $epoche_translations{hint22}{$lang}, $num_inputs, $split_index;
-      return { hints => \@hints };                                                                  # weitere Architekturhinweise sinnlos
+      return { hints => \@hints };                                                                      # weitere Architekturhinweise sinnlos
   }
   
-  my $lr_hint = (defined $learning_rate && abs($sug_lr - $learning_rate) < 0.0001)                  # Hilfssub-äquivalent: hint19 nur ausgeben wenn Empfehlung von aktueller LR abweicht
+  my $lr_hint = (defined $learning_rate && abs($sug_lr - $learning_rate) < 0.0001)                      # Hilfssub-äquivalent: hint19 nur ausgeben wenn Empfehlung von aktueller LR abweicht
                 ? ''
                 : sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;  
   
-  # --- Hinweise ausgeben  
-  if ($cur_ratio > 20 && $epoch_code =~ /^(late|very_late|ok)$/) {                                  # Verhältnis zu hoch → Netz zu klein
-      push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
-      push @hints, $lr_hint if $lr_hint;                                                            # einfügen Hilfssub-äquivalent: hint19
+  # --- Hinweise ausgeben (nur wenn DPR-sicher)
+  if ($cur_ratio > 20 && $epoch_code =~ /^(late|very_late|ok)$/) {                                      # Verhältnis zu hoch → Netz zu klein
+      if ($sug_dpr_safe) {
+          push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
+          push @hints, $lr_hint if $lr_hint;
+      }
   }
-  elsif ($cur_ratio < 3 && $epoch_code eq 'overfit') {                                              # Verhältnis zu niedrig → Netz zu groß NUR bei gleichzeitigem Qualitätsproblem auslösen
-      push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
-      push @hints, $lr_hint if $lr_hint;                                                            # einfügen Hilfssub-äquivalent: hint19
+  elsif ($cur_ratio < 3 && $epoch_code eq 'overfit') {                                                  # Verhältnis zu niedrig → Netz zu groß NUR bei gleichzeitigem Qualitätsproblem auslösen
+      if ($sug_dpr_safe) {
+          push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
+          push @hints, $lr_hint if $lr_hint;
+      }
   } 
   elsif ($sug_arch ne $hidden_layers
          && ($cur_ratio < 6 || $cur_ratio > 18)
          && $epoch_code ne 'ok') {
       if ($cur_ratio > 18) {
-          push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch
-              if($sug_params > $cur_params);
-          push @hints, $lr_hint if($lr_hint && $sug_params > $cur_params);
+          if ($sug_dpr_safe && $sug_params > $cur_params) {
+              push @hints, sprintf $epoche_translations{hint17}{$lang}, $cur_ratio, $sug_arch;
+              push @hints, $lr_hint if $lr_hint;
+          }
       }
       else {
-          push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch
-              if $sug_params < $cur_params;
-          push @hints, $lr_hint if $lr_hint && $sug_params < $cur_params;
+          if ($sug_dpr_safe && $sug_params < $cur_params) {
+              push @hints, sprintf $epoche_translations{hint18}{$lang}, $cur_ratio, $sug_arch;
+              push @hints, $lr_hint if $lr_hint;
+          }
       }
   }
 
   if ($num_train_datasets > 6000) {
       my $suggested_limit  = max (2000, int ($num_train_datasets * 0.5 / 100) * 100);
-      my $limited_train    = int ($suggested_limit * ($split_index / $num_train_datasets));         # proportionaler Trainingsanteil nach Limit
+      my $limited_train    = int ($suggested_limit * ($split_index / $num_train_datasets));
       my $limited_ratio    = $limited_train / ($cur_params || 1);
     
-      if ($limited_ratio >= 5) {                                                                    # nur empfehlen wenn Daten/Parameter-Verhältnis noch ausreichend
+      if ($limited_ratio >= 5) {
           push @hints, sprintf $epoche_translations{hint20}{$lang}, $num_train_datasets, $suggested_limit;
       }
   }
@@ -28046,7 +28061,8 @@ sub _aiFannRetrainIndicator {
   my $dataParamRatio = $paref->{dataParamRatio} // 0;
   my $r2             = $paref->{r2};
   my $profile        = $paref->{profile};                                       # ausgewähltes Profil
-  my $debug          = $paref->{debug};  
+  my $debug          = $paref->{debug}; 
+  my $lang           = $paref->{lang}; 
       
   my @sorted_abs = sort { $a <=> $b } @$abserref;
   
@@ -28114,10 +28130,10 @@ sub _aiFannRetrainIndicator {
   my $dpr_hint     = 'ok';
 
   if ($dataParamRatio > 0) {
-      $dpr_hint = $dataParamRatio < $dpr_warn    ? "CRITICAL (ratio=$dataParamRatio < $dpr_warn): architecture too large for dataset, unstable training likely"
-                : $dataParamRatio < $dpr_caution ? "CAUTION  (ratio=$dataParamRatio < $dpr_caution): architecture slightly oversized for dataset"
-                : $dataParamRatio > 30           ? "NOTICE   (ratio=$dataParamRatio > 30): architecture likely too small, larger network may capture more patterns"
-                : $dataParamRatio > 20           ? "INFO     (ratio=$dataParamRatio > 20): architecture conservative, slightly larger network could be tried"
+      $dpr_hint = $dataParamRatio < $dpr_warn    ? "CRITICAL (ratio=$dataParamRatio < $dpr_warn): $retrain_translations{critical}{$lang}"
+                : $dataParamRatio < $dpr_caution ? "CAUTION  (ratio=$dataParamRatio < $dpr_caution): $retrain_translations{caution}{$lang}"
+                : $dataParamRatio > 30           ? "NOTICE   (ratio=$dataParamRatio > 30): $retrain_translations{notice}{$lang}"
+                : $dataParamRatio > 20           ? "INFO     (ratio=$dataParamRatio > 20): $retrain_translations{info}{$lang}"
                 : $dpr_hint; 
   }
     
