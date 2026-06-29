@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.06.22";
+our $ModulVersion = "26.06.29";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -90,6 +90,8 @@ sub main::FritzSmart_Initialize { goto &Fritz_Initialize_Modul }
 
 ###############################################################################
 # fhem includes
+use GPUtils qw(:all);
+use Exporter ('import');
 use Time::HiRes qw(gettimeofday time);    
 use POSIX qw(strftime);
 use Encode;
@@ -112,6 +114,7 @@ eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
 
 eval "use URI::Escape;1"    or $missingModul .= "URI::Escape ";
 eval "use XML::Simple;1"    or $missingModul .= "XML::Simple ";
+eval "use XML::Hash::XS;1"  or $missingModul .= "XML::Hash::XS ";
 
 eval "use Data::Dumper;1"   or $missingModul .= "Data::Dumper ";
 # $Data::Dumper::Terse = 1;
@@ -1044,28 +1047,114 @@ sub Fritz_Get_attrList($@) {
     $avmModel = "Initial";
   }
   my $fwVersion = (defined($hash->{fhem}{fwVersion}) ? $hash->{fhem}{fwVersion} : 0);
+  my $retAttr   = "";
 
-  my $retAttr = "disable:0,1 "
-
+  if($avmModel eq "Initial") {
+    $retAttr = "INTERVAL "
+              ."boxUser "
+              ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,statIP,_noDefInf_ "
+              ."disable:0,1 "
+              ."FhemLog3Std:0,1 "
+              ."lanDeviceReading:mac,ip "
+              ."maxSIDrenewErrCnt "
               ."nonblockingTimeOut:30,35,40,50,75,100,125 "
+              ."reConnectInterval "
+              ."retMsgbySet:all,error,none "
               ."setgetTimeout:10,30,40,50,75,100,125 "
+              ."setSubVerbose4:multiple-strict,"
+                                ."Fritz_Initialize_Modul,Fritz_Define_Modul,Fritz_Undefine_Modul,Fritz_Delete_Modul,Fritz_Rename_Modul,Fritz_Notify_Modul,Fritz_Set_Modul,Fritz_Get_Modul,Fritz_Attr_Modul,"
+                                ."Fritz_DebugLog,Fritz_dbgLogInit,Fritz_Readout_Start,Fritz_Readout_API_Check,Fritz_Readout_Run_Web,Fritz_Readout_Run_Web_LuaQuery,Fritz_Readout_Run_Web_LuaData,"
+                                ."Fritz_Readout_Run_Web_TR064,Fritz_Readout_Response,Fritz_Readout_Done,Fritz_Readout_Process,Fritz_Readout_Aborted,Fritz_Readout_Add_Reading,Fritz_Readout_Format,"
+                                ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_GuestWlan_OnOff,Fritz_Set_call_Phone,"
+                                ."Fritz_Set_dectRing_Phone,Fritz_Set_ring_Phone,Fritz_Set_rescan_Neighborhood,Fritz_Set_macFilter_OnOff,Fritz_Set_change_Profile,Fritz_Set_lock_filter_Profile,"
+                                ."Fritz_Set_lock_Landevice_OnOffRt,Fritz_Set_lock_Landevice_OnOffRt_8,Fritz_Set_enable_VPNshare_OnOff,Fritz_Set_wake_Up_Call,Fritz_Set_Wlan_Log_Ext_OnOff,"
+                                ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_DOCSIS_Informations,"
+                                ."Fritz_Get_WLAN_Environment,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
+                                ."Fritz_Get_Fritz_Log_Info_nonBlk,Fritz_Get_Kid_Profiles_List,Fritz_Get_Fritz_Log_Info_Std,Fritz_Get_Lan_Device_Info,Fritz_Get_supportData,Fritz_Get_TR064_ServiceList,Fritz_Get_meshInfrastructure,"
+                                ."Fritz_SOAP_Request,Fritz_SOAP_Para_Request,"
+                                ."Fritz_init_TR064,Fritz_open_Web_Connection,Fritz_call_Lua_Query,Fritz_call_LuaData,Fritz_write_javaScript,Fritz_call_javaScript,"
+                                ."Fritz_Helper_make_TableRow,Fritz_Helper_process_JSON,Fritz_Helper_analyse_Lua_Result,Fritz_Phonebook_readRemote,Fritz_Phonebook_parse,"
+                                ."Fritz_Phonebook_Number_normalize,Fritz_Helper_retMsg,Fritz_Helper_html2txt,Fritz_Helper_store_Password,Fritz_Helper_read_Password,Fritz_Helper_Url_Regex,"
+                                ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,Fritz_Helper_TR064_ErrMsg,"
+                                ."Fritz_Helper_removeAfA,Fritz_Helper_reformat "
+              ."userAgentTimeOut "
+              ."userTickets:0,1,2,3,4,5,6,7,8,9,10,11,12 "
+              ."xmlParser:XML_Simple,XML_Hash_XS "
 
+              ."disableBoxReadings:multiple-strict,"
+                                ."box_connect,box_connection_Type,box_cpuTemp,box_dect,box_dsl_downStream,box_dsl_upStream,"
+                                ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
+                                ."box_IPv6_Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
+                                ."box_ip_name,box_ip_IPv4_Extern,box_ip_connection_Type,box_ip_connect,box_ip_last_connect_err,box_ip_last_auth_err,box_ip_mac_Address,box_ip_connection_Trigger,box_ip_uptimeConnect,"
+                                ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
+                                ."box_macFilter_active,"
+                                ."box_moh,box_rateDown,box_rateUp,box_stdDialPort,box_tr064,box_tr069,"
+                                ."box_upnp,box_upnp_control_activated,box_uptime,"
+                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_Active,box_wlan_LogExtended "
+
+              ."disableDectInfo:0,1 "
+              ."disableFonInfo:0,1 "
+              ."disableHostIPv4check:0,1 "
+              ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
+
+              ."enableAlarmInfo:0,1 "
+              ."enableBoxReadings:multiple-strict,"
+			                    ."box_led,box_vdsl,box_guestWlan,box_usb,box_notify,box_pwr,box_energyMode,"
+			                    ."box_globalFilter,box_wan,box_dns,box_user "
+              ."enableDocsisInfo:0,1 "
+              ."enableCallHandling:0,1 "
+              ."enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 "
+              ."enablePhoneBookInfo:0,1 "
+              ."enableKidProfiles:0,1 "
+              ."enableLogReadings:multiple-strict,"
+                                ."box_sys_Log,box_wlan_Log,box_fon_Log "
+              ."enableMobileInfo:0,1 "
+              ."enableMeshMonitor:textField-long "
+              ."enablePassivLanDevices:0,1 "
+              ."enablePowerLine:0,1 "
+              ."enableReadingsFilter:multiple-strict,"
+                                ."dectID_alarmRingTone,dectID_custRingTone,dectID_device,dectID_fwVersion,dectID_intern,dectID_intRingTone,"
+                                ."dectID_manufacturer,dectID_model,dectID_NoRingWithNightSetting,dectID_radio,dectID_NoRingTime,"
+                                ."shdeviceID_adaptivHeatingActive,shdeviceID_adaptivHeatingEnabled,shdeviceID_adaptivHeatingSupported,"
+                                ."shdeviceID_battery,shdeviceID_batteryLow,shdeviceID_buttonLocked,"
+                                ."shdeviceID_category,shdeviceID_currentInAmp,shdeviceID_currentState,shdeviceID_currentStateAction,shdeviceID_currentStateEndTime,"
+                                ."shdeviceID_device,shdeviceID_externalLocked,shdeviceID_firmwareVersion,shdeviceID_holidayActive,"
+                                ."shdeviceID_ledState,shdeviceID_manufacturer,shdeviceID_mode,shdeviceID_modeNextChangeTime,shdeviceID_model,"
+                                ."shdeviceID_powerPerHour,shdeviceID_powerInWatt,"
+                                ."shdeviceID_state,shdeviceID_status,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_summerTimePeriod,shdeviceID_summerTimeRepetition,"
+                                ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
+                                ."shdeviceID_uid,shdeviceID_voltage "
+              ."enableSIP:0,1 "
+              ."enableSmartHome:off,all,group,device "
+              ."enableUserInfo:0,1 "
+              ."enableVPNShares:0,1 "
+              ."enableWLANneighbors:0,1 "
+              ."enableXtamInfo:0,1 "
+              .$readingFnAttributes;
+
+    return $retAttr;
+  }
+
+  $retAttr = "FhemLog3Std:0,1 "
+              ."disable:0,1 "
               ."INTERVAL "
               ."reConnectInterval "
               ."maxSIDrenewErrCnt "
               ."userAgentTimeOut "
-              ."FhemLog3Std:0,1 "
               ."retMsgbySet:all,error,none "
+              ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,statIP,_noDefInf_ "
+              ."lanDeviceReading:mac,ip "
+              ."nonblockingTimeOut:30,35,40,50,75,100,125 "
+              ."setgetTimeout:10,30,40,50,75,100,125 "
+
+              ."disableHostIPv4check:0,1 "
 
               ."enableLogReadings:multiple-strict,"
                                 ."box_sys_Log,box_wlan_Log,box_fon_Log "
 
-              ."disableHostIPv4check:0,1 "
               ."enablePassivLanDevices:0,1 "
               ."enableWLANneighbors:0,1 "
 
-              ."lanDeviceReading:mac,ip "
-              ."deviceInfo:sortable,ipv4,name,uid,connection,speed,rssi,statIP,_noDefInf_ "
 
               ."setSubVerbose4:multiple-strict,"
                                 ."Fritz_Initialize_Modul,Fritz_Define_Modul,Fritz_Undefine_Modul,Fritz_Delete_Modul,Fritz_Rename_Modul,Fritz_Notify_Modul,Fritz_Set_Modul,Fritz_Get_Modul,Fritz_Attr_Modul,"
@@ -1082,9 +1171,19 @@ sub Fritz_Get_attrList($@) {
                                 ."Fritz_Helper_make_TableRow,Fritz_Helper_process_JSON,Fritz_Helper_analyse_Lua_Result,Fritz_Phonebook_readRemote,Fritz_Phonebook_parse,"
                                 ."Fritz_Phonebook_Number_normalize,Fritz_Helper_retMsg,Fritz_Helper_html2txt,Fritz_Helper_store_Password,Fritz_Helper_read_Password,Fritz_Helper_Url_Regex,"
                                 ."Fritz_Helper_Dumper,Fritz_Helper_encode_json,Fritz_Helper_TR064_ErrMsg,"
-                                ."Fritz_Helper_removeAfA,Fritz_Helper_reformat ";
+                                ."Fritz_Helper_removeAfA,Fritz_Helper_reformat "
 
-  if($avmModel =~ /Box|Initial/) {
+              ."enableDocsisInfo:0,1 ";
+              my $retPara = "enableBoxReadings:multiple-strict,";
+                   $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
+                   $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
+                   $retPara .= "box_energyMode,box_globalFilter,box_wan,"  if ($fwVersion == 0 || $fwVersion >= 721);
+                   $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
+                   $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
+                   $retPara =~ s/.$/ /;
+  $retAttr .= $retPara;
+
+  if($avmModel =~ /Box/) {
     $retAttr .= "userTickets:0,1,2,3,4,5,6,7,8,9,10,11,12 "
 
                ."disableDectInfo:0,1 "
@@ -1124,37 +1223,24 @@ sub Fritz_Get_attrList($@) {
                                 ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
                                 ."shdeviceID_uid,shdeviceID_voltage ";
 
-    if ($avmModel =~ /Initial/) {
+    if ($avmModel !~ /Cable/) {
 
-      $retAttr .= "enableDocsisInfo:0,1 ";
-      my $retPara = "enableBoxReadings:multiple-strict,";
-                   $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
-                   $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
-                   $retPara .= "box_energyMode,box_globalFilter,"          if ($fwVersion == 0 || $fwVersion >= 721);
-                   $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
-                   $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
-                   $retPara =~ s/.$/ /;
-      $retAttr .= $retPara;
-
-    } else {
-      if ($avmModel !~ /Cable/) {
-
-        if ($fwVersion == 0 || $fwVersion >= 680) {
+      if ($fwVersion == 0 || $fwVersion >= 680) {
           my $retPara = "enableBoxReadings:multiple-strict,";
                      $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
                      $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
-                     $retPara .= "box_energyMode,box_globalFilter,"          if ($fwVersion == 0 || $fwVersion >= 721);
+                     $retPara .= "box_energyMode,box_globalFilter,box_wan,"  if ($fwVersion == 0 || $fwVersion >= 721);
                      $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
                      $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
                      $retPara =~ s/.$/ /;
           $retAttr .= $retPara;
-        }
+      }
 
-      } elsif ($avmModel =~ /Cable/) {
+    } elsif ($avmModel =~ /Cable/) {
 
-        $retAttr .= "enableDocsisInfo:0,1 ";
+      $retAttr .= "enableDocsisInfo:0,1 ";
 
-        if ($fwVersion == 0 || $fwVersion >= 680) {
+      if ($fwVersion == 0 || $fwVersion >= 680) {
           my $retPara = "enableBoxReadings:multiple-strict,";
                      $retPara .= "box_led,"                          if ($fwVersion == 0 || $fwVersion >= 680);
                      $retPara .= "box_guestWlan,box_usb,box_notify," if ($fwVersion == 0 || $fwVersion >= 700);
@@ -1163,8 +1249,7 @@ sub Fritz_Get_attrList($@) {
                      $retPara .= "box_pwr,"                          if ($fwVersion == 0 || ($fwVersion >= 700 && ($fwVersion < 790 || $fwVersion >= 804)) );
                      $retPara .= "box_user,"                         if ($fwVersion == 0 || $fwVersion >= 752);
                      $retPara  =~ s/.$/ /;
-          $retAttr .= $retPara;
-        }
+        $retAttr .= $retPara;
       }
     }
 
@@ -1191,9 +1276,7 @@ sub Fritz_Get_attrList($@) {
       $retAttr .= "enablePowerLine:0,1 ";
     }
 
-  }
-
-  if($avmModel =~ /Repeater|Initial/) {
+  } elsif($avmModel =~ /Repeater/) {
     $retAttr .= "disableBoxReadings:multiple-strict,"
                                 ."box_cpuTemp,"
                                 ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
@@ -1204,15 +1287,13 @@ sub Fritz_Get_attrList($@) {
                                 ."box_upnp,box_upnp_control_activated,box_uptime,"
                                 ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_LogExtended "
 
-  } 
-  if($avmModel =~ /Powerline|Initial/) {
+  } elsif($avmModel =~ /Powerline/) {
 
-  } 
-  if($avmModel =~ /Gateway|Initial/) {
+  } elsif($avmModel =~ /Gateway/) {
     $retAttr .= "disableBoxReadings:multiple-strict,"
                                 ."box_cpuTemp,"
                                 ."box_guestWlan,box_guestWlanCount,box_guestWlanRemain,"
-                                ."box_IPv6  _Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
+                                ."box_IPv6_Extern,box_IPv6_Prefix,box_IPv6_Valid,box_IPv6_Uptime,"
                                 ."box_ip_name,box_ip_IPv4_Extern,box_ip_connection_Type,box_ip_connect,box_ip_last_connect_err,box_ip_last_auth_err,box_ip_mac_Address,box_ip_connection_Trigger,box_ip_uptimeConnect,"
                                 ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
                                 ."box_tr064,box_tr069,"
@@ -1234,13 +1315,22 @@ sub Fritz_Get_attrList($@) {
   } 
 
   if ($fwVersion == 0 || $fwVersion >= 800) {
-     $retAttr .= "enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 ";
+    $retAttr .= "enableCPUInfo:0,-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24 ";
+  }
+
+  if ($hash->{helper}{XML_Simple} == 1 && $hash->{helper}{XML_Hash_XS} == 1) {
+#    $retAttr .= "xmlParser:";
+#    $retAttr .= "XML_Simple," if ($hash->{helper}{XML_Simple});
+#    $retAttr .= "XML_Hash_XS," if ($hash->{helper}{XML_Hash_XS});
+#    chop($retAttr);
+#    $retAttr .= " ";
+    $retAttr .= "xmlParser:XML_Simple,XML_Hash_XS "
   }
 
   $retAttr .= $readingFnAttributes;
 
-  # main::Log3 $name, 3, "Fritz_Get_attrList: $avmModel \n" . $retAttr;
   return $retAttr;
+
 }
 
 ###############################################################################
@@ -1525,6 +1615,7 @@ sub Fritz_Define_Modul($$)
 
    my $name = $args[0];
 
+   # INTERNALS
    $hash->{NAME}    = $name;
    $hash->{VERSION} = $ModulVersion;
 
@@ -1555,18 +1646,31 @@ sub Fritz_Define_Modul($$)
 
    $hash->{fhem}{definedHost} = $hash->{HOST}; # to cope with old attribute definitions
 
-   my $msg;
+   $hash->{helper}{XML_Simple}  = ($missingModul !~ /XML::Simple/);
+   $hash->{helper}{XML_Hash_XS} = ($missingModul !~ /XML::Hash::XS/);
+   $hash->{helper}{XML_Default} = ($hash->{helper}{XML_Hash_XS} ? "XML_Hash_XS" : "XML_Simple");
 
-   # Check if perl modules for remote APIs exists
+   # XML::Simple and XML::Hash::XS are optional, but at least one parser must be available.
+   # Remove missing parser modules from the fatal dependency list; keep all other missing
+   # modules fatal so the module still fails fast on real runtime dependencies.
+
+   $missingModul =~ s/XML::Simple //g;
+   $missingModul =~ s/XML::Hash::XS //g;
+
+   if (!$hash->{helper}{XML_Simple} && !$hash->{helper}{XML_Hash_XS}) {
+     $missingModul .= "'XML::Simple and/or XML::Hash::XS' ";
+   }
+
    if ($missingModul) {
 
-     Fritz_Log $hash, 2, "Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
-     $hash->{HINT_PERL}      = "Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
+     my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
+     Fritz_Log $hash, 2, $missingMsg;
+     $hash->{HINT_PERL}         = $missingMsg;
      $hash->{APICHECKED}        = (-1);
      $hash->{fhem}{sidTime}     = 0;
      $hash->{fhem}{sidErrCount} = (-1);
 
-     main::readingsSingleUpdate( $hash, "state", "Attention - Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.", 1);
+     main::readingsSingleUpdate( $hash, "state", $missingMsg, 1);
 
    } else {
 
@@ -1579,6 +1683,19 @@ sub Fritz_Define_Modul($$)
      $hash->{SID_RENEW_CNT}          = 0;
      $hash->{STATUS}                 = "active";
      $hash->{MODEL}                  = "";
+     $hash->{XML_PARSER}             = main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default});
+
+     # INTERNALS force check_APIs after fhem.cfg is processed
+     $hash->{CKECKAPI_MAX_TMOUT}  = 200;
+     $hash->{CKECKAPI_TMOUT}      = $hash->{CKECKAPI_MAX_TMOUT};
+     $hash->{APICHECKED}          = 0;  # full check
+     $hash->{WEBCONNECT}          = 0;
+     $hash->{LUAQUERY}            = -1;
+     $hash->{LUADATA}             = -1;
+     $hash->{TR064}               = -1;
+     $hash->{UPNP}                = -1;
+     $hash->{IPv6}                = -1;
+     $hash->{WAN_ACCESS_TYPE}     = "WLAN";
 
      $hash->{fhem}{readOutState}     = 0;
      $hash->{fhem}{fwVersion}        = 0;
@@ -1629,18 +1746,6 @@ sub Fritz_Define_Modul($$)
        $hash->{helper}->{IGDcontrol}{$key}{igd}     = $IGD064{$key}{igd};
        $hash->{helper}->{IGDcontrol}{$key}{active}  = -1;
      }
-
-     # Check APIs after fhem.cfg is processed
-     $hash->{CKECKAPI_MAX_TMOUT}  = 200;
-     $hash->{CKECKAPI_TMOUT}      = $hash->{CKECKAPI_MAX_TMOUT};
-     $hash->{APICHECKED}          = 0;  # full check
-     $hash->{WEBCONNECT}          = 0;
-     $hash->{LUAQUERY}            = -1;
-     $hash->{LUADATA}             = -1;
-     $hash->{TR064}               = -1;
-     $hash->{UPNP}                = -1;
-     $hash->{IPv6}                = -1;
-     $hash->{WAN_ACCESS_TYPE}     = "WLAN";
 
      Fritz_Log $hash, 4, "start of Device readout parameters";
      main::RemoveInternalTimer($hash->{helper}{TimerReadout});
@@ -1868,6 +1973,18 @@ sub Fritz_Attr_Modul($@)
      }
    }
 
+   if ($aName eq "xmlParser") {
+     if ($cmd eq "set") {
+       return "unknown parameter. Please use XML_Simple or XML_Hash_XS" if ($aVal !~ /XML_Simple|XML_Hash_XS/);
+     }
+     if ($cmd eq "del") {
+       $hash->{helper}{XML_Default} = ($hash->{helper}{XML_Hash_XS} ? "XML_Hash_XS" : "XML_Simple");
+     }
+
+     $hash->{XML_PARSER} = main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default});
+
+   }
+
 #   if ($aName eq "enableReadingsFilter") {
 #     my @reading_list = qw(box_led box_energyMode box_globalFilter box_vdsl");
 #     if ($cmd eq "set") {
@@ -1892,7 +2009,7 @@ sub Fritz_Attr_Modul($@)
 #   }
 
    if ($aName eq "enableBoxReadings") {
-     my @reading_list = qw(box_led box_energyMode box_globalFilter box_vdsl box_dns box_pwr box_guestWlan box_usb box_user box_notify);
+     my @reading_list = qw(box_led box_energyMode box_globalFilter box_vdsl box_dns box_pwr box_guestWlan box_usb box_user box_notify box_wan);
      my @para_list    = split(",", $aVal);
 
      if ($cmd eq "set" && $init_done) {
@@ -3236,7 +3353,7 @@ sub Fritz_Set_Modul($$@)
          $retMsg = "";
          my $duration = undef;
          my $dectID   = undef;
-         my $ansID    = undef;
+         my $ansID    = "";
 
          if(@val >= 2) {
             ($duration) = $val[1] =~ /^dur:(\d+)$/;
@@ -3267,23 +3384,28 @@ sub Fritz_Set_Modul($$@)
          $duration = "60" if (!defined($duration) || $duration < 1 || $duration > 60);
          $dectID   = ""   if (!defined($dectID));
 
-         if($dectID  >= 1) {
+         if($dectID ne "") {
+           if ($hash->{LUAQUERY} != 1) { 
+             $retMsg = "ERROR: luaQuery not availabe. dectID could not used.";
+             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+           }
+
            if( main::AttrVal($name, "disableDectInfo", "0") eq "1") {
-             $retMsg = "ERROR: Attribut disableDectInfo is set. dectID is not a valid parameter.";
+             $retMsg = "ERROR: Attribut disableDectInfo is set. dectID could not be verified.";
+             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+           }
 
-           } else {
-
-             $ansID = main::ReadingsVal($name, "dect" .$dectID. "_device", undef);
-             $retMsg = "ERROR: Parameter '$dectID' not a valid dect ID." if(!defined($ansID) && $retMsg eq "");
+           $ansID = main::ReadingsVal($name, "dect" .$dectID. "_device", undef);
+           if(!defined($ansID)) {
+             $retMsg = "ERROR: Parameter '$dectID' not a valid dect ID.";
+             return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
            }
          }
-
-         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet) if ($retMsg ne "");
 
          push(@val, 0) if(int @val == 1);
          push(@val, 0) if(int @val == 2);
          $val[1] = $duration;
-         $val[2] = ($hash->{LUAQUERY} == 1 ? $ansID : undef);
+         $val[2] = $ansID;
 
          push @cmdBuffer, "call " . join(" ", @val);
          $retMsg = Fritz_Readout_SetGet_Start $hash->{helper}{TimerCmd};
@@ -4842,9 +4964,17 @@ sub Fritz_Get_Modul($@)
        my $tmp = Fritz_Helper_analyse_Lua_Result($hash, $result);
 
        my $outhash;
-       eval {
-         $outhash = XMLin($tmp, StrictMode => 0, KeyAttr => []);
-       };
+
+       if (main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default}) eq "XML_Simple") {
+         eval {
+           $outhash = XMLin($tmp, StrictMode => 0, KeyAttr => []);
+         };
+       } else {
+         eval {
+           $outhash = xml2hash($tmp);
+         };
+       }
+
        if ($@) {
          return "ERROR: SmartHome - getting XML data: $val[0]";
        }
@@ -4901,8 +5031,8 @@ sub Fritz_Get_Modul($@)
 
        my $mode = "";
 
-       if ($val[0] =~ /json/) {
-         return "Wrong number of arguments, usage: get $name json JS-Name" if int @val != 2;
+       if ($val[0] =~ /json|pretty/) {
+         return "Wrong number of arguments, usage: get $name json or pretty JS-Name" if int @val != 2;
          $mode = shift (@val); # remove 1st element and store it.
        } else {
          return "Wrong number of arguments, usage: get $name JS-Name" if int @val != 1;
@@ -4918,6 +5048,11 @@ sub Fritz_Get_Modul($@)
 
        $returnStr  = "Result of data = " . $val[0] . "\n";
        $returnStr .= "----------------------------------------------------------------------\n";
+
+       if ($mode eq "pretty") {
+         my $printJSON = Fritz_Helper_encode_json($result);
+         return $returnStr . $printJSON;
+       }
 
        my $tmp = Fritz_Helper_analyse_Lua_Result($hash, $result, 1);
 
@@ -5149,15 +5284,15 @@ sub Fritz_Get_Modul($@)
        my ($a, $h) = main::parseParams( join (" ", @val) );
        @val = @$a;
 
-       return "Wrong number of arguments, usage: get $name tr064command service control action [argName1 argValue1] [argName2 argValue2] ..."
-         if int @val <3 || int(@val) %2 !=1;
-
        # if request for igd-Commands the parameter 'content' must be added for new envelope
        my $igd = 0;
        if ($val[0] && $val[0] eq "igd") {
          $igd = 1;
          shift (@val);
        }
+
+       return "Wrong number of arguments, usage: get $name tr064command service control action [argName1 argValue1] [argName2 argValue2] ..."
+         if int @val <3 || int(@val) %2 !=1;
          
        $returnStr  = "Result of TR064 call\n";
        $returnStr .= "----------------------------------------------------------------------\n";
@@ -8053,9 +8188,16 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
            Fritz_Log $hash, 4, "SmartHome - start getting XML data: $SmartHome";
            my $outhash;
 
-           eval {
-             $outhash = XMLin($XMLtmp, StrictMode => 0, KeyAttr => []);
-           };
+           if (main::AttrVal($name, "xmlParser", "XML_Simple") eq $hash->{helper}{XML_Default}) {
+             eval {
+               $outhash = XMLin($XMLtmp, StrictMode => 0, KeyAttr => []);
+             };
+           } else {
+             eval {
+               $outhash = xml2hash($XMLtmp);
+             };
+           }
+
            if ($@) {
              Fritz_Log $hash, 3, "ERROR: SmartHome - getting XML data: $SmartHome";
            }
@@ -9107,6 +9249,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
    my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
 
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
+   my $enBoxReadings = main::AttrVal($name, "enableBoxReadings", "");
 
    my @webCmdArray;
    my $resultData;
@@ -9199,7 +9342,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
 
            my $data = $tr064NewResult->{"X_AVM-DE_WANMobileConnection:1"}->{GetInfoEx};
 
-           if (defined($data->{NewCellList}->{CellList})) {
+           if (defined($data->{NewCellList}->{CellList}) && ref($data->{NewCellList}->{CellList}) eq "ARRAY") {
 
              my $cData = $data->{NewCellList}->{CellList}->{Cell};
 
@@ -9376,17 +9519,43 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
      } # end, getting PhoneBook ID's
 
      #-------------------------------------------------------------------------------------
+     # getting WAN informations
+
+     if ($enBoxReadings =~ /box_wan/) {
+
+       Fritz_Log $hash, 4, "WAN info - start getting TR064 data: $enBoxReadings";
+
+       # WANCommonInterfaceConfig:1 wancommonifconfig1 GetCommonLinkProperties
+       @tr064CmdArray  = (["WANCommonInterfaceConfig:1", "wancommonifconfig1", "GetCommonLinkProperties"]);
+       $tr064NewResult = Fritz_SOAP_Request( $hash, 0, \@tr064CmdArray );
+
+       # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+       return Fritz_Readout_Response($hash, $tr064NewResult->{Error}->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}, $roReadings) if ( defined $tr064NewResult->{Error} || defined $tr064NewResult->{AuthorizationRequired});
+
+       Fritz_Log $hash, 5, "WAN info GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064NewResult, 5);
+
+       if (exists($tr064NewResult->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{Status_line})) {
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_wan_MaxBitRate",          $tr064NewResult->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{'NewLayer1UpstreamMaxBitRate'};
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_wan_LinkStatus",          $tr064NewResult->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{'NewPhysicalLinkStatus'};
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_wan_CurrentMaxSpeedUp",   $tr064NewResult->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{'NewX_AVM-DE_UpstreamCurrentMaxSpeed'};
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_wan_CurrentMaxSpeedDown", $tr064NewResult->{"WANCommonInterfaceConfig:1"}->{GetCommonLinkProperties}->{'NewX_AVM-DE_DownstreamCurrentMaxSpeed'};
+       }
+
+       Fritz_Log $hash, 4, "WAN info - end getting TR064 data: $enBoxReadings";
+
+     } # end getting WAN informations
+
+     #-------------------------------------------------------------------------------------
      # getting DSL down/up stream rate
 
-     my $globalvdsl = main::AttrVal($name, "enableBoxReadings", "");
      
-     if ($globalvdsl =~ /box_vdsl/) {
+     if ($enBoxReadings =~ /box_vdsl/) {
 
-       Fritz_Log $hash, 4, "down/up stream - start getting TR064 data: $globalvdsl";
+       Fritz_Log $hash, 4, "down/up stream - start getting TR064 data: $enBoxReadings";
 
        if (($mesh ne "slave") && ($hash->{fhem}{fwVersion} >= 680) && (lc($avmModel) !~ "5[4,5][9,3]0|40[2,4,6]0|68[2,5]0|6[4,5,6][3,6,9][0,1]|fiber|cable|lte") ) { # FB ohne VDSL
 
-         @tr064CmdArray = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
+         @tr064CmdArray  = (["WANDSLInterfaceConfig:1", "wandslifconfig1", "GetInfo"]);
          $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
          # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
@@ -9402,7 +9571,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
          }
        }
 
-       Fritz_Log $hash, 4, "down/up stream - end getting TR064 data: $globalvdsl";
+       Fritz_Log $hash, 4, "down/up stream - end getting TR064 data: $enBoxReadings";
 
      } # end getting DSL donw/up stream rate
 
@@ -10435,8 +10604,9 @@ sub Fritz_Readout_API_Check($)
    # Check if perl modules for remote APIs exists
    if ($missingModul) {
 
-     Fritz_Log $hash, 3, "Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PERL", "Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
+     my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
+     Fritz_Log $hash, 2, $missingMsg;
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PERL", $missingMsg;
 
      Fritz_Readout_Add_Reading $hash, \@roReadings, ".calledFrom", "checkApis";
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
@@ -13017,7 +13187,7 @@ sub Fritz_Set_call_Phone($)
 
    my $startTime = time();
 
-   if(defined($val[2]) ) {
+   if(defined($val[2]) && $val[2] ne "" ) {
 
      $luaResult = Fritz_call_Lua_Query( $hash, "fon_num/dial_foncalls.lua?xhr=1&useajax=1&dial=$val[0]&orig_port=$val[2]", "", "luaCall", "post");
 
@@ -13048,7 +13218,7 @@ sub Fritz_Set_call_Phone($)
    } else {
 
      #Preparing command array to ring // X_VoIP:1 x_voip X_AVM-DE_DialNumber NewX_AVM-DE_PhoneNumber 01622846962#
-     Fritz_Log $hash, 3, "Call $extNo for $val[1] seconds - " . $hash->{SECPORT};
+     Fritz_Log $hash, 4, "Call $extNo for $val[1] seconds - " . $hash->{SECPORT};
 
      @tr064CallArray = ();
      push @tr064CallArray, ["X_VoIP:1", "x_voip", "X_AVM-DE_DialNumber", "NewX_AVM-DE_PhoneNumber", $extNo . "#"];
@@ -16560,6 +16730,8 @@ sub Fritz_SOAP_Request($$$;@)
    my %params;
    my $encodingStyle;
 
+   my $xmlSimple = main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default}) eq "XML_Simple";
+
    foreach( @{$cmdArray} ) {
      next unless int @{$_} >=3 && int( @{$_} ) % 2 == 1;
      ( $service, $control, $service_command, %params) = @{$_};
@@ -16694,9 +16866,17 @@ sub Fritz_SOAP_Request($$$;@)
            Fritz_Log $hash, 4, "XML_RESPONSE_SUCCESS:\n" . Dumper($decContent);
 
            my $outHash;
-           eval {
-             $outHash = $outHash = XMLin($decContent, StrictMode => 0, KeyAttr => [], SuppressEmpty => undef);
-           };
+
+           if ($xmlSimple) {
+             eval {
+               $outHash = XMLin($decContent, StrictMode => 0, KeyAttr => [], SuppressEmpty => undef);
+             };
+           } else {
+             eval {
+               $outHash = xml2hash($decContent);
+             };
+           }
+
            if ($@) {
              $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:XML-Fault:$@'};
              $retHash{Error}{$service}{$service_command}{response_error} = $respData->status_line;
@@ -19078,6 +19258,7 @@ sub Fritz_Helper_Dumper($$;@) {
    <br>
    Check also the other FRITZ!BOX moduls: <a href="#SYSMON">SYSMON</a> and <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
+   <br>
    <i>The modul uses the Perl moduls<br>
      <ul>
        <dt>MIME::Base64</dt>
@@ -19087,9 +19268,13 @@ sub Fritz_Helper_Dumper($$;@) {
        <dt>LWP::UserAgent</dt>
        <dt>URI::Escape</dt>
        <dt>XML::Simple</dt>
+       <dt>XML::Hash::XS</dt>
        <dt>Data::Dumper</dt>
      </ul>
+     The module supports XML::Hash::XS and XML::Simple for processing XML structures. XML::Simple is a library that has historically been widely used.<br>
+     Unfortunately, problems are increasingly being reported. Therefore, it is recommended to use XML::Hash::XS.<br>
    </i>
+   <br>
    As of Fritz!OS 7.25 —currently applicable only to Fritz!Box devices— a username is strictly required for login.<br>
    During initialization, the module retrieves the default username of the Fritz!Box and initially sets this as the required username.<br>
    All available usernames are provided in the selection list for the 'boxUser' attribute. By setting this attribute, you can then specify the username to be used for Fhem.
@@ -19540,7 +19725,9 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>get &lt;name&gt; javaScript [json] &lt;Command&gt;</code></dt>
          <br>
          Executes commands via the Fritz!BOX RESTful API. <br>
-         Optionally, json can be specified as the first parameter. The result is then returned as JSON for further processing.
+         If json is specified as an optional parameter, a JSON-formatted string is returned for further processing.<br>
+         If pretty is specified as an optional parameter, a prepared, readable JSON format is returned.<br>
+         By default, a simple prepared JSON is returned.<br>
       </li><br>
 
       <li><a name="lanDeviceInfo"></a>
@@ -19973,6 +20160,14 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>attr &lt;name&gt; wlanNeighborsPrefix &lt;prefix&gt;</code></dt>
          <br>
          Defines a new prefix for the reading name of the wlan neighborhood devices that is build from the mac address. Default prefix is nbh_.
+      </li><br>
+
+      <li><a name="xmlParser"></a>
+         <dt><code>attr &lt;name&gt; xmlParser &lt;XML_Simple|XML_Hash_XS&gt;</code></dt>
+         <br>
+         This attribute allows you to select the XML parser to be used.
+         The attribute is available only if the Perl modules XML::Simple and XML::Hash::XS are installed.<br>
+         In this case, XML_Hash_XS is the default parser.
       </li><br>
 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -20419,6 +20614,7 @@ sub Fritz_Helper_Dumper($$;@) {
    <br>
    Bitte auch die anderen FRITZ!BOX-Module beachten: <a href="#SYSMON">SYSMON</a> und <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a>.
    <br>
+   <br>
    <i>Das Modul nutzt folgende Perlmodule:<br>
      <ul>
        <dt>MIME::Base64</dt>
@@ -20428,9 +20624,13 @@ sub Fritz_Helper_Dumper($$;@) {
        <dt>LWP::UserAgent</dt>
        <dt>URI::Escape</dt>
        <dt>XML::Simple</dt>
+       <dt>XML::Hash::XS</dt>
        <dt>Data::Dumper</dt>
      </ul>
+     Das Modul unterstützt zur Verarbeitung von XML Strukturen XML::Hash::XS und XML::Simple. XML::Simple ist historisch eine häufig verwendete Library.<br>
+     Leider werden zunehmend Probleme berichtet. Somit wird empfohlen XML::Hash::XS zu verwenden.<br>
    </i>
+   <br>
    Ab Fritz!OS 7.25 wird, bisher nur für Fritz!Boxen, zwingend einen Benutzername für das Login verlangt.<br>
    Das Modul ermittel bei der Initialisierung den standard Benutzernamen der Fritz!Box und definiert diesen zunächst als notwendigen Bentuzernamen.<br>
    Alle Benutzernamen werden in der Auswahlliste für das Attribut 'boxUser' bereitgestellt. Über das setzen des Attributs kann dann der für Fhem gewünschte Benutzername gesetzt werden.
@@ -20875,10 +21075,12 @@ sub Fritz_Helper_Dumper($$;@) {
       </li><br>
 
       <li><a name="javaScript"></a>
-         <dt><code>get &lt;name&gt; javaScript [json] &lt;Command&gt;</code></dt>
+         <dt><code>get &lt;name&gt; javaScript [json|pretty] &lt;Command&gt;</code></dt>
          <br>
          Führt Komandos über die RESTfull API der Fritz!BOX aus. <br>
-         Optional kann als erster Parameter json angegeben werden. Es wir dann für weitere Verarbeitungen das Ergebnis als JSON zurück gegeben.
+         Wird als optionaler Parameter json angegeben, so wird eine JSON formtierte Zeichenkette für weitere Verarbeitungen zurück gegeben.<br>
+         Wird als optionaler Parameter pretty angegeben, so wird ein aufbereitetes lesbares JSON Format zurückgegeben.<br>
+         Standardmäßig wird ein einfaches aufbereitetes JSON zurückgegeben.<br>
       </li><br>
 
       <li><a name="lanDeviceInfo"></a>
@@ -21316,8 +21518,16 @@ sub Fritz_Helper_Dumper($$;@) {
 
       <li><a name="wlanNeighborsPrefix"></a>
          <dt><code>attr &lt;name&gt; wlanNeighborsPrefix &lt;prefix&gt;</code></dt>
-         <br>
          Definiert einen Präfix für den Reading Namen der WLAN Nachbarschaftsgeräte, der aus der MAC Adresse gebildet wird. Der default Präfix ist nbh_.
+         <br>
+      </li><br>
+
+      <li><a name="xmlParser"></a>
+         <dt><code>attr &lt;name&gt; xmlParser &lt;XML_Simple|XML_Hash_XS&gt;</code></dt>
+         <br>
+         Durch das Attribut kann der verwendete XML Parser gewählt werden.
+         Das Attribut ist nur vorhanden wenn XML::Simple und XML::Hash::XS als Perl Module installiert sind.<br>
+         In diesem Fall ist XML_Hash_XS der Default Parser.
       </li><br>
 
       <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
@@ -21753,6 +21963,80 @@ sub Fritz_Helper_Dumper($$;@) {
 </div>
 
 =end html_DE
+
+=for :application/json;q=META.json 72_FritzSmart.pm
+{
+  "abstract": "Displays/controls some features of Fritz FRITZ!BOX, FRITZ!Repeater and Fritz!Fon",
+  "x_lang": {
+    "de": {
+      "abstract": "Anzeige/Steuerung von einige Funktionen von Fritz FRITZ!BOX, Fritz!Repeater und Fritz!Fon"
+    }
+  },
+  "keywords": [
+    "Fritz",
+    "Smart",
+    "Router",
+    "Repeater",
+    "Phone",
+    "Dect",
+    "Consumer"
+  ],
+  "version": "260629",
+  "release_status": "stable",
+  "author": [
+    "Jörg Wiemann <jowiemann@debitel.net>"
+  ],
+  "x_fhem_maintainer": [
+    "jowiemann"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 5.00918799,
+        "perl": 5.014,
+        "FHEM::Meta": 0,
+        "GPUtils": 0,
+        "Exporter": 0,
+        "Time::HiRes": 0,
+        "POSIX": 0,
+        "Encode": 0,
+        "Blocking": 0,
+        "HttpUtils": 0,
+        "MIME::Base64": 0,
+        "JSON": 0,
+        "LWP::UserAgent": 0,
+        "URI::Escape": 0,
+        "XML::Simple": 0,
+        "Data::Dumper": 0,
+        "feature 'state'": 0,
+        "FritzBoxUtils": 0
+      },
+      "recommends": {
+        "IO::Socket": 0,
+        "Net::Ping": 0
+      },
+      "suggests": {
+        "XML::Hash::XS": 0
+      }
+    }
+  },
+  "resources": {
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/FRITZBOX",
+      "title": "FritzBox"
+    },
+    "repository": {
+      "x_dev": {
+        "type": "svn",
+        "web": "https://svn.fhem.de/trac/browser/trunk/fhem/72_FritzSmart.pm",
+        "x_branch": "dev",
+        "x_filepath": "fhem/",
+        "x_raw": "https://svn.fhem.de/fhem/trunk/fhem/72_FritzSmart.pm"
+      }
+    }
+  }
+}
+=end :application/json;q=META.json
 
 =cut--
 
