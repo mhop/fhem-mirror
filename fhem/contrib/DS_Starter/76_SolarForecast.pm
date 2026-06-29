@@ -168,7 +168,8 @@ my %vNotesIntern = (
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
                            "Erweiterung _aiFannBevConsumerAggregate um energy_remaining, charge_intensity ".
                            "Auto-Konfiguration: aiConHiddenLayers, aiConLearnRate, aiConSteepness, aiConShufflePeriod - falls nicht gesetzt ".
-                           "Trainingsdefaults angepasst, _aiFannEpochDiagnostic: Anpassung (very) early Konvergenzgrenzen ",
+                           "Trainingsdefaults angepasst, _aiFannEpochDiagnostic: Anpassung (very) early Konvergenzgrenzen ".
+                           "Getter aiNeuralNetConState in aiConTrainState umbenannt",
   "2.7.0"  => "20.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
                            "verbesserter Snap-Guard und Retrainidicator, Hint-Korrektur, Div0-Fix ".
                            "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ".
@@ -921,16 +922,16 @@ my %epoche_translations = (
                DE => "Netz gibt konstanten Ausgabewert aus und hat nichts gelernt (Slope≈0, Validierungsfehler kleiner als Trainingsfehler): Trainingsalgorithmus auf RPROP wechseln (aiControl->aiConTrainAlgo=RPROP) - RPROP ist gegen dieses Initialisierungsproblem immun. Alternativ Lernrate um Faktor 5-10 erhöhen oder Training zu anderem Zeitpunkt neu starten" },  
   deadlow => { EN => "Network is not learning (Slope≈0) and learning rate is already very low (%.5f): increase learning rate by factor 10-50 (e.g. to 0.001-0.01), or switch training algorithm to RPROP (aiControl->aiConTrainAlgo=RPROP) - RPROP is more robust against initialization issues and does not require manual learning rate tuning.",
                DE => "Netz lernt nichts (Slope≈0) und Lernrate ist bereits sehr niedrig (%.5f): Lernrate um Faktor 10-50 erhöhen (z.B. auf 0.001-0.01), alternativ Trainingsalgorithmus auf RPROP wechseln (aiControl->aiConTrainAlgo=RPROP) - RPROP ist gegen Initialisierungsprobleme robuster und benötigt keine manuelle Lernraten-Anpassung." },  
-  afsym   => { EN => "SIGMOID maps all inputs to 0..1 only. A slope below 0.75 or weak R² despite healthy training may indicate insufficient gradient dynamics, especially with delta-features or high load dynamics (heat pump/EV). Try: aiConActFunc SIGMOID_SYMMETRIC. ",
-               DE => "Die Aktivierungsfunktion SIGMOID bildet alle Inputs auf 0..1 ab. Slope < 0.75 oder schwaches R² bei gesundem Training kann auf unzureichende Gradientendynamik hinweisen, besonders wenn Delta-Features oder hohe Lastdynamik (WP/EV) vorliegen. Versuch: aiConActFunc SIGMOID_SYMMETRIC." },
-  afasym  => { EN => "SIGMOID_SYMMETRIC is active but the network shows dead learning behavior (Slope≈0). For predominantly non-negative features without EV/heat pump, SIGMOID may converge more reliably. Try: aiConActFunc SIGMOID. ",
-               DE => "SIGMOID_SYMMETRIC ist aktiv, aber das Netz zeigt totes Lernverhalten (Slope≈0). Bei überwiegend nicht-negativen Features ohne EV/WP kann SIGMOID stabiler konvergieren. Versuch: aiConActFunc SIGMOID. " },
-  afelliot=> { EN => "SIGMOID_SYMMETRIC is active but Slope is still flat (Slope=%.2f). ELLIOT_SYMMETRIC has a less saturating activation curve and may better capture load peaks (heat pump / EV). Try: aiConActFunc ELLIOT_SYMMETRIC. Keep all other parameters unchanged for a clean comparison.",
-               DE => "SIGMOID_SYMMETRIC ist aktiv, aber die Slope ist weiterhin flach (Slope=%.2f). ELLIOT_SYMMETRIC hat eine weniger sättigende Aktivierungskurve und kann Lastspitzen (WP/EV) besser abbilden. Versuch: aiConActFunc ELLIOT_SYMMETRIC. Alle anderen Parameter unverändert lassen für einen sauberen Vergleich." },
+  afsym   => { EN => "SIGMOID maps all inputs to 0..1 only. A slope below 0.75 or weak R² despite healthy training may indicate insufficient gradient dynamics, especially with delta-features or high load dynamics (heat pump/EV). aiControl->aiConActFunc=SIGMOID_SYMMETRIC might be better -> give it a try. ",
+               DE => "Die Aktivierungsfunktion SIGMOID bildet alle Inputs auf 0..1 ab. Slope < 0.75 oder schwaches R² bei gesundem Training kann auf unzureichende Gradientendynamik hinweisen, besonders wenn Delta-Features oder hohe Lastdynamik (WP/EV) vorliegen. Möglicherweise ist aiControl->aiConActFunc=SIGMOID_SYMMETRIC vorteilhafter -> ausprobieren." },
+  afasym  => { EN => "SIGMOID_SYMMETRIC is active but the network shows dead learning behavior (Slope≈0). For predominantly non-negative features without EV/heat pump, SIGMOID may converge more reliably. Try: aiControl->aiConActFunc=SIGMOID. ",
+               DE => "SIGMOID_SYMMETRIC ist aktiv, aber das Netz zeigt totes Lernverhalten (Slope≈0). Bei überwiegend nicht-negativen Features ohne EV/WP kann SIGMOID stabiler konvergieren. Versuch: aiControl->aiConActFunc=SIGMOID. " },
+  afelliot=> { EN => "SIGMOID_SYMMETRIC is active but Slope is still flat (Slope=%.2f). ELLIOT_SYMMETRIC has a less saturating activation curve and may better capture load peaks (heat pump / EV). Try: aiConActFunc=ELLIOT_SYMMETRIC. Keep all other parameters unchanged for a clean comparison.",
+               DE => "SIGMOID_SYMMETRIC ist aktiv, aber die Slope ist weiterhin flach (Slope=%.2f). ELLIOT_SYMMETRIC hat eine weniger sättigende Aktivierungskurve und kann Lastspitzen (WP/EV) besser abbilden. Versuch: aiConActFunc=ELLIOT_SYMMETRIC. Alle anderen Parameter unverändert lassen für einen sauberen Vergleich." },
   hint1   => { EN => "Learning rate too high: Reduce the learning rate (aiControl->aiConLearnRate) by a factor of 5–10 (e.g., from 0.01 to 0.001–0.002)",
                DE => "Lernrate zu hoch: Lernrate (aiControl->aiConLearnRate) um Faktor 5-10 reduzieren (z.B. von 0.01 auf 0.001-0.002)" },                           
-  hint2   => { EN => "Check architecture: Network may be too small for the amount of data; increase the number of neurons (aiControl->aiConHiddenLayers) in the hidden layers (e.g., 50-25 → 64-32)",
-               DE => "Architektur prüfen: Netz möglicherweise zu klein für die Datenmenge, Hidden-Layer-Neuronen (aiControl->aiConHiddenLayers) erhöhen (z.B. 50-25 -> 64-32)" }, 
+  hint2   => { EN => "Check architecture: Network may be too small for the amount of data; increase the number of neurons (aiControl->aiConHiddenLayers) in the hidden layers.",
+               DE => "Architektur prüfen: Netz möglicherweise zu klein für die Datenmenge, Hidden-Layer-Neuronen (aiControl->aiConHiddenLayers) erhöhen." }, 
   hint3   => { EN => "Restart the training at a different time: the random weight initialization at the start had a significant impact on the results here; restarting the training automatically generates a different initialization and usually leads to significantly better results",
                DE => "Training zu einem anderen Zeitpunkt erneut starten: die zufällige Gewichtsinitialisierung beim Start hat das Ergebnis hier stark dominiert, ein neuer Trainingsstart erzeugt automatisch eine andere Initialisierung und führt meist zu einem deutlich besseren Ergebnis" },
   hint4   => { EN => "Check momentum: if the current value is above 0.7, reduce by 0.1–0.2 (e.g. 0.8 → 0.6) – high momentum can cause the network to overshoot the optimal minimum and contribute to early convergence (aiControl->aiConMomentum)",
@@ -1166,6 +1167,8 @@ my %hqtxt = (                                                                   
               DE => qq{Einstellhinweise}                                                                                    },  
   rcdfor => { EN => qq{Recommendation for},
               DE => qq{Empfehlung für}                                                                                      },
+  ratovw => { EN => qq{Rating Overview},
+              DE => qq{Bewertungsüberblick}                                                                                 },
   utiopc => { EN => qq{Utilization of production capacity},
               DE => qq{Epochenausnutzung}                                                                                   },  
   lstrcl => { EN => qq{last recalibration},
@@ -1175,7 +1178,9 @@ my %hqtxt = (                                                                   
   drftid => { EN => qq{Drift Indicators},
               DE => qq{Drift-Kennzahlen}                                                                                    },  
   drfrat => { EN => qq{Drift Rating},
-              DE => qq{Drift Bewertung}                                                                                     },  
+              DE => qq{Drift Bewertung}                                                                                     },
+  exeval => { EN => qq{external Evaluation},
+              DE => qq{externe Bewertung}                                                                                   },              
   fcerma => { EN => qq{Forecast Error Measures},
               DE => qq{Fehlermaße der Prognosen}                                                                            },  
   aifane => { EN => qq{the AI::FANN object loaded from file is empty},
@@ -2665,6 +2670,8 @@ sub Set {
   my $prop2 = shift @a;
 
   return if((controller($name))[1]);
+  
+  my $cl = $hash->{CL};
 
   my ($setlist,@cfs,@condevs,@bkps);
   my ($fcd,$ind,$med,$cf,$sp,$coms) = ('','','','','','');
@@ -2774,6 +2781,7 @@ sub Set {
       type    => $type,
       opt     => $opt,
       arg     => $arg,
+      cl      => $cl,
       argsref => \@args,
       prop    => $prop,
       prop1   => $prop1,
@@ -3145,12 +3153,6 @@ sub _setplantConfiguration {             ## no critic "not used"
       my $out = checkPlantConfig ($hash);
       $out    = qq{<html>$out</html>};
 
-      ## asynchrone Ausgabe
-      #######################
-      #$err          = getClHash($hash);
-      #$paref->{out} = $out;
-      #InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::__plantCfgAsynchOut", $paref, 0);
-
       return $out;
   }
 
@@ -3184,22 +3186,6 @@ sub _setplantConfiguration {             ## no critic "not used"
           return $err;
       }
   }
-
-return;
-}
-
-################################################################
-#   asynchrone Ausgabe Ergbnis Plantconfig Check
-################################################################
-sub __plantCfgAsynchOut {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $out   = $paref->{out};
-
-  my $hash  = $defs{$name};
-
-  asyncOutput($hash->{HELPER}{CL}{1}, $out);
-  delClHash  ($name);
 
 return;
 }
@@ -3769,6 +3755,8 @@ sub Get {
   my $name  = shift @a;
   my $opt   = shift @a;
   my $arg   = join " ", map { my $p = $_; $p =~ s/\s+/ /xg; $p; } @a;     ## no critic 'Map blocks'
+  
+  my $cl = $hash->{CL};
 
   my $type = $hash->{TYPE};
 
@@ -3819,7 +3807,7 @@ sub Get {
 
   ## KI spezifische Getter
   ##########################
-  my $vdtopt = 'aiRawData,aiNeuralNetConState';
+  my $vdtopt = 'aiRawData,aiConAssessGemini,aiConTrainState';
 
   if (isPrepared4AI ($hash)) {
        $vdtopt .= ',';
@@ -3846,6 +3834,7 @@ sub Get {
       opt   => $opt,
       arg   => $arg,
       t     => $t,
+      cl    => $cl,
       chour => $dt->{hour},                                                 # aktuelle Stunde in 24h format (00-23)
       date  => $dt->{date},
       day   => $dt->{day},                                                  # aktueller Tag (range 01 .. 31)
@@ -6321,12 +6310,6 @@ sub _getoutputMessages {             ## no critic "not used"
 
   $data{$name}{messages}{999999}{RD} = 1;                   # Lesekennzeichen setzen
 
-  ## asynchrone Ausgabe
-  #######################
-  #$err          = getClHash($hash);
-  #$paref->{out} = $out;
-  #InternalTimer(gettimeofday()+3, "FHEM::SolarForecast::__plantCfgAsynchOut", $paref, 0);
-
 return $out;
 }
 
@@ -6903,7 +6886,7 @@ sub _getaiDecTree {                   ## no critic "not used"
       $ret .= lineFromSpaces ($ret, 5);
   }
   
-  if ($args[0] =~ /aiNeuralNetConState/xs) {
+  if ($args[0] =~ /aiConTrainState/xs) {
       $paref->{fanntyp} = 'con';                                                # FANN Verwendungsart 'consumption' Prognose  
       $ret = __getaiFannState ($paref);
       delete $paref->{fanntyp};
@@ -6911,6 +6894,18 @@ sub _getaiDecTree {                   ## no critic "not used"
       $ret .= lineFromSpaces ($ret, 0);
       
       if ($arg =~ /imgget/xs) {                                                 # Ausgabe aus dem Grafikheader aiConIcon
+          $ret =~ s/\n/<br>/g;
+      }
+  }
+  
+  if ($args[0] =~ /aiConAssessGemini/xs) {                                      # Bewertung durch Gemini abfragen
+      $paref->{fanntyp} = 'con';                                                 
+      $ret = _aiFannGeminiApiAssess ($paref);
+      delete $paref->{fanntyp};
+      
+      $ret .= lineFromSpaces ($ret, 0);
+      
+      if ($arg =~ /imgget/xs) {                                                 # Ausgabe aus dem Grafikheader
           $ret =~ s/\n/<br>/g;
       }
   }
@@ -7019,22 +7014,22 @@ sub __getaiFannState {            ## no critic "not used"
   my $dsnum    = AiNeuralVal ($name, $fanntyp, 'NumDatasets',    '-'); 
   my $trdnum   = AiNeuralVal ($name, $fanntyp, 'NumTraindata',   '-');
   my $tednum   = AiNeuralVal ($name, $fanntyp, 'NumTestdata',    '-'); 
-  my $inpnum   = AiNeuralVal ($name, $fanntyp, 'NumInputs',      '-');
-  my $hidlay   = AiNeuralVal ($name, $fanntyp, 'HiddenLayers',   '-');
+  my $inpnum   = AiNeuralVal ($name, $fanntyp, 'NumInputs',      '-');                      # Anzahl der Features
+  my $hidlay   = AiNeuralVal ($name, $fanntyp, 'HiddenLayers',   '-');                      # Architektur
   my $dpr      = AiNeuralVal ($name, $fanntyp, 'dataParamRatio', '-');
   my $hidste   = AiNeuralVal ($name, $fanntyp, 'HiddSteepness',  '-');
   my $outnum   = AiNeuralVal ($name, $fanntyp, 'NumOutputs',     '-');
-  my $bstmod   = AiNeuralVal ($name, $fanntyp, 'TrainEpoches',   '-');
+  my $tepoch   = AiNeuralVal ($name, $fanntyp, 'TrainEpoches',   '-');
   my $tramse   = AiNeuralVal ($name, $fanntyp, 'TrainMse',       '-');
   my $valmse   = AiNeuralVal ($name, $fanntyp, 'ValidationMse',  '-');
   my $bitfai   = AiNeuralVal ($name, $fanntyp, 'BitFail',        '-');
-  my $conmae   = AiNeuralVal ($name, $fanntyp, 'Mae',            '-');
+  my $conmae   = AiNeuralVal ($name, $fanntyp, 'Mae',            '-');                      # MAE (Durchschnitt) Originalskala
   my $comdae   = AiNeuralVal ($name, $fanntyp, 'Medae',          '-');
   my $cormse   = AiNeuralVal ($name, $fanntyp, 'Rmse',           '-');
   my $rmse_rel = AiNeuralVal ($name, $fanntyp, 'RmseRel',        '-');  
   my $comape   = AiNeuralVal ($name, $fanntyp, 'Mape',           '-');
   my $codape   = AiNeuralVal ($name, $fanntyp, 'Mdape',          '-');
-  my $conr2    = AiNeuralVal ($name, $fanntyp, 'R2',             '-');
+  my $conr2    = AiNeuralVal ($name, $fanntyp, 'R2',             '-');                      # Bestimmtheitsmaß R²
   my $conhaf   = AiNeuralVal ($name, $fanntyp, 'HiddActFunc',    '-');
   my $conoaf   = AiNeuralVal ($name, $fanntyp, 'OutActFunc',     '-');
   my $retran   = AiNeuralVal ($name, $fanntyp, 'RetrainQuality', '-');
@@ -7194,7 +7189,14 @@ sub __getaiFannState {            ## no critic "not used"
   $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
   $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
                        ":</b> $retrampel $recomd_translated $show_retreason \n";
-  my $rating         = ___aiFannSection (encode('utf8', 'Bewertungsüberblick'), $rating_content, 1);      
+  
+  my $linkGemini     = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConAssessGemini', function(data){FW_okDialog(data)})"};
+  my $askGemini      = qq{<a style="cursor:pointer" onClick=$linkGemini>Google Gemini</a>};
+  
+  $rating_content   .= "\n";
+  $rating_content   .= "<b>".$hqtxt{exeval}{$lang}.":</b> $askGemini \n";
+  
+  my $rating         = ___aiFannSection (encode('utf8', $hqtxt{ratovw}{$lang}), $rating_content, 1);       
 
   # Modellparameter
   ###################  
@@ -7210,7 +7212,7 @@ sub __getaiFannState {            ## no critic "not used"
 
   # Trainingsmetriken
   #####################
-  my $keyfig_content = "<b>".$hqtxt{bmoaep}{$lang}.":</b> $bstmod (max. 15000)\n";                                                                              # bestes Modell bei Epoche
+  my $keyfig_content = "<b>".$hqtxt{bmoaep}{$lang}.":</b> $tepoch (max. 15000)\n";                                                                              # bestes Modell bei Epoche
   $keyfig_content   .= "<b>Training MSE:</b> $tramse\n";
   $keyfig_content   .= "<b>Validation MSE:</b> $valmse\n";
   $keyfig_content   .= "<b>Validation MSE Average:</b> $valavg\n";
@@ -7618,6 +7620,228 @@ sub ___aiFannExplainKeyFigures {
   }
   
 return $note;
+}
+
+###############################################################
+#  Test Gemini-Abfrage
+###############################################################
+sub _aiFannGeminiApiAssess {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $fanntyp = $paref->{fanntyp};
+  my $debug   = $paref->{debug};
+  my $lang    = $paref->{lang};
+  my $cl      = $paref->{cl};
+  
+  my ($prepared, $rdy, $cause);
+  
+  if ($fanntyp eq 'con') {
+      ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+  }
+       
+  if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
+      return "The AI for forecasting $fanntyp is not yet operational. \n<b>Cause:</b> $cause";
+  }
+  
+  my $hash   = $defs{$name};
+  my $apiKey = CurrentVal ($name, 'geminiAPIkey');
+  
+  unless ($apiKey) {
+      my $ret = $lang eq 'DE' 
+              ? "Der benötigte geminiAPIkey ist nicht gesetzt. <br>"
+                ."Kostenlosen Key unter aistudio.google.com->'Get API key' generieren und im Attribut aiControl->geminiAPIkey hinterlegen."
+              : "The required geminiAPIkey is not set. <br>"
+                ."Generate a free key at aistudio.google.com -> “Get API key” and enter it in the aiControl->geminiAPIkey attribute.";
+      
+      
+      return encode ('utf8', $ret); 
+  }
+
+  my $model = 'gemini-2.5-flash-lite';                                                          # alternativ: gemini-2.0-flash (aber älter und qualitativ schlechter), gemini-2.5-flash-lite, gemini-2.5-flash
+  #my $model = 'gemini-2.5-flash';
+  
+  # --- Metriken sammeln ---
+  my $profile  = AiNeuralVal ($name, $fanntyp, 'RegVersion',     'n/a');                        # verwendete Feature-Registry Version
+  my $arch     = AiNeuralVal ($name, $fanntyp, 'HiddenLayers',   'n/a');                        # Architektur
+  my $r2       = AiNeuralVal ($name, $fanntyp, 'R2',             'n/a');                        # Bestimmtheitsmaß R²
+  my $mae      = AiNeuralVal ($name, $fanntyp, 'Mae',            'n/a');                        # MAE (Durchschnitt) Originalskala
+  my $slope    = AiNeuralVal ($name, $fanntyp, 'ModelSlope',     'n/a');
+  my $bias     = AiNeuralVal ($name, $fanntyp, 'ModelBias',      'n/a');
+  my $driftIdx = AiNeuralVal ($name, $fanntyp, 'DriftIndex',     'n/a');
+  my $driftScr = AiNeuralVal ($name, $fanntyp, 'DriftScore',     'n/a'); 
+  my $numRec   = AiNeuralVal ($name, $fanntyp, 'NumTraindata',   'n/a');
+  my $numFeat  = AiNeuralVal ($name, $fanntyp, 'NumInputs',      'n/a');                        # Anzahl der Features
+  my $epochs   = AiNeuralVal ($name, $fanntyp, 'TrainEpoches',   'n/a');
+  my $version  = $hash->{HELPER}{VERSION} // 'n/a';
+    
+      
+  my $sysPrompt = $lang eq 'DE'
+    ? qq{Ich erstelle stündliche Verbrauchsprognosen für einen Haushalt }
+    . qq{mit dem FHEM SolarForecast Modul (FANN-basiertes neuronales Netz) Version $version. }
+    . qq{Ob eine PV-Anlage installiert ist, siehst du am Flag pv im Haushaltsprofil. }
+    . qq{Wichtige Domänen-Kontextinformation für deine Bewertung: }
+    . qq{Stochastische Haushalte (ohne Wärmepumpe/BEV) erreichen typischerweise R²=0.25-0.35 – }
+    . qq{das ist kein Modellfehler, sondern physikalisch bedingt durch unvorhersehbares Nutzerverhalten. }
+    . qq{Ein ModelSlope von 0.35-0.45 und ein ModelBias von 400-500 Wh sind bei diesen Haushalten }
+    . qq{strukturell erwartet (Bias ≈ mean_consumption × (1 - Slope)) und kein Kalibrierfehler. }
+    . qq{Haushalte mit Wärmepumpe oder BEV können R²=0.5-0.7 erreichen. }
+    . qq{Ein DriftIndex unter 0.7 gilt als stabil, über 1.0 als kritisch. }
+    . qq{Beurteile die Metriken ausschließlich vor diesem Domänen-Hintergrund, }
+    . qq{nicht nach generischen ML-Benchmarks. }
+    . qq{Gib auch bei einem guten Modell konkrete Hinweise, welche Hyperparameter }
+    . qq{(z.B. aiConLearnRate, aiConMomentum, Architektur/HiddenLayers) }
+    . qq{experimentell angepasst werden könnten um die Prognosequalität weiter zu verbessern, }
+    . qq{und in welche Richtung (erhöhen/reduzieren). }
+    . qq{Gliedere die Antwort in: Gesamtbewertung, Auffälligkeiten, Empfehlung. }
+    . qq{Maximal 350 Wörter.}
+
+    : qq{I am forecasting hourly household energy consumption }
+    . qq{using the FHEM SolarForecast module (FANN-based neural network) version $version. }
+    . qq{You can see whether a PV system is installed by checking the ‘pv’ flag in the household profile. }
+    . qq{Important domain context for your assessment: }
+    . qq{Stochastic households (no heat pump/EV) typically achieve R²=0.25-0.35 – }
+    . qq{this is not a model failure but physically expected due to unpredictable user behavior. }
+    . qq{A ModelSlope of 0.35-0.45 and ModelBias of 400-500 Wh are structurally expected }
+    . qq{for these households (Bias ≈ mean_consumption × (1 - Slope)), not a calibration error. }
+    . qq{Households with heat pumps or EVs can reach R²=0.5-0.7. }
+    . qq{A DriftIndex below 0.7 is considered stable, above 1.0 critical. }
+    . qq{Assess the metrics strictly within this domain context, }
+    . qq{not against generic ML benchmarks. }
+    . qq{Even for a well-performing model, provide concrete suggestions on which hyperparameters }
+    . qq{(e.g. aiConLearnRate, aiConMomentum, architecture/HiddenLayers) }
+    . qq{could be experimentally adjusted to further improve forecast quality, }
+    . qq{and in which direction (increase/decrease). }
+    . qq{Structure: Overall assessment, Notable points, Recommendation. }
+    . qq{Max 350 words.};
+    
+    
+  my $profileCtx = $lang eq 'DE'
+    ? ( $profile =~ /hp.*bev|bev.*hp/i ? 'Haushalt mit Wärmepumpe und E-Auto'
+      : $profile =~ /heatpump/i        ? 'Haushalt mit Wärmepumpe'
+      : $profile =~ /bev/i             ? 'Haushalt mit E-Auto'
+      :                                  'stochastischer Standardhaushalt' )
+    : ( $profile =~ /hp.*bev|bev.*hp/i ? 'Household with heat pump and EV'
+      : $profile =~ /heatpump/i        ? 'Household with heat pump'
+      : $profile =~ /bev/i             ? 'Household with EV'
+      :                                  'stochastic standard household' );
+   
+  my $userMsg = $lang eq 'DE' ? <<"END_DE" : <<"END_EN";
+Bitte beurteile folgende Trainingsmetriken meines SolarForecast-Modells:
+
+Haushaltstyp:     $profileCtx (Profil: $profile)
+Architektur:      $arch
+Datenbasis:       $numRec Datensätze, $numFeat Features, $epochs Epochen
+
+Qualitätsmetriken:
+  R²:             $r2
+  MAE:            $mae Wh
+  Slope:          $slope
+  Bias:           $bias Wh
+
+Drift-Analyse:
+  DriftIndex:     $driftIdx
+  DriftScore:     $driftScr
+END_DE
+
+Please evaluate the following training metrics for my SolarForecast model:
+
+Household type:   $profileCtx (Profile: $profile)
+Architecture:     $arch
+Data set:         $numRec records, $numFeat features, $epochs epochs
+
+Quality metrics:
+  R²:             $r2
+  MAE:            $mae Wh
+  Slope:          $slope
+  Bias:           $bias Wh
+
+Drift Analysis:
+  DriftIndex:     $driftIdx
+  DriftScore:     $driftScr
+END_EN
+
+  my $body = encode_json ( { contents          => [{ role  => 'user', parts => [{ text => $userMsg }], }],
+                             systemInstruction => { parts => [{ text => $sysPrompt }], },
+                             generationConfig  => { maxOutputTokens => 2048, temperature => 0.3, thinkingConfig  => { thinkingBudget => 512, }, },      # Thinking-Budget begrenzen, reicht für diese Aufgabe völlig
+                         } );
+  
+  my $param = {
+      url      => "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey",
+      timeout  => APITIMEOUT,
+      name     => $name,
+      cl       => $cl,                                                  # der aufrufende Browser-Tab
+      debug    => $debug,
+      lang     => $lang,
+      header   => 'Content-Type: application/json',
+      method   => 'POST',
+      data     => $body,
+      callback => \&__aiFannApiAssessCb,
+  };
+
+  if ($debug =~ /apiCall/x) {
+      $param->{loglevel} = 1;
+  }
+
+  HttpUtils_NonblockingGet ($param);
+  
+  my $msg = $lang eq 'DE'
+          ? 'Anfrage läuft, die Antwort benötigt einige Sekunden ...'
+          : 'The request is in progress; the response will take a few seconds...';
+  
+
+return encode ('utf8', $msg);
+}
+
+###############################################################
+#  Gemini-Response
+###############################################################
+sub __aiFannApiAssessCb {
+  my ($paref, $err, $myjson) = @_;
+  
+  my $name  = $paref->{name};                                                                                    
+  my $lang  = $paref->{lang};
+  my $debug = $paref->{debug};
+  my $cl    = $paref->{cl};                                                     # der ursprüngliche Tab
+
+  if ($err) {
+      asyncOutput ($cl, "Error: $err");
+      return;
+  }
+  
+  my $decoded = eval { decode_json ($myjson) };
+  
+  if ($@ || !$decoded) {
+      asyncOutput ($cl, "JSON-Error: $@");
+      return;
+  }
+
+  if ($decoded->{error}) {                                                     # Gemini-spezifische Fehlerantwort abfangen
+      my $msg = $decoded->{error}{message} // 'unknown API-Fehler';
+      my $code = $decoded->{error}{code}   // '';
+
+      asyncOutput ($cl, "API-Error $code: $msg");
+      return;
+  }
+
+  my $text = eval { $decoded->{candidates}[0]{content}{parts}[0]{text} };
+  
+  $text  //= $lang eq 'DE' 
+           ? 'Keine verwertbare Antwort erhalten.' 
+           : 'Did not receive a useful response.';
+           
+  # Markdown → HTML
+  $text =~ s/\*\*(.+?)\*\*/<b>$1<\/b>/g;                # **fett** → <b>fett</b>
+  $text =~ s/\*(.+?)\*/<i>$1<\/i>/g;                    # *kursiv* → <i>kursiv</i>
+  $text =~ s/^#{1,3}\s+(.+)$/<b>$1<\/b>/mg;             # ### Überschrift → <b>Überschrift</b>
+  $text =~ s/^\*\s+/<br>• /mg;                          # * Listenpunkt → • 
+  $text =~ s/^\d+\.\s+/<br>/mg;                         # 1. Listenpunkt → Zeilenumbruch
+  $text =~ s/\n/<br>/g;                                 # Zeilenumbrüche → <br>
+
+  $text = encode ('utf8', $text);
+  
+  asyncOutput ($cl, "<html>$text</html>");
+  
+return;
 }
 
 ###############################################################
@@ -8439,7 +8663,8 @@ sub _attraiControl {                     ## no critic "not used"
       aiConAlpha         => { comp => '(0(?:\.\d+)?|1)',                                           act => 0 },
       aiConProfile       => { comp => '[a-z0-9,]+',                                                act => 1 },
       aiConAbsOversample => { comp => '0\.(?:[0-4]\d|50?)',                                        act => 0 },
-      aiConTrainLimit    => { comp => '\d+',                                                       act => 1 },  
+      aiConTrainLimit    => { comp => '\d+',                                                       act => 1 }, 
+      geminiAPIkey       => { comp => '.*',                                                        act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -8501,7 +8726,7 @@ sub _attraiControl {                     ## no critic "not used"
           $data{$name}{current}{$key} = $h->{$key};
       }
   }
-  else {                                                                                    # Current Keys mit Attribut löschen
+  else {                                                                                        # Current Keys mit Attribut löschen
       for my $av (keys %{$valid}) {
           delete $data{$name}{current}{$av};
       }
@@ -21266,10 +21491,10 @@ sub __aiCreateConIcon {
   my $nntst    = CurrentVal ($name, 'conNNTrainstate',    undef);
   my $aiconact = CurrentVal ($name, 'aiConActivate', 0);
   
-  my $cmd = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiNeuralNetConState imgget', function(data){FW_okDialog(data)})"};
+  my $cmd = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConTrainState imgget', function(data){FW_okDialog(data)})"};
 
   if ($ftui eq 'ftui') {
-      $cmd = qq{"ftui.setFhemStatus('get $name valDecTree aiNeuralNetConState imgget')"};
+      $cmd = qq{"ftui.setFhemStatus('get $name valDecTree aiConTrainState imgget')"};
   }
 
   my $nntit = !$aiconact                    ? $hqtxt{nnnact}{$lang} : 
@@ -26433,7 +26658,6 @@ sub _aiFannFeatureBuilder {
   # sandbox wird nicht über Flags gesteuert sondern bleibt
   # --------------------------------------------------------
   if ($profile eq 'v1_sandbox') {
-      push @features, @{ $FEATURE_BLOCKS{semantics_human_rhythm_advanced}->($f) };
       push @features, @{ $FEATURE_BLOCKS{sandbox}->($f) };
   }
     
@@ -27421,7 +27645,7 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{PVMaxLimit}     = $paref->{pv_max_limit};
   $data{$name}{$fanntyp.'temp'}{$attempt}{Mape}           = $mape; 
   $data{$name}{$fanntyp.'temp'}{$attempt}{Mdape}          = $mdape; 
-  $data{$name}{$fanntyp.'temp'}{$attempt}{R2}             = $r2;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{R2}             = $r2;                                            # Bestimmtheitsmaß R²
   $data{$name}{$fanntyp.'temp'}{$attempt}{ModelSlope}     = $model_slope;
   $data{$name}{$fanntyp.'temp'}{$attempt}{ModelBias}      = $model_bias;
   $data{$name}{$fanntyp.'temp'}{$attempt}{AvgValidMse}    = $val_mean;
@@ -27700,7 +27924,7 @@ sub _aiFannEpochDiagnostic {
         
       push @hints, $epoche_translations{hint1}{$lang} unless $is_dead_net;
       
-      my $ratio_ok = !defined $cur_ratio || $cur_ratio >= 5;                            # hint2 nur wenn kein totes Netz UND Architektur nicht schon zu komplex
+      my $ratio_ok = !$dpr || $dpr > 20;                                                # hint2 nur wenn DPR sehr hoch → Architektur ist gemessen an den Daten zu klein
       
       unless ($is_dead_net) {                                                           # hint2 nur wenn kein totes Netz vorliegt
           if ($ratio_ok) {
@@ -27722,7 +27946,9 @@ sub _aiFannEpochDiagnostic {
       push @hints, $epoche_translations{hint4}{$lang} if $hint4_fires;
       push @hints, $epoche_translations{hint5}{$lang} if $hint5_fires;
       
-      push @hints, $epoche_translations{hint23}{$lang} unless ($hint4_fires || $hint5_fires);
+      my $arch_too_small = $dpr > 20;                                                   # nur wenn Netz wirklich zu klein für die Datenmenge
+      push @hints, $epoche_translations{hint23}{$lang} 
+          unless ($hint4_fires || $hint5_fires || !$arch_too_small);
   }
   elsif ($rel <= 0.72) {                                                                # 1800 – 10800 Epochen
       $code  = 'ok';
@@ -27788,8 +28014,7 @@ sub _aiFannEpochDiagnostic {
   }
   
   if ($code =~ /late/ && $rmse_rel > $rmse_rel_warn                                     # Späte Konvergenz + hoher RMSE → Architektur zu klein
-      && (!defined $cur_ratio                                                           # Guard: kein ratio verfügbar → feuern
-      ||  ($cur_ratio >= 5 && $cur_ratio <= 20))) {                                     # Guard: nur im normalen Bereich (nicht zu komplex, nicht schon hint17-Territorium)
+      && (!$dpr || ($dpr >= 5 && $dpr <= 20))) {
       push @hints, sprintf $epoche_translations{hint14}{$lang}, $rmse_rel;
   }
 
@@ -38195,7 +38420,7 @@ to ensure that the system configuration is correct.
           <tr><td>                             </td><td>in which the criteria are considered in the decision-making process.                        </td></tr>
           <tr><td>                             </td><td>(available if an AI-compatible SolarForecast MODEL of the PV forecast is activated)         </td></tr>
           <tr><td>                             </td><td>                                                                                            </td></tr>
-          <tr><td> <b>aiNeuralNetConState</b>  </td><td>Shows the status and current key figures of the consumption forecast AI.                    </td></tr>
+          <tr><td> <b>aiConTrainState</b>      </td><td>Shows the status and current key figures of the consumption forecast AI.                    </td></tr>
           <tr><td>                             </td><td>                                                                                            </td></tr>
         </table>
       </ul>
@@ -38335,7 +38560,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> v1 - Standard Household Version 1 </ul>                                                                                                                 </td></tr>
             <tr><td>                          </td><td><ul> active - Households with distinct daily and/or consumption patterns </ul>                                                                               </td></tr>
             <tr><td>                          </td><td><ul> bev - one or more electric vehicles are charged at home </ul>                                                                                           </td></tr>
-            <tr><td>                          </td><td><ul> pv - Household with PV-controlled load management, i.e., when appliances are actively switched on when there is excess power </ul>                      </td></tr>
+            <tr><td>                          </td><td><ul> pv - Household with PV-controlled load management, i.e., when household energy consumption typically increases during PV generation </ul>               </td></tr>
             <tr><td>                          </td><td><ul> heatpump - Household with heat pump(s) </ul>                                                                                                            </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Weighting of AI results with conventional (legacy) consumption forecast values.                                                                              </td></tr>
@@ -38420,6 +38645,9 @@ to ensure that the system configuration is correct.
             <tr><td> <b>aiConTrainLimit</b>   </td><td>The specified number of the most recent training data records is used for training.                                                                          </td></tr>
             <tr><td>                          </td><td>The default value of '0' uses all available data records.                                                                                                    </td></tr>
             <tr><td>                          </td><td>Values:<b> 0 or Integer >= 2000 </b>, default: 0                                                                                                             </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>geminiAPIkey</b>      </td><td>The Google Gemini API key can be entered here for external analysis of AI training results for consumption forecasts.                                        </td></tr>
+            <tr><td>                          </td><td>The API key can be generated for free at aistudio.google.com->‘Get API key’.                                                                                 </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
        </table>
        </ul>
@@ -41294,7 +41522,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
           <tr><td>                             </td><td>wider, in der die Kriterien bei der Entscheidungsfindung geprüft werden.                                 </td></tr>
           <tr><td>                             </td><td>(verfügbar wenn ein KI kompatibles SolarForecast MODEL der PV Vorhersage aktiviert ist)                  </td></tr>
           <tr><td>                             </td><td>                                                                                                         </td></tr>
-          <tr><td> <b>aiNeuralNetConState</b>  </td><td>Zeigt den Status und aktuelle Kennzahlen der Verbrauchsprognose-KI.                                      </td></tr>
+          <tr><td> <b>aiConTrainState</b>      </td><td>Zeigt den Status und aktuelle Kennzahlen der Verbrauchsprognose-KI.                                      </td></tr>
           <tr><td>                             </td><td>                                                                                                         </td></tr>
         </table>
       </ul>
@@ -41433,7 +41661,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> v1 - Standardhaushalt version 1 </ul>                                                                                                                   </td></tr>
             <tr><td>                          </td><td><ul> active - Haushalt mit ausgeprägten Tages- und/oder Verbrauchsrhythmen </ul>                                                                             </td></tr>
             <tr><td>                          </td><td><ul> bev - im Haushalt werden ein oder mehrere Elektrofahrzeuge geladen </ul>                                                                                </td></tr>
-            <tr><td>                          </td><td><ul> pv - Haushalt mit PV-gesteuerten Lastmanagement, d.h. wenn Verbraucher bei Überschuss aktiv zugeschaltet werden </ul>                                   </td></tr>
+            <tr><td>                          </td><td><ul> pv - Haushalt mit PV-gesteuerten Lastmanagement, d.h. wenn sich der Energieverbrauch im Haushalt bei PV-Erzeugung typischerweise erhöht </ul>           </td></tr>
             <tr><td>                          </td><td><ul> heatpump - Haushalt mit Wärmepumpe(n)  </ul>                                                                                                            </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                              </td></tr>
@@ -41518,6 +41746,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>aiConTrainLimit</b>   </td><td>Für das Training wird die angebene Anzahl der neuesten Traningsdatensätze verwendet.                                                                         </td></tr>
             <tr><td>                          </td><td>Mit dem Standardwert '0' werden alle verfügbaren Datensätze verwendet.                                                                                       </td></tr>
             <tr><td>                          </td><td>Werte:<b> 0 oder Ganzzahl >= 2000 </b>, default: 0                                                                                                           </td></tr>
+            <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
+            <tr><td> <b>geminiAPIkey</b>      </td><td>Für die externe Analyse der Verbrauchsprognose KI Trainingsergebnisse kann hier der Google Gemini API-Schlüssel hinterlegt werden.                           </td></tr>
+            <tr><td>                          </td><td>Der API-Schlüssel kann kostenlos unter aistudio.google.com->'Get API key' generiert werden.                                                                  </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
         </table>
         </ul>
