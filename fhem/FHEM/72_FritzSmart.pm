@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.06.29";
+our $ModulVersion = "26.06.30";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -1685,18 +1685,6 @@ sub Fritz_Define_Modul($$)
      $hash->{MODEL}                  = "";
      $hash->{XML_PARSER}             = main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default});
 
-     # INTERNALS force check_APIs after fhem.cfg is processed
-     $hash->{CKECKAPI_MAX_TMOUT}  = 200;
-     $hash->{CKECKAPI_TMOUT}      = $hash->{CKECKAPI_MAX_TMOUT};
-     $hash->{APICHECKED}          = 0;  # full check
-     $hash->{WEBCONNECT}          = 0;
-     $hash->{LUAQUERY}            = -1;
-     $hash->{LUADATA}             = -1;
-     $hash->{TR064}               = -1;
-     $hash->{UPNP}                = -1;
-     $hash->{IPv6}                = -1;
-     $hash->{WAN_ACCESS_TYPE}     = "WLAN";
-
      $hash->{fhem}{readOutState}     = 0;
      $hash->{fhem}{fwVersion}        = 0;
      $hash->{fhem}{fwVersionStr}     = 0.0;
@@ -1746,6 +1734,18 @@ sub Fritz_Define_Modul($$)
        $hash->{helper}->{IGDcontrol}{$key}{igd}     = $IGD064{$key}{igd};
        $hash->{helper}->{IGDcontrol}{$key}{active}  = -1;
      }
+
+     # INTERNALS force check_APIs after fhem.cfg is processed
+     $hash->{CKECKAPI_MAX_TMOUT}  = 300;
+     $hash->{CKECKAPI_TMOUT}      = $hash->{CKECKAPI_MAX_TMOUT};
+     $hash->{APICHECKED}          = 0;  # full check
+     $hash->{WEBCONNECT}          = 0;
+     $hash->{LUAQUERY}            = -1;
+     $hash->{LUADATA}             = -1;
+     $hash->{TR064}               = -1;
+     $hash->{UPNP}                = -1;
+     $hash->{IPv6}                = -1;
+     $hash->{WAN_ACCESS_TYPE}     = "WLAN";
 
      Fritz_Log $hash, 4, "start of Device readout parameters";
      main::RemoveInternalTimer($hash->{helper}{TimerReadout});
@@ -1981,7 +1981,7 @@ sub Fritz_Attr_Modul($@)
        $hash->{helper}{XML_Default} = ($hash->{helper}{XML_Hash_XS} ? "XML_Hash_XS" : "XML_Simple");
      }
 
-     $hash->{XML_PARSER} = main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default});
+     $hash->{XML_PARSER} = ($aVal ? $aVal : $hash->{helper}{XML_Default});
 
    }
 
@@ -21981,7 +21981,7 @@ sub Fritz_Helper_Dumper($$;@) {
     "Dect",
     "Consumer"
   ],
-  "version": "260629",
+  "version": "260630",
   "release_status": "stable",
   "author": [
     "Jörg Wiemann <jowiemann@debitel.net>"
