@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  72_FritzSmart: Fehler korrigiert
+ - feature: 72_FritzSmart: attr <name> xmlParser <XML_Simple|XML_Hash_XS>
  - feature: 98_vitoconnect: Weitere Readings für api-calls und api-quota
  - feature: 98_vitoconnect: Bugfixes und api-calls und api-quota
  - bugfix:  72_FritzSmart: Fehlerkorrekt prüfen Parameter bei set...call
