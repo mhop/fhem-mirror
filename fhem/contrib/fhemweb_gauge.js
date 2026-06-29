@@ -68,19 +68,19 @@ function controlGaugeVCreate(elName, devName, vArr, currVal, set, params, cmd) {
     let skinTextColor = tempElement.css('color') || 'inherit';
     tempElement.remove();
 
-    // Styles injizieren
-    if (!$('#gauge-widget-style').length) {
-        $('<style id="gauge-widget-style">')
+    // Eindeutige Klasse für diesen Scale-Faktor generieren
+    const scopeClass = 'gauge-scope-' + scaleFactor.toString().replace('.', '-');
+
+    if (!$('#' + scopeClass).length) {
+        $('<style id="' + scopeClass + '">')
         .prop('type', 'text/css')
         .html(`
-            /* Pulsier-Animation für die Kurve */
             @keyframes gauge-curve-pulse {
                 0% { opacity: 1; }
                 50% { opacity: 0.2; }
                 100% { opacity: 1; }
             }
-
-            .gauge-card {
+            .${scopeClass}.gauge-card {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
@@ -92,28 +92,24 @@ function controlGaugeVCreate(elName, devName, vArr, currVal, set, params, cmd) {
                 box-sizing: border-box !important;
                 position: relative !important;
             }
-
-            .gauge-container {
+            .${scopeClass} .gauge-container {
                 width: ${120 * scaleFactor}px !important;
                 height: ${70 * scaleFactor}px !important;
                 position: relative !important;
             }
-            .gauge-svg {
+            .${scopeClass} .gauge-svg {
                 width: 100% !important;
                 height: 100% !important;
                 overflow: visible !important;
             }
-            
             .gauge-progress {
                 transition: stroke-dashoffset 0.5s ease-in-out, stroke 0.3s ease !important;
                 transform-origin: center;
             }
-            
-            .gauge-card.gauge-trigger-pulse .gauge-progress {
+            .${scopeClass}.gauge-trigger-pulse .gauge-progress {
                 animation: gauge-curve-pulse 1.2s infinite ease-in-out !important;
             }
-
-            .gauge-info {
+            .${scopeClass} .gauge-info {
                 position: absolute !important;
                 left: 0 !important; right: 0 !important;
                 bottom: ${-12 * scaleFactor}px !important;
@@ -123,41 +119,30 @@ function controlGaugeVCreate(elName, devName, vArr, currVal, set, params, cmd) {
                 display: flex !important; flex-direction: column !important;
                 align-items: center !important;
             }
-            .gauge-val {
+            .${scopeClass} .gauge-val {
                 font-size: ${20 * scaleFactor}px !important;
                 font-weight: bold !important;
             }
-            
-            /* GEÄNDERT: Transparenz für die Unit entfernt */
-            .gauge-unit {
+            .${scopeClass} .gauge-unit {
                 font-size: ${13 * scaleFactor}px !important;
             }
-            
-            .gauge-minmax {
+            .${scopeClass} .gauge-minmax {
                 font-size: ${9 * scaleFactor}px !important;
-                width: ${120 * scaleFactor}px !important; /* Breite des Containers */
+                width: ${120 * scaleFactor}px !important;
                 display: flex !important;
                 justify-content: space-between !important;
                 box-sizing: border-box !important;
                 margin-top: ${-2 * scaleFactor}px !important;
             }
-            .gauge-minmax span:first-child {
-                width: ${25 * scaleFactor}px !important;
-                text-align: center !important;
-                margin-left: ${-3 * scaleFactor}px !important;
-            }
-            .gauge-minmax span:last-child {
-                width: ${25 * scaleFactor}px !important;
-                text-align: center !important;
-                margin-right: ${-3 * scaleFactor}px !important;
-            }
+            .${scopeClass} .gauge-minmax span:first-child { width: ${25 * scaleFactor}px !important; text-align: center !important; margin-left: ${-3 * scaleFactor}px !important; }
+            .${scopeClass} .gauge-minmax span:last-child { width: ${25 * scaleFactor}px !important; text-align: center !important; margin-right: ${-3 * scaleFactor}px !important; }
         `)
         .appendTo('head');
     }
 
     const wrapper = $('<div/>', {
         id: dev + "_" + elName + "_gauge_wrapper",
-        class: 'gauge-card gauge_widget_container',
+        class: 'gauge-card gauge_widget_container ' + scopeClass,
         informid: dev + '-' + elName + '-state'
     });
 

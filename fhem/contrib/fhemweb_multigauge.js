@@ -55,8 +55,11 @@ function controlMultiGaugeVCreate(elName, devName, vArr, currVal, set, params, c
     const labelText = vArr[4] ? vArr[4].trim() : "";
     const scaleFactor = vArr[5] ? parseFloat(vArr[5]) : 1.0; 
 
-    if (!$('#multigauge-widget-style').length) {
-        $('<style id="multigauge-widget-style">')
+    // Eindeutige Klasse für diesen Scale-Faktor generieren
+    const scopeClass = 'mg-scope-' + scaleFactor.toString().replace('.', '-');
+
+    if (!$('#' + scopeClass).length) {
+        $('<style id="' + scopeClass + '">')
         .prop('type', 'text/css')
         .html(`
             @keyframes mg-curve-pulse {
@@ -64,13 +67,12 @@ function controlMultiGaugeVCreate(elName, devName, vArr, currVal, set, params, c
                 50% { opacity: 0.2; }
                 100% { opacity: 1; }
             }
-            .mg-card {
+            .${scopeClass} .mg-card {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
                 padding: 0 !important;
                 font-family: -apple-system, sans-serif !important;
-                /* Skalierung durch direkte Maße statt Transform */
                 width: ${160 * scaleFactor}px !important;
                 height: ${135 * scaleFactor}px !important;
                 display: flex !important;
@@ -79,12 +81,12 @@ function controlMultiGaugeVCreate(elName, devName, vArr, currVal, set, params, c
                 box-sizing: border-box !important;
                 overflow: hidden !important;
             }
-            .mg-container {
+            .${scopeClass} .mg-container {
                 width: ${160 * scaleFactor}px !important;
                 height: ${135 * scaleFactor}px !important;
                 position: relative !important;
             }
-            .mg-svg {
+            .${scopeClass} .mg-svg {
                 width: 100% !important;
                 height: 100% !important;
                 display: block !important;
@@ -92,14 +94,12 @@ function controlMultiGaugeVCreate(elName, devName, vArr, currVal, set, params, c
             .mg-progress {
                 transition: stroke-dashoffset 0.5s ease-in-out, stroke 0.3s ease !important;
             }
-            
-            .mg-card.mg-alarm-t1 .mg-t1 { animation: mg-curve-pulse 1.2s infinite ease-in-out !important; }
-            .mg-card.mg-alarm-t2 .mg-t2 { animation: mg-curve-pulse 1.2s infinite ease-in-out !important; }
-            .mg-card.mg-alarm-t3 .mg-t3 { animation: mg-curve-pulse 1.2s infinite ease-in-out !important; }
-            .mg-info {
+            .${scopeClass}.mg-alarm-t1 .mg-t1 { animation: mg-curve-pulse 1.2s infinite ease-in-out !important; }
+            .${scopeClass}.mg-alarm-t2 .mg-t2 { animation: mg-curve-pulse 1.2s infinite ease-in-out !important; }
+            .${scopeClass}.mg-alarm-t3 .mg-t3 { animation: mg-curve-pulse 1.2s infinite ease-in-out !important; }
+            .${scopeClass} .mg-info {
                 position: absolute !important;
                 left: 0; right: 0; 
-                /* Skaliere auch die Abstände proportional */
                 top: ${35 * scaleFactor}px !important; 
                 margin: auto !important;
                 width: 100% !important;
@@ -110,7 +110,7 @@ function controlMultiGaugeVCreate(elName, devName, vArr, currVal, set, params, c
                 align-items: center !important;
                 justify-content: center !important; 
             }
-            .mg-label { 
+            .${scopeClass} .mg-label { 
                 position: absolute !important;
                 top: ${80 * scaleFactor}px !important; 
                 font-size: ${11 * scaleFactor}px !important; 
@@ -118,26 +118,26 @@ function controlMultiGaugeVCreate(elName, devName, vArr, currVal, set, params, c
                 color: currentColor; 
                 opacity: 0.7;
             }
-            .mg-values-stack {
+            .${scopeClass} .mg-values-stack {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 line-height: 1.30;
             }
-            .mg-vrow {
+            .${scopeClass} .mg-vrow {
                 font-weight: bold !important;
                 text-align: center !important;
                 width: 100% !important;
                 transition: color 0.3s ease;
             }
-            .mg-vrow.mg-size-large  { font-size: ${24 * scaleFactor}px !important; }
-            .mg-vrow.mg-size-medium { font-size: ${17 * scaleFactor}px !important; }
-            .mg-vrow.mg-size-small  { font-size: ${13 * scaleFactor}px !important; }
+            .${scopeClass} .mg-vrow.mg-size-large  { font-size: ${24 * scaleFactor}px !important; }
+            .${scopeClass} .mg-vrow.mg-size-medium { font-size: ${17 * scaleFactor}px !important; }
+            .${scopeClass} .mg-vrow.mg-size-small  { font-size: ${13 * scaleFactor}px !important; }
         `)
         .appendTo('head');
     }
 
-    const wrapper = $('<div/>', { id: dev + "_" + elName + "_multigauge_wrapper", class: 'mg-card gauge_widget_container' });
+    const wrapper = $('<div/>', { id: dev + "_" + elName + "_multigauge_wrapper", class: 'mg-card gauge_widget_container ' + scopeClass });
     wrapper.on('click', function(e) { e.stopPropagation(); });
     const gaugeContainer = $('<div/>', { class: 'mg-container' }).appendTo(wrapper);
 
