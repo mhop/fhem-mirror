@@ -1,4 +1,7 @@
 # $Id$
+# The file is part of the SIGNALduino project.
+# Client functions for SIGNALduino device.
+
 package FHEM::Devices::SIGNALduino::SD_Utils;
 
 use strict;
