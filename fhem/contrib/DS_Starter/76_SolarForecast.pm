@@ -161,13 +161,13 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.0"  => "28.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
+  "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
                            "Erweiterung _aiFannBevConsumerAggregate um energy_remaining, charge_intensity ".
                            "Auto-Konfiguration: aiConHiddenLayers, aiConLearnRate, aiConSteepness, aiConShufflePeriod - falls nicht gesetzt ".
                            "Trainingsdefaults angepasst, _aiFannEpochDiagnostic: Anpassung (very) early Konvergenzgrenzen ".
-                           "Getter aiNeuralNetConState in aiConTrainState umbenannt",
+                           "Getter aiNeuralNetConState in aiConTrainState umbenannt, Online KI-Bewertung durch Gemini ",
   "2.7.0"  => "20.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
                            "verbesserter Snap-Guard und Retrainidicator, Hint-Korrektur, Div0-Fix ".
                            "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ".
@@ -7186,13 +7186,17 @@ sub __getaiFannState {            ## no critic "not used"
   $rating_content   .= "<b>".$hqtxt{nserat}{$lang}.":</b> ".(encode('utf8', $display_noiselvl))." ($nslvl)\n";                    
   $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
   $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
-                       ":</b> $retrampel $recomd_translated $show_retreason \n";
+                       ":</b> $retrampel $recomd_translated $show_retreason \n";  
   
   my $linkGemini     = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConAssessGemini', function(data){FW_okDialog(data)})"};
-  my $askGemini      = qq{<a style="cursor:pointer" onClick=$linkGemini>Google Gemini</a>};
-  
+  my $privacyHint    = $lang eq 'DE'
+                     ? encode ('utf8', 'Es werden Trainingsmetriken an Google Gemini übertragen (sichtbar im Log mit ctrlDebug=apiCall)')
+                     : 'Training metrics are transmitted to Google Gemini (visible in the log with ctrlDebug=apiCall)';
+  my $privacyNote    = qq{<span style="font-size:0.75em;color:#888;margin-left:6px">($privacyHint)</span>};
+  my $askGemini      = qq{<span title="$privacyHint"> <a style="cursor:pointer" onClick=$linkGemini>Google Gemini</a> </span>};
+
   $rating_content   .= "\n";
-  $rating_content   .= "<b>".$hqtxt{exeval}{$lang}.":</b> $askGemini \n";
+  $rating_content   .= "<b>".$hqtxt{exeval}{$lang}.":</b> $askGemini $privacyNote \n";
   
   my $rating         = ___aiFannSection (encode('utf8', $hqtxt{ratovw}{$lang}), $rating_content, 1);       
 
@@ -7655,8 +7659,8 @@ sub _aiFannGeminiApiAssess {
       return encode ('utf8', $ret); 
   }
 
-  my $model = 'gemini-2.5-flash-lite';                                                          # alternativ: gemini-2.0-flash (aber älter und qualitativ schlechter), gemini-2.5-flash-lite, gemini-2.5-flash
-  #my $model = 'gemini-2.5-flash';
+  #my $model = 'gemini-2.5-flash-lite';                                                          # alternativ: gemini-2.0-flash (aber älter und qualitativ schlechter), gemini-2.5-flash-lite, gemini-2.5-flash
+  my $model = 'gemini-2.5-flash';
   
   # --- Metriken sammeln ---
   my $profile   = AiNeuralVal ($name, $fanntyp, 'RegVersion',     'n/a');                       # verwendete Feature-Registry Version
@@ -7676,7 +7680,8 @@ sub _aiFannGeminiApiAssess {
   my $steepness = AiNeuralVal ($name, $fanntyp, 'HiddSteepness',  'n/a');
   my $learnRate = AiNeuralVal ($name, $fanntyp, 'LearnRate',      'n/a');
   my $momentum  = AiNeuralVal ($name, $fanntyp, 'LearnMomentum',  'n/a');
-  my $bitfail   = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   'n/a');   
+  my $bitfail   = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   'n/a');
+  my $bfsug     = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', 'n/a');                       # Bit_Fail_Limit Empfehlung
   my $tepoch    = AiNeuralVal ($name, $fanntyp, 'TrainEpoches',   'n/a');                       # bestes Modell bei Epoche
   my $epochPct  = AiNeuralVal ($name, $fanntyp, 'EpochRelPct',    'n/a');                       # % der max. Epochen genutzt
   my $maxepoch  = AINUMEPOCHS;                                                                  # oder als Konstante
@@ -7702,6 +7707,10 @@ sub _aiFannGeminiApiAssess {
     . qq{(z.B. aiConLearnRate, aiConMomentum, Architektur/HiddenLayers) }
     . qq{experimentell angepasst werden könnten um die Prognosequalität weiter zu verbessern, }
     . qq{und in welche Richtung (erhöhen/reduzieren). }
+    . qq{Wichtig zur Parameterwirkung: BitFailLimit (aiConBitFailLimit) definiert die }
+    . qq{Fehlertoleranz pro Datenpunkt – ein HÖHERER Wert bedeutet MEHR Toleranz }
+    . qq{(mehr Fehler werden akzeptiert, bevor ein Sample als Bit_Fail zählt), }
+    . qq{ein NIEDRIGERER Wert bedeutet strengere Bewertung. }
     . qq{Gliedere die Antwort in: Gesamtbewertung, Auffälligkeiten, Empfehlung. }
     . qq{Maximal 350 Wörter.}
 
@@ -7722,6 +7731,10 @@ sub _aiFannGeminiApiAssess {
     . qq{(e.g. aiConLearnRate, aiConMomentum, architecture/HiddenLayers) }
     . qq{could be experimentally adjusted to further improve forecast quality, }
     . qq{and in which direction (increase/decrease). }
+    . qq{Important note on parameter behavior: BitFailLimit (aiConBitFailLimit) defines the }
+    . qq{error tolerance per data point—a HIGHER value means MORE tolerance }
+    . qq{(more errors are accepted before a sample is counted as a Bit_Fail), }
+    . qq{a LOWER value means stricter evaluation. }
     . qq{Structure: Overall assessment, Notable points, Recommendation. }
     . qq{Max 350 words.};
     
@@ -7749,7 +7762,8 @@ Hyperparameter aktuell:
  Lernrate:             $learnRate (Schlüssel aiConLearnRate)
  Momentum:             $momentum (Schlüssel aiConMomentum)
  Steepness:            $steepness (Schlüssel aiConSteepness)
- BitFail-Limit:        $bitfail (Schlüssel aiConBitFailLimit)
+ BitFail-Limit:        $bitfail (Schlüssel aiConBitFailLimit, höher = toleranter)
+ BitFail-Limit Empfehlung intern: $bfsug
  Epochen genutzt:      $tepoch / $maxepoch ($epochPct %)
  
  Data-Parameter-Ratio: $dpr
@@ -7779,7 +7793,8 @@ Current hyperparameters:
  Learning rate:      $learnRate (key aiConLearnRate)
  Momentum:           $momentum (key aiConMomentum)
  Steepness:          $steepness (key aiConSteepness)
- BitFail limit:      $bitfail (key aiConBitFailLimit)
+ BitFail Limit:        $bitfail (key aiConBitFailLimit; higher values = more tolerant)
+ Internal BitFail Limit Recommendation: $bfsug
  Epochs used:        $tepoch / $maxepoch ($epochPct %)
  
  Data-parameter ratio: $dpr
@@ -7802,16 +7817,18 @@ END_EN
                          } );
   
   my $param = {
-      url      => "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey",
-      timeout  => APITIMEOUT,
-      name     => $name,
-      cl       => $cl,                                                  # der aufrufende Browser-Tab
-      debug    => $debug,
-      lang     => $lang,
-      header   => 'Content-Type: application/json',
-      method   => 'POST',
-      data     => $body,
-      callback => \&__aiFannApiAssessCb,
+      url           => "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey",
+      timeout       => APITIMEOUT,
+      name          => $name,
+      cl            => $cl,                                                  # der aufrufende Browser-Tab
+      debug         => $debug,
+      lang          => $lang,
+      fanntyp       => $fanntyp,
+      retryCount503 => $paref->{retryCount503} // 0,
+      header        => 'Content-Type: application/json',
+      method        => 'POST',
+      data          => $body,
+      callback      => \&__aiFannApiAssessCb,
   };
 
   if ($debug =~ /apiCall/x) {
@@ -7853,6 +7870,45 @@ sub __aiFannApiAssessCb {
   }
 
   if ($decoded->{error}) {                                                     # Gemini-spezifische Fehlerantwort abfangen
+      if ($decoded->{error}{code} == 503) { 
+          my $retryCount = ($paref->{retryCount503} // 0) + 1;
+          my $maxRetries = 3;
+
+          if ($retryCount > $maxRetries) {
+              Log3 ($name, 3, "$name - Gemini 503, max retries ($maxRetries) reached, exiting");
+              
+              my $msg = $lang eq 'DE'
+                      ? "Gemini ist dauerhaft überlastet (503). Bitte später erneut versuchen."
+                      : "Gemini is persistently overloaded (503). Please try again later.";
+              
+              asyncOutput ($cl, encode('utf8', $msg));
+              return;
+          }
+          
+          my $waitSec = 15;                                                    # 503 braucht meist kürzere Wartezeit als 429
+
+          Log3 ($name, 3, "$name - Gemini 503 (high demand), Retry in ${waitSec}s");
+
+          my $msg = $lang eq 'DE'
+                  ? "⏳ Gemini ist gerade stark ausgelastet – automatischer Retry in ${waitSec}s ..."
+                  : "⏳ Gemini is currently overloaded – automatic retry in ${waitSec}s ...";
+
+          InternalTimer ( gettimeofday() + $waitSec,
+                          sub { _aiFannGeminiApiAssess ( { name          => $name,
+                                                           fanntyp       => $paref->{fanntyp},
+                                                           debug         => $debug,
+                                                           lang          => $lang,
+                                                           cl            => $cl,
+                                                           retryCount503 => $retryCount,
+                                                       } );
+                          },
+                          "gemini_retry503_$name",
+                        );
+                        
+          asyncOutput ($cl, encode('utf8', $msg));
+          return;
+      }     
+      
       my $msg = $decoded->{error}{message} // 'unknown API-Fehler';
       my $code = $decoded->{error}{code}   // '';
 
