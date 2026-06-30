@@ -11190,6 +11190,7 @@ sub EnOcean_Parse($$) {
         my $battery = $db[2] >= 121 ? "ok" : "low";
         $contact = $db[1] <= 195 ? "closed" : "open";
         push @event, "3:battery:$battery";
+
       } else {
         # Single Input Contact (EEP A5-30-02)
         # $db[0]_bit_0 is the input state where 0 = closed, 1 = open
@@ -11197,6 +11198,12 @@ sub EnOcean_Parse($$) {
       }
       push @event, "3:contact:$contact";
       push @event, "3:state:$contact";
+      EnOcean_ReadingsDelete($hash, 'alarm', 'reset', 1);
+      if (AttrVal($name, "signOfLife", 'on') eq 'off') {
+        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if (exists $hash->{helper}{timer}{alarm});
+        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5, AttrVal($name, "signOfLifeInterval", 2280), 0);
+        InternalTimer(gettimeofday() + $hash->{helper}{timer}{alarm}[5], 'EnOcean_ctrlAlarmEvent', $hash->{helper}{timer}{alarm}, 0);
+      }
 
     } elsif ($st eq "digitalInput.03") {
       # 4 digital inputs, wake, temperature (EEP A5-30-03)
@@ -11210,9 +11217,14 @@ sub EnOcean_Parse($$) {
           $hash->{helper}{lastEvent} = $alarm;
         }
         push @event, "3:state:$alarm";
-        RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
-        @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
-        InternalTimer(gettimeofday() + 1980, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+        #RemoveInternalTimer($hash->{helper}{timer}{alarm})  if(exists $hash->{helper}{timer}{alarm});
+        #@{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5);
+        #InternalTimer(gettimeofday() + 1980, 'EnOcean_readingsSingleUpdate', $hash->{helper}{timer}{alarm}, 0);
+        if (AttrVal($name, "signOfLife", 'on') eq 'on') {
+          RemoveInternalTimer($hash->{helper}{timer}{alarm})  if (exists $hash->{helper}{timer}{alarm});
+          @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5, AttrVal($name, "signOfLifeInterval", 1980), 0);
+          InternalTimer(gettimeofday() + $hash->{helper}{timer}{alarm}[5], 'EnOcean_ctrlAlarmEvent', $hash->{helper}{timer}{alarm}, 0);
+        }
       } else {
         my $in0 = $db[1] & 1;
         my $in1 = ($db[1] & 2) >> 1;
@@ -11225,6 +11237,12 @@ sub EnOcean_Parse($$) {
         push @event, "3:in3:$in3";
         push @event, "3:wake:$wake";
         push @event, "3:state:T: $temperature I: " . $in0 . $in1 . $in2 . $in3 . " W: " . $wake;
+        EnOcean_ReadingsDelete($hash, 'alarm', 'reset', 1);
+        if (AttrVal($name, "signOfLife", 'on') eq 'off') {
+          RemoveInternalTimer($hash->{helper}{timer}{alarm})  if (exists $hash->{helper}{timer}{alarm});
+          @{$hash->{helper}{timer}{alarm}} = ($hash, 'alarm', 'dead_sensor', 1, 5, AttrVal($name, "signOfLifeInterval", 2280), 0);
+          InternalTimer(gettimeofday() + $hash->{helper}{timer}{alarm}[5], 'EnOcean_ctrlAlarmEvent', $hash->{helper}{timer}{alarm}, 0);
+        }
       }
 
     } elsif ($st eq "digitalInput.04") {
@@ -13795,7 +13813,7 @@ sub EnOcean_Parse($$) {
         $mid = substr(sprintf("%04X", hex($1) & 0x7FF), 1);
         $attr{$name}{manufID} = $mid;
         $mid = $EnO_manuf{$mid} if(exists $EnO_manuf{$mid});
-        $attr{$name}{repeaterID} = $6;
+        #$attr{$name}{repeaterID} = $6;
         $postmasterID = $6;
         $attr{$name}{postmasterID} = $postmasterID;
         $attr{$name}{teachMethod} = 'smartAck';
@@ -15458,6 +15476,9 @@ sub EnOcean_Notify(@) {
       #Log3 $name, 2, "EnOcean $name <notify> $devName $s";
 
     } elsif ($devName eq "global" && $s =~ m/^INITIALIZED$/) {
+      if (AttrVal($name, "observe", "off") eq "on" || exists $hash->{READINGS}{observeCmdRepetitionCount}) {
+        readingsSingleUpdate($hash, "observeCmdRepetitionCount", 0, 0);
+      }
       # assign remote management defptr
       if (exists $attr{$name}{remoteID}) {
         $modules{EnOcean}{defptr}{$attr{$name}{remoteID}} = $hash;
@@ -17522,8 +17543,12 @@ sub EnOcean_observeRepeat($) {
   if ($hash->{helper}{observeCntr} <= AttrVal($name, "observeCmdRepetition", 2)) {
     #repeat last command
     $hash->{helper}{observeCntr} += 1;
+    readingsSingleUpdate($hash,"observeCmdRepetitionCount", ReadingsNum($name, "observeCmdRepetitionCount", 0) + 1, 1);
     Log3 $name, 4, "EnOcean set " . join(" ", @{$hash->{helper}{lastCmdValue}}) . " repeated";
-    EnOcean_Set($hash, @{$hash->{helper}{lastCmdValue}});
+    {
+      local $hash->{InSetExtensions} = 1;
+      EnOcean_Set($hash, @{$hash->{helper}{lastCmdValue}});
+    }
     RemoveInternalTimer($functionHash);
     InternalTimer(gettimeofday() + AttrVal($name, "observeInterval", 1), "EnOcean_observeRepeat", $functionHash, 0);
   } else {
@@ -18898,7 +18923,7 @@ sub EnOcean_sec_convertToNonsecure($$$) {
   return ("Can't verify or decrypt telegram", undef, undef);
 }
 
-sub EnOcean_sec_createTeachIn($$$$$$$$$$$) {
+sub EnOcean_sec_createTeachIn($$$$$$$$$$$$) {
   my ($ctrl, $hash, $comMode, $dataEnc, $eep, $macAlgo, $rlcAlgo, $rlcTX, $secLevel, $rocker, $subDef, $destinationID) = @_;
   my $name = $hash->{NAME};
   my ($data, $err, $response, $loglevel);
@@ -19253,7 +19278,8 @@ sub EnOcean_Delete($$) {
     If the <a href="#EnOcean-attr-observeLogic">observeLogic</a> attribute is set to "and", the monitoring is stopped when a telegram
     was received by all devices (AND logic). Please note that the name of the own device has also to be entered in the
     <a href="#EnOcean-attr-observeRefDev">observeRefDev</a> if required.<br>
-    If the maximum number of retries is reached and still no all acknowledgment telegrams has been received, the reading
+    Every command retry increments the reading "observeCmdRepetitionCount". The counter is reset to 0 when Fhem is restarted.
+    If the maximum number of retries is reached and still not all acknowledgment telegrams have been received, the reading
     "observeFailedDev" shows the faulty devices and the command can be executed, that is stored in the
     <a href="#EnOcean-attr-observeErrorAction">observeErrorAction</a> attribute.
     <br><br>
@@ -23660,11 +23686,15 @@ sub EnOcean_Delete($$) {
          [Thermokon SR65 DI, untested]<br>
      <ul>
        <li>open|closed</li>
+       <li>alarm: dead_sensor</li>
        <li>battery: ok|low (only EEP A5-30-01)</li>
        <li>contact: open|closed</li>
        <li>teach: &lt;result of teach procedure&gt;</li>
        <li>state: open|closed</li>
      </ul><br>
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a>, <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>
+        and <a href="#EnOcean-attr-signOfLifeLostMax">signOfLifeLostMax</a>. Default is "off" and an interval of 2280 sec.<br>
         The attr subType must be digitalInput.01 or digitalInput.02. This is done if the device was
         created by autocreate.
      </li>
@@ -23674,6 +23704,7 @@ sub EnOcean_Delete($$) {
          4 digital Inputs, Wake, Temperature [untested]<br>
      <ul>
        <li>T: t/&#176C I: 0|1 0|1 0|1 0|1 W: 0|1</li>
+       <li>alarm: dead_sensor</li>
        <li>in0: 0|1</li>
        <li>in1: 0|1</li>
        <li>in2: 0|1</li>
@@ -23683,6 +23714,9 @@ sub EnOcean_Delete($$) {
        <li>wake: high|low</li>
        <li>state: T: t/&#176C I: 0|1 0|1 0|1 0|1 W: high|low</li>
      </ul><br>
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a>, <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>
+        and <a href="#EnOcean-attr-signOfLifeLostMax">signOfLifeLostMax</a>. Default is "off" and an interval of 2280 sec.<br>
         The attr subType must be digitalInput.03. This is done if the device was
         created by autocreate.
      </li>
@@ -23698,6 +23732,9 @@ sub EnOcean_Delete($$) {
        <li>temperature: t/&#176C (Sensor Range: t = 0 &#176C ... 40 &#176C)</li>
        <li>state: smoke-alarm|off</li>
      </ul><br>
+        A monitoring period can be set for signOfLife telegrams of the sensor, see
+        <a href="#EnOcean-attr-signOfLife">signOfLife</a>, <a href="#EnOcean-attr-signOfLifeInterval">signOfLifeInterval</a>
+        and <a href="#EnOcean-attr-signOfLifeLostMax">signOfLifeLostMax</a>. Default is "on" and an interval of 1980 sec.<br>
         The attr subType must be digitalInput.03. This is done if the device was
         created by autocreate. Set attr model to Eltako_TF_RWB manually.
      </li>
