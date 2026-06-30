@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  72_FritzSmart: xmlParser Auswahlfehler behoben
  - feature: 76_SolarForecast: Version 2.8.0
  - bugfix:  72_FritzSmart: Fehler korrigiert
  - feature: 72_FritzSmart: attr <name> xmlParser <XML_Simple|XML_Hash_XS>
