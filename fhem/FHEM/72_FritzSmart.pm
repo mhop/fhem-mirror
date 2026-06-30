@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.06.30";
+our $ModulVersion = "26.07.01";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -1355,7 +1355,7 @@ sub Fritz_Initialize_Modul($)
 #    $hash->{AttrRenameMap} = { "enableMobileModem" => "enableMobileInfo"
 #                             };
 
-    return FHEM::Meta::InitMod( __FILE__, $hash );
+  return FHEM::Meta::InitMod( __FILE__, $hash );
 
 } # end Fritz_Initialize
 
@@ -1616,8 +1616,9 @@ sub Fritz_Define_Modul($$)
    my $name = $args[0];
 
    # INTERNALS
-   $hash->{NAME}    = $name;
-   $hash->{VERSION} = $ModulVersion;
+   $hash->{NAME}                 = $name;
+   $hash->{VERSION}              = $ModulVersion;
+   $hash->{helper}{misPerlModul} = $missingModul;
 
    # initialize DEGUB LOg function
    Fritz_dbgLogInit($hash, "init", "verbose", main::AttrVal($name, "verbose", -1));
@@ -1646,24 +1647,28 @@ sub Fritz_Define_Modul($$)
 
    $hash->{fhem}{definedHost} = $hash->{HOST}; # to cope with old attribute definitions
 
-   $hash->{helper}{XML_Simple}  = ($missingModul !~ /XML::Simple/);
-   $hash->{helper}{XML_Hash_XS} = ($missingModul !~ /XML::Hash::XS/);
+   $hash->{helper}{XML_Simple}  = 0;
+   $hash->{helper}{XML_Hash_XS} = 0;
+   $hash->{helper}{XML_Default} = "XML_Hash_XS";
+
+   $hash->{helper}{XML_Simple}  = ($hash->{helper}{misPerlModul} !~ /XML::Simple/);
+   $hash->{helper}{XML_Hash_XS} = ($hash->{helper}{misPerlModul} !~ /XML::Hash::XS/);
    $hash->{helper}{XML_Default} = ($hash->{helper}{XML_Hash_XS} ? "XML_Hash_XS" : "XML_Simple");
 
    # XML::Simple and XML::Hash::XS are optional, but at least one parser must be available.
    # Remove missing parser modules from the fatal dependency list; keep all other missing
    # modules fatal so the module still fails fast on real runtime dependencies.
 
-   $missingModul =~ s/XML::Simple //g;
-   $missingModul =~ s/XML::Hash::XS //g;
+   $hash->{helper}{misPerlModul} =~ s/XML::Simple //g;
+   $hash->{helper}{misPerlModul} =~ s/XML::Hash::XS //g;
 
    if (!$hash->{helper}{XML_Simple} && !$hash->{helper}{XML_Hash_XS}) {
-     $missingModul .= "'XML::Simple and/or XML::Hash::XS' ";
+     $hash->{helper}{misPerlModul} .= "'XML::Simple and/or XML::Hash::XS' ";
    }
 
-   if ($missingModul) {
+   if ($hash->{helper}{misPerlModul}) {
 
-     my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
+     my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.";
      Fritz_Log $hash, 2, $missingMsg;
      $hash->{HINT_PERL}         = $missingMsg;
      $hash->{APICHECKED}        = (-1);
@@ -1689,6 +1694,9 @@ sub Fritz_Define_Modul($$)
      $hash->{fhem}{fwVersion}        = 0;
      $hash->{fhem}{fwVersionStr}     = 0.0;
      $hash->{fhem}{intBoxUsers}      = "&lt;none&gt;";
+
+
+
 
      $hash->{fhem}{multiple_wlan}{cnt}   = 1;
      $hash->{fhem}{multiple_wlan}{names} = "wlan2.4";
@@ -5843,7 +5851,7 @@ sub Fritz_Readout_Start($)
       main::RemoveInternalTimer($hash->{helper}{TimerReadout});
 
       if(exists($hash->{HINT_PERL})) {
-        main::readingsSingleUpdate( $hash, "state", "Attention - Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.", 1);
+        main::readingsSingleUpdate( $hash, "state", "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.", 1);
 
       } elsif(exists($hash->{HINT_NETWORK}) ) {
         main::readingsSingleUpdate( $hash, "state", $hash->{HINT_NETWORK}, 1 );
@@ -10602,9 +10610,9 @@ sub Fritz_Readout_API_Check($)
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", "";
 
    # Check if perl modules for remote APIs exists
-   if ($missingModul) {
+   if ($hash->{helper}{misPerlModul}) {
 
-     my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $missingModul ) missing on this system.";
+     my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.";
      Fritz_Log $hash, 2, $missingMsg;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PERL", $missingMsg;
 
@@ -16941,8 +16949,8 @@ sub Fritz_Get_TR064_ServiceList($;$$)
 
    $dslforum ||= "tr64desc.xml";
 
-   if ( $missingModul ) {
-      my $msg = "ERROR: Perl modul " . $missingModul . " is missing on this system. Please install before using this modul.";
+   if ( $hash->{helper}{misPerlModul} ) {
+      my $msg = "ERROR: Perl modul " . $hash->{helper}{misPerlModul} . " is missing on this system. Please install before using this modul.";
       Fritz_Log $hash, 2, $msg;
       return $msg;
    }
@@ -17080,8 +17088,8 @@ sub Fritz_init_TR064 ($$)
    my ($hash, $host) = @_;
    my $name = $hash->{NAME};
 
-   if ($missingModul) {
-      Fritz_Log $hash, 2,  "ERROR: Cannot use TR-064. Perl modul " . $missingModul . " is missing on this system. Please install.";
+   if ($hash->{helper}{misPerlModul}) {
+      Fritz_Log $hash, 2,  "ERROR: Cannot use TR-064. Perl modul " . $hash->{helper}{misPerlModul} . " is missing on this system. Please install.";
       return undef;
    }
 
@@ -17122,8 +17130,8 @@ sub Fritz_open_Web_Connection ($)
    my $name = $hash->{NAME};
    my %retHash;
 
-   if ($missingModul) {
-      Fritz_Log $hash, 2, "Perl modul ".$missingModul." is missing on this system. Please install before using this modul.";
+   if ($hash->{helper}{misPerlModul}) {
+      Fritz_Log $hash, 2, "Perl modul ".$hash->{helper}{misPerlModul}." is missing on this system. Please install before using this modul.";
       %retHash = ( "Error" => "missing Perl module", "ResetSID" => "1", "Web_Connection" => "Error" ) ;
       return \%retHash;
    }
@@ -21981,7 +21989,7 @@ sub Fritz_Helper_Dumper($$;@) {
     "Dect",
     "Consumer"
   ],
-  "version": "260630",
+  "version": "260701",
   "release_status": "stable",
   "author": [
     "Jörg Wiemann <jowiemann@debitel.net>"
