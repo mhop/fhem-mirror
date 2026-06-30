@@ -57,9 +57,7 @@ eval "use AI::FANN qw(:all); 1;"          or my $aifannabs    = 'AI::FANN';     
 
 use FHEM::SynoModules::ErrCodes qw(:all);                                            # Error Code Modul
 use FHEM::SynoModules::SMUtils qw (checkModVer
-                                   delClHash
                                    evaljson
-                                   getClHash
                                    moduleVersion
                                    trim
                                   );                                                 # Hilfsroutinen Modul
@@ -7212,7 +7210,7 @@ sub __getaiFannState {            ## no critic "not used"
 
   # Trainingsmetriken
   #####################
-  my $keyfig_content = "<b>".$hqtxt{bmoaep}{$lang}.":</b> $tepoch (max. 15000)\n";                                                                              # bestes Modell bei Epoche
+  my $keyfig_content = "<b>".$hqtxt{bmoaep}{$lang}.":</b> $tepoch (max. ".AINUMEPOCHS.")\n";                                                                    # bestes Modell bei Epoche
   $keyfig_content   .= "<b>Training MSE:</b> $tramse\n";
   $keyfig_content   .= "<b>Validation MSE:</b> $valmse\n";
   $keyfig_content   .= "<b>Validation MSE Average:</b> $valavg\n";
@@ -7661,24 +7659,34 @@ sub _aiFannGeminiApiAssess {
   #my $model = 'gemini-2.5-flash';
   
   # --- Metriken sammeln ---
-  my $profile  = AiNeuralVal ($name, $fanntyp, 'RegVersion',     'n/a');                        # verwendete Feature-Registry Version
-  my $arch     = AiNeuralVal ($name, $fanntyp, 'HiddenLayers',   'n/a');                        # Architektur
-  my $r2       = AiNeuralVal ($name, $fanntyp, 'R2',             'n/a');                        # Bestimmtheitsmaß R²
-  my $mae      = AiNeuralVal ($name, $fanntyp, 'Mae',            'n/a');                        # MAE (Durchschnitt) Originalskala
-  my $slope    = AiNeuralVal ($name, $fanntyp, 'ModelSlope',     'n/a');
-  my $bias     = AiNeuralVal ($name, $fanntyp, 'ModelBias',      'n/a');
-  my $driftIdx = AiNeuralVal ($name, $fanntyp, 'DriftIndex',     'n/a');
-  my $driftScr = AiNeuralVal ($name, $fanntyp, 'DriftScore',     'n/a'); 
-  my $numRec   = AiNeuralVal ($name, $fanntyp, 'NumTraindata',   'n/a');
-  my $numFeat  = AiNeuralVal ($name, $fanntyp, 'NumInputs',      'n/a');                        # Anzahl der Features
-  my $epochs   = AiNeuralVal ($name, $fanntyp, 'TrainEpoches',   'n/a');
-  my $version  = $hash->{HELPER}{VERSION} // 'n/a';
+  my $profile   = AiNeuralVal ($name, $fanntyp, 'RegVersion',     'n/a');                       # verwendete Feature-Registry Version
+  my $arch      = AiNeuralVal ($name, $fanntyp, 'HiddenLayers',   'n/a');                       # Architektur
+  my $r2        = AiNeuralVal ($name, $fanntyp, 'R2',             'n/a');                       # Bestimmtheitsmaß R²
+  my $mae       = AiNeuralVal ($name, $fanntyp, 'Mae',            'n/a');                       # MAE (Durchschnitt) Originalskala
+  my $slope     = AiNeuralVal ($name, $fanntyp, 'ModelSlope',     'n/a');
+  my $bias      = AiNeuralVal ($name, $fanntyp, 'ModelBias',      'n/a');
+  my $driftIdx  = AiNeuralVal ($name, $fanntyp, 'DriftIndex',     'n/a');
+  my $driftScr  = AiNeuralVal ($name, $fanntyp, 'DriftScore',     'n/a'); 
+  my $numRec    = AiNeuralVal ($name, $fanntyp, 'NumTraindata',   'n/a');
+  my $numFeat   = AiNeuralVal ($name, $fanntyp, 'NumInputs',      'n/a');                       # Anzahl der Features
+  my $dpr       = AiNeuralVal ($name, $fanntyp, 'dataParamRatio', 'n/a');
+  
+  my $noiseLvl  = AiNeuralVal ($name, $fanntyp, 'NoiseLevel',     'n/a');
+  my $talgo     = AiNeuralVal ($name, $fanntyp, 'TrainAlgo',      'n/a');
+  my $steepness = AiNeuralVal ($name, $fanntyp, 'HiddSteepness',  'n/a');
+  my $learnRate = AiNeuralVal ($name, $fanntyp, 'LearnRate',      'n/a');
+  my $momentum  = AiNeuralVal ($name, $fanntyp, 'LearnMomentum',  'n/a');
+  my $bitfail   = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   'n/a');   
+  my $tepoch    = AiNeuralVal ($name, $fanntyp, 'TrainEpoches',   'n/a');                       # bestes Modell bei Epoche
+  my $epochPct  = AiNeuralVal ($name, $fanntyp, 'EpochRelPct',    'n/a');                       # % der max. Epochen genutzt
+  my $maxepoch  = AINUMEPOCHS;                                                                  # oder als Konstante
+
+  my $version   = $hash->{HELPER}{VERSION} // 'n/a';
     
       
   my $sysPrompt = $lang eq 'DE'
     ? qq{Ich erstelle stündliche Verbrauchsprognosen für einen Haushalt }
-    . qq{mit dem FHEM SolarForecast Modul (FANN-basiertes neuronales Netz) Version $version. }
-    . qq{Ob eine PV-Anlage installiert ist, siehst du am Flag pv im Haushaltsprofil. }
+    . qq{mit dem FHEM SolarForecast Modul (FANN-basiertes neuronales Netz). }
     . qq{Wichtige Domänen-Kontextinformation für deine Bewertung: }
     . qq{Stochastische Haushalte (ohne Wärmepumpe/BEV) erreichen typischerweise R²=0.25-0.35 – }
     . qq{das ist kein Modellfehler, sondern physikalisch bedingt durch unvorhersehbares Nutzerverhalten. }
@@ -7688,6 +7696,8 @@ sub _aiFannGeminiApiAssess {
     . qq{Ein DriftIndex unter 0.7 gilt als stabil, über 1.0 als kritisch. }
     . qq{Beurteile die Metriken ausschließlich vor diesem Domänen-Hintergrund, }
     . qq{nicht nach generischen ML-Benchmarks. }
+    . qq{Berücksichtige bei deiner Bewertung auch das Rauschlevel der Daten (NoiseLevel): }
+    . qq{Ein hohes Rauschlevel begrenzt die maximal erreichbare Modellqualität strukturell. }
     . qq{Gib auch bei einem guten Modell konkrete Hinweise, welche Hyperparameter }
     . qq{(z.B. aiConLearnRate, aiConMomentum, Architektur/HiddenLayers) }
     . qq{experimentell angepasst werden könnten um die Prognosequalität weiter zu verbessern, }
@@ -7696,8 +7706,7 @@ sub _aiFannGeminiApiAssess {
     . qq{Maximal 350 Wörter.}
 
     : qq{I am forecasting hourly household energy consumption }
-    . qq{using the FHEM SolarForecast module (FANN-based neural network) version $version. }
-    . qq{You can see whether a PV system is installed by checking the ‘pv’ flag in the household profile. }
+    . qq{using the FHEM SolarForecast module (FANN-based neural network). }
     . qq{Important domain context for your assessment: }
     . qq{Stochastic households (no heat pump/EV) typically achieve R²=0.25-0.35 – }
     . qq{this is not a model failure but physically expected due to unpredictable user behavior. }
@@ -7707,6 +7716,8 @@ sub _aiFannGeminiApiAssess {
     . qq{A DriftIndex below 0.7 is considered stable, above 1.0 critical. }
     . qq{Assess the metrics strictly within this domain context, }
     . qq{not against generic ML benchmarks. }
+    . qq{When evaluating your data, also take the noise level into account: }
+    . qq{A high noise level structurally limits the maximum achievable model quality. }    
     . qq{Even for a well-performing model, provide concrete suggestions on which hyperparameters }
     . qq{(e.g. aiConLearnRate, aiConMomentum, architecture/HiddenLayers) }
     . qq{could be experimentally adjusted to further improve forecast quality, }
@@ -7715,22 +7726,34 @@ sub _aiFannGeminiApiAssess {
     . qq{Max 350 words.};
     
     
-  my $profileCtx = $lang eq 'DE'
-    ? ( $profile =~ /hp.*bev|bev.*hp/i ? 'Haushalt mit Wärmepumpe und E-Auto'
-      : $profile =~ /heatpump/i        ? 'Haushalt mit Wärmepumpe'
-      : $profile =~ /bev/i             ? 'Haushalt mit E-Auto'
-      :                                  'stochastischer Standardhaushalt' )
-    : ( $profile =~ /hp.*bev|bev.*hp/i ? 'Household with heat pump and EV'
-      : $profile =~ /heatpump/i        ? 'Household with heat pump'
-      : $profile =~ /bev/i             ? 'Household with EV'
-      :                                  'stochastic standard household' );
+  my @ctxParts;
+  push @ctxParts, ($lang eq 'DE' ? 'Wärmepumpe und/oder Klimaanlage'        : 'heat pump and/or AC')                   if $profile =~ /heatpump/i;
+  push @ctxParts, ($lang eq 'DE' ? 'E-Auto'                                 : 'EV')                                    if $profile =~ /bev/i;
+  push @ctxParts, ($lang eq 'DE' ? 'PV-gesteuertem Lastmanagement'          : 'PV-controlled load management')         if $profile =~ /pv/i;
+  push @ctxParts, ($lang eq 'DE' ? 'ausgeprägten Tages-/Verbrauchsrhythmen' : 'pronounced daily/consumption rhythms')  if $profile =~ /active/i;
+
+  my $profileCtx = @ctxParts
+                 ? ($lang eq 'DE' ? 'Haushalt mit '                   : 'Household with ') . join(', ', @ctxParts)
+                 : ($lang eq 'DE' ? 'stochastischer Standardhaushalt' : 'stochastic standard household');
    
   my $userMsg = $lang eq 'DE' ? <<"END_DE" : <<"END_EN";
 Bitte beurteile folgende Trainingsmetriken meines SolarForecast-Modells:
 
+SolarForecast Version:  $version
 Haushaltstyp:     $profileCtx (Profil: $profile)
 Architektur:      $arch
-Datenbasis:       $numRec Datensätze, $numFeat Features, $epochs Epochen
+Datenbasis:       $numRec Datensätze, $numFeat Features
+
+Hyperparameter aktuell:
+ Trainingsalgorithmus: $talgo
+ Lernrate:             $learnRate (Schlüssel aiConLearnRate)
+ Momentum:             $momentum (Schlüssel aiConMomentum)
+ Steepness:            $steepness (Schlüssel aiConSteepness)
+ BitFail-Limit:        $bitfail (Schlüssel aiConBitFailLimit)
+ Epochen genutzt:      $tepoch / $maxepoch ($epochPct %)
+ 
+ Data-Parameter-Ratio: $dpr
+ Rauschbewertung:      $noiseLvl
 
 Qualitätsmetriken:
   R²:             $r2
@@ -7745,10 +7768,23 @@ END_DE
 
 Please evaluate the following training metrics for my SolarForecast model:
 
+SolarForecast version:  $version
 Household type:   $profileCtx (Profile: $profile)
 Architecture:     $arch
-Data set:         $numRec records, $numFeat features, $epochs epochs
+Data set:         $numRec records, $numFeat features
+Epochs:           best model at epoch $tepoch out of the maximum possible $maxepoch
 
+Current hyperparameters:
+ Training algorithm: $talgo
+ Learning rate:      $learnRate (key aiConLearnRate)
+ Momentum:           $momentum (key aiConMomentum)
+ Steepness:          $steepness (key aiConSteepness)
+ BitFail limit:      $bitfail (key aiConBitFailLimit)
+ Epochs used:        $tepoch / $maxepoch ($epochPct %)
+ 
+ Data-parameter ratio: $dpr
+ Noise level:          $noiseLvl
+ 
 Quality metrics:
   R²:             $r2
   MAE:            $mae Wh
@@ -7780,6 +7816,7 @@ END_EN
 
   if ($debug =~ /apiCall/x) {
       $param->{loglevel} = 1;
+      Log3 ($name, 1, "$name DEBUG> The following data are transmitted to Google Gemini for analysis: \n$userMsg");
   }
 
   HttpUtils_NonblockingGet ($param);
@@ -38561,7 +38598,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td><ul> active - Households with distinct daily and/or consumption patterns </ul>                                                                               </td></tr>
             <tr><td>                          </td><td><ul> bev - one or more electric vehicles are charged at home </ul>                                                                                           </td></tr>
             <tr><td>                          </td><td><ul> pv - Household with PV-controlled load management, i.e., when household energy consumption typically increases during PV generation </ul>               </td></tr>
-            <tr><td>                          </td><td><ul> heatpump - Household with heat pump(s) </ul>                                                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> heatpump - Household with heat pump(s) or air conditioner(s) </ul>                                                                                      </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Weighting of AI results with conventional (legacy) consumption forecast values.                                                                              </td></tr>
             <tr><td>                          </td><td><ul> * 0 - the AI results are not used, only legacy values. </ul>                                                                                            </td></tr>
@@ -38648,6 +38685,7 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>geminiAPIkey</b>      </td><td>The Google Gemini API key can be entered here for external analysis of AI training results for consumption forecasts.                                        </td></tr>
             <tr><td>                          </td><td>The API key can be generated for free at aistudio.google.com->‘Get API key’.                                                                                 </td></tr>
+            <tr><td>                          </td><td><b>Transparency Notice:</b> Data transmitted to Gemini is logged with ctrlDebug=apiCall enabled.                                                             </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
        </table>
        </ul>
@@ -41662,7 +41700,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td><ul> active - Haushalt mit ausgeprägten Tages- und/oder Verbrauchsrhythmen </ul>                                                                             </td></tr>
             <tr><td>                          </td><td><ul> bev - im Haushalt werden ein oder mehrere Elektrofahrzeuge geladen </ul>                                                                                </td></tr>
             <tr><td>                          </td><td><ul> pv - Haushalt mit PV-gesteuerten Lastmanagement, d.h. wenn sich der Energieverbrauch im Haushalt bei PV-Erzeugung typischerweise erhöht </ul>           </td></tr>
-            <tr><td>                          </td><td><ul> heatpump - Haushalt mit Wärmepumpe(n)  </ul>                                                                                                            </td></tr>
+            <tr><td>                          </td><td><ul> heatpump - Haushalt mit Wärmepumpe(n) oder Klimaanlage(n) </ul>                                                                                         </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>aiConAlpha</b>        </td><td>Gewichtung der KI-Ergebnisse mit den herkömmlich (Legacy) ermittelten Verbrauchsprognosewerten.                                                              </td></tr>
             <tr><td>                          </td><td><ul> * 0 - die KI-Ergebnisse werden nicht verwendet, nur Legacy Werte </ul>                                                                                  </td></tr>
@@ -41749,6 +41787,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
             <tr><td> <b>geminiAPIkey</b>      </td><td>Für die externe Analyse der Verbrauchsprognose KI Trainingsergebnisse kann hier der Google Gemini API-Schlüssel hinterlegt werden.                           </td></tr>
             <tr><td>                          </td><td>Der API-Schlüssel kann kostenlos unter aistudio.google.com->'Get API key' generiert werden.                                                                  </td></tr>
+            <tr><td>                          </td><td><b>Transparenzhinweis:</b> Die an Gemini übertragenen Daten werden mit ativierten ctrlDebug=apiCall im Log ausgegeben.                                       </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
         </table>
         </ul>
