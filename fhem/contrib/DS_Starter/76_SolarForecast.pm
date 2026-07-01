@@ -161,6 +161,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.8.1"  => "01.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -270,29 +271,6 @@ my %vNotesIntern = (
   "1.60.3" => "06.11.2025  more preparation for barrierSoC, ___batFindMinPhWh: code change, new parameter ctrlBatSocManagementXX->barrierSoC ",
   "1.60.2" => "03.11.2025  fix lowSoC comparison, ___batAdjustPowerByMargin: more preparation for barrierSoC ",
   "1.60.1" => "02.11.2025  ___batAdjustPowerByMargin: minor code change, preparation for barrierSoC ",
-  "1.60.0" => "01.11.2025  ___ownSpecGetFWwidget: handling of line breaks in attributes & can hamdle a key=value pair separateley ".
-                           "Width of a text field in graphicHeaderOwnspec fixed to 10, edit commandref ".
-                           "__batChargeOptTargetPower: use an average for the charging power if smartPower set and charging target are not achievable ".
-                           "__createOwnSpec: an empty field can be created within a line by simply using a colon (:). ".
-                           "add new key pvshare to CustomerXX attributes -> __setConsRcmdState add PV share calculation ".
-                           "___doPlanning: code improvements and implement PV share needed ".
-                           "_restorePlantConfig: fix problem with attr sequence ".
-                           "_setreset: set reset is reworked with widgetList, aiData can be deleted by index ".
-                           "_flowGraphic: new variable node2home_direction  ".
-                           "new sub askLogtime to avoid error logs too often, Forum: https://forum.fhem.de/index.php?msg=1350716 ",
-  "1.59.5" => "15.10.2025  new ___batAdjustPowerByMargin: implement optPower Safety margin decreasing proportionally to the linear surplus ".
-                           "new Reading Battery_TargetAchievable_XX, _batSocTarget: minor code change ",
-  "1.59.4" => "14.10.2025  new subs, ctrlBatSocManagementXX: new key loadTarget, replace __batCapShareFactor by __batDeficitShareFactor ".
-                           "__batChargeOptTargetPower: use pinmax if achievable==0, new ctrlBatSocManagementXX->stepSoC key ".
-                           "loadStrategy: possible value smartPower ",
-  "1.59.3" => "10.10.2025  ___batChargeSaveResults: fix writing 'rcdchargebatXX' ",
-  "1.59.2" => "09.10.2025  one more fix of color filling of svg icon ",
-  "1.59.1" => "08.10.2025  fixed transfer at day change, optimal SoC consideration in SoC forecast for optPower strategy ".
-                           "__normIconInnerScale: add path color filling, Calculation of time-weighted consumption or PV generation ".
-                           "in the current hour ",
-  "1.59.0" => "06.10.2025  new sub __normIconInnerScale to fix problem with chromium engine > 140.x, Forum: https://forum.fhem.de/index.php?msg=1349058 ",
-  "1.58.8" => "06.10.2025  __batChargeOptTargetPower: minor Code change ",
-  "1.58.7" => "05.10.2025  fix negative SoC forecast when using optPower Forum: https://forum.fhem.de/index.php?msg=1348954 ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -6651,10 +6629,11 @@ sub __generateCatOut {
 
       push @data, '</gpx>';
 
-      $err = FileWrite ( {FileName  => $dwdcatgpx,
-                          ForceType => 'file'
-                         }, @data
-                       );
+      my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+      
+      $err = FileWrite ( { FileName  => $dwdcatgpx,
+                           ForceType => $forceType,
+                         }, @data );
 
       if (!$err) {
           debugLog ($paref, 'dwdComm', qq{DWD catalog saved as gpx content: }.$dwdcatgpx);
@@ -7030,7 +7009,8 @@ sub __getaiFannState {            ## no critic "not used"
   my $conr2    = AiNeuralVal ($name, $fanntyp, 'R2',             '-');                      # Bestimmtheitsmaß R²
   my $conhaf   = AiNeuralVal ($name, $fanntyp, 'HiddActFunc',    '-');
   my $conoaf   = AiNeuralVal ($name, $fanntyp, 'OutActFunc',     '-');
-  my $retran   = AiNeuralVal ($name, $fanntyp, 'RetrainQuality', '-');
+  my $retrqal  = AiNeuralVal ($name, $fanntyp, 'RetrainQuality', '-');
+  my $retrres  = AiNeuralVal ($name, $fanntyp, 'RetrainReason',  '-');                      # Gründe für Retrain-Status
   my $valstd   = AiNeuralVal ($name, $fanntyp, 'StdDevValidMse', '-');
   my $valavg   = AiNeuralVal ($name, $fanntyp, 'AvgValidMse',    '-');    
   my $attemp   = AiNeuralVal ($name, $fanntyp, 'Attempt',        '-');
@@ -7072,7 +7052,7 @@ sub __getaiFannState {            ## no critic "not used"
   my $sem_ratio        = AiNeuralVal ($name, $fanntyp, 'DriftSemRatio',      '-');
   
   my $drift_retrecomd = AiNeuralVal ($name, $fanntyp, 'RetrainRecommendation', '-'); 
-  my $drift_retreason = AiNeuralVal ($name, $fanntyp, 'RetrainReason',         '-');
+  my $drift_retreason = AiNeuralVal ($name, $fanntyp, 'DriftRetrainReason',    '-');
   
   my $recomd_translated = $drift_retrecomd;
   
@@ -7124,10 +7104,10 @@ sub __getaiFannState {            ## no critic "not used"
                   $epoch_ampel eq 'grey'   ? FW_makeImage ('15px-grey.png',   $epoch_code) :
                   $epoch_code;
               
-  $modampel     = $modampel eq 'green'  ? FW_makeImage ('15px-green.png',  $retran) : 
-                  $modampel eq 'yellow' ? FW_makeImage ('15px-yellow.png', $retran) :
-                  $modampel eq 'red'    ? FW_makeImage ('15px-blue.png',   $retran) :
-                  $retran;
+  $modampel     = $modampel eq 'green'  ? FW_makeImage ('15px-green.png',  $retrqal) : 
+                  $modampel eq 'yellow' ? FW_makeImage ('15px-yellow.png', $retrqal) :
+                  $modampel eq 'red'    ? FW_makeImage ('15px-blue.png',   $retrqal) :
+                  $retrqal;
            
   my $atf  = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 0);
   my $ars  = CurrentVal  ($name, 'conNNGetResultState',      '-');
@@ -7179,7 +7159,7 @@ sub __getaiFannState {            ## no critic "not used"
                      ? ''
                      : "(".$hqtxt{hcause}{$lang}.": ".(encode('utf8', $display_reason)).")";
                      
-  my $rating_content = "<b>".$hqtxt{treval}{$lang}.":</b> $modampel ($retran)\n";
+  my $rating_content = "<b>".$hqtxt{treval}{$lang}.":</b> $modampel ($retrres)\n";
   $rating_content   .= "<b>".$hqtxt{dpreal}{$lang}.":</b> $dpr_ampel ($dpr_hint)\n";
   $rating_content   .= "<b>".$hqtxt{lrnbeh}{$lang}.":</b> $epoch_ampel ".(encode('utf8', $epoch_label))." ($epoch_rel_pct % ".$hqtxt{utiopc}{$lang}.") \n";        
   $rating_content   .= "<b>".$hqtxt{setins}{$lang}.":</b> ".(encode('utf8', $epoch_hints))."\n" if($epoch_hints);
@@ -8869,6 +8849,7 @@ sub _attrplantControl {                  ## no critic "not used"
       consForecastBase          => { comp => $cforegex,                                           act => 1 },
       showLink                  => { comp => '(0|1)',                                             act => 0 },
       comforttemp               => { comp => '.*',                                                act => 1 },
+      writeForceType            => { comp => '(auto|file)',                                       act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -11169,7 +11150,6 @@ sub writeCacheToFile {
       $hash      = $defs{$name};
   }
 
-  my $type = $hash->{TYPE};
   my ($error, $err, $lw);
 
   if ($cachename eq 'aitrained') {
@@ -11357,8 +11337,12 @@ sub writeCacheToFile {
   }
 
   push my @arr, encode_json ($data{$name}{$cachename});
-
-  $error = FileWrite ($file, @arr);
+  
+  my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+  
+  $error = FileWrite ( { FileName  => $file,
+                         ForceType => $forceType,
+                       }, @arr );
 
   if ($error) {
       $err = qq{ERROR writing cache file "$file": $error};
@@ -27669,7 +27653,7 @@ sub aiFannTrain {
                                                } 
                                              );
                                                
-  my $retrainQuality = $quality_href->{quality};
+  my $retrainQuality = $quality_href->{quality};                    
     
   # FANN-Model in TempFile speichern -> als BLOB String auslesen 
   #################################################################
@@ -27744,6 +27728,7 @@ sub aiFannTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{AvgValidMse}    = $val_mean;
   $data{$name}{$fanntyp.'temp'}{$attempt}{StdDevValidMse} = $val_std;
   $data{$name}{$fanntyp.'temp'}{$attempt}{RetrainQuality} = $retrainQuality;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RetrainReason}  = $quality_href->{retrain_reason}; 
   $data{$name}{$fanntyp.'temp'}{$attempt}{TargetMedian}   = $target_median;
   $data{$name}{$fanntyp.'temp'}{$attempt}{Attempt}        = $attempt;
   $data{$name}{$fanntyp.'temp'}{$attempt}{ShuffleMode}    = $shuffle_mode;
@@ -28424,7 +28409,7 @@ sub _aiFannRetrainIndicator {
   
   # --- Forecast Quality Score (0–100) + Ampel ---              
   my $rmse_rel_capped = $rmse_rel;
-  $rmse_rel_capped    = 60 if $rmse_rel_capped > 60;    # Cap, damit Peaks nicht alles zerstören
+  $rmse_rel_capped    = 60 if $rmse_rel_capped > 60;                            # Cap, damit Peaks nicht alles zerstören
 
   my $bias_w  = $profileweights{$profile}{bias_w};
   my $slope_w = $profileweights{$profile}{slope_w};
@@ -28443,8 +28428,8 @@ sub _aiFannRetrainIndicator {
   $score = round0 ($score);
   
   # --- Data Parameter Ratio ---
-  my $dpr_warn     = 5;                # unter diesem Wert: kritisch
-  my $dpr_caution  = 7;                # unter diesem Wert: Hinweis
+  my $dpr_warn     = 5;                                                         # unter diesem Wert: kritisch
+  my $dpr_caution  = 7;                                                         # unter diesem Wert: Hinweis
   my $dpr_hint     = 'ok';
 
   if ($dataParamRatio > 0) {
@@ -28454,24 +28439,50 @@ sub _aiFannRetrainIndicator {
                 : $dataParamRatio > 20           ? "INFO     (ratio=$dataParamRatio > 20): $retrain_translations{info}{$lang}"
                 : $dpr_hint; 
   }
+  
+  # --- Retrain-Gründe sammeln ---
+  my @retrain_reasons;
+
+  push @retrain_reasons, "score=$score < thd_retrain=$profileweights{$profile}{thd_retrain}"
+      if $score < $profileweights{$profile}{thd_retrain};
+
+  push @retrain_reasons, sprintf("overfitting: val/train MSE ratio=%.4f > %.1f", $ratio, $lim_ratio)
+      if $ratio > $lim_ratio;
+
+  push @retrain_reasons, sprintf("MSE diff=%.6f > %.3f", $diff, $lim_diff)
+      if $diff > $lim_diff;
+
+  push @retrain_reasons, sprintf("valstd=%.8f > limit=%.8f", $valstd, $lim_valstd)
+      if $valstd > $lim_valstd;
+ 
+  push @retrain_reasons, sprintf("rmse_mae_ratio=%.4f > %.1f", $rmse_mae_ratio, $lim_rmse_mae_ratio)
+      if $rmse_mae_ratio > $lim_rmse_mae_ratio;
+
+  push @retrain_reasons, "bitfail=$bitfail > $lim_bitfail"
+      if $bitfail > $lim_bitfail;
+
+  push @retrain_reasons, sprintf("bitfail_rate=%.4f > %.2f", $bitfail_rate, $lim_bitfail_rate)
+      if $bitfail_rate > $lim_bitfail_rate;
+
+  push @retrain_reasons, sprintf("slope=%.4f < slope_min=%.2f", $model_slope, $lim_slope_min)
+      if $model_slope < $lim_slope_min;
+
+  push @retrain_reasons, sprintf("slope=%.4f > slope_max=%.1f", $model_slope, $lim_slope_max)
+      if $model_slope > $lim_slope_max;
+
+  push @retrain_reasons, sprintf("bias=%.1f > lim_bias=%.1f (%.1f * mae)", abs($model_bias), $lim_bias, $profileweights{$profile}{bias_factor})
+      if abs($model_bias) > $lim_bias;
+
+  push @retrain_reasons, sprintf("rmse_rel=%.1f%% > %d%% AND p95=%.1f > %.1f", $rmse_rel, $lim_rmse_rel, $p95_error, $lim_p95_error)
+      if ($rmse_rel > $lim_rmse_rel && $p95_error > $lim_p95_error);
+
+  my $retrain_reason_str = @retrain_reasons ? join(' | ', @retrain_reasons) : 'ok';
     
-  # Bewertungstext
+  # --- Bewertungstext ---
   my $quality = "ok";
-
-  $quality = "Borderline" if ($score < $profileweights{$profile}{thd_borderline} && $score >= $profileweights{$profile}{thd_retrain});
-  $quality = "Retrain"    if ($score < $profileweights{$profile}{thd_retrain} 
-                                    || $ratio           > $lim_ratio
-                                    || $diff            > $lim_diff
-                                    || $bitfail         > $lim_bitfail
-                                    || $valstd          > $lim_valstd
-                                    || $rmse_mae_ratio  > $lim_rmse_mae_ratio
-                                    || $bitfail_rate    > $lim_bitfail_rate
-                                    || $model_slope     < $lim_slope_min
-                                    || $model_slope     > $lim_slope_max
-                                    || abs($model_bias) > $lim_bias
-                                    || ($rmse_rel       > $lim_rmse_rel && $p95_error > $lim_p95_error)    # P99 aus hartem Trigger entfernt
-                                 );
-
+  $quality    = "Borderline" if ($score < $profileweights{$profile}{thd_borderline} && $score >= $profileweights{$profile}{thd_retrain});
+  $quality    = "Retrain"    if scalar (@retrain_reasons);
+  
   my $ampel = $quality eq 'Retrain'    ? 'red' 
             : $quality eq 'Borderline' ? 'yellow'
             : 'green';
@@ -28479,6 +28490,7 @@ sub _aiFannRetrainIndicator {
   my $rethash = { quality         => $quality,
                   score           => $score,
                   ampel           => $ampel,
+                  retrain_reason  => $retrain_reason_str,
                   rmse            => $rmse,
                   rmse_rel        => $rmse_rel,
                   rmse_mae_ratio  => $rmse_mae_ratio,
@@ -28537,7 +28549,8 @@ sub _aiFannRetrainIndicator {
                       ($dpr_hint ? "DPR Warning: $dpr_hint \n" : "DPR: ok \n").
                       
                       "Forecast Quality Score=$score (limit=$profileweights{$profile}{thd_retrain}) \n".
-                      "-> Retrain decision=$quality");
+                      "-> Retrain decision=$quality".
+                      (@retrain_reasons ? "\n-> Retrain reasons: ".join("\n   ", @retrain_reasons) : ""));
   }                            
 
 return $rethash;
@@ -29643,13 +29656,13 @@ sub aiFannDetectDrift {
                                                
   if ($flag eq 'recalibrated') {
       $data{$name}{neuralnet}{$fanntyp}{RetrainRecommendation} = 'none';
-      $data{$name}{neuralnet}{$fanntyp}{RetrainReason}         = 'just_recalibrated';
+      $data{$name}{neuralnet}{$fanntyp}{DriftRetrainReason}    = 'just_recalibrated';
   }
   else {                                             
       # --- Retraining-Empfehlung
       my $retrain                                              = _aiFannRetrainRecommended ($name, $fanntyp);       # liefert Hash
       $data{$name}{neuralnet}{$fanntyp}{RetrainRecommendation} = $retrain->{recommendation};
-      $data{$name}{neuralnet}{$fanntyp}{RetrainReason}         = $retrain->{reason};
+      $data{$name}{neuralnet}{$fanntyp}{DriftRetrainReason}    = $retrain->{reason};
   }
   
   if ($debug =~ /aiProcess/xs) {
@@ -29676,7 +29689,7 @@ sub aiFannDetectDrift {
           $zone3_reset, 
           join (",", @hist),
           ($data{$name}{neuralnet}{$fanntyp}{RetrainRecommendation} // '-'),
-          ($data{$name}{neuralnet}{$fanntyp}{RetrainReason} // '-'),
+          ($data{$name}{neuralnet}{$fanntyp}{DriftRetrainReason}    // '-'),
       ) );
   }
   
@@ -31659,7 +31672,7 @@ sub _listDataPoolPvHist {
   }
 
   if ($export eq 'csv') {
-      return _writeAsCsv ($hash, $hexp, $pvhexprtcsv.$name.'.csv');
+      return _writeAsCsv ($name, $hexp, $pvhexprtcsv.$name.'.csv');
   }
 
 return $sq;
@@ -32425,7 +32438,7 @@ return $spn;
 #   Export Speicherstruktur in CSV-Datei
 ################################################################
 sub _writeAsCsv {
-  my $hash    = shift;
+  my $name    = shift;
   my $hexp    = shift;
   my $outfile = shift // return "No file specified for writing data";
 
@@ -32461,8 +32474,12 @@ sub _writeAsCsv {
           push @data, join(',', map { s{"}{""}g; qq{"$_"};} @aexp);
       }
   }
-
-  my $err = FileWrite ($outfile, @data);
+  
+  my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+  
+  my $err = FileWrite ( { FileName  => $outfile,
+                          ForceType => $forceType,
+                        }, @data );
   return $err if($err);
 
 return "The memory structure was written to the file $outfile";
@@ -43019,6 +43036,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>showLink</b>                  </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                                                              </td></tr>
             <tr><td>                                  </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+            <tr><td> <b>writeForceType</b>            </td><td>Legt den Persistenztyp für die Speicherung der Bewegungsdaten fest. (Manche Daten werden grundsätzlich im Filesystem persistiert)     </td></tr>
+            <tr><td>                                  </td><td><b>auto</b> - Speicherung in Filesystem oder ConfigDB wenn vorhanden, <b>file</b> - Speicherung im Filesystem, default: auto          </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                      </td></tr>
          </table>
          </ul>
 
