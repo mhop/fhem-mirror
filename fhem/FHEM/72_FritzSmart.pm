@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.07.01";
+our $ModulVersion = "26.07.03";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -1349,7 +1349,6 @@ sub Fritz_Initialize_Modul($)
   $hash->{GetFn}       = "Fritz::Fritz_Get_Modul";
   $hash->{AttrFn}      = "Fritz::Fritz_Attr_Modul";
 
-#  main::Log3 $hash, 3, "Fritz_Get_attrList(initial)";
   $hash->{AttrList}    = Fritz_Get_attrList($hash);
 
 #    $hash->{AttrRenameMap} = { "enableMobileModem" => "enableMobileInfo"
@@ -1555,9 +1554,27 @@ sub Fritz_Notify_Modul($$)
 
   if($devName eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
   {
+
+     # initialize Parameters from Attributes
+     $own_hash->{helper}{FhemLog3Std}                         = main::AttrVal($ownName , "FhemLog3Std", 0);
+     $own_hash->{XML_PARSER}                                  = main::AttrVal($ownName , "xmlParser", $own_hash->{helper}{XML_Default});
+     $own_hash->{helper}{LuaQueryCmd}{vpn_info}{AttrVal}      = main::AttrVal($ownName , "enableVPNShares", 0);
+     $own_hash->{helper}{LuaQueryCmd}{userProfil}{AttrVal}    = main::AttrVal($ownName , "enableUserInfo" , 0);
+     $own_hash->{helper}{LuaQueryCmd}{userProfilNew}{AttrVal} = main::AttrVal($ownName , "enableUserInfo" , 0);
+     $own_hash->{helper}{LuaQueryCmd}{alarmClock}{AttrVal}    = main::AttrVal($ownName , "enableAlarmInfo", 0);
+     $own_hash->{helper}{LuaQueryCmd}{fonPort}{AttrVal}       = main::AttrVal($ownName , "disableFonInfo" , 0);
+     $own_hash->{helper}{LuaQueryCmd}{userTicket}{AttrVal}    = main::AttrVal($ownName , "userTickets"    , 0);
+
      # initialize DEGUB LOg function
      Fritz_dbgLogInit($own_hash, "init", "verbose", main::AttrVal($ownName, "verbose", -1));
      # end initialize DEGUB LOg function
+
+     if(! exists($own_hash->{helper}{TimerReadout})) {
+       Fritz_Log $own_hash, 2, "start of Device readout parameters";
+       $own_hash->{helper}{TimerReadout}   = $ownName . ".Readout";
+       main::RemoveInternalTimer($own_hash->{helper}{TimerReadout});
+       main::InternalTimer(gettimeofday() + 1 , "Fritz::Fritz_Readout_Start", $own_hash->{helper}{TimerReadout}, 0);
+     }
   }
 }
 
@@ -1701,7 +1718,7 @@ sub Fritz_Define_Modul($$)
      $hash->{fhem}{multiple_wlan}{cnt}   = 1;
      $hash->{fhem}{multiple_wlan}{names} = "wlan2.4";
 
-     $hash->{helper}{TimerReadout}   = $name . ".Readout";
+#     $hash->{helper}{TimerReadout}   = $name . ".Readout";
      $hash->{helper}{TimerCmd}       = $name . ".Cmd";
      $hash->{helper}{TimerSHInfoExt} = $name . ".SHExt";
      $hash->{helper}{FhemLog3Std}    = main::AttrVal($name, "FhemLog3Std", 0);
@@ -1755,9 +1772,12 @@ sub Fritz_Define_Modul($$)
      $hash->{IPv6}                = -1;
      $hash->{WAN_ACCESS_TYPE}     = "WLAN";
 
-     Fritz_Log $hash, 4, "start of Device readout parameters";
-     main::RemoveInternalTimer($hash->{helper}{TimerReadout});
-     main::InternalTimer(gettimeofday() + 1 , "Fritz::Fritz_Readout_Start", $hash->{helper}{TimerReadout}, 0);
+     if($init_done) {
+       Fritz_Log $hash, 2, "start of Device readout parameters";
+       $hash->{helper}{TimerReadout}   = $name . ".Readout";
+       main::RemoveInternalTimer($hash->{helper}{TimerReadout});
+       main::InternalTimer(gettimeofday() + 1 , "Fritz::Fritz_Readout_Start", $hash->{helper}{TimerReadout}, 0);
+     }
    }
 
    return undef;
