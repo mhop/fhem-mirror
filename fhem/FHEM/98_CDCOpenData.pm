@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.12f";
+my $ModulVersion = "01.13";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -310,6 +310,8 @@ sub CDCOpenData_Initialize($)
                     ."clearRadarFileLog "
                     ."RainRadarFileLog "
                     ."ownRadarFileLog:0,1 "
+                    ."sFTP_TimeOut:10,20,30,40,50 "
+                    ."sFTP_Passive:0,1 "
                     .$readingFnAttributes;
 
 } # end CDCOpenData_Initialize
@@ -671,6 +673,21 @@ sub CDCOpenData_Attr($@)
        }
      }
    }
+
+
+   if ($aName eq "sFTP_TimeOut") {
+
+     if ($cmd eq "set") {
+       return "sFTP_TimeOut: $aVal. Valid is 10 ... 50." if ($aVal <= 10 || $aVal >= 50);
+     }
+   } # end sFTP_TimeOut
+
+   if ($aName eq "sFTP_Passive") {
+
+     if ($cmd eq "set") {
+       return "sFTP_Passive: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
+     }
+   } # end sFTP_Passive
 
    if ($aName eq "ownRadarFileLog") {
      my $dirdef   = Logdir() . "/";
@@ -1152,7 +1169,14 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
    use IO::Uncompress::Bunzip2 qw(bunzip2 $Bunzip2Error);
 
    # create ftp instance to DWD opendata server:
-   my $ftp = Net::FTP->new($HOST, Debug => 0, Timeout => 10);
+   my $passive = AttrVal($name, "sFTP_Passive", 0);
+   my $timeout = AttrVal($name, "sFTP_TimeOut", 10);
+   my %args = (
+      Debug => 0,
+      Timeout => $timeout,
+      Passive => $passive
+   );
+   my $ftp = Net::FTP->new($HOST, %args);
    if (defined($ftp)) {
 
       unless ($ftp->login()) {
@@ -1365,7 +1389,14 @@ sub CDCOpenData_Readout_Run_Rain_Since_Midnight ($@) {
    my $DWDpath = "/climate_environment/CDC/grids_germany/hourly/radolan/recent/bin/";
 
    # create ftp instance to DWD opendata server:
-   my $ftp = Net::FTP->new($HOST, Debug => 0, Timeout => 10);
+   my $passive = AttrVal($name, "sFTP_Passive", 0);
+   my $timeout = AttrVal($name, "sFTP_TimeOut", 10);
+   my %args = (
+      Debug => 0,
+      Timeout => $timeout,
+      Passive => $passive
+   );
+   my $ftp = Net::FTP->new($HOST, %args);
    if (defined($ftp)) {
 
       unless ($ftp->login()) {
@@ -1600,7 +1631,15 @@ sub CDCOpenData_Readout_Run_getRain($@)
      my $DWDpath = "/climate_environment/CDC/grids_germany/daily/radolan/recent/bin/";
 
      # create ftp instance to DWD opendata server:
-     my $ftp = Net::FTP->new($HOST, Debug => 0, Timeout => 10);
+
+     my $passive = AttrVal($name, "sFTP_Passive", 0);
+     my $timeout = AttrVal($name, "sFTP_TimeOut", 10);
+     my %args = (
+        Debug => 0,
+        Timeout => $timeout,
+        Passive => $passive
+     );
+     my $ftp = Net::FTP->new($HOST, %args);
 
      if (defined($ftp)) {
 
@@ -2576,6 +2615,18 @@ sub CDCOpenData_myCalcColor {
          Timeout for fetching data. Default is 55 (seconds).
       </li><br>
 
+      <li><a name="sFTP_Passive"></a>
+         <dt><code>attr &lt;name&gt; sFTP_Passive &lt;0 | 1&gt;</code></dt>
+         <br>
+         When set, sFTP runs in passive mode.
+      </li><br>
+
+      <li><a name="sFTP_TimeOut"></a>
+         <dt><code>attr &lt;name&gt; sFTP_TimeOut &lt;10 .. 50&gt;</code></dt>
+         <br>
+         Sets the timeout to a value between 10 and 50 seconds. The default is 10 seconds.
+      </li><br>
+
       <li><a name="numberOfDays"></a>
          <dt><code>attr &lt;name&gt; numberOfDays &lt;0..9&gt;</code></dt>
          <br>
@@ -2758,6 +2809,18 @@ sub CDCOpenData_myCalcColor {
          <dt><code>attr &lt;name&gt; numberOfDays &lt;0..9&gt;</code></dt>
          <br>
          Anzahl der Tage, für die Daten *_day_rain als Reading vorgehalten werden. Standard sind 5 Readings.
+      </li><br>
+
+      <li><a name="sFTP_Passive"></a>
+         <dt><code>attr &lt;name&gt; sFTP_Passive &lt;0 | 1&gt;</code></dt>
+         <br>
+         Wenn gesetzt wird sFTP im Modus: Passive ausgeführt.
+      </li><br>
+
+      <li><a name="sFTP_TimeOut"></a>
+         <dt><code>attr &lt;name&gt; sFTP_TimeOut &lt;10 .. 50&gt;</code></dt>
+         <br>
+         Setzt den Timeout auf einen Wert zwischen 10 und 50 Sekunden. Standard sind 10 Sekunden.
       </li><br>
 
       <li><a name="updateOnStart"></a>
