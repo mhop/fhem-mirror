@@ -678,7 +678,7 @@ sub CDCOpenData_Attr($@)
    if ($aName eq "sFTP_TimeOut") {
 
      if ($cmd eq "set") {
-       return "sFTP_TimeOut: $aVal. Valid is 10 ... 50." if ($aVal <= 10 || $aVal >= 50);
+       return "sFTP_TimeOut: $aVal. Valid is 10 ... 50." if ($aVal < 10 || $aVal > 50);
      }
    } # end sFTP_TimeOut
 
