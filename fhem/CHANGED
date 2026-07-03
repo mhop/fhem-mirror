@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 98_CDCOpenData: neue Attribute
+ - bugfix:  72_FritzSmart: kleinere Korrektur
  - bugfix:  72_FritzSmart: xmlParser Auswahlfehler behoben
  - feature: 76_SolarForecast: Version 2.8.0
  - bugfix:  72_FritzSmart: Fehler korrigiert
