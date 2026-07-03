@@ -161,7 +161,9 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.1"  => "01.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ",
+  "2.8.1"  => "03.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
+                           "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
+                           "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -182,7 +184,7 @@ my %vNotesIntern = (
   "2.6.11" => "26.05.2026  _saveEnergyConsumption: nutze Logsequenzmanagement für Verbrauchslimitüberschreitung ".
                            "_aiFannApplyBiasCorrection: Anpassung OSL-Gewicht ",
   "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
-                           "aiFannConInferenz: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
+                           "aiFannConInfer: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
                            "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
                            "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ".
                            "Fix Bat Prognose < 100% wenn Bat voll und PVü > Con, safetyMargin default: 20:20 gesetzt ".
@@ -236,7 +238,7 @@ my %vNotesIntern = (
                            "integrate new consumer type=bev as a device with no control, rework of _listDataPoolPvHist ",
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
-                           "aiFannCreateConTrainData: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
+                           "aiFannConDataLoad: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
                            "extended/refactored: writeCacheToFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
                            "new key graphicControl->headerShowEnv, _saveEnergyConsumption: implemntation of MAXCONLIMIT ".
                            "new key plantControl->conEnergyHourLimit ",
@@ -630,25 +632,25 @@ my %fann_valid_versions = map { $_ => 1 } qw(v1 v2);                          # 
 my %fann_valid_flags    = map { $_ => 1 } qw(active pv heatpump bev);         # valide Flags für Profil-Synthese CON-Training
 
 my %profileweights = (                                                        # Gewichte für FANN Training und Inferenz profilabhängig     
-  v1_sandbox            => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common             => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_active      => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_pv          => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_active_pv   => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_heatpump           => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active    => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_pv        => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_pv => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_sandbox            => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_common             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_common_active      => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_common_pv          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_common_active_pv   => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_heatpump           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 350, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_active    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 350, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_pv        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 350, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_active_pv => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 350, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
 
   # --- BEV-Varianten (Startwerte, gespiegelt von common/heatpump; nach erstem realen Training rekalibrieren) ---
-  v1_bev                       => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_active_bev                => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_pv_bev                    => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_active_pv_bev             => { slope_min => 0.25, bias_factor => 3.0, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_heatpump_bev              => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_bev       => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_pv_bev           => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_pv_bev    => { slope_min => 0.60, bias_factor => 1.5, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_bev                    => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_active_bev             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_pv_bev                 => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_active_pv_bev          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
+  v1_heatpump_bev           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 350, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_active_bev    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 350, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_pv_bev        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 350, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_heatpump_active_pv_bev => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 350, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
 );
 
 my %hset = (                                                                  # Hash der Set-Funktion
@@ -1614,14 +1616,14 @@ my %weather_ids = (
 my %hef = (                                                                      # Energiefaktoren für Verbrauchertypen
   "heater"         => { f => 1.00, m => 1.00, l => 1.00, mt => 240         },
   "other"          => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },    # f   = Faktor Energieverbrauch in erster Stunde (wichtig auch für Kalkulation in __calcEnergyPieces !)
-  "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch zwischen erster und letzter Stunde
-  "dishwasher"     => { f => 0.45, m => 0.10, l => 0.45, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
-  "dryer"          => { f => 0.40, m => 0.40, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
+  "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch der Folgestunden 
+  "dishwasher"     => { f => 0.15, m => 0.02, l => 0.15, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
+  "dryer"          => { f => 0.40, m => 0.20, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
   "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
   "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
-  "heatpump"       => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
+  "heatpump"       => { f => 0.25, m => 0.25, l => 0.25, mt => DEFMINTIME  },
   "bev"            => { f => 1.00, m => 1.00, l => 1.00, mt => 600         },
-  "dehydrator"     => { f => 1.00, m => 1.00, l => 1.00, mt => 600         },
+  "dehydrator"     => { f => 0.80, m => 0.80, l => 0.80, mt => 600         },
 );
 
 my @ctypes = sort keys (%hef);                                                  # erlaubte Consumer Typen                                   
@@ -3711,12 +3713,22 @@ sub _setaiDecTree {                   ## no critic "not used"
       __getopenMeteoGHIreplace ($paref);
   }
   elsif ($prop eq 'runConTrain') {
-      BlockingKill ($hash->{HELPER}{AINNTRAINBLOCKRUN}) if(defined $hash->{HELPER}{AINNTRAINBLOCKRUN});
-      my $err = aiFannEnterTraining ($paref);
+      my $fanntyp = 'con';
+      my $blkkey  = 'AINNTRAIN_' . uc($fanntyp) . '_BLOCKRUN';
+      
+      BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
+      
+      $paref->{fanntyp} = $fanntyp;
+      my $err = aiEnterTrain ($paref);
+      delete $paref->{fanntyp};
+      
       return $err;
   }
   elsif ($prop eq 'stopConTrain') {
-      BlockingKill ($hash->{HELPER}{AINNTRAINBLOCKRUN}) if(defined $hash->{HELPER}{AINNTRAINBLOCKRUN});
+      my $fanntyp = 'con';
+      my $blkkey  = 'AINNTRAIN_' . uc($fanntyp) . '_BLOCKRUN';
+      
+      BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
   }
 
 return;
@@ -6974,7 +6986,7 @@ sub __getaiFannState {            ## no critic "not used"
   my $aiAlpha = 1;
   
   if ($fanntyp eq 'con') {
-      ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+      ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp);
       $aiAlpha                  = CurrentVal ($name, 'aiConAlpha', 1);                      # eingestellte Gewichtung AI
   }
   
@@ -7618,7 +7630,7 @@ sub _aiFannGeminiApiAssess {
   my ($prepared, $rdy, $cause);
   
   if ($fanntyp eq 'con') {
-      ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+      ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp);
   }
        
   if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
@@ -7654,6 +7666,8 @@ sub _aiFannGeminiApiAssess {
   my $numRec    = AiNeuralVal ($name, $fanntyp, 'NumTraindata',   'n/a');
   my $numFeat   = AiNeuralVal ($name, $fanntyp, 'NumInputs',      'n/a');                       # Anzahl der Features
   my $dpr       = AiNeuralVal ($name, $fanntyp, 'dataParamRatio', 'n/a');
+  my $tramse    = AiNeuralVal ($name, $fanntyp, 'TrainMse',       'n/a');
+  my $valmse    = AiNeuralVal ($name, $fanntyp, 'ValidationMse',  'n/a');
   
   my $noiseLvl  = AiNeuralVal ($name, $fanntyp, 'NoiseLevel',     'n/a');
   my $talgo     = AiNeuralVal ($name, $fanntyp, 'TrainAlgo',      'n/a');
@@ -7691,6 +7705,11 @@ sub _aiFannGeminiApiAssess {
     . qq{Fehlertoleranz pro Datenpunkt – ein HÖHERER Wert bedeutet MEHR Toleranz }
     . qq{(mehr Fehler werden akzeptiert, bevor ein Sample als Bit_Fail zählt), }
     . qq{ein NIEDRIGERER Wert bedeutet strengere Bewertung. }
+    . qq{Wichtig zur Diagnose von frühzeitiger Konvergenz: }
+    . qq{Wenn Val MSE > Train MSE (Overfitting-Indikator) UND wenige Epochen genutzt werden, }
+    . qq{deutet das auf eine zu hohe Lernrate hin – Empfehlung dann: Lernrate REDUZIEREN. }
+    . qq{Nur wenn Val MSE ≈ Train MSE und wenige Epochen genutzt werden, }
+    . qq{kann eine höhere Lernrate sinnvoll sein. }
     . qq{Gliedere die Antwort in: Gesamtbewertung, Auffälligkeiten, Empfehlung. }
     . qq{Maximal 350 Wörter.}
 
@@ -7714,7 +7733,12 @@ sub _aiFannGeminiApiAssess {
     . qq{Important note on parameter behavior: BitFailLimit (aiConBitFailLimit) defines the }
     . qq{error tolerance per data point—a HIGHER value means MORE tolerance }
     . qq{(more errors are accepted before a sample is counted as a Bit_Fail), }
-    . qq{a LOWER value means stricter evaluation. }
+    . qq{a LOWER value means stricter evaluation. }  
+    . qq{Important for diagnosing premature convergence: }
+    . qq{If Val MSE > Train MSE (overfitting indicator) AND few epochs have been used, }
+    . qq{this indicates that the learning rate is too high—recommendation: REDUCE the learning rate. }
+    . qq{Only if Val MSE ≈ Train MSE and few epochs are used, }
+    . qq{might a higher learning rate be appropriate. }
     . qq{Structure: Overall assessment, Notable points, Recommendation. }
     . qq{Max 350 words.};
     
@@ -7750,6 +7774,8 @@ Hyperparameter aktuell:
  Rauschbewertung:      $noiseLvl
 
 Qualitätsmetriken:
+  Training MSE:   $tramse
+  Validation MSE: $valmse
   R²:             $r2
   MAE:            $mae Wh
   Slope:          $slope
@@ -7781,6 +7807,8 @@ Current hyperparameters:
  Noise level:          $noiseLvl
  
 Quality metrics:
+  Training MSE:   $tramse
+  Validation MSE: $valmse
   R²:             $r2
   MAE:            $mae Wh
   Slope:          $slope
@@ -10655,9 +10683,11 @@ return;
 sub Shutdown {
   my $hash = shift;
   my $name = $hash->{NAME};
-  my $type = $hash->{TYPE};
   
-  BlockingKill ($hash->{HELPER}{AINNTRAINBLOCKRUN}) if(defined $hash->{HELPER}{AINNTRAINBLOCKRUN});
+  my $fanntyp = 'con';
+  my $blkkey  = 'AINNTRAIN_' . uc($fanntyp) . '_BLOCKRUN';
+  
+  BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
 
   writeCacheToFile ($hash, 'pvhist',          $pvhcache.$name, 'nolog');             # Cache File für PV History schreiben
   writeCacheToFile ($hash, 'circular',        $pvccache.$name, 'nolog');             # Cache File für PV Circular schreiben
@@ -12069,13 +12099,8 @@ sub _collectAllRegConsumers {
       my $rauto = $hc->{auto} // q{};
       my $ctype = $hc->{type} // DEFCTYPE;
       
-      if ($ctype eq 'heatpump') {
-          $hc->{mode} = 'mustNot';
-          push @hp, $c;
-      }
-      
       if ($ctype eq 'bev') {
-          $hc->{mode} = 'mustNot';
+          $hc->{mode} = 'mustNot';      
           push @ev, $c;
       }
       
@@ -12397,22 +12422,25 @@ sub _specialActivities {
   
   ## Task 7
   ###########
-  my ($aiconpd, $aiconhr) = split ":", CurrentVal ($name, 'aiConTrainStart', '7:3');            # Periode (in Tagen):Stunde f. Start Training KI Consumption 
+  my ($aiconpd, $aiconhr) = split ":", CurrentVal ($name, 'aiConTrainStart', '7:3');                            # Periode (in Tagen):Stunde f. Start Training KI Consumption 
   
   if ($chour == $aiconhr && $minute >= 20) {
       if (!defined $hash->{HELPER}{T7RUN}) {
           $hash->{HELPER}{T7RUN} = 1;
           
-          my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
-          my $ltctrfts                 = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 86400);      # letztes erfolgreiches KI Consumption Training...
+          my $fanntyp                  = 'con';
+          my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp);
+          my $ltctrfts                 = CircularVal ($name, 99, $fanntyp.'NNTrainLastFinishTs', 86400);        # letztes erfolgreiches KI Consumption Training...
           my $tfo                      = timestringsFromOffset ($name, $ltctrfts, 0);
           my $tfodate                  = $tfo->{date};
-          my $ltctrts                  = timestringToTimestamp ($hash, $tfodate.' 00:00:00');           # ...auf Tag genau
+          my $ltctrts                  = timestringToTimestamp ($hash, $tfodate.' 00:00:00');                   # ...auf Tag genau
           my $newctrstts               = $ltctrts + ($aiconpd * 86400);
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 started");
           
-          aiFannEnterTraining ($paref) if($prepared && $t >= $newctrstts);                              # NN Consumption Forecast Training starten
+          $paref->{fanntyp} = $fanntyp;
+          aiEnterTrain ($paref) if($prepared && $t >= $newctrstts);                                             # NN Consumption Forecast Training starten
+          delete $paref->{fanntyp};
           
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 finished");
       }
@@ -17880,7 +17908,7 @@ sub ___switchConsumerOn {
       
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - priority=$swprio});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - general switching parameters => }.
-                      qq{auto mode=$auto, Current household consumption=$cons W, nompower=$nompow W, surplus=$sp W, }.
+                      qq{auto mode=$auto, Household con=$cons W, nompower=$nompow W, surplus=$sp W, Mode=$cplmode, }.
                       qq{planstate=$pstate, starttime=}.($startts ? (timestampToTimestring ($name, $startts, $lang))[0] : "undef")
            );
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - isInLocktime=$iilt}.($rlt ? ", remainLockTime=$rlt seconds" : ''));
@@ -17935,10 +17963,10 @@ sub ___switchConsumerOn {
           delete $paref->{ps};
       }
       elsif ($cplmode eq 'mustNot') {                                                               # darf nicht eingeschaltet werden
-          $state = qq{switching-on consumer '$calias' is NOT permitted (mode: mustNot)};
+          $state = qq{switching-on command consumer '$calias' is NOT permitted (mode: mustNot)};
           
           if ($debug =~ /consumerSwitching${c}/x) {
-              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - switching-on consumer '$calias' is NOT permitted (mode: mustNot)});
+              Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - $state});
           }          
       }
       elsif ($cplmode eq 'must' || $isConsRcmd) {                                                   # "Muss"-Planung oder Überschuß > Ratio (can)
@@ -17998,6 +18026,13 @@ sub ___switchConsumerOn {
       delete $paref->{ps};
 
       $data{$name}{current}{consumerCacheDirty} = 1;                                                # Cache File Consumer schreiben
+  }
+  elsif ($cplmode eq 'mustNot') {                                                                   # darf nicht eingeschaltet werden
+      $state = qq{switching-on command consumer '$calias' is NOT permitted (mode: mustNot)};
+      
+      if ($debug =~ /consumerSwitching${c}/x) {
+          Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - $state});
+      }          
   }
 
 return $state;
@@ -18664,10 +18699,10 @@ sub _calcConsForecast {                  ## no critic "not used"
   
   _calcConsForecast_legacy ($paref);                                                # legacy Verbrauchsprognose
   
-  my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+  my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, 'con');
   
   if ($rdy) {                                                                       # NN Verbrauch ist ready to use      
-      my $err = aiFannConInferenz ($paref);                                          # Verbrauchsprognose via neuronales Netz
+      my $err = aiFannConInfer ($paref);                                            # Verbrauchsprognose via neuronales Netz
       Log3 ($name, 1, "$name - ERROR - $err") if($err);
       return;
   }
@@ -19447,7 +19482,7 @@ sub _calcDataEveryFullHour {
       _addCon2CircArray ($paref);                                                                 # Hausverbrauch / Netzbezug der vergangenen Stunde zum con-Array im Circular Speicher hinzufügen
 
       # --- Drift Analyse ---
-      my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);         
+      my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, 'con');         
       aiFannDetectDrift ($name, $t, $lang, $debug, 'con') if($rdy);                               # Drift von AI 'con' Werten ermitteln
 
       # --- con - Quantile bestimmen ---    
@@ -25394,47 +25429,65 @@ return $ridx;
 }
 
 #####################################################################
-#  Einstieg in das Neuronale Netz Verbrauchsvorhersage 
-#  Trainingsdaten & Train Prozess Blocking
+#  Einstieg in das KI-Training
+#  Trainingsdaten & Train Prozess non-Blocking
+#  $paref->{fanntyp} = 'con' | 'pv'
 #####################################################################
-sub aiFannEnterTraining {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $hash  = $defs{$name};
-   
-  my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
-  
+sub aiEnterTrain {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $fanntyp = $paref->{fanntyp} // 'con';                                                         # 'con' | 'pv'
+
+  my $blkkey = 'AINNTRAIN_' . uc($fanntyp) . '_BLOCKRUN';
+  my $hash   = $defs{$name};
+
+  my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp);
+      
+  my $ai_attr   = $fanntyp eq 'con' ? 'aiConActivate' : 'aiPvActivate';
+  my $targettyp = $fanntyp eq 'con' ? 'consumption'   : 'PV';
+
   if (!$prepared) {
       return $cause;
   }
-  elsif (!$rdy && $cause =~ /forecasting\sis\snot\sactivated/xs) {
-      return "The neural network for consumption forecasting is not activated. \n".
-              "You can activate this AI with 'attr $name aiControl aiConActivate=..'. ";
+  elsif (!$rdy && $cause =~ /forecasting\sis\snot\sactivated/xs) {      
+      return "The neural network for $targettyp forecasting is not activated.\n".
+             "You can activate this AI with 'attr $name aiControl ${ai_attr}=..'. ";
   }
 
-  if (defined $hash->{HELPER}{AINNTRAINBLOCKRUN}{pid} && $hash->{HELPER}{AINNTRAINBLOCKRUN}{pid} =~ /DEAD/xs) {
-      delete $hash->{HELPER}{AINNTRAINBLOCKRUN};
+  if (defined $hash->{HELPER}{$blkkey}{pid} && $hash->{HELPER}{$blkkey}{pid} =~ /DEAD/xs) {
+      delete $hash->{HELPER}{$blkkey};
+  }
+  
+  if (defined $hash->{HELPER}{$blkkey}{pid}) {
+      Log3 ($name, 3, qq{$name - another AI FANN Training for } . uc($fanntyp) . qq{ Forecast with PID "$hash->{HELPER}{$blkkey}{pid}" is already running ... start Training aborted});
+      return "another AI FANN Training for " . uc($fanntyp) . " Forecast is already running";
   }
 
-  if (defined $hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}) {
-      Log3 ($name, 3, qq{$name - another AI FANN Training for Consumption Forecast with PID "$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}" is already running ... start Training aborted});
-      return "another AI FANN Training for Consumption Forecast is already running";
+  my $finish_sub   = "FHEM::SolarForecast::aiFannFinishTrain";
+  
+  my $abort_sub    = $fanntyp eq 'con'
+                   ? "FHEM::SolarForecast::aiFannConAbortTrain"
+                   : "FHEM::SolarForecast::aiFannPvAbortTrain";                                         # später
+  
+  my $dataload_sub = $fanntyp eq 'con' 
+                   ? "FHEM::SolarForecast::aiFannConDataLoad"
+                   : "FHEM::SolarForecast::aiFannPvDataLoad";                                           # später
+  
+  $hash->{HELPER}{$blkkey} = BlockingCall ( $dataload_sub,
+                                            $paref,
+                                            $finish_sub,
+                                            AINNTRBLTO,
+                                            $abort_sub,
+                                            $hash
+                                          );
+  
+  if (defined $hash->{HELPER}{$blkkey}) {
+      $data{$name}{current}{$fanntyp.'NNTrainstate'} = 'is just retrained';
+      $hash->{HELPER}{$blkkey}{loglevel}             = 3;                                           # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
+      
+      debugLog ($paref, 'aiProcess', qq{AI FANN Training for $targettyp Forecast BlockingCall PID "$hash->{HELPER}{$blkkey}{pid}" with Timeout } . AINNTRBLTO . " s started");
   }
-
-  $hash->{HELPER}{AINNTRAINBLOCKRUN} = BlockingCall ( "FHEM::SolarForecast::aiFannCreateConTrainData",
-                                                      $paref,
-                                                      "FHEM::SolarForecast::aiFannFinishTrain",
-                                                      AINNTRBLTO,
-                                                      "FHEM::SolarForecast::aiFannAbortConTrain",
-                                                      $hash
-                                                    );
-
-  if (defined $hash->{HELPER}{AINNTRAINBLOCKRUN}) {
-      $data{$name}{current}{conNNTrainstate}        = 'is just retrained';
-      $hash->{HELPER}{AINNTRAINBLOCKRUN}{loglevel}  = 3;                     # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
-      debugLog ($paref, 'aiProcess', qq{AI FANN Training for Consumption Forecast BlockingCall PID "$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}" with Timeout }.AINNTRBLTO." s started");
-  }
-
+  
 return;
 }
 
@@ -25442,7 +25495,7 @@ return;
 #  Trainingsdaten für neuronales Netz Verbrauchsdaten aus 
 #  Raw Daten Hash erzeugen
 ################################################################
-sub aiFannCreateConTrainData {
+sub aiFannConDataLoad {
   my $paref = shift;
   my $name  = $paref->{name}; 
   my $debug = $paref->{debug}; 
@@ -25979,9 +26032,1410 @@ sub aiFannCreateConTrainData {
   $paref->{bevremmin}            = $bevremmin;
   $paref->{bevremmax}            = $bevremmax;
 
-  $serial = aiFannTrainstartAndRetry ($paref);
+  $serial = aiFannTrain ($paref);
 
 return $serial;
+}
+
+################################################################
+# Training anstarten und qualitätsgesteuert ggf.
+# mehrfach ausführen - das beste Trainingsergebnis finalisieren
+################################################################
+sub aiFannTrain {
+  my $paref         = shift;
+  my $name          = $paref->{name}; 
+  my $debug         = $paref->{debug};
+  my $fanntyp       = $paref->{fanntyp};                            # Verwendungstyp (z.B. 'con')
+  
+  my $maxRtyRetrain     = 3;                                        # max. Trainingsretries bei Status "Retrain"
+  my $maxRtyBorderline  = 2;                                        # max. Trainingsretries bei Status "Borderline"
+  my $aiconact          = CurrentVal ($name, 'aiConActivate', 0);   # evtl. Train-Only eingeschaltet?
+  
+  # Training starten
+  #################### 
+  my $retref = aiFannRunTrain ($paref);
+  
+  # Retry prüfen und ggf. ausführen
+  ###################################
+  my $NNTrainstate     = $retref->{$fanntyp.'NNTrainstate'};
+  my $retrainQuality   = $retref->{$fanntyp.'NNRetrainQuality'}; 
+  my $attempt          = $retref->{$fanntyp.'NNAttempt'};      
+  my $seed             = $retref->{$fanntyp.'NNSeed'};
+  my $best_score       = $retref->{$fanntyp.'NNScore'};
+  my $best_r2          = $retref->{$fanntyp.'NNR2'};  
+  my $best_modelslope  = $retref->{$fanntyp.'NNModelSlope'};  
+  my $best_modelbias   = $retref->{$fanntyp.'NNModelBias'};
+  my $best_rmse        = $retref->{$fanntyp.'NNRmse'}; 
+  my $best_rmse_rel    = $retref->{$fanntyp.'NNRmseRel'};  
+  my $best_rmse_rating = $retref->{$fanntyp.'NNRmseRating'};
+  my $best_bit_fail    = $retref->{$fanntyp.'NNBestBitFail'};
+  my $best_val_mse     = $retref->{$fanntyp.'NNBestValMse'};
+  my $best_val_mae     = $retref->{$fanntyp.'NNBestValMae'}; 
+  my $best_val_medae   = $retref->{$fanntyp.'NNBestValMedae'};
+
+  #$retrainQuality = 'ok';   # Wiederholung temporär ausschalten
+  
+  my $best_composite = _aiFannCompositeScore ( { score    => $best_score,
+                                                 rmse_rel => $best_rmse_rel,
+                                                 medae    => $best_val_medae,
+                                                 mae      => $best_val_mae,
+                                                 slope    => $best_modelslope,
+                                                 r2       => $best_r2,
+                                                 val_mse  => $best_val_mse,
+                                               }
+                                             );
+
+  if ($NNTrainstate eq 'ok') {
+      my $best_val_mse_final     = $best_val_mse;
+      my $best_val_mae_final     = $best_val_mae;
+      my $best_val_medae_final   = $best_val_medae;  
+      my $best_score_final       = $best_score;
+      my $best_r2_final          = $best_r2; 
+      my $best_modelslope_final  = $best_modelslope;
+      my $best_modelbias_final   = $best_modelbias;
+      my $best_rmse_final        = $best_rmse;
+      my $best_rmse_rel_final    = $best_rmse_rel;
+      my $best_rmse_rating_final = $best_rmse_rating;
+      my $best_seed              = $seed;
+      my $best_attempt           = $attempt;
+
+      if ($retrainQuality eq 'Retrain' || $retrainQuality eq 'Borderline') {
+          my $max_retries = $aiconact == 2                                                      
+                            ? 1                                                 # im "Train Only" Modus nur eine Wiederholung zur Schnelleinschätzung
+                            : $retrainQuality eq 'Retrain' 
+                            ? $maxRtyRetrain 
+                            : $maxRtyBorderline;
+          
+          for my $rt (1 .. $max_retries) {
+              my $new_seed = ($seed * 37 + $rt * 101 + int (rand (1000000))) % 100000000;
+              
+              $retref = aiFannRunTrain ({ %$paref, seed => $new_seed, attempt => $rt });
+              
+              $retrainQuality       = $retref->{$fanntyp.'NNRetrainQuality'};
+              $attempt              = $retref->{$fanntyp.'NNAttempt'};
+              my $retry_r2          = $retref->{$fanntyp.'NNR2'};
+              my $retry_modelslope  = $retref->{$fanntyp.'NNModelSlope'};  
+              my $retry_modelbias   = $retref->{$fanntyp.'NNModelBias'};
+              my $retry_rmse        = $retref->{$fanntyp.'NNRmse'};
+              my $retry_rmse_rel    = $retref->{$fanntyp.'NNRmseRel'};
+              my $retry_rmse_rating = $retref->{$fanntyp.'NNRmseRating'};              
+              my $retry_bit_fail    = $retref->{$fanntyp.'NNBestBitFail'};
+              my $retry_val_mse     = $retref->{$fanntyp.'NNBestValMse'}; 
+              my $retry_val_mae     = $retref->{$fanntyp.'NNBestValMae'}; 
+              my $retry_val_medae   = $retref->{$fanntyp.'NNBestValMedae'};   
+              my $retry_score       = $retref->{$fanntyp.'NNScore'};              
+              
+              # bestes Modell auswählen über Composite Score
+              ################################################
+              my $retry_composite = _aiFannCompositeScore ( { score    => $retry_score,
+                                                              rmse_rel => $retry_rmse_rel,
+                                                              medae    => $retry_val_medae,
+                                                              mae      => $retry_val_mae,
+                                                              slope    => $retry_modelslope,
+                                                              r2       => $retry_r2,
+                                                              val_mse  => $retry_val_mse,
+                                                            }
+                                                          );
+                                                                              
+              if (!defined $best_composite || $retry_composite > $best_composite) {
+                  $best_composite         = $retry_composite;
+                  
+                  $best_score_final       = $retry_score;
+                  $best_rmse_rel_final    = $retry_rmse_rel;
+                  $best_val_medae_final   = $retry_val_medae;
+                  $best_val_mae_final     = $retry_val_mae;
+                  $best_modelslope_final  = $retry_modelslope;
+                  $best_r2_final          = $retry_r2;
+                  $best_val_mse_final     = $retry_val_mse;
+                  
+                  $best_modelbias_final   = $retry_modelbias;
+                  $best_rmse_final        = $retry_rmse;
+                  $best_rmse_rating_final = $retry_rmse_rating;
+                  $best_seed              = $new_seed;
+                  $best_attempt           = $attempt;
+              }
+              
+              last if($retrainQuality eq 'ok');
+          }
+
+          if ($debug =~ /aiProcess/xs) {
+              $best_modelslope_final = round2 ($best_modelslope_final);
+              $best_modelbias_final  = round2 ($best_modelbias_final);
+              $best_val_mse_final    = round6 ($best_val_mse_final);
+              $best_val_mae_final    = round2 ($best_val_mae_final);
+              $best_val_medae_final  = round2 ($best_val_medae_final);
+              $best_r2_final         = round2 ($best_r2_final);
+              $best_rmse_final       = round2 ($best_rmse_final);
+              
+              Log3 ($name, 1, "$name DEBUG> Best model after retries comes from Attempt=$best_attempt with: \n".
+                                            "Seed=$best_seed, \n".
+                                            "Model Score=$best_score_final, \n".
+                                            "Model Slope=$best_modelslope_final, \n".
+                                            "Model Bias=$best_modelbias_final, \n".
+                                            "VAL MedAE=$best_val_medae_final, \n".
+                                            "VAL MAE=$best_val_mae_final, \n".
+                                            "VAL weighted RMSE=$best_rmse_final, \n".
+                                            "VAL weighted RMSE relative=$best_rmse_rel_final %, \n".
+                                            "VAL weighted RMSE_Rating=$best_rmse_rating_final, \n".
+                                            "VAL R2=$best_r2_final, \n".
+                                            "Val MSE=$best_val_mse_final"
+                                          );
+          }      
+      } 
+      else {
+          Log3 ($name, 1, "$name DEBUG> Training accepted - no retry needed") if($debug =~ /aiProcess/xs);
+      }  
+      
+      # Rückgabe vorbereiten: bestes Modell übernehmen
+      ##################################################
+      $data{$name}{neuralnet}{$fanntyp} = ();
+      $data{$name}{neuralnet}{$fanntyp} = $data{$name}{$fanntyp.'temp'}{$best_attempt};    
+      $data{$name}{$fanntyp.'temp'}     = ();
+      
+      delete $data{$name}{$fanntyp.'temp'};
+
+      my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
+
+      if ($err) {
+          $retref->{$fanntyp.'NNTrainstate'} = $err;
+          Log3 ($name, 1, "$name - ERROR while writing file: ".$neuralnet.$name);
+      }
+      else {
+          if ($debug =~ /aiProcess/xs) {
+              Log3 ($name, 1, "$name DEBUG> AI FANN training data successfully written to file: ".$neuralnet.$name);
+          }     
+      }
+
+      $retref->{fanntyp} = $fanntyp;                                                        # Trainingstyp für Auswertung Rückgabe     
+  }
+  
+  my $serial = encode_base64 ( Serialize ($retref), "");
+
+return $serial;
+}
+
+################################################################
+#            Neuronales Netz trainieren
+################################################################
+sub aiFannRunTrain {
+  my $paref                = shift;
+  my $name                 = $paref->{name};
+  my $trdref               = $paref->{trdref};                                   # Arrayref normierte Trainingsdaten
+  my $trgref               = $paref->{trgref};                                   # Arrayref normierte Zielwert(e)
+  my $fanntyp              = $paref->{fanntyp};                                  # Verwendungstyp (z.B. 'con')
+  
+  my $hidden_layers        = $paref->{hidden_layers};
+  my $mse_error            = $paref->{mse_error};
+  my $learning_rate        = $paref->{learning_rate};
+  my $learning_momentum    = $paref->{learning_momentum};
+  my $hidden_steepness     = $paref->{hidden_steepness};                         # bestimmt, wie schnell die Aktivierungsfunktion von ihrem Minimum zum Maximum wechselt, Standard: 0.5
+  my $shuffle_mode         = $paref->{shuffle_mode};
+  my $shuffle_period       = $paref->{shuffle_period};
+  my $bit_fail_limit       = $paref->{bit_fail_limit};                           # Bit-Fail Limit
+  my $dataParamRatio_limit = $paref->{dataParamRatio_limit};
+  my $haf                  = $paref->{haf};
+  my $oaf                  = $paref->{oaf};
+  my $talgo                = $paref->{talgo};
+  my $profile              = $paref->{regv};                                     # ausgewählte Registry Version / Profil
+  my $attempt              = $paref->{attempt} // 0;                             # Nummer des Durchlaufs
+  
+  my $minval               = $paref->{minval};                                   # Target Denormalisierungsparameter
+  my $maxval               = $paref->{maxval};                                   # Target Denormalisierungsparameter
+  my $rr1min               = $paref->{rr1min};
+  my $rr1max               = $paref->{rr1max}; 
+  my $cst                  = $paref->{cst};                                      # Train Startzeit
+  my $seed                 = $paref->{seed} // ($cst % 1000000);                 # Seed setzen (falls übergeben, sonst Standardwert)
+  my $debug                = $paref->{debug};
+  
+  # feste Parameter
+  ###################
+  my $num_epoch                 = AINUMEPOCHS;                                   # max. Anzahl Epochen
+  my $num_epoch_between_statmsg = 0;                                             # Anzahl der Epochen zwischen Statusmeldungen
+  $num_epoch_between_statmsg    = 100 if($debug =~ /aiProcess/xs);
+  my $best_val_mse              = 1e9;
+  my $best_val_mae              = 1e9;
+  my $best_weighted_rmse_proxy  = 1e9;
+  my $best_val_medae            = 1e9;
+  my $best_train_mse            = 1e9;
+  my $best_train_epoch          = 1e9;
+  my $best_bit_fail             = 1e9;
+  my $training_portion          = 0.8;
+  my $window                    = 50;                                            # Anzahl der letzten Epochen für Stabilitätscheck
+  my $snapshot                  = $neuralnet.'best_model_'.$fanntyp.'_'.$name;   
+                                          
+  srand($seed);                                                                  # Trick: Beim Erzeugen eines Netzes (new_standard) werden die Gewichte der Neuronen zufällig initialisiert.
+                                                                                 # Diese Zufallswerte kommen aus dem globalen Zufallszahlengenerator der Laufzeitumgebung (C/Perl).
+                                                                                 # Wenn man vorher srand($seed) setzt, bestimmt man den Startzustand dieses Generators
+                                                                                 # Startgewichte beeinflussen, wie schnell und wohin das Netz konvergiert                                                                                
+
+  # AI::FANN Aktivierungsfunktionen
+  ###################################
+  my %af_map = (                                                                        
+      LINEAR                     => AI::FANN::FANN_LINEAR(),
+      THRESHOLD                  => AI::FANN::FANN_THRESHOLD(),
+      THRESHOLD_SYMMETRIC        => AI::FANN::FANN_THRESHOLD_SYMMETRIC(),
+      SIGMOID                    => AI::FANN::FANN_SIGMOID(),
+      SIGMOID_STEPWISE           => AI::FANN::FANN_SIGMOID_STEPWISE(),
+      SIGMOID_SYMMETRIC          => AI::FANN::FANN_SIGMOID_SYMMETRIC(),
+      SIGMOID_SYMMETRIC_STEPWISE => AI::FANN::FANN_SIGMOID_SYMMETRIC_STEPWISE(),
+      GAUSSIAN                   => AI::FANN::FANN_GAUSSIAN(),
+      GAUSSIAN_SYMMETRIC         => AI::FANN::FANN_GAUSSIAN_SYMMETRIC(),
+      GAUSSIAN_STEPWISE          => AI::FANN::FANN_GAUSSIAN_STEPWISE(),
+      ELLIOT                     => AI::FANN::FANN_ELLIOT(),
+      ELLIOT_SYMMETRIC           => AI::FANN::FANN_ELLIOT_SYMMETRIC(),
+      LINEAR_PIECE               => AI::FANN::FANN_LINEAR_PIECE(),
+      LINEAR_PIECE_SYMMETRIC     => AI::FANN::FANN_LINEAR_PIECE_SYMMETRIC(),
+      SIN                        => AI::FANN::FANN_SIN(),
+      SIN_SYMMETRIC              => AI::FANN::FANN_SIN_SYMMETRIC(),
+      COS                        => AI::FANN::FANN_COS(),
+      COS_SYMMETRIC              => AI::FANN::FANN_COS_SYMMETRIC(),
+  );  
+  
+  # AI::FANN Trainingsalgorithmen
+  #################################
+  my %ta_map = (                                                                        
+      INCREMENTAL => AI::FANN::FANN_TRAIN_INCREMENTAL(),                            # klassisches Backpropagation mit Lernrate/Momentum
+      BATCH       => AI::FANN::FANN_TRAIN_BATCH(),
+      RPROP       => AI::FANN::FANN_TRAIN_RPROP(),                                  # Resilient Propagation (default), robust, kein Tuning von Lernrate/Momentum nötig bzw. möglich
+      QUICKPROP   => AI::FANN::FANN_TRAIN_QUICKPROP(),                              # Quickpropagation
+  ); 
+  
+  if ($debug =~ /aiProcess/xs) {
+      my $do = $attempt ? 'Retry' : 'First';
+      Log3 ($name, 1, "$name DEBUG> $do attempt $attempt with Seed=$seed");
+  }
+  
+  # Auteilung in Trainings- und Validierungs-Daten
+  ##################################################
+  my @train_pairs;
+  my @train_inputs;
+  my @test_inputs;
+  my @test_targets;
+  
+  my @indices     = (0 .. $#$trdref);                                                   # Indizes vorbereiten                                                 
+  @indices        = shuffle (@indices) if($shuffle_mode == 2);
+  my $split_index = int (@indices * $training_portion);                                 # Split in Trainings- und Testdaten
+  
+  for my $i (0 .. $split_index-1) {
+      push @train_pairs,  $trdref->[$i], $trgref->[$i];                                 # Struktur zusammenführen: [ [f1,f2,...], [target] ]
+      push @train_inputs, $trdref->[$i];
+  }
+
+  for my $i ($split_index .. $#$trdref) {
+      push @test_inputs,  $trdref->[$i];
+      push @test_targets, $trgref->[$i];
+  }
+  
+  my $num_train_datasets = scalar(@$trdref);
+  my $num_inputs         = scalar(@{$trdref->[0]});
+  my $num_outputs        = scalar(@{$trgref->[0]});
+  
+  # Netzarchitektur Auto Konfiguration wenn nicht gesetzt
+  #########################################################
+  my $dataParamRatio = 1;                                                               # 1 -> Guard
+  my $num_params     = 0;                                                               # 0 -> Guard
+  
+  if (!$hidden_layers) {  
+      ($hidden_layers, $dataParamRatio) = _aiFannAutoArchitecture ($num_train_datasets, $num_inputs, $dataParamRatio_limit);
+      $num_params                       = __aiFannEstimateParams  ($num_inputs, $hidden_layers);
+  }
+  else {
+      $num_params     = __aiFannEstimateParams ($num_inputs, $hidden_layers);
+      $dataParamRatio = $num_train_datasets / $num_params;
+  }
+  
+  $dataParamRatio    = round3 ($dataParamRatio);
+  my @hiddlays       = map {$_} (split '-', $hidden_layers);                            # Hidden Neuronen Layer Array
+  my $num_hiddenlays = scalar (@hiddlays);
+  
+  # Lernrate Auto Konfiguration wenn nicht gesetzt
+  ##################################################
+  if (!$learning_rate) {                                                                # die optimale Lernrate hängt direkt von der Parameterzahl ab. Mit INCREMENTAL bedeutet eine Epoche N × params Gewichtsupdates – größere Netze brauchen kleinere Schritte
+      $learning_rate = $num_params > 5000 ? 0.0003
+                     : $num_params > 1500 ? 0.0006
+                     : $num_params > 500  ? 0.001
+                     : 0.003;
+  }
+  
+  # Steepness Auto Konfiguration wenn nicht gesetzt
+  ###################################################
+  if (!$hidden_steepness) {                                                             # tiefere Netze sättigen schneller, niedrigere Steepness ist stabiler:
+      $hidden_steepness = $num_hiddenlays >= 3 ? 0.5
+                        : $num_hiddenlays == 2 ? 0.6
+                        : 0.7;
+  }
+  
+  # Shuffle Period Auto Konfiguration wenn nicht gesetzt
+  ########################################################
+  if (!$shuffle_period) {                                                              # größere Datasets profitieren von selteneren Reshuffles
+      $shuffle_period = $num_train_datasets > 10000 ? 25
+                      : $num_train_datasets > 5000  ? 20
+                      : 15;
+  } 
+  
+  
+  # Netz erzeugen
+  #################
+  my $ann = AI::FANN->new_standard ($num_inputs, @hiddlays, $num_outputs);                      
+  
+  $ann->hidden_activation_function  ($af_map{$haf});
+  $ann->output_activation_function  ($af_map{$oaf});
+  $ann->training_algorithm          ($ta_map{$talgo});
+  $ann->learning_rate               ($learning_rate);
+  $ann->learning_momentum           ($learning_momentum);
+  $ann->bit_fail_limit              ($bit_fail_limit);
+  $ann->hidden_activation_steepness ($hidden_steepness);
+  
+  my @steepness_dyn;
+  for my $i (0 .. $num_hiddenlays-1) {                                                                 # Dynamische Steepness-Liste für alle Hidden-Layer erzeugen
+      my $s = $hidden_steepness - 0.2 * $i;
+      push @steepness_dyn, max (0.1, $s);
+  }
+
+  for my $i (1 .. $num_hiddenlays) {                                                                   # Steepness für alle Hidden-Layer setzen
+      $ann->layer_activation_steepness($i, $steepness_dyn[$i-1]);
+  }
+
+ 
+  my $lr = round5 ($ann->learning_rate);
+  my $lm = round1 ($ann->learning_momentum);
+  my $ta = $ann->training_algorithm;
+  
+  if ($debug =~ /aiProcess/xs) {
+      my $mode = $shuffle_mode == 1 
+                 ? 'chronological split and AI internal shuffle of training data' 
+                 : $shuffle_mode == 2 
+                 ? 'split after shuffle of training data and use AI internal shuffle'  
+                 : 'chronological split';
+      
+      Log3 ($name, 1, "$name DEBUG> AI FANN Training started with Params:\n".
+                      "input datasets=$num_train_datasets, \n".
+                      "input features=$num_inputs, \n".
+                      "hidden Neurons=".(join '-',@hiddlays).", \n".
+                      "Data Parameter Ratio=$dataParamRatio, \n".
+                      "Registry version=$profile, \n".
+                      "training algo=$ta, \n".
+                      "output AF=$oaf, \n".
+                      "hidden AF=$haf, \n".
+                      "hidden steepness=$hidden_steepness, \n".
+                      "max. Epoches=$num_epoch, \n".
+                      "mse_error=$mse_error, \n".
+                      "learning rate=$lr, \n".
+                      "learning momentum=$lm, \n".
+                      "BitFail limit: $bit_fail_limit, \n".
+                      "Data sharing=$mode (Train=$split_index, Test=".(scalar($#$trdref)-$split_index)."), \n".
+                      "Data shuffle=$shuffle_mode ".($shuffle_mode ? qq{(period=$shuffle_period)} : '') 
+                     );
+  }
+  
+  # Trainings- und Validierungsdatenobjekte + Epochentraining
+  #############################################################
+  my @val_history;
+  
+  # Snapshot-Guard
+  my $since_improve = 0;
+
+  # Guard: Snapshot-Statistik
+  my $snap_metric_count     = 0;
+  my $snap_rmse_proxy_count = 0;
+  my $snap_bit_count        = 0;
+  my $snap_tradeoff_count   = 0;
+
+  my $snap_metric_last      = 0;
+  my $snap_rmse_proxy_last  = 0;
+  my $snap_bit_last         = 0;
+  my $snap_tradeoff_last    = 0;
+  
+  my $snapshot_saved_overall = 0;
+  
+  my $train_data = AI::FANN::TrainData->new (@train_pairs);                                                 # Trainingsdatenobjekt bauen
+  $train_data->shuffle() if($shuffle_mode == 1);
+  
+  # Start Traningsloop
+  ######################
+  for my $epoch (1 .. $num_epoch) {
+      if ($shuffle_mode && $epoch % $shuffle_period == 0) {                                                 # Periodisches Shuffle
+          $train_data->shuffle();
+      }
+    
+      $ann->train_epoch ($train_data);                                                                      # Einen Trainingsschritt ausführen
+
+      my $mse_train = $ann->MSE();                                                                          # Aktuellen Fehler abfragen
+      my $bfail     = $ann->bit_fail();                                                                     # Anzahl der Ausgaben, die außerhalb einer vorgegebenen Toleranz liegen, Standardtoleranz: 0.35
+
+      # --- Validierung im Normraum
+      ###############################   
+      my $sum_sq       = 0;
+      my $bit_fail_val = 0;
+      my @targetvals; 
+      my @predictvals;
+      my @err_norm_sq;                                                                                      # für robustes Clipping
+      my $werr_sum   = 0;                                                                                   # gewichtete Fehler-Summe
+      my $w_sum      = 0;                                                                                   # Gewicht-Summe
+          
+      for my $i (0 .. $#test_inputs) {
+          my $prediction = $ann->run ($test_inputs[$i]);
+          my $target     = $test_targets[$i];
+
+          my $err_norm = $prediction->[0] - $target->[0];
+          my $err2     = $err_norm * $err_norm;                                                            
+          $sum_sq     += $err2;                                                                             # Grundlage für MSE/RMSE im Normraum                                       
+          
+          push @targetvals,      $target->[0]; 
+          push @predictvals, $prediction->[0];
+
+          my $diff_norm = abs ( $prediction->[0] - $target->[0] );                                          # BitFail prüfen (Toleranz $bit_fail_limit im Normalisierungsbereich)
+          $bit_fail_val++ if($diff_norm > $bit_fail_limit);
+          
+          # --- Weighted-RMSE-Proxy sammeln
+          push @err_norm_sq, $err2;
+          my $w      = $target->[0];                                                                        # Gewichtung nach Zielwertgröße (normiert), 0..1 -> perfekt geeignet
+          $w_sum    += $w;                                                                                  # Clipping erst NACH der Schleife (braucht Median), hier nur Rohwerte sammeln
+          $werr_sum += $w * $err2;
+      }
+      
+      my $mse_val = $sum_sq / scalar (@test_inputs);                                                        # MSE (Mean Squared Error)   
+      push @val_history, $mse_val;                                                                          # Verlauf der Validierungs-MSE
+      
+      my $mae_val   = _aiFannMeanAbsoluteError   (\@targetvals, \@predictvals); 
+      my $medae_val = _aiFannMedianAbsoluteRrror (\@targetvals, \@predictvals);
+      
+      if ($debug =~ /aiProcess/xs 
+          && $num_epoch_between_statmsg 
+          && $epoch % $num_epoch_between_statmsg == 0) {                                                    # Logging alle X Epochen
+          
+          Log3 ($name, 1, sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d", 
+                          $name, $epoch, $mse_train, $mse_val, $mae_val, $medae_val, $bit_fail_val);
+      }
+      
+      
+      # Weighted-RMSE-Proxy berechnen
+      ##################################
+      my @sorted_err2 = sort { $a <=> $b } @err_norm_sq;                                                    # robustes Clipping basierend auf Median der normierten Fehler
+      my $p50_index   = int (0.50 * $#sorted_err2);
+      my $med_err2    = $sorted_err2[$p50_index];
+      my $clip_norm   = 4 * $med_err2;                                                                      # Huber-artig
+
+      my $werr_sum_clipped = 0;
+    
+      for my $i (0 .. $#err_norm_sq) {                                                                      # jetzt Clipping anwenden
+          my $e2             = $err_norm_sq[$i];
+          $e2                = $clip_norm if($e2 > $clip_norm);
+          my $cw             = $targetvals[$i];                                                             # normierter Zielwert
+          $werr_sum_clipped += $cw * $e2;
+      }
+
+      my $weighted_rmse_proxy = sqrt ($werr_sum_clipped / ($w_sum || 1));
+      
+      # Snapshot-Guard: Verbesserung in MSE, MAE oder MedAE
+      #####################################################
+      my $mae_tolerance   = $best_val_mae   * 0.05;
+      my $medae_tolerance = $best_val_medae * 0.05;
+      my $mse_ceiling     = $best_val_mse   * 1.25;                                     # NEU: MSE darf max. 25% über bestem Val-MSE liegen (anpassbar)
+      my $bitfail_gain    = 1;
+      my $reason          = '';
+      my $improved        = 0;
+      my $snapshot_saved  = 0;                                                          # pro Epoche zurücksetzen
+
+      # Zweig 1: echte metrische Verbesserung
+      if ($mse_val         <  $best_val_mse   - 1e-6
+          && $mae_val      <  $best_val_mae   - 1e-6
+          && $medae_val    <  $best_val_medae - 1e-6
+          && $bit_fail_val <= $best_bit_fail) {
+
+          $reason           = 'metric improved';
+          $snap_metric_last = $epoch;
+          $improved         = 1;
+          $snap_metric_count++;
+      }
+      # Zweig 2: Weighted-RMSE-Proxy verbessert sich
+      # nur wenn Val MSE nicht mehr als 25% (anpassbar) über bestem Val MSE liegt (Schutz vor Overfitting)
+      elsif ($weighted_rmse_proxy < $best_weighted_rmse_proxy - 1e-6
+             && $mse_val          < $mse_ceiling) {
+          $reason                 = 'weighted rmse improved';
+          $snap_rmse_proxy_last   = $epoch;          
+          $improved               = 1;
+          $snap_rmse_proxy_count++;
+      }
+      # Zweig 2: BitFail-Verbesserung
+      elsif ($mse_val         <= $best_val_mse
+             && $mae_val      <= $best_val_mae
+             && $medae_val    <= $best_val_medae
+             && $bit_fail_val <  $best_bit_fail) {
+
+          $reason        = 'bit improved';
+          $snap_bit_last = $epoch;
+          $improved      = 1;
+          $snap_bit_count++;
+      }
+      # Zweig 3: Trade-off
+      elsif ($bit_fail_val <= $best_bit_fail  - $bitfail_gain
+             && $mse_val   <= $best_val_mse   + 1e-6
+             && $mae_val   <= $best_val_mae   + $mae_tolerance
+             && $medae_val <= $best_val_medae + $medae_tolerance) {
+
+          $reason             = 'bit tradeoff';
+          $snap_tradeoff_last = $epoch;
+          $improved           = 1;
+          $snap_tradeoff_count++;
+      }
+
+      if ($improved) {
+          if ($reason eq 'metric improved') {                                           # $best_val_mse NUR in Zweig 1 (metric improved) aktualisieren
+              $best_val_mse = $mse_val;
+          }
+          
+          $best_val_mae             = $mae_val    if($mae_val   < $best_val_mae);       # MAE/MedAE nur aktualisieren wenn sie sich verbessert haben (strikt monoton fallend)
+          $best_val_medae           = $medae_val  if($medae_val < $best_val_medae);
+          
+          $best_weighted_rmse_proxy = $weighted_rmse_proxy;
+          $best_train_mse           = $mse_train;
+          $best_train_epoch         = $epoch;
+          $best_bit_fail            = $bit_fail_val;
+          $snapshot_saved_overall   = 1;
+          $since_improve            = 0;
+
+          $ann->save ($snapshot);                                                       # bestes Modell IMMER speichern
+          $snapshot_saved = 1;
+
+          if ($debug =~ /aiProcess/xs) {
+              Log3 ($name, 1, sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d -> Snap %s",
+                                      $name, $best_train_epoch, $best_train_mse, $best_val_mse, $best_val_mae, $best_val_medae, $best_bit_fail,
+                                      $reason );
+          }
+      }
+      else {
+          $since_improve++;
+      }  
+      
+      # Early Stopping
+      ##################
+      if ($since_improve >= AIIMPPATIENCE) {
+          if ($debug =~ /aiProcess/xs) {
+              Log3 ($name, 1,
+                    sprintf "%s DEBUG> Early stopping bei Epoche %d (no improvement since %d epochs)",
+                    $name, $epoch, AIIMPPATIENCE
+                   );
+          }
+        
+          last;
+      }
+  }
+  ######################
+  # Ende Traningsloop
+  
+  
+  
+  # Snapshot-Statistik nach Trainingsloop
+  #########################################
+  if ($debug =~ /aiProcess/xs) {
+      Log3 ($name, 1, "=== Snapshot-Statistik ===");
+      Log3 ($name, 1, sprintf "Metric-Improvement Snapshots:              %d (letzte Epoche: %d)", $snap_metric_count, $snap_metric_last);
+      Log3 ($name, 1, sprintf "Weighted-RMSE-Proxy-Improvement Snapshots: %d (letzte Epoche: %d)", $snap_rmse_proxy_count, $snap_rmse_proxy_last);
+      Log3 ($name, 1, sprintf "Bit-Improvement Snapshots:                 %d (letzte Epoche: %d)", $snap_bit_count, $snap_bit_last);
+      Log3 ($name, 1, sprintf "Bit-Tradeoff Snapshots:                    %d (letzte Epoche: %d)", $snap_tradeoff_count, $snap_tradeoff_last);
+  }
+  
+  # Fallback nach Trainingsloop
+  ###############################
+  unless ($snapshot_saved_overall) {
+      Log3 ($name, 1, "$name - WARNING - AI FANN Training has no snapshot generated – saved last model as fallback");
+      
+      $ann->save ($snapshot);
+  }
+  
+  # Nach Training bestes Modell laden
+  #####################################
+  $ann = AI::FANN->new_from_file ($snapshot);
+  unlink $snapshot;
+  
+  if ($debug =~ /aiProcess/xs) {
+      Log3 ($name, 1,
+            sprintf "%s DEBUG> Best Snapshot reloaded from Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d,",
+            $name, $best_train_epoch, $best_train_mse, $best_val_mse, $best_val_mae, $best_val_medae, $best_bit_fail
+           );
+  }
+  
+  # --- Bester Snapshot -> Validierung und Kennzahlen berechnen
+  ###############################################################
+  my $sum_sq  = 0;                                                                          # für MSE/RMSE (normalisiert)
+  my $bitfail = 0;
+  
+  my @pct_errors;                                                                           # für MAPE und MdAPE (denormalisiert)
+  my @targets;
+  my @preds;
+  
+  if ($debug =~ /aiProcess/xs) {
+      Log3 ($name, 1, "$name DEBUG> Run Validation Test with ".((1-$training_portion) * 100)."% of Input data ...");
+  } 
+
+  for my $i (0 .. $#test_inputs) {                                                          # erste Schleife: Fehler sammeln
+      my $prediction_norm = $ann->run ($test_inputs[$i])->[0];                              # Netz liefert Arrayref
+      my $target_norm     = $test_targets[$i]->[0];                                         # Ziel ebenfalls Arrayref
+      
+      my $diff_norm = abs ($prediction_norm - $target_norm);
+      $bitfail++ if($diff_norm > $bit_fail_limit);                                          # BitFail basiert auf normalisierten Werten
+ 
+      my $err_norm = $prediction_norm - $target_norm;                                       # Fehler im Normalisierungsraum
+      $sum_sq     += $err_norm**2;                                                          # für MSE im Normalisierungsraum
+    
+      my $target     = _aiFannDenormMinMaxValue ($target_norm,     $minval, $maxval);
+      my $prediction = _aiFannDenormMinMaxValue ($prediction_norm, $minval, $maxval);       # Für MAE/MAPE/R² weiterhin denormalisieren
+
+      push @targets, $target;
+      push @preds,   $prediction;      
+  }
+  
+  my $metrics        = _aiFannSlopeBias (\@targets, \@preds);                               # Modell-Slope und Modell-Bias auf denormalisierten Werten
+  my $model_slope    = $metrics->{slope_regres};
+  my $model_bias     = $metrics->{bias_regres};
+  my $cal_slope      = 1.0;                                                                 # Schutz gegen degenerierte Werte
+  my $cal_bias       = 0.0;                                                                 # ... default: keine Korrektur
+  
+  if (defined $model_slope && $model_slope > 0.5  && $model_slope < 2.0) {                  # Inverse Kalibrierung: y_true ≈ (y_pred - bias) / slope
+      $cal_slope = 1.0 / $model_slope;                                                      # z.B. 1/0.85 = 1.176
+      $cal_bias  = -$model_bias / $model_slope;                                             # z.B. -159/0.85 = -187 Wh
+  }
+  
+  my $err_metrics    = _aiFannErrorMetrics (\@targets, \@preds);                            # Fehlermetriken in Originalskala (denormalisiert)
+  my $mae            = $err_metrics->{mae};                                                 # MAE (Durchschnitt) Originalskala
+  my $rmse           = $err_metrics->{rmse};                                                # RMSE auf Originalskala (z.B. Wh)
+  my $rmse_rel       = $err_metrics->{rmse_rel};                                            # relative RMSE in %
+  my $medae          = $err_metrics->{medae};                                               # MedAE (Median) Originalskala
+  my $mape           = $err_metrics->{mape};                                                # MAPE (Durchschnitt) %
+  my $mdape          = $err_metrics->{mdape};                                               # MdAPE (Median) %
+  my $target_median  = $err_metrics->{tgt_median};
+  my $abs_errors_ref = $err_metrics->{abs_error_ref};                
+  my @abs_errors     = @$abs_errors_ref;
+  
+  my $n             = scalar (@test_inputs);
+  my $mse_val       = $sum_sq / $n;                                                         # MSE im Normalisierungsraum
+
+  my $r2 = _aiFannR2 (\@targets, \@preds);                                                  # Bestimmtheitsmaß R² berechnen (Originalskala)
+
+  
+  # --- Zielgrößen relative RMSE / weighted RMSE / + Textbewertung
+  ################################################################## 
+  my $wrmse_ref            = _aiFannWeightedRmse (\@targets, \@abs_errors, $mae, $maxval, $target_median);
+  my $weighted_rmse        = $wrmse_ref->{weighted_rmse};
+  my $weighted_rmse_rel    = $wrmse_ref->{weighted_rmse_rel}; 
+  my $weighted_rmse_rating = $wrmse_ref->{rating};                                          # Textbewertung
+
+
+  # Validation Mittelwert und Standardabweichung im Normraum berechnen
+  ########################################################################
+  # Windows prüft nur die Phase, die wirklich relevant ist -> ob das 
+  # Modell am Ende stabil war.
+  # - Fenstergröße anpassen: Bei kurzen Trainingsläufen reichen 20–30 
+  #                          Epochen, bei langen eher 50–100.
+  ########################################################################
+  my $nvalhist = scalar (@val_history);
+  $window      = $nvalhist if($window > $nvalhist);                                         # falls weniger Epochen als Fenstergröße
+  my @val_tail = @val_history[-$window .. -1];                                              # nur die letzten N Werte
+                                                                                   
+  my $val_mean = sum (@val_tail) / @val_tail;                                               # val_mean = durchschnittlicher Validation-MSE über den gesamten Trainingslauf im Window
+  my $sq_sum   = 0;
+  $sq_sum     += ($_ - $val_mean) ** 2 for @val_tail;
+  my $val_std  = sqrt ($sq_sum / @val_tail);                                                # val_std = Streuung der Validation-MSE
+  
+  if ($debug =~ /aiProcess/xs) {
+      Log3 ($name, 1, sprintf "%s DEBUG> Validation finished - Best Training MSE=%.6f, Validation MSE=%.6f, Validation Bit_Fail=%d",
+                      $name, $best_train_mse, $mse_val, $bitfail);
+  }  
+  
+  # Rauschwertermittlung und Bit-Fail-Limit-Empfehlung
+  ######################################################
+  my ($noise_flag, $bitfail_suggestion) = _aiFannDetectNoiseLevel (\@targets, $mae, $target_median);
+  
+  # Epochen-Diagnose
+  ###################
+  my $cur_ratio = $split_index / ($num_params || 1);                                        # cur_ratio für Epochendiagnose vorberechnen
+  
+  my $epoch_diag = _aiFannEpochDiagnostic ( { best_epoch         => $best_train_epoch,
+                                              mse_train          => $best_train_mse,
+                                              mse_val            => $mse_val,
+                                              val_std            => $val_std,
+                                              val_mean           => $val_mean,
+                                              slope              => $model_slope,
+                                              r2                 => $r2,
+                                              rmse_rel           => $weighted_rmse_rel,
+                                              bitfail            => $bitfail,
+                                              num_epoch          => $num_epoch,
+                                              num_inputs         => $num_inputs,       
+                                              split_index        => $split_index,      
+                                              num_train_datasets => $num_train_datasets,
+                                              hidden_layers      => $hidden_layers, 
+                                              learning_rate      => $learning_rate,
+                                              learning_momentum  => $learning_momentum,
+                                              cur_ratio          => $cur_ratio,
+                                              dataParamRatio     => $dataParamRatio,
+                                              profile            => $profile,
+                                              haf                => $haf,
+                                              lang               => $paref->{lang},
+                                            }
+                                          );
+                                          
+  my $hints_html = '';
+
+  if (@{$epoch_diag->{epoch_hints}}) {
+      $hints_html = '<ul>'
+                  . join ('', map { '<li>' . $_ . '</li>' } @{$epoch_diag->{epoch_hints}})
+                  . '</ul>';
+  }
+
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints} = $hints_html;
+  
+  # Retry-Indikator ausführen
+  #############################
+  my $quality_href = _aiFannRetrainIndicator ( { name           => $name, 
+                                                 mse_train      => $best_train_mse, 
+                                                 mse_val        => $mse_val, 
+                                                 bitfail        => $bitfail, 
+                                                 valstd         => $val_std, 
+                                                 valmean        => $val_mean, 
+                                                 mae            => $mae,
+                                                 abserref       => \@abs_errors, 
+                                                 test_input_num => scalar (@test_inputs),
+                                                 slope          => $model_slope,
+                                                 bias           => $model_bias,
+                                                 dataParamRatio => $dataParamRatio,
+                                                 r2             => $r2,
+                                                 rmse           => $weighted_rmse,                                                   
+                                                 rmse_rel       => $weighted_rmse_rel, 
+                                                 profile        => $profile,
+                                                 debug          => $debug,
+                                                 lang           => $paref->{lang},
+                                               } 
+                                             );
+                                               
+  my $retrainQuality = $quality_href->{quality};                    
+    
+  # FANN-Model in TempFile speichern -> als BLOB String auslesen 
+  #################################################################
+  my $tmpfile = $neuralnet.'fannmodel_'.$name;
+  
+  $ann->save ($tmpfile);
+  
+  my ($err, $blob) = read_blob ($tmpfile);
+  unlink $tmpfile;
+  
+  # Übergaben
+  #############
+  my $retref;
+  
+  if ($err) {
+      $retref = { name                    => $name,
+                  $fanntyp.'NNTrainstate' => "aiNeuroNetConTraining performed, but error occurred while read_blob: $err",
+                };
+
+      return ($retref);
+  } 
+  
+  setTimeTracking ($name, $cst, $fanntyp.'NNRuntimeTrain');                                                  # Zyklus-Laufzeit ermitteln
+
+  # ok -> File schreiben zur Ladung bei Restart
+  ###############################################  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{MinVal}         = $minval;                                         # Target Denormalisierungsparameter 
+  $data{$name}{$fanntyp.'temp'}{$attempt}{MaxVal}         = $maxval;                                         # Target Denormalisierungsparameter
+  $data{$name}{$fanntyp.'temp'}{$attempt}{rr1Min}         = $rr1min;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{rr1Max}         = $rr1max;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{bevloadmin}     = $paref->{bevloadmin};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{bevloadmax}     = $paref->{bevloadmax};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{bevremmin}      = $paref->{bevremmin};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{bevremmax}      = $paref->{bevremmax};
+  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{lagNorms}       = encode_base64 (Serialize ( $paref->{lagnorm_ref} ), "");    # Serialisierung
+  $data{$name}{$fanntyp.'temp'}{$attempt}{FannBlob}       = $blob;                                                      # BLOB im Hash ablegen
+  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{HiddActFunc}    = $haf;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{OutActFunc}     = $oaf;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{LearnMomentum}  = $learning_momentum;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{LearnRate}      = $learning_rate;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{NumDatasets}    = $num_train_datasets;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{NumTraindata}   = $split_index;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{NumTestdata}    = (scalar(@$trdref)-$split_index);
+  $data{$name}{$fanntyp.'temp'}{$attempt}{NumInputs}      = $num_inputs;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{HiddenLayers}   = $hidden_layers;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{dataParamRatio} = $dataParamRatio;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{HiddSteepness}  = $hidden_steepness;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{TrainAlgo}      = $talgo;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RegVersion}     = $paref->{regv};                                 # benutzte Registry Version
+  $data{$name}{$fanntyp.'temp'}{$attempt}{NumOutputs}     = $num_outputs;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{TrainMse}       = $best_train_mse;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{ValidationMse}  = $mse_val;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{BitFailLimit}   = $bit_fail_limit;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{BitFail}        = $bitfail;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{TrainEpoches}   = $best_train_epoch;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{Mae}            = $mae; 
+  $data{$name}{$fanntyp.'temp'}{$attempt}{Medae}          = $medae;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{Rmse}           = $weighted_rmse;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRel}        = $weighted_rmse_rel; 
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRating}     = $weighted_rmse_rating;  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{ModelScore}     = $quality_href->{score};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{ModelAmpel}     = $quality_href->{ampel};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{DPR_Hint}       = $quality_href->{dpr_hint};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{PVMaxLimit}     = $paref->{pv_max_limit};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{Mape}           = $mape; 
+  $data{$name}{$fanntyp.'temp'}{$attempt}{Mdape}          = $mdape; 
+  $data{$name}{$fanntyp.'temp'}{$attempt}{R2}             = $r2;                                            # Bestimmtheitsmaß R²
+  $data{$name}{$fanntyp.'temp'}{$attempt}{ModelSlope}     = $model_slope;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{ModelBias}      = $model_bias;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{AvgValidMse}    = $val_mean;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{StdDevValidMse} = $val_std;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RetrainQuality} = $retrainQuality;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{RetrainReason}  = $quality_href->{retrain_reason}; 
+  $data{$name}{$fanntyp.'temp'}{$attempt}{TargetMedian}   = $target_median;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{Attempt}        = $attempt;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{ShuffleMode}    = $shuffle_mode;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{ShufflePeriod}  = $shuffle_period;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{NoiseLevel}     = $noise_flag;
+  $data{$name}{$fanntyp.'temp'}{$attempt}{BitFailSuggest} = $bitfail_suggestion;
+  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{CalSlope}       = $cal_slope;                             # Kalibrierungs-Steigung
+  $data{$name}{$fanntyp.'temp'}{$attempt}{CalBias}        = $cal_bias;                              # Kalibrierungs-Offset
+  
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochCode}      = $epoch_diag->{epoch_code};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochLabel}     = $epoch_diag->{epoch_label};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochRelPct}    = $epoch_diag->{epoch_rel_pct};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochAmpel}     = $epoch_diag->{epoch_ampel};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints}     = $hints_html;
+  
+  my $runtime    = round2 (CurrentVal ($name, $fanntyp.'NNRuntimeTrain', 0));
+  my $trainstate = !$err 
+                    ? 'ok' 
+                    : "aiNeuroNetConTraining performed, but error occurred while saving: $err";
+  
+  $retref = { name                           => $name,                                             # Rückgabe Ref wichtig für Retry-Operation
+              $fanntyp.'NNTrainstate'        => $trainstate,
+              $fanntyp.'NNRuntimeTrain'      => $runtime,
+              $fanntyp.'NNTrainLastFinishTs' => int time,
+              $fanntyp.'NNRetrainQuality'    => $retrainQuality,
+              $fanntyp.'NNAttempt'           => $attempt,
+              $fanntyp.'NNR2'                => $r2,
+              $fanntyp.'NNModelSlope'        => $model_slope,
+              $fanntyp.'NNModelBias'         => $model_bias,
+              $fanntyp.'NNRmse'              => $weighted_rmse,
+              $fanntyp.'NNRmseRel'           => $weighted_rmse_rel,
+              $fanntyp.'NNRmseRating'        => $weighted_rmse_rating,
+              $fanntyp.'NNScore'             => $quality_href->{score},
+              $fanntyp.'NNSeed'              => $seed,
+              $fanntyp.'NNBestValMse'        => $mse_val,
+              $fanntyp.'NNBestValMae'        => $mae,     
+              $fanntyp.'NNBestValMedae'      => $medae,
+              $fanntyp.'NNBestBitFail'       => $bitfail,
+            };                                  
+  
+return $retref;
+}
+
+###############################################################
+#    Rückkehrfunktion trainieren neuronales Netz 
+###############################################################
+sub aiFannFinishTrain {
+  my $serial  = decode_base64 (shift);
+
+  my $paref   = eval { thaw ($serial) };                          # Deserialisierung
+  my $name    = $paref->{name};
+  my $fanntyp = $paref->{fanntyp};  
+  my $hash    = $defs{$name};
+  my $debug   = getDebug ($hash);  
+
+  my $NNTrainstate = $paref->{$fanntyp.'NNTrainstate'};
+
+  if ($NNTrainstate eq 'ok') {
+      $data{$name}{circular}{99}{$fanntyp.'NNRuntimeTrain'}      = $paref->{$fanntyp.'NNRuntimeTrain'};    
+      $data{$name}{circular}{99}{$fanntyp.'NNTrainLastFinishTs'} = $paref->{$fanntyp.'NNTrainLastFinishTs'}; 
+      
+      readCacheFile ( {name => $name, file => $neuralnet.$name, cachename => 'neuralnet', title => 'NeuralNetwork' } );
+  }
+  else {
+      $data{$name}{current}{$fanntyp.'NNTrainstate'} = $NNTrainstate;
+  }
+  
+  my $blkkey = 'AINNTRAIN_' . uc($fanntyp) . '_BLOCKRUN';
+  
+  if ($debug =~ /aiProcess/xs) {
+      Log3 ($name, 1, "$name DEBUG> AI FANN $fanntyp Training BlockingCall PID '$hash->{HELPER}{$blkkey}{pid}' finished. Trainstate: $NNTrainstate");
+  }
+  
+  delete($hash->{HELPER}{$blkkey});
+
+return;
+}
+
+####################################################################################################
+#                   Abbruchroutine AI Consumption Training
+####################################################################################################
+sub aiFannConAbortTrain {
+  my $hash    = shift;
+  my $cause   = shift // 'Training (Child) process timed out';
+  
+  my $name    = $hash->{NAME};
+  my $fanntyp = 'con';
+  my $blkkey  = 'AINNTRAIN_' . uc($fanntyp) . '_BLOCKRUN';
+  
+  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{$blkkey}{fn} pid:$hash->{HELPER}{$blkkey}{pid} aborted: $cause");
+
+  delete $hash->{HELPER}{$blkkey};
+
+  $data{$name}{current}{$fanntyp.'NNTrainstate'} = $cause;
+
+return;
+}
+
+################################################################
+#  Neuronales Netz Verbrauchswertprognose abrufen
+#  die Struktur des Datenarray muß mit dem Trainingsmodell 
+#  übereinstimmen
+################################################################
+sub aiFannConInfer {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $chour   = $paref->{chour};                                                                # aktuelle Stunde (00 .. 23)
+  my $t       = $paref->{t};
+  my $debug   = $paref->{debug};
+  my $fanntyp = 'con';                                                                          # FANN Verwendungsart 'consumption' Prognose                   
+  
+  my $hash = $defs{$name};
+  my ($msg, $presence, $comftemp);
+  
+  debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
+  $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
+  
+  my $pv_max_limit = _pvMaxLimit ($name);
+  
+  if (!$pv_max_limit) {
+      $msg = 'no peak output is provided by the PV system';
+      $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
+      debugLog ($paref, 'aiData', "AI FANN - consumption prediction aborted: No peak output is provided by the PV system");
+      
+      return $msg;
+  }
+  
+  $pv_max_limit  = $pv_max_limit * AIASPEAKSFAC;                                                # Peak Sicherheitsaufschlag
+  
+  my $cst        = [gettimeofday];                                                              # Startzeit
+  my $haf        = AiNeuralVal ($name, 'con', 'HiddActFunc', 'SIGMOID');                        # Hidden Activation Function
+  my $alpha      = CurrentVal  ($name, 'aiConAlpha', 1);                                        # Steuerung Hybridmodell
+  my $oaf        = 'LINEAR';                                                                    # Output Activation Function
+  my $range      = _aiFannAfNormRange ($haf);
+  
+  ## letzte reale Zielwerte / Temperaturen für Regression lesen
+  ###############################################################
+  my ($targetref, $tempsref, $presref) = getPvHistTargetArray ( { name  => $name, 
+                                                                  debug => $debug, 
+                                                                  par1  => $fanntyp, 
+                                                                  par2  => 'temp', 
+                                                                  par3  => 'presence',
+                                                                  t     => $paref->{t},
+                                                                  limit => 600,
+                                                                }
+                                                              );                                # $fanntyp + Temperaturen aus History lesen    
+  
+  my ($bev_active_ref,           $bev_load_raw_ref,     $bev_n_active_ref, 
+      $bev_soc_deficit_norm_ref, $energy_remaining_ref, $charge_intensity_ref) =
+      _aiFannBevHistArray ( { name    => $name,
+                              fanntyp => $fanntyp,
+                              range   => $range,
+                              t       => $paref->{t},
+                              limit   => 600,
+                            } );                                                               # BEV Aggregationen aus pvHistory lesen                                     
+
+  my @flat_targets     = @$targetref;
+  my @temps            = @$tempsref;
+  my @temp_norm_values = map { _aiFannNormTemp ($_, $range) } @temps;                           # Temperaturen symmetrisch oder asymmetriech normalisieren
+  my @presence_values  = @$presref;
+
+  # Lag-Norms auslesen
+  ######################
+  if (!defined $data{$name}{neuralnet}{$fanntyp} || !defined $data{$name}{neuralnet}{$fanntyp}{lagNorms}) {
+      $msg = 'Lag-Norms is not available. New training is required.'; 
+      $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
+      
+      return $msg;
+  }
+  
+  my $lagnorm_ref = Deserialize ($name, $data{$name}{neuralnet}{$fanntyp}{lagNorms});           # Norms müssen IMMER die Norms aus dem Training bleiben.
+  
+  my $bevloadmin    = $data{$name}{neuralnet}{$fanntyp}{bevloadmin} // 0;                       # BEV-Load normieren mit gespeicherten Trainingsgrenzen (analog rr1c_norm)
+  my $bevloadmax    = $data{$name}{neuralnet}{$fanntyp}{bevloadmax} // 1;
+  
+  my $bevremmin     = $data{$name}{neuralnet}{$fanntyp}{bevremmin} // 0;                        # BEV-remain Energy normieren mit gespeicherten Trainingsgrenzen
+  my $bevremmax     = $data{$name}{neuralnet}{$fanntyp}{bevremmax} // 1;
+  
+  my @bev_load_norm             = map { _aiFannNormMinMaxValue ($_, $bevloadmin, $bevloadmax) } @$bev_load_raw_ref;
+  my @bev_energy_remaining_norm = map { _aiFannNormMinMaxValue ($_, $bevremmin,  $bevremmax)  } @$energy_remaining_ref;
+
+  # Profil einmalig bestimmen
+  #############################
+  my $profile = CurrentVal ($name, 'aiConProfile', undef);                                      # verwendete Feature-Registry Version
+
+  if (!$profile) {
+      my @flags;
+      push @flags, 'heatpump' if defined isHeatPumpUsed ($name);
+      push @flags, 'bev'      if defined isBevUsed      ($name);
+
+      my ($synth, $err) = __aiFannSynthesizeProfile ($name, join (',', @flags) || 'v1');
+
+      if ($err) {
+          Log3 ($name, 1, "$name - ERROR - profile auto-detection failed: $err – using v1_common");
+          $profile = 'v1_common';
+      }
+      else {
+          $profile = $synth;
+      }
+  }
+
+  debugLog ($paref, 'aiData', "AI FANN - using profile: $profile");  
+  
+  # Rohdaten in Reihenfolge extrahieren und vorbereiten
+  #######################################################
+  for my $num (0..MAXNEXTHOURS) {
+      my ($fd, $fh) = calcDayHourMove ($chour, $num);
+      last if($fd > MAXNEXTDAYS);
+      
+      my $nhstr = 'NextHour'.(sprintf "%02d", $num);
+      
+      my $starttime    = NexthoursVal ($name, $nhstr, 'starttime',   undef);
+      my $day          = NexthoursVal ($name, $nhstr, 'day',         undef);
+      my $legacyconfc  = NexthoursVal ($name, $nhstr, 'conlegfc',    undef);      
+      my $weekday      = NexthoursVal ($name, $nhstr, 'weekday',     undef);
+      my $hod          = NexthoursVal ($name, $nhstr, 'hourofday',   undef);
+      my $sunaz        = NexthoursVal ($name, $nhstr, 'sunaz',       undef);
+      my $sunalt       = NexthoursVal ($name, $nhstr, 'sunalt',      undef);
+      my $rr1c         = NexthoursVal ($name, $nhstr, 'rr1c',        undef);
+      my $wcc          = NexthoursVal ($name, $nhstr, 'wcc',         undef);  
+      my $temp         = NexthoursVal ($name, $nhstr, 'temp',        undef);
+      my $isday        = NexthoursVal ($name, $nhstr, 'DoN',         undef);
+      my $pv           = NexthoursVal ($name, $nhstr, 'pvfc',            0);                        # Erstatzwert für pvrl
+      my $holiday      = NexthoursVal ($name, $nhstr, 'holiday',         0);                        # holiday undefiniert -> 0 
+      
+      my ($pv_prev);
+      
+      if (!$num) {                                                                                  # das ist die aktuelle laufende Stunde                                                             
+          my $hits   = timestringToTimestamp ($hash, $starttime);
+          my $dt     = timestringsFromOffset ($name, $hits, -3600);
+          my $hihour = $dt->{hour};
+          my $hiday  = $dt->{day};
+          my $hihod  = sprintf "%02d", int ($hihour) + 1;
+          
+          $pv_prev   = HistoryVal  ($name, $hiday, $hihod, 'pvrl', 0);                              # num 0 -> reale PV der Vorgängerstunde 
+          $presence  = HistoryVal  ($name, $day, $hod, 'presence', 1);                              # Wenn keine Presence-Erfassung -> Anwesenheit annehmen
+          $comftemp  = CircularVal ($name, $hod, 'comforttemp', HPCOMFTEMP);                        # Comport-Temp des Gebäudes
+      }
+      else {
+          my $lhstr = 'NextHour'.(sprintf "%02d", $num-1);
+          $pv_prev  = NexthoursVal ($name, $lhstr, 'pvfc', 0);
+      }
+      
+      # Vollständigkeitsprüfung
+      unless (defined $starttime
+           && defined $legacyconfc
+           && $legacyconfc >= 0
+           && defined $weekday
+           && defined $hod 
+           && defined $sunaz
+           && defined $sunalt
+           && defined $rr1c
+           && defined $wcc 
+           && defined $temp 
+           && defined $isday) {
+
+             debugLog ($paref, 'aiData', "AI FANN - Record $nhstr skipped: data needed are incomplete or legacyconfc < 0"); 
+             next; 
+      }
+
+      # Ableitungen und Normierungen
+      ################################
+      my $month              = int ((split '-', $starttime)[1]);
+      $weekday               = $hwdmap{$weekday};                                        # Wochentag numerisch (1..7)
+      my $intlegacyconfc     = int ($legacyconfc);
+      my $inthod             = int ($hod);                                               # Stunde des Tages numerisch (1..24)
+      my $hour_norm          = ($inthod - 1) / 24;                                       # Stunde des Tages normiert 0..1   
+      $wcc                   = clampValue (int $wcc,   0, 100);
+      $temp                  = clampValue (int $temp, -40, 40);
+      $pv                    = clampValue ($pv, 0, $pv_max_limit);
+      
+      my $sunalt_norm        = _aiFannNormSunalt ($sunalt,      $range);                 # Sonnenaltitude normalisieren im Bereich 0..+1      
+      my $wcc_norm           = _aiFannNormWcc    ($wcc,         $range);                 # Bewölkung symmetrisch oder asymmetriech normalisieren
+      my $temp_norm          = _aiFannNormTemp   ($temp,        $range);                 # Temperatur symmetrisch oder asymmetriech normalisieren
+      my $temp_comfort_norm  = _aiFannNormTemp   ($comftemp,    $range);                 # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
+      my $pv_norm            = _aiFannNormPv     ($pv, $pv_max_limit, $range);           # PV symmetrisch oder asymmetriech normalisieren
+      my $pv_norm_prev       = _aiFannNormPv     ($pv_prev, $pv_max_limit, $range); 
+      my $day_hour_norm      = $isday  ? $hour_norm : 0;                                 # Tagstunden normiert, sonst 0
+      my $night_hour_norm    = !$isday ? $hour_norm : 0;                                 # Nachtstunden normiert, sonst 0 
+      
+      
+      # Monat 1..12 -> 0..11
+      my $month0 = $month - 1;    
+      my ($month_sin, $month_cos) = _aiFannEncodeCyclic ($month0,  12, $range);        # Monat, zyklische Struktur (0 .. 11)
+      
+      # Stunde 1..24 -> 0..23
+      my $hod0 = $inthod - 1;
+      my ($hod_sin, $hod_cos)     = _aiFannEncodeCyclic ($hod0, 24, $range);           # Stunde des Tages zyklisch (0 .. 23)
+      
+      # Wochentag 1..7 -> 0..6
+      my $wday0 = $weekday - 1;   
+      my ($wday_sin, $wday_cos)   = _aiFannEncodeCyclic ($wday0, 7, $range);           # Wochentag in zyklischer Struktur (0..6)
+
+      # Sonnenazimut 0..360 -> 0..359
+      my $sunaz0 = $sunaz % 360; 
+      my ($sunaz_sin, $sunaz_cos) = _aiFannEncodeCyclic ($sunaz0, 360, $range);        # Sonnenazimut zyklisch (0 .. 359)      
+      
+      
+      # Min-Max 0..1|-1..1 Normierung
+      #################################
+      my $rr1c_norm = _aiFannNormMinMaxValue ($rr1c, $data{$name}{neuralnet}{$fanntyp}{rr1Min},
+                                                     $data{$name}{neuralnet}{$fanntyp}{rr1Max}
+                                              );                                            # Niederschlag, numerisch min-max normalisiert  
+                                              
+      ## Lag-Features erzeugen
+      ##########################
+      my $i    = @flat_targets - 1;
+      my $lags = _aiFannBuildLagFeatures ( { con_series                       => \@flat_targets,
+                                             temp_norm_series                 => \@temp_norm_values,
+                                             presence_values                  => \@presence_values,
+                                             i                                => $i,
+                                             norms                            => $lagnorm_ref,
+                                             range                            => $range,
+                                             bev_active_series                => $bev_active_ref,
+                                             bev_load_norm_series             => \@bev_load_norm,
+                                             bev_n_active_series              => $bev_n_active_ref,
+                                             bev_soc_deficit_norm_series      => $bev_soc_deficit_norm_ref, 
+                                             bev_energy_remaining_norm_series => \@bev_energy_remaining_norm,
+                                             bev_charge_intensity_series      => $charge_intensity_ref,                                             
+                                           } );      
+      next if(!$lags);      
+     
+      # diskrete, semantische Zusatzsignale
+      #######################################
+      my $sigs = _aiFannCreateAddOnSignals ( { lags              => $lags,                          
+                                               pv_norm           => $pv_norm,
+                                               pv_norm_prev      => $pv_norm_prev,
+                                               temp_norm         => $temp_norm,
+                                               inthod            => $inthod - 1,
+                                               weekday           => $weekday,
+                                               temp_comfort_norm => $temp_comfort_norm,
+                                               range             => $range,
+                                               con_series        => \@flat_targets,
+                                               i                 => $i,
+                                               norms             => $lagnorm_ref,  
+                                             } );      
+      
+      ## Inputs zusammenstellen
+      ###########################
+      my @new_input = ();
+      
+      # Kombinatorik in _aiFannFeatureBuilder 
+      #######################################
+      my $features = _aiFannFeatureBuilder ($profile, {                                    
+                            pv_norm                     => $pv_norm,                                    # PV-Ertrag (min-max normalisiert)
+                            rr1c_norm                   => $rr1c_norm,                                  # Niederschlag (min-max normalisiert)
+                            temp_norm                   => $temp_norm,                                  # Außentemperatur (min-max normalisiert)
+                            wcc_norm                    => $wcc_norm,                                   # Bewölkungsgrad (min-max normalisiert)
+                            sunalt_norm                 => $sunalt_norm,                                # Sonnenhöhe 0..1 (unterhalb Horizont = 0)
+                            isday                       => $isday,                                      # Tag/Nacht-Flag (1 = Tag)
+                            holiday                     => $holiday,                                    # Feiertag / Urlaub
+                            hour_norm                   => $hour_norm,                                  # Stunde des Tages 0..1
+                            day_hour_norm               => $day_hour_norm,                              # Normierte Tagesstunden (sonst 0)
+                            night_hour_norm             => $night_hour_norm,                            # Normierte Nachtstunden (sonst 0)
+
+                            hod_sin                     => $hod_sin,                                    # Stunde des Tages (sinusförmig zyklisch)
+                            hod_cos                     => $hod_cos,                                    # Stunde des Tages (cosinusförmig zyklisch)
+                            wday_sin                    => $wday_sin,                                   # Wochentag zyklisch (sin)
+                            wday_cos                    => $wday_cos,                                   # Wochentag zyklisch (cos)
+                            month_sin                   => $month_sin,                                  # Monat zyklisch (sin)
+                            month_cos                   => $month_cos,                                  # Monat zyklisch (cos)
+                            sunaz_sin                   => $sunaz_sin,                                  # Sonnenazimut zyklisch (sin)
+                            sunaz_cos                   => $sunaz_cos,                                  # Sonnenazimut zyklisch (cos)
+
+                            presence                    => $presence,                                   # Anwesenheit (0/1, Vergangenheit = 1)
+                            presence_smooth3            => $lags->{presence_smooth3},                   # Anwesenheitsglättung über 3h (0..1)
+                            presence_smooth2            => $lags->{presence_smooth2},                   # Anwesenheitsglättung über 2h (0..1)
+                            presence_transition_up      => $lags->{presence_transition_up},             # Anwesenheit 0->1 Übergang (Impuls)
+                            presence_transition_down    => $lags->{presence_transition_down},           # Anwesenheit 1->0 Übergang (Impuls)
+
+                            lag48_norm                  => $lags->{lag48_norm},                         # Verbrauch vor 48h (normalisiert)
+                            lag168_norm                 => $lags->{lag168_norm},                        # Verbrauch vor 168h = 7d (normalisiert)
+                            hod_mean7_norm              => $lags->{hod_mean7_norm},                     # 7-Tage gleit. Mittelwert gleiche Stunde (normiert)
+                            hod_cv7_norm                => $lags->{hod_cv7_norm},                       # Variationskoeffizient gleiche Stunde (Vorhersagbarkeit)
+
+                            lag1_spike_pos_norm         => $lags->{lag1_spike_pos_norm},                # letzte Stunde war Spike nach oben (laufender Spike)
+                            lag1_spike_neg_norm         => $lags->{lag1_spike_neg_norm},                # letzte Stunde war Spike nach unten (laufender Einbruch)
+                            lag2_spike_pos_norm         => $lags->{lag2_spike_pos_norm},                # vorletzte Stunde war Spike nach oben (Spike klingt ab / hält an)
+                            lag2_spike_neg_norm         => $lags->{lag2_spike_neg_norm},                # vorletzte Stunde war Spike nach unten  (Einbruch klingt ab / hält an)
+                            
+                            cum_day_norm                => $sigs->{cum_day_norm},                       # kumulierter Tagesverbrauch (normiert)
+                            cum_day_deviation           => $sigs->{cum_day_deviation},                  # Abweichung Verbrauch vom erwarteten Tagespfad
+
+                            is_low_cons_regime          => $lags->{is_low_cons_regime},                 # y_t_1 <= P25: Grundlast / Nacht / abwesend
+                            is_high_cons_regime         => $lags->{is_high_cons_regime},                # y_t_1 >= P75: Peak / Kochen / Geräte an
+                            is_transition_regime        => $lags->{is_transition_regime},               # P25 < y_t_1 < P75: normaler Betrieb
+                                                     
+                            delta1_norm                 => $lags->{delta1_norm},                        # Änderung ggü. Vorstunde (normalisiert)
+                            delta24_norm                => $lags->{delta24_norm},                       # Änderung ggü. Vortag (normalisiert)
+                            delta1_norm_pos             => $lags->{delta1_norm_pos},                    # Positive 1h-Änderung
+                            delta1_norm_neg             => $lags->{delta1_norm_neg},                    # Negative 1h-Änderung
+                            delta24_norm_pos            => $lags->{delta24_norm_pos},                   # Positive 24h-Änderung
+                            delta24_norm_neg            => $lags->{delta24_norm_neg},                   # Negative 24h-Änderung
+
+                            roll_min_6_norm             => $lags->{roll_min_6_norm},                    # Tiefstwert der letzten 6h (Grundlastniveau)
+                            roll_max_6_norm             => $lags->{roll_max_6_norm},                    # Höchstwert der letzten 6h (Peak-Niveau)
+                            roll_range_6_norm           => $lags->{roll_range_6_norm},                  # Spannweite der letzten 6h (Volatilität ohne Glättung)
+
+                            temp_norm_lag1h             => $lags->{temp_norm_lag1h},                    # Temperatur vor 1h (normalisiert)
+                            temp_norm_lag3h             => $lags->{temp_norm_lag3h},                    # Temperatur vor 3h (normalisiert)
+                            temp_norm_lag24h            => $lags->{temp_norm_lag24h},                   # Temperatur vor 24h (normalisiert)
+
+                            temp_delta_1h_pos           => $lags->{temp_delta_1h_pos},                  # Positive Temperaturänderung 1h
+                            temp_delta_1h_neg           => $lags->{temp_delta_1h_neg},                  # Negative Temperaturänderung 1h
+                            temp_delta_3h_pos           => $lags->{temp_delta_3h_pos},                  # Positive Temperaturänderung 3h
+                            temp_delta_3h_neg           => $lags->{temp_delta_3h_neg},                  # Negative Temperaturänderung 3h
+                            temp_trend_pos              => $lags->{temp_trend_pos},                     # Aufwärtstrend Temperatur
+                            temp_trend_neg              => $lags->{temp_trend_neg},                     # Abwärtstrend Temperatur
+
+                            trend_break                 => $sigs->{trend_break},                        # Trendwechsel (binär)
+                            trend_up_norm               => $sigs->{trend_up_norm},                      # Aufwärtstrend Stärke (normalisiert)
+                            trend_down_norm             => $sigs->{trend_down_norm},                    # Abwärtstrend Stärke (normalisiert)
+                            trend_up_strength           => $sigs->{trend_up_strength},                  # Starker Aufwärtstrend
+                            trend_down_strength         => $sigs->{trend_down_strength},                # Starker Abwärtstrend
+
+                            pv_jump                     => $sigs->{pv_jump},                            # Plötzlicher PV-Anstieg
+                            cold_trigger                => $sigs->{cold_trigger},                       # Kälte-Trigger (binär)
+                            heat_trigger                => $sigs->{heat_trigger},                       # Hitze-Trigger (binär)
+                            volatility_flag             => $sigs->{volatility_flag},                    # Hohe Lastvolatilität
+                            pv_consumption_cross        => $sigs->{pv_consumption_cross},               # PV-Erzeugung > Verbrauch
+                            pv_drop                     => $sigs->{pv_drop},                            # PV-Einbruch
+
+                            hour_class_morning          => $sigs->{hour_class_morning},                 # Morgenstunden (Flag)
+                            hour_class_evening          => $sigs->{hour_class_evening},                 # Abendstunden (Flag)
+                            hour_class_lateevening      => $sigs->{hour_class_lateevening},             # Spätabend (Flag)
+                            hour_class_midnight         => $sigs->{hour_class_midnight},                # Mitternacht (Flag)
+                            hour_class_night            => $sigs->{hour_class_night},                   # Nachtstunden (Flag)
+                            hour_class_noon             => $sigs->{hour_class_noon},                    # Mittagsstunden (Flag)
+
+                            day_class_weekend           => $sigs->{day_class_weekend},                  # Wochenende (Flag)
+                            day_class_workday           => $sigs->{day_class_workday},                  # Arbeitstag (Flag)
+
+                            heating_degree_norm         => $sigs->{heating_degree_norm},                # Heizgradtage (Heizlast)
+                            cooling_degree_norm         => $sigs->{cooling_degree_norm},                # Kühlgradtage (Kühllast)
+
+                            hp_heating_mode             => $sigs->{hp_heating_mode},                    # Wärmepumpe im Heizmodus
+                            hp_cooling_mode             => $sigs->{hp_cooling_mode},                    # Wärmepumpe im Kühlmodus
+
+                            ww_morning                  => $sigs->{ww_morning},                         # Warmwasser morgens
+                            ww_evening                  => $sigs->{ww_evening},                         # Warmwasser abends
+                            ww_cold_boost               => $sigs->{ww_cold_boost},                      # Kältebedingter WW-Boost
+                            ww_pv_boost                 => $sigs->{ww_pv_boost},                        # PV-optimierter WW-Boost
+                            ww_cycle_flag               => $sigs->{ww_cycle_flag},                      # WW-Zyklus aktiv
+
+                            cop_proxy                   => $sigs->{cop_proxy},                          # COP-Schätzwert (linear zur Temperatur)
+                            cop_inverse                 => $sigs->{cop_inverse},                        # Inverser COP (Strombedarf)
+                            hp_power_factor             => $sigs->{hp_power_factor},                    # Kombinierte WP-Leistungssemantik
+
+                            frost_protect               => $sigs->{frost_protect},                      # Frostschutz aktiv (binär)
+                            frost_load                  => $sigs->{frost_load},                         # Frostschutz-Last (kontinuierlich)                       
+                        
+                            bev_active_lag1                => $lags->{bev_active_lag1},                 # mind. ein EV lud in der Vorstunde (binär)
+                            bev_load_lag1_norm             => $lags->{bev_load_lag1_norm},              # geladene Energiemenge Vorstunde (normiert, Arrayref-Deref!)
+                            bev_n_active_lag1_norm         => $lags->{bev_n_active_lag1_norm},          # Anteil gleichzeitig ladender EVs Vorstunde (bereits 0..1, kein eigener Norm-Schritt)
+                            bev_soc_deficit_lag1_norm      => $lags->{bev_soc_deficit_lag1_norm},       # mittleres SoC-Defizit zum Ende der Vorstunde
+                            bev_energy_remaining_lag1_norm => $lags->{bev_energy_remaining_lag1_norm},  # verbleibende Lademenge in Wh (kapazitätsgewichtet)
+                            bev_charge_intensity_lag1      => $lags->{bev_charge_intensity_lag1},       # Anteil der Stunde mit aktivem Laden (0..1)
+                            
+                        }       
+                    );
+      
+      unless ($features) {
+          $msg = 'ERROR in FANN Feature Registry Builder Version: $bv'; 
+          $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg; 
+
+          return $msg;           
+      }
+      else {
+          push @new_input, @{$features};
+      }
+
+      #debugLog ($paref, 'aiData', "AI FANN - new_input: ".Dumper @new_input);
+      #debugLog ($paref, 'aiData', "AI FANN - Series data: ".Dumper @flat_targets);   
+      #debugLog ($paref, 'aiData', "AI FANN - Lags: ".Dumper $lags);        
+
+      #if ($debug =~ /aiData/xs) {
+      #    my $inpo = join ", \n", @new_input;
+      #    Log3 ($name, 1, "$name DEBUG> AI AI FANN - hod: $hod - Normalized input dataset: \n".
+      #                     $inpo);
+      #} 
+ 
+      # Prognose + BiasKorrektur abfragen
+      #####################################
+      my $denorm_val                                 = _aiFannPredict             ($name, $fanntyp, \@new_input); 
+      my ($prediction, $tc, $bias_zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $hod, $denorm_val, $targetref, $profile);   # gewichtete Bias-Korrektur anwenden
+      
+      my $nngrst = CurrentVal ($name, $fanntyp.'NNGetResultState', 'ok');
+      
+      if ($nngrst ne 'ok') {
+          Log3 ($name, 2, "$name - WARNING - AI FANN '$fanntyp' forecast ignored and Legacy value is used, cause: $nngrst") 
+                  if(askLogtime ($name, $msg, 300));                                                                                            # Log mit Mehrfachverhinderung
+          return;
+      }
+      
+      $denorm_val = round0 ($denorm_val);
+      $prediction = round0 ($prediction);
+      $tc         = round0 ($tc);
+
+      # Fortschreibung der Arrays! mit Horizont-Dämpfung
+      ####################################################
+      my $hist_ref    = _aiFannGetHistoricalReference ($name, $fanntyp, $hod, $t);
+      my $blend_alpha = $hist_ref > 0
+                      ? min (0.8, $num / MAXNEXTHOURS)                                      # maximal 80% historisch
+                      : 0;                                                                  # kein Blending ohne Referenz
+
+      my $forward_val = (1 - $blend_alpha) * $prediction 
+                      +      $blend_alpha  * $hist_ref;
+      
+      $forward_val    = round0 ($forward_val);
+
+      push @flat_targets,     $forward_val;                                                 # V 2.6.10 statt direkt $prediction
+      push @temp_norm_values, $temp_norm;                                                   # wichtig: Temperaturreihe auch erweitern
+      push @presence_values,  $presence;                                                    # wichtig: Presence fortschreiben
+      
+      push @$bev_active_ref,           0;                                                   # BEV-Zukunftswerte: kein Ladezustand bekannt -> neutral (0)
+      push @bev_load_norm,             0;
+      push @$bev_n_active_ref,         0;
+      push @$bev_soc_deficit_norm_ref, 0;
+      push @bev_energy_remaining_norm, 0;
+      push @$charge_intensity_ref,     0;   
+
+      
+      # Hybridmodell mit Legacy
+      ##########################
+      my $confc_final = $alpha * $prediction + (1 - $alpha) * $intlegacyconfc;
+      $confc_final    = round0 ($confc_final);
+ 
+      if ($debug =~ /aiData/xs) {
+          my $dthr = (split ':', $starttime, 2)[0];
+          Log3 ($name, 1, "$name DEBUG> AI FANN con fc - $dthr, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)");
+      }       
+      
+      # Daten speichern
+      ###################
+      $data{$name}{nexthours}{$nhstr}{conbiascorr} = $tc;
+      $data{$name}{nexthours}{$nhstr}{conaifc}     = $prediction;
+      $data{$name}{nexthours}{$nhstr}{confc}       = $confc_final;                           # hybriden prognostizierten Verbrauch speichern
+          
+      if (NexthoursVal ($name, $nhstr, 'today', 0)) {                                        # nur Werte des aktuellen Tags speichern
+          $data{$name}{circular}{$hod}{confc} = $confc_final;
+          writeToHistory ( { paref => $paref, key => 'conaifc',     val => $prediction,  day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'confc',       val => $confc_final, day => $day, hour => $hod } );
+          writeToHistory ( { paref => $paref, key => 'conbiascorr', val => $tc,          day => $day, hour => $hod } );           
+                    
+          debugLog ($paref, 'saveData2Storage|consumption_long', "store AI legacy alpha value to circular/history -> hod=$hod confc=$confc_final Wh");
+      }
+  }
+  
+  setTimeTracking ($name, $cst, $fanntyp.'NNLastGetResultTime');                            # Laufzeit ermitteln
+  
+return;
 }
 
 ###############################################################
@@ -26822,211 +28276,6 @@ return CurrentVal ($name, 'aiConAbsOversample', 0.0);
 }
 
 ################################################################
-# Training anstarten und qualitätsgesteuert ggf.
-# mehrfach ausführen - das beste Trainingsergebnis finalisieren
-#########################################################################################################
-# mögliche Templates:
-# -------------------
-# 1. Architektur: 50-25    
-#    Lernrate/Momentum: 0.01 / 0.9
-#    Shuffling: Chronologischer Split, Shuffle jede Epoche
-#    Erwartung: Baseline; stabile Konvergenz, ggf. Bias-Plateaus (das Training 'steht' auf einem Plateau)
-#
-# 2. Architektur: 64-32   
-#    Lernrate/Momentum: 0.01 / 0.8
-#    Shuffling: Block-Shuffle nur im Trainingsfenster (shuffle_mode=1)
-#    Trainingsalgorithmus: INCREMENTAL
-#    Erwartung: Etwas mehr Kapazität (Netz hat durch mehr Neuronen/Layer mehr Freiheitsgrade, also 
-#               mehr Parameter), bessere Muster, moderates Overfitting-Risiko
-#
-# 3. Architektur: 64-32-16   
-#    Lernrate/Momentum: 0.005 / 0.8
-#    Shuffling: Segment-Shuffle (DoW/Hour) im Training
-#    Trainingsalgorithmus: INCREMENTAL
-#    Erwartung: Tiefer (Netzwerk mit mehr Layern), vorsichtiger LR (bei tieferen Netzen muss die 
-#               Lernrate kleiner gewählt werden); gute Feinmuster (tiefe Netze können subtile, 
-#               nichtlineare Zusammenhänge besser erfassen), nur bei genug Daten
-#
-# 3. Architektur: 64-32 (RPROP)   
-#    Lernrate/Momentum: – / –
-#    Shuffling: Chronologischer Split, Shuffle jede Epoche
-#    Erwartung: Oft stabiler Schritte, weniger Tuning, gute Generalisierung
-#
-#########################################################################################################
-sub aiFannTrainstartAndRetry {
-  my $paref         = shift;
-  my $name          = $paref->{name}; 
-  my $debug         = $paref->{debug};
-  my $fanntyp       = $paref->{fanntyp};                            # Verwendungstyp (z.B. 'con')
-  
-  my $maxRtyRetrain     = 3;                                        # max. Trainingsretries bei Status "Retrain"
-  my $maxRtyBorderline  = 2;                                        # max. Trainingsretries bei Status "Borderline"
-  my $aiconact          = CurrentVal ($name, 'aiConActivate', 0);   # evtl. Train-Only eingeschaltet?
-  
-  # Training starten
-  #################### 
-  my $retref = aiFannTrain ($paref);
-  
-  # Retry prüfen und ggf. ausführen
-  ###################################
-  my $NNTrainstate     = $retref->{$fanntyp.'NNTrainstate'};
-  my $retrainQuality   = $retref->{$fanntyp.'NNRetrainQuality'}; 
-  my $attempt          = $retref->{$fanntyp.'NNAttempt'};      
-  my $seed             = $retref->{$fanntyp.'NNSeed'};
-  my $best_score       = $retref->{$fanntyp.'NNScore'};
-  my $best_r2          = $retref->{$fanntyp.'NNR2'};  
-  my $best_modelslope  = $retref->{$fanntyp.'NNModelSlope'};  
-  my $best_modelbias   = $retref->{$fanntyp.'NNModelBias'};
-  my $best_rmse        = $retref->{$fanntyp.'NNRmse'}; 
-  my $best_rmse_rel    = $retref->{$fanntyp.'NNRmseRel'};  
-  my $best_rmse_rating = $retref->{$fanntyp.'NNRmseRating'};
-  my $best_bit_fail    = $retref->{$fanntyp.'NNBestBitFail'};
-  my $best_val_mse     = $retref->{$fanntyp.'NNBestValMse'};
-  my $best_val_mae     = $retref->{$fanntyp.'NNBestValMae'}; 
-  my $best_val_medae   = $retref->{$fanntyp.'NNBestValMedae'};
-
-  #$retrainQuality = 'ok';   # Wiederholung temporär ausschalten
-  
-  my $best_composite = _aiFannCompositeScore ( { score    => $best_score,
-                                                 rmse_rel => $best_rmse_rel,
-                                                 medae    => $best_val_medae,
-                                                 mae      => $best_val_mae,
-                                                 slope    => $best_modelslope,
-                                                 r2       => $best_r2,
-                                                 val_mse  => $best_val_mse,
-                                               }
-                                             );
-
-  if ($NNTrainstate eq 'ok') {
-      my $best_val_mse_final     = $best_val_mse;
-      my $best_val_mae_final     = $best_val_mae;
-      my $best_val_medae_final   = $best_val_medae;  
-      my $best_score_final       = $best_score;
-      my $best_r2_final          = $best_r2; 
-      my $best_modelslope_final  = $best_modelslope;
-      my $best_modelbias_final   = $best_modelbias;
-      my $best_rmse_final        = $best_rmse;
-      my $best_rmse_rel_final    = $best_rmse_rel;
-      my $best_rmse_rating_final = $best_rmse_rating;
-      my $best_seed              = $seed;
-      my $best_attempt           = $attempt;
-
-      if ($retrainQuality eq 'Retrain' || $retrainQuality eq 'Borderline') {
-          my $max_retries = $aiconact == 2                                                      
-                            ? 1                                                 # im "Train Only" Modus nur eine Wiederholung zur Schnelleinschätzung
-                            : $retrainQuality eq 'Retrain' 
-                            ? $maxRtyRetrain 
-                            : $maxRtyBorderline;
-          
-          for my $rt (1 .. $max_retries) {
-              my $new_seed = ($seed * 37 + $rt * 101 + int (rand (1000000))) % 100000000;
-              
-              $retref = aiFannTrain ({ %$paref, seed => $new_seed, attempt => $rt });
-              
-              $retrainQuality       = $retref->{$fanntyp.'NNRetrainQuality'};
-              $attempt              = $retref->{$fanntyp.'NNAttempt'};
-              my $retry_r2          = $retref->{$fanntyp.'NNR2'};
-              my $retry_modelslope  = $retref->{$fanntyp.'NNModelSlope'};  
-              my $retry_modelbias   = $retref->{$fanntyp.'NNModelBias'};
-              my $retry_rmse        = $retref->{$fanntyp.'NNRmse'};
-              my $retry_rmse_rel    = $retref->{$fanntyp.'NNRmseRel'};
-              my $retry_rmse_rating = $retref->{$fanntyp.'NNRmseRating'};              
-              my $retry_bit_fail    = $retref->{$fanntyp.'NNBestBitFail'};
-              my $retry_val_mse     = $retref->{$fanntyp.'NNBestValMse'}; 
-              my $retry_val_mae     = $retref->{$fanntyp.'NNBestValMae'}; 
-              my $retry_val_medae   = $retref->{$fanntyp.'NNBestValMedae'};   
-              my $retry_score       = $retref->{$fanntyp.'NNScore'};              
-              
-              # bestes Modell auswählen über Composite Score
-              ################################################
-              my $retry_composite = _aiFannCompositeScore ( { score    => $retry_score,
-                                                              rmse_rel => $retry_rmse_rel,
-                                                              medae    => $retry_val_medae,
-                                                              mae      => $retry_val_mae,
-                                                              slope    => $retry_modelslope,
-                                                              r2       => $retry_r2,
-                                                              val_mse  => $retry_val_mse,
-                                                            }
-                                                          );
-                                                                              
-              if (!defined $best_composite || $retry_composite > $best_composite) {
-                  $best_composite         = $retry_composite;
-                  
-                  $best_score_final       = $retry_score;
-                  $best_rmse_rel_final    = $retry_rmse_rel;
-                  $best_val_medae_final   = $retry_val_medae;
-                  $best_val_mae_final     = $retry_val_mae;
-                  $best_modelslope_final  = $retry_modelslope;
-                  $best_r2_final          = $retry_r2;
-                  $best_val_mse_final     = $retry_val_mse;
-                  
-                  $best_modelbias_final   = $retry_modelbias;
-                  $best_rmse_final        = $retry_rmse;
-                  $best_rmse_rating_final = $retry_rmse_rating;
-                  $best_seed              = $new_seed;
-                  $best_attempt           = $attempt;
-              }
-              
-              last if($retrainQuality eq 'ok');
-          }
-
-          if ($debug =~ /aiProcess/xs) {
-              $best_modelslope_final = round2 ($best_modelslope_final);
-              $best_modelbias_final  = round2 ($best_modelbias_final);
-              $best_val_mse_final    = round6 ($best_val_mse_final);
-              $best_val_mae_final    = round2 ($best_val_mae_final);
-              $best_val_medae_final  = round2 ($best_val_medae_final);
-              $best_r2_final         = round2 ($best_r2_final);
-              $best_rmse_final       = round2 ($best_rmse_final);
-              
-              Log3 ($name, 1, "$name DEBUG> Best model after retries comes from Attempt=$best_attempt with: \n".
-                                            "Seed=$best_seed, \n".
-                                            "Model Score=$best_score_final, \n".
-                                            "Model Slope=$best_modelslope_final, \n".
-                                            "Model Bias=$best_modelbias_final, \n".
-                                            "VAL MedAE=$best_val_medae_final, \n".
-                                            "VAL MAE=$best_val_mae_final, \n".
-                                            "VAL weighted RMSE=$best_rmse_final, \n".
-                                            "VAL weighted RMSE relative=$best_rmse_rel_final %, \n".
-                                            "VAL weighted RMSE_Rating=$best_rmse_rating_final, \n".
-                                            "VAL R2=$best_r2_final, \n".
-                                            "Val MSE=$best_val_mse_final"
-                                          );
-          }      
-      } 
-      else {
-          Log3 ($name, 1, "$name DEBUG> Training accepted - no retry needed") if($debug =~ /aiProcess/xs);
-      }  
-      
-      # Rückgabe vorbereiten: bestes Modell übernehmen
-      ##################################################
-      $data{$name}{neuralnet}{$fanntyp} = ();
-      $data{$name}{neuralnet}{$fanntyp} = $data{$name}{$fanntyp.'temp'}{$best_attempt};    
-      $data{$name}{$fanntyp.'temp'}     = ();
-      
-      delete $data{$name}{$fanntyp.'temp'};
-
-      my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
-
-      if ($err) {
-          $retref->{$fanntyp.'NNTrainstate'} = $err;
-          Log3 ($name, 1, "$name - ERROR while writing file: ".$neuralnet.$name);
-      }
-      else {
-          if ($debug =~ /aiProcess/xs) {
-              Log3 ($name, 1, "$name DEBUG> AI FANN training data successfully written to file: ".$neuralnet.$name);
-          }     
-      }
-
-      $retref->{fanntyp} = $fanntyp;                                                        # Trainingstyp für Auswertung Rückgabe     
-  }
-  
-  my $serial = encode_base64 ( Serialize ($retref), "");
-
-return $serial;
-}
-
-################################################################
 #            Composite-Score Funktion
 ################################################################
 sub _aiFannCompositeScore {
@@ -27057,720 +28306,6 @@ sub _aiFannCompositeScore {
                 - $w_val_mse  * $val_mse;
 
 return $composite;
-}
-
-################################################################
-#            Neuronales Netz trainieren
-################################################################
-sub aiFannTrain {
-  my $paref                = shift;
-  my $name                 = $paref->{name};
-  my $trdref               = $paref->{trdref};                                   # Arrayref normierte Trainingsdaten
-  my $trgref               = $paref->{trgref};                                   # Arrayref normierte Zielwert(e)
-  my $fanntyp              = $paref->{fanntyp};                                  # Verwendungstyp (z.B. 'con')
-  
-  my $hidden_layers        = $paref->{hidden_layers};
-  my $mse_error            = $paref->{mse_error};
-  my $learning_rate        = $paref->{learning_rate};
-  my $learning_momentum    = $paref->{learning_momentum};
-  my $hidden_steepness     = $paref->{hidden_steepness};                         # bestimmt, wie schnell die Aktivierungsfunktion von ihrem Minimum zum Maximum wechselt, Standard: 0.5
-  my $shuffle_mode         = $paref->{shuffle_mode};
-  my $shuffle_period       = $paref->{shuffle_period};
-  my $bit_fail_limit       = $paref->{bit_fail_limit};                           # Bit-Fail Limit
-  my $dataParamRatio_limit = $paref->{dataParamRatio_limit};
-  my $haf                  = $paref->{haf};
-  my $oaf                  = $paref->{oaf};
-  my $talgo                = $paref->{talgo};
-  my $profile              = $paref->{regv};                                     # ausgewählte Registry Version / Profil
-  my $attempt              = $paref->{attempt} // 0;                             # Nummer des Durchlaufs
-  
-  my $minval               = $paref->{minval};                                   # Target Denormalisierungsparameter
-  my $maxval               = $paref->{maxval};                                   # Target Denormalisierungsparameter
-  my $rr1min               = $paref->{rr1min};
-  my $rr1max               = $paref->{rr1max}; 
-  my $cst                  = $paref->{cst};                                      # Train Startzeit
-  my $seed                 = $paref->{seed} // ($cst % 1000000);                 # Seed setzen (falls übergeben, sonst Standardwert)
-  my $debug                = $paref->{debug};
-  
-  # feste Parameter
-  ###################
-  my $num_epoch                 = AINUMEPOCHS;                                   # max. Anzahl Epochen
-  my $num_epoch_between_statmsg = 0;                                             # Anzahl der Epochen zwischen Statusmeldungen
-  $num_epoch_between_statmsg    = 100 if($debug =~ /aiProcess/xs);
-  my $best_val_mse              = 1e9;
-  my $best_val_mae              = 1e9;
-  my $best_weighted_rmse_proxy  = 1e9;
-  my $best_val_medae            = 1e9;
-  my $best_train_mse            = 1e9;
-  my $best_train_epoch          = 1e9;
-  my $best_bit_fail             = 1e9;
-  my $training_portion          = 0.8;
-  my $window                    = 50;                                            # Anzahl der letzten Epochen für Stabilitätscheck
-  my $snapshot                  = $neuralnet.'best_model_'.$fanntyp.'_'.$name;   
-                                          
-  srand($seed);                                                                  # Trick: Beim Erzeugen eines Netzes (new_standard) werden die Gewichte der Neuronen zufällig initialisiert.
-                                                                                 # Diese Zufallswerte kommen aus dem globalen Zufallszahlengenerator der Laufzeitumgebung (C/Perl).
-                                                                                 # Wenn man vorher srand($seed) setzt, bestimmt man den Startzustand dieses Generators
-                                                                                 # Startgewichte beeinflussen, wie schnell und wohin das Netz konvergiert                                                                                
-
-  # AI::FANN Aktivierungsfunktionen
-  ###################################
-  my %af_map = (                                                                        
-      LINEAR                     => AI::FANN::FANN_LINEAR(),
-      THRESHOLD                  => AI::FANN::FANN_THRESHOLD(),
-      THRESHOLD_SYMMETRIC        => AI::FANN::FANN_THRESHOLD_SYMMETRIC(),
-      SIGMOID                    => AI::FANN::FANN_SIGMOID(),
-      SIGMOID_STEPWISE           => AI::FANN::FANN_SIGMOID_STEPWISE(),
-      SIGMOID_SYMMETRIC          => AI::FANN::FANN_SIGMOID_SYMMETRIC(),
-      SIGMOID_SYMMETRIC_STEPWISE => AI::FANN::FANN_SIGMOID_SYMMETRIC_STEPWISE(),
-      GAUSSIAN                   => AI::FANN::FANN_GAUSSIAN(),
-      GAUSSIAN_SYMMETRIC         => AI::FANN::FANN_GAUSSIAN_SYMMETRIC(),
-      GAUSSIAN_STEPWISE          => AI::FANN::FANN_GAUSSIAN_STEPWISE(),
-      ELLIOT                     => AI::FANN::FANN_ELLIOT(),
-      ELLIOT_SYMMETRIC           => AI::FANN::FANN_ELLIOT_SYMMETRIC(),
-      LINEAR_PIECE               => AI::FANN::FANN_LINEAR_PIECE(),
-      LINEAR_PIECE_SYMMETRIC     => AI::FANN::FANN_LINEAR_PIECE_SYMMETRIC(),
-      SIN                        => AI::FANN::FANN_SIN(),
-      SIN_SYMMETRIC              => AI::FANN::FANN_SIN_SYMMETRIC(),
-      COS                        => AI::FANN::FANN_COS(),
-      COS_SYMMETRIC              => AI::FANN::FANN_COS_SYMMETRIC(),
-  );  
-  
-  # AI::FANN Trainingsalgorithmen
-  #################################
-  my %ta_map = (                                                                        
-      INCREMENTAL => AI::FANN::FANN_TRAIN_INCREMENTAL(),                            # klassisches Backpropagation mit Lernrate/Momentum
-      BATCH       => AI::FANN::FANN_TRAIN_BATCH(),
-      RPROP       => AI::FANN::FANN_TRAIN_RPROP(),                                  # Resilient Propagation (default), robust, kein Tuning von Lernrate/Momentum nötig bzw. möglich
-      QUICKPROP   => AI::FANN::FANN_TRAIN_QUICKPROP(),                              # Quickpropagation
-  ); 
-  
-  if ($debug =~ /aiProcess/xs) {
-      my $do = $attempt ? 'Retry' : 'First';
-      Log3 ($name, 1, "$name DEBUG> $do attempt $attempt with Seed=$seed");
-  }
-  
-  # Auteilung in Trainings- und Validierungs-Daten
-  ##################################################
-  my @train_pairs;
-  my @train_inputs;
-  my @test_inputs;
-  my @test_targets;
-  
-  my @indices     = (0 .. $#$trdref);                                                   # Indizes vorbereiten                                                 
-  @indices        = shuffle (@indices) if($shuffle_mode == 2);
-  my $split_index = int (@indices * $training_portion);                                 # Split in Trainings- und Testdaten
-  
-  for my $i (0 .. $split_index-1) {
-      push @train_pairs,  $trdref->[$i], $trgref->[$i];                                 # Struktur zusammenführen: [ [f1,f2,...], [target] ]
-      push @train_inputs, $trdref->[$i];
-  }
-
-  for my $i ($split_index .. $#$trdref) {
-      push @test_inputs,  $trdref->[$i];
-      push @test_targets, $trgref->[$i];
-  }
-  
-  my $num_train_datasets = scalar(@$trdref);
-  my $num_inputs         = scalar(@{$trdref->[0]});
-  my $num_outputs        = scalar(@{$trgref->[0]});
-  
-  # Netzarchitektur Auto Konfiguration wenn nicht gesetzt
-  #########################################################
-  my $dataParamRatio = 1;                                                               # 1 -> Guard
-  my $num_params     = 0;                                                               # 0 -> Guard
-  
-  if (!$hidden_layers) {  
-      ($hidden_layers, $dataParamRatio) = _aiFannAutoArchitecture ($num_train_datasets, $num_inputs, $dataParamRatio_limit);
-      $num_params                       = __aiFannEstimateParams  ($num_inputs, $hidden_layers);
-  }
-  else {
-      $num_params     = __aiFannEstimateParams ($num_inputs, $hidden_layers);
-      $dataParamRatio = $num_train_datasets / $num_params;
-  }
-  
-  $dataParamRatio    = round3 ($dataParamRatio);
-  my @hiddlays       = map {$_} (split '-', $hidden_layers);                            # Hidden Neuronen Layer Array
-  my $num_hiddenlays = scalar (@hiddlays);
-  
-  # Lernrate Auto Konfiguration wenn nicht gesetzt
-  ##################################################
-  if (!$learning_rate) {                                                                # die optimale Lernrate hängt direkt von der Parameterzahl ab. Mit INCREMENTAL bedeutet eine Epoche N × params Gewichtsupdates – größere Netze brauchen kleinere Schritte
-      $learning_rate = $num_params > 5000 ? 0.0003
-                     : $num_params > 1500 ? 0.0006
-                     : $num_params > 500  ? 0.001
-                     : 0.003;
-  }
-  
-  # Steepness Auto Konfiguration wenn nicht gesetzt
-  ###################################################
-  if (!$hidden_steepness) {                                                             # tiefere Netze sättigen schneller, niedrigere Steepness ist stabiler:
-      $hidden_steepness = $num_hiddenlays >= 3 ? 0.5
-                        : $num_hiddenlays == 2 ? 0.6
-                        : 0.7;
-  }
-  
-  # Shuffle Period Auto Konfiguration wenn nicht gesetzt
-  ########################################################
-  if (!$shuffle_period) {                                                              # größere Datasets profitieren von selteneren Reshuffles
-      $shuffle_period = $num_train_datasets > 10000 ? 25
-                      : $num_train_datasets > 5000  ? 20
-                      : 15;
-  } 
-  
-  
-  # Netz erzeugen
-  #################
-  my $ann = AI::FANN->new_standard ($num_inputs, @hiddlays, $num_outputs);                      
-  
-  $ann->hidden_activation_function  ($af_map{$haf});
-  $ann->output_activation_function  ($af_map{$oaf});
-  $ann->training_algorithm          ($ta_map{$talgo});
-  $ann->learning_rate               ($learning_rate);
-  $ann->learning_momentum           ($learning_momentum);
-  $ann->bit_fail_limit              ($bit_fail_limit);
-  $ann->hidden_activation_steepness ($hidden_steepness);
-  
-  my @steepness_dyn;
-  for my $i (0 .. $num_hiddenlays-1) {                                                                 # Dynamische Steepness-Liste für alle Hidden-Layer erzeugen
-      my $s = $hidden_steepness - 0.2 * $i;
-      push @steepness_dyn, max (0.1, $s);
-  }
-
-  for my $i (1 .. $num_hiddenlays) {                                                                   # Steepness für alle Hidden-Layer setzen
-      $ann->layer_activation_steepness($i, $steepness_dyn[$i-1]);
-  }
-
- 
-  my $lr = round5 ($ann->learning_rate);
-  my $lm = round1 ($ann->learning_momentum);
-  my $ta = $ann->training_algorithm;
-  
-  if ($debug =~ /aiProcess/xs) {
-      my $mode = $shuffle_mode == 1 
-                 ? 'chronological split and AI internal shuffle of training data' 
-                 : $shuffle_mode == 2 
-                 ? 'split after shuffle of training data and use AI internal shuffle'  
-                 : 'chronological split';
-      
-      Log3 ($name, 1, "$name DEBUG> AI FANN Training started with Params:\n".
-                      "input datasets=$num_train_datasets, \n".
-                      "input features=$num_inputs, \n".
-                      "hidden Neurons=".(join '-',@hiddlays).", \n".
-                      "Data Parameter Ratio=$dataParamRatio, \n".
-                      "Registry version=$profile, \n".
-                      "training algo=$ta, \n".
-                      "output AF=$oaf, \n".
-                      "hidden AF=$haf, \n".
-                      "hidden steepness=$hidden_steepness, \n".
-                      "max. Epoches=$num_epoch, \n".
-                      "mse_error=$mse_error, \n".
-                      "learning rate=$lr, \n".
-                      "learning momentum=$lm, \n".
-                      "BitFail limit: $bit_fail_limit, \n".
-                      "Data sharing=$mode (Train=$split_index, Test=".(scalar($#$trdref)-$split_index)."), \n".
-                      "Data shuffle=$shuffle_mode ".($shuffle_mode ? qq{(period=$shuffle_period)} : '') 
-                     );
-  }
-  
-  # Trainings- und Validierungsdatenobjekte + Epochentraining
-  #############################################################
-  my @val_history;
-  
-  # Snapshot-Guard
-  my $since_improve = 0;
-
-  # Guard: Snapshot-Statistik
-  my $snap_metric_count     = 0;
-  my $snap_rmse_proxy_count = 0;
-  my $snap_bit_count        = 0;
-  my $snap_tradeoff_count   = 0;
-
-  my $snap_metric_last      = 0;
-  my $snap_rmse_proxy_last  = 0;
-  my $snap_bit_last         = 0;
-  my $snap_tradeoff_last    = 0;
-  
-  my $snapshot_saved_overall = 0;
-  
-  my $train_data = AI::FANN::TrainData->new (@train_pairs);                                                 # Trainingsdatenobjekt bauen
-  $train_data->shuffle() if($shuffle_mode == 1);
-  
-  # Start Traningsloop
-  ######################
-  for my $epoch (1 .. $num_epoch) {
-      if ($shuffle_mode && $epoch % $shuffle_period == 0) {                                                 # Periodisches Shuffle
-          $train_data->shuffle();
-      }
-    
-      $ann->train_epoch ($train_data);                                                                      # Einen Trainingsschritt ausführen
-
-      my $mse_train = $ann->MSE();                                                                          # Aktuellen Fehler abfragen
-      my $bfail     = $ann->bit_fail();                                                                     # Anzahl der Ausgaben, die außerhalb einer vorgegebenen Toleranz liegen, Standardtoleranz: 0.35
-
-      # --- Validierung im Normraum
-      ###############################   
-      my $sum_sq       = 0;
-      my $bit_fail_val = 0;
-      my @targetvals; 
-      my @predictvals;
-      my @err_norm_sq;                                                                                      # für robustes Clipping
-      my $werr_sum   = 0;                                                                                   # gewichtete Fehler-Summe
-      my $w_sum      = 0;                                                                                   # Gewicht-Summe
-          
-      for my $i (0 .. $#test_inputs) {
-          my $prediction = $ann->run ($test_inputs[$i]);
-          my $target     = $test_targets[$i];
-
-          my $err_norm = $prediction->[0] - $target->[0];
-          my $err2     = $err_norm * $err_norm;                                                            
-          $sum_sq     += $err2;                                                                             # Grundlage für MSE/RMSE im Normraum                                       
-          
-          push @targetvals,      $target->[0]; 
-          push @predictvals, $prediction->[0];
-
-          my $diff_norm = abs ( $prediction->[0] - $target->[0] );                                          # BitFail prüfen (Toleranz $bit_fail_limit im Normalisierungsbereich)
-          $bit_fail_val++ if($diff_norm > $bit_fail_limit);
-          
-          # --- Weighted-RMSE-Proxy sammeln
-          push @err_norm_sq, $err2;
-          my $w      = $target->[0];                                                                        # Gewichtung nach Zielwertgröße (normiert), 0..1 -> perfekt geeignet
-          $w_sum    += $w;                                                                                  # Clipping erst NACH der Schleife (braucht Median), hier nur Rohwerte sammeln
-          $werr_sum += $w * $err2;
-      }
-      
-      my $mse_val = $sum_sq / scalar (@test_inputs);                                                        # MSE (Mean Squared Error)   
-      push @val_history, $mse_val;                                                                          # Verlauf der Validierungs-MSE
-      
-      my $mae_val   = _aiFannMeanAbsoluteError   (\@targetvals, \@predictvals); 
-      my $medae_val = _aiFannMedianAbsoluteRrror (\@targetvals, \@predictvals);
-      
-      if ($debug =~ /aiProcess/xs 
-          && $num_epoch_between_statmsg 
-          && $epoch % $num_epoch_between_statmsg == 0) {                                                    # Logging alle X Epochen
-          
-          Log3 ($name, 1, sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d", 
-                          $name, $epoch, $mse_train, $mse_val, $mae_val, $medae_val, $bit_fail_val);
-      }
-      
-      
-      # Weighted-RMSE-Proxy berechnen
-      ##################################
-      my @sorted_err2 = sort { $a <=> $b } @err_norm_sq;                                                    # robustes Clipping basierend auf Median der normierten Fehler
-      my $p50_index   = int (0.50 * $#sorted_err2);
-      my $med_err2    = $sorted_err2[$p50_index];
-      my $clip_norm   = 4 * $med_err2;                                                                      # Huber-artig
-
-      my $werr_sum_clipped = 0;
-    
-      for my $i (0 .. $#err_norm_sq) {                                                                      # jetzt Clipping anwenden
-          my $e2             = $err_norm_sq[$i];
-          $e2                = $clip_norm if($e2 > $clip_norm);
-          my $cw             = $targetvals[$i];                                                             # normierter Zielwert
-          $werr_sum_clipped += $cw * $e2;
-      }
-
-      my $weighted_rmse_proxy = sqrt ($werr_sum_clipped / ($w_sum || 1));
-      
-      # Snapshot-Guard: Verbesserung in MSE, MAE oder MedAE
-      #####################################################
-      my $mae_tolerance   = $best_val_mae   * 0.05;
-      my $medae_tolerance = $best_val_medae * 0.05;
-      my $mse_ceiling     = $best_val_mse   * 1.25;                                     # NEU: MSE darf max. 25% über bestem Val-MSE liegen (anpassbar)
-      my $bitfail_gain    = 1;
-      my $reason          = '';
-      my $improved        = 0;
-      my $snapshot_saved  = 0;                                                          # pro Epoche zurücksetzen
-
-      # Zweig 1: echte metrische Verbesserung
-      if ($mse_val         <  $best_val_mse   - 1e-6
-          && $mae_val      <  $best_val_mae   - 1e-6
-          && $medae_val    <  $best_val_medae - 1e-6
-          && $bit_fail_val <= $best_bit_fail) {
-
-          $reason           = 'metric improved';
-          $snap_metric_last = $epoch;
-          $improved         = 1;
-          $snap_metric_count++;
-      }
-      # Zweig 2: Weighted-RMSE-Proxy verbessert sich
-      # nur wenn Val MSE nicht mehr als 25% (anpassbar) über bestem Val MSE liegt (Schutz vor Overfitting)
-      elsif ($weighted_rmse_proxy < $best_weighted_rmse_proxy - 1e-6
-             && $mse_val          < $mse_ceiling) {
-          $reason                 = 'weighted rmse improved';
-          $snap_rmse_proxy_last   = $epoch;          
-          $improved               = 1;
-          $snap_rmse_proxy_count++;
-      }
-      # Zweig 2: BitFail-Verbesserung
-      elsif ($mse_val         <= $best_val_mse
-             && $mae_val      <= $best_val_mae
-             && $medae_val    <= $best_val_medae
-             && $bit_fail_val <  $best_bit_fail) {
-
-          $reason        = 'bit improved';
-          $snap_bit_last = $epoch;
-          $improved      = 1;
-          $snap_bit_count++;
-      }
-      # Zweig 3: Trade-off
-      elsif ($bit_fail_val <= $best_bit_fail  - $bitfail_gain
-             && $mse_val   <= $best_val_mse   + 1e-6
-             && $mae_val   <= $best_val_mae   + $mae_tolerance
-             && $medae_val <= $best_val_medae + $medae_tolerance) {
-
-          $reason             = 'bit tradeoff';
-          $snap_tradeoff_last = $epoch;
-          $improved           = 1;
-          $snap_tradeoff_count++;
-      }
-
-      if ($improved) {
-          if ($reason eq 'metric improved') {                                           # $best_val_mse NUR in Zweig 1 (metric improved) aktualisieren
-              $best_val_mse = $mse_val;
-          }
-          
-          $best_val_mae             = $mae_val    if($mae_val   < $best_val_mae);       # MAE/MedAE nur aktualisieren wenn sie sich verbessert haben (strikt monoton fallend)
-          $best_val_medae           = $medae_val  if($medae_val < $best_val_medae);
-          
-          $best_weighted_rmse_proxy = $weighted_rmse_proxy;
-          $best_train_mse           = $mse_train;
-          $best_train_epoch         = $epoch;
-          $best_bit_fail            = $bit_fail_val;
-          $snapshot_saved_overall   = 1;
-          $since_improve            = 0;
-
-          $ann->save ($snapshot);                                                       # bestes Modell IMMER speichern
-          $snapshot_saved = 1;
-
-          if ($debug =~ /aiProcess/xs) {
-              Log3 ($name, 1, sprintf "%s DEBUG> Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d -> Snap %s",
-                                      $name, $best_train_epoch, $best_train_mse, $best_val_mse, $best_val_mae, $best_val_medae, $best_bit_fail,
-                                      $reason );
-          }
-      }
-      else {
-          $since_improve++;
-      }  
-      
-      # Early Stopping
-      ##################
-      if ($since_improve >= AIIMPPATIENCE) {
-          if ($debug =~ /aiProcess/xs) {
-              Log3 ($name, 1,
-                    sprintf "%s DEBUG> Early stopping bei Epoche %d (no improvement since %d epochs)",
-                    $name, $epoch, AIIMPPATIENCE
-                   );
-          }
-        
-          last;
-      }
-  }
-  ######################
-  # Ende Traningsloop
-  
-  
-  
-  # Snapshot-Statistik nach Trainingsloop
-  #########################################
-  if ($debug =~ /aiProcess/xs) {
-      Log3 ($name, 1, "=== Snapshot-Statistik ===");
-      Log3 ($name, 1, sprintf "Metric-Improvement Snapshots:              %d (letzte Epoche: %d)", $snap_metric_count, $snap_metric_last);
-      Log3 ($name, 1, sprintf "Weighted-RMSE-Proxy-Improvement Snapshots: %d (letzte Epoche: %d)", $snap_rmse_proxy_count, $snap_rmse_proxy_last);
-      Log3 ($name, 1, sprintf "Bit-Improvement Snapshots:                 %d (letzte Epoche: %d)", $snap_bit_count, $snap_bit_last);
-      Log3 ($name, 1, sprintf "Bit-Tradeoff Snapshots:                    %d (letzte Epoche: %d)", $snap_tradeoff_count, $snap_tradeoff_last);
-  }
-  
-  # Fallback nach Trainingsloop
-  ###############################
-  unless ($snapshot_saved_overall) {
-      Log3 ($name, 1, "$name - WARNING - AI FANN Training has no snapshot generated – saved last model as fallback");
-      
-      $ann->save ($snapshot);
-  }
-  
-  # Nach Training bestes Modell laden
-  #####################################
-  $ann = AI::FANN->new_from_file ($snapshot);
-  unlink $snapshot;
-  
-  if ($debug =~ /aiProcess/xs) {
-      Log3 ($name, 1,
-            sprintf "%s DEBUG> Best Snapshot reloaded from Epoche %d: Train MSE=%.6f, Val MSE=%.6f, Val MAE=%.6f, Val MedAE=%.6f, Bit_Fail=%d,",
-            $name, $best_train_epoch, $best_train_mse, $best_val_mse, $best_val_mae, $best_val_medae, $best_bit_fail
-           );
-  }
-  
-  # --- Bester Snapshot -> Validierung und Kennzahlen berechnen
-  ###############################################################
-  my $sum_sq  = 0;                                                                          # für MSE/RMSE (normalisiert)
-  my $bitfail = 0;
-  
-  my @pct_errors;                                                                           # für MAPE und MdAPE (denormalisiert)
-  my @targets;
-  my @preds;
-  
-  if ($debug =~ /aiProcess/xs) {
-      Log3 ($name, 1, "$name DEBUG> Run Validation Test with ".((1-$training_portion) * 100)."% of Input data ...");
-  } 
-
-  for my $i (0 .. $#test_inputs) {                                                          # erste Schleife: Fehler sammeln
-      my $prediction_norm = $ann->run ($test_inputs[$i])->[0];                              # Netz liefert Arrayref
-      my $target_norm     = $test_targets[$i]->[0];                                         # Ziel ebenfalls Arrayref
-      
-      my $diff_norm = abs ($prediction_norm - $target_norm);
-      $bitfail++ if($diff_norm > $bit_fail_limit);                                          # BitFail basiert auf normalisierten Werten
- 
-      my $err_norm = $prediction_norm - $target_norm;                                       # Fehler im Normalisierungsraum
-      $sum_sq     += $err_norm**2;                                                          # für MSE im Normalisierungsraum
-    
-      my $target     = _aiFannDenormMinMaxValue ($target_norm,     $minval, $maxval);
-      my $prediction = _aiFannDenormMinMaxValue ($prediction_norm, $minval, $maxval);       # Für MAE/MAPE/R² weiterhin denormalisieren
-
-      push @targets, $target;
-      push @preds,   $prediction;      
-  }
-  
-  my $metrics        = _aiFannSlopeBias (\@targets, \@preds);                               # Modell-Slope und Modell-Bias auf denormalisierten Werten
-  my $model_slope    = $metrics->{slope_regres};
-  my $model_bias     = $metrics->{bias_regres};
-  my $cal_slope      = 1.0;                                                                 # Schutz gegen degenerierte Werte
-  my $cal_bias       = 0.0;                                                                 # ... default: keine Korrektur
-  
-  if (defined $model_slope && $model_slope > 0.5  && $model_slope < 2.0) {                  # Inverse Kalibrierung: y_true ≈ (y_pred - bias) / slope
-      $cal_slope = 1.0 / $model_slope;                                                      # z.B. 1/0.85 = 1.176
-      $cal_bias  = -$model_bias / $model_slope;                                             # z.B. -159/0.85 = -187 Wh
-  }
-  
-  my $err_metrics    = _aiFannErrorMetrics (\@targets, \@preds);                            # Fehlermetriken in Originalskala (denormalisiert)
-  my $mae            = $err_metrics->{mae};                                                 # MAE (Durchschnitt) Originalskala
-  my $rmse           = $err_metrics->{rmse};                                                # RMSE auf Originalskala (z.B. Wh)
-  my $rmse_rel       = $err_metrics->{rmse_rel};                                            # relative RMSE in %
-  my $medae          = $err_metrics->{medae};                                               # MedAE (Median) Originalskala
-  my $mape           = $err_metrics->{mape};                                                # MAPE (Durchschnitt) %
-  my $mdape          = $err_metrics->{mdape};                                               # MdAPE (Median) %
-  my $target_median  = $err_metrics->{tgt_median};
-  my $abs_errors_ref = $err_metrics->{abs_error_ref};                
-  my @abs_errors     = @$abs_errors_ref;
-  
-  my $n             = scalar (@test_inputs);
-  my $mse_val       = $sum_sq / $n;                                                         # MSE im Normalisierungsraum
-
-  my $r2 = _aiFannR2 (\@targets, \@preds);                                                  # Bestimmtheitsmaß R² berechnen (Originalskala)
-
-  
-  # --- Zielgrößen relative RMSE / weighted RMSE / + Textbewertung
-  ################################################################## 
-  my $wrmse_ref            = _aiFannWeightedRmse (\@targets, \@abs_errors, $mae, $maxval, $target_median);
-  my $weighted_rmse        = $wrmse_ref->{weighted_rmse};
-  my $weighted_rmse_rel    = $wrmse_ref->{weighted_rmse_rel}; 
-  my $weighted_rmse_rating = $wrmse_ref->{rating};                                          # Textbewertung
-
-
-  # Validation Mittelwert und Standardabweichung im Normraum berechnen
-  ########################################################################
-  # Windows prüft nur die Phase, die wirklich relevant ist -> ob das 
-  # Modell am Ende stabil war.
-  # - Fenstergröße anpassen: Bei kurzen Trainingsläufen reichen 20–30 
-  #                          Epochen, bei langen eher 50–100.
-  ########################################################################
-  my $nvalhist = scalar (@val_history);
-  $window      = $nvalhist if($window > $nvalhist);                                         # falls weniger Epochen als Fenstergröße
-  my @val_tail = @val_history[-$window .. -1];                                              # nur die letzten N Werte
-                                                                                   
-  my $val_mean = sum (@val_tail) / @val_tail;                                               # val_mean = durchschnittlicher Validation-MSE über den gesamten Trainingslauf im Window
-  my $sq_sum   = 0;
-  $sq_sum     += ($_ - $val_mean) ** 2 for @val_tail;
-  my $val_std  = sqrt ($sq_sum / @val_tail);                                                # val_std = Streuung der Validation-MSE
-  
-  if ($debug =~ /aiProcess/xs) {
-      Log3 ($name, 1, sprintf "%s DEBUG> Validation finished - Best Training MSE=%.6f, Validation MSE=%.6f, Validation Bit_Fail=%d",
-                      $name, $best_train_mse, $mse_val, $bitfail);
-  }  
-  
-  # Rauschwertermittlung und Bit-Fail-Limit-Empfehlung
-  ######################################################
-  my ($noise_flag, $bitfail_suggestion) = _aiFannDetectNoiseLevel (\@targets, $mae, $target_median);
-  
-  # Epochen-Diagnose
-  ###################
-  my $cur_ratio = $split_index / ($num_params || 1);                                        # cur_ratio für Epochendiagnose vorberechnen
-  
-  my $epoch_diag = _aiFannEpochDiagnostic ( { best_epoch         => $best_train_epoch,
-                                              mse_train          => $best_train_mse,
-                                              mse_val            => $mse_val,
-                                              val_std            => $val_std,
-                                              val_mean           => $val_mean,
-                                              slope              => $model_slope,
-                                              r2                 => $r2,
-                                              rmse_rel           => $weighted_rmse_rel,
-                                              bitfail            => $bitfail,
-                                              num_epoch          => $num_epoch,
-                                              num_inputs         => $num_inputs,       
-                                              split_index        => $split_index,      
-                                              num_train_datasets => $num_train_datasets,
-                                              hidden_layers      => $hidden_layers, 
-                                              learning_rate      => $learning_rate,
-                                              learning_momentum  => $learning_momentum,
-                                              cur_ratio          => $cur_ratio,
-                                              dataParamRatio     => $dataParamRatio,
-                                              profile            => $profile,
-                                              haf                => $haf,
-                                              lang               => $paref->{lang},
-                                            }
-                                          );
-                                          
-  my $hints_html = '';
-
-  if (@{$epoch_diag->{epoch_hints}}) {
-      $hints_html = '<ul>'
-                  . join ('', map { '<li>' . $_ . '</li>' } @{$epoch_diag->{epoch_hints}})
-                  . '</ul>';
-  }
-
-  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints} = $hints_html;
-  
-  # Retry-Indikator ausführen
-  #############################
-  my $quality_href = _aiFannRetrainIndicator ( { name           => $name, 
-                                                 mse_train      => $best_train_mse, 
-                                                 mse_val        => $mse_val, 
-                                                 bitfail        => $bitfail, 
-                                                 valstd         => $val_std, 
-                                                 valmean        => $val_mean, 
-                                                 mae            => $mae,
-                                                 abserref       => \@abs_errors, 
-                                                 test_input_num => scalar (@test_inputs),
-                                                 slope          => $model_slope,
-                                                 bias           => $model_bias,
-                                                 dataParamRatio => $dataParamRatio,
-                                                 r2             => $r2,
-                                                 rmse           => $weighted_rmse,                                                   
-                                                 rmse_rel       => $weighted_rmse_rel, 
-                                                 profile        => $profile,
-                                                 debug          => $debug,
-                                                 lang           => $paref->{lang},
-                                               } 
-                                             );
-                                               
-  my $retrainQuality = $quality_href->{quality};                    
-    
-  # FANN-Model in TempFile speichern -> als BLOB String auslesen 
-  #################################################################
-  my $tmpfile = $neuralnet.'fannmodel_'.$name;
-  
-  $ann->save ($tmpfile);
-  
-  my ($err, $blob) = read_blob ($tmpfile);
-  unlink $tmpfile;
-  
-  # Übergaben
-  #############
-  my $retref;
-  
-  if ($err) {
-      $retref = { name                    => $name,
-                  $fanntyp.'NNTrainstate' => "aiNeuroNetConTraining performed, but error occurred while read_blob: $err",
-                };
-
-      return ($retref);
-  } 
-  
-  setTimeTracking ($name, $cst, $fanntyp.'NNRuntimeTrain');                                                  # Zyklus-Laufzeit ermitteln
-
-  # ok -> File schreiben zur Ladung bei Restart
-  ###############################################  
-  $data{$name}{$fanntyp.'temp'}{$attempt}{MinVal}         = $minval;                                         # Target Denormalisierungsparameter 
-  $data{$name}{$fanntyp.'temp'}{$attempt}{MaxVal}         = $maxval;                                         # Target Denormalisierungsparameter
-  $data{$name}{$fanntyp.'temp'}{$attempt}{rr1Min}         = $rr1min;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{rr1Max}         = $rr1max;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{bevloadmin}     = $paref->{bevloadmin};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{bevloadmax}     = $paref->{bevloadmax};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{bevremmin}      = $paref->{bevremmin};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{bevremmax}      = $paref->{bevremmax};
-  
-  $data{$name}{$fanntyp.'temp'}{$attempt}{lagNorms}       = encode_base64 (Serialize ( $paref->{lagnorm_ref} ), "");    # Serialisierung
-  $data{$name}{$fanntyp.'temp'}{$attempt}{FannBlob}       = $blob;                                                      # BLOB im Hash ablegen
-  
-  $data{$name}{$fanntyp.'temp'}{$attempt}{HiddActFunc}    = $haf;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{OutActFunc}     = $oaf;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{LearnMomentum}  = $learning_momentum;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{LearnRate}      = $learning_rate;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{NumDatasets}    = $num_train_datasets;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{NumTraindata}   = $split_index;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{NumTestdata}    = (scalar(@$trdref)-$split_index);
-  $data{$name}{$fanntyp.'temp'}{$attempt}{NumInputs}      = $num_inputs;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{HiddenLayers}   = $hidden_layers;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{dataParamRatio} = $dataParamRatio;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{HiddSteepness}  = $hidden_steepness;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{TrainAlgo}      = $talgo;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{RegVersion}     = $paref->{regv};                                 # benutzte Registry Version
-  $data{$name}{$fanntyp.'temp'}{$attempt}{NumOutputs}     = $num_outputs;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{TrainMse}       = $best_train_mse;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{ValidationMse}  = $mse_val;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{BitFailLimit}   = $bit_fail_limit;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{BitFail}        = $bitfail;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{TrainEpoches}   = $best_train_epoch;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{Mae}            = $mae; 
-  $data{$name}{$fanntyp.'temp'}{$attempt}{Medae}          = $medae;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{Rmse}           = $weighted_rmse;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRel}        = $weighted_rmse_rel; 
-  $data{$name}{$fanntyp.'temp'}{$attempt}{RmseRating}     = $weighted_rmse_rating;  
-  $data{$name}{$fanntyp.'temp'}{$attempt}{ModelScore}     = $quality_href->{score};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{ModelAmpel}     = $quality_href->{ampel};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{DPR_Hint}       = $quality_href->{dpr_hint};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{PVMaxLimit}     = $paref->{pv_max_limit};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{Mape}           = $mape; 
-  $data{$name}{$fanntyp.'temp'}{$attempt}{Mdape}          = $mdape; 
-  $data{$name}{$fanntyp.'temp'}{$attempt}{R2}             = $r2;                                            # Bestimmtheitsmaß R²
-  $data{$name}{$fanntyp.'temp'}{$attempt}{ModelSlope}     = $model_slope;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{ModelBias}      = $model_bias;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{AvgValidMse}    = $val_mean;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{StdDevValidMse} = $val_std;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{RetrainQuality} = $retrainQuality;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{RetrainReason}  = $quality_href->{retrain_reason}; 
-  $data{$name}{$fanntyp.'temp'}{$attempt}{TargetMedian}   = $target_median;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{Attempt}        = $attempt;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{ShuffleMode}    = $shuffle_mode;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{ShufflePeriod}  = $shuffle_period;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{NoiseLevel}     = $noise_flag;
-  $data{$name}{$fanntyp.'temp'}{$attempt}{BitFailSuggest} = $bitfail_suggestion;
-  
-  $data{$name}{$fanntyp.'temp'}{$attempt}{CalSlope}       = $cal_slope;                             # Kalibrierungs-Steigung
-  $data{$name}{$fanntyp.'temp'}{$attempt}{CalBias}        = $cal_bias;                              # Kalibrierungs-Offset
-  
-  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochCode}      = $epoch_diag->{epoch_code};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochLabel}     = $epoch_diag->{epoch_label};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochRelPct}    = $epoch_diag->{epoch_rel_pct};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochAmpel}     = $epoch_diag->{epoch_ampel};
-  $data{$name}{$fanntyp.'temp'}{$attempt}{EpochHints}     = $hints_html;
-  
-  my $runtime    = round2 (CurrentVal ($name, $fanntyp.'NNRuntimeTrain', 0));
-  my $trainstate = !$err 
-                    ? 'ok' 
-                    : "aiNeuroNetConTraining performed, but error occurred while saving: $err";
-  
-  $retref = { name                           => $name,                                             # Rückgabe Ref wichtig für Retry-Operation
-              $fanntyp.'NNTrainstate'        => $trainstate,
-              $fanntyp.'NNRuntimeTrain'      => $runtime,
-              $fanntyp.'NNTrainLastFinishTs' => int time,
-              $fanntyp.'NNRetrainQuality'    => $retrainQuality,
-              $fanntyp.'NNAttempt'           => $attempt,
-              $fanntyp.'NNR2'                => $r2,
-              $fanntyp.'NNModelSlope'        => $model_slope,
-              $fanntyp.'NNModelBias'         => $model_bias,
-              $fanntyp.'NNRmse'              => $weighted_rmse,
-              $fanntyp.'NNRmseRel'           => $weighted_rmse_rel,
-              $fanntyp.'NNRmseRating'        => $weighted_rmse_rating,
-              $fanntyp.'NNScore'             => $quality_href->{score},
-              $fanntyp.'NNSeed'              => $seed,
-              $fanntyp.'NNBestValMse'        => $mse_val,
-              $fanntyp.'NNBestValMae'        => $mae,     
-              $fanntyp.'NNBestValMedae'      => $medae,
-              $fanntyp.'NNBestBitFail'       => $bitfail,
-            };                                  
-  
-return $retref;
 }
 
 ####################################################################################################
@@ -27818,56 +28353,6 @@ sub __aiFannEstimateParams {
   $total += $prev + 1;                                                                      # Output-Schicht (1 Neuron)
   
 return $total;
-}
-
-###############################################################
-#    Rückkehrfunktion trainieren neuronales Netz 
-###############################################################
-sub aiFannFinishTrain {
-  my $serial  = decode_base64 (shift);
-
-  my $paref   = eval { thaw ($serial) };                          # Deserialisierung
-  my $name    = $paref->{name};
-  my $fanntyp = $paref->{fanntyp};  
-  my $hash    = $defs{$name};
-  my $debug   = getDebug ($hash);  
-
-  my $NNTrainstate = $paref->{$fanntyp.'NNTrainstate'};
-
-  if ($NNTrainstate eq 'ok') {
-      $data{$name}{circular}{99}{$fanntyp.'NNRuntimeTrain'}      = $paref->{$fanntyp.'NNRuntimeTrain'};    
-      $data{$name}{circular}{99}{$fanntyp.'NNTrainLastFinishTs'} = $paref->{$fanntyp.'NNTrainLastFinishTs'}; 
-      
-      readCacheFile ( {name => $name, file => $neuralnet.$name, cachename => 'neuralnet', title => 'NeuralNetwork' } );
-  }
-  else {
-      $data{$name}{current}{$fanntyp.'NNTrainstate'} = $NNTrainstate;
-  }
-  
-  if ($debug =~ /aiProcess/xs) {
-      Log3 ($name, 1, "$name DEBUG> AI FANN $fanntyp Training BlockingCall PID '$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid}' finished. Trainstate: $NNTrainstate");
-  }
-  
-  delete($hash->{HELPER}{AINNTRAINBLOCKRUN});
-
-return;
-}
-
-####################################################################################################
-#                   Abbruchroutine AI Consumption Training
-####################################################################################################
-sub aiFannAbortConTrain {
-  my $hash  = shift;
-  my $cause = shift // 'Training (Child) process timed out';
-  my $name  = $hash->{NAME};
-
-  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{AINNTRAINBLOCKRUN}{fn} pid:$hash->{HELPER}{AINNTRAINBLOCKRUN}{pid} aborted: $cause");
-
-  delete $hash->{HELPER}{AINNTRAINBLOCKRUN};
-
-  $data{$name}{current}{conNNTrainstate} = $cause;
-
-return;
 }
 
 ################################################################
@@ -28393,7 +28878,9 @@ sub _aiFannRetrainIndicator {
   my $lim_slope_max      = 1.3;
   
   # Bias
-  my $lim_bias           = $profileweights{$profile}{bias_factor} * $mae;       # Bias Grenzen nach Stochastik des Haushalts/Profils
+  my $lim_bias = max ($profileweights{$profile}{bias_factor}  * $mae,           # Bias Grenzen nach Stochastik des Haushalts/Profils
+                      $profileweights{$profile}{bias_abs_min} // 0,
+                     );
   
   # RMSE/MAE
   my $lim_rmse_mae_ratio = 2.5;                                                 # vorher 1.5 – Peaks machen RMSE immer größer als MAE
@@ -28554,461 +29041,6 @@ sub _aiFannRetrainIndicator {
   }                            
 
 return $rethash;
-}
-
-################################################################
-#  Neuronales Netz Verbrauchswertprognose abrufen
-#  die Struktur des Datenarray muß mit dem Trainingsmodell 
-#  übereinstimmen
-################################################################
-sub aiFannConInferenz {
-  my $paref   = shift;
-  my $name    = $paref->{name};
-  my $chour   = $paref->{chour};                                                                # aktuelle Stunde (00 .. 23)
-  my $t       = $paref->{t};
-  my $debug   = $paref->{debug};
-  my $fanntyp = 'con';                                                                          # FANN Verwendungsart 'consumption' Prognose                   
-  
-  my $hash = $defs{$name};
-  my ($msg, $presence, $comftemp);
-  
-  debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
-  $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
-  
-  my $pv_max_limit = _pvMaxLimit ($name);
-  
-  if (!$pv_max_limit) {
-      $msg = 'no peak output is provided by the PV system';
-      $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
-      debugLog ($paref, 'aiData', "AI FANN - consumption prediction aborted: No peak output is provided by the PV system");
-      
-      return $msg;
-  }
-  
-  $pv_max_limit  = $pv_max_limit * AIASPEAKSFAC;                                                # Peak Sicherheitsaufschlag
-  
-  my $cst        = [gettimeofday];                                                              # Startzeit
-  my $haf        = AiNeuralVal ($name, 'con', 'HiddActFunc', 'SIGMOID');                        # Hidden Activation Function
-  my $alpha      = CurrentVal  ($name, 'aiConAlpha', 1);                                        # Steuerung Hybridmodell
-  my $oaf        = 'LINEAR';                                                                    # Output Activation Function
-  my $range      = _aiFannAfNormRange ($haf);
-  
-  ## letzte reale Zielwerte / Temperaturen für Regression lesen
-  ###############################################################
-  my ($targetref, $tempsref, $presref) = getPvHistTargetArray ( { name  => $name, 
-                                                                  debug => $debug, 
-                                                                  par1  => $fanntyp, 
-                                                                  par2  => 'temp', 
-                                                                  par3  => 'presence',
-                                                                  t     => $paref->{t},
-                                                                  limit => 600,
-                                                                }
-                                                              );                                # $fanntyp + Temperaturen aus History lesen    
-  
-  my ($bev_active_ref,           $bev_load_raw_ref,     $bev_n_active_ref, 
-      $bev_soc_deficit_norm_ref, $energy_remaining_ref, $charge_intensity_ref) =
-      _aiFannBevHistArray ( { name    => $name,
-                              fanntyp => $fanntyp,
-                              range   => $range,
-                              t       => $paref->{t},
-                              limit   => 600,
-                            } );                                                               # BEV Aggregationen aus pvHistory lesen                                     
-
-  my @flat_targets     = @$targetref;
-  my @temps            = @$tempsref;
-  my @temp_norm_values = map { _aiFannNormTemp ($_, $range) } @temps;                           # Temperaturen symmetrisch oder asymmetriech normalisieren
-  my @presence_values  = @$presref;
-
-  # Lag-Norms auslesen
-  ######################
-  if (!defined $data{$name}{neuralnet}{$fanntyp} || !defined $data{$name}{neuralnet}{$fanntyp}{lagNorms}) {
-      $msg = 'Lag-Norms is not available. New training is required.'; 
-      $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
-      
-      return $msg;
-  }
-  
-  my $lagnorm_ref = Deserialize ($name, $data{$name}{neuralnet}{$fanntyp}{lagNorms});           # Norms müssen IMMER die Norms aus dem Training bleiben.
-  
-  my $bevloadmin    = $data{$name}{neuralnet}{$fanntyp}{bevloadmin} // 0;                       # BEV-Load normieren mit gespeicherten Trainingsgrenzen (analog rr1c_norm)
-  my $bevloadmax    = $data{$name}{neuralnet}{$fanntyp}{bevloadmax} // 1;
-  
-  my $bevremmin     = $data{$name}{neuralnet}{$fanntyp}{bevremmin} // 0;                        # BEV-remain Energy normieren mit gespeicherten Trainingsgrenzen
-  my $bevremmax     = $data{$name}{neuralnet}{$fanntyp}{bevremmax} // 1;
-  
-  my @bev_load_norm             = map { _aiFannNormMinMaxValue ($_, $bevloadmin, $bevloadmax) } @$bev_load_raw_ref;
-  my @bev_energy_remaining_norm = map { _aiFannNormMinMaxValue ($_, $bevremmin,  $bevremmax)  } @$energy_remaining_ref;
-
-  # Profil einmalig bestimmen
-  #############################
-  my $profile = CurrentVal ($name, 'aiConProfile', undef);                                      # verwendete Feature-Registry Version
-
-  if (!$profile) {
-      my @flags;
-      push @flags, 'heatpump' if defined isHeatPumpUsed ($name);
-      push @flags, 'bev'      if defined isBevUsed      ($name);
-
-      my ($synth, $err) = __aiFannSynthesizeProfile ($name, join (',', @flags) || 'v1');
-
-      if ($err) {
-          Log3 ($name, 1, "$name - ERROR - profile auto-detection failed: $err – using v1_common");
-          $profile = 'v1_common';
-      }
-      else {
-          $profile = $synth;
-      }
-  }
-
-  debugLog ($paref, 'aiData', "AI FANN - using profile: $profile");  
-  
-  # Rohdaten in Reihenfolge extrahieren und vorbereiten
-  #######################################################
-  for my $num (0..MAXNEXTHOURS) {
-      my ($fd, $fh) = calcDayHourMove ($chour, $num);
-      last if($fd > MAXNEXTDAYS);
-      
-      my $nhstr = 'NextHour'.(sprintf "%02d", $num);
-      
-      my $starttime    = NexthoursVal ($name, $nhstr, 'starttime',   undef);
-      my $day          = NexthoursVal ($name, $nhstr, 'day',         undef);
-      my $legacyconfc  = NexthoursVal ($name, $nhstr, 'conlegfc',    undef);      
-      my $weekday      = NexthoursVal ($name, $nhstr, 'weekday',     undef);
-      my $hod          = NexthoursVal ($name, $nhstr, 'hourofday',   undef);
-      my $sunaz        = NexthoursVal ($name, $nhstr, 'sunaz',       undef);
-      my $sunalt       = NexthoursVal ($name, $nhstr, 'sunalt',      undef);
-      my $rr1c         = NexthoursVal ($name, $nhstr, 'rr1c',        undef);
-      my $wcc          = NexthoursVal ($name, $nhstr, 'wcc',         undef);  
-      my $temp         = NexthoursVal ($name, $nhstr, 'temp',        undef);
-      my $isday        = NexthoursVal ($name, $nhstr, 'DoN',         undef);
-      my $pv           = NexthoursVal ($name, $nhstr, 'pvfc',            0);                        # Erstatzwert für pvrl
-      my $holiday      = NexthoursVal ($name, $nhstr, 'holiday',         0);                        # holiday undefiniert -> 0 
-      
-      my ($pv_prev);
-      
-      if (!$num) {                                                                                  # das ist die aktuelle laufende Stunde                                                             
-          my $hits   = timestringToTimestamp ($hash, $starttime);
-          my $dt     = timestringsFromOffset ($name, $hits, -3600);
-          my $hihour = $dt->{hour};
-          my $hiday  = $dt->{day};
-          my $hihod  = sprintf "%02d", int ($hihour) + 1;
-          
-          $pv_prev   = HistoryVal  ($name, $hiday, $hihod, 'pvrl', 0);                              # num 0 -> reale PV der Vorgängerstunde 
-          $presence  = HistoryVal  ($name, $day, $hod, 'presence', 1);                              # Wenn keine Presence-Erfassung -> Anwesenheit annehmen
-          $comftemp  = CircularVal ($name, $hod, 'comforttemp', HPCOMFTEMP);                        # Comport-Temp des Gebäudes
-      }
-      else {
-          my $lhstr = 'NextHour'.(sprintf "%02d", $num-1);
-          $pv_prev  = NexthoursVal ($name, $lhstr, 'pvfc', 0);
-      }
-      
-      # Vollständigkeitsprüfung
-      unless (defined $starttime
-           && defined $legacyconfc
-           && $legacyconfc >= 0
-           && defined $weekday
-           && defined $hod 
-           && defined $sunaz
-           && defined $sunalt
-           && defined $rr1c
-           && defined $wcc 
-           && defined $temp 
-           && defined $isday) {
-
-             debugLog ($paref, 'aiData', "AI FANN - Record $nhstr skipped: data needed are incomplete or legacyconfc < 0"); 
-             next; 
-      }
-
-      # Ableitungen und Normierungen
-      ################################
-      my $month              = int ((split '-', $starttime)[1]);
-      $weekday               = $hwdmap{$weekday};                                        # Wochentag numerisch (1..7)
-      my $intlegacyconfc     = int ($legacyconfc);
-      my $inthod             = int ($hod);                                               # Stunde des Tages numerisch (1..24)
-      my $hour_norm          = ($inthod - 1) / 24;                                       # Stunde des Tages normiert 0..1   
-      $wcc                   = clampValue (int $wcc,   0, 100);
-      $temp                  = clampValue (int $temp, -40, 40);
-      $pv                    = clampValue ($pv, 0, $pv_max_limit);
-      
-      my $sunalt_norm        = _aiFannNormSunalt ($sunalt,      $range);                 # Sonnenaltitude normalisieren im Bereich 0..+1      
-      my $wcc_norm           = _aiFannNormWcc    ($wcc,         $range);                 # Bewölkung symmetrisch oder asymmetriech normalisieren
-      my $temp_norm          = _aiFannNormTemp   ($temp,        $range);                 # Temperatur symmetrisch oder asymmetriech normalisieren
-      my $temp_comfort_norm  = _aiFannNormTemp   ($comftemp,    $range);                 # Komforttemperatur / Solltemperatur mit Wärmepumpenbetrieb
-      my $pv_norm            = _aiFannNormPv     ($pv, $pv_max_limit, $range);           # PV symmetrisch oder asymmetriech normalisieren
-      my $pv_norm_prev       = _aiFannNormPv     ($pv_prev, $pv_max_limit, $range); 
-      my $day_hour_norm      = $isday  ? $hour_norm : 0;                                 # Tagstunden normiert, sonst 0
-      my $night_hour_norm    = !$isday ? $hour_norm : 0;                                 # Nachtstunden normiert, sonst 0 
-      
-      
-      # Monat 1..12 -> 0..11
-      my $month0 = $month - 1;    
-      my ($month_sin, $month_cos) = _aiFannEncodeCyclic ($month0,  12, $range);        # Monat, zyklische Struktur (0 .. 11)
-      
-      # Stunde 1..24 -> 0..23
-      my $hod0 = $inthod - 1;
-      my ($hod_sin, $hod_cos)     = _aiFannEncodeCyclic ($hod0, 24, $range);           # Stunde des Tages zyklisch (0 .. 23)
-      
-      # Wochentag 1..7 -> 0..6
-      my $wday0 = $weekday - 1;   
-      my ($wday_sin, $wday_cos)   = _aiFannEncodeCyclic ($wday0, 7, $range);           # Wochentag in zyklischer Struktur (0..6)
-
-      # Sonnenazimut 0..360 -> 0..359
-      my $sunaz0 = $sunaz % 360; 
-      my ($sunaz_sin, $sunaz_cos) = _aiFannEncodeCyclic ($sunaz0, 360, $range);        # Sonnenazimut zyklisch (0 .. 359)      
-      
-      
-      # Min-Max 0..1|-1..1 Normierung
-      #################################
-      my $rr1c_norm = _aiFannNormMinMaxValue ($rr1c, $data{$name}{neuralnet}{$fanntyp}{rr1Min},
-                                                     $data{$name}{neuralnet}{$fanntyp}{rr1Max}
-                                              );                                            # Niederschlag, numerisch min-max normalisiert  
-                                              
-      ## Lag-Features erzeugen
-      ##########################
-      my $i    = @flat_targets - 1;
-      my $lags = _aiFannBuildLagFeatures ( { con_series                       => \@flat_targets,
-                                             temp_norm_series                 => \@temp_norm_values,
-                                             presence_values                  => \@presence_values,
-                                             i                                => $i,
-                                             norms                            => $lagnorm_ref,
-                                             range                            => $range,
-                                             bev_active_series                => $bev_active_ref,
-                                             bev_load_norm_series             => \@bev_load_norm,
-                                             bev_n_active_series              => $bev_n_active_ref,
-                                             bev_soc_deficit_norm_series      => $bev_soc_deficit_norm_ref, 
-                                             bev_energy_remaining_norm_series => \@bev_energy_remaining_norm,
-                                             bev_charge_intensity_series      => $charge_intensity_ref,                                             
-                                           } );      
-      next if(!$lags);      
-     
-      # diskrete, semantische Zusatzsignale
-      #######################################
-      my $sigs = _aiFannCreateAddOnSignals ( { lags              => $lags,                          
-                                               pv_norm           => $pv_norm,
-                                               pv_norm_prev      => $pv_norm_prev,
-                                               temp_norm         => $temp_norm,
-                                               inthod            => $inthod - 1,
-                                               weekday           => $weekday,
-                                               temp_comfort_norm => $temp_comfort_norm,
-                                               range             => $range,
-                                               con_series        => \@flat_targets,
-                                               i                 => $i,
-                                               norms             => $lagnorm_ref,  
-                                             } );      
-      
-      ## Inputs zusammenstellen
-      ###########################
-      my @new_input = ();
-      
-      # Kombinatorik in _aiFannFeatureBuilder 
-      #######################################
-      my $features = _aiFannFeatureBuilder ($profile, {                                    
-                            pv_norm                     => $pv_norm,                                    # PV-Ertrag (min-max normalisiert)
-                            rr1c_norm                   => $rr1c_norm,                                  # Niederschlag (min-max normalisiert)
-                            temp_norm                   => $temp_norm,                                  # Außentemperatur (min-max normalisiert)
-                            wcc_norm                    => $wcc_norm,                                   # Bewölkungsgrad (min-max normalisiert)
-                            sunalt_norm                 => $sunalt_norm,                                # Sonnenhöhe 0..1 (unterhalb Horizont = 0)
-                            isday                       => $isday,                                      # Tag/Nacht-Flag (1 = Tag)
-                            holiday                     => $holiday,                                    # Feiertag / Urlaub
-                            hour_norm                   => $hour_norm,                                  # Stunde des Tages 0..1
-                            day_hour_norm               => $day_hour_norm,                              # Normierte Tagesstunden (sonst 0)
-                            night_hour_norm             => $night_hour_norm,                            # Normierte Nachtstunden (sonst 0)
-
-                            hod_sin                     => $hod_sin,                                    # Stunde des Tages (sinusförmig zyklisch)
-                            hod_cos                     => $hod_cos,                                    # Stunde des Tages (cosinusförmig zyklisch)
-                            wday_sin                    => $wday_sin,                                   # Wochentag zyklisch (sin)
-                            wday_cos                    => $wday_cos,                                   # Wochentag zyklisch (cos)
-                            month_sin                   => $month_sin,                                  # Monat zyklisch (sin)
-                            month_cos                   => $month_cos,                                  # Monat zyklisch (cos)
-                            sunaz_sin                   => $sunaz_sin,                                  # Sonnenazimut zyklisch (sin)
-                            sunaz_cos                   => $sunaz_cos,                                  # Sonnenazimut zyklisch (cos)
-
-                            presence                    => $presence,                                   # Anwesenheit (0/1, Vergangenheit = 1)
-                            presence_smooth3            => $lags->{presence_smooth3},                   # Anwesenheitsglättung über 3h (0..1)
-                            presence_smooth2            => $lags->{presence_smooth2},                   # Anwesenheitsglättung über 2h (0..1)
-                            presence_transition_up      => $lags->{presence_transition_up},             # Anwesenheit 0->1 Übergang (Impuls)
-                            presence_transition_down    => $lags->{presence_transition_down},           # Anwesenheit 1->0 Übergang (Impuls)
-
-                            lag48_norm                  => $lags->{lag48_norm},                         # Verbrauch vor 48h (normalisiert)
-                            lag168_norm                 => $lags->{lag168_norm},                        # Verbrauch vor 168h = 7d (normalisiert)
-                            hod_mean7_norm              => $lags->{hod_mean7_norm},                     # 7-Tage gleit. Mittelwert gleiche Stunde (normiert)
-                            hod_cv7_norm                => $lags->{hod_cv7_norm},                       # Variationskoeffizient gleiche Stunde (Vorhersagbarkeit)
-
-                            lag1_spike_pos_norm         => $lags->{lag1_spike_pos_norm},                # letzte Stunde war Spike nach oben (laufender Spike)
-                            lag1_spike_neg_norm         => $lags->{lag1_spike_neg_norm},                # letzte Stunde war Spike nach unten (laufender Einbruch)
-                            lag2_spike_pos_norm         => $lags->{lag2_spike_pos_norm},                # vorletzte Stunde war Spike nach oben (Spike klingt ab / hält an)
-                            lag2_spike_neg_norm         => $lags->{lag2_spike_neg_norm},                # vorletzte Stunde war Spike nach unten  (Einbruch klingt ab / hält an)
-                            
-                            cum_day_norm                => $sigs->{cum_day_norm},                       # kumulierter Tagesverbrauch (normiert)
-                            cum_day_deviation           => $sigs->{cum_day_deviation},                  # Abweichung Verbrauch vom erwarteten Tagespfad
-
-                            is_low_cons_regime          => $lags->{is_low_cons_regime},                 # y_t_1 <= P25: Grundlast / Nacht / abwesend
-                            is_high_cons_regime         => $lags->{is_high_cons_regime},                # y_t_1 >= P75: Peak / Kochen / Geräte an
-                            is_transition_regime        => $lags->{is_transition_regime},               # P25 < y_t_1 < P75: normaler Betrieb
-                                                     
-                            delta1_norm                 => $lags->{delta1_norm},                        # Änderung ggü. Vorstunde (normalisiert)
-                            delta24_norm                => $lags->{delta24_norm},                       # Änderung ggü. Vortag (normalisiert)
-                            delta1_norm_pos             => $lags->{delta1_norm_pos},                    # Positive 1h-Änderung
-                            delta1_norm_neg             => $lags->{delta1_norm_neg},                    # Negative 1h-Änderung
-                            delta24_norm_pos            => $lags->{delta24_norm_pos},                   # Positive 24h-Änderung
-                            delta24_norm_neg            => $lags->{delta24_norm_neg},                   # Negative 24h-Änderung
-
-                            roll_min_6_norm             => $lags->{roll_min_6_norm},                    # Tiefstwert der letzten 6h (Grundlastniveau)
-                            roll_max_6_norm             => $lags->{roll_max_6_norm},                    # Höchstwert der letzten 6h (Peak-Niveau)
-                            roll_range_6_norm           => $lags->{roll_range_6_norm},                  # Spannweite der letzten 6h (Volatilität ohne Glättung)
-
-                            temp_norm_lag1h             => $lags->{temp_norm_lag1h},                    # Temperatur vor 1h (normalisiert)
-                            temp_norm_lag3h             => $lags->{temp_norm_lag3h},                    # Temperatur vor 3h (normalisiert)
-                            temp_norm_lag24h            => $lags->{temp_norm_lag24h},                   # Temperatur vor 24h (normalisiert)
-
-                            temp_delta_1h_pos           => $lags->{temp_delta_1h_pos},                  # Positive Temperaturänderung 1h
-                            temp_delta_1h_neg           => $lags->{temp_delta_1h_neg},                  # Negative Temperaturänderung 1h
-                            temp_delta_3h_pos           => $lags->{temp_delta_3h_pos},                  # Positive Temperaturänderung 3h
-                            temp_delta_3h_neg           => $lags->{temp_delta_3h_neg},                  # Negative Temperaturänderung 3h
-                            temp_trend_pos              => $lags->{temp_trend_pos},                     # Aufwärtstrend Temperatur
-                            temp_trend_neg              => $lags->{temp_trend_neg},                     # Abwärtstrend Temperatur
-
-                            trend_break                 => $sigs->{trend_break},                        # Trendwechsel (binär)
-                            trend_up_norm               => $sigs->{trend_up_norm},                      # Aufwärtstrend Stärke (normalisiert)
-                            trend_down_norm             => $sigs->{trend_down_norm},                    # Abwärtstrend Stärke (normalisiert)
-                            trend_up_strength           => $sigs->{trend_up_strength},                  # Starker Aufwärtstrend
-                            trend_down_strength         => $sigs->{trend_down_strength},                # Starker Abwärtstrend
-
-                            pv_jump                     => $sigs->{pv_jump},                            # Plötzlicher PV-Anstieg
-                            cold_trigger                => $sigs->{cold_trigger},                       # Kälte-Trigger (binär)
-                            heat_trigger                => $sigs->{heat_trigger},                       # Hitze-Trigger (binär)
-                            volatility_flag             => $sigs->{volatility_flag},                    # Hohe Lastvolatilität
-                            pv_consumption_cross        => $sigs->{pv_consumption_cross},               # PV-Erzeugung > Verbrauch
-                            pv_drop                     => $sigs->{pv_drop},                            # PV-Einbruch
-
-                            hour_class_morning          => $sigs->{hour_class_morning},                 # Morgenstunden (Flag)
-                            hour_class_evening          => $sigs->{hour_class_evening},                 # Abendstunden (Flag)
-                            hour_class_lateevening      => $sigs->{hour_class_lateevening},             # Spätabend (Flag)
-                            hour_class_midnight         => $sigs->{hour_class_midnight},                # Mitternacht (Flag)
-                            hour_class_night            => $sigs->{hour_class_night},                   # Nachtstunden (Flag)
-                            hour_class_noon             => $sigs->{hour_class_noon},                    # Mittagsstunden (Flag)
-
-                            day_class_weekend           => $sigs->{day_class_weekend},                  # Wochenende (Flag)
-                            day_class_workday           => $sigs->{day_class_workday},                  # Arbeitstag (Flag)
-
-                            heating_degree_norm         => $sigs->{heating_degree_norm},                # Heizgradtage (Heizlast)
-                            cooling_degree_norm         => $sigs->{cooling_degree_norm},                # Kühlgradtage (Kühllast)
-
-                            hp_heating_mode             => $sigs->{hp_heating_mode},                    # Wärmepumpe im Heizmodus
-                            hp_cooling_mode             => $sigs->{hp_cooling_mode},                    # Wärmepumpe im Kühlmodus
-
-                            ww_morning                  => $sigs->{ww_morning},                         # Warmwasser morgens
-                            ww_evening                  => $sigs->{ww_evening},                         # Warmwasser abends
-                            ww_cold_boost               => $sigs->{ww_cold_boost},                      # Kältebedingter WW-Boost
-                            ww_pv_boost                 => $sigs->{ww_pv_boost},                        # PV-optimierter WW-Boost
-                            ww_cycle_flag               => $sigs->{ww_cycle_flag},                      # WW-Zyklus aktiv
-
-                            cop_proxy                   => $sigs->{cop_proxy},                          # COP-Schätzwert (linear zur Temperatur)
-                            cop_inverse                 => $sigs->{cop_inverse},                        # Inverser COP (Strombedarf)
-                            hp_power_factor             => $sigs->{hp_power_factor},                    # Kombinierte WP-Leistungssemantik
-
-                            frost_protect               => $sigs->{frost_protect},                      # Frostschutz aktiv (binär)
-                            frost_load                  => $sigs->{frost_load},                         # Frostschutz-Last (kontinuierlich)                       
-                        
-                            bev_active_lag1                => $lags->{bev_active_lag1},                 # mind. ein EV lud in der Vorstunde (binär)
-                            bev_load_lag1_norm             => $lags->{bev_load_lag1_norm},              # geladene Energiemenge Vorstunde (normiert, Arrayref-Deref!)
-                            bev_n_active_lag1_norm         => $lags->{bev_n_active_lag1_norm},          # Anteil gleichzeitig ladender EVs Vorstunde (bereits 0..1, kein eigener Norm-Schritt)
-                            bev_soc_deficit_lag1_norm      => $lags->{bev_soc_deficit_lag1_norm},       # mittleres SoC-Defizit zum Ende der Vorstunde
-                            bev_energy_remaining_lag1_norm => $lags->{bev_energy_remaining_lag1_norm},  # verbleibende Lademenge in Wh (kapazitätsgewichtet)
-                            bev_charge_intensity_lag1      => $lags->{bev_charge_intensity_lag1},       # Anteil der Stunde mit aktivem Laden (0..1)
-                            
-                        }       
-                    );
-      
-      unless ($features) {
-          $msg = 'ERROR in FANN Feature Registry Builder Version: $bv'; 
-          $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg; 
-
-          return $msg;           
-      }
-      else {
-          push @new_input, @{$features};
-      }
-
-      #debugLog ($paref, 'aiData', "AI FANN - new_input: ".Dumper @new_input);
-      #debugLog ($paref, 'aiData', "AI FANN - Series data: ".Dumper @flat_targets);   
-      #debugLog ($paref, 'aiData', "AI FANN - Lags: ".Dumper $lags);        
-
-      #if ($debug =~ /aiData/xs) {
-      #    my $inpo = join ", \n", @new_input;
-      #    Log3 ($name, 1, "$name DEBUG> AI AI FANN - hod: $hod - Normalized input dataset: \n".
-      #                     $inpo);
-      #} 
- 
-      # Prognose + BiasKorrektur abfragen
-      #####################################
-      my $denorm_val                                 = _aiFannPredict             ($name, $fanntyp, \@new_input); 
-      my ($prediction, $tc, $bias_zone, $drift_zone) = _aiFannApplyBiasCorrection ($name, $fanntyp, $hod, $denorm_val, $targetref, $profile);   # gewichtete Bias-Korrektur anwenden
-      
-      my $nngrst = CurrentVal ($name, $fanntyp.'NNGetResultState', 'ok');
-      
-      if ($nngrst ne 'ok') {
-          Log3 ($name, 2, "$name - WARNING - AI FANN '$fanntyp' forecast ignored and Legacy value is used, cause: $nngrst") 
-                  if(askLogtime ($name, $msg, 300));                                                                                            # Log mit Mehrfachverhinderung
-          return;
-      }
-      
-      $denorm_val = round0 ($denorm_val);
-      $prediction = round0 ($prediction);
-      $tc         = round0 ($tc);
-
-      # Fortschreibung der Arrays! mit Horizont-Dämpfung
-      ####################################################
-      my $hist_ref    = _aiFannGetHistoricalReference ($name, $fanntyp, $hod, $t);
-      my $blend_alpha = $hist_ref > 0
-                      ? min (0.8, $num / MAXNEXTHOURS)                                      # maximal 80% historisch
-                      : 0;                                                                  # kein Blending ohne Referenz
-
-      my $forward_val = (1 - $blend_alpha) * $prediction 
-                      +      $blend_alpha  * $hist_ref;
-      
-      $forward_val    = round0 ($forward_val);
-
-      push @flat_targets,     $forward_val;                                                 # V 2.6.10 statt direkt $prediction
-      push @temp_norm_values, $temp_norm;                                                   # wichtig: Temperaturreihe auch erweitern
-      push @presence_values,  $presence;                                                    # wichtig: Presence fortschreiben
-      
-      push @$bev_active_ref,           0;                                                   # BEV-Zukunftswerte: kein Ladezustand bekannt -> neutral (0)
-      push @bev_load_norm,             0;
-      push @$bev_n_active_ref,         0;
-      push @$bev_soc_deficit_norm_ref, 0;
-      push @bev_energy_remaining_norm, 0;
-      push @$charge_intensity_ref,     0;   
-
-      
-      # Hybridmodell mit Legacy
-      ##########################
-      my $confc_final = $alpha * $prediction + (1 - $alpha) * $intlegacyconfc;
-      $confc_final    = round0 ($confc_final);
- 
-      if ($debug =~ /aiData/xs) {
-          my $dthr = (split ':', $starttime, 2)[0];
-          Log3 ($name, 1, "$name DEBUG> AI FANN con fc - $dthr, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)");
-      }       
-      
-      # Daten speichern
-      ###################
-      $data{$name}{nexthours}{$nhstr}{conbiascorr} = $tc;
-      $data{$name}{nexthours}{$nhstr}{conaifc}     = $prediction;
-      $data{$name}{nexthours}{$nhstr}{confc}       = $confc_final;                           # hybriden prognostizierten Verbrauch speichern
-          
-      if (NexthoursVal ($name, $nhstr, 'today', 0)) {                                        # nur Werte des aktuellen Tags speichern
-          $data{$name}{circular}{$hod}{confc} = $confc_final;
-          writeToHistory ( { paref => $paref, key => 'conaifc',     val => $prediction,  day => $day, hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'confc',       val => $confc_final, day => $day, hour => $hod } );
-          writeToHistory ( { paref => $paref, key => 'conbiascorr', val => $tc,          day => $day, hour => $hod } );           
-                    
-          debugLog ($paref, 'saveData2Storage|consumption_long', "store AI legacy alpha value to circular/history -> hod=$hod confc=$confc_final Wh");
-      }
-  }
-  
-  setTimeTracking ($name, $cst, $fanntyp.'NNLastGetResultTime');                            # Laufzeit ermitteln
-  
-return;
 }
 
 ######################################################################################
@@ -30311,14 +30343,19 @@ return $med;
 ################################################################
 #       neurales Network Readiness prüfen
 ################################################################
-sub _aiFannConModelReady {
-  my ($name) = @_;
+sub _aiFannModelReady {
+  my ($name, $fanntyp) = @_;
 
   my $cause    = '';
   my $prepared = 1;                                                             # Netz ist vorbereitet
   my $ready    = 1;                                                             # Netz ist bereit
-  my $nctst    = CurrentVal ($name, 'conNNTrainstate', undef);
-  my $aiconact = CurrentVal ($name, 'aiConActivate', 0);
+  my $nctst    = CurrentVal ($name, $fanntyp.'NNTrainstate', undef);
+  
+  my $nactive  = $fanntyp eq 'con' ? 'aiConActivate' 
+               : $fanntyp eq 'pv'  ? 'aiPvActivate'
+               : '';
+  
+  my $aiconact = CurrentVal ($name, $nactive, 0);
   
   if ($aifannabs) { 
       $cause    = "Perl Modul AI::FANN is missing"; 
@@ -32599,7 +32636,7 @@ sub checkPlantConfig {
   
   ## Check FANN AI
   ##################
-  my ($prepared, $rdy, $cause) = _aiFannConModelReady ($name);
+  my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, 'con');
   my $congrs                   = CurrentVal ($name, 'conNNGetResultState', 'ok');
   
   # --- FANN allgemein 
@@ -39070,7 +39107,8 @@ to ensure that the system configuration is correct.
          </ul>
        <br>
        
-       (**) The consumer type <b>heatpump</b> is always assigned <b>mode=mustNot</b>, and there are additional special considerations to keep in mind:
+       (**) For the load type <b>heatpump</b>, ensure that there is no duplicate control by SolarForecast and the device's native control system. <br>
+       In addition, other specific characteristics of this load type must be taken into account:
        <br>
        <br>
        
@@ -42177,7 +42215,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          </ul>
        <br>
        
-       (**) Dem Verbrauchertyp <b>heatpump</b> wird immer <b>mode=mustNot</b> zugewiesen und es sind weitere Besonderheiten zu beachten: 
+       (**) Beim Verbrauchertyp <b>heatpump</b> ist sicherzustellen, dass keine doppelte Regelung durch SolarForecast und die native Gerätesteuerung erfolgt. <br>
+       Zusätzlich sind weitere spezifische Besonderheiten dieses Verbrauchertyps zu berücksichtigen: 
        <br>
        <br>
        
