@@ -31,8 +31,10 @@ function controlMultiGaugeVCreate(elName, devName, vArr, currVal, set, params, c
         let hueStart = 0, hueEnd = 120;
         if (isHue) {
             let hParts = colorStr.split('-');
-            hueStart = parseInt(hParts[1], 10) || 0;
-            hueEnd = parseInt(hParts[2], 10) || 120;
+            let startVal = parseInt(hParts[1], 10);
+            hueStart = isNaN(startVal) ? 0 : startVal;
+            let endVal = parseInt(hParts[2], 10);
+            hueEnd = isNaN(endVal) ? 120 : endVal;
         }
 
         return {
