@@ -8284,6 +8284,7 @@ sub _attrconsumer {                      ## no critic "not used"
       
       # --- nur für heatpump (musts in __attrKeyAction checken)
       opmode          => { comp => '.*',                                                  must => 0, act => 1 },
+      opmodeIcon      => { comp => '.*',                                                  must => 0, act => 1 },
       modulation      => { comp => '(?:[A-Za-z0-9_.äöüÄÖÜß]+:[A-Za-z0-9_.äöüÄÖÜß]+|100)', must => 0, act => 1 },
       
       # --- nur für bev (musts in __attrKeyAction checken)
@@ -9904,33 +9905,7 @@ sub __attrKeyAction {
           my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                        # gespeicherte nächste CyleTime
           readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
       }
-
-      if ($akey eq 'capacity') {
-          if (!isNumeric ($akeyval)) {
-              return qq{The value '$akey=$akeyval' must be numeric. Please consider the commandref.};
-          }
-      }
-
-      if ($akey eq 'limit') {
-          if (!isNumeric ($akeyval) || $akeyval < 0 || $akeyval > 100) {
-              return qq{The value '$akey=$akeyval' is not valid. Please consider the commandref.};
-          }
-      }
       
-      if ($akey =~ /(gfeedin|gcon)/xs) {
-          if ($pphash->{gcon} eq '-gfeedin' && $pphash->{gfeedin} eq '-gcon') {
-              return qq{Incorrect input. It is not allowed that the keys 'gcon' and 'gfeedin' refer to each other.};
-          }
-      }
-      
-      if ($akey =~ /(con|feed)price/xs) {                                                                       # Einspeisevergütung / Bezugspreis (Arbeitspreis) pro kWh
-          my @acp = split ":", $akeyval;
-          
-          if (scalar(@acp) != 2 && scalar(@acp) != 3) {
-              return qq{Incorrect input for key '$akey'};
-          }
-      }
-
       if ($init_done && $akey eq 'headerDetail') {
           my @hda = split ",", $akeyval;
 
@@ -9960,12 +9935,6 @@ sub __attrKeyAction {
           if ($akeyval =~ /bev/xs) {
               my $ev = isBevUsed ($name);                                                       
               if (!defined $ev) { return qq{No Consumer type 'bev' is defined. Please define it with the consumerXX attribute first.} }
-          }
-      }
-      
-      if ($akey eq 'aiConTrainLimit') {
-          if ($akeyval && $akeyval < AINUMMININPUTS) {
-              return qq{The value '$akeyval' is not valid for key '$akey'. It must be set to '0' or an integer >= }.AINUMMININPUTS;
           }
       }
       
@@ -10019,7 +9988,39 @@ sub __attrKeyAction {
               return $err;
           }
       }
+
+      if ($akey eq 'capacity') {
+          if (!isNumeric ($akeyval)) {
+              return qq{The value '$akey=$akeyval' must be numeric. Please consider the commandref.};
+          }
+      }
+
+      if ($akey eq 'limit') {
+          if (!isNumeric ($akeyval) || $akeyval < 0 || $akeyval > 100) {
+              return qq{The value '$akey=$akeyval' is not valid. Please consider the commandref.};
+          }
+      }
       
+      if ($akey =~ /(gfeedin|gcon)/xs) {
+          if ($pphash->{gcon} eq '-gfeedin' && $pphash->{gfeedin} eq '-gcon') {
+              return qq{Incorrect input. It is not allowed that the keys 'gcon' and 'gfeedin' refer to each other.};
+          }
+      }
+      
+      if ($akey =~ /(con|feed)price/xs) {                                                                       # Einspeisevergütung / Bezugspreis (Arbeitspreis) pro kWh
+          my @acp = split ":", $akeyval;
+          
+          if (scalar(@acp) != 2 && scalar(@acp) != 3) {
+              return qq{Incorrect input for key '$akey'};
+          }
+      }
+      
+      if ($akey eq 'aiConTrainLimit') {
+          if ($akeyval && $akeyval < AINUMMININPUTS) {
+              return qq{The value '$akeyval' is not valid for key '$akey'. It must be set to '0' or an integer >= }.AINUMMININPUTS;
+          }
+      }
+            
       if ($akey eq 'interruptable') {
           if ($akeyval !~ /^[01]$/xs) {
               my ($dev, $rd, $code, $hyst);
@@ -10073,7 +10074,7 @@ sub __attrKeyAction {
           }
           
           if ($akeyval ne 'heatpump') {                                                                 # Exklusivschlüssel heatpump
-              my @dont = qw(opmode modulation);
+              my @dont = qw(opmode opmodeIcon modulation);
               my $chk  = 0;    
 
               for my $k (@dont) {
@@ -10159,15 +10160,28 @@ sub __attrKeyAction {
           else {
               if ($akey eq 'modulation' 
                   && isNumeric($akeyval) 
-                  && $akeyval == 100) {                               # Wert darf genau numerisch 100 sein
+                  && $akeyval == 100) {                                             # Wert darf genau numerisch 100 sein
                   return;
               }
               
               return "The value '$akey=$akeyval' is not valid. Please consider the commandref.";
           }
       }
-      
-      if ($akey =~ /^(?:batCap|currSoC|targetSoC)$/xs) {     
+      elsif ($akey eq 'opmodeIcon') {
+          my ($a, $hops) = parseParams ($akeyval, ',', '', '->');                   # ($text, $separator, $joiner, $keyvalueseparator)
+          my $poom       = HPOPMODES;
+          my @hpStates   = split /\|/, HPOPMODES; 
+          
+          return "No valid opmode is set in key '$akey'. Use syntax like '<opmode>-><icon>[\@color]'. Please consider the commandref."
+               if keys %$hops == 0;
+          
+          for my $om (keys %{$hops}) {
+              if ($om !~ /^(?:$poom)$/xs) {
+                  return "The opmode '$om' is not valid. Use one of: " . (join ', ', @hpStates);
+              }              
+          }          
+      }
+      elsif ($akey =~ /^(?:batCap|currSoC|targetSoC)$/xs) {     
           if (!isNumeric ($akeyval)) {   
               my ($rdg, $unit) = split ':', $akeyval, 2;
               ($err)          = isDeviceValid ( { name => $name, obj => $adev, method => 'string' } );
@@ -10187,8 +10201,7 @@ sub __attrKeyAction {
               }
           }
       }
-      
-      if ($akey eq 'evid') {
+      elsif ($akey eq 'evid') {
           my ($rdg, $regex) = split ":", $akeyval, 2;
 
           $err = checkRegex ($regex);
@@ -11683,8 +11696,6 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
   
-  delete $data{$name}{circular}{99}{last_presence_check};                # 08.03.2026
-  
   for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {             # 29.03.
       my $bla = AttrVal ($name, "consumer$c", undef);
     
@@ -12098,6 +12109,10 @@ sub _collectAllRegConsumers {
 
       my $rauto = $hc->{auto} // q{};
       my $ctype = $hc->{type} // DEFCTYPE;
+      
+      if ($ctype eq 'heatpump') {
+          push @hp, $c;
+      }
       
       if ($ctype eq 'bev') {
           $hc->{mode} = 'mustNot';      
@@ -39912,7 +39927,7 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>consForecastBase</b>          </td><td>The consumption forecast will be increased to at least the specified base value. Higher consumption forecasts remain unaffected.                                         </td></tr>
             <tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1–24) or as a group of hours (e.g., 5–9).                                                             </td></tr>
-			<tr><td>                                  </td><td>The syntax is '&lt;hod&gt;->&lt;value&gt;,&lt;hod&gt;->&lt;value&gt;,...'. The &lt;value&gt; can be specified as:                                                        </td></tr>
+			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;value&gt;,&lt;hod&gt;->&lt;value&gt;,...</b> The &lt;value&gt; can be specified as:                                                          </td></tr>
             <tr><td>                                  </td><td><b>&lt;Integer&gt;</b> - a fixed base value, e.g. '2–500' or '3-9->650'                                                                                                  </td></tr>
             <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. '11->Dev:Rdg:200' or '6-11->Dev:Rdg:200', returns the base as an integer. '200' is the default value.       </td></tr>
             <tr><td>                                  </td><td><b>Note:</b> The base is only effective within the context of the consumption forecast component without AI.                                                             </td></tr>
@@ -43019,7 +43034,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>consForecastBase</b>          </td><td>Die Verbrauchsprognose wird mindestens auf den angegebenen Basiswert erhöht. Höhere Verbrauchsprognosen bleiben unberührt.                                           </td></tr>
             <tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat oder als Stundengruppe (z.B. 5-9) definierbar.                                                           </td></tr>
-			<tr><td>                                  </td><td>Die Syntax ist '&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...'. Der &lt;Wert&gt; kann angegeben werden mit:                                                </td></tr>
+			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...</b>  Der &lt;Wert&gt; kann angegeben werden mit:                                                  </td></tr>
             <tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Base-Wert, z.B. '2->500' oder '3-9->650'                                                                                        </td></tr>
             <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. '11->Dev:Rdg:200' oder '6-11->Dev:Rdg:200', liefert die Base als Ganzzahl. '200' ist der Ersatzwert.    </td></tr>
             <tr><td>                                  </td><td><b>Hinweis:</b> Die Base ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                            </td></tr>
