@@ -161,9 +161,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.1"  => "03.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
+  "2.8.1"  => "04.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
                            "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
-                           "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ",
+                           "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
+                           "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -8287,7 +8288,7 @@ sub _attrconsumer {                      ## no critic "not used"
       
       # --- nur für heatpump (musts in __attrKeyAction checken)
       opmode          => { comp => '.*',                                                  must => 0, act => 1 },
-      opmodeIcon      => { comp => '.*',                                                  must => 0, act => 1 },
+      opmodeIcons     => { comp => '.*',                                                  must => 0, act => 1 },
       modulation      => { comp => '(?:[A-Za-z0-9_.äöüÄÖÜß]+:[A-Za-z0-9_.äöüÄÖÜß]+|100)', must => 0, act => 1 },
       
       # --- nur für bev (musts in __attrKeyAction checken)
@@ -10077,7 +10078,7 @@ sub __attrKeyAction {
           }
           
           if ($akeyval ne 'heatpump') {                                                                 # Exklusivschlüssel heatpump
-              my @dont = qw(opmode opmodeIcon modulation);
+              my @dont = qw(opmode opmodeIcons modulation);
               my $chk  = 0;    
 
               for my $k (@dont) {
@@ -10170,7 +10171,7 @@ sub __attrKeyAction {
               return "The value '$akey=$akeyval' is not valid. Please consider the commandref.";
           }
       }
-      elsif ($akey eq 'opmodeIcon') {
+      elsif ($akey eq 'opmodeIcons') {
           my ($a, $hops) = parseParams ($akeyval, ',', '', '->');                   # ($text, $separator, $joiner, $keyvalueseparator)
           my $poom       = HPOPMODES;
           my @hpStates   = split /\|/, HPOPMODES; 
@@ -10179,10 +10180,11 @@ sub __attrKeyAction {
                if keys %$hops == 0;
           
           for my $om (keys %{$hops}) {
+              $om = trim ($om);
               if ($om !~ /^(?:$poom)$/xs) {
                   return "The opmode '$om' is not valid. Use one of: " . (join ', ', @hpStates);
               }              
-          }          
+          }        
       }
       elsif ($akey =~ /^(?:batCap|currSoC|targetSoC)$/xs) {     
           if (!isNumeric ($akeyval)) {   
@@ -11734,8 +11736,8 @@ sub centralTask {
     }
     $data{$name}{current}{airaw_hp_cleanup_done} = 1;               # läuft nur einmal pro Session
   }
-                   
-  ##########################################################################################################################
+              
+##########################################################################################################################
 
   if (!CurrentVal ($name, 'allStringsFullfilled', 0)) {                                        # die String Konfiguration erstellen wenn noch nicht erfolgreich ausgeführt
       my $ret = _createStringConfig ($hash);
@@ -12095,7 +12097,7 @@ sub _collectAllRegConsumers {
 
       my ($riseshift, $setshift);
 
-      if (exists $hc->{mintime}) {                                                                # Check Regex
+      if (exists $hc->{mintime}) {                                                              # Check Regex
           my $mintime = $hc->{mintime};
 
           if ($mintime =~ /^SunPath/xsi) {
@@ -12103,6 +12105,14 @@ sub _collectAllRegConsumers {
               $riseshift *= 60 if(defined $riseshift && isNumeric($riseshift));
               $setshift  *= 60 if(defined $setshift  && isNumeric($setshift));
           }
+      }
+      
+      my %homi;
+      if (exists $hc->{opmodeIcons}) {                                                          # WP-Consumer opmode abhängige Icons
+          %homi = map {
+                  my ($k, $v) = split /->/;
+                  $k => $v;
+                } map { trim($_) } split /,/, $hc->{opmodeIcons};
       }
 
       my $clt;
@@ -12123,7 +12133,8 @@ sub _collectAllRegConsumers {
       }
       
       # --- Löschen relevanter Schlüssel
-      my @delkeys = qw (sunriseshift sunsetshift icon batCap currSoC targetSoC evid timeOfDeparture opmode modulation);
+      my @delkeys = qw (sunriseshift sunsetshift icon batCap currSoC opmodeIcons
+                        targetSoC evid timeOfDeparture opmode modulation);
       delete @{$data{$name}{consumers}{$c}}{@delkeys};
 
       # --- Neuanlage Consumer Hash-Werte
@@ -12182,7 +12193,8 @@ sub _collectAllRegConsumers {
 
       # --- nur für heatpump
       $data{$name}{consumers}{$c}{opmode}            = $hc->{opmode}       if(defined $hc->{opmode}); 
-      $data{$name}{consumers}{$c}{modulation}        = $hc->{modulation}   if(defined $hc->{modulation}); 
+      $data{$name}{consumers}{$c}{opmodeIcons}       = \%homi              if(scalar keys %homi); 
+      $data{$name}{consumers}{$c}{modulation}        = $hc->{modulation}   if(defined $hc->{modulation});
   }
   
   if (@hp) { $data{$name}{current}{heatpumpInstalled} = join (",", @hp); }                                  # mehrere Wärmepumpen möglich
@@ -18574,6 +18586,14 @@ sub __hpConsumerOpmode {
       }
   }
   
+  # --- opmode spezifische Icons setzen
+  my $omi = ConsumerVal ($name, $c, 'opmodeIcons', '');
+  delete $data{$name}{consumers}{$c}{opmodeActiveIcon};  
+       
+  if (ref $omi eq 'HASH') {                                                                 # WP-Consumer opmode abhängige Icons
+      $data{$name}{consumers}{$c}{opmodeActiveIcon} = $omi->{$opmode};                      # Icon dynamisch nach opmode
+  }
+  
   # --- modulation Device prüfen
   my ($dvm, $rdm) = split ':', $md;
   
@@ -24446,19 +24466,22 @@ sub __substituteIcon {
   my ($color, $icon);
   my $txt = '';
 
-  if ($ptyp eq 'consumer') {                                                             # Icon Consumer
-      ($icon, $color) = split '@', ConsumerVal ($name, $pn, 'icon', CICONDEF);
+  if ($ptyp eq 'consumer') {                                                            # Icon Consumer
+      my $omai = ConsumerVal ($name, $pn, 'opmodeActiveIcon', '');                      # dynamische Icons auslesen falls vorhanden
+      
+      if ($omai) { ($icon, $color) = split '@', $omai }
+      else       { ($icon, $color) = split '@', ConsumerVal ($name, $pn, 'icon', CICONDEF) }
 
       if (!$color) {
           $color = isConsumerLogOn ($hash, $pn, $pcurr) ? CICONCOLACT : CICONCOLINACT;
       }
   }
-  elsif ($ptyp eq 'consumerdummy') {                                                     # Icon Dummy Consumer
+  elsif ($ptyp eq 'consumerdummy') {                                                    # Icon Dummy Consumer
       ($icon, $color) = split '@', CurrentVal ($name, 'dummyIcon', CICONDEF);
       $icon           = CICONDEF if(!$icon);
       $color          = $pcurr > 0 ? CICONCOLACT : CICONCOLINACT if(!$color);
   }
-  elsif ($ptyp eq 'generator') {                                                         # Generator (z.B. String)
+  elsif ($ptyp eq 'generator') {                                                        # Generator (z.B. String)
       ($icon, $color) = split '@', GENICONDEF.'@'.GENCOLACT;
 
       if (!$pcurr) {
@@ -24467,7 +24490,7 @@ sub __substituteIcon {
 
       $txt = $msg1 if(defined $msg1);
   }
-  elsif ($ptyp eq 'battery') {                                                           # Icon Batterie
+  elsif ($ptyp eq 'battery') {                                                          # Icon Batterie
       my ($ircmd, $icharge, $idischrg, $inorcmd) = split ':', BatteryVal ($name, $pn, 'bicon', '');
 
       my $soctxt = '';
@@ -31779,7 +31802,7 @@ sub _listDataPoolVarious {
 
           if (ref $h->{$idx}{$ckey} eq 'HASH') {
               my $hk = qq{};
-              for my $f (sort {$a<=>$b} keys %{$h->{$idx}{$ckey}}) {
+              for my $f (sort { naturalSort($a, $b) } keys %{$h->{$idx}{$ckey}}) {        
                   $hk .= " " if($hk);
                   $hk .= "$f=".$h->{$idx}{$ckey}{$f};
               }
@@ -35514,6 +35537,17 @@ return;
 }
 
 ################################################################
+#  Hilfsfunktion Sortierung numerische und 
+#  nicht numerische Daten zur Verwendung in sort ...
+################################################################
+sub naturalSort {
+    my ($a, $b) = @_;
+    return ( $a =~ /^-?\d+(\.\d+)?$/ && $b =~ /^-?\d+(\.\d+)?$/ )
+        ? $a <=> $b
+        : $a cmp $b;
+}
+
+################################################################
 #                 prüfen Angabe hh[:mm]
 ################################################################
 sub checkhhmm {
@@ -39144,6 +39178,10 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
             <tr><td>                       </td><td>The return value must be exactly one of the following: <b>off heating defrost hotwater cooling pool poolheating </b>                               </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>opmodeIcons</b>    </td><td>Each possible operating mode (opmode) can be assigned a unique icon and color. The entries are specified as a comma-separated list.                </td></tr>
+            <tr><td>                       </td><td>Syntax: <b> &lt;opmode&gt;->&lt;Icon&gt;[@&lt;Color&gt;],&lt;opmode&gt;->&lt;Icon&gt;[@&lt;Color&gt;],... </b>                                     </td></tr>
+            <tr><td>                       </td><td>The color specification is optional. If the list spans multiple lines, enclose the entire list in " ".                                    </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>The key is a required field.                                                                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>Maximum power consumption in W. The value must not be 0.                                                                                           </td></tr>
@@ -42251,6 +42289,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>opmode</b>         </td><td>definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche den aktuellen Betriebsmodus liefert (Pflichtangabe).                              </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
             <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating </b>                          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>opmodeIcons</b>    </td><td>Jedem möglichen Betriebsmodus (opmode) kann ein inividuelles Icon und Farbe zugewiesen werden. Die Eingabe erfolgt als Komma getrennte Liste.      </td></tr>
+            <tr><td>                       </td><td>Syntax: <b> &lt;opmode&gt;->&lt;Icon&gt;[@&lt;Farbe&gt;],&lt;opmode&gt;->&lt;Icon&gt;[@&lt;Farbe&gt;],... </b>                                     </td></tr>
+            <tr><td>                       </td><td>Die Farbangabe ist optional. Wird die Liste mehrzeilig eingegeben, ist die gesamte Liste in " " einzuschließen.                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>der Schlüssel ist Pflichtangabe                                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
