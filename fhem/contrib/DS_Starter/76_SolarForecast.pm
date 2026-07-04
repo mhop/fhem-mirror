@@ -287,11 +287,12 @@ for my $wday (0..6) {
     push @LOCALE_DAYNAMES, POSIX::strftime("%a", localtime($epoch));
 }
 
-## Konstanten
+## Konstanten    
 ######################
 use constant {
   ACTCOLDEF       => 'orange',                                                      # default Färbung Icon wenn aktiv
   ACTCOLINVBAT    => '#00e000',                                                     # default Färbung aktiver Batterie-Wechselrichter ohne Solarzellen
+  AIBITFAILLIMIT  => 5,                                                             # AI::FANN harter Bit_Fail-Indikator für grobe Fehler
   AINUMTREES      => 10,                                                            # Anzahl der Entscheidungsbäume im Ensemble
   AITRBLTO        => 7200,                                                          # KI DecTree Training BlockingCall Timeout
   AIASPEAKSFAC    => 1.05,                                                          # Sicherheitsaufschlag auf installiertes PV Peak
@@ -954,6 +955,8 @@ my %epoche_translations = (
                DE => "Konvergenz erfolgt früh, Momentum/Lernrate sind bereits konservativ: um mehr nützliche Epochen vor dem Early-Stopping zu ermöglichen, aiConSteepness leicht reduzieren (z.B. um 0.1) für langsamere, feinere Konvergenz - bei zu niedrigen aiConSteepness-Wert kann das Netz komplett aufhören zu lernen (Slope≈0); alternativ Hidden-Layer-Größe/Tiefe (aiConHiddenLayers) leicht erhöhen für mehr Lernkapazität, was aber ggf. mehr Trainingsdaten erfordert" },
   hint24  => { EN => "High momentum (%.2f) likely amplifies shuffle-event overshooting (validation loss jumps at each shuffle boundary): reduce momentum to 0.4–0.5 (aiControl->aiConMomentum). This stabilizes the validation curve and typically improves Slope, as the optimizer can settle into narrower minima without bouncing out on each data reshuffle.",
                DE => "Hohes Momentum (%.2f) verstärkt wahrscheinlich Shuffle-Event-Overshooting (Validierungsfehler springt an jedem Shuffle-Ereignis nach oben): Momentum auf 0.4–0.5 reduzieren (aiControl->aiConMomentum). Dies stabilisiert den Validierungsverlauf und verbessert typischerweise die Slope, da der Optimizer in engere Minima einsinken kann ohne bei jedem Datenshuffle herauszuschießen." },
+  hint25 =>  { EN => "Consider switching training algorithm: use RPROP instead of INCREMENTAL - RPROP adapts its step size automatically without manual learning rate tuning, which often converges faster when slope remains flat despite healthy training (aiControl->aiConTrainAlgo)",
+               DE => "Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL verwenden - RPROP passt seine Schrittweite automatisch an und kommt ohne manuelle Lernraten-Einstellung aus, was bei anhaltend flacher Slope trotz gesunden Trainings oft deutlich schneller zum Ziel führt (aiControl->aiConTrainAlgo)" },
 ); 
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -1619,7 +1622,7 @@ my %hef = (                                                                     
   "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch der Folgestunden 
   "dishwasher"     => { f => 0.15, m => 0.02, l => 0.15, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
   "dryer"          => { f => 0.40, m => 0.20, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
-  "washingmachine" => { f => 0.50, m => 0.30, l => 0.40, mt => 120         },
+  "washingmachine" => { f => 0.20, m => 0.03, l => 0.03, mt => 120         },
   "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
   "heatpump"       => { f => 0.25, m => 0.25, l => 0.25, mt => DEFMINTIME  },
   "bev"            => { f => 1.00, m => 1.00, l => 1.00, mt => 600         },
@@ -28448,7 +28451,7 @@ sub _aiFannEpochDiagnostic {
   my $slope              = $paref->{slope};
   my $r2                 = $paref->{r2};
   my $rmse_rel           = $paref->{rmse_rel};
-  my $bitfail            = $paref->{bitfail};
+  my $bitfail            = $paref->{bitfail};                                        
   my $num_epoch          = $paref->{num_epoch} // AINUMEPOCHS;
   my $num_inputs         = $paref->{num_inputs};
   my $split_index        = $paref->{split_index};
@@ -28469,7 +28472,7 @@ sub _aiFannEpochDiagnostic {
             : 999;
                   
   # Normierung auf 0..1
-  my $overfitting = ($ratio - 1) / 30;                                                  # 30 = obere Ratio-Grenze für Verbrauchsdaten
+  my $overfitting = ($ratio - 1) / 30;                                                          # 30 = obere Ratio-Grenze für Verbrauchsdaten
   $overfitting    = clampValue ($overfitting, 0, 1);
                       
   my $stability   = ($val_mean > 0)
@@ -28484,12 +28487,12 @@ sub _aiFannEpochDiagnostic {
   my $slope_warn_min = $profileweights{$profile}{slope_warn_min};
   my $rmse_rel_warn  = $profileweights{$profile}{rmse_rel_warn};  
   my $is_dead_net    = defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7;
+  my $lim_bitfail    = AIBITFAILLIMIT;                                                         # Bit_Fail-Limit für rprop-Guard
 
   my $code  = 'ok';
   my $label = '';
   my @hints;
   
-
   # --- DPR-abhängige Epochen-Schwellen:
   # kleine Architekturen (hoher DPR) konvergieren strukturell früher – das ist kein Fehler
   my $thr_very_early = $dpr > 20 ? 0.015 : $dpr > 10 ? 0.02 : 0.03;
@@ -28537,7 +28540,7 @@ sub _aiFannEpochDiagnostic {
       $label = $epoche_translations{late}{$lang};
         
       push @hints, $epoche_translations{hint6}{$lang};
-      push @hints, $epoche_translations{hint7}{$lang};
+      push @hints, $epoche_translations{hint7}{$lang};                                  # hint7: Lernrate reduzieren bei später Konvergenz
   }
   else {                                                                                # > 13500 Epochen
       $code  = 'very_late';
@@ -28579,29 +28582,29 @@ sub _aiFannEpochDiagnostic {
   if ($stability > 0.15) {                                                              # Instabiler Validierungsverlauf
       push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability;
     
-      if ($learning_momentum >= 0.65) {                                                 # Hohe Momentum ist wahrscheinlich primärer Treiber der Instabilität
+      if ($learning_momentum >= 0.65) {                                                 # hohes Momentum ist wahrscheinlich primärer Treiber der Instabilität
           push @hints, sprintf $epoche_translations{hint24}{$lang}, $learning_momentum;
       }
     
       $code = 'unstable' unless $code =~ /very/;
   }
 
-  if (($code eq 'very_early' || $code eq 'early')                                       # Schlechte Slope in früher Phase -> Datenproblem
+  if (($code eq 'very_early' || $code eq 'early')                                       # schlechter Slope in früher Phase -> Datenproblem
       && ($slope < $slope_warn_min || $slope > 1.4)) {
       push @hints, sprintf $epoche_translations{hint13}{$lang}, $slope;
   }
   
-  if ($code =~ /late/ && $rmse_rel > $rmse_rel_warn                                     # Späte Konvergenz + hoher RMSE → Architektur zu klein
+  if ($code =~ /late/ && $rmse_rel > $rmse_rel_warn                                     # späte Konvergenz + hoher RMSE → Architektur zu klein
       && (!$dpr || ($dpr >= 5 && $dpr <= 20))) {
       push @hints, sprintf $epoche_translations{hint14}{$lang}, $rmse_rel;
   }
 
-  if ($r2 < $r2_threshold && $code eq 'ok') {                                           # Schlechtes R² trotz gesunder Epochenphase
+  if ($r2 < $r2_threshold && $code eq 'ok') {                                           # schlechtes R² trotz gesunder Epochenphase
       push @hints, sprintf $epoche_translations{hint15}{$lang}, $r2, $r2_threshold;   
       push @hints, sprintf $epoche_translations{hint16}{$lang}, $r2, $r2_threshold;
   }
   
-  # --- 3. Architektur-Empfehlung  (vor Ampel-Block einfügen)
+  # --- 3. Architektur-Empfehlung
   my $arch_ref = __aiFannArchHint ({ num_inputs         => $num_inputs,
                                      split_index        => $split_index,
                                      num_train_datasets => $num_train_datasets,
@@ -28615,31 +28618,32 @@ sub _aiFannEpochDiagnostic {
   
   # --- 4. Aktivierungsfunktion Empfehlung
   if (defined $haf) {
-      if ($haf =~ /ELLIOT_SYMMETRIC/xs) {                                               # ELLIOT_SYMMETRIC aktiv aber totes Netz -> zurück zu SIGMOID
-          if ($is_dead_net) {
+      if ($haf =~ /ELLIOT_SYMMETRIC/xs) {                                               # ELLIOT_SYMMETRIC aktiv
+          if ($is_dead_net) {                                                           # totes Netz -> zurück zu SIGMOID
               push @hints, $epoche_translations{afasym}{$lang};
           }
           elsif (   $code        eq  'ok'
                  && $overfitting <   0.15
-                 && $slope       <   0.75) {
-              push @hints, $epoche_translations{hint7}{$lang};                          # RPROP empfehlen
+                 && $slope       <   0.75
+                 && $bitfail     <=  $lim_bitfail) {                                    # kein RPROP wenn Bit_Fail der Haupttreiber ist
+              push @hints, $epoche_translations{hint25}{$lang};                         # eigener Hint statt hint7
           }
       }
       elsif ($haf =~ /SYMMETRIC/xs) {                                                   # SIGMOID_SYMMETRIC aktiv
-          if ($is_dead_net) {                                                            # Totes Netz -> zurück zu SIGMOID
+          if ($is_dead_net) {                                                           # totes Netz -> zurück zu SIGMOID
               push @hints, $epoche_translations{afasym}{$lang};
           }
-          elsif (   $code       eq  'ok'                                                # Gesundes Training, aber Slope flach
+          elsif (   $code        eq  'ok'                                               # gesundes Training, aber Slope flach
                  && $overfitting <   0.15
                  && $slope       <   0.75) {
               push @hints, sprintf $epoche_translations{afelliot}{$lang}, $slope;
           }
       }
-      else {                                                                             # Nicht-symmetrische AF (SIGMOID, ELLIOT)
-          my $af_candidate = $code      eq  'ok'
+      else {                                                                            # nicht-symmetrische AF (SIGMOID, ELLIOT)
+          my $af_candidate = $code         eq  'ok'
                           && !$is_dead_net
-                          && $overfitting <   0.15
-                          && ($slope      <   0.75 || ($r2 < 0.75 && $rmse_rel > $rmse_rel_warn));
+                          && $overfitting  <   0.15
+                          && ($slope       <   0.75 || ($r2 < 0.75 && $rmse_rel > $rmse_rel_warn));
 
           push @hints, $epoche_translations{afsym}{$lang} if $af_candidate;
       }
@@ -28906,7 +28910,7 @@ sub _aiFannRetrainIndicator {
   my $lim_p99_error      = 3 * $lim_p95_error;                                  # P99-Limit: 3x P95-Limit statt 8*MAE; P99 bleibt nur weiche Score-Komponente, kein harter Retrain-Trigger
   
   # BitFail
-  my $lim_bitfail        = 5;                                                   # Sehr gut. BitFail ist ein harter Indikator für grobe Fehler.
+  my $lim_bitfail        = AIBITFAILLIMIT;                                      # BitFail ist ein harter Indikator für grobe Fehler
   my $lim_bitfail_rate   = 0.10;
   
   # --- Forecast Quality Score (0–100) + Ampel ---              
