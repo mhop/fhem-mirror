@@ -114,7 +114,7 @@ FHEM/14_Hideki.pm            Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_BELL.pm           HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
 FHEM/14_SD_RSL.pm            Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_UT.pm             HomeAuto_User        Sonstige Systeme (Link als PM an HomeAuto_User)
-FHEM/14_SD_WS.pm             Sidey/Ralf9          Sonstige Systeme
+FHEM/14_SD_WS.pm             Sidey/elektron-bbs   Sonstige Systeme
 FHEM/14_SD_WS07.pm           Sidey/Ralf9          Sonstige Systeme
 FHEM/14_SD_WS09.pm           Sidey/pejonp         Sonstige Systeme
 FHEM/14_SD_WS_Maverick.pm    Sidey79/Cruizer      Sonstige Systeme
