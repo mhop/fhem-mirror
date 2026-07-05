@@ -20,8 +20,9 @@ use strict;
 use warnings;
 use GPUtils qw(GP_Import GP_Export);
 use FHEM::Meta;
+use SetExtensions;
 
-our $VERSION = '1.1';
+our $VERSION = '1.2';
 
 # Export to main context with different name
 GP_Export(qw(
