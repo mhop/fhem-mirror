@@ -14,7 +14,7 @@ use strict;
 use warnings;
 use POSIX;
 use List::Util qw(any);         # for any function
-use lib::SD_Protocols;          # for any function
+use FHEM::Devices::SIGNALduino::SD_Protocols;          # for any function
 
 my @bitcountlength = (0,0,0);   # array min|default|max
 
@@ -170,7 +170,7 @@ sub SIGNALduino_un_Parse {
     my $hexcount = length($rawData);
     my $bitDataInvert = $bitData;
     $bitDataInvert =~ tr/01/10/;  # invert message and check if it is possible to deocde now
-    my $rawDataInvert = lib::SD_Protocols::binStr2hexStr($bitDataInvert);
+    my $rawDataInvert = FHEM::Devices::SIGNALduino::SD_Protocols::binStr2hexStr($bitDataInvert);
     my $seconds = ReadingsAge($name, 'state', 0);
 
     readingsBeginUpdate($hash);
