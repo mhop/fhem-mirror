@@ -8,15 +8,14 @@
 #
 # 2014-2015  S.Butzek, N.Butzek
 # 2016-2019  S.Butzek, Ralf9
-# 2019-2025  S.Butzek, HomeAutoUser, elektron-bbs
-
+# 2019-2026  S.Butzek, HomeAutoUser, elektron-bbs
 
 package main;
 use strict;
 use warnings;
 use Storable qw(dclone); 
 use FHEM::Core::Utils::Math;
-#use version 0.77; our $VERSION = version->declare('v3.5.5');
+#use version 0.77; our $VERSION = version->declare('v4.0.0');
 
 my $missingModulSIGNALduino = ' ';
 
@@ -27,22 +26,8 @@ no warnings 'portable';
 
 eval {use Data::Dumper qw(Dumper);1};
 
-use constant HAS_JSON      => defined  eval { require JSON; JSON->import; };
-
-eval {use Scalar::Util qw(looks_like_number);1};
-eval {use Time::HiRes qw(gettimeofday);1} ;
-eval {use FHEM::Core::Timer::Helper;1 } ;
-
-use lib::SD_Protocols;
-use List::Util qw(first);
-
-#$| = 1;    #Puffern abschalten, Hilfreich fuer PEARL WARNINGS Search
-
-
-
-
 use constant {
-  SDUINO_VERSION                  => '3.5.7',  # Datum wird automatisch bei jedem pull request aktualisiert
+  SDUINO_VERSION                  => '4.0.1+20260306',  # Datum wird automatisch bei jedem pull request aktualisiert
   SDUINO_INIT_WAIT_XQ             => 1.5,     # wait disable device
   SDUINO_INIT_WAIT                => 2,
   SDUINO_INIT_MAXRETRY            => 3,
@@ -52,30 +37,34 @@ use constant {
   SDUINO_WRITEQUEUE_NEXT          => 0.3,
   SDUINO_WRITEQUEUE_TIMEOUT       => 2,
 
-  SDUINO_DISPATCH_VERBOSE         => 5,       # default 5
   SDUINO_MC_DISPATCH_VERBOSE      => 5,       # wenn kleiner 5, z.B. 3 dann wird vor dem dispatch mit loglevel 3 die ID und rmsg ausgegeben
   SDUINO_MC_DISPATCH_LOG_ID       => '12.1',  # die o.g. Ausgabe erfolgt nur wenn der Wert mit der ID uebereinstimmt
   SDUINO_PARSE_DEFAULT_LENGHT_MIN => 8,
-  SDUINO_GET_CONFIGQUERY_DELAY    => 0.75     # delay for cmd to no overwrite a working cmd
+  SDUINO_GET_CONFIGQUERY_DELAY    => 0.75,     # delay for cmd to no overwrite a working cmd
+  
+  HAS_JSON                        => defined  eval { require JSON; JSON->import; }
 };
 
+eval {use Scalar::Util qw(looks_like_number);1};
+eval {use Time::HiRes qw(gettimeofday);1} ;
+eval {use FHEM::Core::Timer::Helper;1 } ;
 
-#sub SIGNALduino_Attr(@);
-#sub SIGNALduino_HandleWriteQueue($);
-#sub SIGNALduino_Parse($$$$@);
-#sub SIGNALduino_Read($);
-#sub SIGNALduino_Ready($);
-#sub SIGNALduino_Write($$$);
-#sub SIGNALduino_SimpleWrite(@);
-#sub SIGNALduino_LoadProtocolHash($);
-#sub SIGNALduino_Log3($$$);
+use FHEM::Devices::SIGNALduino::SD_Protocols;
+use FHEM::Devices::SIGNALduino::SD_Clients;
+use FHEM::Devices::SIGNALduino::SD_Message;
+use FHEM::Devices::SIGNALduino::SD_Matchlist;
+use FHEM::Devices::SIGNALduino::SD_CC1101;
+use FHEM::Devices::SIGNALduino::SD_Utils qw( :all );
+use FHEM::Devices::SIGNALduino::SD_IO qw( :all );
+use List::Util qw(first);
 
+#$| = 1;    #Puffern abschalten, Hilfreich fuer PEARL WARNINGS Search
 #my $debug=0;
 
 our %modules;
 our %defs;
 
-my %gets = (  # NameOFCommand =>  StyleMod for Fhemweb, SubToCall if get is executed, String to send to uC, sub called with response, regex to verify response,
+our %gets = (  # NameOFCommand =>  StyleMod for Fhemweb, SubToCall if get is executed, String to send to uC, sub called with response, regex to verify response,
   '?'                 =>  ['', \&SIGNALduino_Get_FhemWebList ],
   'version'           =>  ['noArg', \&SIGNALduino_Get_Command, "V", \&SIGNALduino_CheckVersionResp, 'V\s.*SIGNAL(?:duino|ESP|STM).*(?:\s\d\d:\d\d:\d\d)' ],
   'freeram'           =>  ['noArg', \&SIGNALduino_Get_Command, "R", \&SIGNALduino_GetResponseUpdateReading, '^[0-9]+' ] ,
@@ -91,34 +80,6 @@ my %gets = (  # NameOFCommand =>  StyleMod for Fhemweb, SubToCall if get is exec
 );
 
 
-my %patable = (
-  '433' =>
-  {
-    '-30_dBm'  => '12',
-    '-20_dBm'  => '0E',
-    '-15_dBm'  => '1D',
-    '-10_dBm'  => '34',
-    '-5_dBm'   => '68',
-    '0_dBm'    => '60',
-    '5_dBm'    => '84',
-    '7_dBm'    => 'C8',
-    '10_dBm'   => 'C0',
-  },
-  '868' =>
-  {
-    '-30_dBm'  => '03',
-    '-20_dBm'  => '0F',
-    '-15_dBm'  => '1E',
-    '-10_dBm'  => '27',
-    '-5_dBm'   => '67',
-    '0_dBm'    => '50',
-    '5_dBm'    => '81',
-    '7_dBm'    => 'CB',
-    '10_dBm'   => 'C2',
-  },
-);
-my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42);    # rAmpl(dB)
-
 my %sets = (
   #Command name             [FhemWeb Argument type, code to run]
   '?'                   =>  ['', \&SIGNALduino_Set_FhemWebList ],
@@ -130,157 +91,30 @@ my %sets = (
   'disableMessagetype'  =>  ['syncedMS,unsyncedMU,manchesterMC', \&SIGNALduino_Set_MessageType ],
   'sendMsg'             =>  ['textFieldNL',\&SIGNALduino_Set_sendMsg ],
   'cc1101_bWidth'       =>  ['58,68,81,102,116,135,162,203,232,270,325,406,464,541,650,812', \&SIGNALduino_Set_bWidth ],
-  'cc1101_dataRate'     =>  ['textFieldNL', \&cc1101::SetDataRate ],
-  'cc1101_deviatn'      =>  ['textFieldNL', \&cc1101::SetDeviatn ],
-  'cc1101_freq'         =>  ['textFieldNL', \&cc1101::SetFreq ],
-  'cc1101_patable'      =>  ['-30_dBm,-20_dBm,-15_dBm,-10_dBm,-5_dBm,0_dBm,5_dBm,7_dBm,10_dBm', \&cc1101::SetPatable ],
-  'cc1101_rAmpl'        =>  ['24,27,30,33,36,38,40,42',  \&cc1101::setrAmpl ],
-  'cc1101_reg'          =>  ['textFieldNL', \&cc1101::SetRegisters ],
-  'cc1101_reg_user'     =>  ['noArg', \&cc1101::SetRegistersUser ],
-  'cc1101_sens'         =>  ['4,8,12,16', \&cc1101::SetSens ],
+  'cc1101_dataRate'     =>  ['textFieldNL', \&FHEM::Devices::SIGNALduino::SD_CC1101::SetDataRate ],
+  'cc1101_deviatn'      =>  ['textFieldNL', \&FHEM::Devices::SIGNALduino::SD_CC1101::SetDeviatn ],
+  'cc1101_freq'         =>  ['textFieldNL', \&FHEM::Devices::SIGNALduino::SD_CC1101::SetFreq ],
+  'cc1101_patable'      =>  ['-30_dBm,-20_dBm,-15_dBm,-10_dBm,-5_dBm,0_dBm,5_dBm,7_dBm,10_dBm', \&FHEM::Devices::SIGNALduino::SD_CC1101::SetPatable ],
+  'cc1101_rAmpl'        =>  ['24,27,30,33,36,38,40,42',  \&FHEM::Devices::SIGNALduino::SD_CC1101::setrAmpl ],
+  'cc1101_reg'          =>  ['textFieldNL', \&FHEM::Devices::SIGNALduino::SD_CC1101::SetRegisters ],
+  'cc1101_reg_user'     =>  ['noArg', \&FHEM::Devices::SIGNALduino::SD_CC1101::SetRegistersUser ],
+  'cc1101_sens'         =>  ['4,8,12,16', \&FHEM::Devices::SIGNALduino::SD_CC1101::SetSens ],
   'LaCrossePairForSec'  =>  ['textFieldNL', \&SIGNALduino_Set_LaCrossePairForSec ],
 );
 
 ## Supported config CC1101 ##
-my @modformat = ('2-FSK','GFSK','-','ASK/OOK','4-FSK','-','-','MSK');
-my @syncmod = ( 'No preamble/sync','15/16 sync word bits detected','16/16 sync word bits detected','30/32 sync word bits detected',
+our @modformat = ('2-FSK','GFSK','-','ASK/OOK','4-FSK','-','-','MSK');
+our @syncmod = ( 'No preamble/sync','15/16 sync word bits detected','16/16 sync word bits detected','30/32 sync word bits detected',
                 'No preamble/sync, carrier-sense above threshold', '15/16 + carrier-sense above threshold',
                 '16/16 + carrier-sense above threshold', '30/32 + carrier-sense above threshold'
               );
 
-my %cc1101_register = (   # for get ccreg 99 and set cc1101_reg
-  '00' => 'IOCFG2   - 0x0D',      # ! the values with spaces for output get ccreg 99 !
-  '01' => 'IOCFG1   - 0x2E',
-  '02' => 'IOCFG0   - 0x2D',
-  '03' => 'FIFOTHR  - 0x47',
-  '04' => 'SYNC1    - 0xD3',
-  '05' => 'SYNC0    - 0x91',
-  '06' => 'PKTLEN   - 0x3D',
-  '07' => 'PKTCTRL1 - 0x04',
-  '08' => 'PKTCTRL0 - 0x32',
-  '09' => 'ADDR     - 0x00',
-  '0A' => 'CHANNR   - 0x00',
-  '0B' => 'FSCTRL1  - 0x06',
-  '0C' => 'FSCTRL0  - 0x00',
-  '0D' => 'FREQ2    - 0x10',
-  '0E' => 'FREQ1    - 0xB0',
-  '0F' => 'FREQ0    - 0x71',
-  '10' => 'MDMCFG4  - 0x57',
-  '11' => 'MDMCFG3  - 0xC4',
-  '12' => 'MDMCFG2  - 0x30',
-  '13' => 'MDMCFG1  - 0x23',
-  '14' => 'MDMCFG0  - 0xB9',
-  '15' => 'DEVIATN  - 0x00',
-  '16' => 'MCSM2    - 0x07',
-  '17' => 'MCSM1    - 0x00',
-  '18' => 'MCSM0    - 0x18',
-  '19' => 'FOCCFG   - 0x14',
-  '1A' => 'BSCFG    - 0x6C',
-  '1B' => 'AGCCTRL2 - 0x07',
-  '1C' => 'AGCCTRL1 - 0x00',
-  '1D' => 'AGCCTRL0 - 0x91',
-  '1E' => 'WOREVT1  - 0x87',
-  '1F' => 'WOREVT0  - 0x6B',
-  '20' => 'WORCTRL  - 0xF8',
-  '21' => 'FREND1   - 0xB6',
-  '22' => 'FREND0   - 0x11',
-  '23' => 'FSCAL3   - 0xE9',
-  '24' => 'FSCAL2   - 0x2A',
-  '25' => 'FSCAL1   - 0x00',
-  '26' => 'FSCAL0   - 0x1F',
-  '27' => 'RCCTRL1  - 0x41',
-  '28' => 'RCCTRL0  - 0x00',
-  '29' => 'FSTEST   - N/A ',
-  '2A' => 'PTEST    - N/A ',
-  '2B' => 'AGCTEST  - N/A ',
-  '2C' => 'TEST2    - N/A ',
-  '2D' => 'TEST1    - N/A ',
-  '2E' => 'TEST0    - N/A ',
-);
-
-## Supported Clients per default
-my $clientsSIGNALduino = ':CUL_EM:'
-            .'CUL_FHTTK:'
-            .'CUL_TCM97001:'
-            .'CUL_TX:'
-            .'CUL_WS:'
-            .'Dooya:'
-            .'FHT:'
-            .'FLAMINGO:'
-            .'FS10:'
-            .'FS20:'
-            .' :'         # Zeilenumbruch
-            .'Fernotron:'
-            .'Hideki:'
-            .'IT:'
-            .'KOPP_FC:'
-            .'LaCrosse:'
-            .'OREGON:'
-            .'PCA301:'
-            .'RFXX10REC:'
-            .'Revolt:'
-            .'SD_AS:'
-            .'SD_Rojaflex:'
-            .' :'         # Zeilenumbruch
-            .'SD_BELL:'
-            .'SD_GT:'
-            .'SD_Keeloq:'
-            .'SD_RSL:'
-            .'SD_UT:'
-            .'SD_WS07:'
-            .'SD_WS09:'
-            .'SD_WS:'
-            .'SD_WS_Maverick:'
-            .'SOMFY:'
-            .'WMBUS:'
-            .' :'         # Zeilenumbruch
-            .'Siro:'
-            .'SIGNALduino_un:'
-          ;
-
-## default regex match List for dispatching message to logical modules, can be updated during runtime because it is referenced
-my %matchListSIGNALduino = (
-      '1:IT'                => '^i......',
-      '2:CUL_TCM97001'      => '^s[A-Fa-f0-9]+',
-      '3:SD_RSL'            => '^P1#[A-Fa-f0-9]{8}',
-      '5:CUL_TX'            => '^TX..........',                       # Need TX to avoid FHTTK
-      '6:SD_AS'             => '^P2#[A-Fa-f0-9]{7,8}',                # Arduino based Sensors, should not be default
-      '4:OREGON'            => '^(3[8-9A-F]|[4-6][0-9A-F]|7[0-8]).*',
-      '7:Hideki'            => '^P12#75[A-F0-9]+',
-      '9:CUL_FHTTK'         => '^T[A-F0-9]{8}',
-      '10:SD_WS07'          => '^P7#[A-Fa-f0-9]{6}[AFaf][A-Fa-f0-9]{2,3}',
-      '11:SD_WS09'          => '^P9#F[A-Fa-f0-9]+',
-      '12:SD_WS'            => '^W\d+x{0,1}#.*',
-      '13:RFXX10REC'        => '^(20|29)[A-Fa-f0-9]+',
-      '14:Dooya'            => '^P16#[A-Fa-f0-9]+',
-      '15:SOMFY'            => '^Ys[0-9A-F]+',
-      '16:SD_WS_Maverick'   => '^P47#[A-Fa-f0-9]+',
-      '17:SD_UT'            => '^P(?:14|20|20.1|22|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91.1|92|93|95|97|99|104|105|114|118|121|127|128|130|132)#.*', # universal - more devices with different protocols
-      '18:FLAMINGO'         => '^P13\.?1?#[A-Fa-f0-9]+',              # Flamingo Smoke
-      '19:CUL_WS'           => '^K[A-Fa-f0-9]{5,}',
-      '20:Revolt'           => '^r[A-Fa-f0-9]{22}',
-      '21:FS10'             => '^P61#[A-F0-9]+',
-      '22:Siro'             => '^P72#[A-Fa-f0-9]+',
-      '23:FHT'              => '^81..(04|09|0d)..(0909a001|83098301|c409c401)..',
-      '24:FS20'             => '^81..(04|0c)..0101a001',
-      '25:CUL_EM'           => '^E0.................',
-      '26:Fernotron'        => '^P82#.*',
-      '27:SD_BELL'          => '^P(?:15|32|41|42|57|79|96|98|112)#.*',
-      '28:SD_Keeloq'        => '^P(?:87|88)#.*',
-      '29:SD_GT'            => '^P49#[A-Fa-f0-9]+',
-      '30:LaCrosse'         => '^(\\S+\\s+9 |OK\\sWS\\s)',
-      '31:KOPP_FC'          => '^kr\w{18,}',
-      '32:PCA301'           => '^\\S+\\s+24',
-      '33:SD_Rojaflex'      => '^P109#[A-Fa-f0-9]+',
-      '34:WMBUS'            => '^b.*',
-      'X:SIGNALduino_un'    => '^[u]\d+#.*',
-);
 
 my %symbol_map = (one => 1 , zero =>0 ,sync => '', float=> 'F', 'start' => '');
 
 ## rfmode for attrib & supported rfmodes
 my @rfmode;
-my $Protocols = new lib::SD_Protocols();
+my $Protocols = new FHEM::Devices::SIGNALduino::SD_Protocols();
 
 ############################# package main
 sub SIGNALduino_Initialize {
@@ -289,7 +123,9 @@ sub SIGNALduino_Initialize {
   my $dev = '';
   $dev = ',1' if (index(SDUINO_VERSION, 'dev') >= 0);
 
-  my $error = $Protocols->LoadHash(qq[$attr{global}{modpath}/FHEM/lib/SD_ProtocolData.pm]); 
+  my $error = $Protocols->LoadHash(qq[./lib/FHEM/Devices/SIGNALduino/SD_Protocols/Data.pm]); 
+  
+
   if (defined($error)) {
     Log3 'SIGNALduino', 1, qq[Error loading Protocol Hash. Module is in inoperable mode error message:($error)];
   } else {
@@ -384,41 +220,36 @@ sub SIGNALduino_Define {
   my @a =split m{\s+}xms, $def;
 
   if(@a != 3) {
-    my $msg = 'Define, wrong syntax: define <name> SIGNALduino {none | devicename[\@baudrate] | devicename\@directio | hostname:port}';
+    my $msg = 'Define, wrong parameter count: define <name> SIGNALduino {none | devicename[\@baudrate] | devicename\@directio | hostname:port}';
     Log3 undef, 2, $msg;
     return $msg;
   }
 
   DevIo_CloseDev($hash);
   my $name = $a[0];
-
-
   my $dev = $a[2];
-  #$hash->{debugMethod}->(qq[dev: $dev]);
-  #my $hardware=AttrVal($name,'hardware','nano');
-  #$hash->{debugMethod}->(qq[hardware: $hardware]);
 
   if($dev eq 'none') {
     Log3 $name, 1, "$name: Define, device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
-  }  elsif ($dev !~ m/\@/) { 
+  } elsif ($dev !~ m/\@/) {
     if ( ($dev =~ m~^(?:/[^/ ]*)+?$~xms || $dev =~ m~^COM\d$~xms) )  # bei einer IP oder hostname wird kein \@57600 angehaengt
     {
       $dev .= '@57600' 
     } elsif ($dev !~ /@\d+$/ && ($dev !~ /^
       (?: (?:[a-z0-9-]+(?:\.[a-z]{2,6})?)*|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}
           (?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9]))
-      : (?:6553[0-5]|655[0-2]\d|65[0-4]\d{2}|6[0-4]\d{3}|[1-5]\d{4}|[1-9]\d{0,3})$/xmsi) ) { 
-      my $msg = 'Define, wrong hostname/port syntax: define <name> SIGNALduino {none | devicename[\@baudrate] | devicename\@directio | hostname:port}';
+      : (?:6553[0-5]|655[0-2]\d|65[0-4]\d{2}|6[0-4]\d{3}|[1-5]\d{4}|[1-9]\d{0,3})$/xmsi) ) { # bei einer IP oder hostname wird kein \@57600 angehaengt{ 
+      my $msg = "Define, wrong hostname/port syntax ($dev): define <name> SIGNALduino {none | devicename[\@baudrate] | devicename\@directio | hostname:port}";
       Log3 undef, 2, $msg;
+      $hash->{STATE} = 'error';
       return $msg;
     }
   }
   
-  #$hash->{CMDS} = '';
   $hash->{ClientsKeepOrder} = 1;
-  $hash->{Clients}    = $clientsSIGNALduino;
-  $hash->{MatchList}  = \%matchListSIGNALduino;
+  $hash->{Clients}    = FHEM::Devices::SIGNALduino::SD_Clients::getClientsasStr();
+  $hash->{MatchList}  = FHEM::Devices::SIGNALduino::SD_Matchlist::getMatchListasRef();
   $hash->{DeviceName} = $dev;
   $hash->{logMethod}  = \&main::Log3;
   $hash->{debugMethod}  = sub { return; };
@@ -428,12 +259,11 @@ sub SIGNALduino_Define {
   $hash->{protocolObject}->registerLogCallback(SIGNALduino_createLogCallback($hash));
     
   FHEM::Core::Timer::Helper::addTimer($name, time(), \&SIGNALduino_IdList,"sduino_IdList:$name",0 );
-  #InternalTimer(gettimeofday(), \&SIGNALduino_IdList,"sduino_IdList:$name",0);       # verzoegern bis alle Attribute eingelesen sind
   
   if($dev ne 'none') {
     $ret = DevIo_OpenDev($hash, 0, \&SIGNALduino_DoInit, \&SIGNALduino_Connect);
   } else {
-  $hash->{DevState} = 'initialized';
+    $hash->{DevState} = 'initialized';
     readingsSingleUpdate($hash, 'state', 'opened', 1);
   }
 
@@ -450,17 +280,6 @@ sub SIGNALduino_Define {
   }
 
   return $ret;
-}
-
-############################# package main
-sub SIGNALduino_Connect {
-  my ($hash, $err) = @_;
-
-  # damit wird die err-msg nur einmal ausgegeben
-  if (!defined($hash->{disConnFlag}) && $err) {
-    $hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: Connect, ${err}");
-    $hash->{disConnFlag} = 1;
-  }
 }
 
 ############################# package main
@@ -482,15 +301,7 @@ sub SIGNALduino_Undef {
   SIGNALduino_Shutdown($hash);
 
   DevIo_CloseDev($hash);
-  FHEM::Core::Timer::Helper::removeTimer($name); 
-  return ;
-}
-
-############################# package main
-sub SIGNALduino_Shutdown {
-  my ($hash) = @_;
-  #DevIo_SimpleWrite($hash, "XQ\n",2);
-  SIGNALduino_SimpleWrite($hash, 'XQ');   # Switch reception off, it may hang up the SIGNALduino
+  FHEM::Core::Timer::Helper::removeTimer($name);
   return ;
 }
 
@@ -987,7 +798,7 @@ sub SIGNALduino_Set_bWidth {
 
   if (exists($hash->{ucCmd}->{cmd}) && $hash->{ucCmd}->{cmd} eq 'set_bWidth' && $a[0] =~ /^C10\s=\s([A-Fa-f0-9]{2})$/ )
   {
-    my ($ob,$bw) = cc1101::CalcbWidthReg($hash,$1,$hash->{ucCmd}->{arg});
+    my ($ob,$bw) = FHEM::Devices::SIGNALduino::SD_CC1101::CalcbWidthReg($hash,$1,$hash->{ucCmd}->{arg});
     $hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: Set_bWidth, bWidth: Setting MDMCFG4 (10) to $ob = $bw KHz");
     # Toddo setRegisters verwenden
     main::SIGNALduino_AddSendQueue($hash,"W12$ob");
@@ -996,7 +807,7 @@ sub SIGNALduino_Set_bWidth {
   } else {
     $hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: Set_bWidth, Request register 10");
     # Get Register 10
-    cc1101::GetRegister($hash,10);
+    FHEM::Devices::SIGNALduino::SD_CC1101::GetRegister($hash,10);
 
     $hash->{ucCmd}->{cmd}         = 'set_bWidth';
     $hash->{ucCmd}->{arg}         = $a[1];                                  # Zielbandbreite
@@ -1128,7 +939,7 @@ sub SIGNALduino_Get_Command_CCReg {
   return 'not enough number of arguments' if $#a < 1;
   return 'Wrong command provided' if $a[0] ne 'ccreg';
   my $name=$hash->{NAME};
-  if (exists($cc1101_register{uc($a[1])}) || $a[1] eq '99' || $a[1] =~ /^3[0-9a-dA-D]$/ ) {
+  if (exists($FHEM::Devices::SIGNALduino::SD_CC1101::cc1101_register{uc($a[1])}) || $a[1] eq '99' || $a[1] =~ /^3[0-9a-dA-D]$/ ) {
     return SIGNALduino_Get_Command(@_);
   } else {
     return "unknown Register $a[1], please choose a valid cc1101 register";
@@ -1224,7 +1035,7 @@ sub SIGNALduino_CheckccConfResponse {
   my $msg = sprintf("Freq: %.3f MHz, Bandwidth: %d kHz, rAmpl: %d dB, sens: %d dB, DataRate: %.2f kBaud",
     26*(($r{"0D"}*256+$r{"0E"})*256+$r{"0F"})/65536,                 #Freq       | Register 0x0D,0x0E,0x0F
     26000/(8 * (4+(($r{"10"}>>4)&3)) * (1 << (($r{"10"}>>6)&3))),    #Bw         | Register 0x10
-    $ampllist[$r{"1B"}&7],                                           #rAmpl      | Register 0x1B
+    $FHEM::Devices::SIGNALduino::SD_CC1101::ampllist[$r{"1B"}&7],    #rAmpl      | Register 0x1B
     4+4*($r{"1D"}&3),                                                #Sens       | Register 0x1D
     (((256+$r{"11"})*(2**($r{"10"} & 15 )))*26000000/(2**28) / 1000) #DataRate   | Register 0x10,0x11
   );
@@ -1257,8 +1068,8 @@ sub SIGNALduino_CheckccPatableResponse {
   $CC1101Frequency = 868 if ($CC1101Frequency >= 863 && $CC1101Frequency <= 870);
   my $dBn = substr($msg,9,2);
   $hash->{logMethod}->($name, 3, "$name: CheckCcpatableResponse, patable: $dBn");
-  foreach my $dB (keys %{ $patable{$CC1101Frequency} }) {
-    if ($dBn eq $patable{$CC1101Frequency}{$dB}) {
+  foreach my $dB (keys %{ $FHEM::Devices::SIGNALduino::SD_CC1101::patable{$CC1101Frequency} }) {
+    if ($dBn eq $FHEM::Devices::SIGNALduino::SD_CC1101::patable{$CC1101Frequency}{$dB}) {
       $hash->{logMethod}->($name, 5, "$name: CheckCcpatableResponse, patable: $dB");
       $msg .= " => $dB";
       last;
@@ -1283,8 +1094,8 @@ sub SIGNALduino_CheckCcregResponse {
     $msg1 =~ s/\s\s/ /g;
     my @ccreg = split(/\s/,$msg1);
     my $reg_idx = 0;
-    foreach my $key (sort keys %cc1101_register) {
-      $msg.= '0x'.$key.'  '.$cc1101_register{$key}. ' - 0x'.$ccreg[$reg_idx]."\n";
+    foreach my $key (sort keys %FHEM::Devices::SIGNALduino::SD_CC1101::cc1101_register) {
+      $msg.= '0x'.$key.'  '.$FHEM::Devices::SIGNALduino::SD_CC1101::cc1101_register{$key}. ' - 0x'.$ccreg[$reg_idx]."\n";
       $reg_idx++;
     }
   } else {
@@ -1293,13 +1104,13 @@ sub SIGNALduino_CheckCcregResponse {
     my $val = $2;
     if ( $reg =~ /^3[0-9a-dA-D]$/ ) { # Status register
       $msg = "\nStatus register detail:\n---------------------------\nadd.  name             cur.\n";
-      $msg .= "0x$reg  $cc1101::cc1101_status_register{$reg} - 0x$val";
-      if ( $reg eq '31' && exists $cc1101::cc1101_version{$val}) { # VERSION – Chip ID
-        $msg .= " Chip $cc1101::cc1101_version{$val}";
+      $msg .= "0x$reg  $FHEM::Devices::SIGNALduino::SD_CC1101::cc1101_status_register{$reg} - 0x$val";
+      if ( $reg eq '31' && exists $FHEM::Devices::SIGNALduino::SD_CC1101::cc1101_version{$val}) { # VERSION – Chip ID
+        $msg .= " Chip $FHEM::Devices::SIGNALduino::SD_CC1101::cc1101_version{$val}";
       }
     } else { # Configuration Register
       $msg = "\nConfiguration register detail:\n------------------------------\nadd.  name       def.   cur.\n";
-      $msg .= "0x$reg  $cc1101_register{$reg} - 0x$val";
+      $msg .= "0x$reg  $FHEM::Devices::SIGNALduino::SD_CC1101::cc1101_register{$reg} - 0x$val";
     }
     $msg .= "\n";
   }
@@ -1330,205 +1141,6 @@ sub SIGNALduino_CheckSendRawResponse {
   }
   return (undef);
 }
-
-############################# package main
-sub SIGNALduino_ResetDevice {
-  my $hash = shift;
-  my $name = $hash->{NAME};
-
-  if (!defined($hash->{helper}{resetInProgress})) {
-    my $hardware = AttrVal($name,'hardware','');
-    $hash->{logMethod}->($name, 3, "$name: ResetDevice, $hardware");
-
-    if (IsDummy($name)) { # for dummy device
-      $hash->{DevState} = 'initialized';
-      readingsSingleUpdate($hash, 'state', 'opened', 1);
-      return ;
-    }
-
-    DevIo_CloseDev($hash);
-    if ($hardware eq 'radinoCC1101' && $^O eq 'linux') {
-      # The reset is triggered when the Micro's virtual (CDC) serial / COM port is opened at 1200 baud and then closed.
-      # When this happens, the processor will reset, breaking the USB connection to the computer (meaning that the virtual serial / COM port will disappear).
-      # After the processor resets, the bootloader starts, remaining active for about 8 seconds.
-      # The bootloader can also be initiated by pressing the reset button on the Micro.
-      # Note that when the board first powers up, it will jump straight to the user sketch, if present, rather than initiating the bootloader.
-      my ($dev, $baudrate) = split("@", $hash->{DeviceName});
-      $hash->{logMethod}->($name, 3, "$name: ResetDevice, forcing special reset for $hardware on $dev");
-      # Mit dem Linux-Kommando 'stty' die Port-Einstellungen setzen
-      system("stty -F $dev ospeed 1200 ispeed 1200");
-      $hash->{helper}{resetInProgress}=1;
-      FHEM::Core::Timer::Helper::addTimer($name,gettimeofday()+10,\&SIGNALduino_ResetDevice,$hash);
-      
-      $hash->{logMethod}->($name, 3, "$name: ResetDevice, reopen delayed for 10 second");
-      return ;
-    }
-  } else {
-    delete($hash->{helper}{resetInProgress});
-  }
-  DevIo_OpenDev($hash, 0, \&SIGNALduino_DoInit, \&SIGNALduino_Connect);
-  return ;
-}
-
-############################# package main
-sub SIGNALduino_CloseDevice {
-  my ($hash) = @_;
-
-  $hash->{logMethod}->($hash->{NAME}, 2, "$hash->{NAME}: CloseDevice, closed");
-  FHEM::Core::Timer::Helper::removeTimer($hash->{NAME});
-  DevIo_CloseDev($hash);
-  readingsSingleUpdate($hash, 'state', 'closed', 1);
-
-  return ;
-}
-
-############################# package main
-sub SIGNALduino_DoInit {
-  my $hash = shift;
-  my $name = $hash->{NAME};
-  my $err;
-  my $msg = undef;
-
-  my ($ver, $try) = ('', 0);
-  #Dirty hack to allow initialisation of DirectIO Device for some debugging and tesing
-
-  delete($hash->{disConnFlag}) if defined($hash->{disConnFlag});
-
-  FHEM::Core::Timer::Helper::removeTimer($name,\&SIGNALduino_HandleWriteQueue,"HandleWriteQueue:$name");
-  @{$hash->{QUEUE}} = ();
-  $hash->{sendworking} = 0;
-
-  if (($hash->{DEF} !~ m/\@directio/) and ($hash->{DEF} !~ m/none/) )
-  {
-    $hash->{logMethod}->($hash, 1, "$name: DoInit, ".$hash->{DEF});
-    $hash->{initretry} = 0;
-    FHEM::Core::Timer::Helper::removeTimer($name,undef,$hash); # What timer should be removed here is not clear
-
-    #SIGNALduino_SimpleWrite($hash, 'XQ'); # Disable receiver
-    
-    FHEM::Core::Timer::Helper::addTimer($name,gettimeofday() + SDUINO_INIT_WAIT_XQ, \&SIGNALduino_SimpleWrite_XQ, $hash, 0);
-    FHEM::Core::Timer::Helper::addTimer($name,gettimeofday() + SDUINO_INIT_WAIT, \&SIGNALduino_StartInit, $hash, 0);
-  }
-  # Reset the counter
-  delete($hash->{XMIT_TIME});
-  delete($hash->{NR_CMD_LAST_H});
-
-  return;
-}
-
-
-############################# package main
-# Disable receiver
-sub SIGNALduino_SimpleWrite_XQ {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  $hash->{logMethod}->($hash, 3, "$name: SimpleWrite_XQ, disable receiver (XQ)");
-  SIGNALduino_SimpleWrite($hash, 'XQ');
-  #DevIo_SimpleWrite($hash, "XQ\n",2);
-}
-
-############################# package main, test exists
-sub SIGNALduino_StartInit {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  $hash->{version} = undef;
-
-  $hash->{logMethod}->($name,3 , "$name: StartInit, get version, retry = " . $hash->{initretry});
-  if ($hash->{initretry} >= SDUINO_INIT_MAXRETRY) {
-    $hash->{DevState} = 'INACTIVE';
-    # einmaliger reset, wenn danach immer noch 'init retry count reached', dann SIGNALduino_CloseDevice()
-    if (!defined($hash->{initResetFlag})) {
-      $hash->{logMethod}->($name,2 , "$name: StartInit, retry count reached. Reset");
-      $hash->{initResetFlag} = 1;
-      SIGNALduino_ResetDevice($hash);
-    } else {
-      $hash->{logMethod}->($name,2 , "$name: StartInit, init retry count reached. Closed");
-      SIGNALduino_CloseDevice($hash);
-    }
-    return;
-  }
-  else {
-    $hash->{ucCmd}->{cmd} = 'version';
-    $hash->{ucCmd}->{responseSub} = \&SIGNALduino_CheckVersionResp;
-    $hash->{ucCmd}->{timenow} = time();
-    SIGNALduino_SimpleWrite($hash, 'V');
-    #DevIo_SimpleWrite($hash, "V\n",2);
-    $hash->{DevState} = 'waitInit';
-    FHEM::Core::Timer::Helper::removeTimer($name);
-    FHEM::Core::Timer::Helper::addTimer($name, gettimeofday() + SDUINO_CMD_TIMEOUT, \&SIGNALduino_CheckVersionResp, $hash, 0);
-  }
-}
-
-############################# package main, test exists
-sub SIGNALduino_CheckVersionResp {
-  my ($hash,$msg) = @_;
-  my $name = $hash->{NAME};
-
-  ### ToDo, manchmal kommen Mu Nachrichten in $msg und somit ist keine Version feststellbar !!!
-  if (defined($msg)) {
-    $hash->{logMethod}->($hash, 5, "$name: CheckVersionResp, called with $msg");
-    if ($msg =~ m/($gets{$hash->{ucCmd}->{cmd}}[4])/ ) {
-       $hash->{version} = $1;
-    } else {
-      delete $hash->{version};
-    }
-  } else {
-    $hash->{logMethod}->($hash, 5, "$name: CheckVersionResp, called without msg");
-    # Aufruf durch Timeout!
-    $msg='undef';
-    delete($hash->{ucCmd});
-  }
-
-  if (!defined($hash->{version}) ) {
-    $msg = "$name: CheckVersionResp, Not an SIGNALduino device, got for V: $msg";
-    $hash->{logMethod}->($hash, 1, $msg);
-    readingsSingleUpdate($hash, 'state', 'no SIGNALduino found', 1); #uncoverable statement because state is overwritten by SIGNALduino_CloseDevice
-    $hash->{initretry} ++;
-    SIGNALduino_StartInit($hash);
-  } elsif($hash->{version} =~ m/^V 3\.1\./) {
-    $msg = "$name: CheckVersionResp, Version of your arduino is not compatible, please flash new firmware. (device closed) Got for V: $msg";
-    readingsSingleUpdate($hash, 'state', 'unsupported firmware found', 1); #uncoverable statement because state is overwritten by SIGNALduino_CloseDevice
-    $hash->{logMethod}->($hash, 1, $msg);
-    $hash->{DevState} = 'INACTIVE';
-    SIGNALduino_CloseDevice($hash);
-  } else {
-    if (exists($hash->{DevState}) && $hash->{DevState} eq 'waitInit') {
-      FHEM::Core::Timer::Helper::removeTimer($name);
-    }
-
-    readingsSingleUpdate($hash, 'state', 'opened', 1);
-    $hash->{logMethod}->($name, 2, "$name: CheckVersionResp, initialized " . SDUINO_VERSION);
-    delete($hash->{initResetFlag}) if defined($hash->{initResetFlag});
-    SIGNALduino_SimpleWrite($hash, 'XE'); # Enable receiver
-    $hash->{logMethod}->($hash, 3, "$name: CheckVersionResp, enable receiver (XE) ");
-    delete($hash->{initretry});
-    # initialize keepalive
-    $hash->{keepalive}{ok}    = 0;
-    $hash->{keepalive}{retry} = 0;
-    FHEM::Core::Timer::Helper::addTimer($name, gettimeofday() + SDUINO_KEEPALIVE_TIMEOUT, \&SIGNALduino_KeepAlive, $hash, 0);
-    if ($hash->{version} =~ m/cc1101/) {
-      $hash->{cc1101_available} = 1;
-      $hash->{logMethod}->($name, 5, "$name: CheckVersionResp, cc1101 available");
-      SIGNALduino_Get($hash, $name,'ccconf');
-      SIGNALduino_Get($hash, $name,'ccpatable');
-    } else {
-      # connect device without cc1101 to port where a device with cc1101 was previously connected (example DEF with /dev/ttyUSB0@57600) #
-      $hash->{logMethod}->($hash, 5, "$name: CheckVersionResp, delete old READINGS from cc1101 device");
-      if ( exists($hash->{cc1101_available}) ) {
-        delete($hash->{cc1101_available});
-      };
-
-      for my $readingName  ( qw(cc1101_config cc1101_config_ext cc1101_patable) ) {
-        readingsDelete($hash,$readingName);
-      }
-    }
-    $hash->{DevState} = 'initialized';
-    $msg = $hash->{version};
-  }
-  return ($msg,undef);
-}
-
 
 ############################# package main, test exists
 # Todo: SUB kann entfernt werden
@@ -1891,43 +1503,6 @@ sub SIGNALduino_Read {
   $hash->{PARTIAL} = $SIGNALduinodata;
 }
 
-############################# package main
-sub SIGNALduino_KeepAlive{
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-
-  return if ($hash->{DevState} eq 'disconnected');
-
-  #SIGNALduino_Log3 $name,4 , "$name: KeepAliveOk, " . $hash->{keepalive}{ok};
-  if (!$hash->{keepalive}{ok}) {
-    delete($hash->{ucCmd});
-    if ($hash->{keepalive}{retry} >= SDUINO_KEEPALIVE_MAXRETRY) {
-      $hash->{logMethod}->($name,3 , "$name: KeepAlive, not ok, retry count reached. Reset");
-      $hash->{DevState} = 'INACTIVE';
-      SIGNALduino_ResetDevice($hash);
-      return;
-    }
-    else {
-      my $logLevel = 3;
-      $hash->{keepalive}{retry} ++;
-      if ($hash->{keepalive}{retry} == 1) {
-        $logLevel = 4;
-      }
-      $hash->{logMethod}->($name, $logLevel, "$name: KeepAlive, not ok, retry = " . $hash->{keepalive}{retry} . ' -> get ping');
-      $hash->{ucCmd}->{cmd} = 'ping';
-      $hash->{ucCmd}->{timenow} = time();
-      $hash->{ucCmd}->{responseSub} = \&SIGNALduino_GetResponseUpdateReading;
-      SIGNALduino_AddSendQueue($hash, 'P');
-    }
-  }
-  else {
-    $hash->{logMethod}->($name,4 , "$name: KeepAlive, ok, retry = " . $hash->{keepalive}{retry});
-  }
-  $hash->{keepalive}{ok} = 0;
-
-  FHEM::Core::Timer::Helper::addTimer($name, gettimeofday() + SDUINO_KEEPALIVE_TIMEOUT, \&SIGNALduino_KeepAlive, $hash);
-}
-
 
 ### Helper Subs >>>
 
@@ -2240,82 +1815,7 @@ sub SIGNALduino_Split_Message {
   return %ret;
 }
 
-############################# package main, test exists
-# Function which dispatches a message if needed.
-sub SIGNALduno_Dispatch {
-  my ($hash, $rmsg, $dmsg, $rssi, $id, $freqafc) = @_;
-  my $name = $hash->{NAME};
-
-  if (!defined($dmsg))
-  {
-    $hash->{logMethod}->($name, 5, "$name: Dispatch, dmsg is undef. Skipping dispatch call");
-    return;
-  }
-
-  #SIGNALduino_Log3 $name, 5, "$name: Dispatch, DMSG: $dmsg";
-
-  my $DMSGgleich = 1;
-  if ($dmsg eq $hash->{LASTDMSG}) {
-    $hash->{logMethod}->($name, SDUINO_DISPATCH_VERBOSE, "$name: Dispatch, $dmsg, test gleich");
-  } else {
-    if ( defined $hash->{DoubleMsgIDs}{$id} ) {
-      $DMSGgleich = 0;
-      $hash->{logMethod}->($name, SDUINO_DISPATCH_VERBOSE, "$name: Dispatch, $dmsg, test ungleich");
-    } else {
-      $hash->{logMethod}->($name, SDUINO_DISPATCH_VERBOSE, "$name: Dispatch, $dmsg, test ungleich: disabled");
-    }
-    $hash->{LASTDMSG} = $dmsg;
-    $hash->{LASTDMSGID} = $id;
-  }
-
-  if ($DMSGgleich) {
-    #Dispatch if dispatchequals is provided in protocol definition or only if $dmsg is different from last $dmsg, or if 2 seconds are between transmits
-    if (  ( $hash->{protocolObject}->checkProperty($id,'dispatchequals','false') eq 'true') 
-        || ($hash->{DMSG} ne $dmsg) 
-        || ($hash->{TIME}+2 < time() )  )
-    {
-      $hash->{MSGCNT}++;
-      $hash->{TIME} = time();
-      $hash->{DMSG} = $dmsg;
-      #my $event = 0;
-      if (substr(ucfirst($dmsg),0,1) eq 'U') { # u oder U
-        #$event = 1;
-        DoTrigger($name, 'DMSG ' . $dmsg);
-        return if (substr($dmsg,0,1) eq 'U'); # Fuer $dmsg die mit U anfangen ist kein Dispatch notwendig, da es dafuer kein Modul gibt klein u wird dagegen dispatcht
-      }
-      #readingsSingleUpdate($hash, 'state', $hash->{READINGS}{state}{VAL}, $event);
-
-      $hash->{RAWMSG} = $rmsg;
-      my %addvals = (
-        DMSG => $dmsg,
-        Protocol_ID => $id
-      );
-      if (AttrVal($name,'suppressDeviceRawmsg',0) == 0) {
-        $addvals{RAWMSG} = $rmsg
-      }
-      if(defined($rssi)) {
-        $hash->{RSSI} = $rssi;
-        $addvals{RSSI} = $rssi;
-        $rssi .= ' dB,'
-      }
-      else {
-        $rssi = '';
-      }
-      if(defined($freqafc)) { # AFC cc1101 0x32 (0xF2): FREQEST – Frequency Offset Estimate from Demodulator
-        $addvals{FREQAFC} = $freqafc;
-      }
-
-      $dmsg = lc($dmsg) if ($id eq '74' or $id eq '74.1');    # 10_FS20.pm accepted only lower case hex
-      $hash->{logMethod}->($name, SDUINO_DISPATCH_VERBOSE, "$name: Dispatch, $dmsg, $rssi dispatch");
-      Dispatch($hash, $dmsg, \%addvals);  ## Dispatch to other Modules
-
-    } else {
-      $hash->{logMethod}->($name, 4, "$name: Dispatch, $dmsg, Dropped due to short time or equal msg");
-    }
-  }
-}
-
-############################# package main  todo: move to lib::SD_Protocols
+############################# package main  todo: move to FHEM::Devices::SIGNALduino::SD_Protocols
 # param #1 is name of definition
 # param #2 is protocol id
 # param #3 is dispatched message to check against
@@ -2528,7 +2028,7 @@ sub SIGNALduino_Parse_MS {
       @bit_msg = @retvalue;
       undef(@retvalue); undef($rcode);
 
-      my $dmsg = lib::SD_Protocols::binStr2hexStr(join '', @bit_msg);
+      my $dmsg = FHEM::Devices::SIGNALduino::SD_Protocols::binStr2hexStr(join '', @bit_msg);
       my $postamble = $hash->{protocolObject}->checkProperty($id,'postamble','');
       $dmsg = $hash->{protocolObject}->checkProperty($id,'preamble','').qq[$dmsg$postamble];
       
@@ -2541,7 +2041,7 @@ sub SIGNALduino_Parse_MS {
       {
         $message_dispatched++;
         $hash->{logMethod}->($name, 4, "$name: Parse_MS, Decoded matched MS protocol id $id dmsg $dmsg length " . scalar @bit_msg . " $rssiStr");
-        SIGNALduno_Dispatch($hash,$rmsg,$dmsg,$rssi,$id);
+        FHEM::Devices::SIGNALduino::SD_Message::Dispatch($hash,$rmsg,$dmsg,$rssi,$id);
       }
     }
 
@@ -2769,7 +2269,7 @@ sub SIGNALduino_Parse_MU {
         my $bit_length=scalar @bit_msg;
         @bit_msg=(); # clear bit_msg array
 
-        $dmsg = lib::SD_Protocols::binStr2hexStr($dmsg) if ($hash->{protocolObject}->checkProperty($id,'dispatchBin',0) == 0 );
+        $dmsg = FHEM::Devices::SIGNALduino::SD_Protocols::binStr2hexStr($dmsg) if ($hash->{protocolObject}->checkProperty($id,'dispatchBin',0) == 0 );
 
         $dmsg =~ s/^0+//   if (  $hash->{protocolObject}->checkProperty($id,'remove_zero',0) );
 
@@ -2780,7 +2280,7 @@ sub SIGNALduino_Parse_MU {
         {
           $nrDispatch++;
           $hash->{logMethod}->($name, 4, "$name: Parse_MU, Decoded matched MU protocol id $id dmsg $dmsg length $bit_length dispatch($nrDispatch/". AttrVal($name,'maxMuMsgRepeat', 4) . ") $rssiStr");
-          SIGNALduno_Dispatch($hash,$rmsg,$dmsg,$rssi,$id);
+          FHEM::Devices::SIGNALduino::SD_Message::Dispatch($hash,$rmsg,$dmsg,$rssi,$id);
           if ( $nrDispatch == AttrVal($name,'maxMuMsgRepeat', 4))
           {
             last;
@@ -2905,7 +2405,7 @@ sub SIGNALduino_Parse_MC {
               defined($rssi)  ? $hash->{logMethod}->($name, SDUINO_MC_DISPATCH_VERBOSE, qq[$name: Parse_MC, $id, $rmsg $rssiStr])
                       :  $hash->{logMethod}->($name, SDUINO_MC_DISPATCH_VERBOSE, qq[$name: Parse_MC, $id, $rmsg]);
             }
-            SIGNALduno_Dispatch($hash,$rmsg,$dmsg,$rssi,$id);
+            FHEM::Devices::SIGNALduino::SD_Message::Dispatch($hash,$rmsg,$dmsg,$rssi,$id);
             $message_dispatched=1;
           }
         } else {
@@ -2990,7 +2490,7 @@ sub SIGNALduino_Parse_MN {
     }
     $dmsg = sprintf('%s%s',$hash->{protocolObject}->checkProperty($id,'preamble',''),$methodReturn[0]);
     $hash->{logMethod}->($name, 5, qq[$name: Parse_MN, Decoded matched MN Protocol id $id dmsg=$dmsg $rssiStr]);
-    SIGNALduno_Dispatch($hash,$rmsg,$dmsg,$rssi,$id,$freqafc);
+    FHEM::Devices::SIGNALduino::SD_Message::Dispatch($hash,$rmsg,$dmsg,$rssi,$id,$freqafc);
     $message_dispatched++;
     
   }
@@ -3092,38 +2592,6 @@ sub SIGNALduino_Ready {
 }
 
 ############################# package main
-sub SIGNALduino_WriteInit {
-  my ($hash) = @_;
-
-  # todo: ist dies so ausreichend, damit die Aenderungen uebernommen werden?
-  SIGNALduino_AddSendQueue($hash,'WS36');   # SIDLE, Exit RX / TX, turn off frequency synthesizer
-  SIGNALduino_AddSendQueue($hash,'WS3A');   # SFRX, Flush the RX FIFO buffer. Only issue SFRX in IDLE or RXFIFO_OVERFLOW states.
-  SIGNALduino_AddSendQueue($hash,'WS34');   # SRX, Enable RX. Perform calibration first if coming from IDLE and MCSM0.FS_AUTOCAL=1.
-}
-
-############################# package main
-sub SIGNALduino_SimpleWrite {
-  my ($hash, $msg, $nonl) = @_;
-  return if(!$hash);
-  if($hash->{TYPE} eq 'SIGNALduino_RFR') {
-    # Prefix $msg with RRBBU and return the corresponding SIGNALduino hash.
-    ($hash, $msg) = SIGNALduino_RFR_AddPrefix($hash, $msg);
-  }
-
-  my $name = $hash->{NAME};
-  $hash->{logMethod}->($name, 5, "$name: SimpleWrite, $msg");
-
-  $msg .= "\n" unless($nonl);
-
-  $hash->{USBDev}->write($msg)    if($hash->{USBDev});
-  syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
-  syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
-
-  # Some linux installations are broken with 0.001, T01 returns no answer
-  select(undef, undef, undef, 0.01);
-}
-
-############################# package main
 sub SIGNALduino_Attr {
   my ($cmd,$name,$aName,$aVal) = @_;
   my $hash = $defs{$name};
@@ -3138,7 +2606,7 @@ sub SIGNALduino_Attr {
     return  if ($hash->{Clients});
     
     ## Set defaults
-    $hash->{Clients} = $clientsSIGNALduino; 
+    $hash->{Clients} = FHEM::Devices::SIGNALduino::SD_Clients::getClientsasStr();
     return 'Setting defaults';
   }
   ## Change MatchList
@@ -3150,13 +2618,7 @@ sub SIGNALduino_Attr {
         $hash->{logMethod}->($name, 2, $name .": Attr, $aVal: ". $@);
       }
     }
-
-    if( ref($match_list) eq 'HASH' ) {
-      $hash->{MatchList} = { %matchListSIGNALduino , %$match_list };          ## Allow incremental addition of an entry to existing hash list
-    } else {
-      $hash->{MatchList} = \%matchListSIGNALduino;                      ## Set defaults
-      $hash->{logMethod}->($name, 2, $name .": Attr, $aVal: not a HASH using defaults") if( $aVal );
-    }
+    FHEM::Devices::SIGNALduino::SD_Matchlist::UpdateMatchList($hash,$match_list);
   }
   ## Change verbose
   elsif ($aName eq 'verbose') {
@@ -3270,25 +2732,31 @@ sub SIGNALduino_FW_Detail {
   my ($FW_wname, $name, $room, $pageHash) = @_;
 
   my $hash = $defs{$name};
-  my @dspec=devspec2array("DEF=.*fakelog");
-  my $lfn = $dspec[0];
+  
+
+  my $lfn = do { 
+    my $d = (devspec2array('TYPE=FileLog'))[0]; 
+    IsDevice($d) ? $d : undef 
+  };
   my $fn=$defs{$name}->{TYPE}."-Flash.log";
+  my $fw_me = defined($FW_ME) ? $FW_ME : q{};
+  my $fw_detail = defined($FW_detail) ? $FW_detail : q{};
 
   my $ret = "<div class='makeTable wide'><span>Information menu</span>
 <table class='block wide' id='SIGNALduinoInfoMenue' nm='$hash->{NAME}' class='block wide'>
 <tr class='even'>";
 
-  if (-s AttrVal('global', 'logdir', './log/') .$fn)
-  {
-    my $flashlogurl="$FW_ME/FileLog_logWrapper?dev=$lfn&type=text&file=$fn";
+  if (!defined($lfn)) {
+    $ret .= "<td>No device of TYPE=FileLog found</td>" 
+  } elsif (! -s AttrVal('global', 'logdir', './log/'). $fn) {
+    $ret .= "<td></td>";
+  } else {
+    my $flashlogurl="$fw_me/FileLog_logWrapper?dev=$lfn&type=text&file=$fn";
 
     $ret .= "<td>";
     $ret .= "<a href=\"$flashlogurl\">Last Flashlog<\/a>";
     $ret .= "</td>";
-    #return $ret;
-  }
-
-  my $protocolURL="$FW_ME/FileLog_logWrapper?dev=$lfn&type=text&file=$fn";
+  }   
 
   $ret.="<td><a href='#showProtocolList' id='showProtocolList'>Display protocollist</a></td>";
   $ret .= '</tr></table></div>
@@ -3296,7 +2764,7 @@ sub SIGNALduino_FW_Detail {
 <script>
 $( "#showProtocolList" ).click(function(e) {
   e.preventDefault();
-  FW_cmd(FW_root+\'?cmd={SIGNALduino_FW_getProtocolList("'.$FW_detail.'")}&XHR=1\', function(data){SD_plistWindow(data)});
+  FW_cmd(FW_root+\'?cmd={SIGNALduino_FW_getProtocolList("'.$fw_detail.'")}&XHR=1\', function(data){SD_plistWindow(data)});
 
 });
 
@@ -3430,7 +2898,7 @@ sub SIGNALduino_IdList {
       #SIGNALduino_Log3 $name, 3, "$name IdList, Attr blacklist $w";
     }
 
-    $hash->{Clients} = AttrVal($name,'Clients', $clientsSIGNALduino); # use Attribute Clients or default if whitelist is not active
+    $hash->{Clients} = AttrVal($name,'Clients', FHEM::Devices::SIGNALduino::SD_Clients::getClientsasStr()); # use Attribute Clients or default if whitelist is not active
   } else {
     $hash->{Clients} =  q[] # clear Clients if whitelist is active    
   }
@@ -3497,7 +2965,7 @@ sub SIGNALduino_IdList {
     }
   }
   $hash->{Clients} = $hash->{Clients} =~ s/.{25,50}:\K(?=.{25,50})/ :/rg; # Add spaces to create linebreaks in webview
-  $hash->{Clients} = substr($hash->{Clients}, 0, -1); # Remove last :
+  $hash->{Clients} =~ s/^://; $hash->{Clients} =~ s/:$//; # Remove leading/trailing :
 
   delete $hash->{'.clientArray'}; #force recompute of clientArray after changes
 
@@ -3544,46 +3012,6 @@ sub SIGNALduino_getAttrDevelopment {
   }
   return ($develop,$devFlag);
 }
-
-############################# package main, test exists
-sub SIGNALduino_callsub {
-  my $obj=shift; #comatibility thing
-  my $funcname =shift // carp 'to less arguments,functionname is required';;
-  my $method = shift // undef;
-  my $evalFirst = shift // undef;
-  my $name = shift // carp 'to less arguments, name is required';
-
-  my @args = @_;
-
-  my $hash = $defs{$name};
-  if ( defined $method && defined &$method )
-  {
-    if (defined($evalFirst) && $evalFirst)
-    {
-      eval( $method->($obj,$name, @args));
-      if($@) {
-        $hash->{logMethod}->($name, 5, "$name: callsub, Error: $funcname, has an error and will not be executed: $@ please report at github.");
-        return (0,undef);
-      }
-    }
-    #my $subname = @{[eval {&$method}, $@ =~ /.*/]};
-    $hash->{logMethod}->($hash, 5, "$name: callsub, applying $funcname, value before: @args"); # method $subname"
-
-    my ($rcode, @returnvalues) = $method->($obj,$name, @args) ;
-
-    if (@returnvalues && defined($returnvalues[0])) {
-      $hash->{logMethod}->($name, 5, "$name: callsub, rcode=$rcode, modified value after $funcname: @returnvalues");
-    } else {
-      $hash->{logMethod}->($name, 5, "$name: callsub, rcode=$rcode, after calling $funcname");
-    }
-    return ($rcode, @returnvalues);
-  } elsif (defined $method ) {
-    $hash->{logMethod}->($name, 5, "$name: callsub, Error: Unknown method $funcname pease report at github");
-    return (0,undef);
-  }
-  return (1,@args);
-}
-
 
 
 # - - - - - - - - - - - -
@@ -3792,60 +3220,12 @@ sub SIGNALduino_compPattern {
   #$patternListRaw = \%buckets;
 }
 
-
-############################# package main
-# the new Log with integrated loglevel checking
-sub SIGNALduino_Log3 {
-  my ($dev, $loglevel, $text) = @_;
-  my $name =$dev;
-  $name= $dev->{NAME} if(defined($dev) && ref($dev) eq "HASH");
-
-  my $textEventlogging = $text;
-
-  ### DoTrigger for eventlogging event
-  #DoTrigger($dev,"$name $loglevel: $text");
-  #2020-07-14_12:47:01 sduino_USB_SB_Test sduino_USB_SB_Test 4: sduino_USB_SB_Test: HandleWriteQueue, called
-
-  #DoTrigger($dev,"$loglevel: $text");
-  #2020-07-14_12:47:01 sduino_USB_SB_Test 4: sduino_USB_SB_Test: HandleWriteQueue, called
-
-  ### $text may not be changed for return value
-  if ($textEventlogging =~ /^$dev:\s/) {
-    my $textCut = length($dev)+2;                            # length receivername and ': "
-    $textEventlogging = substr($textEventlogging,$textCut);  # cut $textCut from $textEventlogging
-  }
-
-  ### DoTrigger for eventlogging event with adapted structure
-  DoTrigger($dev,"$loglevel: $textEventlogging");
-  #2020-07-16_12:40:07 sduino_USB_SB_Test 4: HandleWriteQueue, called
-
-  ### return for normal logfile | unchangeable
-  #2020.07.16 11:35:40.676 4: sduino_USB_SB_Test: HandleWriteQueue, called
-  return Log3($name,$loglevel,$text);
-}
-
-
 ############################# package main
 # Helper to get a reference of the protocolList Hash
 # ?? ToDo - wird diese Sub noch beoetigt ???
 sub SIGNALduino_getProtocolList() {
   #return \%ProtocolListSIGNALduino
 }
-
-############################# package main
-# Helper to create a individual callback per definition which can receive log output from perl modules
-sub SIGNALduino_createLogCallback {
-  my $hash = shift // return ;
-  (ref $hash ne 'HASH') // return ;
-
-  return sub  {
-    my $message = shift // carp 'message must be provided';
-    my $level = shift // 0;
-
-    $hash->{logMethod}->($hash->{NAME}, $level,qq[$hash->{NAME}: $message]);
-  };
-};
-
 
 ############################# package main
 sub SIGNALduino_FW_getProtocolList {
@@ -4081,299 +3461,6 @@ sub SIGNALduino_githubParseHttpResponse {
      FW_directNotify("FILTER=$name", "#FHEMWEB:$FW_wname", "location.reload('true')", '');
   }
   return 0;
-}
-
-
-
-############################# package main, candidate for fhem core utility lib
-sub _limit_to_number {
-  my $number = shift // return;
-  return $number if ($number =~ /^[0-9]+$/);
-  return ;
-}
-
-
-############################# package main, candidate for fhem core utility lib
-sub _limit_to_hex {
-  my $hex = shift // return;
-  return $hex if ($hex =~ /^[0-9A-F]+$/i);
-  return;
-}
-
-
-################################################
-########## Section & functions cc1101 ##########
-package cc1101;
-
-our %cc1101_status_register = ( # for get ccreg 30-3D status registers
-  '30' => 'PARTNUM       ',
-  '31' => 'VERSION       ',
-  '32' => 'FREQEST       ',
-  '33' => 'LQI           ',
-  '34' => 'RSSI          ',
-  '35' => 'MARCSTATE     ',
-  '36' => 'WORTIME1      ',
-  '37' => 'WORTIME0      ',
-  '38' => 'PKTSTATUS     ',
-  '39' => 'VCO_VC_DAC    ',
-  '3A' => 'TXBYTES       ',
-  '3B' => 'RXBYTES       ',
-  '3C' => 'RCCTRL1_STATUS',
-  '3D' => 'RCCTRL0_STATUS',
-);
-
-our %cc1101_version = ( # Status register 0x31 (0xF1): VERSION – Chip ID
-  '03' => 'CC1100',
-  '04' => 'CC1101',
-  '14' => 'CC1101',
-  '05' => 'CC1100E',
-  '07' => 'CC110L',
-  '17' => 'CC110L',
-  '08' => 'CC113L',
-  '18' => 'CC113L',
-  '15' => 'CC115L',
-);
-
-############################# package cc1101
-#### for set function to change the patable for 433 or 868 Mhz supported
-#### 433.05–434.79 MHz, 863–870 MHz
-sub SetPatable {
-  my ($hash,@a) = @_;
-  my $paFreq = main::AttrVal($hash->{NAME},'cc1101_frequency','433');
-  $paFreq = 433 if ($paFreq >= 433 && $paFreq <= 435);
-  $paFreq = 868 if ($paFreq >= 863 && $paFreq <= 870);
-  if ( exists($patable{$paFreq}) )
-  {
-    my $pa = "x" . $patable{$paFreq}{$a[1]};
-    $hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: SetPatable, Setting patable $paFreq $a[1] $pa");
-    main::SIGNALduino_AddSendQueue($hash,$pa);
-    main::SIGNALduino_WriteInit($hash);
-    return ;
-  } else {
-    return "$hash->{NAME}: Frequency $paFreq MHz not supported (supported frequency ranges: 433.05-434.79 MHz, 863.00-870.00 MHz).";
-  }
-}
-
-############################# package cc1101
-sub SetRegisters  {
-  my ($hash, @a) = @_;
-
-  ## check for four hex digits
-  my @nonHex = grep (!/^[0-9A-Fa-f]{4}$/,@a[1..$#a]) ;
-  return "$hash->{NAME} ERROR: wrong parameter value @nonHex, only hexadecimal ​​four digits allowed" if (@nonHex);
-
-  ## check allowed register position
-  my (@wrongRegisters) = grep { !exists($cc1101_register{uc(substr($_,0,2))}) } @a[1..$#a] ;
-  return "$hash->{NAME} ERROR: unknown register position ".substr($wrongRegisters[0],0,2) if (@wrongRegisters);
-
-  $hash->{logMethod}->($hash->{NAME}, 4, "$hash->{NAME}: SetRegisters, cc1101_reg @a[1..$#a]");
-  my @tmpSendQueue=();
-  foreach my $argcmd (@a[1..$#a]) {
-    $argcmd = sprintf("W%02X%s",hex(substr($argcmd,0,2)) + 2,substr($argcmd,2,2));
-    main::SIGNALduino_AddSendQueue($hash,$argcmd);
-  }
-  main::SIGNALduino_WriteInit($hash);
-  return ;
-}
-
-############################# package cc1101
-sub SetRegistersUser  {
-  my ($hash) = @_;
-
-  my $cc1101User = main::AttrVal($hash->{NAME}, 'cc1101_reg_user', undef);
-
-  ## look, user defined self default register values via attribute
-  if (defined $cc1101User) {
-    $hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: SetRegistersUser, write CC1101 defaults from attribute");
-    $cc1101User = '0815,'.$cc1101User; # for SetRegisters, value for register starts on pos 1 in array
-    cc1101::SetRegisters($hash, split(',', $cc1101User) );
-  }
-  return ;
-}
-
-############################# package cc1101
-sub SetDataRate  {
-  my ($hash, @a) = @_;
-  my $arg = $a[1];
-
-  if (exists($hash->{ucCmd}->{cmd}) && $hash->{ucCmd}->{cmd} eq 'set_dataRate' && $a[0] =~ /^C10\s=\s([A-Fa-f0-9]{2})$/) {
-    my ($ob1,$ob2) = cc1101::CalcDataRate($hash,$1,$hash->{ucCmd}->{arg});
-    main::SIGNALduino_AddSendQueue($hash,"W12$ob1");
-    main::SIGNALduino_AddSendQueue($hash,"W13$ob2");
-    main::SIGNALduino_WriteInit($hash);
-    return ("Setting MDMCFG4..MDMCFG3 to $ob1 $ob2 = $hash->{ucCmd}->{arg} kHz" ,undef);
-  } else {
-    if ($arg !~ m/\d/) { return qq[$hash->{NAME}: ERROR, unsupported DataRate value]; }
-    if ($arg > 1621.83) { $arg = 1621.83; }     # max 1621.83      kBaud DataRate
-    if ($arg < 0.0247955) { $arg = 0.0247955; } # min    0.0247955 kBaud DataRate
-
-    cc1101::GetRegister($hash,10);              # Get Register 10
-
-    $hash->{ucCmd}->{cmd}         = 'set_dataRate';
-    $hash->{ucCmd}->{arg}         = $arg;                                   # ZielDataRate
-    $hash->{ucCmd}->{responseSub} = \&cc1101::SetDataRate;                  # Callback auf sich selbst setzen
-    $hash->{ucCmd}->{asyncOut}    = $hash->{CL} if (defined($hash->{CL}));
-    $hash->{ucCmd}->{timenow}     = time();
-  }
-  return ;
-}
-
-############################# package cc1101
-sub CalcDataRate {
-  # register 0x10 3:0 & register 0x11 7:0
-  my ($hash, $ob10, $dr) = @_;
-  $ob10 = hex($ob10) & 0xf0;
-
-  my $DRATE_E = ($dr*1000) * (2**20) / 26000000;
-  $DRATE_E = log($DRATE_E) / log(2);
-  $DRATE_E = int($DRATE_E);
-
-  my $DRATE_M = (($dr*1000) * (2**28) / (26000000 * (2**$DRATE_E))) - 256;
-  my $DRATE_Mr = FHEM::Core::Utils::Math::round($DRATE_M,0);
-  $DRATE_M = int($DRATE_M);
-
-  my $datarate0 = ( ((256+$DRATE_M)*(2**($DRATE_E & 15 )))*26000000/(2**28) / 1000);
-  my $DRATE_M1 = $DRATE_M + 1;
-  my $DRATE_E1 = $DRATE_E;
-
-  if ($DRATE_M1 == 256) {
-    $DRATE_M1 = 0;
-    $DRATE_E1++;
-  }
-
-  my $datarate1 = ( ((256+$DRATE_M1)*(2**($DRATE_E1 & 15 )))*26000000/(2**28) / 1000);
-
-  if ($DRATE_Mr != $DRATE_M) {
-    $DRATE_M = $DRATE_M1;
-    $DRATE_E = $DRATE_E1;
-  }
-
-  my $ob11 = sprintf("%02x",$DRATE_M);
-  $ob10 = sprintf("%02x", $ob10+$DRATE_E);
-
-  $hash->{logMethod}->($hash->{NAME}, 5, qq[$hash->{NAME}: CalcDataRate, DataRate $hash->{ucCmd}->{arg} kHz step from $datarate0 to $datarate1 kHz]);
-  $hash->{logMethod}->($hash->{NAME}, 3, qq[$hash->{NAME}: CalcDataRate, DataRate MDMCFG4..MDMCFG3 to $ob10 $ob11 = $hash->{ucCmd}->{arg} kHz]);
-
-  return ($ob10,$ob11);
-}
-
-############################# package cc1101
-sub SetDeviatn {
-  my ($hash, @a) = @_;
-  my $arg = $a[1];
-
-  if ($arg !~ m/\d/) { return qq[$hash->{NAME}: ERROR, unsupported Deviation value]; }
-  if ($arg > 380.859375) { $arg = 380.859375; }   # max 380.859375 kHz Deviation
-  if ($arg < 1.586914) { $arg = 1.586914; }       # min   1.586914 kHz Deviation
-
-  my $deviatn_val;
-  my $bits;
-  my $devlast = 0;
-  my $bitlast = 0;
-
-  CalcDeviatn:
-  for (my $DEVIATION_E=0; $DEVIATION_E<8; $DEVIATION_E++) {
-    for (my $DEVIATION_M=0; $DEVIATION_M<8; $DEVIATION_M++) {
-      $deviatn_val = (8+$DEVIATION_M)*(2**$DEVIATION_E) *26000/(2**17);
-      $bits = $DEVIATION_M + ($DEVIATION_E << 4);
-      if ($arg > $deviatn_val) {
-        $devlast = $deviatn_val;
-        $bitlast = $bits;
-      } else {
-        if (($deviatn_val - $arg) < ($arg - $devlast)) {
-          $devlast = $deviatn_val;
-          $bitlast = $bits;
-        }
-        last CalcDeviatn;
-      }
-    }
-  }
-
-  my $reg15 = sprintf("%02x",$bitlast);
-  my $deviatn_str =  sprintf("% 5.2f",$devlast);
-  $hash->{logMethod}->($hash->{NAME}, 3, qq[$hash->{NAME}: SetDeviatn, Setting DEVIATN (15) to $reg15 = $deviatn_str kHz]);
-
-  main::SIGNALduino_AddSendQueue($hash,"W17$reg15");
-  main::SIGNALduino_WriteInit($hash);
-
-  return;
-}
-
-############################# package cc1101
-sub SetFreq  {
-  my ($hash, @a) = @_;
-
-  my $arg = $a[1];
-  if (!defined($arg)) {
-    $arg = main::AttrVal($hash->{NAME},'cc1101_frequency', 433.92);
-  }
-  my $f = $arg/26*65536;
-  my $f2 = sprintf("%02x", $f / 65536);
-  my $f1 = sprintf("%02x", int($f % 65536) / 256);
-  my $f0 = sprintf("%02x", $f % 256);
-  $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
-  $hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: SetFreq, Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz");
-  main::SIGNALduino_AddSendQueue($hash,"W0F$f2");
-  main::SIGNALduino_AddSendQueue($hash,"W10$f1");
-  main::SIGNALduino_AddSendQueue($hash,"W11$f0");
-  main::SIGNALduino_WriteInit($hash);
-  return ;
-}
-
-############################# package cc1101
-sub setrAmpl  {
-  my ($hash, @a) = @_;
-  return "$hash->{NAME}: A numerical value between 24 and 42 is expected." if($a[1] !~ m/^\d+$/ || $a[1] < 24 ||$a[1] > 42);
-  my $v;
-  for($v = 0; $v < @ampllist; $v++) {
-    last if($ampllist[$v] > $a[1]);
-  }
-  $v = sprintf("%02d", $v-1);
-  my $w = $ampllist[$v];
-  $hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: setrAmpl, Setting AGCCTRL2 (1B) to $v / $w dB");
-  main::SIGNALduino_AddSendQueue($hash,"W1D$v");
-  main::SIGNALduino_WriteInit($hash);
-  return ;
-}
-
-############################# package cc1101
-sub GetRegister {
-  my ($hash, $reg) = @_;
-  main::SIGNALduino_AddSendQueue($hash,'C'.$reg);
-  return ;
-}
-
-############################# package cc1101
-sub CalcbWidthReg {
-  my ($hash, $reg10, $bWith) = @_;
-  # Beispiel Rückmeldung, mit Ergebnis von Register 10: C10 = 57
-  my $ob = hex($reg10) & 0x0f;
-  my ($bits, $bw) = (0,0);
-  OUTERLOOP:
-  for (my $e = 0; $e < 4; $e++) {
-    for (my $m = 0; $m < 4; $m++) {
-      $bits = ($e<<6)+($m<<4);
-      $bw  = int(26000/(8 * (4+$m) * (1 << $e))); # KHz
-      last OUTERLOOP if($bWith >= $bw);
-    }
-  }
-  $ob = sprintf("%02x", $ob+$bits);
-
-  return ($ob,$bw);
-}
-
-############################# package cc1101
-sub SetSens {
-  my ($hash, @a) = @_;
-
-  # Todo: Abfrage in Grep auf Array ändern
-  return 'a numerical value between 4 and 16 is expected' if($a[1] !~ m/^\d+$/ || $a[1] < 4 || $a[1] > 16);
-  my $w = int($a[1]/4)*4;
-  my $v = sprintf("9%d",$a[1]/4-1);
-  $hash->{logMethod}->($hash->{NAME}, 3, "$hash->{NAME}: SetSens, Setting AGCCTRL0 (1D) to $v / $w dB");
-  main::SIGNALduino_AddSendQueue($hash,"W1F$v");
-  main::SIGNALduino_WriteInit($hash);
-  return ;
 }
 
 ################################################################################################
@@ -5631,7 +4718,11 @@ USB-connected devices (SIGNALduino):<br>
         "IPC::Open3": "0",
         "Symbol": "0",
         "constant": "0",
-        "lib::SD_Protocols": "0",
+        "FHEM::Devices::SIGNALduino::SD_Protocols": "0",
+        "FHEM::Core::Timer::Helper": "0",
+        "FHEM::Devices::SIGNALduino::SD_CC1101": "0",
+        "FHEM::Devices::SIGNALduino::SD_IO": "0",
+        "FHEM::Devices::SIGNALduino::SD_Utils": "0",
         "strict": "0",
         "warnings": "0",
         "Time::HiRes": "0",
@@ -5650,12 +4741,11 @@ USB-connected devices (SIGNALduino):<br>
         "IPC::Open3": "0",
         "Symbol": "0",
         "constant": "0",
-        "lib::SD_Protocols": "0",
+        "FHEM::Devices::SIGNALduino::SD_Protocols": "0",
         "strict": "0",
         "warnings": "0",
         "Data::Dumper": "0",
         "Time::HiRes": "0",
-        "FHEM::Core::Timer::Helper": "0",
         "JSON": "0"
       },
       "suggests": {
@@ -5706,7 +4796,7 @@ USB-connected devices (SIGNALduino):<br>
       "web": "https://wiki.fhem.de/wiki/SIGNALduino"
     }
   },
-  "version": "v3.5.7"
+  "version": "v4.0.1"
 }
 =end :application/json;q=META.json
 =cut
