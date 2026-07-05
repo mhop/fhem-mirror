@@ -1,4 +1,4 @@
-REV 31435
+REV 31441
 DIR unused
 UPD 2026-07-04_07:45:03 458089 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -772,8 +772,8 @@ UPD 2026-07-04_07:45:11 5569212 docs/commandref.html
 UPD 2026-07-04_07:45:15 3545518 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-07-04_07:45:17 330666 docs/commandref_modular.html
-UPD 2026-07-04_07:45:18 342480 docs/commandref_modular_DE.html
+UPD 2026-07-05_07:45:17 330666 docs/commandref_modular.html
+UPD 2026-07-05_07:45:18 342480 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2546,11 +2546,13 @@ UPD 2026-05-27_07:45:17 74913 www/pgm2/fhemweb.js
 UPD 2022-03-14_07:45:13 14080 www/pgm2/fhemweb_colorpicker.js
 UPD 2026-01-27_07:45:03 40575 www/pgm2/fhemweb_controlminidash.js
 UPD 2020-01-19_07:45:03 4252 www/pgm2/fhemweb_fbcalllist.js
+UPD 2026-07-05_07:45:03 9871 www/pgm2/fhemweb_gauge.js
 UPD 2018-01-14_07:45:02 8950 www/pgm2/fhemweb_iconButtons.js
 UPD 2017-11-07_07:45:02 5913 www/pgm2/fhemweb_iconLabel.js
 UPD 2018-01-14_07:45:02 21914 www/pgm2/fhemweb_iconRadio.js
 UPD 2024-03-21_07:45:02 8020 www/pgm2/fhemweb_iconSwitch.js
 UPD 2017-10-04_07:45:02 1953 www/pgm2/fhemweb_knob.js
+UPD 2026-07-05_07:45:03 11326 www/pgm2/fhemweb_multigauge.js
 UPD 2017-10-04_07:45:02 4248 www/pgm2/fhemweb_readingsGroup.js
 UPD 2017-10-04_07:45:02 920 www/pgm2/fhemweb_readingsHistory.js
 UPD 2017-10-04_07:45:02 9001 www/pgm2/fhemweb_sortable.js
