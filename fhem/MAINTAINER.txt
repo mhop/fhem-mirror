@@ -68,7 +68,7 @@ FHEM/10_EQ3BT.pm             rudolfkoenig/orphan  Sonstige Systeme
 FHEM/10_FBDECT.pm            rudolfkoenig         FRITZ!Box
 FHEM/10_FRM.pm               jensb                Sonstige Systeme
 FHEM/10_FS20.pm              rudolfkoenig         SlowRF
-FHEM/10_GFPROBT.pm           dominik              Sonstige Systeme
+FHEM/10_GFPROBT.pm           do_minik              Sonstige Systeme
 FHEM/10_HXBDevice.pm         neubert              Sonstige Systeme
 FHEM/10_IT.pm                Ralf9/KoelnSolar     InterTechno
 FHEM/10_Itach_IR.pm          ulimaass             Sonstige Systeme
@@ -86,6 +86,7 @@ FHEM/10_pilight_ctrl.pm      risiko               Sonstige Systeme
 FHEM/10_RESIDENTS.pm         rudolfkoenig/orphan  Automatisierung
 FHEM/10_RHASSPY.pm           Beta-User            Frontends/Sprachsteuerung http://forum.fhem.de/index.php/topic,129050.0.html
 FHEM/10_SD_GT.pm             sidey/elektron-bbs   SlowRF
+FHEM/10_SD_Rojaflex.pm       sidey/elektron-bbs   SlowRF
 FHEM/10_SOMFY.pm             viegener             Sonstige Systeme
 FHEM/10_UNIRoll.pm           C_Herrmann           SlowRF
 FHEM/10_WS980.pm             choenig              Unterstützende Dienste/Wettermodule

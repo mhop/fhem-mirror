@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 10_SD_ROJAFLEX: New Module, decodes Rojeflex HSR-15
  - feature: 10_FS10: Version 1.2; support setExtensions
  - feature: 90_SIGNALduino_un: using packages
  - feature: 00_SIGNALduino: Version 4.0.1 - code refactored in serval packages
