@@ -10567,7 +10567,7 @@ sub Notify {
       my ($cname, $cindex, $dswname);
 
       for my $c (sort{$a<=>$b} keys %{$data{$myName}{consumers}}) {
-          ($err, $cname, $dswname) = getCDnames ($myHash, $c);
+          ($err, $cname, $dswname) = getCDnames ($myName, $c);
 
           if ($devName eq $cname) {
               $cindex = $c;
@@ -16635,8 +16635,8 @@ sub _manageConsumerData {
       # --- Consumer Schaltstatus und Schaltzeit für Readings ermitteln
       ###################################################################
       my $cstate = !$cactive                     ? 'deactivated' :
-                   isConsumerPhysOn  ($hash, $c) ? 'on'          :
-                   isConsumerPhysOff ($hash, $c) ? 'off'         :
+                   isConsumerPhysOn  ($name, $c) ? 'on'          :
+                   isConsumerPhysOff ($name, $c) ? 'off'         :
                    'unknown';
 
       $data{$name}{consumers}{$c}{state}          = $cstate;
@@ -17810,7 +17810,7 @@ sub __setConsRcmdState {
   my $gridshare  = $nompower - $pvpow;                                                    # Anteil Netzleistung an Leistungsaufnahme in Watt
 
   my $ccr        = AttrVal          ($name, 'ctrlConsRecommendReadings', '');             # Liste der Consumer für die ConsumptionRecommended-Readings erstellt werden sollen
-  my $rescons    = isConsumerPhysOn ($hash, $c) ? 0 : $nompower;                          # resultierender Verbrauch nach Einschaltung Consumer
+  my $rescons    = isConsumerPhysOn ($name, $c) ? 0 : $nompower;                          # resultierender Verbrauch nach Einschaltung Consumer
   my $surpreduce = $rescons > $pvpow ? $pvpow : $rescons;
   
   my ($method, $surplus) = determSurplus ($name, $c);                                     # Consumer spezifische Ermittlung des Energieüberschußes
@@ -17904,7 +17904,7 @@ sub ___switchConsumerOn {
   my $lang   = $paref->{lang};
 
   my $hash                    = $defs{$name};
-  my ($err, $cname, $dswname) = getCDnames ($hash, $c);                                           # Consumer und Switch Device Name
+  my ($err, $cname, $dswname) = getCDnames ($name, $c);                                           # Consumer und Switch Device Name
 
   if ($err) {
       $state = 'ERROR - '.$err;
@@ -18090,7 +18090,7 @@ sub ___switchConsumerOff {
   my $offcom                   = ConsumerVal             ($name, $c, 'offcom', '');                 # Set Command für "off"
   my ($swoffcond,$infoff,$err) = isAddSwitchOffCond      ($hash, $c);                               # zusätzliche Switch off Bedingung
   my $simpCstat                = simplifyCstate          ($pstate);
-  my (undef, $cname, $dswname) = getCDnames              ($hash, $c);                               # Consumer und Switch Device Name
+  my (undef, $cname, $dswname) = getCDnames              ($name, $c);                               # Consumer und Switch Device Name
   my $isConsRcmd               = isConsRcmd              ($hash, $c);                               # Consumptionempfehlung
   my $cplmode                  = getConsumerPlanningMode ($hash, $c);                               # Planungsmode 'can', 'must' oder 'mustNot'
   my $cause;
@@ -18197,7 +18197,7 @@ sub ___setConsumerSwitchingState {
 
   debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - current planning state: $simpCstat});
 
-  if (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'starting') {
+  if (isConsumerPhysOn ($name, $c) && $simpCstat eq 'starting') {
       my ($err, $mintime) = getConsumerMintime ( { name    => $name,
                                                    startts => $t,
                                                    c       => $c,
@@ -18230,7 +18230,7 @@ sub ___setConsumerSwitchingState {
       $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
-  elsif (isConsumerPhysOff ($hash, $c) && $simpCstat eq 'stopping') {
+  elsif (isConsumerPhysOff ($name, $c) && $simpCstat eq 'stopping') {
       $paref->{ps}            = "switched off:";
       $paref->{stopts}        = $t;
       $paref->{lastAutoOffTs} = $t;
@@ -18245,7 +18245,7 @@ sub ___setConsumerSwitchingState {
       $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
-  elsif (isConsumerPhysOn ($hash, $c) && $simpCstat eq 'continuing') {
+  elsif (isConsumerPhysOn ($name, $c) && $simpCstat eq 'continuing') {
       $paref->{ps} = "continued:";
       $paref->{lastAutoOnTs} = $t;
 
@@ -18258,7 +18258,7 @@ sub ___setConsumerSwitchingState {
       $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
-  elsif (isConsumerPhysOff ($hash, $c) && $simpCstat eq 'interrupting') {
+  elsif (isConsumerPhysOff ($name, $c) && $simpCstat eq 'interrupting') {
       $paref->{ps}            = "interrupted:";
       $paref->{lastAutoOffTs} = $t;
 
@@ -18271,7 +18271,7 @@ sub ___setConsumerSwitchingState {
       $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
-  elsif ($oldpsw eq 'off' && isConsumerPhysOn ($hash, $c) && ($t - $lastOwnSwitch > BLINDTIME)){
+  elsif ($oldpsw eq 'off' && isConsumerPhysOn ($name, $c) && ($t - $lastOwnSwitch > BLINDTIME)){
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
 
       ___setConsumerPlanningState ($paref);
@@ -18281,7 +18281,7 @@ sub ___setConsumerSwitchingState {
       $state = qq{Consumer '$calias' was switched on externally};
       $dowri = 1;
   }
-  elsif ($oldpsw eq 'on' && isConsumerPhysOff ($hash, $c) && ($t - $lastOwnSwitch > BLINDTIME)) {
+  elsif ($oldpsw eq 'on' && isConsumerPhysOff ($name, $c) && ($t - $lastOwnSwitch > BLINDTIME)) {
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
 
       ___setConsumerPlanningState ($paref);
@@ -18368,7 +18368,7 @@ sub ___isExclGroupActive {
           $pcurr  = ReadingsNum ($cname, $pcread, 0) * $eup;
       }
       
-      my $islogon = isConsumerLogOn ($hash, $oc, $pcurr);      
+      my $islogon = isConsumerLogOn ($name, $oc, $pcurr);      
 
       if ($ocstate =~ /^(?:started|starting|continued|continuing|interrupted|interrupting)$/xs || $islogon) {
           debugLog ($paref, "consumerSwitching${c}",
@@ -18403,7 +18403,7 @@ sub __getCyclesAndRuntime {
 
   my ($starthour, $startday);
 
-  if (isConsumerLogOn ($hash, $c, $pcurr)) {                                                                                             # Verbraucher ist logisch "an"
+  if (isConsumerLogOn ($name, $c, $pcurr)) {                                                                                             # Verbraucher ist logisch "an"
         if (ConsumerVal ($name, $c, 'onoff', 'off') eq 'off') {
             my $prevStartts = ConsumerVal ($name, $c, 'startTime', $t);
             my $prevDt      = timestringsFromOffset ($name, $prevStartts, 0);
@@ -18473,7 +18473,7 @@ sub __getCyclesAndRuntime {
   # --- Debug-Ausgabe ---
   if ($debug =~ /consumerSwitching${c}/xs) {
       my $sr  = 'still running';
-      my $son = isConsumerLogOn ($hash, $c, $pcurr) 
+      my $son = isConsumerLogOn ($name, $c, $pcurr) 
                 ? $sr 
                 : ConsumerVal ($name, $c, 'cycleTime', 0) * 60;                                 # letzte Cycle-Zeitdauer in Sekunden
       
@@ -18525,9 +18525,9 @@ sub __remainConsumerTime {
 
   $data{$name}{consumers}{$c}{remainTime} = 0;
 
-  if (isInTimeframe($hash, $c) && (($planstate =~ /started/xs && isConsumerPhysOn($hash, $c)) | $planstate =~ /interrupt|continu/xs)) {
-      my $remainTime                                 = $stopts - $t ;
-      $data{$name}{consumers}{$c}{remainTime} = round0 ($remainTime / 60) if($remainTime > 0);
+  if (isInTimeframe($hash, $c) && (($planstate =~ /started/xs && isConsumerPhysOn($name, $c)) | $planstate =~ /interrupt|continu/xs)) {
+      my $remainTime                           = $stopts - $t ;
+      $data{$name}{consumers}{$c}{remainTime}  = round0 ($remainTime / 60) if($remainTime > 0);
   }
 
 return;
@@ -18666,8 +18666,8 @@ sub  __setPhysLogSwState {
   my $debug = $paref->{debug};
 
   my $hash = $defs{$name};
-  my $cpo  = isConsumerPhysOn ($hash, $c)         ? 'on' : 'off';
-  my $clo  = isConsumerLogOn  ($hash, $c, $pcurr) ? 'on' : 'off';
+  my $cpo  = isConsumerPhysOn ($name, $c)         ? 'on' : 'off';
+  my $clo  = isConsumerLogOn  ($name, $c, $pcurr) ? 'on' : 'off';
 
   $data{$name}{consumers}{$c}{physoffon} = $cpo;
   $data{$name}{consumers}{$c}{logoffon}  = $clo;
@@ -22223,9 +22223,17 @@ sub _graphicConsumerLegend {
       $paref->{consumer} = $c;
       
       my $caicon                  = $paref->{caicon};                                               # Consumer AdviceIcon
-      my ($err, $cname, $dswname) = getCDnames  ($hash, $c);                                        # Consumer und Switch Device Name
+      my ($err, $cname, $dswname) = getCDnames  ($name, $c);                                        # Consumer und Switch Device Name
       my $calias                  = ConsumerVal ($name, $c, 'alias',   $cname);                     # Alias des Consumerdevices
-      my $cicon                   = ConsumerVal ($name, $c, 'icon',        '');                     # Icon des Consumerdevices
+      #my $cicon                   = ConsumerVal ($name, $c, 'icon',        '');                     # Icon des Consumerdevices
+
+      my ($cicon) = __substituteIcon ( { name  => $name,                                            # Icon des Consumerdevices
+                                         pn    => $c,
+                                         ptyp  => 'consumer',
+                                         pcurr => ConsumerVal ($name, $c, 'currpower', 0),                              
+                                         lang  => $lang
+                                       } );
+
       my $oncom                   = ConsumerVal ($name, $c, 'oncom',       '');                     # Consumer Einschaltkommando
       my $offcom                  = ConsumerVal ($name, $c, 'offcom',      '');                     # Consumer Ausschaltkommando
       my $autord                  = ConsumerVal ($name, $c, 'autoreading', '');                     # Readingname f. Automatiksteuerung
@@ -22332,7 +22340,7 @@ sub _graphicConsumerLegend {
       }
 
       if ($noshow !~ /[9]/xs) {                                                                     # mit $noshow '9' die Schalter im Paneel ausblenden
-          if (isConsumerPhysOff ($hash, $c)) {                                                      # Schaltzustand des Consumerdevices off
+          if (isConsumerPhysOff ($name, $c)) {                                                      # Schaltzustand des Consumerdevices off
               if ($cmdon) {
                   $staticon = FW_makeImage('ios_off_fill@red', $htitles{iave}{$lang});
                   $swicon   = "<a title='$htitles{iave}{$lang}' onClick=$cmdon> $staticon</a>";
@@ -22343,8 +22351,8 @@ sub _graphicConsumerLegend {
               }
           }
 
-          if (isConsumerPhysOn ($hash, $c)) {                                                       # Schaltzustand des Consumerdevices on
-              if($cmdoff) {
+          if (isConsumerPhysOn ($name, $c)) {                                                       # Schaltzustand des Consumerdevices on
+              if ($cmdoff) {
                   $staticon = FW_makeImage('ios_on_fill@green', $htitles{ieva}{$lang});
                   $swicon   = "<a title='$htitles{ieva}{$lang}' onClick=$cmdoff> $staticon</a>";
               }
@@ -23441,8 +23449,7 @@ sub __batteryOnBeam {
                                                      soc   => $soc,
                                                      pcurr => $bpower,
                                                      lang  => $lang
-                                                   }
-                                                 );
+                                                   } );
 
           $title   .= defined $currsoc ? "\n".$htitles{socbacur}{$lang}.": ".$currsoc." %" : '';
           my $image = defined $hfcg->{$i}{'rcdchargebat'.$bn} ? FW_makeImage ($bicon) : '';
@@ -23812,14 +23819,12 @@ END0
           my $calias  = ConsumerVal ($name, $c, 'alias', '');                                              # Name des Consumerdevices
           $cnsmrpower = $cnsmr->{$c}{p};
 
-          my ($cicon) = __substituteIcon ( { hash => $hash,                                                # Icon des Consumerdevices
-                                             name => $name,
+          my ($cicon) = __substituteIcon ( { name  => $name,                                               # Icon des Consumerdevices
                                              pn    => $c,
                                              ptyp  => $cnsmr->{$c}{ptyp},
                                              pcurr => $cnsmrpower,
                                              lang  => $lang
-                                           }
-                                         );
+                                           } );
 
           my $ccicon = (split '@', $cicon)[1];
           $cicon     = FW_makeImage         ($cicon, '');
@@ -23876,14 +23881,12 @@ END1
   if ($flowgconX) {
       my $dumtxt  = $htitles{dumtxt}{$lang};
 
-      my ($dicon) = __substituteIcon ( { hash => $hash,                                           # Icon des Consumerdevices
-                                         name => $name,
+      my ($dicon) = __substituteIcon ( { name  => $name,                                          # Icon des Consumerdevices
                                          pn    => '',
                                          ptyp  => 'consumerdummy',
                                          pcurr => $cons_dmy,
                                          lang  => $lang
-                                       }
-                                     );
+                                       } );
 
       my $cdicon = (split '@', $dicon)[1];
       $dicon     = FW_makeImage         ($dicon, '');
@@ -24030,7 +24033,7 @@ END3
 
       for my $c (@consumers) {
           $cnsmrpower = $cnsmr->{$c}{p};
-          my $cilon   = isConsumerLogOn ($hash, $c, $cnsmrpower);
+          my $cilon   = isConsumerLogOn ($name, $c, $cnsmrpower);
 
           $consumer_style = $cilon ? "$stna active_normal" : "$stna inactive";
           my $chain_color = "";                                                                    # Farbe der Laufkette des Consumers
@@ -24159,7 +24162,7 @@ END3
           my $rpcurr       = ConsumerVal ($name, $c, 'rpcurr',     '');                               # Readingname f. current Power
 
           if (!$rpcurr) {                                                                             # Workaround wenn Verbraucher ohne Leistungsmessung
-              $cnsmrpower = isConsumerPhysOn($hash, $c) ? 'on' : 'off';
+              $cnsmrpower = isConsumerPhysOn($name, $c) ? 'on' : 'off';
           }
 
           my $lcp = strlength ($cnsmrpower);
@@ -24356,16 +24359,14 @@ sub __addInputProducerIcon {
                   $pdcr->{$lfn}{xsgenerator} = $xstart;                                    # Übertrag Koordinaten für Laufketten/Text Anzeige
                   $pdcr->{$lfn}{ysgenerator} = $ystart;                                    # Übertrag Koordinaten für Laufketten/Text Anzeige
 
-                  my ($genericon, $genertxt) = __substituteIcon ( { hash  => $hash,                                                 # Icon des Producerdevices
-                                                                    name  => $name,
+                  my ($genericon, $genertxt) = __substituteIcon ( { name  => $name,        # Icon des Producerdevices
                                                                     msg1  => $generator,
                                                                     pn    => $pn,
                                                                     ptyp  => 'generator',
                                                                     don   => $don,         # Tag oder Nacht
                                                                     pcurr => $genpow,
                                                                     lang  => $lang
-                                                                  }
-                                                                );
+                                                                  } );
 
                   my $gcolor = (split '@', $genericon)[1];
                   $genericon = FW_makeImage         ($genericon, '');
@@ -24377,15 +24378,13 @@ sub __addInputProducerIcon {
               }
           }
 
-          my ($picon, $ptxt) = __substituteIcon ( { hash  => $hash,         # Icon des Producerdevices
-                                                    name  => $name,
+          my ($picon, $ptxt) = __substituteIcon ( { name  => $name,         # Icon des Producerdevices
                                                     pn    => $pn,
                                                     ptyp  => $ptyp,
                                                     don   => $don,          # Tag oder Nacht
                                                     pcurr => $pdrpow,
                                                     lang  => $lang
-                                                  }
-                                                );
+                                                  } );
 
           my $cpicon = (split '@', $picon)[1];
           $picon     = FW_makeImage         ($picon, '');
@@ -24416,13 +24415,11 @@ sub __addNodeIcon {
   my $x_coord  = $paref->{x_coord};
   my $y_coord  = $paref->{y_coord};
 
-  my ($nicon, $ntxt) = __substituteIcon ( { hash  => $hash,
-                                            name  => $name,
+  my ($nicon, $ntxt) = __substituteIcon ( { name  => $name,
                                             ptyp  => 'node',
                                             pcurr => $pnodesum,
                                             lang  => $lang
-                                           }
-                                         );
+                                          } );
 
   my $cnicon = (split '@', $nicon)[1];
   $nicon     = FW_makeImage         ($nicon, '');
@@ -24451,7 +24448,6 @@ return $ret;
 sub __substituteIcon {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $hash  = $paref->{hash} // $defs{$name};
   my $ptyp  = $paref->{ptyp};
   my $pn    = $paref->{pn};
   my $msg1  = $paref->{msg1};
@@ -24473,7 +24469,7 @@ sub __substituteIcon {
       else       { ($icon, $color) = split '@', ConsumerVal ($name, $pn, 'icon', CICONDEF) }
 
       if (!$color) {
-          $color = isConsumerLogOn ($hash, $pn, $pcurr) ? CICONCOLACT : CICONCOLINACT;
+          $color = isConsumerLogOn ($name, $pn, $pcurr) ? CICONCOLACT : CICONCOLINACT;
       }
   }
   elsif ($ptyp eq 'consumerdummy') {                                                    # Icon Dummy Consumer
@@ -24579,7 +24575,7 @@ sub __substituteIcon {
   }
   elsif ($ptyp eq 'producer') {                                                          # Icon Producer
       ($icon, $color) = split '@', ProducerVal ($name, $pn, 'picon', PRODICONDEF);
-      $txt            = ProducerVal ($hash, $pn, 'palias', '');
+      $txt            = ProducerVal ($name, $pn, 'palias', '');
 
       if (!$pcurr) {
           $color = 'grey';
@@ -24588,7 +24584,7 @@ sub __substituteIcon {
   elsif ($ptyp eq 'inverter') {                                                          # Inverter, Smartloader
       my ($iday, $inight);
 
-      if (InverterVal ($hash, $pn, 'isource', 'pv') eq 'bat') {
+      if (InverterVal ($name, $pn, 'isource', 'pv') eq 'bat') {
           ($iday, $inight) = split ':', InverterVal ($name, $pn, 'iicon', 'inverter:inverter');
       }
       else {
@@ -34430,19 +34426,17 @@ return 1;
 #  ist, d.h. der Wert onreg des Readings rswstate wahr ist
 ################################################################
 sub isConsumerPhysOn {
-  my $hash = shift;
-  my $c    = shift;
-  my $name = $hash->{NAME};
+  my ($name, $c) = @_;
 
-  my ($err, $cname, $dswname) = getCDnames ($hash, $c);                  # Consumer und Switch Device Name
+  my ($err, $cname, $dswname) = getCDnames ($name, $c);                  # Consumer und Switch Device Name
 
   if ($err) {
       Log3 ($name, 1, "$name - ERROR - $err") if(askLogtime ($name, $err));
       return 0;
   }
 
-  my $reg      = ConsumerVal ($hash, $c, 'onreg',       'on');
-  my $rswstate = ConsumerVal ($hash, $c, 'rswstate', 'state');           # Reading mit Schaltstatus
+  my $reg      = ConsumerVal ($name, $c, 'onreg',       'on');
+  my $rswstate = ConsumerVal ($name, $c, 'rswstate', 'state');           # Reading mit Schaltstatus
   my $swstate  = ReadingsVal ($dswname, $rswstate,   'undef');
 
   if ($swstate =~ m/^$reg$/x) {
@@ -34457,19 +34451,17 @@ return 0;
 #  ist, d.h. der Wert offreg des Readings rswstate wahr ist
 ################################################################
 sub isConsumerPhysOff {
-  my $hash = shift;
-  my $c    = shift;
-  my $name = $hash->{NAME};
+  my ($name, $c) = @_;
 
-  my ($err, $cname, $dswname) = getCDnames ($hash, $c);                  # Consumer und Switch Device Name
+  my ($err, $cname, $dswname) = getCDnames ($name, $c);                  # Consumer und Switch Device Name
 
   if ($err) {
       Log3 ($name, 1, "$name - ERROR - $err") if(askLogtime ($name, $err));
       return 0;
   }
 
-  my $reg      = ConsumerVal ($hash, $c, 'offreg',     'off');
-  my $rswstate = ConsumerVal ($hash, $c, 'rswstate', 'state');           # Reading mit Schaltstatus
+  my $reg      = ConsumerVal ($name, $c, 'offreg',     'off');
+  my $rswstate = ConsumerVal ($name, $c, 'rswstate', 'state');           # Reading mit Schaltstatus
   my $swstate  = ReadingsVal ($dswname, $rswstate,    'undef');
 
   if ($swstate =~ m/^$reg$/x) {
@@ -34488,12 +34480,11 @@ return 0;
 #  Logisch "on" schließt physisch "on" mit ein.
 ################################################################
 sub isConsumerLogOn {
-  my $hash  = shift;
+  my $name  = shift;
   my $c     = shift;
   my $pcurr = shift // 0;
 
-  my $name  = $hash->{NAME};
-  my $cname = ConsumerVal ($name, $c, 'name', '');                                         # Devicename Customer
+  my $cname = ConsumerVal   ($name, $c, 'name', '');                                       # Devicename Customer
   my ($err) = isDeviceValid ( { name => $name, obj => $cname, method => 'string' } );
 
   if ($err) {
@@ -34506,7 +34497,7 @@ sub isConsumerLogOn {
   my $pthreshold = ConsumerVal ($name, $c, "powerthreshold", 0);                           # Schwellenwert (W) ab der ein Verbraucher als aktiv gewertet wird
 
   if (!$rpcurr) {                                                                          # Workaround wenn Verbraucher ohne Leistungsmessung
-      if (isConsumerPhysOn ($hash, $c)) { $pcurr = $nompower }
+      if (isConsumerPhysOn ($name, $c)) { $pcurr = $nompower }
       else                              { $pcurr = 0         }
   }
 
@@ -34516,7 +34507,7 @@ sub isConsumerLogOn {
 
   $data{$name}{consumers}{$c}{currpowerpercent} = $currpowerpercent;
   
-  if (isConsumerPhysOff ($hash, $c)) {                                                     # Device ist physisch ausgeschaltet
+  if (isConsumerPhysOff ($name, $c)) {                                                     # Device ist physisch ausgeschaltet
       return 0;
   }
 
@@ -34546,7 +34537,7 @@ sub isConsumerNoshow {
 
   if (!isNumeric ($noshow)) {                                                           # Key "noshow" enthält Signalreading
       my $rdg                   = $noshow;
-      my ($err, $dev, $dswname) = getCDnames ($hash, $c);                               # Consumer und Switch Device Name
+      my ($err, $dev, $dswname) = getCDnames ($name, $c);                               # Consumer und Switch Device Name
 
       if ($noshow =~ /:/xs) {
           ($dev, $rdg) = split ":", $noshow;
@@ -34883,19 +34874,19 @@ sub isInLocktime {
   my $lt   = 0;
   my $clt  = 0;
 
-  my $ltt = isConsumerPhysOn  ($hash, $c) ? 'onlt'  :                             # Typ der Sperrzeit
-            isConsumerPhysOff ($hash, $c) ? 'offlt' :
+  my $ltt = isConsumerPhysOn  ($name, $c) ? 'onlt'  :                             # Typ der Sperrzeit
+            isConsumerPhysOff ($name, $c) ? 'offlt' :
             '';
 
-  my ($cltoff, $clton) = split ":", ConsumerVal ($hash, $c, 'locktime', '0:0');
+  my ($cltoff, $clton) = split ":", ConsumerVal ($name, $c, 'locktime', '0:0');
   $clton             //= 0;                                                       # $clton undef möglich, da Angabe optional
 
   if ($ltt eq 'onlt') {
-      $lt = ConsumerVal ($hash, $c, 'lastAutoOnTs', 0);
+      $lt = ConsumerVal ($name, $c, 'lastAutoOnTs', 0);
       $clt = $clton;
   }
   elsif ($ltt eq 'offlt') {
-      $lt  = ConsumerVal ($hash, $c, 'lastAutoOffTs', 0);
+      $lt  = ConsumerVal ($name, $c, 'lastAutoOffTs', 0);
       $clt = $cltoff;
   }
 
@@ -35467,7 +35458,7 @@ sub lastConsumerSwitchtime {
   my $c    = shift;
   my $name = $hash->{NAME};
 
-  my ($err, $cname, $dswname) = getCDnames ($hash, $c);                        # Consumer und Switch Device Name
+  my ($err, $cname, $dswname) = getCDnames ($name, $c);                        # Consumer und Switch Device Name
 
   if ($err) {
       Log3 ($name, 1, qq{$name - ERROR - The last switching time can't be identified due to the device '$dswname' is invalid.
@@ -35648,12 +35639,11 @@ return $debug;
 #  Switch Devices ermitteln
 ################################################################
 sub getCDnames {
-  my $hash = shift;
-  my $c    = shift;
+  my ($name, $c) = @_;
 
-  my $cname   = ConsumerVal ($hash, $c, "name",        "");                                         # Name des Consumerdevices
-  my $dswname = ConsumerVal ($hash, $c, 'dswitch', $cname);                                         # alternatives Switch Device
-  my ($err)   = isDeviceValid ( { name => $hash->{NAME}, obj => $dswname, method => 'string' } );
+  my $cname   = ConsumerVal ($name, $c, 'name',        '');                                         # Name des Consumerdevices
+  my $dswname = ConsumerVal ($name, $c, 'dswitch', $cname);                                         # alternatives Switch Device
+  my ($err)   = isDeviceValid ( { name => $name, obj => $dswname, method => 'string' } );
   $err        = qq{$err. Please check device names in consumer '$c' attribute} if($err);
 
 return ($err, $cname, $dswname);
