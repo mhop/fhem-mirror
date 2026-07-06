@@ -161,10 +161,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.1"  => "04.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
+  "2.8.1"  => "05.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
                            "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
                            "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
-                           "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ",
+                           "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
+                           "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -2282,6 +2283,19 @@ heatpump_base => sub {
         $f->{temp_trend_neg},                                                       # Kältetrend
     ];
 },
+
+heatpump_opmode => sub {
+      my $f = shift;
+      return [
+          $f->{hp_active_frac_lag1},                                                # WP Aktivitätsgrad Vorstunde (0..1)
+          $f->{hp_heating_frac_lag1},                                               # Heizen Anteil Vorstunde
+          $f->{hp_defrost_frac_lag1},                                               # Abtauen Anteil Vorstunde
+          $f->{hp_hotwater_frac_lag1},                                              # Warmwasser Anteil Vorstunde
+          $f->{hp_cooling_frac_lag1},                                               # Kühlen Anteil Vorstunde
+          $f->{hp_pool_frac_lag1},                                                  # Pool Anteil Vorstunde
+          $f->{hp_poolheating_frac_lag1},                                           # Poolheizung Anteil Vorstunde
+      ];
+  },
 
 semantics_heatpump => sub {                                             
     my ($f) = @_;
@@ -18659,7 +18673,6 @@ return;
 sub  __setPhysLogSwState {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $pcurr = $paref->{pcurr};
   my $befsw = $paref->{befsw};                      # Status vor Switching:1, danach 0 | undef
@@ -25567,6 +25580,8 @@ sub aiFannConDataLoad {
   my (@presence_values, @holiday_values);
   my (@bev_active_values, @bev_load_values, @bev_n_active_values, @bev_soc_deficit_norm_values);
   my (@bev_energy_remaining_values, @bev_charge_intensity_values);
+  my (@hp_heating_frac_values, @hp_defrost_frac_values, @hp_hotwater_frac_values, @hp_cooling_frac_values,  
+      @hp_pool_frac_values,   @hp_poolheating_frac_values, @hp_active_frac_values);
   
   # einstellbare Parameter
   ##########################
@@ -25637,6 +25652,7 @@ sub aiFannConDataLoad {
       my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                  # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend'
       my $holiday   = defined $rec->{holiday}  ? $rec->{holiday}  : 0;                  # nicht definierte Feiertage/Uerlaub als 0 belegen
       my $bev_sig   = _aiFannBevConsumerAggregate ($rec);                               # BEV Aggregate
+      my $hp_sig    = _aiFannHpOpmodeAggregate    ($rec);                               # HP Opmode Aggregate
 
       
       # Ableitungen und Normierungen
@@ -25705,12 +25721,21 @@ sub aiFannConDataLoad {
       push @inthod_values,               $inthod - 1;
       push @presence_values,             $presence;
       push @holiday_values,              $holiday;
+      
       push @bev_active_values,           $bev_sig->{active};
       push @bev_load_values,             $bev_sig->{load};
       push @bev_n_active_values,         $bev_sig->{n_active_ratio};
       push @bev_soc_deficit_norm_values, $bev_soc_deficit_norm;
       push @bev_energy_remaining_values, $bev_sig->{energy_remaining};
       push @bev_charge_intensity_values, $bev_sig->{charge_intensity};
+      
+      push @hp_heating_frac_values,      $hp_sig->{heating_frac};
+      push @hp_defrost_frac_values,      $hp_sig->{defrost_frac};
+      push @hp_hotwater_frac_values,     $hp_sig->{hotwater_frac};
+      push @hp_cooling_frac_values,      $hp_sig->{cooling_frac};
+      push @hp_pool_frac_values,         $hp_sig->{pool_frac};
+      push @hp_poolheating_frac_values,  $hp_sig->{poolheating_frac};
+      push @hp_active_frac_values,       $hp_sig->{active_frac};
                                 
       # Zielwert
       ############
@@ -25800,7 +25825,14 @@ sub aiFannConDataLoad {
                                              bev_n_active_series               => \@bev_n_active_values,
                                              bev_soc_deficit_norm_series       => \@bev_soc_deficit_norm_values,
                                              bev_energy_remaining_norm_series  => $bev_energy_remaining_norm,
-                                             bev_charge_intensity_series       => \@bev_charge_intensity_values,                                             
+                                             bev_charge_intensity_series       => \@bev_charge_intensity_values,
+                                             hp_heating_frac_series            => \@hp_heating_frac_values,
+                                             hp_defrost_frac_series            => \@hp_defrost_frac_values,
+                                             hp_hotwater_frac_series           => \@hp_hotwater_frac_values,
+                                             hp_cooling_frac_series            => \@hp_cooling_frac_values,
+                                             hp_pool_frac_series               => \@hp_pool_frac_values,
+                                             hp_poolheating_frac_series        => \@hp_poolheating_frac_values,
+                                             hp_active_frac_series             => \@hp_active_frac_values,                                             
                                            } ); 
 
       my $sigs = _aiFannCreateAddOnSignals ( { lags              => $lags,                                  # diskrete, semantische Zusatzsignale
@@ -25950,6 +25982,13 @@ sub aiFannConDataLoad {
                          
                          hp_heating_mode           => $sigs->{hp_heating_mode},                 # Wärmepumpe im Heizmodus
                          hp_cooling_mode           => $sigs->{hp_cooling_mode},                 # Wärmepumpe im Kühlmodus
+                         hp_heating_frac_lag1      => $lags->{hp_heating_frac_lag1},            # WP Heizen Anteil Vorstunde
+                         hp_defrost_frac_lag1      => $lags->{hp_defrost_frac_lag1},            # WP Abtauen Anteil Vorstunde
+                         hp_hotwater_frac_lag1     => $lags->{hp_hotwater_frac_lag1},           # WP Warmwasser Anteil Vorstunde
+                         hp_cooling_frac_lag1      => $lags->{hp_cooling_frac_lag1},            # WP Kühlen Anteil Vorstunde
+                         hp_pool_frac_lag1         => $lags->{hp_pool_frac_lag1},               # WP Pool Anteil Vorstunde
+                         hp_poolheating_frac_lag1  => $lags->{hp_poolheating_frac_lag1},        # WP Poolheizung Anteil Vorstunde
+                         hp_active_frac_lag1       => $lags->{hp_active_frac_lag1},             # WP Aktivitätsgrad Vorstunde (0..1)
                          
                          ww_morning                => $sigs->{ww_morning},                      # Warmwasser morgens
                          ww_evening                => $sigs->{ww_evening},                      # Warmwasser abends
@@ -27076,7 +27115,16 @@ sub aiFannConInfer {
                               range   => $range,
                               t       => $paref->{t},
                               limit   => 600,
-                            } );                                                               # BEV Aggregationen aus pvHistory lesen                                     
+                            } );                                                                # BEV Aggregationen aus pvHistory lesen 
+
+  my ($hp_heating_ref, $hp_defrost_ref, $hp_hotwater_ref,
+      $hp_cooling_ref, $hp_pool_ref,    $hp_poolheating_ref,
+      $hp_active_ref) =
+      _aiFannHpOpmodeHistArray ( { name    => $name,
+                                   fanntyp => $fanntyp,
+                                   t       => $paref->{t},
+                                   limit   => 600,
+                                 } );                                                           # WP Aggregationen aus pvHistory lesen                                
 
   my @flat_targets     = @$targetref;
   my @temps            = @$tempsref;
@@ -27235,12 +27283,21 @@ sub aiFannConInfer {
                                              i                                => $i,
                                              norms                            => $lagnorm_ref,
                                              range                            => $range,
+                                             
                                              bev_active_series                => $bev_active_ref,
                                              bev_load_norm_series             => \@bev_load_norm,
                                              bev_n_active_series              => $bev_n_active_ref,
                                              bev_soc_deficit_norm_series      => $bev_soc_deficit_norm_ref, 
                                              bev_energy_remaining_norm_series => \@bev_energy_remaining_norm,
-                                             bev_charge_intensity_series      => $charge_intensity_ref,                                             
+                                             bev_charge_intensity_series      => $charge_intensity_ref,  
+
+                                             hp_heating_frac_series            => $hp_heating_ref,
+                                             hp_defrost_frac_series            => $hp_defrost_ref,
+                                             hp_hotwater_frac_series           => $hp_hotwater_ref,
+                                             hp_cooling_frac_series            => $hp_cooling_ref,
+                                             hp_pool_frac_series               => $hp_pool_ref,
+                                             hp_poolheating_frac_series        => $hp_poolheating_ref,
+                                             hp_active_frac_series             => $hp_active_ref,                                             
                                            } );      
       next if(!$lags);      
      
@@ -27358,8 +27415,15 @@ sub aiFannConInfer {
                             cooling_degree_norm         => $sigs->{cooling_degree_norm},                # Kühlgradtage (Kühllast)
 
                             hp_heating_mode             => $sigs->{hp_heating_mode},                    # Wärmepumpe im Heizmodus
-                            hp_cooling_mode             => $sigs->{hp_cooling_mode},                    # Wärmepumpe im Kühlmodus
-
+                            hp_cooling_mode             => $sigs->{hp_cooling_mode},                    # Wärmepumpe im Kühlmodus                            
+                            hp_heating_frac_lag1        => $lags->{hp_heating_frac_lag1},               # WP Heizen Anteil Vorstunde
+                            hp_defrost_frac_lag1        => $lags->{hp_defrost_frac_lag1},               # WP Abtauen Anteil Vorstunde
+                            hp_hotwater_frac_lag1       => $lags->{hp_hotwater_frac_lag1},              # WP Warmwasser Anteil Vorstunde
+                            hp_cooling_frac_lag1        => $lags->{hp_cooling_frac_lag1},               # WP Kühlen Anteil Vorstunde
+                            hp_pool_frac_lag1           => $lags->{hp_pool_frac_lag1},                  # WP Pool Anteil Vorstunde
+                            hp_poolheating_frac_lag1    => $lags->{hp_poolheating_frac_lag1},           # WP Poolheizung Anteil Vorstunde
+                            hp_active_frac_lag1         => $lags->{hp_active_frac_lag1},                # WP Aktivitätsgrad Vorstunde (0..1)
+                            
                             ww_morning                  => $sigs->{ww_morning},                         # Warmwasser morgens
                             ww_evening                  => $sigs->{ww_evening},                         # Warmwasser abends
                             ww_cold_boost               => $sigs->{ww_cold_boost},                      # Kältebedingter WW-Boost
@@ -27420,8 +27484,8 @@ sub aiFannConInfer {
       $prediction = round0 ($prediction);
       $tc         = round0 ($tc);
 
-      # Fortschreibung der Arrays! mit Horizont-Dämpfung
-      ####################################################
+      # Array-Fortschreibung im Horizont
+      ####################################
       my $hist_ref    = _aiFannGetHistoricalReference ($name, $fanntyp, $hod, $t);
       my $blend_alpha = $hist_ref > 0
                       ? min (0.8, $num / MAXNEXTHOURS)                                      # maximal 80% historisch
@@ -27441,7 +27505,15 @@ sub aiFannConInfer {
       push @$bev_n_active_ref,         0;
       push @$bev_soc_deficit_norm_ref, 0;
       push @bev_energy_remaining_norm, 0;
-      push @$charge_intensity_ref,     0;   
+      push @$charge_intensity_ref,     0;
+
+      push @$hp_heating_ref,     0;                                                         # WP-Zukunftsmodus unbekannt -> neutral (0)
+      push @$hp_defrost_ref,     0;
+      push @$hp_hotwater_ref,    0;
+      push @$hp_cooling_ref,     0;
+      push @$hp_pool_ref,        0;
+      push @$hp_poolheating_ref, 0;
+      push @$hp_active_ref,      0;      
 
       
       # Hybridmodell mit Legacy
@@ -27533,6 +27605,53 @@ sub _aiFannBevConsumerAggregate {
       energy_remaining => $n_batcap    ? ($energy_remaining_sum / $n_batcap)    : 0,    # später zu normieren 
       charge_intensity => $n_intensity ? ($charge_intensity_sum / $n_intensity) : 0,  
   };
+}
+
+################################################################
+#  Aggregiert HP Opmode Punkte über alle WP-Consumer eines 
+#  Datensatzes zu normierten Modusfraktionen (0..1).
+#  Gibt immer einen vollständigen Hash zurück (0-Defaults).
+################################################################
+sub _aiFannHpOpmodeAggregate {
+  my $rec = shift;
+
+  my @modes        = split /\|/, HPOPMODES;
+  my %totals       = map { $_ => 0 } @modes;
+  my $total_points = 0;
+  my %result;
+  
+  $result{active_frac} = 0;                                                     # Initialisieren für Early Return
+  for my $mode (@modes) {
+      next if $mode eq 'off';
+      $result{"${mode}_frac"} = 0;                                              
+  }
+  
+  my @ids = $rec->{hpcsm} ? (split /\s*,\s*/, $rec->{hpcsm}) : ();              # alle definierten WP Consumer als Array
+  
+  return \%result if !scalar @ids;                                              # leerer Hash wenn keine WP definiert
+
+  for my $cn (@ids) {
+      my $c = sprintf "%02d", $cn;
+
+      for my $mode (@modes) {
+          next if $mode eq 'off';
+          my $pts         = $rec->{"csm${c}_${mode}_points"} // 0;
+          $totals{$mode} += $pts;
+          $total_points  += $pts;
+      }
+  }
+  
+  for my $mode (@modes) {
+      next if $mode eq 'off';
+      $result{"${mode}_frac"} = $total_points > 0
+                              ? $totals{$mode} / $total_points                  # Anteil des Modus (0..1)
+                              : 0;
+  }
+  
+  $result{active_frac} = $total_points / 60;                                    # Aktivitätsgrad der Stunde (0..1, max=60 Punkte)
+  $result{active_frac} = 1 if $result{active_frac} > 1;                         # Clamp gegen Rundungsfehler
+
+return \%result;
 }
 
 ################################################################
@@ -27877,6 +27996,17 @@ sub _aiFannBuildLagFeatures {
   my $bev_charge_intensity_lag1      = $bev_charge_intensity_series->[$i - 1]      // 0;
   
   # ---------------------------------------------------------
+  # WP Mode Lags
+  # ---------------------------------------------------------
+  my $hp_heating_frac_lag1     = $paref->{hp_heating_frac_series}[$i-1]     // 0;
+  my $hp_defrost_frac_lag1     = $paref->{hp_defrost_frac_series}[$i-1]     // 0;
+  my $hp_hotwater_frac_lag1    = $paref->{hp_hotwater_frac_series}[$i-1]    // 0;
+  my $hp_cooling_frac_lag1     = $paref->{hp_cooling_frac_series}[$i-1]     // 0;
+  my $hp_pool_frac_lag1        = $paref->{hp_pool_frac_series}[$i-1]        // 0;
+  my $hp_poolheating_frac_lag1 = $paref->{hp_poolheating_frac_series}[$i-1] // 0;
+  my $hp_active_frac_lag1      = $paref->{hp_active_frac_series}[$i-1]      // 0;
+  
+  # ---------------------------------------------------------
   # presence_smooth3/2        -> gleitender 3h/2h-Mittelwert
   # $presence_transition_up   -> 'Heimkehr'
   # $presence_transition_down -> 'Haus wird verlassen'
@@ -27946,13 +28076,21 @@ sub _aiFannBuildLagFeatures {
       is_low_cons_regime        => $regime_low,
       is_high_cons_regime       => $regime_high,
       is_transition_regime      => $regime_trans,
+
+      hp_heating_frac_lag1      => $hp_heating_frac_lag1,    
+      hp_defrost_frac_lag1      => $hp_defrost_frac_lag1,     
+      hp_hotwater_frac_lag1     => $hp_hotwater_frac_lag1,    
+      hp_cooling_frac_lag1      => $hp_cooling_frac_lag1,     
+      hp_pool_frac_lag1         => $hp_pool_frac_lag1,        
+      hp_poolheating_frac_lag1  => $hp_poolheating_frac_lag1, 
+      hp_active_frac_lag1       => $hp_active_frac_lag1,
       
       bev_active_lag1                => $bev_active_lag1,
       bev_load_lag1_norm             => $bev_load_lag1_norm,
       bev_n_active_lag1_norm         => $bev_n_active_lag1_norm,
       bev_soc_deficit_lag1_norm      => $bev_soc_deficit_lag1_norm,
       bev_energy_remaining_lag1_norm => $bev_energy_remaining_lag1_norm,
-      bev_charge_intensity_lag1      => $bev_charge_intensity_lag1,
+      bev_charge_intensity_lag1      => $bev_charge_intensity_lag1,    
   };
 }
 
@@ -28201,6 +28339,7 @@ sub _aiFannFeatureBuilder {
   # --------------------------------------------------------  
   if ($flags->{heatpump}) {
       push @features, @{ $FEATURE_BLOCKS{heatpump_base}->($f) };
+      push @features, @{ $FEATURE_BLOCKS{heatpump_opmode}->($f) };
       
       if ($flags->{pv} && $flags->{active}) {                                               # WP + PV + starker Tagesrhythmus
           push @features, @{ $FEATURE_BLOCKS{semantics_heatpump_boost_special}->($f) };
@@ -29117,8 +29256,7 @@ sub _aiFannBevHistArray {
   my $hour = $dt->{hour};
 
   # --- Cache-Key generieren ---
-  my $key = join '::', 'BEVHISTARR',                                                     # Cache Key ID
-                       $name, $year, $mon, $mday, $hour, $limit;
+  my $key = join '::', 'BEVHISTARR', $name, $year, $mon, $mday, $hour, $limit;          # Cache Key ID
 
   # --- Cache-Hit? ---
   if (my $cached = LRU_get ($name, $cache, $key)) {
@@ -29169,6 +29307,88 @@ sub _aiFannBevHistArray {
   LRU_insert ($name, $cache, $key, [ \@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining, \@charge_intensity ]);
 
 return (\@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining, \@charge_intensity);
+}
+
+######################################################################################
+#  Liefert HP-Opmode-Fraktions-Arrays aus pvHistory, synchron zur
+#  Iteration von getPvHistTargetArray (gleiche Filterkriterien,
+#  gleiche Reihenfolge, gleicher Cutoff).
+#
+#  Return: (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active)
+######################################################################################
+sub _aiFannHpOpmodeHistArray {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $t       = $paref->{t}     // time;
+  my $limit   = $paref->{limit} // 200;
+  my $fanntyp = $paref->{fanntyp};
+
+  my (@heating, @defrost, @hotwater, @cooling, @pool, @poolheating, @active);
+
+  return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active)
+      unless exists $data{$name}{pvhist};
+
+  # --- Cache-Objekt initialisieren ---
+  my $hash  = $defs{$name};
+  my $cache = $hash->{'.pvHistCache'} //= LRU_cache_create ('pvHistCache', 'pvHistory Cache', CACHEPVHMS);
+
+  # --- Zeitkontext über TS_OFFSET_CACHE (stabil & gecacht) ---   
+  my $dt   = timestringsFromOffset ($name, $t, 0);
+  my $year = $dt->{year};
+  my $mon  = $dt->{month};
+  my $mday = $dt->{day};
+  my $hour = $dt->{hour};
+
+  # --- Cache-Key generieren ---
+  my $key = join '::', 'HPOPMODEHISTARR', $name, $year, $mon, $mday, $hour, $limit;
+
+  # --- Cache-Hit? ---
+  if (my $cached = LRU_get ($name, $cache, $key)) {
+      return @$cached;
+  }
+
+  # --- Kein Cache-Hit → Originalberechnung ---
+  # --- identische Tagesreihenfolge wie getPvHistTargetArray --
+  my $ph = $data{$name}{pvhist};
+
+  my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;
+  my @days_upto  = sort { $a <=> $b } grep { $_ <= $mday } keys %$ph;
+
+  for my $day (@days_after, @days_upto) {
+      for my $hod (sort { $a <=> $b } keys %{ $ph->{$day} }) {
+          next if $hod < 1 || $hod > 24;
+          last if ($day == $mday && $hod == $hour + 1);
+
+          my $rec = $ph->{$day}{$hod};
+          next unless defined $rec->{$fanntyp};                                         # identisches Filterkriterium wie getPvHistTargetArray
+          next unless $rec->{$fanntyp} >= 0;
+
+          my $hp_sig = _aiFannHpOpmodeAggregate ($rec);
+
+          push @heating,     $hp_sig->{heating_frac};
+          push @defrost,     $hp_sig->{defrost_frac};
+          push @hotwater,    $hp_sig->{hotwater_frac};
+          push @cooling,     $hp_sig->{cooling_frac};
+          push @pool,        $hp_sig->{pool_frac};
+          push @poolheating, $hp_sig->{poolheating_frac};
+          push @active,      $hp_sig->{active_frac};
+      }
+  }
+
+  my $n   = scalar @active;
+  my $min = $n < $limit ? $n : $limit;
+
+  @heating     = @heating    [-$min .. -1];
+  @defrost     = @defrost    [-$min .. -1];
+  @hotwater    = @hotwater   [-$min .. -1];
+  @cooling     = @cooling    [-$min .. -1];
+  @pool        = @pool       [-$min .. -1];
+  @poolheating = @poolheating[-$min .. -1];
+  @active      = @active     [-$min .. -1];
+
+  LRU_insert ($name, $cache, $key, [ \@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active ]);
+
+return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active);
 }
 
 ################################################################
