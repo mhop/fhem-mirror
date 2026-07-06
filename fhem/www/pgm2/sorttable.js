@@ -195,7 +195,7 @@ sorttable = {
         console.log( 'doSort: no table given' );
         return;
       }
-      if( table.tHead === undefined ) {
+      if( !table || !table.tHead || !table.tHead.rows || !table.tHead.rows[0] ) {
         console.log( 'doSort: table has no heading' );
         return;
       }
