@@ -166,7 +166,8 @@ my %vNotesIntern = (
                            "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
                            "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
                            "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz, Speicherung zeitgewichtete Empfehlung Verbrauchernutzung ".
-                           "Bereinigung Verbrauchsinput um PV-getriebenen Anteil im CON-KI-Training für Non-PV-Profile ",
+                           "Bereinigung Verbrauchsinput um PV-getriebenen Anteil im CON-KI-Training für Non-PV-Profile ".
+                           "Consumer type noSchedule setzt immer mode=mustNot ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -12154,6 +12155,10 @@ sub _collectAllRegConsumers {
       if ($ctype eq 'bev') {
           $hc->{mode} = 'mustNot';      
           push @ev, $c;
+      }
+      
+      if ($ctype eq 'noSchedule') {
+          $hc->{mode} = 'mustNot';
       }
       
       # --- Löschen relevanter Schlüssel
@@ -39291,8 +39296,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>heatpump</b>       - Consumer is a heat pump or an air conditioner (**)                                                                              </td></tr>
             <tr><td>                       </td><td><b>washingmachine</b> - Consumer is a washing machine                                                                                                   </td></tr>            
             <tr><td>                       </td><td><b>other</b>          - Consumer is none of the above types                                                                                             </td></tr>
-            <tr><td>                       </td><td><b>noSchedule</b>     - there is no scheduling or automatic switching for the consumer.                                                                 </td></tr>
-            <tr><td>                       </td><td><ul><ul>&nbsp;&nbsp;&nbsp;&nbsp; Display functions or manual controls are available.  </ul></ul>                                                        </td></tr>
+            <tr><td>                       </td><td><b>noSchedule</b>     - deprecated; use `mode=mustNot` instead                                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command              </td></tr>
             <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                          </td></tr>
@@ -42404,8 +42408,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>heatpump</b>       - Verbraucher ist eine Wärmepumpe oder ein Klimagerät (**)                                                                   </td></tr>    
             <tr><td>                       </td><td><b>washingmachine</b> - Verbraucher ist eine Waschmaschine                                                                                         </td></tr>
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                              </td></tr>
-            <tr><td>                       </td><td><b>noSchedule</b>     - für den Verbraucher erfolgt keine Einplanung oder automatische Schaltung.                                                  </td></tr>
-            <tr><td>                       </td><td><ul><ul>&nbsp;&nbsp;&nbsp;&nbsp; Anzeigefunktionen oder manuelle Schaltungen sind verfügbar.  </ul></ul>                                           </td></tr>
+            <tr><td>                       </td><td><b>noSchedule</b>     - veraltet, mode=mustNot anstatt verwenden                                                                                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>die Art der Schaltstatus Ermittlung im Verbraucher Device. Die Statusermittlung des Verbrauchers nach einem Schaltbefehl erfolgt nur               </td></tr>
             <tr><td>                       </td><td>durch Abfrage innerhalb eines Datensammelintervals (synchron) oder zusätzlich durch Eventverarbeitung (asynchron).                                 </td></tr>
