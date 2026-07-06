@@ -161,11 +161,12 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.1"  => "05.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
+  "2.8.1"  => "06.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
                            "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
                            "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
                            "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
-                           "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz ",
+                           "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz, Speicherung zeitgewichtete Empfehlung Verbrauchernutzung ".
+                           "Bereinigung Verbrauchsinput um PV-getriebenen Anteil im CON-KI-Training für Non-PV-Profile ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -1790,6 +1791,12 @@ my %hfspvh = (
   for my $cn (1..MAXCONSUMER) {
       $cn = sprintf "%02d", $cn;
       
+      # --- Aktivierungsempfehlung (Verbrauch)
+      $hfspvh{'rcmdcsm'.$cn}{fn}       = \&_saveHistP2;
+      $hfspvh{'rcmdcsm'.$cn}{storname} = 'rcmdcsm'.$cn;
+      $hfspvh{'rcmdcsm'.$cn}{validkey} = undef;
+      $hfspvh{'rcmdcsm'.$cn}{fpar}     = undef;      
+      
       # --- heatpump OpMode-Keys
       for my $s (@hpopm) {
           $hfspvh{"csm${cn}_${s}_points"}{fn}       = \&_saveHistP2;                       
@@ -2802,14 +2809,14 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
   my $c     = $paref->{prop};
-  my $evt   = $paref->{prop1} // 0;                                                          # geändert V 1.1.0 - 1 -> 0
+  my $evt   = $paref->{prop1} // 0;                                                         # geändert V 1.1.0 - 1 -> 0
   my $hash  = $defs{$name};
 
   return qq{no consumer number specified} if(!$c);
   return qq{no valid consumer id "$c"}    if(!ConsumerVal ($name, $c, 'name', ''));
   
-  my $ctype   = ConsumerVal ($name, $c, 'type', DEFCTYPE);
-  my $cplmode = getConsumerPlanningMode ($hash, $c);                                         # Planungsmode 'can', 'must' oder 'mustNot'
+  my $ctype   = ConsumerVal     ($name, $c, 'type', DEFCTYPE);
+  my $cplmode = getConsumerMode ($name, $c);                                                # Planungsmode 'can', 'must' oder 'mustNot'
 
   if ($ctype   eq 'noSchedule' || 
       $cplmode eq 'mostNot') {
@@ -10906,8 +10913,9 @@ sub delConsumerFromMem {
   }
   
   for my $key (keys %{$data{$name}{circular}{99}}) {                            # consumerspezifische Schlüssel aus Circular entfernen
-      next if $key !~ /^accum_csm${c}_\w+_seconds$/xs;
-      delete $data{$name}{circular}{99}{$key};
+      delete $data{$name}{circular}{99}{$key}
+          if $key =~ /^accum_csm${c}_\w+_w?seconds$/;
+
   }
   
   delete $data{$name}{current}{"csm${c}_active_opmode"};                        # aktiven Opmode entfernen
@@ -11831,8 +11839,6 @@ sub centralTask {
   _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
   _batChargeMgmt              ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
-
-  $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
   
   _calcConsForecast           ($centpars);                                            # Verbrauchsprognose
   
@@ -11853,6 +11859,10 @@ sub centralTask {
     
   setTimeTracking             ($name, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
   _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
+  
+  
+  # --- Finalisierungen ---
+  $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
   
   if ($debug =~ /miniCache/xs) {                                                      # Mini Cache Inhalt ausgeben 
       MC_debug ($name) if(askLogtime ($name, 'Dummy_Entry', 300));
@@ -13271,7 +13281,7 @@ sub _transferInverterValues {
 
   my $hash         = $defs{$name};
   my ($acu, $aln)  = isAutoCorrUsed ($name);
-  my $hod          = sprintf "%02d", ($chour + 1);
+  my $hod          = sprintf "%02d", ($chour + 1) % 24;
   my $warn         = '';
   my $pvsum        = 0;                                                 # Summe aktuelle PV aller Inverter
   my $ethishoursum = 0;                                                 # Summe Erzeugung akt. Stunde aller Inverter
@@ -13505,7 +13515,7 @@ sub __handleReductionState {
   debugLog ($paref, 'collectData|collectData_long', "State of Plant derating: $rdcstate, info: $info");
 
   if ($info ne 'reductionState not set') {
-      my $hod = sprintf "%02d", ($chour + 1);
+      my $hod = sprintf "%02d", ($chour + 1) % 24;
       my $pd  = HistoryVal ($name, $day, $hod, 'plantderated', 0);                                # evtl. schon gespeicherte Abregelungszeitpunkt
 
       if (!$pd && $rdcstate) {
@@ -14586,7 +14596,7 @@ sub _transferEnvironmentValues {
       }
   }   
   
-  my $hod = sprintf "%02d", ($chour + 1);  
+  my $hod = sprintf "%02d", ($chour + 1) % 24;  
 
   # --- Werte speichern
   if ($doct) {
@@ -16564,10 +16574,10 @@ sub _manageConsumerData {
   my $day   = $paref->{day};
   my $debug = $paref->{debug};
 
-  my $hash  = $defs{$name};
-  my $hod   = sprintf "%02d", ($chour + 1);
-  
+  my $hash     = $defs{$name};
+  my $hod      = sprintf "%02d", ($chour + 1) % 24;
   my $pcurrsum = 0;
+  
   $data{$name}{current}{surplusCycleCommitted} = 0;                                 # Anti-Toggling: das Surplus Budget zurücksetzen
   
   # --- Prio-Steuerung
@@ -16613,6 +16623,7 @@ sub _manageConsumerData {
       __planInitialSwitchTime ($paref);                                             # Consumer Switch Zeiten planen
       __setTimeframeState     ($paref);                                             # Timeframe Status ermitteln
       __setConsRcmdState      ($paref);                                             # Consumption Recommended Status setzen
+      __accumConRecommended   ($paref);                                             # ConsumptionRecommended zeitgewichtet akkumulieren
       __switchConsumer        ($paref);                                             # Consumer schalten  
       __getCyclesAndRuntime   ($paref);                                             # Verbraucher - Laufzeit, Tagesstarts und Aktivminuten pro Stunde ermitteln
       __reviewSwitchTime      ($paref);                                             # Planungsdaten überprüfen und ggf. neu planen
@@ -16656,8 +16667,8 @@ sub _manageConsumerData {
       $data{$name}{consumers}{$c}{state}          = $cstate;
       my ($pstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
       
-      my ($iilt,$rlt) = isInLocktime ($paref);                                                                    # Sperrzeit Status ermitteln
-      my $cplmode     = getConsumerPlanningMode ($hash, $c);                                                      # Planungsmode 'can' oder 'must'
+      my ($iilt,$rlt) = isInLocktime    ($paref);                                                                 # Sperrzeit Status ermitteln
+      my $cplmode     = getConsumerMode ($name, $c);                                                              # Planungsmode 'can' oder 'must'
       my $constate    = "name='$calias' state='$cstate'";
       $constate      .= " mode='$cplmode' planningstate='$pstate'";
       $constate      .= " remainLockTime='$rlt'" if($rlt);
@@ -16748,7 +16759,7 @@ sub __saveBEVvalues {
   
   return if($ctype ne 'bev' || !$cactive);                                                              # kein BEV oder Consumer nicht aktiviert 
   
-  my $hod = sprintf "%02d", ($chour + 1);
+  my $hod = sprintf "%02d", ($chour + 1) % 24;
   
   # --- Batteriekapazität
   my $batCapVal;
@@ -16809,7 +16820,7 @@ sub __savePowerAndEnergy {
   my $day     = $paref->{day};
   
   my $hash  = $defs{$name};
-  my $hod   = sprintf "%02d", ($chour + 1);
+  my $hod   = sprintf "%02d", ($chour + 1) % 24;
   
   if (!$cactive) {                                                                              # Consumer nicht aktiviert
       delete $data{$name}{consumers}{$c}{currpower};
@@ -16951,7 +16962,7 @@ sub __calcEnergyPieces {
   
   return if(!$cactive);                                                     # Consumer ist nicht aktiviert
   
-  my $hod   = sprintf "%02d", ($chour + 1);
+  my $hod  = sprintf "%02d", ($chour + 1) % 24;
 
   my $etot = HistoryVal ($name, $paref->{day}, $hod, "csmt${c}", 0);        # etotal zu Beginn der Stunde
   my $ecur = HistoryVal ($name, $paref->{day}, $hod, "csme${c}", 0);        # Energie Stunde bis jetzt
@@ -17185,7 +17196,7 @@ sub __planInitialSwitchTime {
 
   my $hash    = $defs{$name};
   my $dnp     = ___noPlanRelease ($paref);
-  my $cplmode = getConsumerPlanningMode ($hash, $c);                                            # Planungsmode 'can', 'must' oder 'mustNot'
+  my $cplmode = getConsumerMode  ($name, $c);                                                   # Planungsmode 'can', 'must' oder 'mustNot'
 
   if ($dnp) {                                                                                   # do not plan? -> generell keine Planungsfreigabe
       if ($dnp eq 'planned' && $cplmode eq 'mustNot') {                                         # anpassen falls schon geplant bei dynamischer Änderung
@@ -17368,10 +17379,10 @@ sub ___doPlanning {
 
   debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - first energy piece: $epiece1, PV share needed: $pvshare %, energy piece share: }.$epiece1 * $shfactor);
 
-  my $cplmode         = getConsumerPlanningMode ($hash, $c);                                           # Planungsmode 'can', 'must' oder 'mustNot'
-  my $oldplanstate    = ConsumerVal ($name, $c, 'planstate', '');                                      # V. 1.35.0
+  my $cplmode         = getConsumerMode ($name, $c);                                                    # Planungsmode 'can', 'must' oder 'mustNot'
+  my $oldplanstate    = ConsumerVal     ($name, $c, 'planstate', '');                                   # V. 1.35.0
 
-  my ($err, $mintime) = getConsumerMintime ( { name    => $name,                                       # Einplanungsdauer
+  my ($err, $mintime) = getConsumerMintime ( { name    => $name,                                        # Einplanungsdauer
                                                c       => $c,
                                                lang    => $lang,
                                                debug   => $debug,
@@ -17812,7 +17823,6 @@ return;
 sub __setConsRcmdState {
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
 
@@ -17854,6 +17864,7 @@ sub __setConsRcmdState {
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - IgnoreCondition - $info});
   }
 
+  # --- Emtscheidungsmatrix
   if (!defined $surplus) {                                                                # $surplus kann undef sein! -> dann bisherigen isConsumptionRecommended verwenden
       $data{$name}{consumers}{$c}{isConsumptionRecommended} = ReadingsVal ($name, "consumer${c}_ConsumptionRecommended", 0);
   }
@@ -17869,6 +17880,59 @@ sub __setConsRcmdState {
 
   if ($ccr =~ /$c/xs) {
       storeReading ("consumer${c}_ConsumptionRecommended", ConsumerVal ($hash, $c, 'isConsumptionRecommended', 0));
+  }
+
+return;
+}
+
+################################################################
+# PV-Überschuß getriebene Verbrauchsanteile zeitgewichtet 
+# akkumulieren
+################################################################
+sub __accumConRecommended {
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $chour  = $paref->{chour};
+  my $day    = $paref->{day};
+  my $c      = $paref->{consumer};
+  my $t      = $paref->{t};                                                     # aktueller Timestamp
+  my $minute = $paref->{minute};    
+  my $debug  = $paref->{debug};    
+ 
+  my $hod    = sprintf "%02d", ($chour + 1) % 24;
+   
+  my $rcmd    = ConsumerVal     ($name, $c, 'isConsumptionRecommended', 0);     # Verbrauchsempfehlung abhängig vom PV-Überschuß
+  my $cplmode = getConsumerMode ($name, $c);                                    # Planungsmode 'can', 'must' oder 'mustNot'
+  
+  $rcmd = $cplmode eq 'mustNot'                                                 # 'mustNot'-Status überstimmt Recommended=1 -> nicht PV-getrieben trotz PV-Überschuß + darauf aufbauender Empfehlung 
+        ? 0
+        : $rcmd;
+  
+  my $key           = "accum_csm${c}_rcmd_seconds";
+  my $accum_seconds = CircularVal ($name, 99, $key, 0);
+  my $last_check    = CircularVal ($name, 99, 'last_transfer', $t);
+  my $delta         = $t - $last_check;
+  my $dt            = timestringsFromOffset ($name, $last_check, 0);
+  my $lchkhour      = $dt->{hour};
+
+  if ($chour == $lchkhour) {
+      $accum_seconds                  += $delta if $rcmd;
+      $data{$name}{circular}{99}{$key} = $accum_seconds;
+      my $rcmd_weighted                = $rcmd;                                 # default: Momentwert
+       
+      if ($minute >= 30) {                                                      # erst ab Minute 30 bewerten
+          $rcmd_weighted = $accum_seconds >= 1800 ? 1 : 0;                      # 30 Minuten Schwelle = > 50% der Stunde empfohlen
+      }
+
+      writeToHistory ( { paref => $paref,
+                         key   => "rcmdcsm${c}",
+                         val   => $rcmd_weighted,
+                         day   => $day,
+                         hour  => $hod, 
+                       } );
+  }
+  else {
+      $data{$name}{circular}{99}{$key} = 0;                                     # neue Stunde -> Reset
   }
 
 return;
@@ -17927,22 +17991,22 @@ sub ___switchConsumerOn {
   }
 
   my $pstate    = ConsumerVal ($name, $c, 'planstate',        '');
-  my $startts   = ConsumerVal ($name, $c, 'planswitchon',  undef);                                # geplante Unix Startzeit
-  my $oncom     = ConsumerVal ($name, $c, 'oncom',            '');                                # Set Command für "on"
+  my $startts   = ConsumerVal ($name, $c, 'planswitchon',  undef);                                  # geplante Unix Startzeit
+  my $oncom     = ConsumerVal ($name, $c, 'oncom',            '');                                  # Set Command für "on"
   my $auto      = ConsumerVal ($name, $c, 'auto',              1);
   my $simpCstat = simplifyCstate ($pstate);
   my $isInTime  = isInTimeframe  ($hash, $c);
 
   my ($swoncond, $swoffcond, $infon, $infoff);
 
-  ($swoncond, $infon, $err) = isAddSwitchOnCond ($name, $c);                                      # zusätzliche Switch-on Bedingung
+  ($swoncond, $infon, $err) = isAddSwitchOnCond ($name, $c);                                        # zusätzliche Switch-on Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
-  ($swoffcond, $infoff, $err) = isAddSwitchOffCond ($hash, $c);                                   # zusätzliche Switch-off Bedingung
+  ($swoffcond, $infoff, $err) = isAddSwitchOffCond ($hash, $c);                                     # zusätzliche Switch-off Bedingung
   Log3 ($name, 1, "$name - $err") if($err);
 
-  my ($iilt,$rlt) = isInLocktime ($paref);                                                        # Sperrzeit Status ermitteln
-  my $cplmode     = getConsumerPlanningMode ($hash, $c);                                          # Planungsmode 'can', 'must' oder 'mustNot'
+  my ($iilt,$rlt) = isInLocktime    ($paref);                                                       # Sperrzeit Status ermitteln
+  my $cplmode     = getConsumerMode ($name, $c);                                                    # Planungsmode 'can', 'must' oder 'mustNot'
 
   if ($debug =~ /consumerSwitching${c}/x) {                                                           
       my $nompow     = ConsumerVal ($name, $c, 'power', '-');
@@ -18101,12 +18165,12 @@ sub ___switchConsumerOff {
   my $auto    = ConsumerVal ($name, $c, 'auto',              1);
   my $hyst    = ConsumerVal ($name, $c, 'hysteresis',  DEFHYST);                                    # Hysterese
 
-  my $offcom                   = ConsumerVal             ($name, $c, 'offcom', '');                 # Set Command für "off"
-  my ($swoffcond,$infoff,$err) = isAddSwitchOffCond      ($hash, $c);                               # zusätzliche Switch off Bedingung
-  my $simpCstat                = simplifyCstate          ($pstate);
-  my (undef, $cname, $dswname) = getCDnames              ($name, $c);                               # Consumer und Switch Device Name
-  my $isConsRcmd               = isConsRcmd              ($hash, $c);                               # Consumptionempfehlung
-  my $cplmode                  = getConsumerPlanningMode ($hash, $c);                               # Planungsmode 'can', 'must' oder 'mustNot'
+  my $offcom                   = ConsumerVal        ($name, $c, 'offcom', '');                      # Set Command für "off"
+  my ($swoffcond,$infoff,$err) = isAddSwitchOffCond ($hash, $c);                                    # zusätzliche Switch off Bedingung
+  my $simpCstat                = simplifyCstate     ($pstate);
+  my (undef, $cname, $dswname) = getCDnames         ($name, $c);                                    # Consumer und Switch Device Name
+  my $isConsRcmd               = isConsRcmd         ($hash, $c);                                    # Consumptionempfehlung
+  my $cplmode                  = getConsumerMode    ($name, $c);                                    # Planungsmode 'can', 'must' oder 'mustNot'
   my $cause;
 
   Log3 ($name, 1, "$name - $err") if($err);
@@ -18413,7 +18477,7 @@ sub __getCyclesAndRuntime {
   my $debug = $paref->{debug};
 
   my $hash  = $defs{$name};
-  my $hod   = sprintf "%02d", ($chour + 1);
+  my $hod   = sprintf "%02d", ($chour + 1) % 24;
 
   my ($starthour, $startday);
 
@@ -19866,7 +19930,7 @@ sub _saveEnergyConsumption {
   my $chour = $paref->{chour};
   my $debug = $paref->{debug};
 
-  my $hod     = sprintf "%02d", ($chour + 1);
+  my $hod     = sprintf "%02d", ($chour + 1) % 24;
   my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$hod.'_PVreal',          0);       # Reading enthält die Summe aller Inverterdevices
   my $gfeedin = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridFeedIn',      0);
   my $gcon    = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridConsumption', 0);
@@ -22286,8 +22350,8 @@ sub _graphicConsumerLegend {
 
       my ($planstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
       $supplmnt                                      = '-' if(!$supplmnt);
-      my ($iilt,$rlt)                                = isInLocktime ($paref);                         # Sperrzeit Status ermitteln
-      my $cplmode                                    = getConsumerPlanningMode ($hash, $c);           # Planungsmode 'can', 'must' oder 'mustNot'
+      my ($iilt,$rlt)                                = isInLocktime    ($paref);                      # Sperrzeit Status ermitteln
+      my $cplmode                                    = getConsumerMode ($name, $c);                   # Planungsmode 'can', 'must' oder 'mustNot'
 
       my $sm          = ConsumerVal ($name, $c, 'surpmeth', 'default');
       $sm             = $sm eq 'default' || $sm =~ /_/ ? $sm : $sm.'_all';
@@ -25386,12 +25450,14 @@ sub __aiAddRawData {
               my $evtgtsoc = HistoryVal ($name, $pvd, $hod, 'bevcsmTargSoC'.$c, undef);                         # eingestellter Ziel-SOC (%) des BEV-Verbrauchers XX 
               my $evbatcap = HistoryVal ($name, $pvd, $hod, 'bevcsmBatCap'.$c,  undef);                         # EV Batteriekapazität                     
               my $evcurpwr = HistoryVal ($name, $pvd, $hod, 'bevcsmPwr'.$c,     undef);                         # EV aktuelle Ladeleistung
+              my $rcmdcsm  = HistoryVal ($name, $pvd, $hod, 'rcmdcsm'.$c,       undef);                         # zeitgewichtete Nutzungsempfehlung für Verbraucher XX
               
               if (defined $csme)     { $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c}          = round0 ($csme) } 
               if (defined $evsoc)    { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmSoC'.$c}     = round0 ($evsoc) } 
               if (defined $evtgtsoc) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmTargSoC'.$c} = round0 ($evtgtsoc) }  
               if (defined $evbatcap) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmBatCap'.$c}  = round0 ($evbatcap) } 
               if (defined $evcurpwr) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmPwr'.$c}     = round0 ($evcurpwr) } 
+              if (defined $rcmdcsm)  { $data{$name}{aidectree}{airaw}{$ridx}{'rcmdcsm'.$c}       = $rcmdcsm } 
 
               for my $s (@hpStates) {                                                                           # WP Opmode-Minuten je Status
                   my $hppnt = HistoryVal ($name, $pvd, $hod, "csm${c}_${s}_points", undef);
@@ -25546,14 +25612,14 @@ return;
 #  Raw Daten Hash erzeugen
 ################################################################
 sub aiFannConDataLoad {
-  my $paref = shift;
-  my $name  = $paref->{name}; 
-  my $debug = $paref->{debug}; 
+  my $paref   = shift;
+  my $name    = $paref->{name}; 
+  my $debug   = $paref->{debug}; 
+  my $fanntyp = $paref->{fanntyp} // 'con';                                                  # FANN Verwendungsart
 
   my ($msg, $serial);
   
   my $pv_max_limit = _pvMaxLimit ($name);
-  my $fanntyp      = 'con';                                                                 # FANN Verwendungsart 'consumption' Prognose
 
   if (!$pv_max_limit ) {
       $msg = 'No peak output is provided by the PV system';
@@ -25600,6 +25666,26 @@ sub aiFannConDataLoad {
   my $dataParamRatio_limit = 7;                                                             # mindest Daten / Architektur-Parameter Ratio -> konservativ 8
   my $pvrl_prev            = 0;                                                             # virtueller Startwert PV real vor ersten Wert                                                
   
+  # Profil einmalig bestimmen
+  #############################
+  my $profile = CurrentVal ($name, 'aiConProfile', undef);                                  # verwendete Feature-Registry Version
+
+  if (!$profile) {
+      my @flags;
+      push @flags, 'heatpump' if defined isHeatPumpUsed ($name);
+      push @flags, 'bev'      if defined isBevUsed      ($name);
+
+      my ($synth, $err) = __aiFannSynthesizeProfile ($name, join (',', @flags) || 'v1');
+
+      if ($err) {
+          Log3 ($name, 1, "$name - ERROR - profile auto-detection failed: $err – using v1_common");
+          $profile = 'v1_common';
+      }
+      else {
+          $profile = $synth;
+      }
+  }  
+  
   # Rohdaten in Reihenfolge extrahieren und vorbereiten
   #######################################################  
   for my $idx (sort keys %{$data{$name}{aidectree}{airaw}}) {
@@ -25637,22 +25723,39 @@ sub aiFannConDataLoad {
           push @skipped, "$idx -> pvrlvd=false";
           next;
       }
+                  
+      # --- Verbrauch um PV-getriebenen Energieanteil bereinigen
+      my $dest_base = $rec->{$fanntyp};
       
-      my $month     = int (substr ($idx, 4, 2));                                        # Monat aus Index extrahieren und numerisch wandeln (1..12)
-      my $weekday   = $hwdmap{$rec->{dayname}};                                         # Wochentag numerisch (1..7)                   
-      my $inthod    = int ($rec->{hod});                                                # Stunde des Tages numerisch (1..24)
+      if ($profile !~ /pv/xs) {                                                                 # nur für Non-PV Profile bereinigen
+          for my $cn (1..MAXCONSUMER) {
+              my $c       = sprintf "%02d", $cn;
+              my $pvshare = ConsumerVal ($name, $c, 'pvshare', 100);                            # Soll-Anteil PV-Energie
+              
+              next unless $rec->{"rcmdcsm${c}"};                                                # nicht empfohlen -> Grundlast
+              next unless $pvshare >= 50;                                                       # pvshare < 50% -> Consumer läuft überwiegend netzgestützt -> Grundlast
+            
+              $dest_base -= $rec->{"csme${c}"} // 0;
+          }
+          
+          $dest_base = 0 if $dest_base < 0;                                                     # Clamp gegen negative Basiswerte
+      }
+      
+      # --- Inputwerte einlesen
+      my $month     = int (substr ($idx, 4, 2));                                                # Monat aus Index extrahieren und numerisch wandeln (1..12)
+      my $weekday   = $hwdmap{$rec->{dayname}};                                                 # Wochentag numerisch (1..7)                   
+      my $inthod    = int ($rec->{hod});                                                        # Stunde des Tages numerisch (1..24)
       my $sunaz     = $rec->{sunaz};
       my $sunalt    = $rec->{sunalt};
-      my $rr1c      = $rec->{rr1c};
-      my $con       = $rec->{con};   
-      my $comftemp  = $rec->{comforttemp} // HPCOMFTEMP;                                # Comport-Temp des Gebäudes
+      my $rr1c      = $rec->{rr1c};   
+      my $comftemp  = $rec->{comforttemp} // HPCOMFTEMP;                                        # Comport-Temp des Gebäudes
       my $pvrl      = clampValue ($rec->{pvrl} // 0, 0, $pv_max_limit);
       my $wcc       = clampValue ($rec->{wcc}, 0, 100);
       my $temp      = clampValue ($rec->{temp}, -40, 40);
-      my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                  # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend'
-      my $holiday   = defined $rec->{holiday}  ? $rec->{holiday}  : 0;                  # nicht definierte Feiertage/Uerlaub als 0 belegen
-      my $bev_sig   = _aiFannBevConsumerAggregate ($rec);                               # BEV Aggregate
-      my $hp_sig    = _aiFannHpOpmodeAggregate    ($rec);                               # HP Opmode Aggregate
+      my $presence  = defined $rec->{presence} ? $rec->{presence} : 1;                          # nicht definierte Anwesenheiten in der Vergangenheit als 'anwesend'
+      my $holiday   = defined $rec->{holiday}  ? $rec->{holiday}  : 0;                          # nicht definierte Feiertage/Uerlaub als 0 belegen
+      my $bev_sig   = _aiFannBevConsumerAggregate ($rec);                                       # BEV Aggregate
+      my $hp_sig    = _aiFannHpOpmodeAggregate    ($rec);                                       # HP Opmode Aggregate
 
       
       # Ableitungen und Normierungen
@@ -25669,23 +25772,23 @@ sub aiFannConDataLoad {
       my $day_hour_norm        = $isday  ? $hour_norm : 0;                                      # Tagstunden normiert, sonst 0
       my $night_hour_norm      = !$isday ? $hour_norm : 0;                                      # Nachtstunden normiert, sonst 0  
       
-      $pvrl_prev = $pvrl;                                                               # pvrl ist Vorgänger für nächsten loop
+      $pvrl_prev = $pvrl;                                                                       # pvrl ist Vorgänger für nächsten loop
       
       # Monat 1..12 -> 0..11
       my $month0 = $month - 1;    
-      my ($month_sin, $month_cos) = _aiFannEncodeCyclic ($month0,  12, $range);         # Monat, zyklische Struktur (0 .. 11)
+      my ($month_sin, $month_cos) = _aiFannEncodeCyclic ($month0,  12, $range);                 # Monat, zyklische Struktur (0 .. 11)
       
       # Stunde 1..24 -> 0..23
       my $hod0 = $inthod - 1;
-      my ($hod_sin, $hod_cos)     = _aiFannEncodeCyclic ($hod0, 24, $range);            # Stunde des Tages zyklisch (0 .. 23)
+      my ($hod_sin, $hod_cos)     = _aiFannEncodeCyclic ($hod0, 24, $range);                    # Stunde des Tages zyklisch (0 .. 23)
       
       # Wochentag 1..7 -> 0..6
       my $wday0 = $weekday - 1;   
-      my ($wday_sin, $wday_cos)   = _aiFannEncodeCyclic ($wday0, 7, $range);            # Wochentag in zyklischer Struktur (0..6)
+      my ($wday_sin, $wday_cos)   = _aiFannEncodeCyclic ($wday0, 7, $range);                    # Wochentag in zyklischer Struktur (0..6)
 
       # Sonnenazimut 0..360 -> 0..359
       my $sunaz0 = $sunaz % 360; 
-      my ($sunaz_sin, $sunaz_cos) = _aiFannEncodeCyclic ($sunaz0, 360, $range);         # Sonnenazimut zyklisch (0 .. 359)
+      my ($sunaz_sin, $sunaz_cos) = _aiFannEncodeCyclic ($sunaz0, 360, $range);                 # Sonnenazimut zyklisch (0 .. 359)
           
           
       # Inputs zusammenstellen
@@ -25695,7 +25798,7 @@ sub aiFannConDataLoad {
       
       # Daten für Min-Max Normierung
       ################################
-      push @rr1cs, $rr1c;                                                              # Niederschlag, numerisch -> Min-Max später
+      push @rr1cs, $rr1c;                                                                       # Niederschlag, numerisch -> Min-Max später
       
       # Daten für FeatureBuilder vorbereiten
       ######################################## 
@@ -25739,7 +25842,7 @@ sub aiFannConDataLoad {
                                 
       # Zielwert
       ############
-      my @output = ($con);                                                                  # Consumption, numerisch -> Min-Max später
+      my @output = ($dest_base);                                                            # Zielwert, numerisch -> Min-Max später
       
       push @training_data, \@inputs;
       push @targets,       \@output;                                                        # realer Verbrauch in zeitlicher Reihenfolge
@@ -25790,26 +25893,6 @@ sub aiFannConDataLoad {
   # Lag Normierungen erstellen
   ##############################
   my $lagnorm_ref = _aiFannCreateLagNorms (\@flat_targets, $targminval, $targmaxval, $range);   
-
-  # Profil einmalig bestimmen
-  #############################
-  my $profile = CurrentVal ($name, 'aiConProfile', undef);                                                  # verwendete Feature-Registry Version
-
-  if (!$profile) {
-      my @flags;
-      push @flags, 'heatpump' if defined isHeatPumpUsed ($name);
-      push @flags, 'bev'      if defined isBevUsed      ($name);
-
-      my ($synth, $err) = __aiFannSynthesizeProfile ($name, join (',', @flags) || 'v1');
-
-      if ($err) {
-          Log3 ($name, 1, "$name - ERROR - profile auto-detection failed: $err – using v1_common");
-          $profile = 'v1_common';
-      }
-      else {
-          $profile = $synth;
-      }
-  } 
   
   # Zusammenführen für Training
   ################################
@@ -31686,7 +31769,7 @@ sub _listDataPoolPvHist {
               
               for my $field (qw (cyclescsm csmt csme minutescsm hourscsme avgcycmntscsm
                                 bevcsmSoC bevcsmTargSoC bevcsmBatCap bevcsmPwr) ) {
-                  my $fkey = "${field}${cf}";
+                  my $fkey      = "${field}${cf}";
                   $entry{$fkey} = HistoryVal ($name, $day, $key, $fkey, undef);
               }
               
@@ -31694,6 +31777,8 @@ sub _listDataPoolPvHist {
                   my $fkey = "csm${cf}_${s}_points";
                   $entry{$fkey} = HistoryVal ($name, $day, $key, $fkey, undef);
               }
+              
+              $entry{"rcmdcsm${cf}"} = HistoryVal ($name, $day, $key, "rcmdcsm${cf}", undef);
           }
 
           # ----- Key-Filter anwenden ---------------------------------------------
@@ -31777,10 +31862,11 @@ sub _listDataPoolPvHist {
                   $csvmap{"bevcsmTargSoC${cf}"} = "BEVcsmTargSoC${cf}";
                   $csvmap{"bevcsmBatCap${cf}"}  = "BEVcsmBatCap${cf}";
                   $csvmap{"bevcsmPwr${cf}"}     = "BEVcsmPwr${cf}";
+                  $csvmap{"rcmdcsm${cf}"}       = "RcmdCsm${cf}";
                   
                   for my $s (@hpStates) {                                                               # + WP Opmode-Minuten je Status
                       $csvmap{"csm${cf}_${s}_points"} = "Csm${cf}" . ucfirst ($s) . "Points";
-                  }
+                  } 
               }
 
               for my $fkey (keys %entry) {
@@ -31910,9 +31996,9 @@ sub _listDataPoolPvHist {
               }
               else {                                                                                        # Stundenwerte: Energie, Minuten, BEV-Daten
                   @cfields  = map { "${_}${cf}" }
-                              qw (csmt csme minutescsm bevcsmSoC 
+                              qw (csmt csme minutescsm rcmdcsm bevcsmSoC 
                                   bevcsmTargSoC bevcsmBatCap bevcsmPwr);
-                  @hpfields = map { "csm${cf}_${_}_points" } @hpStates;                                    # WP Opmode-Minuten, separat behandelt
+                  @hpfields = map { "csm${cf}_${_}_points" } @hpStates;                                     # WP Opmode-Minuten, separat behandelt
               }
 
               my @show = grep { defined $entry{$_} && $entry{$_} ne '' && $entry{$_} ne '-' } @cfields;
@@ -32212,6 +32298,22 @@ sub _listDataPoolCircular {
               $hpwsec .= "\n      " if($hpwsec);
               $hpwsec .= $cnwsec;
           }
+          
+          # --- accum_csm rcmd_seconds (ConsumptionRecommended gewichtete Sekunden)
+          my $rcmdsec;
+          my $keycount = 0;
+          
+          for my $cn (1..MAXCONSUMER) {
+              $cn     = sprintf "%02d", $cn;
+              my $key = "accum_csm${cn}_rcmd_seconds";
+              my $val = CircularVal ($name, $idx, $key, undef);
+              next if !defined $val;
+              
+              $rcmdsec  .= ', '       if( $rcmdsec && $keycount % 4 != 0);
+              $rcmdsec  .= "\n      " if( $rcmdsec && $keycount % 4 == 0);
+              $rcmdsec .= "${key}: $val";
+              $keycount++;
+          }
 
           for my $bn (1..MAXBATTERIES) {                                            # + alle Batterien
               $bn          = sprintf "%02d", $bn;
@@ -32255,7 +32357,8 @@ sub _listDataPoolCircular {
           $sq .= "      runTimeTrainAI: $rtaitr, aitrainLastFinishTs: $fsaitr, aiRulesNumber: $airn \n";
           $sq .= "      conNNRuntimeTrain: $nnrtt, conNNTrainLastFinishTs: $nntlfts \n";
           $sq .= "      last_transfer: $ltransfer, accum_presence_seconds: $accum_secs \n";
-          $sq .= "      $hpwsec\n" if($hpwsec);
+          $sq .= "      $hpwsec\n"  if($hpwsec);
+          $sq .= "      $rcmdsec\n" if($rcmdsec);
           $sq .= "      attrInvChangedTs: $aicts \n";
       }
   }
@@ -32557,8 +32660,9 @@ sub _listDataPoolAiRawData {
       my $hpcsm         = AiRawdataVal ($name, $idx, 'hpcsm',          '-');
       my $bevcsm        = AiRawdataVal ($name, $idx, 'bevcsm',         '-');
       
-      my ($csm, $hpm);
+      my ($csm, $hpm, $csmrcm);
       my $hpmCnt = 0; 
+      my $rcmCnt = 0;
       
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
           $c           = sprintf "%02d", $c;
@@ -32567,6 +32671,7 @@ sub _listDataPoolAiRawData {
           my $evtgtsoc = AiRawdataVal ($name, $idx, 'bevcsmTargSoC'.$c, undef);
           my $evbatcap = AiRawdataVal ($name, $idx, 'bevcsmBatCap'.$c,  undef);
           my $evcurpwr = AiRawdataVal ($name, $idx, 'bevcsmPwr'.$c,     undef);
+          my $rcmdcsm  = AiRawdataVal ($name, $idx, 'rcmdcsm'.$c,       undef);
 
           if (defined $csme) {
               $csm .= ", " if($csm);
@@ -32591,6 +32696,14 @@ sub _listDataPoolAiRawData {
           if (defined $evcurpwr) {
               $csm .= ", " if($csm);
               $csm .= "bevcsmPwr${c}: $evcurpwr";
+          }
+          
+          if (defined $rcmdcsm) {
+              if ($csmrcm) {
+                  $csmrcm .= ($rcmCnt % 10 == 0) ? "\n              " : ", ";           # alle X Einträge neue Zeile
+              }
+              $csmrcm .= "rcmdcsm${c}: $rcmdcsm";
+              $rcmCnt++;             
           }
           
           for my $s (@hpStates) {                                                       # WP Opmode-Minuten je Status
@@ -32618,11 +32731,16 @@ sub _listDataPoolAiRawData {
       $sq .= "presence: $presence, holiday: $holiday ";
       $sq .= "\n              "; 
       $sq .= "hpcsm: $hpcsm, bevcsm: $bevcsm";
+
+      if (defined $csmrcm) {
+          $sq .= "\n              ";
+          $sq .= $csmrcm;
+      }   
       
       if (defined $csm) {
-          $sq .= ", ";
+          $sq .= "\n              ";
           $sq .= $csm; 
-      }
+      }   
       
       if (defined $hpm) {
           $sq .= "\n              ";
@@ -34422,28 +34540,24 @@ return;
 }
 
 ################################################################
-#  Funktion liefert den Planungsmodus eines Verbrauchers
+#  Funktion liefert den 'mode' eines Verbrauchers
 #  mode kann sein:
 #       can
 #       must
 #       mustNot
 ################################################################
-sub getConsumerPlanningMode {
-  my $hash = shift;
-  my $c    = shift;
+sub getConsumerMode {
+  my ($name, $c) = @_;
 
-  my $name        = $hash->{NAME};
-  my $cplmode     = ConsumerVal ($name, $c, 'mode', DEFCMODE);                                       # Consumer Planungsmode
-  my $globalmode  = CurrentVal  ($name, 'globalMode', 'unset');                                      # globaler Mode
-  
-  $cplmode        = $globalmode if($globalmode ne 'unset');
+  my $cplmode    = ConsumerVal ($name, $c, 'mode', DEFCMODE);                                       # Consumer Planungsmode
+  my $globalmode = CurrentVal  ($name, 'globalMode', 'unset');                                      # globaler Mode
+  $cplmode       = $globalmode if($globalmode ne 'unset');
 
   if ($cplmode =~ /^(?:can|must|mustNot)$/xs) {
       return $cplmode;
   }
 
-  ## Mode kann über Device:Reading gesteuert sein
-  #################################################
+  # --- Device:Reading Mode
   my ($dv, $rd) = split ':', $cplmode;
   my ($err)     = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
 
@@ -34452,11 +34566,10 @@ sub getConsumerPlanningMode {
       return DEFCMODE;
   }
 
-  $err     = q{};
   $cplmode = ReadingsVal ($dv, $rd, '');
 
   if ($cplmode !~ /^(?:can|must|mustNot)$/xs) {
-      Log3 ($name, 1, qq{$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to 'DEFCMODE' mode.});
+      Log3 ($name, 1, "$name - ERROR - consumer >$c< - The reading '$rd' of device '$dv' is invalid or doesn't contain a valid mode. Fall back to ".DEFCMODE." mode.");
       return DEFCMODE;
   }
 
@@ -38613,6 +38726,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as copromitted                 </td></tr>
             <tr><td> <b>pvcorrf</b>         </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
+            <tr><td> <b>rcmdcsmXX</b>       </td><td>time-weighted PV-driven activation recommendation for consumer XX with mode ≠ 'mustNot'                                  </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
             <tr><td> <b>socwhsum</b>        </td><td>real SoC achieved (Wh) summarized across all batteries                                                                   </td></tr>
             <tr><td> <b>socprogwhsum</b>    </td><td>predicted SoC (Wh) summarized across all batteries                                                                       </td></tr>
@@ -38642,8 +38756,9 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>accum_presence_seconds</b> </td><td>accumulated seconds with status 'Presence' of residents in the current evaluation cycle (auxiliary value)             </td></tr>
+            <tr><td> <b>accum_presence_seconds</b>            </td><td>accumulated seconds with status 'Presence' of residents in the current evaluation cycle (auxiliary value)  </td></tr>
             <tr><td> <b>accum_csmXX_&lt;mode&gt;_wseconds</b> </td><td>accumulated seconds for Consumer XX in operating mode &lt;mode&gt; (auxiliary value)                       </td></tr>
+            <tr><td> <b>accum_csmXX_rcmd_seconds</b>          </td><td>accumulated seconds with PV-driven consumption recommendation for Consumer XX where mode ≠ 'mustNot'       </td></tr>
             <tr><td> <b>aihit</b>                  </td><td>Delivery status of the AI for the PV forecast (0-no delivery, 1-delivery)                                             </td></tr>
             <tr><td> <b>attrInvChangedTs</b>       </td><td>Time stamp of the last change to the inverter device definition                                                       </td></tr>
             <tr><td> <b>batinXX</b>                </td><td>Battery XX charge (Wh)                                                                                                </td></tr>
@@ -39095,10 +39210,10 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>globalMode</b>          </td><td>Sets the planning mode globally for all consumers. This setting takes precedence over specific mode settings.                                      </td></tr>
             <tr><td>                            </td><td>The meaning of the options is identical to the setting of the specific <i>consumerXX->mode</i>:                                                    </td></tr>
-            <tr><td>                            </td><td><b>unset</b> - No global mode setting; consumer-specific mode applies. Corresponds to an unset attribute key.                                      </td></tr>
+            <tr><td>                            </td><td><b>unset</b> - No global mode setting; consumer-specific mode applies. (default)                                                                   </td></tr>
 			<tr><td>                            </td><td><b>can</b>  - Scheduling takes place at a time when there is likely to be sufficient PV surplus available.                                         </td></tr>
-            <tr><td>                            </td><td><b>must</b> - The consumer is optimally scheduled, even if there is likely to be insufficient PV surplus available.                                </td></tr>
-            <tr><td>                            </td><td><b>mustNot</b> - The consumer must not be scheduled or started. Started consumers are stopped.                                                     </td></tr>
+            <tr><td>                            </td><td><b>must</b> - Consumers will be optimally scheduled even if there is likely to be insufficient surplus PV power available.                         </td></tr>
+            <tr><td>                            </td><td><b>mustNot</b> - Consumers must not be scheduled or started. Consumers that have been started will be stopped.                                     </td></tr>
             <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>showLegend</b>          </td><td>Defines the position or display method of the consumer legend if consumers are registered.                                                         </td></tr>
             <tr><td>                            </td><td>To hide the consumer panel, please use <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>.                                              </td></tr>
@@ -39203,7 +39318,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>2</b> - as with '1', but the consumer's planning data is included in the forecast for the coming hours.                                              </td></tr>
             <tr><td>                       </td><td><b>Note:</b> When using exconfc, <b>plantControl->consForecastIdentWeekdays=1</b> and <b>plantControl->consForecastLastDays=4</b>                       </td></tr>
             <tr><td>                       </td><td>should be set.                                                                                                                                          </td></tr>
-            <tr><td>                       </td><td>See the explanations in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wie_wird_die_Verbrauchsprognose_erstellt?' target='_blank'>German Wiki</a>  </td></tr>
+            <tr><td>                       </td><td>See the explanations in the <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Die_Legacy-Verbrauchsprognose_einstellen' target='_blank'>German Wiki</a>  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>icon</b>           </td><td>&lt;Icon&gt;[@&lt;Color&gt;] - Icon and, if applicable, its color for displaying the consumer in the overview graphic (optional)                        </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
@@ -41725,6 +41840,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als komprimittiert bewertet   </td></tr>
             <tr><td> <b>pvcorrf</b>         </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                           </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>Globalstrahlung (kJ/m2)                                                                                </td></tr>
+            <tr><td> <b>rcmdcsmXX</b>       </td><td>zeitgewichtete PV-getriebene Aktivierungsempfehlung des VerbrauchersXX mit mode ≠ 'mustNot'            </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                         </td></tr>
             <tr><td> <b>socwhsum</b>        </td><td>real erreichter SoC (Wh) zusammengefasst über alle Batterien                                           </td></tr>
             <tr><td> <b>socprogwhsum</b>    </td><td>prognostizierter SoC (Wh) zusammengefasst über alle Batterien                                          </td></tr>
@@ -41754,8 +41870,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="25%"> <col width="75%"> </colgroup>
-            <tr><td> <b>accum_presence_seconds</b> </td><td>akkumulierte Sekunden mit Status 'Anwesenheit' der Bewohner im laufenden Bewertungszyklus (Hilfswert)                     </td></tr>
+            <tr><td> <b>accum_presence_seconds</b>            </td><td>akkumulierte Sekunden mit Status 'Anwesenheit' der Bewohner im laufenden Bewertungszyklus (Hilfswert)          </td></tr>
             <tr><td> <b>accum_csmXX_&lt;mode&gt;_wseconds</b> </td><td>akkumulierte Sekunden des Consumer XX im Betriebsmodus &lt;mode&gt; (Hilfswert)                                </td></tr>
+            <tr><td> <b>accum_csmXX_rcmd_seconds</b>          </td><td>akkumulierte Sekunden mit PV-getriebener Verbrauchsempfehlung für Consumer XX mit mode ≠ 'mustNot'             </td></tr>
             <tr><td> <b>aihit</b>                  </td><td>Lieferstatus der KI für die PV Vorhersage (0-keine Lieferung, 1-Lieferung)                                                </td></tr>
             <tr><td> <b>attrInvChangedTs</b>       </td><td>Zeitstempel der letzten Änderung der Inverter Gerätedefinition                                                            </td></tr>
             <tr><td> <b>batinXX</b>                </td><td>Ladung der Batterie XX (Wh)                                                                                               </td></tr>
@@ -42206,10 +42323,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>globalMode</b>          </td><td>Setzt den Planungsmodus global für alle Verbraucher. Diese Einstellung ist dominant gegenüber spezifischen mode Einstellungen.                     </td></tr>
             <tr><td>                            </td><td>Die Bedeutung der Optionen ist identisch mit der Einstellung des spezifischen <i>consumerXX->mode</i>:                                             </td></tr>
-            <tr><td>                            </td><td><b>unset</b> - keine globale mode Einstellung, es gilt der verbraucherspezifische mode. Entspricht einem nicht gesetzten Attributschlüssel.        </td></tr>
+            <tr><td>                            </td><td><b>unset</b> - keine globale mode Einstellung, es gilt der verbraucherspezifische Modus (default)                                                  </td></tr>
 			<tr><td>                            </td><td><b>can</b>  - die Einplanung erfolgt zum Zeitpunkt mit wahrscheinlich genügend verfügbaren PV Überschuß                                            </td></tr>
-            <tr><td>                            </td><td><b>must</b> - der Verbraucher wird optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                   </td></tr>
-            <tr><td>                            </td><td><b>mustNot</b> - Der Verbraucher darf nicht geplant bzw. gestartet werden. Gestartete Verbraucher werden gestoppt                                  </td></tr>
+            <tr><td>                            </td><td><b>must</b> - Verbraucher werden optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                     </td></tr>
+            <tr><td>                            </td><td><b>mustNot</b> - Verbraucher dürfen nicht geplant bzw. gestartet werden. Gestartete Verbraucher werden gestoppt                                    </td></tr>
             <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>showLegend</b>          </td><td>Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher registriert sind.                                              </td></tr>
             <tr><td>                            </td><td>Zur Ausblendung des Verbraucherpaneels bitte <a href="#SolarForecast-attr-graphicSelect ">graphicSelect</a> verwenden.                             </td></tr>
@@ -42314,7 +42431,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>2</b> - wie bei '1', jedoch gehen die Planungsdaten des Verbrauchers bei der Prognose der kommenden Stunden wieder mit ein.                     </td></tr>
             <tr><td>                       </td><td><b>Hinweis:</b> Bei Verwendung von exconfc sollte <b>plantControl->consForecastIdentWeekdays=1</b> und <b>plantControl->consForecastLastDays=4</b> </td></tr>
             <tr><td>                       </td><td>gesetzt werden.                                                                                                                                    </td></tr>
-            <tr><td>                       </td><td>Siehe dazu die Erläuterungen im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Wie_wird_die_Verbrauchsprognose_erstellt?' target='_blank'>Wiki</a>  </td></tr>
+            <tr><td>                       </td><td>Siehe dazu die Erläuterungen im <a href='https://wiki.fhem.de/wiki/SolarForecast_-_Solare_Prognose_(PV_Erzeugung)_und_Verbrauchersteuerung#Die_Legacy-Verbrauchsprognose_einstellen' target='_blank'>Wiki</a>  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>icon</b>           </td><td>&lt;Icon&gt;[@&lt;Farbe&gt;] - Icon und optional dessen Farbe zur Darstellung des Verbrauchers in der Übersichtsgrafik (optional)                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
