@@ -1982,8 +1982,8 @@ lags => sub {
 daily_energy_context => sub {
     my ($f) = @_;
     return [
-        $f->{cum_day_norm},                                                 # Wieviel heute schon verbraucht
-        $f->{cum_day_deviation},                                            # Über/Unter Erwartungspfad
+        $f->{cum_day_norm},                                                         # Wieviel heute schon verbraucht
+        $f->{cum_day_deviation},                                                    # Über/Unter Erwartungspfad
     ];
 },
 
@@ -1993,10 +1993,10 @@ daily_energy_context => sub {
 trends => sub {
     my ($f) = @_;
     return [
-        $f->{trend_up_strength},                                            # Trendrichtung Steigender Verbrauchstrend
-        $f->{trend_down_strength},                                          # Fallender Verbrauchstrend
-        $f->{volatility_flag},                                              # Kurzfristige Unruhe Gerätewechsel, Kochen, Aktivität
-        $f->{trend_break},                                                  # Trendbruch (Peak oder Lastabwurf)
+        $f->{trend_up_strength},                                                    # Trendrichtung Steigender Verbrauchstrend
+        $f->{trend_down_strength},                                                  # Fallender Verbrauchstrend
+        $f->{volatility_flag},                                                      # Kurzfristige Unruhe Gerätewechsel, Kochen, Aktivität
+        $f->{trend_break},                                                          # Trendbruch (Peak oder Lastabwurf)
     ];
 },
 
@@ -2007,9 +2007,9 @@ weather_pv => sub {
     my ($f) = @_;
     return [
         $f->{temp_norm},
-        $f->{wcc_norm},                                                     # Bewölkung – PV-Erzeugung & Lichtbedarf
-        $f->{rr1c_norm},                                                    # Niederschlag – Aktivität, Licht, Heizung
-        $f->{pv_norm},                                                      # PV-Erzeugung – Grundsignal
+        $f->{wcc_norm},                                                             # Bewölkung – PV-Erzeugung & Lichtbedarf
+        $f->{rr1c_norm},                                                            # Niederschlag – Aktivität, Licht, Heizung
+        $f->{pv_norm},                                                              # PV-Erzeugung – Grundsignal
     ];
 },
 
@@ -2021,6 +2021,16 @@ pv => sub {
     return [        
         $f->{pv_jump},                                                              # Plötzlicher PV-Anstieg (Wolkenloch) # verlegt
         $f->{pv_drop},                                                              # Plötzlicher PV-Abfall (Wolke)       # verlegt
+    ];
+},
+
+# --------------------------------------------------------
+# Consumer Energy Lags
+# --------------------------------------------------------
+cycle_consumer => sub {
+    my ($f) = @_;
+    return [
+        $f->{cycle_csme_lag1_norm},                                                 # Zyklus-Consumer Energiemenge Vorstunde (normiert)
     ];
 },
 
@@ -25653,6 +25663,7 @@ sub aiFannConDataLoad {
   my (@bev_energy_remaining_values, @bev_charge_intensity_values);
   my (@hp_heating_frac_values, @hp_defrost_frac_values, @hp_hotwater_frac_values, @hp_cooling_frac_values,  
       @hp_pool_frac_values,   @hp_poolheating_frac_values, @hp_active_frac_values);
+  my @cycle_csme_values;
   
   # einstellbare Parameter
   ##########################
@@ -25739,11 +25750,26 @@ sub aiFannConDataLoad {
               
               next unless $rec->{"rcmdcsm${c}"};                                                # nicht empfohlen -> Grundlast
               next unless $pvshare >= 50;                                                       # pvshare < 50% -> Consumer läuft überwiegend netzgestützt -> Grundlast
-            
-              $dest_base -= $rec->{"csme${c}"} // 0;
+              
+              my $val     = $rec->{"csme${c}"} // 0;
+              $dest_base -= max (0, $val);
           }
           
           $dest_base = 0 if $dest_base < 0;                                                     # Clamp gegen negative Basiswerte
+      }
+      
+      # --- Zyklus-Consumer Aggregat (nicht-WP, nicht-BEV)
+      my $cycle_csme = 0;
+      
+      for my $cn (1..MAXCONSUMER) {
+          my $c    = sprintf "%02d", $cn;
+          my $type = ConsumerVal ($name, $c, 'type', '');
+          
+          next unless $type;
+          next if $type =~ /heatpump|bev/xs;                                                    # durch eigene Features abgedeckt
+          
+          my $val      = $rec->{"csme${c}"} // 0;
+          $cycle_csme += max (0, $val);                                                         # Schutz gegen negative Werte
       }
       
       # --- Inputwerte einlesen
@@ -25844,6 +25870,8 @@ sub aiFannConDataLoad {
       push @hp_pool_frac_values,         $hp_sig->{pool_frac};
       push @hp_poolheating_frac_values,  $hp_sig->{poolheating_frac};
       push @hp_active_frac_values,       $hp_sig->{active_frac};
+   
+      push @cycle_csme_values,           $cycle_csme;
                                 
       # Zielwert
       ############
@@ -25861,7 +25889,7 @@ sub aiFannConDataLoad {
       for my $ign (@skipped) {
           debugLog ($paref, 'aiProcess_long', "AI FANN - dataset skipped - $ign");    
       }
-  }
+  } 
   
   # Mindestanzahl an gültigen Datensätzen prüfen
   ################################################
@@ -25885,7 +25913,8 @@ sub aiFannConDataLoad {
   ################################################################
   my ($rr1c_norm, $rr1min, $rr1max)                       = _aiFannNormalizeMinMax (\@rr1cs);          
   my ($bev_load_norm, $bevloadmin, $bevloadmax)           = _aiFannNormalizeMinMax (\@bev_load_values); 
-  my ($bev_energy_remaining_norm, $bevremmin, $bevremmax) = _aiFannNormalizeMinMax (\@bev_energy_remaining_values);  
+  my ($bev_energy_remaining_norm, $bevremmin, $bevremmax) = _aiFannNormalizeMinMax (\@bev_energy_remaining_values);
+  my ($cycle_csme_norm, $cyclecsmmin, $cyclecsmmax)       = _aiFannNormalizeMinMax (\@cycle_csme_values);  
   
   # Min-Max Normierung für Zielwert(e)
   ######################################
@@ -25908,19 +25937,23 @@ sub aiFannConDataLoad {
                                              i                                 => $i,
                                              norms                             => $lagnorm_ref,
                                              range                             => $range,
+                                             
                                              bev_active_series                 => \@bev_active_values,
                                              bev_load_norm_series              => $bev_load_norm,
                                              bev_n_active_series               => \@bev_n_active_values,
                                              bev_soc_deficit_norm_series       => \@bev_soc_deficit_norm_values,
                                              bev_energy_remaining_norm_series  => $bev_energy_remaining_norm,
                                              bev_charge_intensity_series       => \@bev_charge_intensity_values,
+                                             
                                              hp_heating_frac_series            => \@hp_heating_frac_values,
                                              hp_defrost_frac_series            => \@hp_defrost_frac_values,
                                              hp_hotwater_frac_series           => \@hp_hotwater_frac_values,
                                              hp_cooling_frac_series            => \@hp_cooling_frac_values,
                                              hp_pool_frac_series               => \@hp_pool_frac_values,
                                              hp_poolheating_frac_series        => \@hp_poolheating_frac_values,
-                                             hp_active_frac_series             => \@hp_active_frac_values,                                             
+                                             hp_active_frac_series             => \@hp_active_frac_values, 
+                                             
+                                             cycle_csme_norm_series            => $cycle_csme_norm,                                             
                                            } ); 
 
       my $sigs = _aiFannCreateAddOnSignals ( { lags              => $lags,                                  # diskrete, semantische Zusatzsignale
@@ -26078,6 +26111,8 @@ sub aiFannConDataLoad {
                          hp_poolheating_frac_lag1  => $lags->{hp_poolheating_frac_lag1},        # WP Poolheizung Anteil Vorstunde
                          hp_active_frac_lag1       => $lags->{hp_active_frac_lag1},             # WP Aktivitätsgrad Vorstunde (0..1)
                          
+                         cycle_csme_lag1_norm      => $lags->{cycle_csme_lag1_norm},            # Zyklus-Consumer Energiemenge Vorstunde (normiert)
+                         
                          ww_morning                => $sigs->{ww_morning},                      # Warmwasser morgens
                          ww_evening                => $sigs->{ww_evening},                      # Warmwasser abends
                          ww_cold_boost             => $sigs->{ww_cold_boost},                   # Kältebedingter WW-Boost
@@ -26115,7 +26150,6 @@ sub aiFannConDataLoad {
           push @{ $training_data[$i] }, @{$features}; 
       }       
   }
-
 
   # Finalisierungen
   ###################
@@ -26195,6 +26229,8 @@ sub aiFannConDataLoad {
   $paref->{bevloadmax}           = $bevloadmax;
   $paref->{bevremmin}            = $bevremmin;
   $paref->{bevremmax}            = $bevremmax;
+  $paref->{cyclecsmmin}          = $cyclecsmmin;
+  $paref->{cyclecsmmax}          = $cyclecsmmax;
 
   $serial = aiFannTrain ($paref);
 
@@ -27007,6 +27043,8 @@ sub aiFannRunTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{bevloadmax}     = $paref->{bevloadmax};
   $data{$name}{$fanntyp.'temp'}{$attempt}{bevremmin}      = $paref->{bevremmin};
   $data{$name}{$fanntyp.'temp'}{$attempt}{bevremmax}      = $paref->{bevremmax};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{cyclecsmmin}    = $paref->{cyclecsmmin};
+  $data{$name}{$fanntyp.'temp'}{$attempt}{cyclecsmmax}    = $paref->{cyclecsmmax};
   
   $data{$name}{$fanntyp.'temp'}{$attempt}{lagNorms}       = encode_base64 (Serialize ( $paref->{lagnorm_ref} ), "");    # Serialisierung
   $data{$name}{$fanntyp.'temp'}{$attempt}{FannBlob}       = $blob;                                                      # BLOB im Hash ablegen
@@ -27212,15 +27250,21 @@ sub aiFannConInfer {
                                    fanntyp => $fanntyp,
                                    t       => $paref->{t},
                                    limit   => 600,
-                                 } );                                                           # WP Aggregationen aus pvHistory lesen                                
+                                 } );                                                           # WP Aggregationen aus pvHistory lesen  
+
+  my ($cycle_csme_raw_ref) =
+      _aiFannCycleConsumerHistArray ( { name    => $name,
+                                        fanntyp => $fanntyp,
+                                        t       => $paref->{t},
+                                        limit   => 600,
+                                      } );                                                      # Consumer Energie Aggregate aus pvHistory lesen              
 
   my @flat_targets     = @$targetref;
   my @temps            = @$tempsref;
   my @temp_norm_values = map { _aiFannNormTemp ($_, $range) } @temps;                           # Temperaturen symmetrisch oder asymmetriech normalisieren
   my @presence_values  = @$presref;
 
-  # Lag-Norms auslesen
-  ######################
+  # --- Lag-Norms auslesen
   if (!defined $data{$name}{neuralnet}{$fanntyp} || !defined $data{$name}{neuralnet}{$fanntyp}{lagNorms}) {
       $msg = 'Lag-Norms is not available. New training is required.'; 
       $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
@@ -27230,17 +27274,21 @@ sub aiFannConInfer {
   
   my $lagnorm_ref = Deserialize ($name, $data{$name}{neuralnet}{$fanntyp}{lagNorms});           # Norms müssen IMMER die Norms aus dem Training bleiben.
   
-  my $bevloadmin    = $data{$name}{neuralnet}{$fanntyp}{bevloadmin} // 0;                       # BEV-Load normieren mit gespeicherten Trainingsgrenzen (analog rr1c_norm)
-  my $bevloadmax    = $data{$name}{neuralnet}{$fanntyp}{bevloadmax} // 1;
+  my $bevloadmin  = $data{$name}{neuralnet}{$fanntyp}{bevloadmin} // 0;                         # BEV-Load normieren mit gespeicherten Trainingsgrenzen (analog rr1c_norm)
+  my $bevloadmax  = $data{$name}{neuralnet}{$fanntyp}{bevloadmax} // 1;
   
-  my $bevremmin     = $data{$name}{neuralnet}{$fanntyp}{bevremmin} // 0;                        # BEV-remain Energy normieren mit gespeicherten Trainingsgrenzen
-  my $bevremmax     = $data{$name}{neuralnet}{$fanntyp}{bevremmax} // 1;
+  my $bevremmin   = $data{$name}{neuralnet}{$fanntyp}{bevremmin} // 0;                          # BEV-remain Energy normieren mit gespeicherten Trainingsgrenzen
+  my $bevremmax   = $data{$name}{neuralnet}{$fanntyp}{bevremmax} // 1;
   
+  my $cyclecsmmin = $data{$name}{neuralnet}{$fanntyp}{cyclecsmmin} // 0;                        # normierte Energieverbräuche (Summe) aller Consumer 
+  my $cyclecsmmax = $data{$name}{neuralnet}{$fanntyp}{cyclecsmmax} // 1;
+  
+  # --- Normierungen 
   my @bev_load_norm             = map { _aiFannNormMinMaxValue ($_, $bevloadmin, $bevloadmax) } @$bev_load_raw_ref;
   my @bev_energy_remaining_norm = map { _aiFannNormMinMaxValue ($_, $bevremmin,  $bevremmax)  } @$energy_remaining_ref;
+  my @cycle_csme_norm_hist      = map { _aiFannNormMinMaxValue ($_, $cyclecsmmin, $cyclecsmmax) } @$cycle_csme_raw_ref; 
 
-  # Profil einmalig bestimmen
-  #############################
+  # --- Profil einmalig bestimmen
   my $profile = CurrentVal ($name, 'aiConProfile', undef);                                      # verwendete Feature-Registry Version
 
   if (!$profile) {
@@ -27365,27 +27413,29 @@ sub aiFannConInfer {
       ## Lag-Features erzeugen
       ##########################
       my $i    = @flat_targets - 1;
-      my $lags = _aiFannBuildLagFeatures ( { con_series                       => \@flat_targets,
-                                             temp_norm_series                 => \@temp_norm_values,
-                                             presence_values                  => \@presence_values,
-                                             i                                => $i,
-                                             norms                            => $lagnorm_ref,
-                                             range                            => $range,
+      my $lags = _aiFannBuildLagFeatures ( { con_series                        => \@flat_targets,
+                                             temp_norm_series                  => \@temp_norm_values,
+                                             presence_values                   => \@presence_values,
+                                             i                                 => $i,
+                                             norms                             => $lagnorm_ref,
+                                             range                             => $range,
                                              
-                                             bev_active_series                => $bev_active_ref,
-                                             bev_load_norm_series             => \@bev_load_norm,
-                                             bev_n_active_series              => $bev_n_active_ref,
-                                             bev_soc_deficit_norm_series      => $bev_soc_deficit_norm_ref, 
-                                             bev_energy_remaining_norm_series => \@bev_energy_remaining_norm,
-                                             bev_charge_intensity_series      => $charge_intensity_ref,  
-
+                                             bev_active_series                 => $bev_active_ref,
+                                             bev_load_norm_series              => \@bev_load_norm,
+                                             bev_n_active_series               => $bev_n_active_ref,
+                                             bev_soc_deficit_norm_series       => $bev_soc_deficit_norm_ref, 
+                                             bev_energy_remaining_norm_series  => \@bev_energy_remaining_norm,
+                                             bev_charge_intensity_series       => $charge_intensity_ref, 
+                                                                                          
                                              hp_heating_frac_series            => $hp_heating_ref,
                                              hp_defrost_frac_series            => $hp_defrost_ref,
                                              hp_hotwater_frac_series           => $hp_hotwater_ref,
                                              hp_cooling_frac_series            => $hp_cooling_ref,
                                              hp_pool_frac_series               => $hp_pool_ref,
                                              hp_poolheating_frac_series        => $hp_poolheating_ref,
-                                             hp_active_frac_series             => $hp_active_ref,                                             
+                                             hp_active_frac_series             => $hp_active_ref,      
+
+                                             cycle_csme_norm_series            => \@cycle_csme_norm_hist,                                             
                                            } );      
       next if(!$lags);      
      
@@ -27512,6 +27562,8 @@ sub aiFannConInfer {
                             hp_poolheating_frac_lag1    => $lags->{hp_poolheating_frac_lag1},           # WP Poolheizung Anteil Vorstunde
                             hp_active_frac_lag1         => $lags->{hp_active_frac_lag1},                # WP Aktivitätsgrad Vorstunde (0..1)
                             
+                            cycle_csme_lag1_norm        => $lags->{cycle_csme_lag1_norm},               # Zyklus-Consumer Energiemenge Vorstunde (normiert)
+                            
                             ww_morning                  => $sigs->{ww_morning},                         # Warmwasser morgens
                             ww_evening                  => $sigs->{ww_evening},                         # Warmwasser abends
                             ww_cold_boost               => $sigs->{ww_cold_boost},                      # Kältebedingter WW-Boost
@@ -27594,14 +27646,16 @@ sub aiFannConInfer {
       push @$bev_soc_deficit_norm_ref, 0;
       push @bev_energy_remaining_norm, 0;
       push @$charge_intensity_ref,     0;
-
+      
+      push @cycle_csme_norm_hist,      0;                                                   # Consumer Energy, Zukunft unbekannt -> neutral      
+      
       push @$hp_heating_ref,     0;                                                         # WP-Zukunftsmodus unbekannt -> neutral (0)
       push @$hp_defrost_ref,     0;
       push @$hp_hotwater_ref,    0;
       push @$hp_cooling_ref,     0;
       push @$hp_pool_ref,        0;
       push @$hp_poolheating_ref, 0;
-      push @$hp_active_ref,      0;      
+      push @$hp_active_ref,      0; 
 
       
       # Hybridmodell mit Legacy
@@ -28084,7 +28138,7 @@ sub _aiFannBuildLagFeatures {
   my $bev_charge_intensity_lag1      = $bev_charge_intensity_series->[$i - 1]      // 0;
   
   # ---------------------------------------------------------
-  # WP Mode Lags
+  # WP Mode Lag1
   # ---------------------------------------------------------
   my $hp_heating_frac_lag1     = $paref->{hp_heating_frac_series}[$i-1]     // 0;
   my $hp_defrost_frac_lag1     = $paref->{hp_defrost_frac_series}[$i-1]     // 0;
@@ -28093,6 +28147,13 @@ sub _aiFannBuildLagFeatures {
   my $hp_pool_frac_lag1        = $paref->{hp_pool_frac_series}[$i-1]        // 0;
   my $hp_poolheating_frac_lag1 = $paref->{hp_poolheating_frac_series}[$i-1] // 0;
   my $hp_active_frac_lag1      = $paref->{hp_active_frac_series}[$i-1]      // 0;
+  
+  # -----------------------------------------------------------------------
+  # Zyklus-Consumer Lag1 (Waschmaschine, Trockner, Spülmaschine etc.)
+  # Nicht-WP/BEV Consumer - durch eigene Feature-Blöcke bereits abgedeckt
+  # Lag1-sicher: csme[$i] ist Bestandteil von con[$i] -> Leakage
+  # -----------------------------------------------------------------------
+  my $cycle_csme_lag1_norm = $paref->{cycle_csme_norm_series}[$i-1] // 0;
   
   # ---------------------------------------------------------
   # presence_smooth3/2        -> gleitender 3h/2h-Mittelwert
@@ -28172,6 +28233,8 @@ sub _aiFannBuildLagFeatures {
       hp_pool_frac_lag1         => $hp_pool_frac_lag1,        
       hp_poolheating_frac_lag1  => $hp_poolheating_frac_lag1, 
       hp_active_frac_lag1       => $hp_active_frac_lag1,
+
+      cycle_csme_lag1_norm      => $cycle_csme_lag1_norm,  
       
       bev_active_lag1                => $bev_active_lag1,
       bev_load_lag1_norm             => $bev_load_lag1_norm,
@@ -28389,6 +28452,8 @@ sub _aiFannFeatureBuilder {
   if (!$flags->{heatpump}) {
       push @features, @{ $FEATURE_BLOCKS{semantics_temp_basic}->($f) };
   }
+  
+  push @features, @{ $FEATURE_BLOCKS{cycle_consumer}->($f) };                               # Zyklusgeräte sind haushaltuniversell und unabhängig von WP, BEV oder PV-Konfiguration
   
   # -------------------------------------------------------------------
   # Stochastische Haushaltssemantik (ohne dedizierte Großverbraucher)
@@ -29395,6 +29460,89 @@ sub _aiFannBevHistArray {
   LRU_insert ($name, $cache, $key, [ \@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining, \@charge_intensity ]);
 
 return (\@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining, \@charge_intensity);
+}
+
+######################################################################################
+#  Liefert Zyklus-Consumer-Energiearray aus pvHistory, synchron zur
+#  Iteration von getPvHistTargetArray (gleiche Filterkriterien,
+#  gleiche Reihenfolge, gleicher Cutoff) damit Indexausrichtung
+#  zu @flat_targets gewährleistet ist.
+#
+#  Aggregiert csmeXX aller Consumer die weder heatpump noch bev sind.
+#  Filterkriterium: dieselbe Zeile muss par1 (='con') >= 0
+#  haben, damit der Index identisch zu @flat_targets bleibt.
+#
+#  Return: \@cycle_csme_raw
+######################################################################################
+sub _aiFannCycleConsumerHistArray {
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $t       = $paref->{t}     // time;
+  my $limit   = $paref->{limit} // 200;
+  my $fanntyp = $paref->{fanntyp};
+
+  my @cycle_csme_raw;
+
+  return \@cycle_csme_raw unless exists $data{$name}{pvhist};
+
+  # --- Cache-Objekt initialisieren ---
+  my $hash  = $defs{$name};
+  my $cache = $hash->{'.pvHistCache'} //= LRU_cache_create ('pvHistCache', 'pvHistory Cache', CACHEPVHMS);
+
+  # --- Zeitkontext ---
+  my $dt   = timestringsFromOffset ($name, $t, 0);
+  my $year = $dt->{year};
+  my $mon  = $dt->{month};
+  my $mday = $dt->{day};
+  my $hour = $dt->{hour};
+
+  # --- Cache-Key ---
+  my $key = join '::', 'CYCLECSMHISTARR', $name, $year, $mon, $mday, $hour, $limit;
+
+  # --- Cache-Hit? ---
+  if (my $cached = LRU_get ($name, $cache, $key)) {
+      return @$cached;                                                        # (\@cycle_csme_raw)
+  }
+
+  # --- Kein Cache-Hit → Originalberechnung ---
+  my $ph = $data{$name}{pvhist};
+
+  my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;
+  my @days_upto  = sort { $a <=> $b } grep { $_ <= $mday } keys %$ph;
+
+  for my $day (@days_after, @days_upto) {
+      for my $hod (sort { $a <=> $b } keys %{ $ph->{$day} }) {
+          next if $hod < 1 || $hod > 24;
+          last if ($day == $mday && $hod == $hour + 1);                      # nur abgeschlossene Stunden
+
+          my $rec = $ph->{$day}{$hod};
+          next unless defined $rec->{$fanntyp};                              # identisches Filterkriterium wie getPvHistTargetArray
+          next unless $rec->{$fanntyp} >= 0;
+
+          my $cycle_csme = 0;
+          
+          for my $cn (1..MAXCONSUMER) {
+              my $c         = sprintf "%02d", $cn;
+              my $type      = ConsumerVal ($name, $c, 'type', '');
+              next unless $type;
+              next if $type =~ /heatpump|bev/xs;                             # durch eigene Feature-Blöcke abgedeckt
+              
+              $cycle_csme += $rec->{"csme${c}"} // 0;
+          }
+
+          push @cycle_csme_raw, $cycle_csme;
+      }
+  }
+
+  # --- Limit anwenden ---
+  my $n   = scalar @cycle_csme_raw;
+  my $min = $n < $limit ? $n : $limit;
+  @cycle_csme_raw = @cycle_csme_raw[-$min .. -1];
+
+  # --- Ergebnis cachen ---
+  LRU_insert ($name, $cache, $key, [ \@cycle_csme_raw ]);
+
+return (\@cycle_csme_raw);
 }
 
 ######################################################################################
