@@ -28741,10 +28741,11 @@ sub _aiFannDetectNoiseLevel {
   $score   += 1 if $rel_volatility > $THR_VOLATILITY;
   $score   += 1 if $acf1           < $THR_ACF1;
 
-  # --- 4-Stufen-Logik ---
+  # --- 5-Stufen-Logik ---
   if    ($score >= 4) { $flag = 'noisy';      $bfl = 0.40; }
   elsif ($score >= 3) { $flag = 'borderline'; $bfl = 0.34; }
   elsif ($score >= 2) { $flag = 'low';        $bfl = 0.28; }
+  elsif ($score >= 1) { $flag = 'smooth';     $bfl = 0.24; }
   else                { $flag = 'stable';     $bfl = 0.22; }
 
 return ($flag, $bfl);
