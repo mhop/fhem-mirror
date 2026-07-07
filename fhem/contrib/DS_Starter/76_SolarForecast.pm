@@ -25746,7 +25746,7 @@ sub aiFannConDataLoad {
       if ($profile !~ /pv/xs) {                                                                 # nur für Non-PV Profile bereinigen
           for my $cn (1..MAXCONSUMER) {
               my $c       = sprintf "%02d", $cn;
-              my $pvshare = ConsumerVal ($name, $c, 'pvshare', 100);                            # Soll-Anteil PV-Energie
+              my $pvshare = ConsumerVal ($name, $c, 'pvshare', 0);                              # Soll-Anteil PV-Energie
               
               next unless $rec->{"rcmdcsm${c}"};                                                # nicht empfohlen -> Grundlast
               next unless $pvshare >= 50;                                                       # pvshare < 50% -> Consumer läuft überwiegend netzgestützt -> Grundlast
