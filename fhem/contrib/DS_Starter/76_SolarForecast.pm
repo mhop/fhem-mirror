@@ -17941,7 +17941,7 @@ sub __accumConRecommended {
 
       writeToHistory ( { paref => $paref,
                          key   => "rcmdcsm${c}",
-                         val   => $rcmd_weighted,
+                         val   => $rcmd_weighted . ':' . ConsumerVal ($name, $c, 'pvshare', 0),
                          day   => $day,
                          hour  => $hod, 
                        } );
@@ -25745,10 +25745,12 @@ sub aiFannConDataLoad {
       
       if ($profile !~ /pv/xs) {                                                                 # nur für Non-PV Profile bereinigen
           for my $cn (1..MAXCONSUMER) {
-              my $c       = sprintf "%02d", $cn;
-              my $pvshare = ConsumerVal ($name, $c, 'pvshare', 0);                              # Soll-Anteil PV-Energie
-              
-              next unless $rec->{"rcmdcsm${c}"};                                                # nicht empfohlen -> Grundlast
+              my $c                = sprintf "%02d", $cn;              
+              my $rcmd_raw         = $rec->{"rcmdcsm${c}"} // '0:0';
+              my ($rcmd, $pvshare) = split ':', $rcmd_raw;
+              $pvshare           //= 0;                                                         # Fallback für alte Einträge ohne pvshare-Anteil
+
+              next unless $rcmd;                                                                # nicht empfohlen -> Grundlast
               next unless $pvshare >= 50;                                                       # pvshare < 50% -> Consumer läuft überwiegend netzgestützt -> Grundlast
               
               my $val     = $rec->{"csme${c}"} // 0;
