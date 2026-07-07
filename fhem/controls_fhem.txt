@@ -1,4 +1,4 @@
-REV 31449
+REV 31454
 DIR unused
 UPD 2026-07-06_07:45:03 458374 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -773,8 +773,8 @@ UPD 2026-07-06_07:45:11 5573534 docs/commandref.html
 UPD 2026-07-06_07:45:15 3550066 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-07-06_07:45:16 331321 docs/commandref_modular.html
-UPD 2026-07-06_07:45:17 343121 docs/commandref_modular_DE.html
+UPD 2026-07-07_07:45:17 331321 docs/commandref_modular.html
+UPD 2026-07-07_07:45:18 343121 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2618,7 +2618,7 @@ UPD 2015-07-28_14:05:34 95931 www/pgm2/jquery.min.js
 UPD 2017-03-08_07:45:03 4545 www/pgm2/jquery.vticker.min.js
 UPD 2026-04-01_07:45:04 240 www/pgm2/manifest.json
 UPD 2018-10-08_07:45:02 3106 www/pgm2/smallscreenstyle.css
-UPD 2017-01-17_07:45:03 18745 www/pgm2/sorttable.js
+UPD 2026-07-07_07:45:04 18789 www/pgm2/sorttable.js
 UPD 2018-12-17_07:45:02 789397 www/pgm2/sscam_hls.js
 UPD 2015-07-28_14:05:34 649 www/pgm2/style.css
 UPD 2026-06-21_07:45:03 14684 www/pgm2/svg.js
