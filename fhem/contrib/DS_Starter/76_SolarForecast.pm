@@ -13722,7 +13722,7 @@ sub _transferInverterValues {
 
   my $hash         = $defs{$name};
   my ($acu, $aln)  = isAutoCorrUsed ($name);
-  my $hod          = sprintf "%02d", ($chour + 1) % 24;
+  my $hod          = sprintf "%02d", ($chour + 1);
   my $warn         = '';
   my $pvsum        = 0;                                                 # Summe aktuelle PV aller Inverter
   my $ethishoursum = 0;                                                 # Summe Erzeugung akt. Stunde aller Inverter
@@ -13956,7 +13956,7 @@ sub __handleReductionState {
   debugLog ($paref, 'collectData|collectData_long', "State of Plant derating: $rdcstate, info: $info");
 
   if ($info ne 'reductionState not set') {
-      my $hod = sprintf "%02d", ($chour + 1) % 24;
+      my $hod = sprintf "%02d", ($chour + 1);
       my $pd  = HistoryVal ($name, $day, $hod, 'plantderated', 0);                                # evtl. schon gespeicherte Abregelungszeitpunkt
 
       if (!$pd && $rdcstate) {
@@ -15037,7 +15037,7 @@ sub _transferEnvironmentValues {
       }
   }   
   
-  my $hod = sprintf "%02d", ($chour + 1) % 24;  
+  my $hod = sprintf "%02d", ($chour + 1);  
 
   # --- Werte speichern
   if ($doct) {
@@ -17016,7 +17016,7 @@ sub _manageConsumerData {
   my $debug = $paref->{debug};
 
   my $hash     = $defs{$name};
-  my $hod      = sprintf "%02d", ($chour + 1) % 24;
+  my $hod      = sprintf "%02d", ($chour + 1);
   my $pcurrsum = 0;
   
   $data{$name}{current}{surplusCycleCommitted} = 0;                                 # Anti-Toggling: das Surplus Budget zurücksetzen
@@ -17200,7 +17200,7 @@ sub __saveBEVvalues {
   
   return if($ctype ne 'bev' || !$cactive);                                                              # kein BEV oder Consumer nicht aktiviert 
   
-  my $hod = sprintf "%02d", ($chour + 1) % 24;
+  my $hod = sprintf "%02d", ($chour + 1);
   
   # --- Batteriekapazität
   my $batCapVal;
@@ -17261,7 +17261,7 @@ sub __savePowerAndEnergy {
   my $day     = $paref->{day};
   
   my $hash  = $defs{$name};
-  my $hod   = sprintf "%02d", ($chour + 1) % 24;
+  my $hod   = sprintf "%02d", ($chour + 1);
   
   if (!$cactive) {                                                                              # Consumer nicht aktiviert
       delete $data{$name}{consumers}{$c}{currpower};
@@ -17403,7 +17403,7 @@ sub __calcEnergyPieces {
   
   return if(!$cactive);                                                     # Consumer ist nicht aktiviert
   
-  my $hod  = sprintf "%02d", ($chour + 1) % 24;
+  my $hod  = sprintf "%02d", ($chour + 1);
 
   my $etot = HistoryVal ($name, $paref->{day}, $hod, "csmt${c}", 0);        # etotal zu Beginn der Stunde
   my $ecur = HistoryVal ($name, $paref->{day}, $hod, "csme${c}", 0);        # Energie Stunde bis jetzt
@@ -18340,7 +18340,7 @@ sub __accumConRecommended {
   my $minute = $paref->{minute};    
   my $debug  = $paref->{debug};    
  
-  my $hod    = sprintf "%02d", ($chour + 1) % 24;
+  my $hod    = sprintf "%02d", ($chour + 1);
    
   my $rcmd    = ConsumerVal     ($name, $c, 'isConsumptionRecommended', 0);     # Verbrauchsempfehlung abhängig vom PV-Überschuß
   my $cplmode = getConsumerMode ($name, $c);                                    # Planungsmode 'can', 'must' oder 'mustNot'
@@ -18918,7 +18918,7 @@ sub __getCyclesAndRuntime {
   my $debug = $paref->{debug};
 
   my $hash  = $defs{$name};
-  my $hod   = sprintf "%02d", ($chour + 1) % 24;
+  my $hod   = sprintf "%02d", ($chour + 1);
 
   my ($starthour, $startday);
 
@@ -19080,7 +19080,7 @@ sub __hpConsumerOpmode {
   return if $ctype ne 'heatpump';                                                           # Verarbeitung nur für WP
 
   my $msg;
-  my $hod        = sprintf "%02d", ($chour + 1) % 24;
+  my $hod        = sprintf "%02d", ($chour + 1);
   my $om         = ConsumerVal ($name, $c, 'opmode',     ' : ');                            # Consumer Operation Mode
   my $md         = ConsumerVal ($name, $c, 'modulation', ' : ');                            # Modulationsgrad in % (0-100) oder fix
   my $opmode     = HPOPMODEDEF;
@@ -20371,7 +20371,7 @@ sub _saveEnergyConsumption {
   my $chour = $paref->{chour};
   my $debug = $paref->{debug};
 
-  my $hod     = sprintf "%02d", ($chour + 1) % 24;
+  my $hod     = sprintf "%02d", ($chour + 1);
   my $pvrl    = ReadingsNum ($name, 'Today_Hour'.$hod.'_PVreal',          0);       # Reading enthält die Summe aller Inverterdevices
   my $gfeedin = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridFeedIn',      0);
   my $gcon    = ReadingsNum ($name, 'Today_Hour'.$hod.'_GridConsumption', 0);
