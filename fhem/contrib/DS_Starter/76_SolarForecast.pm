@@ -1172,14 +1172,16 @@ my %hqtxt = (                                                                   
               DE => qq{das aus der Datei geladene AI::FANN-Objekt ist leer}                                                 },
   ailatr => { EN => qq{last AI training:},
               DE => qq{letztes KI-Training:}                                                                                },
-  airest => { EN => qq{AI query status:},
-              DE => qq{KI Abfragestatus:}                                                                                   },
+  airest => { EN => qq{AI query status},
+              DE => qq{KI Abfragestatus}                                                                                    },
+  trmovr => { EN => qq{trains using module version},
+              DE => qq{trainiert mit Modulversion}                                                                          }, 
   nnlatr => { EN => qq{last training of the neural network consumption forecast:},
               DE => qq{letztes Training des neuronalen Netzes Verbrauchsprognose:}                                          },
   ailgrt => { EN => qq{last AI result generation time:},
               DE => qq{letzte KI-Ergebnis Generierungsdauer:}                                                               },
   vbnrhp => { EN => qq{Consumer number Heat pump},
-              DE => qq{Verbrauchernummer W&auml;rmepumpe}                                                                   },
+              DE => qq{Verbrauchernummer Wärmepumpe}                                                                        },
   feregv => { EN => qq{activated registry version},
               DE => qq{aktivierte Registry Version}                                                                         }, 
   nnlgrt => { EN => qq{last generation time for a consumption forecast:},
@@ -6893,44 +6895,47 @@ sub _getaiDecTree {                   ## no critic "not used"
   if ( $arg =~ /=/ ) { $arg =~ s/,(?=[^=]*=)/ /g; }
   else               { $arg =~ s/,/ /g; }
 
-  $arg     = trim ($arg);                                                        # trim it
-  my @args = split " ", $arg;
+  $arg              = trim ($arg);                                               # trim it
+  my ($scom, $args) = split (" ", $arg, 2);                                      # in den Sub-Befehl und Befehlsargumente splitten
 
   my $ret;
   my $hash = $defs{$name};
 
-  if ($args[0] eq 'aiRawData') {
+  if ($scom eq 'aiRawData') {
       $ret  = "<span style='font-size:90%;'>";
-      $ret .= listDataPool ($hash, 'aiRawData', $args[1]);
+      $ret .= listDataPool ($hash, 'aiRawData', $args);
       $ret .= "</span>";
       $ret .= lineFromSpaces ($ret, 0);
   }
 
-  if ($args[0] eq 'aiRuleStrings') {
+  if ($scom eq 'aiRuleStrings') {
       $ret = __getaiRuleStrings ($paref);
       $ret .= lineFromSpaces ($ret, 5);
   }
   
-  if ($args[0] =~ /aiConTrainState/xs) {
+  if ($scom =~ /aiConTrainState/xs) {
       $paref->{fanntyp} = 'con';                                                # FANN Verwendungsart 'consumption' Prognose  
-      $ret = __getaiFannState ($paref);
+      
+      if ($args =~ /llm/i) { $ret = __getaiFannPromptExport ($paref);}          # Ausgabe für Copy&Paste an LLM-Prompt
+      else                 { $ret = __getaiFannState ($paref) };
+      
       delete $paref->{fanntyp};
       
       $ret .= lineFromSpaces ($ret, 0);
       
-      if ($arg =~ /imgget/xs) {                                                 # Ausgabe aus dem Grafikheader aiConIcon
+      if ($args =~ /imgget/xs) {                                                # Ausgabe aus dem Grafikheader aiConIcon
           $ret =~ s/\n/<br>/g;
       }
   }
   
-  if ($args[0] =~ /aiConAssessGemini/xs) {                                      # Bewertung durch Gemini abfragen
+  if ($scom =~ /aiConAssessGemini/xs) {                                         # Bewertung durch Gemini abfragen
       $paref->{fanntyp} = 'con';                                                 
       $ret = _aiFannGeminiApiAssess ($paref);
       delete $paref->{fanntyp};
       
       $ret .= lineFromSpaces ($ret, 0);
       
-      if ($arg =~ /imgget/xs) {                                                 # Ausgabe aus dem Grafikheader
+      if ($args =~ /imgget/xs) {                                                # Ausgabe aus dem Grafikheader
           $ret =~ s/\n/<br>/g;
       }
   }
@@ -7009,6 +7014,342 @@ return $rs;
 }
 
 ################################################################
+# Liefert die Trainings-/Bewertungskennzahlen der KI Verbrauchs-
+# vorhersage als reinen Text, geeignet zum Copy&Paste in einen
+# LLM-Prompt. Kein HTML, keine Ampel-Icons, keine Erläuterungen
+# der Kennzahlen (die kennt das LLM selbst).
+#
+# Aufruf z.B. über:  get <name> valDecTree ....
+# (Dispatch-Zeile am Ende dieser Datei ergänzen)
+################################################################
+sub __getaiFannPromptExport {          ## no critic "not used"
+  my $paref   = shift;
+  my $name    = $paref->{name};
+  my $lang    = $paref->{lang};
+  my $fanntyp = $paref->{fanntyp};
+
+  my ($rs, $prepared, $rdy, $cause);
+
+  if ($fanntyp eq 'con') {
+      ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp);
+  }
+
+  if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
+      return $lang eq 'DE'
+           ? "Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause"
+           : "The AI for forecasting $fanntyp is not yet operational.\n<b>Cause:</b> $cause";
+  }
+
+  my $hpinst   = CurrentVal  ($name, 'heatpumpInstalled',        '-');
+
+  my $version  = AiNeuralVal ($name, $fanntyp, 'ModuleVersion',  '-');                      # mit welcher Modulversion wurde trainiert
+  my $pvmaxlim = AiNeuralVal ($name, $fanntyp, 'PVMaxLimit',     '?');
+  my $tgtmin   = AiNeuralVal ($name, $fanntyp, 'MinVal',         '-');
+  my $tgtmax   = AiNeuralVal ($name, $fanntyp, 'MaxVal',         '-');
+  my $dsnum    = AiNeuralVal ($name, $fanntyp, 'NumDatasets',    '-');
+  my $trdnum   = AiNeuralVal ($name, $fanntyp, 'NumTraindata',   '-');
+  my $tednum   = AiNeuralVal ($name, $fanntyp, 'NumTestdata',    '-');
+  my $inpnum   = AiNeuralVal ($name, $fanntyp, 'NumInputs',      '-');
+  my $hidlay   = AiNeuralVal ($name, $fanntyp, 'HiddenLayers',   '-');
+  my $dpr      = AiNeuralVal ($name, $fanntyp, 'dataParamRatio', '-');
+  my $hidste   = AiNeuralVal ($name, $fanntyp, 'HiddSteepness',  '-');
+  my $outnum   = AiNeuralVal ($name, $fanntyp, 'NumOutputs',     '-');
+  my $tepoch   = AiNeuralVal ($name, $fanntyp, 'TrainEpoches',   '-');
+  my $tramse   = AiNeuralVal ($name, $fanntyp, 'TrainMse',       '-');
+  my $valmse   = AiNeuralVal ($name, $fanntyp, 'ValidationMse',  '-');
+  my $bitfai   = AiNeuralVal ($name, $fanntyp, 'BitFail',        '-');
+  my $conmae   = AiNeuralVal ($name, $fanntyp, 'Mae',            '-');
+  my $comdae   = AiNeuralVal ($name, $fanntyp, 'Medae',          '-');
+  my $cormse   = AiNeuralVal ($name, $fanntyp, 'Rmse',           '-');
+  my $rmse_rel = AiNeuralVal ($name, $fanntyp, 'RmseRel',        '-');
+  my $comape   = AiNeuralVal ($name, $fanntyp, 'Mape',           '-');
+  my $codape   = AiNeuralVal ($name, $fanntyp, 'Mdape',          '-');
+  my $conr2    = AiNeuralVal ($name, $fanntyp, 'R2',             '-');
+  my $conhaf   = AiNeuralVal ($name, $fanntyp, 'HiddActFunc',    '-');
+  my $conoaf   = AiNeuralVal ($name, $fanntyp, 'OutActFunc',     '-');
+  my $retrqal  = AiNeuralVal ($name, $fanntyp, 'RetrainQuality', '-');
+  my $retrres  = AiNeuralVal ($name, $fanntyp, 'RetrainReason',  '-');
+  my $valstd   = AiNeuralVal ($name, $fanntyp, 'StdDevValidMse', '-');
+  my $valavg   = AiNeuralVal ($name, $fanntyp, 'AvgValidMse',    '-');
+  my $shmode   = AiNeuralVal ($name, $fanntyp, 'ShuffleMode',    '-');
+  my $shperi   = AiNeuralVal ($name, $fanntyp, 'ShufflePeriod',  '-');
+  my $lrnmom   = AiNeuralVal ($name, $fanntyp, 'LearnMomentum',  '-');
+  my $lrnrte   = AiNeuralVal ($name, $fanntyp, 'LearnRate',      '-');
+  my $rmse_rat = AiNeuralVal ($name, $fanntyp, 'RmseRating',     '-');
+  my $bias     = AiNeuralVal ($name, $fanntyp, 'ModelBias',      '-');
+  my $slope    = AiNeuralVal ($name, $fanntyp, 'ModelSlope',     '-');
+  my $profile  = AiNeuralVal ($name, $fanntyp, 'RegVersion',     '-');
+  my $talgo    = AiNeuralVal ($name, $fanntyp, 'TrainAlgo',      '-');
+  my $nslvl    = AiNeuralVal ($name, $fanntyp, 'NoiseLevel',     '-');
+  my $bflim    = AiNeuralVal ($name, $fanntyp, 'BitFailLimit',   '-');
+  my $bfsug    = AiNeuralVal ($name, $fanntyp, 'BitFailSuggest', '-');
+
+  my $epoch_label   = AiNeuralVal ($name, $fanntyp, 'EpochLabel',   '');
+  my $epoch_code    = AiNeuralVal ($name, $fanntyp, 'EpochCode',    '');
+  my $epoch_rel_pct = AiNeuralVal ($name, $fanntyp, 'EpochRelPct', '-');
+
+  my $dpr_hint      = AiNeuralVal ($name, $fanntyp, 'DPR_Hint', '-');
+
+  my $drift_window    = AiNeuralVal ($name, $fanntyp, 'DriftWindowSize',    '-');
+  my $drift_score     = AiNeuralVal ($name, $fanntyp, 'DriftScore',         '-');
+  my $drift_index     = AiNeuralVal ($name, $fanntyp, 'DriftIndex',         '-');
+  my $drift_rmserel   = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio',  '-');
+  my $bias_ref        = AiNeuralVal ($name, $fanntyp, 'DriftRefBias',       '-');
+  my $drift_bias_live = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive',      '-');
+  my $drift_bias      = AiNeuralVal ($name, $fanntyp, 'DriftBias',          '-');
+  my $drift_flag      = AiNeuralVal ($name, $fanntyp, 'DriftFlag',          '-');
+  my $slope_ref       = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope',      '-');
+  my $slope_live      = AiNeuralVal ($name, $fanntyp, 'DriftSlopeLive',     '-');
+  my $drift_slope     = AiNeuralVal ($name, $fanntyp, 'DriftSlope',         '-');
+  my $model_age       = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',      '-');
+  my $last_recaltm    = AiNeuralVal ($name, $fanntyp, 'DriftLastRecalTime', '-');
+  my $sem_ratio       = AiNeuralVal ($name, $fanntyp, 'DriftSemRatio',      '-');
+
+  my $drift_retrecomd = AiNeuralVal ($name, $fanntyp, 'RetrainRecommendation', '-');
+  my $drift_retreason = AiNeuralVal ($name, $fanntyp, 'DriftRetrainReason',    '-');
+
+  my $recomd_translated = $drift_retrecomd;
+  if ($lang eq 'DE') {
+      $recomd_translated = $drift_retrecomd eq 'urgent'  ? 'dringend'
+                         : $drift_retrecomd eq 'advised' ? 'empfohlen'
+                         : 'keine';
+  }
+
+  # Anzeige Retrain-Grund: ersten passenden Treffer nutzen (Klartext, kein Icon)
+  my $display_reason = $drift_retreason;
+  for my $key (sort keys %block_translations) {
+      if ($drift_retreason =~ /$key/i) {
+          $display_reason = $block_translations{$key}{$lang};
+          last;
+      }
+  }
+
+  my $display_noiselvl = $noise_translations{$nslvl}{$lang};
+
+  # Anzeige Drift-Flag als Klartext (kein Icon)
+  my $display_driftflag = $drift_flag;
+  for my $key (sort keys %block_translations) {
+      if ($drift_flag =~ /$key/i) {
+          $display_driftflag = ($lang eq 'DE' ? 'Rekalibrierung ausgesetzt' : 'recalibration blocked'). ': '.
+                               $block_translations{$key}{$lang};
+          last;
+      }
+  }
+
+  my $show_retreason = $drift_retreason eq '-'
+                     ? ''
+                     : "(".$hqtxt{hcause}{$lang}.": ".$display_reason.")";
+
+  my $atf  = CircularVal ($name, 99, 'conNNTrainLastFinishTs', 0);
+  my $ars  = CurrentVal  ($name, 'conNNGetResultState',      '-');
+  my $agt  = CurrentVal  ($name, 'conNNLastGetResultTime',    '');
+  my $rtt  = CircularVal ($name, 99, 'conNNRuntimeTrain',    '-');
+  $rtt     = round0 ($rtt) if(isNumeric($rtt));
+
+  $valstd      = round6 ($valstd)      if($valstd      ne '-');
+  $valavg      = round6 ($valavg)      if($valavg      ne '-');
+  $tramse      = round6 ($tramse)      if($tramse      ne '-');
+  $valmse      = round6 ($valmse)      if($valmse      ne '-');
+  $conmae      = round2 ($conmae)      if($conmae      ne '-');
+  $comdae      = round2 ($comdae)      if($comdae      ne '-');
+  $cormse      = round2 ($cormse)      if($cormse      ne '-');
+  $comape      = round2 ($comape)      if($comape      ne '-');
+  $codape      = round2 ($codape)      if($codape      ne '-');
+  $conr2       = round2 ($conr2)       if($conr2       ne '-');
+  $bias        = round0 ($bias)        if($bias        ne '-');
+  $tgtmax      = round0 ($tgtmax)      if($tgtmax      ne '-');
+  $bias_ref    = round0 ($bias_ref)    if($bias_ref    ne '-');
+  $slope_ref   = round2 ($slope_ref)   if($slope_ref   ne '-');
+  $slope       = round2 ($slope)       if($slope       ne '-');
+  $slope_live  = round2 ($slope_live)  if($slope_live  ne '-');
+  $pvmaxlim    = round0 ($pvmaxlim)    if($pvmaxlim    ne '?');
+  $bfsug       = round2 ($bfsug)       if($bfsug       ne '-');
+
+  my $tgt = $fanntyp eq 'con' ? $hqtxt{hodcon}{$lang} : '';
+
+  ####################################################################
+  # einleitender Prompt-Text für das LLM
+  ####################################################################
+  my $intro = $lang eq 'DE' ? <<"INTRO_DE" : <<"INTRO_EN";
+Du bist ein erfahrener Data Scientist für Zeitreihenprognosen im Bereich Energiemanagement.
+Nachfolgend erhältst du die Trainings- und Bewertungskennzahlen eines neuronalen Netzes (FANN),
+das den Hausverbrauch eines privaten Haushalts prognostiziert (FHEM-Modul 76_SolarForecast.pm).
+
+Bitte bewerte die Kennzahlen im Kontext dieser konkreten Haushaltskonfiguration
+(siehe Abschnitt "Modellparameter", insbesondere Profile) und beantworte:
+
+1. Wo liegen aktuell die größten Schwachstellen des Modells?
+2. Welche 2-3 Maßnahmen versprechen den größten Hebel zur Verbesserung
+   (Datenqualität/-menge, Hyperparameter, Architektur, Feature-Auswahl,
+   Trainingsdauer/Epochen, Rauschen, Drift/Rekalibrierung)?
+3. Gibt es Hinweise auf strukturelle Probleme (z.B. zu wenig Trainingsdaten,
+   instabile Slope, Bias-Drift, Over-/Underfitting, verrauschte Zielgröße,
+   zu früh konvergiertes Training)?
+4. Bitte konkrete, umsetzbare nächste Schritte nennen, keine allgemeinen Floskeln.
+
+Hier die Kennzahlen:
+--------------------------------------------------------------------
+INTRO_DE
+You are an experienced data scientist for time-series forecasting in energy management.
+Below are the training and evaluation metrics of a neural network (FANN) that forecasts
+household consumption for a private household (FHEM module 76_SolarForecast.pm).
+
+Please assess the metrics in the context of this specific household configuration
+(see "Model parameters" section, in particular the profile) and answer:
+
+1. Where are the model's biggest current weaknesses?
+2. Which 2-3 measures promise the biggest leverage for improvement
+   (data quality/quantity, hyperparameters, architecture, feature selection,
+   training duration/epochs, noise, drift/recalibration)?
+3. Are there indications of structural problems (e.g. too little training data,
+   unstable slope, bias drift, over-/underfitting, noisy target, training that
+   converged too early)?
+4. Please give concrete, actionable next steps, no generic platitudes.
+
+Here are the metrics:
+--------------------------------------------------------------------
+INTRO_EN
+
+  my @ctxParts;
+  push @ctxParts, ($lang eq 'DE' ? encode('utf8', 'Wärmepumpe und/oder Klimaanlage')        : 'heat pump and/or AC')                   if $profile =~ /heatpump/i;    
+  push @ctxParts, ($lang eq 'DE' ? 'E-Auto'                                                 : 'EV')                                    if $profile =~ /bev/i;
+  push @ctxParts, ($lang eq 'DE' ? 'PV-gesteuertem Lastmanagement'                          : 'PV-controlled load management')         if $profile =~ /pv/i;
+  push @ctxParts, ($lang eq 'DE' ? encode('utf8', 'ausgeprägten Tages-/Verbrauchsrhythmen') : 'pronounced daily/consumption rhythms')  if $profile =~ /active/i;          
+
+  my $profileCtx = @ctxParts
+                 ? ($lang eq 'DE' ? 'Haushalt mit '                   : 'Household with ') . join(', ', @ctxParts)
+                 : ($lang eq 'DE' ? 'stochastischer Standardhaushalt' : 'stochastic standard household');
+
+  $intro = encode('utf8', $intro);
+
+  ####################################################################
+  # Textblöcke
+  ####################################################################
+  my $general  = ($lang eq 'DE' ? 'Allgemeine Informationen' : 'General information')."\n";
+     $general .= '- '.$hqtxt{trmovr}{$lang}.": $version\n";
+     $general .= '- '.$hqtxt{ailatr}{$lang}.' '.($atf ? (timestampToTimestring ($name, $atf, $lang))[0] : '-')." (".$hqtxt{aitris}{$lang}." $rtt)\n";
+     $general .= '- '.$hqtxt{airest}{$lang}.": $ars\n";
+     $general .= '- '.$hqtxt{ailgrt}{$lang}.' '.($agt ? ($agt * 1000).' ms' : '-')."\n";
+     $general .= '- '.(encode('utf8', $hqtxt{vbnrhp}{$lang})).": $hpinst\n";  
+
+  my $rating  = encode('utf8', ($lang eq 'DE' ? 'Bewertungsüberblick' : 'Rating overview'))."\n";
+     $rating .= '- '.$hqtxt{treval}{$lang}.": $retrqal ($retrres)\n";
+     $rating .= '- '.$hqtxt{dpreal}{$lang}.": $dpr_hint\n";
+     $rating .= '- '.$hqtxt{lrnbeh}{$lang}.": ".(encode('utf8', $epoch_label))." ($epoch_rel_pct % ".$hqtxt{utiopc}{$lang}.")\n";
+     $rating .= '- '.$hqtxt{nserat}{$lang}.": ".(encode('utf8', $display_noiselvl))." ($nslvl)\n";
+     $rating .= '- '.$hqtxt{drfrat}{$lang}.": ".(encode('utf8', $display_driftflag))."\n";
+     $rating .= '- '.(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).": $recomd_translated $show_retreason\n";
+
+  my $model  = $hqtxt{nmdpar}{$lang}."\n";
+     $model .= '- '.$hqtxt{nnmlim}{$lang}.": PV=$pvmaxlim Wh, $tgt: Min=$tgtmin Wh / Max=$tgtmax Wh\n";
+     $model .= '- '.$hqtxt{tradat}{$lang}.": $dsnum ".(encode('utf8', $hqtxt{dtsets}{$lang}))." (Training=$trdnum, Validation=$tednum)\n";      
+     $model .= '- '.$hqtxt{archit}{$lang}.": Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum\n";
+     $model .= '- '.$hqtxt{hyppar}{$lang}.": Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim\n";
+     $model .= '- '.$hqtxt{actvat}{$lang}.": Hidden=$conhaf, Steepness=$hidste, Output=$conoaf\n";
+     $model .= '- '.$hqtxt{tralgo}{$lang}.": $talgo, Profile=$profile ($profileCtx)\n";
+     $model .= '- '.$hqtxt{rangen}{$lang}.": Mode=$shmode, Period=$shperi\n";
+     $model .= '- '.$hqtxt{modage}{$lang}.": $model_age h\n";
+
+  my $keyfig  = $hqtxt{trmetc}{$lang}."\n";
+     $keyfig .= '- '.$hqtxt{bmoaep}{$lang}.": $tepoch (max. ".AINUMEPOCHS.")\n";
+     $keyfig .= "- Training MSE: $tramse\n";
+     $keyfig .= "- Validation MSE: $valmse\n";
+     $keyfig .= "- Validation MSE Average: $valavg\n";
+     $keyfig .= "- Validation MSE Standard Deviation: $valstd\n";
+     $keyfig .= "- Validation Bit_Fail: $bitfai\n";
+     $keyfig .= "- Data Parameter Ratio: $dpr\n";
+     $keyfig .= "- Model Bias: $bias Wh\n";
+     $keyfig .= "- Model Slope: $slope\n";
+     $keyfig .= '- '.$hqtxt{treval}{$lang}.": $retrqal\n";
+
+  my $ermsr  =  (encode('utf8', $hqtxt{fcerma}{$lang}))."\n";    
+     $ermsr .= "- MAE: $conmae Wh\n";
+     $ermsr .= "- MedAE: $comdae Wh\n";
+     $ermsr .= "- RMSE: $cormse Wh\n";
+     $ermsr .= "- RMSE relative: $rmse_rel %\n";
+     $ermsr .= "- RMSE Rating: $rmse_rat\n";
+     $ermsr .= "- MAPE: $comape %\n";
+     $ermsr .= "- MdAPE: $codape %\n";
+     $ermsr .= "- R2: $conr2\n";
+
+  my $noise  = $hqtxt{noise}{$lang}."\n";
+     $noise .= '- '.$hqtxt{nserat}{$lang}.": $nslvl\n";
+     $noise .= '- '.(encode('utf8', $hqtxt{rcdfor}{$lang})).' Bit_Fail'.": $bfsug (".$hqtxt{setof}{$lang}." aiControl->aiConBitFailLimit)\n";    
+
+  my $drift_title = $hqtxt{drftid}{$lang}.' ('.$hqtxt{calasf}{$lang}.' '.$hqtxt{modage}{$lang}.' > '.AIMODELMINAGE.' h)';
+  my $drift  = $drift_title."\n";
+     $drift .= '- '.$hqtxt{anawin}{$lang}.": $drift_window h\n";
+     $drift .= "- Drift RMSE Ratio: $drift_rmserel\n";
+     $drift .= "- Semantic Ratio: $sem_ratio\n";
+     $drift .= "- Slope Reference: $slope_ref\n";
+     $drift .= "- Slope Live: $slope_live\n";
+     $drift .= "- Slope Drift: $drift_slope\n";
+     $drift .= "- Bias Reference: $bias_ref\n";
+     $drift .= "- Bias Live: $drift_bias_live\n";
+     $drift .= "- Bias Drift: $drift_bias\n";
+     $drift .= "- Score: $drift_score\n";
+     $drift .= "- Index: $drift_index\n";
+     $drift .= '- '.$hqtxt{drfrat}{$lang}.": ".(encode('utf8', $display_driftflag))."\n";
+     $drift .= '- '.(encode('utf8', $hqtxt{rcdfor}{$lang})).' Retrain'.": $recomd_translated $show_retreason\n";    
+     $drift .= '- '.$hqtxt{lstrcl}{$lang}.": $last_recaltm\n";
+
+  ####################################################################
+  # Zusammenstellung des reinen Textes (= Inhalt der Textarea, das ist
+  # exakt das, was per Copy-Button in die Zwischenablage wandert)
+  ####################################################################
+  $rs  = $intro;
+  $rs .= "\n".$general;
+  $rs .= "\n".$rating;
+  $rs .= "\n".$model;
+  $rs .= "\n".$keyfig;
+  $rs .= "\n".$ermsr;
+  $rs .= "\n".$noise;
+  $rs .= "\n".$drift;
+
+  ####################################################################
+  # HTML-Hülle für die Anzeige im FW_okDialog-Popup:
+  # Textarea (readonly, monospace) + Copy-Button.
+  # $rs ist an dieser Stelle bereits ein reiner Byte-String (alle
+  # Bestandteile sind oben schon korrekt encode('utf8', ...)
+  # bzw. stammen unverändert aus %hqtxt). Für die Platzierung als
+  # Element-Inhalt müssen nur noch die HTML-Metazeichen escaped
+  # werden - NICHT nochmal encode('utf8', ...) auf $rs anwenden,
+  # das würde zu einer Doppel-Encodierung (erneuten Umlaut-Salat)
+  # führen.
+  ####################################################################
+  (my $escaped = $rs) =~ s/&/&amp;/g;
+  $escaped =~ s/</&lt;/g;
+  $escaped =~ s/>/&gt;/g;
+
+  my $taId    = 'aiPromptExportTA_'.$name;
+  my $btnId   = 'aiPromptExportBtn_'.$name;
+  my $btnTxt  = $lang eq 'DE' ? encode('utf8', 'In Zwischenablage kopieren') : 'Copy to clipboard';
+  my $doneTxt = $lang eq 'DE' ? encode('utf8', 'Kopiert') : 'Copied';
+
+  my $html  = '<style>';
+  $html    .= '#'.$taId.'{width:98%;min-height:420px;font-family:monospace;font-size:0.82em;'.
+              'white-space:pre;overflow:auto;box-sizing:border-box;}';
+  $html    .= '#'.$btnId.'{margin-bottom:6px;cursor:pointer;padding:4px 10px;}';
+  $html    .= '</style>';
+  $html    .= '<button id="'.$btnId.'" onclick="'.
+              "var ta=document.getElementById('$taId');".
+              "var b=document.getElementById('$btnId');".
+              "var old=b.innerHTML;".
+              "if(navigator.clipboard && navigator.clipboard.writeText){".
+                "navigator.clipboard.writeText(ta.value);".
+              "}else{".
+                "ta.removeAttribute('readonly');ta.focus();ta.select();".
+                "document.execCommand('copy');ta.setAttribute('readonly','readonly');".
+              "}".
+              "b.innerHTML='&#10003; $doneTxt';".
+              "setTimeout(function(){b.innerHTML=old;},1500);".
+              '">&#128203; '.$btnTxt.'</button>';
+  $html    .= '<br/><textarea id="'.$taId.'" readonly onclick="this.select()">'.$escaped.'</textarea>';
+
+return $html;
+}
+
+################################################################
 # Liefert den Status der KI Verbrauchsvorhersage und Kennzahlen
 ################################################################
 sub __getaiFannState {            ## no critic "not used"
@@ -7027,12 +7368,14 @@ sub __getaiFannState {            ## no critic "not used"
   }
   
   if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
-      $rs = "The AI for forecasting $fanntyp is not yet operational. \n<b>Cause:</b> $cause";
-      return $rs;
+      return $lang eq 'DE'
+           ? "Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause"
+           : "The AI for forecasting $fanntyp is not yet operational.\n<b>Cause:</b> $cause";
   }
   
   my $hpinst   = CurrentVal  ($name, 'heatpumpInstalled',        '-');                      # WP installiert?
   
+  my $version  = AiNeuralVal ($name, $fanntyp, 'ModuleVersion',  '-');                      # mit welcher Modulversion wurde trainiert
   my $pvmaxlim = AiNeuralVal ($name, $fanntyp, 'PVMaxLimit',     '?'); 
   my $tgtmin   = AiNeuralVal ($name, $fanntyp, 'MinVal',         '-');              
   my $tgtmax   = AiNeuralVal ($name, $fanntyp, 'MaxVal',         '-');               
@@ -7195,11 +7538,12 @@ sub __getaiFannState {            ## no critic "not used"
   my $head  = '<b><u>'.$headline.'</b></u>'."\n\n";                                                                                                     # Informationen zum neuronalen Netz der Verbrauchsvorhersage/PV-Prognose
 
   my $art  = $hqtxt{aitris}{$lang}.' '.$rtt;   
-  $ars     = '<b>'.$hqtxt{airest}{$lang}.'</b> '.$ars;
+  $version = '<b>'.$hqtxt{trmovr}{$lang}.':</b> '.$version;                           
+  $ars     = '<b>'.$hqtxt{airest}{$lang}.':</b> '.$ars;
   $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($name, $atf, $lang))[0] : '-');
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
   $aiAlpha = '<b>Alpha:</b> '.$aiAlpha;
-  $hpinst  = '<b>'.$hqtxt{vbnrhp}{$lang}.': </b> '.$hpinst;
+  $hpinst  = '<b>'.(encode('utf8', $hqtxt{vbnrhp}{$lang})).': </b> '.$hpinst;
   
   # Überblick über die Bewertungen                
   #################################
@@ -7305,6 +7649,7 @@ sub __getaiFannState {            ## no critic "not used"
   $rs .= "<style>summary { user-select:none } summary:hover { color:#c8a000 }</style>\n";
   $rs .= $head;
   $rs .= $atf.' / '.$art."\n";
+  $rs .= $version."\n";
   $rs .= $ars."\n";
   $rs .= $agt."\n";
   $rs .= $aiAlpha."\n";
@@ -10108,6 +10453,11 @@ sub __attrKeyAction {
           if (!$alowt) {
               return "The consumer type '$akeyval' isn't allowed!";
           }
+          
+          # --- deprecated Check noSchedule
+          if ($akeyval eq 'noSchedule') {
+              return qq{The consumer type '$akeyval' is deprecated. User another consumer type and mode=mustNot instead.};
+          }          
           
           # --- Negativtest: diese Schlüssel dürfen nur bei bestimmten type vorkommen
           if ($akeyval ne 'bev') {                                                                      # Exklusivschlüssel bev
@@ -27062,6 +27412,7 @@ sub aiFannRunTrain {
   $data{$name}{$fanntyp.'temp'}{$attempt}{lagNorms}       = encode_base64 (Serialize ( $paref->{lagnorm_ref} ), "");    # Serialisierung
   $data{$name}{$fanntyp.'temp'}{$attempt}{FannBlob}       = $blob;                                                      # BLOB im Hash ablegen
   
+  $data{$name}{$fanntyp.'temp'}{$attempt}{ModuleVersion}  = $defs{$name}->{HELPER}{VERSION};                # festhalten mit welcher Modulversion trainiert wurde
   $data{$name}{$fanntyp.'temp'}{$attempt}{HiddActFunc}    = $haf;
   $data{$name}{$fanntyp.'temp'}{$attempt}{OutActFunc}     = $oaf;
   $data{$name}{$fanntyp.'temp'}{$attempt}{LearnMomentum}  = $learning_momentum;
@@ -38893,7 +39244,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as copromitted                 </td></tr>
             <tr><td> <b>pvcorrf</b>         </td><td>Autocorrection factor used / forecast quality achieved                                                                   </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>global radiation (kJ/m2)                                                                                                 </td></tr>
-            <tr><td> <b>rcmdcsmXX</b>       </td><td>time-weighted PV-driven activation recommendation for consumer XX with mode ≠ 'mustNot'                                  </td></tr>
+            <tr><td> <b>rcmdcsmXX</b>       </td><td>time-weighted PV-driven <i>activation recommendation:pvshare share</i> for consumer                                      </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Total precipitation during the last hour kg/m2                                                                           </td></tr>
             <tr><td> <b>socwhsum</b>        </td><td>real SoC achieved (Wh) summarized across all batteries                                                                   </td></tr>
             <tr><td> <b>socprogwhsum</b>    </td><td>predicted SoC (Wh) summarized across all batteries                                                                       </td></tr>
@@ -42006,7 +42357,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als komprimittiert bewertet   </td></tr>
             <tr><td> <b>pvcorrf</b>         </td><td>verwendeter Autokorrekturfaktor / erreichte Prognosequalität                                           </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>Globalstrahlung (kJ/m2)                                                                                </td></tr>
-            <tr><td> <b>rcmdcsmXX</b>       </td><td>zeitgewichtete PV-getriebene Aktivierungsempfehlung des VerbrauchersXX mit mode ≠ 'mustNot'            </td></tr>
+            <tr><td> <b>rcmdcsmXX</b>       </td><td>zeitgewichtete PV-getriebene <i>Aktivierungsempfehlung:pvshare-Anteil</i> des VerbrauchersXX           </td></tr>
             <tr><td> <b>rr1c</b>            </td><td>Gesamtniederschlag in der letzten Stunde kg/m2                                                         </td></tr>
             <tr><td> <b>socwhsum</b>        </td><td>real erreichter SoC (Wh) zusammengefasst über alle Batterien                                           </td></tr>
             <tr><td> <b>socprogwhsum</b>    </td><td>prognostizierter SoC (Wh) zusammengefasst über alle Batterien                                          </td></tr>
