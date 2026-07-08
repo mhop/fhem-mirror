@@ -167,7 +167,7 @@ my %vNotesIntern = (
                            "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
                            "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz, Speicherung zeitgewichtete Empfehlung Verbrauchernutzung ".
                            "Bereinigung Verbrauchsinput um PV-getriebenen Anteil im CON-KI-Training für Non-PV-Profile ".
-                           "Consumer type noSchedule (deprecated) setzt immer mode=mustNot ",
+                           "Consumer type noSchedule (deprecated) setzt immer mode=mustNot, Änderung von type=noSchedule nach type=X ist ohne lÖschrequest möglich ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -8432,6 +8432,17 @@ sub __consumerIdentityFp {
       if ($newset && $oldh->{$k} ne $h->{$k}) {                             # beide gesetzt, unterschiedlich -> Device Änderung prüfen
           my $olddev = (split ":", $oldh->{$k}, 2)[0];
           my $newdev = (split ":", $h->{$k}, 2)[0];
+          
+          if ($k eq 'type') {                                               # Sonderfall type: Wechsel VON noSchedule NACH irgendwas anderem ist zulässig
+              if ($olddev eq 'noSchedule' && $newdev ne 'noSchedule') {
+                  next;                                                     # kein Löschrequest für diesen Key
+              }
+              
+              if ($newdev eq 'noSchedule' && $olddev ne 'noSchedule') {     # Sonderfall type: Wechsel VON irgendwas ANDEREM NACH noSchedule ist NICHT zulässig
+                  $delreq = 1;
+                  next;
+              }
+          }
           
           $delreq = 1 if $newdev ne $olddev;                                # Devices unterschiedlich -> Löschrequest              
       }
