@@ -1166,6 +1166,10 @@ my %hqtxt = (                                                                   
               DE => qq{Drift Bewertung}                                                                                     },
   exeval => { EN => qq{external Evaluation},
               DE => qq{externe Bewertung}                                                                                   },              
+  oalman => { EN => qq{or alternatively manually},
+              DE => qq{oder alternativ manuell}                                                                             },   
+  inallp => { EN => qq{into an LLM prompt},
+              DE => qq{in einen LLM-Prompt}                                                                                 },  
   fcerma => { EN => qq{Forecast Error Measures},
               DE => qq{Fehlermaße der Prognosen}                                                                            },  
   aifane => { EN => qq{the AI::FANN object loaded from file is empty},
@@ -7597,15 +7601,38 @@ sub __getaiFannState {            ## no critic "not used"
   $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
                        ":</b> $retrampel $recomd_translated $show_retreason \n";  
   
-  my $linkGemini     = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConAssessGemini', function(data){FW_okDialog(data)})"};
+  # ------------------------------
+  #my $linkGemini     = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConAssessGemini', function(data){FW_okDialog(data)})"};
+  
+  #my $privacyHint    = $lang eq 'DE'
+  #                   ? encode ('utf8', 'Es werden Trainingsmetriken an Google Gemini übertragen (sichtbar im Log mit ctrlDebug=apiCall)')
+  #                   : 'Training metrics are transmitted to Google Gemini (visible in the log with ctrlDebug=apiCall)';
+  #my $privacyNote    = qq{<span style="font-size:0.75em;color:#888;margin-left:6px">($privacyHint)</span>};
+  #my $askGemini      = qq{<span title="$privacyHint"> <a style="cursor:pointer" onClick=$linkGemini>Google Gemini</a> </span>};
+
+  #$rating_content   .= "\n";
+  #$rating_content   .= "<b>".$hqtxt{exeval}{$lang}.":</b> $askGemini $privacyNote \n";
+  
+  # ----------------------------
+  
+  my $linkGemini       = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConAssessGemini', function(data){FW_okDialog(data)})"};
+  my $linkPromptExport = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConTrainState LLM', function(data){FW_okDialog(data)})"};
+
   my $privacyHint    = $lang eq 'DE'
                      ? encode ('utf8', 'Es werden Trainingsmetriken an Google Gemini übertragen (sichtbar im Log mit ctrlDebug=apiCall)')
                      : 'Training metrics are transmitted to Google Gemini (visible in the log with ctrlDebug=apiCall)';
   my $privacyNote    = qq{<span style="font-size:0.75em;color:#888;margin-left:6px">($privacyHint)</span>};
   my $askGemini      = qq{<span title="$privacyHint"> <a style="cursor:pointer" onClick=$linkGemini>Google Gemini</a> </span>};
 
-  $rating_content   .= "\n";
-  $rating_content   .= "<b>".$hqtxt{exeval}{$lang}.":</b> $askGemini $privacyNote \n";
+  my $promptExportLabel = $lang eq 'DE'
+                         ? encode('utf8', 'Copy&amp;Paste')
+                         : 'copy&amp;paste';
+  my $askPromptExport   = qq{<span> <a style="cursor:pointer" onClick=$linkPromptExport>$promptExportLabel</a> </span>};
+
+  $rating_content   .= "\n";                           
+  $rating_content   .= "<b>".$hqtxt{exeval}{$lang}.":</b> $askGemini ".$hqtxt{oalman}{$lang}." $askPromptExport ".$hqtxt{inallp}{$lang}." $privacyNote \n";
+  
+  # ------------------------------
   
   my $rating         = ___aiFannSection (encode('utf8', $hqtxt{ratovw}{$lang}), $rating_content, 1);       
 
@@ -33172,6 +33199,10 @@ return $sq;
 sub _listDataPoolAiRawData {
   my $name = shift;
   my $par  = shift // 0;
+  
+  if (!isNumeric($par)) {
+      return qq{The argument must be an integer!};
+  }
 
   my $h         = $data{$name}{aidectree}{airaw};
   my $maxcnt    = keys %{$h};
@@ -33182,6 +33213,7 @@ sub _listDataPoolAiRawData {
   }
   
   my $count = $maxcnt;
+  $par      = int $par;
   $par      = (!$par || $par > $maxcnt) ? $maxcnt : $par;
   $count    = $par;
   
@@ -39490,18 +39522,20 @@ to ensure that the system configuration is correct.
 
       <ul>
        <table>
-       <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-          <tr><td> <b>aiRawData</b>            </td><td>Display of the PV, radiation and environmental data currently saved for an AI evaluation.   </td></tr>
-          <tr><td>                             </td><td>Optionally, only the last saved data records can be displayed (e.g. aiRawData 20).          </td></tr>
-          <tr><td>                             </td><td>                                                                                            </td></tr>
-          <tr><td> <b>aiRuleStrings</b>        </td><td>Returns a list describing the decision tree of the solar forecast AI in the form of rules.  </td></tr>
-          <tr><td>                             </td><td><b>Note:</b> While the order of the rules is not predictable, the                           </td></tr>
-          <tr><td>                             </td><td>order of criteria within each rule, however, reflects the order                             </td></tr>
-          <tr><td>                             </td><td>in which the criteria are considered in the decision-making process.                        </td></tr>
-          <tr><td>                             </td><td>(available if an AI-compatible SolarForecast MODEL of the PV forecast is activated)         </td></tr>
-          <tr><td>                             </td><td>                                                                                            </td></tr>
-          <tr><td> <b>aiConTrainState</b>      </td><td>Shows the status and current key figures of the consumption forecast AI.                    </td></tr>
-          <tr><td>                             </td><td>                                                                                            </td></tr>
+       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
+          <tr><td> <b>aiRawData</b>            </td><td>Display of the PV, radiation and environmental data currently saved for an AI evaluation.                </td></tr>
+          <tr><td>                             </td><td>Optionally, only the last saved data records can be displayed (e.g. aiRawData 20).                       </td></tr>
+          <tr><td>                             </td><td>                                                                                                         </td></tr>
+          <tr><td> <b>aiRuleStrings</b>        </td><td>Returns a list describing the decision tree of the solar forecast AI in the form of rules.               </td></tr>
+          <tr><td>                             </td><td><b>Note:</b> While the order of the rules is not predictable, the                                        </td></tr>
+          <tr><td>                             </td><td>order of criteria within each rule, however, reflects the order                                          </td></tr>
+          <tr><td>                             </td><td>in which the criteria are considered in the decision-making process.                                     </td></tr>
+          <tr><td>                             </td><td>(available if an AI-compatible SolarForecast MODEL of the PV forecast is activated)                      </td></tr>
+          <tr><td>                             </td><td>                                                                                                         </td></tr>
+          <tr><td> <b>aiConTrainState</b>      </td><td>Displays the status and key metrics of the consumption forecast AI's most recent training session.       </td></tr>
+          <tr><td>                             </td><td>Optional argument:                                                                                       </td></tr>
+          <tr><td>                             </td><td><b>LLM</b> - Output key metrics, including a prompt for manual transfer to an LLM via copy and paste     </td></tr>
+          <tr><td>                             </td><td>                                                                                                         </td></tr>       
         </table>
       </ul>
     </li>
@@ -42602,7 +42636,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
       <ul>
        <table>
-       <colgroup> <col width="20%"> <col width="80%"> </colgroup>
+       <colgroup> <col width="15%"> <col width="85%"> </colgroup>
           <tr><td> <b>aiRawData</b>            </td><td>Anzeige der aktuell für eine KI-Auswertung gespeicherten PV-, Strahlungs- und Umweltdaten.               </td></tr>
           <tr><td>                             </td><td>Optional können nur die letzten gespeicherten Datensätze angezeigt werden (z.B. aiRawData 20)            </td></tr>
           <tr><td>                             </td><td>                                                                                                         </td></tr>
@@ -42612,8 +42646,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
           <tr><td>                             </td><td>wider, in der die Kriterien bei der Entscheidungsfindung geprüft werden.                                 </td></tr>
           <tr><td>                             </td><td>(verfügbar wenn ein KI kompatibles SolarForecast MODEL der PV Vorhersage aktiviert ist)                  </td></tr>
           <tr><td>                             </td><td>                                                                                                         </td></tr>
-          <tr><td> <b>aiConTrainState</b>      </td><td>Zeigt den Status und aktuelle Kennzahlen der Verbrauchsprognose-KI.                                      </td></tr>
-          <tr><td>                             </td><td>                                                                                                         </td></tr>
+          <tr><td> <b>aiConTrainState</b>      </td><td>Zeigt den Status und die Kennzahlen des letzten Trainings der Verbrauchsprognose-KI.                     </td></tr>
+          <tr><td>                             </td><td>Optionales Argument:                                                                                     </td></tr>
+          <tr><td>                             </td><td><b>LLM</b> - Ausgabe Kennzahlen inklusive Prompt zur manuellen Übertragung an ein LLM per Copy&Paste     </td></tr>
+          <tr><td>                             </td><td>                                                                                                         </td></tr>       
         </table>
       </ul>
     </li>
