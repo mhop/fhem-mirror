@@ -7167,48 +7167,87 @@ sub __getaiFannPromptExport {          ## no critic "not used"
 
   my $tgt = $fanntyp eq 'con' ? $hqtxt{hodcon}{$lang} : '';
 
-  ####################################################################
+####################################################################
   # einleitender Prompt-Text für das LLM
   ####################################################################
   my $intro = $lang eq 'DE' ? <<"INTRO_DE" : <<"INTRO_EN";
-Du bist ein erfahrener Data Scientist für Zeitreihenprognosen im Bereich Energiemanagement.
-Nachfolgend erhältst du die Trainings- und Bewertungskennzahlen eines neuronalen Netzes (FANN),
-das den Hausverbrauch eines privaten Haushalts prognostiziert (FHEM-Modul 76_SolarForecast.pm).
+Du bewertest die Trainings- und Bewertungskennzahlen eines neuronalen Netzes (FANN),
+das den stündlichen Hausverbrauch für einen Photovoltaik-Haushalt prognostiziert
+(FHEM-Modul 76_SolarForecast.pm, FANN-basiertes neuronales Netz).
 
-Bitte bewerte die Kennzahlen im Kontext dieser konkreten Haushaltskonfiguration
+Wichtiger Domänen-Kontext für deine Bewertung:
+- Stochastische Haushalte (ohne Wärmepumpe/BEV) erreichen typischerweise R²=0.25-0.35 –
+  das ist kein Modellfehler, sondern physikalisch bedingt durch unvorhersehbares Nutzerverhalten.
+- Ein ModelSlope von 0.35-0.45 und ein ModelBias von 400-500 Wh sind bei diesen Haushalten
+  strukturell erwartet (Bias ≈ mean_consumption × (1 - Slope)) und kein Kalibrierfehler.
+- Haushalte mit Wärmepumpe oder BEV können R²=0.5-0.7 erreichen.
+- Ein DriftIndex unter 0.7 gilt als stabil, über 1.0 als kritisch.
+- Ein hohes Rauschlevel (NoiseLevel) begrenzt die maximal erreichbare Modellqualität strukturell.
+- BitFailLimit (aiConBitFailLimit) definiert die Fehlertoleranz pro Datenpunkt – ein HÖHERER
+  Wert bedeutet MEHR Toleranz (mehr Fehler werden akzeptiert, bevor ein Sample als Bit_Fail
+  zählt), ein NIEDRIGERER Wert bedeutet strengere Bewertung.
+- Zur Diagnose von früher Konvergenz: Wenn Val MSE > Train MSE (Overfitting-Indikator) UND
+  wenige Epochen genutzt wurden, deutet das auf eine zu hohe Lernrate hin (Empfehlung:
+  Lernrate reduzieren). Nur wenn Val MSE ≈ Train MSE und wenige Epochen genutzt wurden,
+  kann eine höhere Lernrate sinnvoll sein.
+
+Beurteile die Metriken ausschließlich vor diesem Domänen-Hintergrund, nicht nach
+generischen ML-Benchmarks.
+
+Bitte bewerte die Kennzahlen zusätzlich im Kontext dieser konkreten Haushaltskonfiguration
 (siehe Abschnitt "Modellparameter", insbesondere Profile) und beantworte:
 
 1. Wo liegen aktuell die größten Schwachstellen des Modells?
-2. Welche 2-3 Maßnahmen versprechen den größten Hebel zur Verbesserung
-   (Datenqualität/-menge, Hyperparameter, Architektur, Feature-Auswahl,
-   Trainingsdauer/Epochen, Rauschen, Drift/Rekalibrierung)?
-3. Gibt es Hinweise auf strukturelle Probleme (z.B. zu wenig Trainingsdaten,
-   instabile Slope, Bias-Drift, Over-/Underfitting, verrauschte Zielgröße,
-   zu früh konvergiertes Training)?
+2. Welche 2-3 Maßnahmen versprechen den größten Hebel zur Verbesserung (Datenqualität/-menge,
+   Hyperparameter wie aiConLearnRate/aiConMomentum, Architektur/HiddenLayers, Feature-Auswahl,
+   Trainingsdauer/Epochen, Rauschen, Drift/Rekalibrierung)? Bitte jeweils mit Richtungsangabe
+   (erhöhen/reduzieren).
+3. Gibt es Hinweise auf strukturelle Probleme (z.B. zu wenig Trainingsdaten, instabile Slope,
+   Bias-Drift, Over-/Underfitting, verrauschte Zielgröße, zu früh konvergiertes Training)?
 4. Bitte konkrete, umsetzbare nächste Schritte nennen, keine allgemeinen Floskeln.
 
 Hier die Kennzahlen:
 --------------------------------------------------------------------
 INTRO_DE
-You are an experienced data scientist for time-series forecasting in energy management.
-Below are the training and evaluation metrics of a neural network (FANN) that forecasts
-household consumption for a private household (FHEM module 76_SolarForecast.pm).
+You are assessing the training and evaluation metrics of a neural network (FANN) that
+forecasts hourly household consumption for a photovoltaic household (FHEM module
+76_SolarForecast.pm, FANN-based neural network).
 
-Please assess the metrics in the context of this specific household configuration
+Important domain context for your assessment:
+- Stochastic households (no heat pump/EV) typically achieve R²=0.25-0.35 – this is not a
+  model failure but physically expected due to unpredictable user behavior.
+- A ModelSlope of 0.35-0.45 and ModelBias of 400-500 Wh are structurally expected for these
+  households (Bias ≈ mean_consumption × (1 - Slope)), not a calibration error.
+- Households with heat pumps or EVs can reach R²=0.5-0.7.
+- A DriftIndex below 0.7 is considered stable, above 1.0 critical.
+- A high noise level (NoiseLevel) structurally limits the maximum achievable model quality.
+- BitFailLimit (aiConBitFailLimit) defines the error tolerance per data point—a HIGHER value
+  means MORE tolerance (more errors are accepted before a sample is counted as a Bit_Fail),
+  a LOWER value means stricter evaluation.
+- For diagnosing premature convergence: If Val MSE > Train MSE (overfitting indicator) AND
+  few epochs have been used, this indicates the learning rate is too high (recommendation:
+  reduce it). Only if Val MSE ≈ Train MSE and few epochs are used, might a higher learning
+  rate be appropriate.
+
+Assess the metrics strictly within this domain context, not against generic ML benchmarks.
+
+Please also assess the metrics in the context of this specific household configuration
 (see "Model parameters" section, in particular the profile) and answer:
 
 1. Where are the model's biggest current weaknesses?
-2. Which 2-3 measures promise the biggest leverage for improvement
-   (data quality/quantity, hyperparameters, architecture, feature selection,
-   training duration/epochs, noise, drift/recalibration)?
-3. Are there indications of structural problems (e.g. too little training data,
-   unstable slope, bias drift, over-/underfitting, noisy target, training that
-   converged too early)?
+2. Which 2-3 measures promise the biggest leverage for improvement (data quality/quantity,
+   hyperparameters like aiConLearnRate/aiConMomentum, architecture/HiddenLayers, feature
+   selection, training duration/epochs, noise, drift/recalibration)? Please state the
+   direction (increase/decrease) for each.
+3. Are there indications of structural problems (e.g. too little training data, unstable
+   slope, bias drift, over-/underfitting, noisy target, training that converged too early)?
 4. Please give concrete, actionable next steps, no generic platitudes.
 
 Here are the metrics:
 --------------------------------------------------------------------
 INTRO_EN
+
+  $intro = encode('utf8', $intro);
 
   my @ctxParts;
   push @ctxParts, ($lang eq 'DE' ? encode('utf8', 'Wärmepumpe und/oder Klimaanlage')        : 'heat pump and/or AC')                   if $profile =~ /heatpump/i;    
@@ -7219,8 +7258,6 @@ INTRO_EN
   my $profileCtx = @ctxParts
                  ? ($lang eq 'DE' ? 'Haushalt mit '                   : 'Household with ') . join(', ', @ctxParts)
                  : ($lang eq 'DE' ? 'stochastischer Standardhaushalt' : 'stochastic standard household');
-
-  $intro = encode('utf8', $intro);
 
   ####################################################################
   # Textblöcke
