@@ -167,7 +167,8 @@ my %vNotesIntern = (
                            "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
                            "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz, Speicherung zeitgewichtete Empfehlung Verbrauchernutzung ".
                            "Bereinigung Verbrauchsinput um PV-getriebenen Anteil im CON-KI-Training für Non-PV-Profile ".
-                           "Consumer type noSchedule (deprecated) setzt immer mode=mustNot, Änderung von type=noSchedule nach type=X ist ohne lÖschrequest möglich ",
+                           "Consumer type noSchedule (deprecated) setzt immer mode=mustNot, Änderung von type=noSchedule nach type=X ist ohne Löschrequest möglich ".
+                           "Trainingsergebnisse können per Copy&Paste über ein generiertes Output manuell an LLM übergeben werden ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -7176,7 +7177,7 @@ sub __getaiFannPromptExport {          ## no critic "not used"
   ####################################################################
   my $intro = $lang eq 'DE' ? <<"INTRO_DE" : <<"INTRO_EN";
 Du bewertest die Trainings- und Bewertungskennzahlen eines neuronalen Netzes (FANN),
-das den stündlichen Hausverbrauch für einen Photovoltaik-Haushalt prognostiziert
+das den stündlichen Hausverbrauch für einen Haushalt prognostiziert
 (FHEM-Modul 76_SolarForecast.pm, FANN-basiertes neuronales Netz).
 
 Wichtiger Domänen-Kontext für deine Bewertung:
@@ -7214,7 +7215,7 @@ Hier die Kennzahlen:
 --------------------------------------------------------------------
 INTRO_DE
 You are assessing the training and evaluation metrics of a neural network (FANN) that
-forecasts hourly household consumption for a photovoltaic household (FHEM module
+forecasts hourly household consumption for a household (FHEM module
 76_SolarForecast.pm, FANN-based neural network).
 
 Important domain context for your assessment:
