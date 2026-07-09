@@ -12160,28 +12160,16 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
   
-  for my $c (sort{$a<=>$b} keys %{$data{$name}{consumers}}) {             # 29.03.
-      my $bla = AttrVal ($name, "consumer$c", undef);
-    
-      if (defined $bla) {
-          my ($a, $h) = parseParams ($bla);
-                    
-          if (defined $h->{comforttemp}) {
-              my $newval = $a->[0].' ';              
-              $newval .= join ' ',
-                  map  { qq{$_=$h->{$_}} }
-                  grep { $_ ne 'comforttemp' }
-                  sort keys %{$h};
-              
-              ::CommandDeleteAttr (undef, "$name consumer$c");
-              _setattrKeyVal ( { name => $name, opt => 'attrKeyVal', arg => "consumer$c $newval"} );         
-              _setattrKeyVal ( { name => $name, opt => 'attrKeyVal', arg => "plantControl comforttemp=$h->{comforttemp}" } );
-              last;
-          }
-      }
-  }
-  
   readingsDelete ($hash, 'Tomorrow_ConsumptionForecast');               # 07.06.
+  
+  if (!CurrentVal($name, 'pvh_00_cleanup_done', 0)) {             # 09.07.
+      for my $dy (1..31) {
+          my $day = sprintf "%02d", $dy;
+          delete $data{$name}{pvhist}{$day}{'00'};
+          delete $data{$name}{circular}{'00'};
+      }
+    $data{$name}{current}{pvh_00_cleanup_done} = 1;               # läuft nur einmal pro Session
+  }
   
   if (isHeatPumpUsed($name) && !CurrentVal($name, 'airaw_hp_cleanup_done', 0)) {             # 23.06.
     my @hpStates = split /\|/, HPOPMODES; 
