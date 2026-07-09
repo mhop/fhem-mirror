@@ -161,7 +161,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.8.1"  => "06.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
+  "2.9.0"  => "09.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
                            "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
                            "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
                            "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
@@ -26210,6 +26210,9 @@ sub aiFannConDataLoad {
           
           next unless $type;
           next if $type =~ /heatpump|bev/xs;                                                    # durch eigene Features abgedeckt
+
+          my $exconfc = $rec->{"exconfc${c}"} // 0;
+          next if $exconfc;                                                                     # Energieanteil vom User ausgeschlossen (konsistent zu dest_base-Bereinigung)
           
           my $val      = $rec->{"csme${c}"} // 0;
           $cycle_csme += max (0, $val);                                                         # Schutz gegen negative Werte
@@ -29969,10 +29972,15 @@ sub _aiFannCycleConsumerHistArray {
           for my $cn (1..MAXCONSUMER) {
               my $c         = sprintf "%02d", $cn;
               my $type      = ConsumerVal ($name, $c, 'type', '');
-              next unless $type;
-              next if $type =~ /heatpump|bev/xs;                             # durch eigene Feature-Blöcke abgedeckt
               
-              $cycle_csme += $rec->{"csme${c}"} // 0;
+              next unless $type;
+              next if $type =~ /heatpump|bev/xs;                            # durch eigene Feature-Blöcke abgedeckt
+              
+              my $exconfc = $rec->{"exconfc${c}"} // 0;
+              next if $exconfc;                                             # Energieanteil vom User ausgeschlossen (konsistent zu dest_base-Bereinigung)
+
+              my $val      = $rec->{"csme${c}"} // 0;
+              $cycle_csme += max (0, $val);                                 # Schutz gegen negative Werte
           }
 
           push @cycle_csme_raw, $cycle_csme;
@@ -39873,8 +39881,7 @@ to ensure that the system configuration is correct.
         percentage of PV to cover the power consumption. <br>
         Depending on these values, the switching times of the consumer are planned and the cycle of the consumer is started depending on
         the sufficient PV surplus at the time of planning. <br>
-        If <b>power=0</b> or <b>pvshare=0</b> is set, the consumer is switched on as planned, regardless of whether there is sufficient
-        PV surplus.
+        If <b>pvshare=0</b> is set, the load is switched on as scheduled, regardless of any PV surplus.
         <br><br>
 
          <ul>
@@ -39932,14 +39939,14 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>1</b> - Load is temporarily switched off if the PV surplus falls below the required energy                                                           </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:{Perl-Code}</b> - Load is temporarily interrupted if the Perl code returns 'true' <b>or</b> insufficient              </td></tr>
-            <tr><td>                       </td><td>PV surplus (if power is not equal to 0) and is switched on again if the Perl code returns 'false' <b>and</b> PV surplus                                 </td></tr>
-            <tr><td>                       </td><td>(if power is not equal to 0). The value of Device:Reading is passed to the code with the variable $VALUE.                                               </td></tr>
+            <tr><td>                       </td><td>PV surplus. It is switched on again if the Perl code returns 'false' <b>and</b> PV surplus is present.                                                  </td></tr>
+            <tr><td>                       </td><td>The value of Device:Reading is passed to the code with the variable $VALUE.                                                                             </td></tr>
             <tr><td>                       </td><td>The code must be enclosed in {..} and must <b>not contain any spaces</b>.                                                                               </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;[:&lt;Hysteresis&gt;]</b> - Load is temporarily interrupted when the value of the specified              </td></tr>
-            <tr><td>                       </td><td>Device:Readings on the Regex matched <b>or</b> there is insufficient PV surplus (if power is not equal to 0).                                           </td></tr>
-            <tr><td>                       </td><td>The interrupted load is switched on again when the value is no longer matched <b>and</b> there is sufficient PV surplus                                 </td></tr>
-            <tr><td>                       </td><td>is present (if power is not equal to 0).                                                                                                                </td></tr>
+            <tr><td>                       </td><td>Device:Readings on the Regex matched <b>or</b> there is insufficient PV surplus.                                                                        </td></tr>
+            <tr><td>                       </td><td>The interrupted load is switched on again when the value is no longer matched <b>and</b> there is sufficient PV surplus is present.                     </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td>                       </td><td>If the optional <b>hysteresis</b> is specified, the hysteresis value is subtracted from the reading value and the regex is then applied.                </td></tr>
             <tr><td>                       </td><td>If this and the original reading value match, the consumer is temporarily interrupted.                                                                  </td></tr>
             <tr><td>                       </td><td>The consumer is continued if both the original and the subtracted readings value do not (or no longer) match.                                           </td></tr>
@@ -40110,11 +40117,11 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmodeIcons</b>    </td><td>Each possible operating mode (opmode) can be assigned a unique icon and color. The entries are specified as a comma-separated list.                </td></tr>
             <tr><td>                       </td><td>Syntax: <b> &lt;opmode&gt;->&lt;Icon&gt;[@&lt;Color&gt;],&lt;opmode&gt;->&lt;Icon&gt;[@&lt;Color&gt;],... </b>                                     </td></tr>
-            <tr><td>                       </td><td>The color specification is optional. If the list spans multiple lines, enclose the entire list in " ".                                    </td></tr>
+            <tr><td>                       </td><td>The color specification is optional. If the list spans multiple lines, enclose the entire list in " ".                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>The key is a required field.                                                                                                                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>power</b>          </td><td>Maximum power consumption in W. The value must not be 0.                                                                                           </td></tr>
+            <tr><td> <b>power</b>          </td><td>Maximum power consumption in W. Value range: <b>Integer from 1..X</b>                                                                              </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Compressor operating status. The syntax remains as specified above.                                                                                </td></tr>
             <tr><td>                       </td><td>Unlike other consumers, this information is required even if you intend to use the default value.                                                  </td></tr>
@@ -42988,8 +42995,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         prozentuale PV-Anteil zur Deckung der Leistungsaufnahme festgelegt werden. <br>
         Abhängig von diesen Werten werden die Schaltzeiten des Verbrauchers geplant und der Zyklus des Verbrauchers in Abhängigkeit
         des ausreichenden PV-Überschußes zum Einplanungszeitpunkt gestartet. <br>
-        Ist <b>power=0</b> oder <b>pvshare=0</b> gesetzt, wird der Verbraucher unabhängig von einem ausreichend vorhandenem PV-Überschuß
-        wie eingeplant geschaltet.
+        Ist <b>pvshare=0</b> gesetzt, wird der Verbraucher unabhängig von einem PV-Überschuß wie eingeplant geschaltet.
         <br><br>
 
          <ul>
@@ -43047,14 +43053,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>1</b> - Verbraucher wird temporär ausgeschaltet falls der PV Überschuß die benötigte Energie unterschreitet                                     </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:{Perl-Code}</b> - Verbraucher wird temporär unterbrochen, wenn der Perl-Code 'wahr' zurückgibt <b>oder</b>       </td></tr>
-            <tr><td>                       </td><td>unzureichender PV Überschuß (wenn power ungleich 0) vorliegt und wird wieder eingeschaltet, wenn der Perl-Code 'falsch' zurückgibt <b>und</b>      </td></tr>
-            <tr><td>                       </td><td>PV Überschuß (wenn power ungleich 0) vorliegt. Der Wert von  &lt;Device&gt;:&lt;Reading&gt; wird dem Code mit der Variable $VALUE übergeben.       </td></tr>
+            <tr><td>                       </td><td>unzureichender PV Überschuß vorliegt. Er wird wieder eingeschaltet, wenn der Perl-Code 'falsch' zurückgibt <b>und</b>                              </td></tr>
+            <tr><td>                       </td><td>PV Überschuß vorliegt. Der Wert von  &lt;Device&gt;:&lt;Reading&gt; wird dem Code mit der Variable $VALUE übergeben.                               </td></tr>
             <tr><td>                       </td><td>Der Code ist in {..} einzuschließen und darf <b>keine Leerzeichen</b> enthalten.                                                                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td>                       </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;[:&lt;Hysterese&gt;]</b> - Verbraucher wird temporär unterbrochen, wenn der Wert des angegebenen    </td></tr>
-            <tr><td>                       </td><td>&lt;Device&gt;:&lt;Reading&gt; auf den Regex matched <b>oder</b> unzureichender PV Überschuß (wenn power ungleich 0) vorliegt.                     </td></tr>
-            <tr><td>                       </td><td>Der unterbrochene Verbraucher wird wieder eingeschaltet, wenn der Wert nicht mehr matched <b>und</b> ausreichender PV Überschuß                    </td></tr>
-            <tr><td>                       </td><td>(wenn power ungleich 0) vorliegt.                                                                                                                  </td></tr>
+            <tr><td>                       </td><td>&lt;Device&gt;:&lt;Reading&gt; auf den Regex matched <b>oder</b> unzureichender PV Überschuß vorliegt.                                             </td></tr>
+            <tr><td>                       </td><td>Der unterbrochene Verbraucher wird wieder eingeschaltet, wenn der Wert nicht mehr matched <b>und</b> ausreichender PV Überschuß vorliegt.          </td></tr>
+            <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td>                       </td><td>Ist die optionale <b>Hysterese</b> angegeben, wird der Hysteresewert vom Readingswert subtrahiert und danach der Regex angewendet.                 </td></tr>
             <tr><td>                       </td><td>Matched dieser und der originale Readingswert, wird der Verbraucher temporär unterbrochen.                                                         </td></tr>
             <tr><td>                       </td><td>Der Verbraucher wird fortgesetzt, wenn sowohl der originale als auch der substrahierte Readingswert nicht (mehr) matchen.                          </td></tr>
@@ -43230,7 +43236,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pcurr</b>          </td><td>der Schlüssel ist Pflichtangabe                                                                                                                    </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
-            <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme in W. Der Wert darf nicht! 0 sein.                                                                                      </td></tr>
+            <tr><td> <b>power</b>          </td><td>maximale Leistungsaufnahme in W. Wertebereich: <b>Ganzzahl von 1..X</b>                                                                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>swstate</b>        </td><td>Schaltstatus des Kompressors. Die Syntax bleibt wie oben angegeben.                                                                                </td></tr>
             <tr><td>                       </td><td>Abweichend von anderen Consumern ist die Angabe verpflichtend, auch wenn der default verwendet werden soll.                                        </td></tr>
