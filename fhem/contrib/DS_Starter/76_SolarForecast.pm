@@ -1803,7 +1803,25 @@ my %hfspvh = (
       $hfspvh{'rcmdcsm'.$cn}{fn}       = \&_saveHistP2;
       $hfspvh{'rcmdcsm'.$cn}{storname} = 'rcmdcsm'.$cn;
       $hfspvh{'rcmdcsm'.$cn}{validkey} = undef;
-      $hfspvh{'rcmdcsm'.$cn}{fpar}     = undef;      
+      $hfspvh{'rcmdcsm'.$cn}{fpar}     = undef;
+      
+      # --- Energieverbrauch
+      $hfspvh{'csme'.$cn}{fn}       = \&_saveHistP2;
+      $hfspvh{'csme'.$cn}{storname} = 'csme'.$cn;
+      $hfspvh{'csme'.$cn}{validkey} = undef;
+      $hfspvh{'csme'.$cn}{fpar}     = 'calc99'; 
+      
+      # --- Energieverbrauch Total
+      $hfspvh{'csmt'.$cn}{fn}       = \&_saveHistP2;
+      $hfspvh{'csmt'.$cn}{storname} = 'csmt'.$cn;
+      $hfspvh{'csmt'.$cn}{validkey} = undef;
+      $hfspvh{'csmt'.$cn}{fpar}     = undef; 
+
+      # --- Exclude-Kennzeichen Verbrauch von Prognose
+      $hfspvh{'exconfc'.$cn}{fn}       = \&_saveHistP2;
+      $hfspvh{'exconfc'.$cn}{storname} = 'exconfc'.$cn;
+      $hfspvh{'exconfc'.$cn}{validkey} = undef;
+      $hfspvh{'exconfc'.$cn}{fpar}     = undef;      
       
       # --- heatpump OpMode-Keys
       for my $s (@hpopm) {
@@ -17306,21 +17324,28 @@ sub __savePowerAndEnergy {
                   Log3 ($name, $vl, "$name $pre The calculated Energy consumption of >$cname< is negative. This appears to be an error and the energy consumption of the consumer for the current hour is set to '0'.");
               }
 
-              _saveHistP1 ( { paref => $paref, 
-                              key   => "csme${c}",
-                              val   => round2 ($consumerco),                            # Verbrauch des Consumers aktuelle Stunde                             
-                              day   => $day,
-                              hour  => $hod,
-                            } );
+              writeToHistory ( { paref => $paref, 
+                                 key   => "csme${c}",
+                                 val   => round2 ($consumerco),                         # Verbrauch des Consumers aktuelle Stunde                             
+                                 day   => $day,
+                                 hour  => $hod,
+                               } );
+                            
+              writeToHistory ( { paref => $paref,                                       # Snapshot des Ausschluss-Flags zum Zeitpunkt der csme-Erfassung
+                                 key   => "exconfc${c}", 
+                                 val   => ConsumerVal ($name, $c, 'exconfc', 0), 
+                                 day   => $day, 
+                                 hour  => $hod, 
+                               } );
           }
       }
-      else {                                                                            # Stundenwechsel von vorn beginnen         
-          _saveHistP1 ( { paref => $paref, 
-                          key   => "csmt${c}",
-                          val   => $etot,                                               # Totalverbrauch des Verbrauchers                            
-                          day   => $day,
-                          hour  => $hod,
-                        } );
+      else {                                                                            # Stundenwechsel von vorn beginnen                                 
+          writeToHistory ( { paref => $paref,                                           # Totalverbrauch Consumer
+                             key   => "csmt${c}", 
+                             val   => $etot, 
+                             day   => $day, 
+                             hour  => $hod, 
+                           } );
       }
   }
 
@@ -25880,6 +25905,7 @@ sub __aiAddRawData {
               my $evbatcap = HistoryVal ($name, $pvd, $hod, 'bevcsmBatCap'.$c,  undef);                         # EV Batteriekapazität                     
               my $evcurpwr = HistoryVal ($name, $pvd, $hod, 'bevcsmPwr'.$c,     undef);                         # EV aktuelle Ladeleistung
               my $rcmdcsm  = HistoryVal ($name, $pvd, $hod, 'rcmdcsm'.$c,       undef);                         # zeitgewichtete Nutzungsempfehlung für Verbraucher XX
+              my $exconfc  = HistoryVal ($name, $pvd, $hod, 'exconfc'.$c,       undef);                         # Snapshot des Ausschluss-Flags zum Zeitpunkt der csme-Erfassung
               
               if (defined $csme)     { $data{$name}{aidectree}{airaw}{$ridx}{'csme'.$c}          = round0 ($csme) } 
               if (defined $evsoc)    { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmSoC'.$c}     = round0 ($evsoc) } 
@@ -25887,6 +25913,7 @@ sub __aiAddRawData {
               if (defined $evbatcap) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmBatCap'.$c}  = round0 ($evbatcap) } 
               if (defined $evcurpwr) { $data{$name}{aidectree}{airaw}{$ridx}{'bevcsmPwr'.$c}     = round0 ($evcurpwr) } 
               if (defined $rcmdcsm)  { $data{$name}{aidectree}{airaw}{$ridx}{'rcmdcsm'.$c}       = $rcmdcsm } 
+              if (defined $exconfc)  { $data{$name}{aidectree}{airaw}{$ridx}{'exconfc'.$c}       = $exconfc } 
 
               for my $s (@hpStates) {                                                                           # WP Opmode-Minuten je Status
                   my $hppnt = HistoryVal ($name, $pvd, $hod, "csm${c}_${s}_points", undef);
@@ -32005,25 +32032,7 @@ sub _saveHistP1 {
       return;
   }
 
-  if ($key =~ /csm[et][0-9]+$/xs) {                                                                # Verbrauch eines Verbrauchers
-      $data{$name}{pvhist}{$day}{$hod}{$key} = $val;
-
-      if ($key =~ /csme[0-9]+$/xs) {
-          my $sum = 0;
-
-          for my $k (keys %{$data{$name}{pvhist}{$day}}) {
-              next if($k eq "99");
-              my $csme = HistoryVal ($name, $day, $k, $key, 0);
-              next if(!$csme);
-
-              $sum += $csme;
-          }
-
-          $data{$name}{pvhist}{$day}{99}{$key} = round2 ($sum);
-      }
-  }
-
-  if ($key =~ /minutescsm[0-9]+$/xs) {                                                             # Anzahl Aktivminuten des Verbrauchers
+  if ($key =~ /minutescsm[0-9]+$/xs) {                                                              # Anzahl Aktivminuten des Verbrauchers
       $data{$name}{pvhist}{$day}{$hod}{$key} = $val;
       my $minutes = 0;
       my ($num)   = $key =~ /minutescsm(\d+)$/xs;
@@ -32044,7 +32053,7 @@ sub _saveHistP1 {
       }
   }
 
-  if ($key =~ /cyclescsm[0-9]+$/xs) {                                                              # Anzahl Tageszyklen des Verbrauchers
+  if ($key =~ /cyclescsm[0-9]+$/xs) {                                                               # Anzahl Tageszyklen des Verbrauchers
       $data{$name}{pvhist}{$day}{99}{$key} = $val;
   }
   
@@ -32350,6 +32359,7 @@ sub _listDataPoolPvHist {
               }
               
               $entry{"rcmdcsm${cf}"} = HistoryVal ($name, $day, $key, "rcmdcsm${cf}", undef);
+              $entry{"exconfc${cf}"} = HistoryVal ($name, $day, $key, "exconfc${cf}", undef);           # Snapshot des Ausschluss-Flags zum Zeitpunkt der csme-Erfassung
           }
 
           # ----- Key-Filter anwenden ---------------------------------------------
@@ -32434,6 +32444,7 @@ sub _listDataPoolPvHist {
                   $csvmap{"bevcsmBatCap${cf}"}  = "BEVcsmBatCap${cf}";
                   $csvmap{"bevcsmPwr${cf}"}     = "BEVcsmPwr${cf}";
                   $csvmap{"rcmdcsm${cf}"}       = "RcmdCsm${cf}";
+                  $csvmap{"exconfc${cf}"}       = "ExConFc${cf}";
                   
                   for my $s (@hpStates) {                                                               # + WP Opmode-Minuten je Status
                       $csvmap{"csm${cf}_${s}_points"} = "Csm${cf}" . ucfirst ($s) . "Points";
@@ -32567,8 +32578,9 @@ sub _listDataPoolPvHist {
               }
               else {                                                                                        # Stundenwerte: Energie, Minuten, BEV-Daten
                   @cfields  = map { "${_}${cf}" }
-                              qw (csmt csme minutescsm rcmdcsm bevcsmSoC 
+                              qw (csmt csme minutescsm rcmdcsm exconfc bevcsmSoC 
                                   bevcsmTargSoC bevcsmBatCap bevcsmPwr);
+                  
                   @hpfields = map { "csm${cf}_${_}_points" } @hpStates;                                     # WP Opmode-Minuten, separat behandelt
               }
 
@@ -33236,9 +33248,10 @@ sub _listDataPoolAiRawData {
       my $hpcsm         = AiRawdataVal ($name, $idx, 'hpcsm',          '-');
       my $bevcsm        = AiRawdataVal ($name, $idx, 'bevcsm',         '-');
       
-      my ($csm, $hpm, $csmrcm);
+      my ($csm, $hpm, $csmrcm, $csmecfc);
       my $hpmCnt = 0; 
       my $rcmCnt = 0;
+      my $ecfCnt = 0;
       
       for my $c (1..MAXCONSUMER) {                                                      # + alle Consumer
           $c           = sprintf "%02d", $c;
@@ -33248,6 +33261,7 @@ sub _listDataPoolAiRawData {
           my $evbatcap = AiRawdataVal ($name, $idx, 'bevcsmBatCap'.$c,  undef);
           my $evcurpwr = AiRawdataVal ($name, $idx, 'bevcsmPwr'.$c,     undef);
           my $rcmdcsm  = AiRawdataVal ($name, $idx, 'rcmdcsm'.$c,       undef);
+          my $exconfc  = AiRawdataVal ($name, $idx, 'exconfc'.$c,       undef);
 
           if (defined $csme) {
               $csm .= ", " if($csm);
@@ -33282,6 +33296,14 @@ sub _listDataPoolAiRawData {
               $rcmCnt++;             
           }
           
+          if (defined $exconfc) {
+              if ($csmecfc) {
+                  $csmecfc .= ($ecfCnt % 10 == 0) ? "\n              " : ", ";           # alle X Einträge neue Zeile
+              }
+              $csmecfc .= "exconfc${c}: $exconfc";
+              $ecfCnt++;             
+          }
+          
           for my $s (@hpStates) {                                                       # WP Opmode-Minuten je Status
               my $hppnt = AiRawdataVal ($name, $idx, "csm${c}_${s}_points", undef);
               next if(!defined $hppnt);
@@ -33312,6 +33334,11 @@ sub _listDataPoolAiRawData {
           $sq .= "\n              ";
           $sq .= $csmrcm;
       }   
+      
+      if (defined $csmecfc) {
+          $sq .= "\n              ";
+          $sq .= $csmecfc;
+      }
       
       if (defined $csm) {
           $sq .= "\n              ";
@@ -39283,6 +39310,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>DoN</b>             </td><td>Sunrise and sunset status (0 - night, 1 - day)                                                                           </td></tr>
             <tr><td> <b>etotaliXX</b>       </td><td>PV meter reading 'Total energy yield' (Wh) of inverter XX at the beginning of the hour                                   </td></tr>
             <tr><td> <b>etotalpXX</b>       </td><td>Meter reading 'Total energy yield' (Wh) of producer XX at the beginning of the hour                                      </td></tr>
+            <tr><td> <b>exconfcXX</b>       </td><td>Snapshot of the 'use consumption in forecast' exclusion flag at the time of csme capture                                 </td></tr>
             <tr><td> <b>gcons</b>           </td><td>real consumption (Wh) from the electricity grid                                                                          </td></tr>
             <tr><td> <b>gfeedin</b>         </td><td>real feed-in (Wh) into the electricity grid                                                                              </td></tr>
             <tr><td> <b>feedprice</b>       </td><td>Remuneration for the feed-in of one kWh. The currency of the price is defined in the setupMeterDev.                      </td></tr>
@@ -42397,6 +42425,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>DoN</b>             </td><td>Sonnenauf- und untergangsstatus (0 - Nacht, 1 - Tag)                                                   </td></tr>
             <tr><td> <b>etotaliXX</b>       </td><td>PV Zählerstand "Energieertrag total" (Wh) von Inverter XX zu Beginn der Stunde                         </td></tr>
             <tr><td> <b>etotalpXX</b>       </td><td>Zählerstand "Energieertrag total" (Wh) des Produzenten XX zu Beginn der Stunde                         </td></tr>
+            <tr><td> <b>exconfcXX</b>       </td><td>Snapshot des Ausschluss-Flags 'Verbrauch in Vorhersage nutzen' zum Zeitpunkt der csme-Erfassung        </td></tr>
             <tr><td> <b>gcons</b>           </td><td>realer Bezug (Wh) aus dem Stromnetz                                                                    </td></tr>
             <tr><td> <b>gfeedin</b>         </td><td>reale Einspeisung (Wh) in das Stromnetz                                                                </td></tr>
             <tr><td> <b>feedprice</b>       </td><td>Vergütung für die Einpeisung einer kWh. Die Währung des Preises ist im setupMeterDev definiert.        </td></tr>
