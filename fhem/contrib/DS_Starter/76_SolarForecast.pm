@@ -7177,7 +7177,7 @@ sub __getaiFannPromptExport {          ## no critic "not used"
   ####################################################################
   my $intro = $lang eq 'DE' ? <<"INTRO_DE" : <<"INTRO_EN";
 Du bewertest die Trainings- und Bewertungskennzahlen eines neuronalen Netzes (FANN),
-das den stündlichen Hausverbrauch für einen Haushalt prognostiziert
+das den stündlichen Energieverbrauch für einen Haushalt prognostiziert
 (FHEM-Modul 76_SolarForecast.pm, FANN-basiertes neuronales Netz).
 
 Wichtiger Domänen-Kontext für deine Bewertung:
@@ -7215,7 +7215,7 @@ Hier die Kennzahlen:
 --------------------------------------------------------------------
 INTRO_DE
 You are assessing the training and evaluation metrics of a neural network (FANN) that
-forecasts hourly household consumption for a household (FHEM module
+forecasts hourly energy consumption for a household (FHEM module
 76_SolarForecast.pm, FANN-based neural network).
 
 Important domain context for your assessment:
