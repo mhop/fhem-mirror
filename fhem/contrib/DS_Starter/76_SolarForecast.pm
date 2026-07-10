@@ -161,14 +161,16 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.0"  => "09.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
+  "2.9.0"  => "10.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
                            "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
                            "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
                            "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
                            "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz, Speicherung zeitgewichtete Empfehlung Verbrauchernutzung ".
                            "Bereinigung Verbrauchsinput um PV-getriebenen Anteil im CON-KI-Training für Non-PV-Profile ".
                            "Consumer type noSchedule (deprecated) setzt immer mode=mustNot, Änderung von type=noSchedule nach type=X ist ohne Löschrequest möglich ".
-                           "Trainingsergebnisse können per Copy&Paste über ein generiertes Output manuell an LLM übergeben werden ",
+                           "Trainingsergebnisse können per Copy&Paste über ein generiertes Output manuell an LLM übergeben werden ".
+                           "Consumer 'power' darf nicht mehr 0 sein, dafür 'power=<Nominalleistung>' und 'pvshare=0' nutzen ".
+                           "neuer Consumer Typ 'fridge' ",
   "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
                            "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
                            "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
@@ -1633,6 +1635,7 @@ my %hef = (                                                                     
   "charger"        => { f => 1.00, m => 1.00, l => 1.00, mt => 120         },    # m   = Faktor Energieverbrauch der Folgestunden 
   "dishwasher"     => { f => 0.15, m => 0.02, l => 0.15, mt => 180         },    # l   = Faktor Energieverbrauch in letzter Stunde
   "dryer"          => { f => 0.40, m => 0.20, l => 0.20, mt => 90          },    # mt  = default mintime (Minuten)
+  "fridge"         => { f => 0.20, m => 0.20, l => 0.20, mt => 1440        },
   "washingmachine" => { f => 0.20, m => 0.03, l => 0.03, mt => 120         },
   "noSchedule"     => { f => 1.00, m => 1.00, l => 1.00, mt => DEFMINTIME  },
   "heatpump"       => { f => 0.25, m => 0.25, l => 0.25, mt => DEFMINTIME  },
@@ -8720,7 +8723,7 @@ sub _attrconsumer {                      ## no critic "not used"
   my $valid = {
       aliasshort      => { comp => '.*',                              must => 0, act => 1 },
       type            => { comp => '.*',                              must => 1, act => 1 },
-      power           => { comp => '[0-9]+',                          must => 1, act => 0 },
+      power           => { comp => '(0|[1-9][0-9]*)',                 must => 1, act => 1 },
       switchdev       => { comp => '.*',                              must => 0, act => 1 },
       mode            => { comp => '.*',                              must => 0, act => 1 },
       icon            => { comp => '',                                must => 0, act => 0 },
@@ -10375,94 +10378,104 @@ sub __attrKeyAction {
   my $err  = q{};
 
   if ($cmd eq 'set') {
-      if ($init_done && $akey eq 'cycleInterval') {
-          _newCycTime ($hash, time, $akeyval);
-          my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                        # gespeicherte nächste CyleTime
-          readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
-      }
-      
-      if ($init_done && $akey eq 'headerDetail') {
-          my @hda = split ",", $akeyval;
-
-          for my $val (@hda) {
-              if (!grep /^$val$/, qw (all co pv own status)) {
-                  return qq{The value '$val' is not valid for key '$akey'};
-              }
-          }
-      }
-      
-      if ($init_done && $akey eq 'headerShowEnv') {
-          my @hse = split ",", $akeyval;
-
-          for my $env (@hse) {
-              if (!grep /^$env$/, qw (outsideTemp presence windSpeed)) {
-                  return qq{The value '$env' is not valid for key '$akey'};
-              }
-          }
-      }
-      
-      if ($init_done && $akey eq 'aiConProfile') {
-          if ($akeyval =~ /heatpump/xs) {
-              my $hp = isHeatPumpUsed ($name);                                             
-              if (!defined $hp) { return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.} }
+      # --- init_done Sektion ----
+      if ($init_done) {
+          
+          if ($akey eq 'cycleInterval') {
+              _newCycTime ($hash, time, $akeyval);
+              my $nct = CurrentVal ($name, 'nextCycleTime', 0);                                                        # gespeicherte nächste CyleTime
+              readingsSingleUpdate ($hash, 'nextCycletime', (!$nct ? 'Manual / Event-controlled' : FmtTime($nct)), 0);
           }
           
-          if ($akeyval =~ /bev/xs) {
-              my $ev = isBevUsed ($name);                                                       
-              if (!defined $ev) { return qq{No Consumer type 'bev' is defined. Please define it with the consumerXX attribute first.} }
+          if ($akey eq 'headerDetail') {
+              my @hda = split ",", $akeyval;
+
+              for my $val (@hda) {
+                  if (!grep /^$val$/, qw (all co pv own status)) {
+                      return qq{The value '$val' is not valid for key '$akey'};
+                  }
+              }
           }
-      }
-      
-      if ($init_done && $akey eq 'consForecastBase') {
-          my $cfbase  = CurrentVal  ($name, 'consForecastBase', '');
-          my ($a, $h) = parseParams ($cfbase, ',', '', '->');
           
-          for my $hnum (keys %{$h}) {                                
-              my ($cfodev, $cford, $def) = split ":", $h->{$hnum}; 
+          if ($akey eq 'power' && !$akeyval) {
+              return qq{The value for 'power' cannot be 0. If necessary, use 'power=<nominal power>' and 'pvshare=0'.};
+          }
+          
+          if ($akey eq 'headerShowEnv') {
+              my @hse = split ",", $akeyval;
+
+              for my $env (@hse) {
+                  if (!grep /^$env$/, qw (outsideTemp presence windSpeed)) {
+                      return qq{The value '$env' is not valid for key '$akey'};
+                  }
+              }
+          }
+          
+          if ($akey eq 'aiConProfile') {
+              if ($akeyval =~ /heatpump/xs) {
+                  my $hp = isHeatPumpUsed ($name);                                             
+                  if (!defined $hp) { return qq{No Consumer type 'heatpump' is defined. Please define it with the consumerXX attribute first.} }
+              }
               
-              if ($cfodev && $cford) {                                                                  # Auswertung Device/Reading Kombi
-                  ($err) = isDeviceValid ( { name   => $name,
-                                             obj    => $cfodev,
-                                             method => 'string',
-                                           }
-                                         );                                          
+              if ($akeyval =~ /bev/xs) {
+                  my $ev = isBevUsed ($name);                                                       
+                  if (!defined $ev) { return qq{No Consumer type 'bev' is defined. Please define it with the consumerXX attribute first.} }
               }
-  
+          }
+          
+          if ($akey eq 'consForecastBase') {
+              my $cfbase  = CurrentVal  ($name, 'consForecastBase', '');
+              my ($a, $h) = parseParams ($cfbase, ',', '', '->');
+              
+              for my $hnum (keys %{$h}) {                                
+                  my ($cfodev, $cford, $def) = split ":", $h->{$hnum}; 
+                  
+                  if ($cfodev && $cford) {                                                                  # Auswertung Device/Reading Kombi
+                      ($err) = isDeviceValid ( { name   => $name,
+                                                 obj    => $cfodev,
+                                                 method => 'string',
+                                               }
+                                             );                                          
+                  }
+      
+                  if ($err) {
+                      delete $data{$name}{current}{$akey};
+                      return $err;
+                  }             
+              }          
+          }
+
+          if ($akey eq 'reductionState') {
+              my $rdcinfo = CurrentVal ($name, 'reductionState', '');
+              my ($rdcdev, $rdcrd, $code) = split ":", $rdcinfo, 3;
+
+              ($err) = isDeviceValid ( { name   => $name,
+                                         obj    => $rdcdev,
+                                         method => 'string',
+                                       }
+                                     );
+
               if ($err) {
                   delete $data{$name}{current}{$akey};
                   return $err;
-              }             
-          }          
-      }
+              }
 
-      if ($init_done && $akey eq 'reductionState') {
-          my $rdcinfo = CurrentVal ($name, 'reductionState', '');
-          my ($rdcdev, $rdcrd, $code) = split ":", $rdcinfo, 3;
+              if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # prüft Perl-Code
+                  $code  =~ s/\s//xg;
+                  ($err) = checkCode ($name, $code);
+              }
+              else {                                                                                   # prüft Regex
+                  $err = checkRegex ($code);
+              }
 
-          ($err) = isDeviceValid ( { name   => $name,
-                                     obj    => $rdcdev,
-                                     method => 'string',
-                                   }
-                                 );
-
-          if ($err) {
-              delete $data{$name}{current}{$akey};
-              return $err;
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-          }
-          else {                                                                                   # prüft Regex
-              $err = checkRegex ($code);
-          }
-
-          if ($err) {
-              delete $data{$name}{current}{$akey};
-              return $err;
+              if ($err) {
+                  delete $data{$name}{current}{$akey};
+                  return $err;
+              }
           }
       }
+      
+      # --- Ende init_done Sektion
 
       if ($akey eq 'capacity') {
           if (!isNumeric ($akeyval)) {
@@ -10539,7 +10552,7 @@ sub __attrKeyAction {
           
           # --- deprecated Check noSchedule
           if ($akeyval eq 'noSchedule') {
-              return qq{The consumer type '$akeyval' is deprecated. User another consumer type and mode=mustNot instead.};
+              return qq{The consumer type '$akeyval' is deprecated. User another consumer type and 'mode=mustNot' instead.};
           }          
           
           # --- Negativtest: diese Schlüssel dürfen nur bei bestimmten type vorkommen
@@ -10575,11 +10588,7 @@ sub __attrKeyAction {
           }
                 
           # --- Checks Consumer Wärmepumpe
-          if ($akeyval eq 'heatpump') {              
-              if ($pphash->{power} == 0) {
-                  return qq{For the consumer type 'heatpump' the rated power value must be specified as not equal to 0.};
-              }
-              
+          if ($akeyval eq 'heatpump') {                            
               if (   !defined $pphash->{etotal}                                                         # Muß-Schlüssel check
                   || !defined $pphash->{pcurr} 
                   || !defined $pphash->{swstate}
@@ -10588,7 +10597,7 @@ sub __attrKeyAction {
                   return qq{The consumer type 'heatpump' needs keys 'etotal', 'swstate', 'opmode', 'modulation' and 'pcurr' to be defined.};
               }        
           }
-      }
+      }     
       
       if ($akey eq 'aliasshort') {                                                                      # Kurzalias
           if (strlength ($akeyval) > 10) {
@@ -37650,51 +37659,7 @@ return $def;
 # ConsumerVal ($hash or $name, $co, $key, $def)
 #
 # $co:  Consumer Nummer (01,02,03,...)
-# $key: name            - Name des Verbrauchers (Device)
-#       alias           - Alias des Verbrauchers (Device)
-#       autoreading     - Readingname f. Automatiksteuerung
-#       type            - Typ des Verbrauchers
-#       state           - Schaltstatus des Consumers
-#       power           - nominale Leistungsaufnahme des Verbrauchers in W
-#       mode            - Planungsmode des Verbrauchers
-#       icon            - Icon für den Verbraucher
-#       mintime         - min. Einplanungsdauer
-#       onreg           - Regex für phys. Zustand "ein"
-#       offreg          - Regex für phys. Zustand "aus"
-#       oncom           - Einschaltkommando
-#       offcom          - Ausschaltkommando
-#       physoffon       - physischer Schaltzustand ein/aus
-#       logoffon        - logischer Schaltzustand ein/aus
-#       onoff           - logischer ein/aus Zustand des am Consumer angeschlossenen Endverbrauchers
-#       asynchron       - Arbeitsweise des FHEM Consumer Devices
-#       retotal         - Reading der Leistungsmessung
-#       uetotal         - Unit der Leistungsmessung
-#       rpcurr          - Readingname des aktuellen Verbrauchs
-#       powerthreshold  - Schwellenwert d. aktuellen Leistung(W) ab der ein Verbraucher als aktiv gewertet wird
-#       energythreshold - Schwellenwert (Wh pro Stunde) ab der ein Verbraucher als aktiv gewertet wird
-#       upcurr          - Unit des aktuellen Verbrauchs
-#       avgenergy       - initialer / gemessener Durchschnittsverbrauch pro Stunde
-#       runtimeAvgDay   - durchschnittliche 'On'-Zeit an einem Tag (Minuten)
-#       epieces         - prognostizierte Energiescheiben (Hash)
-#       ehodpieces      - geplante Energiescheiben nach Tagesstunde (hour of day) (Hash)
-#       dswoncond       - Device zur Lieferung einer zusätzliche Einschaltbedingung
-#       planstate       - Planungsstatus
-#       planswitchon    - geplante Switch-On Zeit
-#       planswitchoff   - geplante Switch-Off Zeit
-#       planSupplement  - Ergänzung zum Planungsstatus
-#       rswoncond       - Reading zur Lieferung einer zusätzliche Einschaltbedingung
-#       swoncondition   - Regex einer zusätzliche Einschaltbedingung
-#       dswoffcond      - Device zur Lieferung einer vorrangige Ausschaltbedingung
-#       rswoffcond      - Reading zur Lieferung einer vorrangige Ausschaltbedingung
-#       swoffcondition  - Regex einer einer vorrangige Ausschaltbedingung
-#       isIntimeframe   - ist Zeit innerhalb der Planzeit ein/aus
-#       interruptable   - Consumer "on" ist während geplanter "ein"-Zeit unterbrechbar
-#       lastAutoOnTs    - Timestamp des letzten On-Schaltens bzw. letzter Fortsetzung (nur Automatik-Modus)
-#       lastAutoOffTs   - Timestamp des letzten Off-Schaltens bzw. letzter Unterbrechnung (nur Automatik-Modus)
-#       hysteresis      - Hysterese
-#       sunriseshift    - Verschiebung (Sekunden) Sonnenaufgang bei SunPath Verwendung
-#       sunsetshift     - Verschiebung (Sekunden) Sonnenuntergang bei SunPath Verwendung
-#
+# $key: Eigenschaftsschlüssel des Verbrauchers
 # $def: Defaultwert
 #
 ####################################################################################################################
@@ -39900,11 +39865,12 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>dehydrator</b>     - Consumer is a dehydrator (e.g., a fruit dryer)                                                                                  </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Consumer is a dishwasher                                                                                                        </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Consumer is a tumble dryer                                                                                                      </td></tr>
-            <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating rod                                                                                                       </td></tr>
+            <tr><td>                       </td><td><b>fridge</b>         - Consumer is a refrigerator or freezer                                                                                           </td></tr>
+            <tr><td>                       </td><td><b>heater</b>         - Consumer is a heating device with a linear characteristic curve (e.g., a heating rod)                                           </td></tr>
             <tr><td>                       </td><td><b>heatpump</b>       - Consumer is a heat pump or an air conditioner (**)                                                                              </td></tr>
             <tr><td>                       </td><td><b>washingmachine</b> - Consumer is a washing machine                                                                                                   </td></tr>            
             <tr><td>                       </td><td><b>other</b>          - Consumer is none of the above types                                                                                             </td></tr>
-            <tr><td>                       </td><td><b>noSchedule</b>     - deprecated; use `mode=mustNot` instead                                                                                          </td></tr>
+            <tr><td>                       </td><td><b>noSchedule</b>     - deprecated; use 'mode=mustNot' instead                                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>the type of switching status determination in the consumer device. The status of the consumer is only determined after a switching command              </td></tr>
             <tr><td>                       </td><td>by polling within a data collection interval (synchronous) or additionally by event processing (asynchronous).                                          </td></tr>
@@ -40008,7 +39974,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td><b>&lt;threshold&gt;</b> (W) - Once this service is received, the consumer is considered active. This addition is optional. (default: 0)                </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>power</b>          </td><td>Power consumption of the consumer in W. Typically, it is the nominal power according to the data sheet or a dynamically specified reference value.      </td></tr>
-            <tr><td>                       </td><td>Value range: <b>Integer from 0..X</b>                                                                                                                   </td></tr>
+            <tr><td>                       </td><td>Value range: <b>Integer from 1..X</b>                                                                                                                   </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>pvshare</b>        </td><td>The key can be used to specify the desired percentage of PV power to cover the power consumption 'power'. (optional)                                    </td></tr>
             <tr><td>                       </td><td>The setting 100% defines a required PV surplus of at least 'power'. With 0%, the consumer does not require any PV surplus.                              </td></tr>
@@ -43014,11 +42980,12 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>dehydrator</b>     - Verbraucher ist eine Dörrmaschine (z.B. Trockengerät für Obst)                                                             </td></tr>
             <tr><td>                       </td><td><b>dishwasher</b>     - Verbraucher ist eine Spülmaschine                                                                                          </td></tr>
             <tr><td>                       </td><td><b>dryer</b>          - Verbraucher ist ein Wäschetrockner                                                                                         </td></tr>
-            <tr><td>                       </td><td><b>heater</b>         - Verbraucher ist ein Heizstab                                                                                               </td></tr>
+            <tr><td>                       </td><td><b>fridge</b>         - Verbraucher ist ein Kühl- oder Gefriergerät                                                                                </td></tr>
+            <tr><td>                       </td><td><b>heater</b>         - Verbraucher ist ein Heizgerät mit linearer Kennlinie (z.B. Heizstab)                                                       </td></tr>
             <tr><td>                       </td><td><b>heatpump</b>       - Verbraucher ist eine Wärmepumpe oder ein Klimagerät (**)                                                                   </td></tr>    
             <tr><td>                       </td><td><b>washingmachine</b> - Verbraucher ist eine Waschmaschine                                                                                         </td></tr>
             <tr><td>                       </td><td><b>other</b>          - Verbraucher ist keiner der vorgenannten Typen                                                                              </td></tr>
-            <tr><td>                       </td><td><b>noSchedule</b>     - veraltet, mode=mustNot anstatt verwenden                                                                                   </td></tr>
+            <tr><td>                       </td><td><b>noSchedule</b>     - veraltet, 'mode=mustNot' anstatt verwenden                                                                                 </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>asynchron</b>      </td><td>die Art der Schaltstatus Ermittlung im Verbraucher Device. Die Statusermittlung des Verbrauchers nach einem Schaltbefehl erfolgt nur               </td></tr>
             <tr><td>                       </td><td>durch Abfrage innerhalb eines Datensammelintervals (synchron) oder zusätzlich durch Eventverarbeitung (asynchron).                                 </td></tr>
@@ -43122,7 +43089,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td><b>&lt;Schwellenwert&gt;</b> (W) - ab diesem Leistungsbezug wird der Verbraucher als aktiv gewertet. Die Ergänzung ist optional (default: 0)       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>power</b>          </td><td>Leistungsaufnahme des Verbrauchers in W. Typisch ist es die nominale Leistung gemäß Datenblatt oder ein dynamisch vorgegebener Richtwert.          </td></tr>
-            <tr><td>                       </td><td>Wertebereich: <b>Ganzzahl von 0..X</b>                                                                                                             </td></tr>
+            <tr><td>                       </td><td>Wertebereich: <b>Ganzzahl von 1..X</b>                                                                                                             </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>pvshare</b>        </td><td>Mit dem Schlüssel kann der gewünschte prozentuale PV-Anteil zur Deckung der Leistungsaufnahme 'power' festgelegt werden. (optional)                </td></tr>
             <tr><td>                       </td><td>Die Einstellung 100% definiert einen benötigten PV-Überschuß von mindestens 'power'. Mit 0% benötigt der Verbraucher keinen PV-Überschuß.          </td></tr>
