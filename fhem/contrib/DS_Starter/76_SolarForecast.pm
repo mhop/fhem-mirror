@@ -161,6 +161,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.9.1"  => "13.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ",
   "2.9.0"  => "10.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
                            "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
                            "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
@@ -2388,6 +2389,51 @@ semantics_heatpump => sub {
         $f->{pv_norm}    * $f->{hour_class_noon},                               
         $f->{ww_morning} * $f->{hour_class_morning},                            
         $f->{frost_load} * $f->{hour_class_morning},                          
+    ];
+},
+
+# --------------------------------------------------------------------------
+# Schliesst die Luecke fuer WP-Haushalte OHNE PV.
+# Identisch zu semantics_heatpump, aber OHNE die zwei PV-abhaengigen
+# Zeilen (ww_pv_boost*pv_norm und pv_norm*hour_class_noon), damit der
+# Block auch ohne PV-Signal sinnvolle (nicht dauerhaft-0) Werte liefert.
+# --------------------------------------------------------------------------
+semantics_heatpump_nopv => sub {
+    my ($f) = @_;
+    return [
+        # --- HEIZEN ---
+        softplus($f->{hp_heating_mode} * $f->{temp_delta_1h_neg}),
+        softplus($f->{hp_heating_mode} * $f->{temp_trend_neg}),
+        softplus($f->{hp_heating_mode} * $f->{frost_load}),
+        softplus($f->{hp_heating_mode} * $f->{hour_class_morning}),
+        softplus($f->{hp_heating_mode} * $f->{hour_class_evening}),
+
+        # --- KUEHLEN ---
+        softplus($f->{hp_cooling_mode} * $f->{temp_delta_1h_pos}),
+        softplus($f->{hp_cooling_mode} * $f->{temp_trend_pos}),
+        softplus($f->{hp_cooling_mode} * $f->{hour_class_noon}),
+
+        # --- WARM-WASSER (ohne PV-Boost-Zeile) ---
+        softplus($f->{ww_morning}    * $f->{hp_heating_mode}),
+        softplus($f->{ww_evening}    * $f->{hp_heating_mode}),
+        softplus($f->{ww_cycle_flag} * $f->{hp_heating_mode}),
+        softplus($f->{ww_cold_boost} * $f->{temp_delta_1h_neg}),
+
+        # --- EFFIZIENZ ---
+        softplus($f->{cop_inverse} * $f->{trend_up_strength}),
+        softplus($f->{cop_proxy}   * $f->{trend_down_strength}),
+
+        # --- FROSTSCHUTZ ---
+        softplus($f->{frost_protect} * $f->{hour_class_midnight}),
+        softplus($f->{frost_protect} * $f->{temp_delta_1h_neg}),
+
+        # --- TEMPERATUR + TREND ---
+        softplus($f->{temp_delta_3h_neg} * $f->{trend_up_strength}),
+        softplus($f->{temp_delta_3h_pos} * $f->{trend_down_strength}),
+
+        # --- Verstaerker (ohne pv_norm*hour_class_noon Zeile) ---
+        $f->{ww_morning} * $f->{hour_class_morning},
+        $f->{frost_load} * $f->{hour_class_morning},
     ];
 },
 
@@ -8119,7 +8165,8 @@ sub _aiFannGeminiApiAssess {
   }
 
   #my $model = 'gemini-2.5-flash-lite';                                                          # alternativ: gemini-2.0-flash (aber älter und qualitativ schlechter), gemini-2.5-flash-lite, gemini-2.5-flash
-  my $model = 'gemini-2.5-flash';
+  #my $model = 'gemini-2.5-flash';
+  my $model = 'gemini-3.5-flash';
   
   # --- Metriken sammeln ---
   my $profile   = AiNeuralVal ($name, $fanntyp, 'RegVersion',     'n/a');                       # verwendete Feature-Registry Version
@@ -28955,6 +29002,9 @@ sub _aiFannFeatureBuilder {
       }  
       elsif ($flags->{pv}) {                                                                # WP + PV
           push @features, @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) };
+      }
+      else {                                                                                # WP ohne PV - schliesst die zuvor bestehende Luecke
+          push @features, @{ $FEATURE_BLOCKS{semantics_heatpump_nopv}->($f) };
       }
   }
     
