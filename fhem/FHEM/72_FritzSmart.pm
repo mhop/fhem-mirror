@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.07.03";
+our $ModulVersion = "26.07.13";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -1319,11 +1319,6 @@ sub Fritz_Get_attrList($@) {
   }
 
   if ($hash->{helper}{XML_Simple} == 1 && $hash->{helper}{XML_Hash_XS} == 1) {
-#    $retAttr .= "xmlParser:";
-#    $retAttr .= "XML_Simple," if ($hash->{helper}{XML_Simple});
-#    $retAttr .= "XML_Hash_XS," if ($hash->{helper}{XML_Hash_XS});
-#    chop($retAttr);
-#    $retAttr .= " ";
     $retAttr .= "xmlParser:XML_Simple,XML_Hash_XS "
   }
 
@@ -1570,7 +1565,7 @@ sub Fritz_Notify_Modul($$)
      # end initialize DEGUB LOg function
 
      if(! exists($own_hash->{helper}{TimerReadout})) {
-       Fritz_Log $own_hash, 2, "start of Device readout parameters";
+       Fritz_Log $own_hash, 2, "start intitial API full check";
        $own_hash->{helper}{TimerReadout}   = $ownName . ".Readout";
        main::RemoveInternalTimer($own_hash->{helper}{TimerReadout});
        main::InternalTimer(gettimeofday() + 1 , "Fritz::Fritz_Readout_Start", $own_hash->{helper}{TimerReadout}, 0);
@@ -1635,7 +1630,6 @@ sub Fritz_Define_Modul($$)
    # INTERNALS
    $hash->{NAME}                 = $name;
    $hash->{VERSION}              = $ModulVersion;
-   $hash->{helper}{misPerlModul} = $missingModul;
 
    # initialize DEGUB LOg function
    Fritz_dbgLogInit($hash, "init", "verbose", main::AttrVal($name, "verbose", -1));
@@ -1664,13 +1658,39 @@ sub Fritz_Define_Modul($$)
 
    $hash->{fhem}{definedHost} = $hash->{HOST}; # to cope with old attribute definitions
 
-   $hash->{helper}{XML_Simple}  = 0;
-   $hash->{helper}{XML_Hash_XS} = 0;
-   $hash->{helper}{XML_Default} = "XML_Hash_XS";
+   $hash->{helper}{misPerlModul} = $missingModul;
+   $hash->{helper}{XML_Simple}   = 0;
+   $hash->{helper}{XML_Hash_XS}  = 0;
+   $hash->{helper}{XML_Default}  = "XML_Hash_XS";
 
-   $hash->{helper}{XML_Simple}  = ($hash->{helper}{misPerlModul} !~ /XML::Simple/);
-   $hash->{helper}{XML_Hash_XS} = ($hash->{helper}{misPerlModul} !~ /XML::Hash::XS/);
+   $hash->{helper}{XML_Simple}  = ($hash->{helper}{misPerlModul} !~ /XML::Simple/)? 1 : 0;
+   $hash->{helper}{XML_Hash_XS} = ($hash->{helper}{misPerlModul} !~ /XML::Hash::XS/)? 1: 0;
+
+   # verifying 
+   my $outhash;
+   my $xmlTest = '<?xml version="1.0" encoding="UTF-8"?><a/>';
+
+   if ($hash->{helper}{XML_Simple}) {
+     eval {
+       $outhash = XMLin($xmlTest, StrictMode => 0, KeyAttr => []);
+     };
+     if ($@) {
+       Fritz_Log $hash, 2, "eval: XML_Simple $@";
+       $hash->{helper}{XML_Simple} = 0;
+     }
+   }
+
+   if ($hash->{helper}{XML_Hash_XS}) {
+     eval {
+       $outhash = xml2hash($xmlTest);
+     };
+     if ($@) {
+       Fritz_Log $hash, 2, "eval: XML_Hash_XS $@";
+       $hash->{helper}{XML_Hash_XS} = 0;
+     }
+   }
    $hash->{helper}{XML_Default} = ($hash->{helper}{XML_Hash_XS} ? "XML_Hash_XS" : "XML_Simple");
+
 
    # XML::Simple and XML::Hash::XS are optional, but at least one parser must be available.
    # Remove missing parser modules from the fatal dependency list; keep all other missing
@@ -1773,7 +1793,7 @@ sub Fritz_Define_Modul($$)
      $hash->{WAN_ACCESS_TYPE}     = "WLAN";
 
      if($init_done) {
-       Fritz_Log $hash, 2, "start of Device readout parameters";
+       Fritz_Log $hash, 2, "start intitial API full check";
        $hash->{helper}{TimerReadout}   = $name . ".Readout";
        main::RemoveInternalTimer($hash->{helper}{TimerReadout});
        main::InternalTimer(gettimeofday() + 1 , "Fritz::Fritz_Readout_Start", $hash->{helper}{TimerReadout}, 0);
@@ -11316,9 +11336,31 @@ sub Fritz_Readout_API_Check($)
          my @tr064CmdArray = (["WANCommonInterfaceConfig:1", "wancommonifconfig1", "GetCommonLinkProperties"]);
          my $tr064Result = Fritz_SOAP_Request( $hash, 0, \@tr064CmdArray );
 
+
          if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
-           Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN";
+           Fritz_Log $hash, 4, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
+           # Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN?";
+
+           my $errText = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error}, 1);
+
+           $apiError .= " TR064: $errText";
+
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $errText;
+
+           $hash->{fhem}{sidTime} = 0;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+
+           my $returnStr = join('|', @roReadings );
+
+           Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
+
+           return $name . "|" . encode_base64($returnStr,"");
+
          } else {
            Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
 
@@ -11329,7 +11371,7 @@ sub Fritz_Readout_API_Check($)
            }
          }
        } else {
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN?";
        }
 
        my $avmModel = main::InternalVal($name, "MODEL", $hash->{MODEL});
@@ -16800,7 +16842,7 @@ sub Fritz_SOAP_Request($$$;@)
      my $ua = UserAgentClient->new;
 
      $ua->default_headers;
-     $ua->ssl_opts( verify_hostname => 0 ,SSL_verify_mode => 0x00);
+     $ua->ssl_opts( verify_hostname => 0, SSL_verify_mode => 0x00);
 
      # Prepare request for query LAN host
      $ua->default_header( 'SOAPACTION' => "$service_type#$service_command" );
@@ -16864,32 +16906,15 @@ sub Fritz_SOAP_Request($$$;@)
 
          if (!$respData->is_success) {
 
-           my $outHash;
-#           eval {
-#             $outHash = XMLin($respData->decoded_content, StrictMode => 0, KeyAttr => []);
-#           };
-#           if ($@) {
-#             $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:XML-Fault:$@'};
-#           } else {
-
-             Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS:\n" . Dumper($outHash);
-
-             if(exists($outHash->{'s:Body'}->{'s:Fault'})) {
-               $retHash{Error}{$service}{$service_command} = $outHash->{'s:Body'}->{'s:Fault'};
-             } else {
-               Fritz_Log $hash, 4, "XML_RESPONSE_NO_SUCCESS: unhandled error";
-             }
-#           }
-
            $retHash{Error}{$service}{$service_command}{response_error} = $respData->status_line;
            $retHash{Error}{$service}{$service_command}{response_code}  = $respData->code();
-           $retHash{Error}{$service}{$service_command}{ErrLevel} = "5";
+           $retHash{Error}{$service}{$service_command}{ErrLevel}       = "5";
 
          } else {
+
            # there are some unusefull characters in $respData->decoded_content
            my $decContent = $respData->decoded_content;
               $decContent =~ s/&lt;CellList.*?&gt;\n/\<CellList \/\>/isg;
-#              $decContent =~ s/&lt;(.*?)&gt;\n/\<$1\>/isg;
 
            Fritz_Log $hash, 4, "XML_RESPONSE_SUCCESS:\n" . Dumper($decContent);
 
