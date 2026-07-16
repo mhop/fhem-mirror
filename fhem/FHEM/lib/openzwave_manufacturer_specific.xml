@@ -765,6 +765,7 @@
     <Product config="fibaro/fgwpb121.xml" id="2000" name="FGWPB-121 Wall Plug" type="1401"/>
     <Product config="fibaro/fgwpfzw5.xml" id="1001" name="FGWPE/F Wall Plug Gen5" type="0602"/>
     <Product config="fibaro/fgwpfzw5.xml" id="1003" name="FGWPE/F Wall Plug Gen5" type="0602"/>
+    <Product config="fibaro/fgwpfzw5.xml" id="1004" name="FGWPE/F Wall Plug Gen5" type="0602"/>
     <Product config="fibaro/fgms.xml" id="1001" name="FGMS001 Motion Sensor" type="0800"/>
     <Product config="fibaro/fgms.xml" id="2001" name="FGMS001 Motion Sensor" type="0800"/>
     <Product config="fibaro/fgms.xml" id="3001" name="FGMS001 Motion Sensor" type="0800"/>
