@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.13";
+my $ModulVersion = "01.14";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -72,6 +72,7 @@ eval "use POSIX;1"                               or $missingModul .= "POSIX inst
 eval "use File::Path;1"                          or $missingModul .= "File::Path not available ";
 eval "use FHEM::Scheduler::Cron;1"               or $missingModul .= "FHEM::Scheduler::Cron: update Fhem ";
 eval "use List::Util qw(pairs);1"                or $missingModul .= "List::Util: update Perl ";
+eval "use Time::Local;1"                         or $missingModul .= "Time::Local ";
 
 # FIFO Buffer for commands
 my @cmdBuffer=();
