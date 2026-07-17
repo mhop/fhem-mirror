@@ -1,4 +1,4 @@
-REV 31484
+REV 31489
 DIR unused
 UPD 2026-07-14_07:45:03 458464 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -404,7 +404,7 @@ UPD 2022-11-14_07:45:07 120483 FHEM/73_GasCalculator.pm
 UPD 2024-04-25_07:45:03 90685 FHEM/73_MPD.pm
 UPD 2025-10-17_07:45:05 10412 FHEM/73_NUKIBridge.pm
 UPD 2024-06-04_07:45:03 91633 FHEM/73_PRESENCE.pm
-UPD 2026-05-12_07:45:04 95217 FHEM/73_PRESENCE2.pm
+UPD 2026-07-17_07:45:03 111174 FHEM/73_PRESENCE2.pm
 UPD 2026-01-22_07:45:03 57725 FHEM/73_Tide.pm
 UPD 2022-11-14_07:45:07 130714 FHEM/73_WaterCalculator.pm
 UPD 2022-12-14_07:45:02 2562316 FHEM/73_km200.pm
@@ -493,7 +493,7 @@ UPD 2018-12-21_07:45:02 12164 FHEM/97_TrashCal.pm
 UPD 2023-07-17_07:45:02 37253 FHEM/98_AirUnit.pm
 UPD 2022-12-06_07:45:03 142841 FHEM/98_ArduCounter.pm
 UPD 2026-07-01_07:45:03 133820 FHEM/98_BOSEST.pm
-UPD 2026-07-04_07:45:03 98747 FHEM/98_CDCOpenData.pm
+UPD 2026-07-17_07:45:03 98832 FHEM/98_CDCOpenData.pm
 UPD 2016-08-19_14:49:02 4984 FHEM/98_CULflash.pm
 UPD 2023-02-02_07:45:03 50496 FHEM/98_ComfoAir.pm
 UPD 2017-09-20_07:45:02 9013 FHEM/98_CustomReadings.pm
@@ -746,7 +746,7 @@ UPD 2017-05-15_07:45:02 2779 FHEM/lib/UPnP/sonos_tunein_quadratic.jpg
 UPD 2017-05-15_07:45:02 1979 FHEM/lib/UPnP/sonos_tunein_round.png
 UPD 2024-06-21_07:45:02 53914 FHEM/lib/fhem_zwave_deviceconfig.xml.gz
 UPD 2023-10-22_07:45:02 730362 FHEM/lib/openzwave_deviceconfig.xml.gz
-UPD 2024-04-23_07:45:02 174550 FHEM/lib/openzwave_manufacturer_specific.xml
+UPD 2026-07-17_07:45:03 174646 FHEM/lib/openzwave_manufacturer_specific.xml
 UPD 2024-03-07_07:45:03 39770 FHEM/lib/zwave_alliancelinks.csv.gz
 UPD 2024-04-17_07:45:03 22499 FHEM/lib/zwave_pepperlinks.csv.gz
 UPD 2023-01-05_07:45:03 19832 FHEM/msgSchema.pm
@@ -769,12 +769,12 @@ UPD 2016-07-21_07:45:27 24829 docs/HOWTO_DE.html
 UPD 2015-07-28_14:05:35 46151 docs/IMG_0483.jpg
 UPD 2017-06-30_07:45:02 37394 docs/Landis-Gyr-E350-meter.jpg
 UPD 2015-07-28_14:05:35 14548 docs/ccc.jpg
-UPD 2026-07-11_07:45:12 5576186 docs/commandref.html
-UPD 2026-07-11_07:45:16 3552494 docs/commandref_DE.html
+UPD 2026-07-17_07:45:11 5579877 docs/commandref.html
+UPD 2026-07-17_07:45:15 3556054 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-07-16_07:45:16 331321 docs/commandref_modular.html
-UPD 2026-07-16_07:45:17 343121 docs/commandref_modular_DE.html
+UPD 2026-07-17_07:45:17 331688 docs/commandref_modular.html
+UPD 2026-07-17_07:45:18 343488 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
