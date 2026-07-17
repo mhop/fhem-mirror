@@ -467,6 +467,7 @@ sub PIFACE_Shutdown {
   <ul>
   <li>Raspbian OS, Debian version 11 (bullseye) 32 bit and wiringpi_3.2-bullseye_armhf</li>
   <li>Raspbian OS, Debian version 12 (bookworm) 64 bit and wiringpi_3.12_arm64 (Raspberry Pi 5 B)</li>
+  <li>Raspbian OS, Debian version 13 (trixie) 64 bit and wiringpi_3.18_arm64 (Raspberry Pi 5 B)</li>
   </ul>
   <br><br>
   <b>Preparatory Work</b><br>
