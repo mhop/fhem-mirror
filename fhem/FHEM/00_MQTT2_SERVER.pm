@@ -10,13 +10,14 @@ use MIME::Base64;
 sub MQTT2_SERVER_Read($@);
 sub MQTT2_SERVER_Write($$$);
 sub MQTT2_SERVER_Undef($@);
-sub MQTT2_SERVER_doPublish($$$$;$);
+sub MQTT2_SERVER_doPublish($$$$;$$);
 
 use vars qw($FW_chash);   # client fhem hash
 use vars qw(%FW_id2inform);
 
 # See also:
 # http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html
+# http://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html
 
 sub
 MQTT2_SERVER_Initialize($)
@@ -85,6 +86,7 @@ MQTT2_SERVER_Define($$)
 
   readingsSingleUpdate($hash, "nrclients", 0, 0);
   $hash->{clients} = {};
+  $hash->{connects} = 0;
   $hash->{retain} = {};
   InternalTimer(1, "MQTT2_SERVER_keepaliveChecker", $hash, 0);
 
@@ -135,7 +137,6 @@ MQTT2_SERVER_Undef($@)
                        ReadingsVal($sname, "nrclients", 1)-1, 1);
 
   if($hash->{lwt}) {    # Last will
-
     # skip lwt if there is another connection with the same ip+cid (tasmota??)
     for my $dev (keys %defs) {
       my $h = $defs{$dev};
@@ -298,7 +299,7 @@ my %cptype = (
  12 => "PINGREQ",
  13 => "PINGRESP",
  14 => "DISCONNECT",
- 15 => "RESERVED_15",
+ 15 => "AUTH",
 );
 
 #####################################
@@ -307,11 +308,18 @@ MQTT2_SERVER_out($$$;$)
 {
   my ($hash, $msg, $dump, $callback) = @_;
   addToWritebuffer($hash, $msg, $callback) if(defined($hash->{FD}));
-  if($dump) {
-    my $cpt = $cptype{ord(substr($msg,0,1)) >> 4};
-    $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $dump, 5, "out\@$hash->{PEER}:$hash->{PORT} $cpt: $msg";
-  }
+  MQTT2_SERVER_dump($dump, "out", $hash, $msg) if($dump);
+}
+
+sub
+MQTT2_SERVER_dump($$$$)
+{
+  my ($sname, $dir, $hash, $msg) = @_;
+  my ($tlen, $off) = MQTT2_SERVER_getLength($msg,1);
+  my $cpt = $cptype{ord(substr($msg,0,1)) >> 4};
+  my $pl = substr($msg, $off);
+  $pl =~ s/([^ -~])/"(".ord($1).")"/ge;
+  Log3 $sname,5, "$dir\@$hash->{PEER}:$hash->{PORT} $cpt len:$tlen payload:$pl";
 }
 
 sub
@@ -358,7 +366,7 @@ MQTT2_SERVER_Read($@)
     }
   }
 
-  my ($tlen, $off) = MQTT2_SERVER_getRemainingLength($hash);
+  my ($tlen, $off) = MQTT2_SERVER_getLength($hash->{BUF},1);
   if($tlen < 0) {
     Log3 $sname, 1, "Bogus data from $cname, closing connection";
     return CommandDelete(undef, $cname);
@@ -368,17 +376,13 @@ MQTT2_SERVER_Read($@)
   my $fb = substr($hash->{BUF}, 0, 1);
   my $pl = substr($hash->{BUF}, $off, $tlen); # payload
 
-  my $cp = ord(substr($fb,0,1)) >> 4;
-  my $cpt = $cptype{$cp};
+  my $cpt = $cptype{ord(substr($fb,0,1)) >> 4};
   $hash->{lastMsgTime} = gettimeofday();
 
   # Lowlevel debugging
   my $dump = (AttrVal($sname, "verbose", 1) >= 5) ? $sname : undef;
-  if($dump) {
-    my $msg = substr($hash->{BUF}, 0, $off+$tlen);
-    $msg =~ s/([^ -~])/"(".ord($1).")"/ge;
-    Log3 $sname, 5, "in\@$hash->{PEER}:$hash->{PORT} $cpt: $msg";
-  }
+  MQTT2_SERVER_dump($dump, "in", $hash, substr($hash->{BUF},0,$off+$tlen))
+        if($dump);
 
   $hash->{BUF} = substr($hash->{BUF}, $tlen+$off);
 
@@ -389,30 +393,35 @@ MQTT2_SERVER_Read($@)
 
   ####################################
   if($cpt eq "CONNECT") {
-    # V3:MQIsdb V4:MQTT
     if(ord($fb) & 0xf) { # lower nibble must be zero
       Log3 $sname, 3, "$cname with bogus CONNECT (".ord($fb)."), disconnecting";
       Log3 $sname, 3, "TLS activated on the client but not on the server?"
         if(!AttrVal($sname,"TLS",0) && ord($fb) == 22);
       return CommandDelete(undef, $cname);
     }
+
+    # V3:MQIsdb V4/V5:MQTT
     ($hash->{protoTxt}, $off) = MQTT2_SERVER_getStr($hash, $pl, 0);
     $hash->{protoNum}  = unpack('C*', substr($pl,$off++,1)); # 3 or 4
     $hash->{cflags}    = unpack('C*', substr($pl,$off++,1));
     $hash->{keepalive} = unpack('n', substr($pl, $off, 2)); $off += 2;
-    my $cid;
-    ($cid, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
 
-    if($hash->{protoNum} > 4) {
+    if($hash->{protoNum} < 3 || $hash->{protoNum} > 5) {
       Log3 $sname, 3, "$cname: unsuported protocol version $hash->{protoNum}, ".
                       "closing the connection";
       return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 1), $dump,
                                 sub{ CommandDelete(undef, $hash->{NAME}); });
     }
+    $off = MQTT2_SERVER_parseProps("conn_", $shash, $hash, $pl, $off, $dump)
+             if($hash->{protoNum} == 5);
 
+    my $cid;
+    ($cid, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
     my $desc = "keepAlive:$hash->{keepalive}";
     if($hash->{cflags} & 0x04) { # Last Will & Testament
       my ($wt, $wm);
+      $off = MQTT2_SERVER_parseProps("lwt_", $shash, $hash, $pl, $off, $dump)
+               if($hash->{protoNum} == 5);
       ($wt, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       ($wm, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       $hash->{lwt} = "$wt:$wm";
@@ -431,18 +440,22 @@ MQTT2_SERVER_Read($@)
     }
 
     my $ret = Authenticate($hash, "basicAuth:".encode_base64("$usr:$pwd"));
-    if($ret == 2) { # CONNACK, Error
+    if($ret == 2) { # Permission denied
       delete($hash->{lwt}); # Avoid autocreate, #121587
-      return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 4), $dump, 
-                                sub{ CommandDelete(undef, $hash->{NAME}); });
+      return MQTT2_SERVER_connack($shash, $hash, 4, $dump);
     }
 
     $hash->{subscriptions} = {};
     $shash->{clients}{$cname} = 1;
+    $shash->{connects}++;
+    if(!$cid) {
+      $cid = "mosq_$shash->{connects}"; # avoid autocreate
+      $hash->{cidByServer} = 1;
+    }
     $hash->{cid} = $cid; #124699
 
     Log3 $sname, 4, "  $cname cid:$hash->{cid} $cpt V:$hash->{protoNum} $desc";
-    MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 0), $dump); # CONNACK+OK
+    MQTT2_SERVER_connack($shash, $hash, 0, $dump);
 
   ####################################
   } elsif($cpt eq "PUBLISH") {
@@ -451,8 +464,15 @@ MQTT2_SERVER_Read($@)
     my ($tp, $val, $pid);
     ($tp, $off) = MQTT2_SERVER_getStr($hash, $pl, 0);
     if($qos && length($pl) >= $off+2) {
-      $pid = unpack('n', substr($pl, $off, 2));
+      $pid = unpack('n', substr($pl, $off, 2)); # Packet Identifier
       $off += 2;
+    }
+
+    my $props="";
+    if($hash->{protoNum} == 5) {
+      my $n = MQTT2_SERVER_parseProps("pub_", $shash, $hash, $pl, $off, $dump);
+      $props = substr($pl, $off, $n-$off);
+      $off = $n;
     }
     $val = (length($pl)>$off ? substr($pl, $off) : "");
     if($unicodeEncoding) {
@@ -462,37 +482,54 @@ MQTT2_SERVER_Read($@)
       }
     }
     Log3 $sname, 4, "  $cname $hash->{cid} $cpt $tp:$val";
-    # PUBACK
-    MQTT2_SERVER_out($hash, pack("CCnC*", 0x40, 2, $pid), $dump) if($qos);
-    MQTT2_SERVER_doPublish($hash, $shash, $tp, $val, $cf & 0x01);
+
+    if($qos) {           # PUBACK
+      if($hash->{protoNum} == 5) { # ok, no properties, 
+        MQTT2_SERVER_out($hash, pack("CCnCC", 0x40, 4, $pid, 0, 0), $dump);
+      } else {
+        MQTT2_SERVER_out($hash, pack("CCn", 0x40, 2, $pid), $dump);
+      }
+    }
+
+    MQTT2_SERVER_doPublish($hash, $shash, $tp, $val, $cf & 0x01, $props);
 
   ####################################
   } elsif($cpt eq "PUBACK") { # ignore it
 
   ####################################
   } elsif($cpt eq "SUBSCRIBE") {
-    Log3 $sname, 4, "  $cname $hash->{cid} $cpt";
     my $pid = unpack('n', substr($pl, 0, 2));
+    Log3 $sname, 4, "  $cname $hash->{cid} $cpt pid:$pid";
     my ($subscr, @ret);
     $off = 2;
+
+    $off = MQTT2_SERVER_parseProps("sub_",$shash,$hash,$pl,$off,$dump)
+             if($hash->{protoNum} == 5);
+
     while($off < $tlen) {
       ($subscr, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
-      my $qos = unpack("C*", substr($pl, $off++, 1));
-      $hash->{subscriptions}{$subscr} = $hash->{lastMsgTime};
-      Log3 $sname, 4, "  topic:$subscr qos:$qos";
-      push @ret, ($qos > 1 ? 1 : 0);    # max qos supported is 1
+      my $sopt = unpack("C", substr($pl, $off++, 1));
+      $hash->{subscriptions}{$subscr} = $sopt;
+      Log3 $sname, 4, "    topic:$subscr options:$sopt";
+      push @ret, (($sopt & 3) > 1 ? 1 : 0);    # max qos supported is 1
     }
-    # SUBACK
-    MQTT2_SERVER_out($hash, pack("CCnC*", 0x90, 2+@ret, $pid, @ret), $dump);
 
-    if(!$hash->{answerScheduled}) {
+    if($hash->{protoNum} == 5) { # SUBACK: ok, no properties
+      MQTT2_SERVER_out($hash, pack("CCnCC*",0x90,3+@ret,$pid,0,@ret), $dump);
+    } else {
+      MQTT2_SERVER_out($hash, pack("CCnC*", 0x90,2+@ret,$pid,  @ret), $dump);
+    }
+
+
+    if(!$hash->{answerScheduled} && $shash->{retain}) {
       $hash->{answerScheduled} = 1;
       InternalTimer($hash->{lastMsgTime}+1, sub(){
         return if(!$hash->{FD}); # Closed in the meantime, #114425
         delete($hash->{answerScheduled});
         my $r = $shash->{retain};
         foreach my $tp (sort { $r->{$a}{ts} <=> $r->{$b}{ts} } keys %{$r}) {
-          MQTT2_SERVER_sendto($shash, $hash, $tp, $r->{$tp}{val});
+          MQTT2_SERVER_sendto($shash, $hash, $tp,
+                              $r->{$tp}{val}, 1, $r->{$tp}{props});
         }
       }, undef, 0);
     }
@@ -503,12 +540,22 @@ MQTT2_SERVER_Read($@)
     my $pid = unpack('n', substr($pl, 0, 2));
     my ($subscr, @ret);
     $off = 2;
+
+    $off = MQTT2_SERVER_parseProps("unsub_",$shash,$hash,$pl,$off,$dump)
+             if($hash->{protoNum} == 5);
+
     while($off < $tlen) {
       ($subscr, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       delete $hash->{subscriptions}{$subscr};
-      Log3 $sname, 4, "  topic:$subscr";
+      Log3 $sname, 4, "    topic:$subscr";
     }
-    MQTT2_SERVER_out($hash, pack("CCn", 0xb0, 2, $pid), $dump); # UNSUBACK
+
+    if($hash->{protoNum} == 5) { # UNSUBACK: ok, no properties
+      MQTT2_SERVER_out($hash, pack("CCCn", 0xb0, 3, 0, $pid), $dump);
+    } else {
+      MQTT2_SERVER_out($hash, pack("CCn", 0xb0, 2, $pid), $dump);
+    }
+
 
   ####################################
   } elsif($cpt eq "PINGREQ") {
@@ -517,7 +564,11 @@ MQTT2_SERVER_Read($@)
 
   ####################################
   } elsif($cpt eq "DISCONNECT") {
-    Log3 $sname, 4, "  $cname $hash->{cid} $cpt";
+    my $reason = length($pl) ? unpack('C', substr($pl, 0, 1)) : "N/A";
+    Log3 $sname, 4, "  $cname $hash->{cid} $cpt, reason:$reason";
+    $off = MQTT2_SERVER_parseProps("disco_",$shash,$hash,$pl,1,$dump)
+             if($hash->{protoNum} == 5);
+
     delete($hash->{lwt}); # no LWT on disconnect, see doc, chapter 3.14
     return CommandDelete(undef, $cname);
 
@@ -542,9 +593,9 @@ MQTT2_SERVER_Read($@)
 # Call sendto for all clients + Dispatch + dotrigger if rawEvents is set
 # server is the "accept" server, src is the connection generating the data
 sub
-MQTT2_SERVER_doPublish($$$$;$)
+MQTT2_SERVER_doPublish($$$$;$$)
 {
-  my ($src, $server, $tp, $val, $retain) = @_;
+  my ($src, $server, $tp, $val, $retain, $props) = @_;
   $val = "" if(!defined($val));
   $src = $server if(!defined($src));
   my $now = gettimeofday();
@@ -554,11 +605,8 @@ MQTT2_SERVER_doPublish($$$$;$)
     if(!defined($val) || $val eq "") {
       delete($server->{retain}{$tp});
     } else {
-      my %h = ( ts=>$now, val=>$val );
-      $server->{retain}{$tp} = \%h;
+      $server->{retain}{$tp} = { ts=>$now, val=>$val, props=>$props };
     }
-
-
     # Save it
     my %nots = map { $_ => $server->{retain}{$_}{val} }
                keys %{$server->{retain}};
@@ -567,7 +615,7 @@ MQTT2_SERVER_doPublish($$$$;$)
   }
 
   foreach my $clName (keys %{$server->{clients}}) {
-    MQTT2_SERVER_sendto($server, $defs{$clName}, $tp, $val);
+    MQTT2_SERVER_sendto($server, $defs{$clName}, $tp, $val, $props);
   }
 
   my $ir = AttrVal($serverName, "ignoreRegexp", undef);
@@ -610,9 +658,9 @@ MQTT2_SERVER_doPublish($$$$;$)
 ######################################
 # send topic to client if its subscription matches the topic
 sub
-MQTT2_SERVER_sendto($$$$)
+MQTT2_SERVER_sendto($$$$;$)
 {
-  my ($shash, $hash, $topic, $val) = @_;
+  my ($shash, $hash, $topic, $val, $props) = @_;
   return if(IsDisabled($hash->{NAME}));
   $val = "" if(!defined($val));
   my $dump = (AttrVal($shash->{NAME},"verbose",1)>=5) ? $shash->{NAME} :undef;
@@ -624,18 +672,26 @@ MQTT2_SERVER_sendto($$$$)
     $lval   = Encode::encode('UTF-8', $val);
   }
 
+  # FIXME: respect the subscribe options NL/RAP/RETAIN for proto 5
   foreach my $s (keys %{$hash->{subscriptions}}) {
+
     my $re = $s;
     $re =~ s,^#$,.*,g;
     $re =~ s,/?#,\\b.*,g;
     $re =~ s,\+,\\b[^/]+\\b,g;
     if($topic =~ m/^$re$/) {
+
       Log3 $shash, 5, "  $hash->{NAME} $hash->{cid} => $topic:$val";
-      MQTT2_SERVER_out($hash,                  # PUBLISH
-        pack("C",0x30).
-        MQTT2_SERVER_calcRemainingLength(2+length($ltopic)+length($lval)).
-        pack("n", length($ltopic)).
-        $ltopic.$lval, $dump);
+
+      if($hash->{protoNum} == 5) {
+        $props = pack("C",0) if(!$props);
+      } else {
+        $props = "";
+      }
+      my $rl = MQTT2_SERVER_makeLength(2+length($props)+
+                                         length($ltopic)+length($lval));
+      MQTT2_SERVER_out($hash,
+        pack("C",0x30).$rl.MQTT2_SERVER_makeStr($topic).$props.$lval,$dump);
       last;       # send a message only once
     }
   }
@@ -665,7 +721,7 @@ MQTT2_SERVER_Write($$$)
 }
 
 sub
-MQTT2_SERVER_calcRemainingLength($)
+MQTT2_SERVER_makeLength($)
 {
   my ($l) = @_;
   my @r;
@@ -679,20 +735,28 @@ MQTT2_SERVER_calcRemainingLength($)
 }
 
 sub
-MQTT2_SERVER_getRemainingLength($)
+MQTT2_SERVER_getLength($$)
 {
-  my ($hash) = @_;
-  return (2,2) if(length($hash->{BUF}) < 2);
+  my ($buf,$start) = @_;
+  return (2,2) if(length($buf) < $start+1);
 
   my $ret = 0;
   my $mul = 1;
-  for(my $off = 1; $off <= 4; $off++) {
-    my $b = ord(substr($hash->{BUF},$off,1));
+  for(my $off = 0; $off < 4; $off++) {
+    my $b = ord(substr($buf,$start+$off,1));
     $ret += ($b & 0x7f)*$mul;
-    return ($ret, $off+1) if(($b & 0x80) == 0);
+    return ($ret, $start+$off+1) if(($b & 0x80) == 0);
     $mul *= 128;
   }
   return -1;
+}
+
+sub
+MQTT2_SERVER_makeStr($)
+{
+  my ($str) = @_;
+  $str = Encode::encode('UTF-8', $str) if($unicodeEncoding);
+  return pack("n",length($str)).$str;
 }
 
 sub
@@ -746,6 +810,105 @@ MQTT2_SERVER_addToFeedList($$)
     delete($hash->{".feedList"}) if(!keys %{$hash->{".feedList"}});
   }
   return undef;
+}
+
+sub
+MQTT2_SERVER_parseProps($$$$$$)
+{
+  my ($prefix, $shash, $hash, $pl, $off, $dump) = @_;
+
+  return if(length($pl) <= $off);
+
+  my ($tlen, $noff) = MQTT2_SERVER_getLength($pl,$off);
+  $off=$noff;
+  $noff = $off+$tlen;
+
+  my $setNum = sub($$)
+  {
+    my ($n,$l) = @_;
+    my $s = substr($pl, $off, $l);
+    if($l) {
+      $hash->{$prefix.$n} = ($l==1 ? ord($s) : unpack($l==2 ? 'n':'N',$s));
+      $off += $l;
+    } else {
+      my $v;
+      ($v, $off) = MQTT2_SERVER_getLength($pl,$off);
+      $hash->{$prefix.$n} = $v;
+    }
+    Log 1, " Prop $prefix$n = $hash->{$prefix.$n}" if($dump);
+  };
+
+  my $setStr = sub($)
+  {
+    my ($n, $val) = @_;
+    ($val, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
+    $hash->{$prefix.$n} = $val;
+    Log 1, " Prop $prefix$n = $hash->{$prefix.$n}" if($dump);
+  };
+
+  my $usrProp = sub()
+  {
+    my ($key, $value);
+
+    ($key, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
+    ($value, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
+    $hash->{$prefix."_up_".$key} = $value;
+    Log 1, " UserProp ${prefix}_up_$key = $value" if($dump);
+  };
+  
+  while($off < $noff) {
+    my $p = ord(substr($pl,$off++,1));
+       if($p ==  1) { $setNum->("payload_format", 1)         }
+    elsif($p ==  2) { $setNum->("message_expiry_interval",4) }
+    elsif($p ==  3) { $setStr->("content_type")              }
+    elsif($p ==  8) { $setStr->("response_topic")            }
+    elsif($p ==  9) { $setStr->("correlation_data")          }
+    elsif($p == 11) { $setNum->("subscription_identifier",0) }
+    elsif($p == 17) { $setNum->("session_expiry_interval",4) }
+    elsif($p == 21) { $setStr->("auth_method")               }
+    elsif($p == 22) { $setStr->("auth_data")                 }
+    elsif($p == 23) { $setNum->("request_problem_info",1)    }
+    elsif($p == 25) { $setNum->("request_response",1)        }
+    elsif($p == 33) { $setNum->("receive_max",2)             }
+    elsif($p == 34) { $setNum->("topic_alias_max",2)         }
+    elsif($p == 35) { $setNum->("topic_alias",2)             }
+    elsif($p == 38) { $usrProp->()                           }
+    elsif($p == 39) { $setNum->("max_packet_size",4)         }
+    else            { Log 1, "Unknown Prop $p"               }
+  }
+  return $off;
+}
+
+sub
+MQTT2_SERVER_connack($$$$)
+{
+  my ($shash, $hash, $ret, $dump) = @_;
+
+  if($hash->{protoNum} == 5) {
+    if($ret == 4) {                         # not authorized
+      $ret = 135;
+    } elsif(($hash->{cflags}&0x18) >> 3 > 1) { # LWT QOS=2 not supported
+      $ret = 155;
+    }
+  }
+  my $fn = $ret ? sub { CommandDelete(undef, $hash->{NAME}) } : undef;
+
+  return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, $ret), $dump, $fn)
+    if($hash->{protoNum} < 5);
+
+  my $props = "";
+  $props .= pack("CN", 17, 0); # Session expiry: 0s
+  $props .= pack("CC", 36, 1); # QOS max is 1
+  $props .= pack("CC", 37, 0) if(!AttrVal($shash->{NAME}, "respectRetain", 0));
+  $props .= pack("C",  18).MQTT2_SERVER_makeStr($hash->{cid})
+                                if($hash->{cidByServer});
+  $props .= pack("CC", 41, 0); # no subscription identifier
+  $props .= pack("CC", 42, 0); # no shared subscriptions
+
+  $props = MQTT2_SERVER_makeLength(length($props)).$props;
+  my $rlen = MQTT2_SERVER_makeLength(2+length($props));
+  my $out = pack("C",0x20).$rlen.pack("CC",0,$ret).$props; # 0: no session 
+  MQTT2_SERVER_out($hash, $out, $dump, $fn);
 }
 
 # {MQTT2_SERVER_ReadDebug("m2s", '0(12)(0)(5)HelloWorld')}
