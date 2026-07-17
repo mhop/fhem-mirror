@@ -126,6 +126,38 @@ sub write_cookie_export_and_trigger_import_for_device {
   return write_cookie_export_and_trigger_import($main::defs{$name}, $payload, %args);
 }
 
+sub httpmod_write_cookie_export_and_trigger_import {
+  my ($httpmod_hash, $buffer) = @_;
+
+  return if ref $httpmod_hash ne q{HASH} || !defined $buffer;
+
+  my $payload = _normalize_httpmod_export_payload($buffer);
+  return if ref $payload ne q{HASH};
+
+  my $httpmod_name = $httpmod_hash->{NAME} || q{};
+  my $echodevice = main::AttrVal($httpmod_name, q{echodevice}, q{});
+  if (!$echodevice) {
+    main::Log3($httpmod_name, 3, qq[$httpmod_name: missing echodevice attribute]);
+    return q{missing echodevice attribute};
+  }
+
+  my $error = write_cookie_export_and_trigger_import_for_device(
+    $echodevice,
+    $payload,
+    export_dir => q{/opt/fhem/cache/alexa-cookie},
+  );
+
+  main::Log3(
+    $httpmod_name,
+    $error ? 3 : 4,
+    $error
+      ? qq[$httpmod_name: cookie export/import failed: $error]
+      : qq[$httpmod_name: cookie export written and imported],
+  );
+
+  return $error;
+}
+
 sub trigger_import {
   my ($hash, %args) = @_;
 
@@ -167,6 +199,22 @@ sub _normalize_export_payload {
   }
 
   return;
+}
+
+sub _normalize_httpmod_export_payload {
+  my ($buffer) = @_;
+
+  my $body = $buffer;
+  $body =~ s{\A.*?\r?\n\r?\n}{}s;
+
+  my $payload = _normalize_export_payload($body);
+  return if ref $payload ne q{HASH};
+
+  return if !exists $payload->{localCookie};
+  return if !exists $payload->{refreshToken};
+  return if !exists $payload->{formerRegistrationData};
+
+  return $payload;
 }
 
 1;
