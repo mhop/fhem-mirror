@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.23";
+my $Signalbot_VERSION="3.24";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -31,6 +31,22 @@ sub LogUnicode($$$);
 
 require FHEM::Text::Unicode;
 use FHEM::Text::Unicode qw(:ALL);
+
+# FHEM traditionally stores UTF-8 encoded byte strings unless
+# attr global encoding unicode is enabled.
+#
+# Signalbot needs Perl character strings for DBus, but these must not be
+# written unchanged into readings in classic FHEM mode. Wide character
+# readings can cause broken display and failures while writing the statefile.
+sub Signalbot_ReadingValue($) {
+    my ($value) = @_;
+
+    return $value if !defined $value;
+    return $value if $unicodeEncoding;
+    return $value if !utf8::is_utf8($value);
+
+    return encode_utf8($value);
+}
 use vars qw(%FW_webArgs); # all arguments specified in the GET
 use vars qw($FW_detail);  # currently selected device for detail view
 use vars qw($FW_RET);
@@ -1103,7 +1119,7 @@ sub Signalbot_MessageReceived ($@) {
 		readingsBeginUpdate($hash);
 		readingsBulkUpdate($hash, "msgAttachment", trim($atr));
 		readingsBulkUpdate($hash, "msgTimestamp", strftime("%d-%m-%Y %H:%M:%S", localtime($timestamp/1000)));
-		readingsBulkUpdate($hash, "msgText", $message);
+		readingsBulkUpdate($hash, "msgText", Signalbot_ReadingValue($message));
 		readingsBulkUpdate($hash, "msgSender", $sender);
 		readingsBulkUpdate($hash, "msgGroupName", $group);
 		Signalbot_AddToChat($hash,$sender,$sender,$group,$message);
@@ -1883,7 +1899,7 @@ sub Signalbot_sendMessage($@) {
 		push @recipient, $trans;
 	}
 	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "sentMsg", $mes);
+	readingsBulkUpdate($hash, "sentMsg", Signalbot_ReadingValue($mes));
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', "pending");
 	InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"sendTimeout",60)+5, "Signalbot_checkPending", $hash, 0);
 	readingsEndUpdate($hash, 1);
@@ -1935,7 +1951,7 @@ sub Signalbot_sendGroupMessage($@) {
 	return join(" ",@arr) unless @arr>1;
 
 	readingsBeginUpdate($hash);
-	readingsBulkUpdate($hash, "sentMsg", $mes);
+	readingsBulkUpdate($hash, "sentMsg", Signalbot_ReadingValue($mes));
 	readingsBulkUpdate($hash, 'sentMsgTimestamp', "pending");
 	InternalTimer(gettimeofday()+AttrVal($hash->{NAME},"sendTimeout",60)+5, "Signalbot_checkPending", $hash, 0);
 	readingsEndUpdate($hash, 1);
