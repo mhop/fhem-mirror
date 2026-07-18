@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.07.13";
+our $ModulVersion = "26.07.16";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -1731,9 +1731,6 @@ sub Fritz_Define_Modul($$)
      $hash->{fhem}{fwVersion}        = 0;
      $hash->{fhem}{fwVersionStr}     = 0.0;
      $hash->{fhem}{intBoxUsers}      = "&lt;none&gt;";
-
-
-
 
      $hash->{fhem}{multiple_wlan}{cnt}   = 1;
      $hash->{fhem}{multiple_wlan}{names} = "wlan2.4";
@@ -10877,7 +10874,7 @@ sub Fritz_Readout_API_Check($)
          if($mybody =~ /("activeUsers":\[\{.*?\}\]),/isg) {
 
            $user_content = "{" .$1. "}";
-           # Fritz_Log $name, 3, "FBUser: \n" . $user_content;
+           Fritz_Log $name, 4, "FBUser: \n" . $user_content;
 
            my $resultData = Fritz_Helper_process_JSON($hash, $user_content, "", "");
 
@@ -10898,23 +10895,37 @@ sub Fritz_Readout_API_Check($)
                chop($bUsers) if($nbViews != 0);
                $bUsers =~ s/&lt;pWd&gt;//;
              }
+
+             $boxUser = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
+
+             $bUsers =~ s/ /&#160;/g;
+             #Fritz_Log $name, 3, "FBUser: \n" . $bUsers;
+
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "$bUsers";
+             $hash->{fhem}{intBoxUsers} = $bUsers;
+
+           } else {
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "&lt;none&gt;";
+             $hash->{fhem}{intBoxUsers} = "&lt;none&gt;";
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", "";
+             $hash->{DEFAULT_USER} = "";
+             $boxUser = main::AttrVal( $name, "boxUser", "" );
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
            }
+         } else {
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "&lt;none&gt;";
+           $hash->{fhem}{intBoxUsers} = "&lt;none&gt;";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", "";
+           $hash->{DEFAULT_USER} = "";
+           $boxUser = main::AttrVal( $name, "boxUser", "" );
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
          }
-
-         $boxUser = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
-
-         $bUsers =~ s/ /&#160;/g;
-         #Fritz_Log $name, 3, "FBUser: \n" . $bUsers;
-
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "$bUsers";
-         $hash->{fhem}{intBoxUsers} = $bUsers;
        }
-#       $attrList = Fritz_Get_attrList($hash);
-#       main::setDevAttrList($hash->{NAME}, $attrList);
        
      } else {
        $boxUser = main::AttrVal( $name, "boxUser", "" );
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
      }
      # End check for defined user in Fritz!Device
 
@@ -11339,27 +11350,31 @@ sub Fritz_Readout_API_Check($)
 
          if (exists($tr064Result->{Error}) && ref($tr064Result->{Error}) eq "HASH" ) {
            Fritz_Log $hash, 4, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
-           # Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN?";
 
-           my $errText = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error}, 1);
+           if($hash->{fhem}{fwVersion} < 700) {
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN?";
+           } else {
 
-           $apiError .= " TR064: $errText";
+             my $errText = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error}, 1);
 
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+             $apiError .= " TR064: $errText";
 
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $errText;
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
 
-           $hash->{fhem}{sidTime} = 0;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $errText;
 
-           my $returnStr = join('|', @roReadings );
+             $hash->{fhem}{sidTime} = 0;
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
-           Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
+             my $returnStr = join('|', @roReadings );
 
-           return $name . "|" . encode_base64($returnStr,"");
+             Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
+
+             return $name . "|" . encode_base64($returnStr,"");
+           }
 
          } else {
            Fritz_Log $hash, 5, "wancommonifconfig1 GetCommonLinkProperties -> \n" . Fritz_Helper_Dumper($hash, $tr064Result, 5);
@@ -17361,7 +17376,7 @@ sub Fritz_call_Lua_Query($$@)
    $luaContent .= ',"status_line":"' . $response->status_line .'"}';
 
 #################
-#     Fritz_Log $hash, 5, "Response: " . $response->content;
+#   Fritz_Log $hash, 3, "Response: " . $response->content;
 #################
    my $jsonResult ;
 
@@ -21406,7 +21421,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="enableAlarmInfo"></a>
          <dt><code>attr &lt;name&gt; enableAlarmInfo &lt;0 | 1&gt;</code></dt>
          <br>
-         Schaltet die Anzeige von Alarm Informationen las Readings aus/ein.
+         Schaltet die Anzeige von Alarm Informationen als Readings aus/ein.
       </li><br>
 
       <li><a name="enableCallHandling"></a>
