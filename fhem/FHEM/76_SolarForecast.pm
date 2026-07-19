@@ -161,6 +161,10 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.9.1"  => "16.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ".
+                           "neuer Befehl set .. reset aiData setValue ... ".
+                           "das Gemini Model kann im Schlüssel aiControl->geminiAPIkey nach dem API-Key angegeben werden ".
+                           "die Victron API ((Model VictronKiAPI) kann nun den neuen Token-Auth verwenden ",
   "2.9.0"  => "10.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
                            "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
                            "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
@@ -2391,6 +2395,51 @@ semantics_heatpump => sub {
     ];
 },
 
+# --------------------------------------------------------------------------
+# Schliesst die Luecke fuer WP-Haushalte OHNE PV.
+# Identisch zu semantics_heatpump, aber OHNE die zwei PV-abhaengigen
+# Zeilen (ww_pv_boost*pv_norm und pv_norm*hour_class_noon), damit der
+# Block auch ohne PV-Signal sinnvolle (nicht dauerhaft-0) Werte liefert.
+# --------------------------------------------------------------------------
+semantics_heatpump_nopv => sub {
+    my ($f) = @_;
+    return [
+        # --- HEIZEN ---
+        softplus($f->{hp_heating_mode} * $f->{temp_delta_1h_neg}),
+        softplus($f->{hp_heating_mode} * $f->{temp_trend_neg}),
+        softplus($f->{hp_heating_mode} * $f->{frost_load}),
+        softplus($f->{hp_heating_mode} * $f->{hour_class_morning}),
+        softplus($f->{hp_heating_mode} * $f->{hour_class_evening}),
+
+        # --- KUEHLEN ---
+        softplus($f->{hp_cooling_mode} * $f->{temp_delta_1h_pos}),
+        softplus($f->{hp_cooling_mode} * $f->{temp_trend_pos}),
+        softplus($f->{hp_cooling_mode} * $f->{hour_class_noon}),
+
+        # --- WARM-WASSER (ohne PV-Boost-Zeile) ---
+        softplus($f->{ww_morning}    * $f->{hp_heating_mode}),
+        softplus($f->{ww_evening}    * $f->{hp_heating_mode}),
+        softplus($f->{ww_cycle_flag} * $f->{hp_heating_mode}),
+        softplus($f->{ww_cold_boost} * $f->{temp_delta_1h_neg}),
+
+        # --- EFFIZIENZ ---
+        softplus($f->{cop_inverse} * $f->{trend_up_strength}),
+        softplus($f->{cop_proxy}   * $f->{trend_down_strength}),
+
+        # --- FROSTSCHUTZ ---
+        softplus($f->{frost_protect} * $f->{hour_class_midnight}),
+        softplus($f->{frost_protect} * $f->{temp_delta_1h_neg}),
+
+        # --- TEMPERATUR + TREND ---
+        softplus($f->{temp_delta_3h_neg} * $f->{trend_up_strength}),
+        softplus($f->{temp_delta_3h_pos} * $f->{trend_down_strength}),
+
+        # --- Verstaerker (ohne pv_norm*hour_class_noon Zeile) ---
+        $f->{ww_morning} * $f->{hour_class_morning},
+        $f->{frost_load} * $f->{hour_class_morning},
+    ];
+},
+
 semantics_heatpump_boost_special => sub {                                               # NEU 14.01.
     my ($f) = @_;
 
@@ -3082,7 +3131,6 @@ return $msg;
 sub _setVictronCredentials {                 ## no critic "not used"
   my $paref = shift;
   my $name  = $paref->{name};
-  my $type  = $paref->{type};
   my $opt   = $paref->{opt};
   my $arg   = $paref->{arg};
 
@@ -3100,14 +3148,16 @@ sub _setVictronCredentials {                 ## no critic "not used"
       $msg = qq{Credentials for the Victron VRM API are deleted. };
   }
   else {
-      if (!$h->{user} || !$h->{pwd} || !$h->{idsite}) {
+      if (!$h->{user} || !$h->{idsite} || (!$h->{pwd} && !$h->{token})) {
           return qq{The syntax of "$opt" is not correct. Please consider the commandref.};
       }
-
+      if ($h->{pwd} && $h->{token}) {
+          return qq{Please provide either "pwd" or "token", not both.};
+      }
       my $serial = eval { freeze ($h)
                         }
                         or do { return "Serialization ERROR: $@" };
-
+      
       $data{$name}{statusapi}{'?VRM'}{'?API'}{credentials} = chew ($serial);
       $msg = qq{Credentials for the Victron VRM API has been saved.};
   }
@@ -3532,7 +3582,7 @@ return;
 }
 
 ################################################################
-#                     KI Daten löschen
+#                 KI Raw-Daten löschen/ändern
 ################################################################
 sub __resetAiData {
   my ($name, $arg, $argsref) = @_;
@@ -3639,6 +3689,27 @@ sub __resetAiData {
               Log3 ($name, 1, "$name - AI Raw data $done - idx: $idx -> key=$key, val=$val");
           }
       }
+  }
+  elsif ($args[1] eq 'setValue') {                                                   # den Wert eines Schlüssels in einem bestimmten Index setzen/ändern
+      my $idx = $ha->{Index};
+      my $key = $ha->{key};
+      my $val = $ha->{value};
+
+      return "the arguments of 'setValue' are not specified correctly, use: setValue Index=<idx> key=<key> value=<value>"
+          if (!defined $idx || !defined $key || !defined $val || !length $idx || !length $key || !length $val);
+
+      return "Index '$idx' must be numeric" if ($idx !~ /^\d+$/);
+      return "key '$key' contains invalid characters"
+          if ($key !~ /^[A-Za-z0-9_]+$/);
+      return "AI Raw data index '$idx' doesn't exist"
+          if (!exists $data{$name}{aidectree}{airaw}{$idx});
+
+      my $old = AiRawdataVal ($name, $idx, $key, undef);
+      $data{$name}{aidectree}{airaw}{$idx}{$key} = $val;
+      $dosave = 1;
+
+      Log3 ($name, 1, qq{$name - AI Raw data set - idx: $idx -> key=$key, old value=}.
+                       (defined $old ? $old : '<undef>').qq{, new value=$val});
   }
   
   if ($dosave) {
@@ -5140,55 +5211,67 @@ return;
 # https://vrm-api-docs.victronenergy.com/#/
 ################################################################
 sub __VictronVRM_ApiRequestLogin {
-  my $paref = shift;
-  my $name  = $paref->{name};
-  my $debug = $paref->{debug};
-  my $type  = $paref->{type};
+  my $paref  = shift;
+  my $name   = $paref->{name};
+  my $debug  = $paref->{debug};
+  my $hash   = $defs{$name};
+  my $caller = (caller(0))[3];
 
-  my $hash  = $defs{$name};
-  my $url   = 'https://vrmapi.victronenergy.com/v2/auth/login';
-
-  debugLog ($paref, "apiProcess|apiCall", qq{Request VictronVRM API Login: $url});
-
-  my $caller = (caller(0))[3];                                                     # Rücksprungmarke
-
-  my ($user, $pwd, $idsite);
-
+  my ($user, $pwd, $token, $idsite, $authtype);
   my $serial = StatusAPIVal ($hash, '?VRM', '?API', 'credentials', '');
 
   if ($serial) {
-      my $h   = eval { thaw (assemble ($serial)) };                                # Deserialisierung
-      $user   = $h->{user}   // q{};
-      $pwd    = $h->{pwd}    // q{};
-      $idsite = $h->{idsite} // q{};
+      my $h     = eval { thaw (assemble ($serial)) };
+      $user     = $h->{user}     // q{};
+      $pwd      = $h->{pwd}      // q{};                          # nur bei klassischem Login gesetzt
+      $token    = $h->{token}    // q{};                          # nur bei Token-Auth gesetzt
+      $idsite   = $h->{idsite}   // q{};
+      
+      $authtype = $token ? 'token' : 'password';                  # Unterscheidung anhand vorhandener Felder
 
-      debugLog ($paref, "apiCall", qq{Used credentials for Login: user->$user, pwd->$pwd, idsite->$idsite});
+      debugLog ($paref, "apiCall", qq{Used credentials for Login: user->$user, authtype->$authtype, idsite->$idsite});
   }
   else {
       my $msg = "Victron VRM API credentials are not set or couldn't be decrypted. Use 'set $name vrmCredentials' to set it.";
       Log3              ($name, 2, "$name - $msg");
       singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
-
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $msg;
       return;
   }
 
+  $paref->{idsite}   = $idsite;
+  $paref->{authtype} = $authtype;
+
+  if ($authtype eq 'token') {
+      debugLog ($paref, "apiProcess|apiCall", qq{VictronVRM API: using Access Token auth, skipping /v2/auth/login});
+      
+      $paref->{token} = $token;
+      
+      __VictronVRM_ApiRequestForecast ($paref);                   # direkt weiter, kein Login-Roundtrip nötig
+      
+      return;
+  }
+
+  # ---- ab hier unverändert der bisherige Passwort-Login-Zweig ----
+  my $url = 'https://vrmapi.victronenergy.com/v2/auth/login';
+  
+  debugLog ($paref, "apiProcess|apiCall", qq{Request VictronVRM API Login: $url});
+
   my $param = {
-      url        => $url,
-      timeout    => APITIMEOUT,
-      name       => $name,
-      type       => $paref->{type},
-      stc        => [gettimeofday],
-      debug      => $debug,
-      caller     => \&$caller,
-      lang       => $paref->{lang},
-      chour      => $paref->{chour},                                            # aktuelle Stunde in 24h format (00-23)
-      date       => $paref->{date},
-      idsite     => $idsite,
-      header     => { "Content-Type" => "application/json" },
-      data       => qq({ "username": "$user",  "password": "$pwd" }),
-      method     => 'POST',
-      callback   => \&__VictronVRM_ApiResponseLogin
+      url      => $url,
+      timeout  => APITIMEOUT,
+      name     => $name,
+      stc      => [gettimeofday],
+      debug    => $debug,
+      caller   => \&$caller,
+      lang     => $paref->{lang},
+      chour    => $paref->{chour},
+      date     => $paref->{date},
+      idsite   => $idsite,
+      header   => { "Content-Type" => "application/json" },
+      data     => qq({ "username": "$user",  "password": "$pwd" }),
+      method   => 'POST',
+      callback => \&__VictronVRM_ApiResponseLogin
   };
 
   if ($debug =~ /apiCall/x) {
@@ -5196,7 +5279,7 @@ sub __VictronVRM_ApiRequestLogin {
   }
 
   HttpUtils_NonblockingGet ($param);
-
+  
 return;
 }
 
@@ -5209,7 +5292,6 @@ sub __VictronVRM_ApiResponseLogin {
   my $myjson = shift;
 
   my $name   = $paref->{name};
-  my $type   = $paref->{type};
   my $caller = $paref->{caller};
   my $stc    = $paref->{stc};
   my $lang   = $paref->{lang};
@@ -5297,37 +5379,41 @@ return;
 # # API Beschreibung: https://vrm-api-docs.victronenergy.com/#/operations/installations/idSite/stats
 ######################################################################################################
 sub __VictronVRM_ApiRequestForecast {
-  my $paref  = shift;
-  my $name   = $paref->{name};
-  my $token  = $paref->{token};
-  my $debug  = $paref->{debug};
-  my $lang   = $paref->{lang};
-  my $idsite = $paref->{idsite};
-  my $chour  = $paref->{chour};                                                   # aktuelle Stunde in 24h format (00-23)
-  my $date   = $paref->{date};
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $token    = $paref->{token};
+  my $debug    = $paref->{debug};
+  my $lang     = $paref->{lang};
+  my $idsite   = $paref->{idsite};
+  my $chour    = $paref->{chour};
+  my $date     = $paref->{date};
+  my $authtype = $paref->{authtype} // 'password';                 # Fallback falls nicht gesetzt
 
   my $hash   = $defs{$name};
   my $tstart = timestringToTimestamp ($hash, "$date $chour:00:00");
-  my $tend   = $tstart + 259200;                                                  # 172800 = 2 Tage
+  my $tend   = $tstart + 259200;
 
   my $url = "https://vrmapi.victronenergy.com/v2/installations/$idsite/stats?type=forecast&interval=hours&start=$tstart&end=$tend";
 
   debugLog ($paref, "apiProcess|apiCall", qq{Request VictronVRM API Forecast: $url});
 
-  my $caller = (caller(0))[3];                                                    # Rücksprungmarke
+  my $caller = (caller(0))[3];
+
+  my $authheader = ($authtype eq 'token') ? "Token $token" : "Bearer $token";  # <-- Kernänderung
 
   my $param = {
-      url     => $url,
-      timeout => APITIMEOUT,
-      name    => $name,
-      type    => $paref->{type},
-      stc     => [gettimeofday],
-      debug   => $debug,
-      token   => $token,
-      caller  => \&$caller,
-      lang    => $paref->{lang},
-      header  => { "Content-Type" => "application/json", "x-authorization" => "Bearer $token" },
-      method  => 'GET',
+      url      => $url,
+      timeout  => APITIMEOUT,
+      name     => $name,
+      type     => $paref->{type},
+      stc      => [gettimeofday],
+      debug    => $debug,
+      token    => $token,
+      authtype => $authtype,                                       # für Response-Handler durchreichen
+      caller   => \&$caller,
+      lang     => $paref->{lang},
+      header   => { "Content-Type" => "application/json", "x-authorization" => $authheader },
+      method   => 'GET',
       callback => \&__VictronVRM_ApiResponseForecast
   };
 
@@ -5336,7 +5422,7 @@ sub __VictronVRM_ApiRequestForecast {
   }
 
   HttpUtils_NonblockingGet ($param);
-
+  
 return;
 }
 
@@ -5349,7 +5435,6 @@ sub __VictronVRM_ApiResponseForecast {
   my $myjson = shift;
 
   my $name   = $paref->{name};
-  my $type   = $paref->{type};
   my $caller = $paref->{caller};
   my $stc    = $paref->{stc};
   my $lang   = $paref->{lang};
@@ -5455,12 +5540,12 @@ sub __VictronVRM_ApiResponseForecast {
 
           $k = 0;
           while ($jdata->{'records'}{'vrm_consumption_fc'}[$k]) {
-              if (ref $jdata->{'records'}{'vrm_consumption_fc'}[$k] ne "ARRAY") {              # Forum: https://forum.fhem.de/index.php?msg=1288637
+              if (ref $jdata->{'records'}{'vrm_consumption_fc'}[$k] ne "ARRAY") {                           # Forum: https://forum.fhem.de/index.php?msg=1288637
                   $k++;
                   next;
               }
 
-              my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];               # Millisekunden geliefert
+              my $starttmstr = $jdata->{'records'}{'vrm_consumption_fc'}[$k][0];                            # Millisekunden geliefert
               my $val        = $jdata->{'records'}{'vrm_consumption_fc'}[$k][1];
               $starttmstr    = (timestampToTimestring ($name, $starttmstr, $lang))[3];
 
@@ -5478,10 +5563,12 @@ sub __VictronVRM_ApiResponseForecast {
       }
   }
 
-  $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval  ($sta));                                    # Verarbeitungszeit ermitteln
-  $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($stc) - tv_interval ($sta));                # API Laufzeit ermitteln
+  $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval  ($sta));                               # Verarbeitungszeit ermitteln
+  $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($stc) - tv_interval ($sta));           # API Laufzeit ermitteln
 
-  __VictronVRM_ApiRequestLogout ($paref);
+  if (($paref->{authtype} // 'password') ne 'token') {
+      __VictronVRM_ApiRequestLogout ($paref);                                                               # nur bei Session-Login nötig
+  }
 
 return;
 }
@@ -5508,7 +5595,6 @@ sub __VictronVRM_ApiRequestLogout {
       url        => $url,
       timeout    => APITIMEOUT,
       name       => $name,
-      type       => $paref->{type},
       debug      => $debug,
       caller     => \&$caller,
       lang       => $paref->{lang},
@@ -7622,20 +7708,7 @@ sub __getaiFannState {            ## no critic "not used"
   $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
   $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
                        ":</b> $retrampel $recomd_translated $show_retreason \n";  
-  
-  # ------------------------------
-  #my $linkGemini     = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConAssessGemini', function(data){FW_okDialog(data)})"};
-  
-  #my $privacyHint    = $lang eq 'DE'
-  #                   ? encode ('utf8', 'Es werden Trainingsmetriken an Google Gemini übertragen (sichtbar im Log mit ctrlDebug=apiCall)')
-  #                   : 'Training metrics are transmitted to Google Gemini (visible in the log with ctrlDebug=apiCall)';
-  #my $privacyNote    = qq{<span style="font-size:0.75em;color:#888;margin-left:6px">($privacyHint)</span>};
-  #my $askGemini      = qq{<span title="$privacyHint"> <a style="cursor:pointer" onClick=$linkGemini>Google Gemini</a> </span>};
-
-  #$rating_content   .= "\n";
-  #$rating_content   .= "<b>".$hqtxt{exeval}{$lang}.":</b> $askGemini $privacyNote \n";
-  
-  # ----------------------------
+  # ------------------------------  
   
   my $linkGemini       = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConAssessGemini', function(data){FW_okDialog(data)})"};
   my $linkPromptExport = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConTrainState LLM', function(data){FW_okDialog(data)})"};
@@ -8104,8 +8177,7 @@ sub _aiFannGeminiApiAssess {
       return "The AI for forecasting $fanntyp is not yet operational. \n<b>Cause:</b> $cause";
   }
   
-  my $hash   = $defs{$name};
-  my $apiKey = CurrentVal ($name, 'geminiAPIkey');
+  my ($apiKey, $model) = split ( ":", CurrentVal ($name, 'geminiAPIkey', ':') );
   
   unless ($apiKey) {
       my $ret = $lang eq 'DE' 
@@ -8118,8 +8190,7 @@ sub _aiFannGeminiApiAssess {
       return encode ('utf8', $ret); 
   }
 
-  #my $model = 'gemini-2.5-flash-lite';                                                          # alternativ: gemini-2.0-flash (aber älter und qualitativ schlechter), gemini-2.5-flash-lite, gemini-2.5-flash
-  my $model = 'gemini-2.5-flash';
+  $model = $model ? $model : 'gemini-2.5-flash';
   
   # --- Metriken sammeln ---
   my $profile   = AiNeuralVal ($name, $fanntyp, 'RegVersion',     'n/a');                       # verwendete Feature-Registry Version
@@ -8147,6 +8218,7 @@ sub _aiFannGeminiApiAssess {
   my $epochPct  = AiNeuralVal ($name, $fanntyp, 'EpochRelPct',    'n/a');                       # % der max. Epochen genutzt
   my $maxepoch  = AINUMEPOCHS;                                                                  # oder als Konstante
 
+  my $hash      = $defs{$name};
   my $version   = $hash->{HELPER}{VERSION} // 'n/a';
     
       
@@ -8308,6 +8380,7 @@ END_EN
 
   if ($debug =~ /apiCall/x) {
       $param->{loglevel} = 1;
+      Log3 ($name, 1, "$name DEBUG> Google Gemini model $model is used for external analysis.");
       Log3 ($name, 1, "$name DEBUG> The following data are transmitted to Google Gemini for analysis: \n$userMsg");
   }
 
@@ -28956,6 +29029,9 @@ sub _aiFannFeatureBuilder {
       elsif ($flags->{pv}) {                                                                # WP + PV
           push @features, @{ $FEATURE_BLOCKS{semantics_heatpump}->($f) };
       }
+      else {                                                                                # WP ohne PV - schliesst die zuvor bestehende Luecke
+          push @features, @{ $FEATURE_BLOCKS{semantics_heatpump_nopv}->($f) };
+      }
   }
     
   # --------------------------------------------------------
@@ -38942,7 +39018,7 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>The following arguments can be used to selectively or completely remove AI raw data:                                                                            </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>AI raw data can be manipulated using the following methods:                                                                                                     </td></tr>
             <tr><td>                           </td><td><b>delDataAll</b> - deletes the AI instance, including all training and raw data as well as data at the file level, and reinitializes it.                       </td></tr>
             <tr><td>                           </td><td><b>delIndex=&lt;Index&gt;,&lt;Index&gt;,...</b> - deletes one or more records with the index. The index can be specified as a regex.                            </td></tr>
             <tr><td>                           </td><td>If there are spaces in the argument, the entire argument must be enclosed in quotation marks.                                                                   </td></tr>
@@ -38951,6 +39027,8 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td>Examples: <b>1.)</b> searchValue=con==9786  <b>2.)</b> searchValue=con>=14578  <b>3.)</b> searchValue=temp<=-5                                                  </td></tr>
             <tr><td>                           </td><td><b>delValue</b> - deletes the numerical value in the specified key. Possible comparison operators are: > | >= | == | <= | < (Deletion confirmation in log file) </td></tr>
             <tr><td>                           </td><td>Examples: <b>1.)</b> delValue=con==9786  <b>2.)</b> delValue=con>=14578  <b>3.)</b> delValue=temp<=-5                                                           </td></tr>
+            <tr><td>                           </td><td><b>setValue</b> - Sets or changes the value for the specified key in a data record index. (The operation is confirmed in the log file.)                         </td></tr>
+            <tr><td>                           </td><td>Examples: <b>1.)</b> setValue Index=2026071416 key=presence value=0 <b>2.)</b> setValue Index=2026071418 key=pvrl value=1722                                    </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                                                               </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
@@ -39026,32 +39104,43 @@ to ensure that the system configuration is correct.
 
     <ul>
       <a id="SolarForecast-set-vrmCredentials"></a>
-      <li><b>vrmCredentials user=&lt;Benutzer&gt; pwd=&lt;Paßwort&gt; idsite=&lt;idSite&gt; </b> <br>
+      <li><b>vrmCredentials user=&lt;Benutzer&gt; idsite=&lt;idSite&gt; pwd=&lt;Paßwort&gt; | token=&lt;API-Token&gt; </b> <br>
       (only when using Model VictronKiAPI) <br><br>
 
        If the Victron VRM API is used, the required access data must be stored with this set command. <br><br>
-
+      
       <ul>
          <table>
          <colgroup> <col width="10%"> <col width="90%"> </colgroup>
             <tr><td> <b>user</b>   </td><td>Username for the Victron VRM Portal                                              </td></tr>
-            <tr><td> <b>pwd</b>    </td><td>Password for access to the Victron VRM Portal                                    </td></tr>
             <tr><td> <b>idsite</b> </td><td>idSite is the identifier "XXXXXX" in the Victron VRM Portal Dashboard URL.       </td></tr>
             <tr><td>               </td><td>URL of the Victron VRM Dashboard:                                                </td></tr>
             <tr><td>               </td><td>https://vrm.victronenergy.com/installation/<b>XXXXXX</b>/dashboard               </td></tr>
+         </table>
+      </ul>
+
+      In the credentials, set either a password (deprecated method) <b>or</b> API Access token:
+
+      <ul>
+         <table>
+         <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+			<tr><td> <b>pwd</b>    </td><td>Password for access to the Victron VRM Portal                                     </td></tr>
+			<tr><td> <b>token</b>  </td><td>API Access Token                                                                  </td></tr>
+			<tr><td>               </td><td>Create the API token in the Victron VRM Portal under Preferences > Integrations.  </td></tr>
          </table>
       </ul>
       <br>
 
       To delete the stored credentials, only the argument <b>delete</b> must be passed to the command. <br><br>
 
-       <ul>
-        <b>Examples: </b> <br>
-        set &lt;name&gt; vrmCredentials user=john@example.com pwd=somepassword idsite=212008 <br>
-        set &lt;name&gt; vrmCredentials delete <br>
-       </ul>
-
-      </li>
+      <ul>
+       <b>Examples: </b> <br>
+       set &lt;name&gt; vrmCredentials user=john@example.com idsite=212008 pwd=somepassword <br>
+	   set &lt;name&gt; vrmCredentials user=john@example.com idsite=212008 token=addd5....b3e72e15e0 <br>
+       set &lt;name&gt; vrmCredentials delete <br>
+      </ul>
+      
+    </li>
     </ul>
     <br>
 
@@ -39750,8 +39839,9 @@ to ensure that the system configuration is correct.
             <tr><td>                          </td><td>The default value of '0' uses all available data records.                                                                                                    </td></tr>
             <tr><td>                          </td><td>Values:<b> 0 or Integer >= 2000 </b>, default: 0                                                                                                             </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
-            <tr><td> <b>geminiAPIkey</b>      </td><td>The Google Gemini API key can be entered here for external analysis of AI training results for consumption forecasts.                                        </td></tr>
+            <tr><td> <b>geminiAPIkey</b>      </td><td>To perform an external analysis of the consumption forecast AI training results, you can enter the Google Gemini API key and model version here.             </td></tr>
             <tr><td>                          </td><td>The API key can be generated for free at aistudio.google.com->‘Get API key’.                                                                                 </td></tr>
+            <tr><td>                          </td><td>Syntax: <b> &lt;API-Key&gt;:&lt;Gemini-Model&gt; </b>, default Gemini-Model: gemini-2.5-flash                                                                </td></tr>
             <tr><td>                          </td><td><b>Transparency Notice:</b> Data transmitted to Gemini is logged with ctrlDebug=apiCall enabled.                                                             </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
        </table>
@@ -42058,7 +42148,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       <ul>
          <table>
          <colgroup> <col width="20%"> <col width="80%"> </colgroup>
-            <tr><td> <b>aiData</b>             </td><td>Mit den nachfolgenden Argumenten können KI-Rohdaten selektiv oder komplett entfernt werden:                                                                     </td></tr>
+            <tr><td> <b>aiData</b>             </td><td>Mit den nachfolgenden Argumenten können KI-Rohdaten manipuliert werden:                                                                                         </td></tr>
             <tr><td>                           </td><td><b>delDataAll</b> - löscht die KI Instanz inklusive aller Trainings- und Rohdaten sowie Daten auf Fileebene und initialisiert sie neu                           </td></tr>
             <tr><td>                           </td><td><b>delIndex=&lt;Index&gt;,&lt;Index&gt;,...</b> - löscht einen oder mehrere Datensätze mit dem Index. Der Index kann als Regex angegeben sein.                  </td></tr>
             <tr><td>                           </td><td>Sind im Argument Leerzeichen vorhanden, ist das gesamte Argument in Hochkomma einzuschließen.                                                                   </td></tr>
@@ -42067,6 +42157,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td>Beispiele: <b>1.)</b> searchValue=con==9786  <b>2.)</b> searchValue=con>=14578  <b>3.)</b> searchValue=temp<=-5                                                 </td></tr>
             <tr><td>                           </td><td><b>delValue</b> - löscht den Zahlenwert im angegebenen Schlüssel. Mögliche Vergleichsoperatoren sind: > | >= | == | <= | <  (Löschbestätigung im Logfile)       </td></tr>
             <tr><td>                           </td><td>Beispiele: <b>1.)</b> delValue=con==9786  <b>2.)</b> delValue=con>=14578  <b>3.)</b> delValue=temp<=-5                                                          </td></tr>
+            <tr><td>                           </td><td><b>setValue</b> - setzt bzw. ändert den Wert im angegebenen Schlüssel eines Datensatzes Index. (Bestätigung der Operation erfolgt im Logfile)                   </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> setValue Index=2026071416 key=presence value=0 <b>2.)</b> setValue Index=2026071418 key=pvrl value=1722                                   </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                                                  </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
@@ -42141,7 +42233,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
     <ul>
       <a id="SolarForecast-set-vrmCredentials"></a>
-      <li><b>vrmCredentials user=&lt;Benutzer&gt; pwd=&lt;Paßwort&gt; idsite=&lt;idSite&gt; </b> <br>
+      <li><b>vrmCredentials user=&lt;Benutzer&gt; idsite=&lt;idSite&gt; pwd=&lt;Paßwort&gt; | token=&lt;API-Token&gt; </b> <br>
       (nur bei Verwendung Model VictronKiAPI) <br><br>
 
        Wird die Victron VRM API genutzt, sind mit diesem set-Befehl die benötigten Zugangsdaten zu hinterlegen. <br><br>
@@ -42150,23 +42242,34 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <table>
          <colgroup> <col width="10%"> <col width="90%"> </colgroup>
             <tr><td> <b>user</b>   </td><td>Benutzername für das Victron VRM Portal                                           </td></tr>
-            <tr><td> <b>pwd</b>    </td><td>Paßwort für den Zugang zum Victron VRM Portal                                     </td></tr>
             <tr><td> <b>idsite</b> </td><td>idSite ist der Bezeichner "XXXXXX" in der Victron VRM Portal Dashboard URL.       </td></tr>
             <tr><td>               </td><td>URL des Victron VRM Dashboard ist:                                                </td></tr>
             <tr><td>               </td><td>https://vrm.victronenergy.com/installation/<b>XXXXXX</b>/dashboard                </td></tr>
+         </table>
+      </ul>
+
+      In den Credentials entweder Paßwort (abgekündigtes Verfahren) <b>oder</b> API-Zugriffstoken setzen:
+
+      <ul>
+         <table>
+         <colgroup> <col width="10%"> <col width="90%"> </colgroup>
+			<tr><td> <b>pwd</b>    </td><td>Paßwort für den Zugang zum Victron VRM Portal                                     </td></tr>
+			<tr><td> <b>token</b>  </td><td>API-Zugriffstoken                                                                 </td></tr>
+			<tr><td>               </td><td>Das API-Token im Victron VRM Portal unter Präferenzen->Integrationen anlegen.     </td></tr>
          </table>
       </ul>
       <br>
 
       Um die gespeicherten Credentials zu löschen, ist dem Kommando nur das Argument <b>delete</b> zu übergeben. <br><br>
 
-       <ul>
-        <b>Beispiele: </b> <br>
-        set &lt;name&gt; vrmCredentials user=john@example.com pwd=somepassword idsite=212008 <br>
-        set &lt;name&gt; vrmCredentials delete <br>
-       </ul>
+      <ul>
+       <b>Beispiele: </b> <br>
+       set &lt;name&gt; vrmCredentials user=john@example.com idsite=212008 pwd=somepassword <br>
+	   set &lt;name&gt; vrmCredentials user=john@example.com idsite=212008 token=addd5....b3e72e15e0 <br>
+       set &lt;name&gt; vrmCredentials delete <br>
+      </ul>
 
-      </li>
+    </li>
     </ul>
     <br>
 
@@ -42864,8 +42967,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                          </td><td>Mit dem Standardwert '0' werden alle verfügbaren Datensätze verwendet.                                                                                       </td></tr>
             <tr><td>                          </td><td>Werte:<b> 0 oder Ganzzahl >= 2000 </b>, default: 0                                                                                                           </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
-            <tr><td> <b>geminiAPIkey</b>      </td><td>Für die externe Analyse der Verbrauchsprognose KI Trainingsergebnisse kann hier der Google Gemini API-Schlüssel hinterlegt werden.                           </td></tr>
+            <tr><td> <b>geminiAPIkey</b>      </td><td>Für die externe Analyse der Verbrauchsprognose KI Trainingsergebnisse kann hier der Google Gemini API-Schlüssel und Modelversion hinterlegt werden.          </td></tr>
             <tr><td>                          </td><td>Der API-Schlüssel kann kostenlos unter aistudio.google.com->'Get API key' generiert werden.                                                                  </td></tr>
+            <tr><td>                          </td><td>Syntax: <b> &lt;API-Key&gt;:&lt;Gemini-Model&gt; </b>, default Gemini-Model: gemini-2.5-flash                                                                </td></tr>
             <tr><td>                          </td><td><b>Transparenzhinweis:</b> Die an Gemini übertragenen Daten werden mit ativierten ctrlDebug=apiCall im Log ausgegeben.                                       </td></tr>
             <tr><td>                          </td><td>                                                                                                                                                             </td></tr>
         </table>
