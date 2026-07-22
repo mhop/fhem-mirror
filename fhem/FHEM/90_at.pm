@@ -35,19 +35,25 @@ at_Initialize($)
 my %at_stt;
 my $at_detailFnCalled;
 
+# 86400, if tomorrow is no DST change. Assuming the change at minute 0.
 sub
-at_SecondsTillTomorrow($)  # 86400, if tomorrow is no DST change
+at_SecondsTillTomorrow($)
 {
   my $t = shift;
   my $dayHour = int($t/3600);
 
-  if(!$at_stt{$dayHour}) {
+  my $ret = $at_stt{$dayHour};
+  if(!$ret) {
     my @l1 = localtime($t);
     my @l2 = localtime($t+86400);
-    $at_stt{$dayHour} = 86400+($l1[8]-$l2[8])*3600;
+    $ret = $at_stt{$dayHour} = 86400+($l1[8]-$l2[8])*3600;
+
+    foreach my $key (keys %at_stt) { #145176
+      delete($at_stt{$key}) if($key < $dayHour-23);
+    }
   }
 
-  return $at_stt{$dayHour};
+  return $ret;
 }
 
 
