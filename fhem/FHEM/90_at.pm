@@ -49,7 +49,7 @@ at_SecondsTillTomorrow($)
     $ret = $at_stt{$dayHour} = 86400+($l1[8]-$l2[8])*3600;
 
     foreach my $key (keys %at_stt) { #145176
-      delete($at_stt{$key}) if($key < $dayHour-23);
+      delete($at_stt{$key}) if($key < $dayHour-25);
     }
   }
 
