@@ -161,9 +161,11 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.2"  => "21.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
+  "2.9.2"  => "23.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
                            "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
-                           "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben, Ergänzung Datensammlung für consumerXX->type heatpump->opmode 'eco' ",
+                           "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
+                           "Ergänzung Datensammlung und Training für consumerXX->type heatpump->opmode 'eco' ".
+                           "vermeide zu wenig Datensätze im Drift-Retrain Prüfungskontext ",
   "2.9.1"  => "16.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ".
                            "neuer Befehl set .. reset aiData setValue ... ".
                            "das Gemini Model kann im Schlüssel aiControl->geminiAPIkey nach dem API-Key angegeben werden ".
@@ -26662,7 +26664,7 @@ sub aiFannConDataLoad {
                          hp_cooling_frac_lag1      => $lags->{hp_cooling_frac_lag1},            # WP Kühlen Anteil Vorstunde
                          hp_pool_frac_lag1         => $lags->{hp_pool_frac_lag1},               # WP Pool Anteil Vorstunde
                          hp_poolheating_frac_lag1  => $lags->{hp_poolheating_frac_lag1},        # WP Poolheizung Anteil Vorstunde
-                         #hp_eco_frac_lag1          => $lags->{hp_eco_frac_lag1},                # WP Eco Anteil Vorstunde
+                         hp_eco_frac_lag1          => $lags->{hp_eco_frac_lag1},                # WP Eco Anteil Vorstunde
                          hp_active_frac_lag1       => $lags->{hp_active_frac_lag1},             # WP Aktivitätsgrad Vorstunde (0..1)
                          
                          cycle_csme_lag1_norm      => $lags->{cycle_csme_lag1_norm},            # Zyklus-Consumer Energiemenge Vorstunde (normiert)
@@ -28116,7 +28118,7 @@ sub aiFannConInfer {
                             hp_cooling_frac_lag1        => $lags->{hp_cooling_frac_lag1},               # WP Kühlen Anteil Vorstunde
                             hp_pool_frac_lag1           => $lags->{hp_pool_frac_lag1},                  # WP Pool Anteil Vorstunde
                             hp_poolheating_frac_lag1    => $lags->{hp_poolheating_frac_lag1},           # WP Poolheizung Anteil Vorstunde
-                            #hp_eco_frac_lag1            => $lags->{hp_eco_frac_lag1},                   # WP Eco Anteil Vorstunde
+                            hp_eco_frac_lag1            => $lags->{hp_eco_frac_lag1},                   # WP Eco Anteil Vorstunde
                             hp_active_frac_lag1         => $lags->{hp_active_frac_lag1},                # WP Aktivitätsgrad Vorstunde (0..1)
                             
                             cycle_csme_lag1_norm        => $lags->{cycle_csme_lag1_norm},               # Zyklus-Consumer Energiemenge Vorstunde (normiert)
@@ -31037,7 +31039,11 @@ sub _aiFannRetrainRecommended {
       return { recommendation => 'none', reason => '-' };
   }
     
-  my @recent      = @{$hist}[-12 .. -1];
+  #my @recent      = @{$hist}[-12 .. -1];
+  my $len    = @$hist;
+  my $start  = $len >= 12 ? $len - 12 : 0;
+  my @recent = @{$hist}[$start .. $len - 1];
+
   my $persist_cnt = grep { /^(moderate|severe)$/ } @recent;
     
   # --- Strukturelle Blocks: Modell ist das Problem
