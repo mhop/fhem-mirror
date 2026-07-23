@@ -163,7 +163,7 @@ BEGIN {
 my %vNotesIntern = (
   "2.9.2"  => "21.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
                            "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
-                           "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ",
+                           "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben, Ergänzung Datensammlung für consumerXX->type heatpump->opmode 'eco' ",
   "2.9.1"  => "16.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ".
                            "neuer Befehl set .. reset aiData setValue ... ".
                            "das Gemini Model kann im Schlüssel aiControl->geminiAPIkey nach dem API-Key angegeben werden ".
@@ -394,7 +394,7 @@ use constant {
   HOMEICONDEF     => 'control_building_control@grey',                               # default Home-Icon
   HPOPMODEDEF     => 'off',                                                         # WP default Operation Mode
   HPDEFMODULATN   => 100,                                                           # WP default Modulation (%)
-  HPOPMODES       => 'off|heating|defrost|hotwater|cooling|pool|poolheating',       # WP mögliche Operating Modes
+  HPOPMODES       => 'off|heating|defrost|hotwater|cooling|pool|poolheating|eco',   # WP mögliche Operating Modes
   
   INFINITE        => ~0 >> 1,                                                       # "Unendlich"
   INPUTSIZE       => 10,                                                            # default Breite eines Textfeldes in graphicHeaderOwnspec
@@ -2350,6 +2350,7 @@ heatpump_opmode => sub {
           $f->{hp_cooling_frac_lag1},                                               # Kühlen Anteil Vorstunde
           $f->{hp_pool_frac_lag1},                                                  # Pool Anteil Vorstunde
           $f->{hp_poolheating_frac_lag1},                                           # Poolheizung Anteil Vorstunde
+          $f->{hp_eco_frac_lag1},                                                   # WP Eco Modus Anteil Vorstunde
       ];
   },
 
@@ -26159,7 +26160,7 @@ sub aiEnterTrain {
   
   if (defined $hash->{HELPER}{$blkkey}) {
       $data{$name}{current}{$fanntyp.'NNTrainstate'} = 'is just retrained';
-      $hash->{HELPER}{$blkkey}{loglevel}             = 3;                                           # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
+      $hash->{HELPER}{$blkkey}{loglevel}             = 3;                                               # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
       
       debugLog ($paref, 'aiProcess', qq{AI FANN Training for $targettyp Forecast BlockingCall PID "$hash->{HELPER}{$blkkey}{pid}" with Timeout } . AINNTRBLTO . " s started");
   }
@@ -26207,7 +26208,7 @@ sub aiFannConDataLoad {
   my (@bev_active_values, @bev_load_values, @bev_n_active_values, @bev_soc_deficit_norm_values);
   my (@bev_energy_remaining_values, @bev_charge_intensity_values);
   my (@hp_heating_frac_values, @hp_defrost_frac_values, @hp_hotwater_frac_values, @hp_cooling_frac_values,  
-      @hp_pool_frac_values,   @hp_poolheating_frac_values, @hp_active_frac_values);
+      @hp_pool_frac_values, @hp_poolheating_frac_values, @hp_eco_frac_values, @hp_active_frac_values);
   my @cycle_csme_values;
   
   # einstellbare Parameter
@@ -26419,6 +26420,7 @@ sub aiFannConDataLoad {
       push @hp_cooling_frac_values,      $hp_sig->{cooling_frac};
       push @hp_pool_frac_values,         $hp_sig->{pool_frac};
       push @hp_poolheating_frac_values,  $hp_sig->{poolheating_frac};
+      push @hp_eco_frac_values,          $hp_sig->{eco_frac};
       push @hp_active_frac_values,       $hp_sig->{active_frac};
    
       push @cycle_csme_values,           $cycle_csme;
@@ -26501,6 +26503,7 @@ sub aiFannConDataLoad {
                                              hp_cooling_frac_series            => \@hp_cooling_frac_values,
                                              hp_pool_frac_series               => \@hp_pool_frac_values,
                                              hp_poolheating_frac_series        => \@hp_poolheating_frac_values,
+                                             hp_eco_frac_series                => \@hp_eco_frac_values,
                                              hp_active_frac_series             => \@hp_active_frac_values, 
                                              
                                              cycle_csme_norm_series            => $cycle_csme_norm,                                             
@@ -26659,6 +26662,7 @@ sub aiFannConDataLoad {
                          hp_cooling_frac_lag1      => $lags->{hp_cooling_frac_lag1},            # WP Kühlen Anteil Vorstunde
                          hp_pool_frac_lag1         => $lags->{hp_pool_frac_lag1},               # WP Pool Anteil Vorstunde
                          hp_poolheating_frac_lag1  => $lags->{hp_poolheating_frac_lag1},        # WP Poolheizung Anteil Vorstunde
+                         #hp_eco_frac_lag1          => $lags->{hp_eco_frac_lag1},                # WP Eco Anteil Vorstunde
                          hp_active_frac_lag1       => $lags->{hp_active_frac_lag1},             # WP Aktivitätsgrad Vorstunde (0..1)
                          
                          cycle_csme_lag1_norm      => $lags->{cycle_csme_lag1_norm},            # Zyklus-Consumer Energiemenge Vorstunde (normiert)
@@ -27796,7 +27800,7 @@ sub aiFannConInfer {
 
   my ($hp_heating_ref, $hp_defrost_ref, $hp_hotwater_ref,
       $hp_cooling_ref, $hp_pool_ref,    $hp_poolheating_ref,
-      $hp_active_ref) =
+      $hp_eco_ref,     $hp_active_ref) =
       _aiFannHpOpmodeHistArray ( { name    => $name,
                                    fanntyp => $fanntyp,
                                    t       => $paref->{t},
@@ -27984,7 +27988,8 @@ sub aiFannConInfer {
                                              hp_cooling_frac_series            => $hp_cooling_ref,
                                              hp_pool_frac_series               => $hp_pool_ref,
                                              hp_poolheating_frac_series        => $hp_poolheating_ref,
-                                             hp_active_frac_series             => $hp_active_ref,      
+                                             hp_active_frac_series             => $hp_active_ref,
+                                             hp_eco_frac_series                => $hp_eco_ref,
 
                                              cycle_csme_norm_series            => \@cycle_csme_norm_hist,                                             
                                            } );      
@@ -28111,6 +28116,7 @@ sub aiFannConInfer {
                             hp_cooling_frac_lag1        => $lags->{hp_cooling_frac_lag1},               # WP Kühlen Anteil Vorstunde
                             hp_pool_frac_lag1           => $lags->{hp_pool_frac_lag1},                  # WP Pool Anteil Vorstunde
                             hp_poolheating_frac_lag1    => $lags->{hp_poolheating_frac_lag1},           # WP Poolheizung Anteil Vorstunde
+                            #hp_eco_frac_lag1            => $lags->{hp_eco_frac_lag1},                   # WP Eco Anteil Vorstunde
                             hp_active_frac_lag1         => $lags->{hp_active_frac_lag1},                # WP Aktivitätsgrad Vorstunde (0..1)
                             
                             cycle_csme_lag1_norm        => $lags->{cycle_csme_lag1_norm},               # Zyklus-Consumer Energiemenge Vorstunde (normiert)
@@ -28206,6 +28212,7 @@ sub aiFannConInfer {
       push @$hp_cooling_ref,     0;
       push @$hp_pool_ref,        0;
       push @$hp_poolheating_ref, 0;
+      push @$hp_eco_ref,         0;
       push @$hp_active_ref,      0; 
 
       
@@ -28697,6 +28704,7 @@ sub _aiFannBuildLagFeatures {
   my $hp_cooling_frac_lag1     = $paref->{hp_cooling_frac_series}[$i-1]     // 0;
   my $hp_pool_frac_lag1        = $paref->{hp_pool_frac_series}[$i-1]        // 0;
   my $hp_poolheating_frac_lag1 = $paref->{hp_poolheating_frac_series}[$i-1] // 0;
+  my $hp_eco_frac_lag1         = $paref->{hp_eco_frac_series}[$i-1]         // 0;
   my $hp_active_frac_lag1      = $paref->{hp_active_frac_series}[$i-1]      // 0;
   
   # -----------------------------------------------------------------------
@@ -28782,7 +28790,8 @@ sub _aiFannBuildLagFeatures {
       hp_hotwater_frac_lag1     => $hp_hotwater_frac_lag1,    
       hp_cooling_frac_lag1      => $hp_cooling_frac_lag1,     
       hp_pool_frac_lag1         => $hp_pool_frac_lag1,        
-      hp_poolheating_frac_lag1  => $hp_poolheating_frac_lag1, 
+      hp_poolheating_frac_lag1  => $hp_poolheating_frac_lag1,
+      hp_eco_frac_lag1          => $hp_eco_frac_lag1,      
       hp_active_frac_lag1       => $hp_active_frac_lag1,
 
       cycle_csme_lag1_norm      => $cycle_csme_lag1_norm,  
@@ -30122,9 +30131,9 @@ sub _aiFannHpOpmodeHistArray {
   my $limit   = $paref->{limit} // 200;
   my $fanntyp = $paref->{fanntyp};
 
-  my (@heating, @defrost, @hotwater, @cooling, @pool, @poolheating, @active);
+  my (@heating, @defrost, @hotwater, @cooling, @pool, @poolheating, @eco, @active);
 
-  return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active)
+  return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active)
       unless exists $data{$name}{pvhist};
 
   # --- Cache-Objekt initialisieren ---
@@ -30171,6 +30180,7 @@ sub _aiFannHpOpmodeHistArray {
           push @pool,        $hp_sig->{pool_frac};
           push @poolheating, $hp_sig->{poolheating_frac};
           push @active,      $hp_sig->{active_frac};
+          push @eco,         $hp_sig->{eco_frac};
       }
   }
 
@@ -30184,10 +30194,11 @@ sub _aiFannHpOpmodeHistArray {
   @pool        = @pool       [-$min .. -1];
   @poolheating = @poolheating[-$min .. -1];
   @active      = @active     [-$min .. -1];
+  @eco         = @eco        [-$min .. -1];
 
-  LRU_insert ($name, $cache, $key, [ \@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active ]);
+  LRU_insert ($name, $cache, $key, [ \@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active ]);
 
-return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active);
+return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active);
 }
 
 ################################################################
@@ -40210,7 +40221,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmode</b>         </td><td>defines a &lt;Device&gt;:&lt;Reading&gt; combination that provides the current operating mode (Required Information).                              </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
-            <tr><td>                       </td><td>The return value must be exactly one of the following: <b>off heating defrost hotwater cooling pool poolheating </b>                               </td></tr>
+            <tr><td>                       </td><td>The return value must be exactly one of the following: <b>off heating defrost hotwater cooling pool poolheating eco</b>                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmodeIcons</b>    </td><td>Each possible operating mode (opmode) can be assigned a unique icon and color. The entries are specified as a comma-separated list.                </td></tr>
             <tr><td>                       </td><td>Syntax: <b> &lt;opmode&gt;->&lt;Icon&gt;[@&lt;Color&gt;],&lt;opmode&gt;->&lt;Icon&gt;[@&lt;Color&gt;],... </b>                                     </td></tr>
@@ -43345,7 +43356,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmode</b>         </td><td>definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche den aktuellen Betriebsmodus liefert (Pflichtangabe).                              </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
-            <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating </b>                          </td></tr>
+            <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating eco</b>                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmodeIcons</b>    </td><td>Jedem möglichen Betriebsmodus (opmode) kann ein inividuelles Icon und Farbe zugewiesen werden. Die Eingabe erfolgt als Komma getrennte Liste.      </td></tr>
             <tr><td>                       </td><td>Syntax: <b> &lt;opmode&gt;->&lt;Icon&gt;[@&lt;Farbe&gt;],&lt;opmode&gt;->&lt;Icon&gt;[@&lt;Farbe&gt;],... </b>                                     </td></tr>
