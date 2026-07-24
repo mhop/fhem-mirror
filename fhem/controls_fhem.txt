@@ -1,4 +1,4 @@
-REV 31504
+REV 31509
 DIR unused
 UPD 2026-07-20_07:45:03 458750 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -460,7 +460,7 @@ UPD 2016-01-05_07:45:12 44169 FHEM/89_HEATRONIC.pm
 UPD 2019-05-27_07:45:02 53160 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
 UPD 2026-07-06_07:45:03 15628 FHEM/90_SIGNALduino_un.pm
-UPD 2026-07-23_07:45:03 28410 FHEM/90_at.pm
+UPD 2026-07-24_07:45:03 28410 FHEM/90_at.pm
 UPD 2021-01-05_07:45:03 7422 FHEM/91_eventTypes.pm
 UPD 2025-09-04_07:45:03 30145 FHEM/91_notify.pm
 UPD 2023-07-15_07:45:03 11892 FHEM/91_sequence.pm
@@ -773,8 +773,8 @@ UPD 2026-07-20_07:45:11 5581261 docs/commandref.html
 UPD 2026-07-20_07:45:15 3557340 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-07-23_07:45:17 331688 docs/commandref_modular.html
-UPD 2026-07-23_07:45:18 343488 docs/commandref_modular_DE.html
+UPD 2026-07-24_07:45:16 331688 docs/commandref_modular.html
+UPD 2026-07-24_07:45:17 343488 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2342,6 +2342,8 @@ UPD 2015-07-28_14:05:33 1756 www/images/openautomation/scene_night.svg
 UPD 2015-07-28_14:05:33 2621 www/images/openautomation/scene_office.svg
 UPD 2015-07-28_14:05:33 1732 www/images/openautomation/scene_party.svg
 UPD 2015-07-28_14:05:33 2995 www/images/openautomation/scene_pool.svg
+UPD 2026-07-24_07:45:03 3903 www/images/openautomation/scene_power_grid_crossed.svg
+UPD 2026-07-24_07:45:03 3892 www/images/openautomation/scene_power_grid_crossed_red.svg
 UPD 2015-07-28_14:05:33 3865 www/images/openautomation/scene_robo_lawnmower.svg
 UPD 2015-07-28_14:05:33 2685 www/images/openautomation/scene_sauna.svg
 UPD 2015-07-28_14:05:33 2688 www/images/openautomation/scene_scene.svg
