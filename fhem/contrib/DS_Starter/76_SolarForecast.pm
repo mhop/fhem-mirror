@@ -67,97 +67,6 @@ use Blocking;
 use Storable qw(dclone freeze thaw nstore retrieve);
 use MIME::Base64;
 
-# Run before module compilation
-BEGIN {
-  # Import from main::
-  GP_Import(
-      qw (attr
-          asyncOutput
-          AnalyzePerlCommand
-          AnalyzeCommandChain
-          AttrVal
-          AttrNum
-          BlockingCall
-          BlockingKill
-          CommandAttr
-          CommandGet
-          CommandSet
-          CommandSetReading
-          data
-          defs
-          delFromDevAttrList
-          delFromAttrList
-          devspec2array
-          deviceEvents
-          DoTrigger
-          Debug
-          fhemTimeLocal
-          fhemTimeGm
-          fhem
-          FileWrite
-          FileRead
-          FileDelete
-          FmtTime
-          FmtDateTime
-          FW_makeImage
-          getKeyValue
-          getAllAttr
-          getAllGets
-          getAllSets
-          HttpUtils_NonblockingGet
-          HttpUtils_BlockingGet
-          GetFileFromURL
-          GetHttpFile
-          init_done
-          InternalTimer
-          InternalVal
-          IsDisabled
-          Log
-          Log3
-          modules
-          parseParams
-          perlSyntaxCheck
-          readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsBeginUpdate
-          readingsDelete
-          readingsEndUpdate
-          ReadingsNum
-          ReadingsTimestamp
-          ReadingsVal
-          RemoveInternalTimer
-          ReplaceEventMap
-          readingFnAttributes
-          setKeyValue
-          sunrise_abs_dat
-          sunset_abs_dat
-          FW_cmd
-          FW_directNotify
-          FW_pH
-          FW_room
-          FW_detail
-          FW_widgetOverride
-          FW_wname
-          readyfnlist
-         )
-  );
-
-  # Export to main context with different name
-  #     my $pkg  = caller(0);
-  #     my $main = $pkg;
-  #     $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
-  #     foreach (@_) {
-  #         *{ $main . $_ } = *{ $pkg . '::' . $_ };
-  #     }
-  GP_Export(
-      qw(
-          Initialize
-          pageAsHtml
-          NexthoursVal
-        )
-  );
-}
 
 # Versions History intern
 my %vNotesIntern = (
@@ -296,14 +205,105 @@ my %vNotesIntern = (
 );
 
 
-# Locale-abhängige Kurz-Wochentage erzeugen (Mo, Tue, lun., …)
+# --- Block vor Modul-Kompilierung ausführen
+##############################################
 my @LOCALE_DAYNAMES;
 
-my $sunday_epoch = 3 * 86400;  # 259200                                             # 1970-01-04 00:00:00 UTC war ein Sonntag -> wday = 0
+BEGIN {
+  GP_Import(                                                            # Import from main::
+      qw (attr
+          asyncOutput
+          AnalyzePerlCommand
+          AnalyzeCommandChain
+          AttrVal
+          AttrNum
+          BlockingCall
+          BlockingKill
+          CommandAttr
+          CommandGet
+          CommandSet
+          CommandSetReading
+          data
+          defs
+          delFromDevAttrList
+          delFromAttrList
+          devspec2array
+          deviceEvents
+          DoTrigger
+          Debug
+          fhemTimeLocal
+          fhemTimeGm
+          fhem
+          FileWrite
+          FileRead
+          FileDelete
+          FmtTime
+          FmtDateTime
+          FW_makeImage
+          getKeyValue
+          getAllAttr
+          getAllGets
+          getAllSets
+          HttpUtils_NonblockingGet
+          HttpUtils_BlockingGet
+          GetFileFromURL
+          GetHttpFile
+          init_done
+          InternalTimer
+          InternalVal
+          IsDisabled
+          Log
+          Log3
+          modules
+          parseParams
+          perlSyntaxCheck
+          readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsDelete
+          readingsEndUpdate
+          ReadingsNum
+          ReadingsTimestamp
+          ReadingsVal
+          RemoveInternalTimer
+          ReplaceEventMap
+          readingFnAttributes
+          setKeyValue
+          sunrise_abs_dat
+          sunset_abs_dat
+          FW_cmd
+          FW_directNotify
+          FW_pH
+          FW_room
+          FW_detail
+          FW_widgetOverride
+          FW_wname
+          readyfnlist
+         )
+  );
 
-for my $wday (0..6) {
-    my $epoch = $sunday_epoch + $wday * 86400;
-    push @LOCALE_DAYNAMES, POSIX::strftime("%a", localtime($epoch));
+  # Export to main context with different name
+  #     my $pkg  = caller(0);
+  #     my $main = $pkg;
+  #     $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+  #     foreach (@_) {
+  #         *{ $main . $_ } = *{ $pkg . '::' . $_ };
+  #     }
+  GP_Export(
+      qw (Initialize
+          pageAsHtml
+          NexthoursVal
+         )
+  );
+  
+  # Locale-abhängige Kurz-Wochentage erzeugen (Mo, Tue, lun., …)
+  my $sunday_epoch = 3 * 86400;  # 259200                                             # 1970-01-04 00:00:00 UTC war ein Sonntag -> wday = 0
+
+  for my $wday (0..6) {
+      my $epoch = $sunday_epoch + $wday * 86400;
+      push @LOCALE_DAYNAMES, POSIX::strftime("%a", localtime($epoch));
+  }
 }
 
 ## Konstanten    
@@ -12096,7 +12096,8 @@ sub _initfirstSync {
           }
 
           $initfirstMap{$key}{set}->($name, $val);
-          Log3 ($name, 3, qq{$name - set init data $key=$val before load over data});
+          
+          Log3 ($name, 3, qq{$name - set initial $key=$val before load other data});
       }
       
       return;
