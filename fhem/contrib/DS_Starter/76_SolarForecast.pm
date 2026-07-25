@@ -161,11 +161,14 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.2"  => "23.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
+  "2.9.2"  => "25.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
                            "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
                            "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
                            "Ergänzung Datensammlung und Training für consumerXX->type heatpump->opmode 'eco' ".
-                           "vermeide zu wenig Datensätze im Drift-Retrain Prüfungskontext ",
+                           "vermeide zu wenig Datensätze im Drift-Retrain Prüfungskontext ".
+                           "Änderung plantControl->writeForceType: 'file' ist Standardspeicher, 'auto' ist deprecated, verwende 'db' anstatt (incl. BugFix FileRead) ".
+                           "Integration initialen Cache-Load 'initfirst' um vor dem Laden weiterer Daten Voreinstellungen festzulegen ".
+                           "Intern: writeCacheToFile nach writeCacheFile umbenannt ",
   "2.9.1"  => "16.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ".
                            "neuer Befehl set .. reset aiData setValue ... ".
                            "das Gemini Model kann im Schlüssel aiControl->geminiAPIkey nach dem API-Key angegeben werden ".
@@ -255,7 +258,7 @@ my %vNotesIntern = (
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannConDataLoad: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
-                           "extended/refactored: writeCacheToFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
+                           "extended/refactored: writeCacheFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
                            "new key graphicControl->headerShowEnv, _saveEnergyConsumption: implemntation of MAXCONLIMIT ".
                            "new key plantControl->conEnergyHourLimit ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
@@ -440,6 +443,7 @@ use constant {
   
   PI              => 3.141592653589793,                                             # die Konstante π
   PERCCONINSOC    => 0.75,                                                          # Batterie SoC-Management: Anteilsfaktor für Verbrauch
+  PERSISTDEST     => 'file',                                                        # Standard Ziel für Datenpersistenz ist das Dateisystem
   PRDEF           => 0.9,                                                           # default Performance Ratio (PR)
   PRDCRROWSHIFT   => 100,                                                           # Flußgrafik: Verschiebung bei Anzeige Producer/Inverter-Zeile
   PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
@@ -490,6 +494,7 @@ my %MCache_Stats;                                                               
 my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
 my $root           = $attr{global}{modpath};                                        # Pfad zu dem Verzeichnis der FHEM Module
 my $cachedir       = $root."/FHEM/FhemUtils";                                       # Directory für Cachefiles
+my $initcache      = $root."/FHEM/FhemUtils/Init_SolarForecast_";                   # Filename-Fragment für Initialisierung (wird mit Devicename ergänzt), muß vor allen anderen Files geladen werden!
 my $pvhcache       = $root."/FHEM/FhemUtils/PVH_SolarForecast_";                    # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache       = $root."/FHEM/FhemUtils/PVC_SolarForecast_";                    # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 my $plantcfg       = $root."/FHEM/FhemUtils/PVCfg_SolarForecast_";                  # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
@@ -1433,6 +1438,30 @@ my %htitles = (                                                                 
                 DE => qq{kein Abregelungsstatus verf&uuml;gbar\nSetzen sie bitte den Schl&uuml;ssel 'reductionState' mit 'attr <NAME> plantControl'}                                    },
 );
 
+# -----------------------------------------------------------------------------------------------------------------
+# Zentrale Zuordnung: welcher Key liegt wo in %data und wie wird er
+# gelesen (get) bzw. zurückgeschrieben (set).
+# Hier alle Keys eintragen, die im 'initfirst' Cache landen sollen -
+# unabhängig davon aus welchem Datenbereich (current, circular, ...)
+# sie stammen.
+# -----------------------------------------------------------------------------------------------------------------
+my %initfirstMap = (
+  writeForceType => {
+      get => sub { my $name = shift;      return CurrentVal ($name, 'writeForceType', undef); },
+      set => sub { my ($name, $val) = @_; $data{$name}{current}{writeForceType} = $val;       },
+  },
+
+  # Beispiel für einen Wert aus 'circular' (Index 99):
+  # someCircKey => {
+  #     get => sub { my $name = shift; return CircularVal ($name, 99, 'someCircKey', undef); },
+  #     set => sub { my ($name, $val) = @_; $data{$name}{circular}{99}{someCircKey} = $val;  },
+  # },
+
+  # beliebig erweiterbar
+);
+
+
+# -----------------------------------------------------------------------------------------------------------------
 # Wetterintertretation
 # https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/01_num_vorhersagemodelle/01c_wetterinterpretation/wetter_interpretation.pdf?__blob=publicationFile&v=7
 #
@@ -1450,7 +1479,7 @@ my %htitles = (                                                                 
 # ww = 01 leicht bewölkt
 # ww = 02 wolkig
 # ww = 03 stark bewölkt bis bedeckt
-#################################################
+# -----------------------------------------------------------------------------------------------------------------
 my %weather_ids = (
   '0'   => { s => '0', icon => 'weather_sun',                       txtd => 'wolkenloser Himmel',                                                       txte => 'cloudless sky'                                                              },
   '1'   => { s => '0', icon => 'weather_cloudy_light',              txtd => 'leicht bewölkt',                                                           txte => 'slightly cloudy'                                                            },
@@ -2561,6 +2590,7 @@ sandbox => sub {
 # Information zu verwendeten internen Datenhashes
 ####################################################
 # Daten die nach einem Restart mit reloadCacheFiles nachgeladen werden müssen:
+# $data{$name}{initfirst}                                                     # erste Initialisierungen bevor weitere Loads erfolgen (auch vor Attr)
 # $data{$name}{pvhist}                                                        # historische Werte
 # $data{$name}{weatherapi}                                                    # Zwischenspeicher API-Wetterdaten
 # $data{$name}{solcastapi}                                                    # Zwischenspeicher API-Solardaten
@@ -2947,8 +2977,8 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
   $paref->{consumer} = $c;
   $paref->{ps}       = 'planned:';
-  $paref->{startts}  = $startts;                                                               # Unix Timestamp für geplanten Switch on
-  $paref->{stopts}   = $stopts;                                                                # Unix Timestamp für geplanten Switch off
+  $paref->{startts}  = $startts;                                                                # Unix Timestamp für geplanten Switch on
+  $paref->{stopts}   = $stopts;                                                                 # Unix Timestamp für geplanten Switch off
 
   ___setConsumerPlanningState ($paref);
   ___saveEhodpieces           ($paref);
@@ -2957,7 +2987,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $planstate = ConsumerVal ($name, $c, 'planstate', '');
   my $calias    = ConsumerVal ($name, $c, 'alias',     '');
 
-  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                      # Cache File Consumer schreiben
+  writeCacheFile ($hash, 'consumers', $csmcache.$name);                                         # Cache File Consumer schreiben
 
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
 
@@ -2981,7 +3011,7 @@ sub _setconsumerNewPlanning {            ## no critic "not used"
 
   if ($c) {
       deleteConsumerPlanning ($hash, $c);
-      writeCacheToFile       ($hash, 'consumers', $csmcache.$name);                            # Cache File Consumer schreiben
+      writeCacheFile         ($hash, 'consumers', $csmcache.$name);                            # Cache File Consumer schreiben
   }
 
   centralTask ($hash, $evt);
@@ -3123,7 +3153,7 @@ sub _setroofIdentPair {                 ## no critic "not used"
   $data{$name}{statusapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
   $data{$name}{statusapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
 
-  writeCacheToFile ($hash, 'statusapi', $statcache.$name);                               # Status-API Cache sichern
+  writeCacheFile ($hash, 'statusapi', $statcache.$name);                                # Status-API Cache sichern
 
   my $msg = qq{The Roof identification pair "$pk" has been saved. }.
             qq{Repeat the command if you want to save more Roof identification pairs.};
@@ -3171,7 +3201,7 @@ sub _setVictronCredentials {                 ## no critic "not used"
       $msg = qq{Credentials for the Victron VRM API has been saved.};
   }
 
-  writeCacheToFile ($hash, 'statusapi', $statcache.$name);                               # Status-API Cache sichern
+  writeCacheFile ($hash, 'statusapi', $statcache.$name);                                # Status-API Cache sichern
 
 return $msg;
 }
@@ -3231,7 +3261,7 @@ sub _setTrigger {                        ## no critic "not used"
       readingsSingleUpdate ($hash, 'energyH4Trigger', $arg, 1);
   }
 
-  writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration File schreiben
+  writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                               # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -3258,7 +3288,7 @@ sub _setplantConfiguration {             ## no critic "not used"
   }
 
   if ($arg eq "save") {
-      ($err, $nr, $na) = writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);             # Anlagenkonfiguration fileStore schreiben
+      ($err, $nr, $na) = writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                # Anlagenkonfiguration fileStore schreiben
 
       if ($err) {
           return $err;
@@ -3359,7 +3389,7 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
       }
   }
 
-  writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                    # Anlagenkonfiguration sichern
+  writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                       # Anlagenkonfiguration sichern
 
 return;
 }
@@ -3512,21 +3542,21 @@ sub _setreset {                          ## no critic "not used"
 
   if ($args[0] eq 'powerTriggerSet') {
       deleteReadingspec ($hash, "powerTrigger.*");
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration File schreiben
+      writeCacheFile  ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
       Log3 ($name, 1, qq{$name - data of 'powerTrigger' were deleted});
       return;
   }
 
   if ($args[0] eq 'batteryTriggerSet') {
       deleteReadingspec ($hash, "batteryTrigger.*");
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);
+      writeCacheFile  ($hash, "plantconfig", $plantcfg.$name);
       Log3 ($name, 1, qq{$name - data of 'batteryTrigger' were deleted});
       return;
   }
 
   if ($args[0] eq 'energyH4TriggerSet') {
       deleteReadingspec ($hash, "energyH4Trigger.*");
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);
+      writeCacheFile  ($hash, "plantconfig", $plantcfg.$name);
       Log3 ($name, 1, qq{$name - data of 'energyH4Trigger' were deleted});
       return;
   }
@@ -3545,7 +3575,7 @@ sub _setreset {                          ## no critic "not used"
           Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
       }
 
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                      # Cache File SolCast API Werte schreiben
+      writeCacheFile ($hash, 'solcastapi', $scpicache.$name);                       # Cache File SolCast API Werte schreiben
       return;
   }
 
@@ -3561,27 +3591,27 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                        # Cache File Consumer schreiben
+      writeCacheFile ($hash, 'consumers', $csmcache.$name);                         # Cache File Consumer schreiben
   }
 
-  if ($args[0] eq 'consumerMaster') {                                                # Verbraucherhash löschen
-      my $c = $args[1] // '';                                                        # bestimmten Verbraucher setzen falls angegeben
+  if ($args[0] eq 'consumerMaster') {                                               # Verbraucherhash löschen
+      my $c = $args[1] // '';                                                       # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
           $paref->{c} = $c;
-          delConsumerFromMem ($paref);                                               # spezifischen Consumer aus Speichern löschen
+          delConsumerFromMem ($paref);                                              # spezifischen Consumer aus Speichern löschen
       }
       else {
           for my $c (keys %{$data{$name}{consumers}}) {
               $paref->{c} = $c;
-              delConsumerFromMem ($paref);                                           # alle Consumer aus Speichern löschen
+              delConsumerFromMem ($paref);                                          # alle Consumer aus Speichern löschen
           }
       }
 
       delete $paref->{c};
-      $data{$name}{current}{consumerCollected} = 0;                                  # Consumer neu sammeln
+      $data{$name}{current}{consumerCollected} = 0;                                 # Consumer neu sammeln
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                        # Cache File Consumer schreiben
+      writeCacheFile ($hash, 'consumers', $csmcache.$name);                         # Cache File Consumer schreiben
       centralTask      ($hash, 0);
   }
 
@@ -3722,7 +3752,7 @@ sub __resetAiData {
   }
   
   if ($dosave) {
-      my $err = writeCacheToFile ($defs{$name}, 'airaw', $airaw.$name);
+      my $err = writeCacheFile ($defs{$name}, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
@@ -6154,7 +6184,7 @@ sub __openMeteo_ApiResponse {
   }
 
   if ($nghi) {
-      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+      $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
@@ -6800,7 +6830,7 @@ sub __generateCatOut {
 
       push @data, '</gpx>';
 
-      my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+      my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
       
       $err = FileWrite ( { FileName  => $dwdcatgpx,
                            ForceType => $forceType,
@@ -6961,12 +6991,12 @@ sub __dwdStatCatalog_Response {
           $tail    = trim   (substr ($tail, 0, $ri));
 
           $ri      = rindex ($tail, " ");
-          my $lat  = substr ($tail, $ri + 1);                                                # Latitude
+          my $lat  = substr ($tail, $ri + 1);                                               # Latitude
           $tail    = trim   (substr ($tail, 0, $ri));
 
-          my ($icao, $stnam) = split " ", $tail, 2;                                          # ICAO = International Civil Aviation Organization, Stationsname
+          my ($icao, $stnam) = split " ", $tail, 2;                                         # ICAO = International Civil Aviation Organization, Stationsname
 
-          my ($latg, $latm) = split /\./, $lat;                                              # in Grad und Minuten splitten
+          my ($latg, $latm) = split /\./, $lat;                                             # in Grad und Minuten splitten
           my ($long, $lonm) = split /\./, $lon;
           my $latdec        = round2 ($latg + ($latm / 60));
           my $londec        = round2 ($long + ($lonm / 60));
@@ -6975,13 +7005,13 @@ sub __dwdStatCatalog_Response {
           $data{$name}{dwdcatalog}{$id}{stnam}  = $stnam;
           $data{$name}{dwdcatalog}{$id}{icao}   = $icao;
           $data{$name}{dwdcatalog}{$id}{lat}    = $lat;
-          $data{$name}{dwdcatalog}{$id}{latdec} = $latdec;                                # Latitude Dezimalgrad
+          $data{$name}{dwdcatalog}{$id}{latdec} = $latdec;                                  # Latitude Dezimalgrad
           $data{$name}{dwdcatalog}{$id}{lon}    = $lon;
-          $data{$name}{dwdcatalog}{$id}{londec} = $londec;                                # Longitude Dezimalgrad
+          $data{$name}{dwdcatalog}{$id}{londec} = $londec;                                  # Longitude Dezimalgrad
           $data{$name}{dwdcatalog}{$id}{elev}   = $elev;
       }
 
-      $err = writeCacheToFile ($hash, 'dwdcatalog', $dwdcatalog);                            # DWD Stationskatalog speichern
+      $err = writeCacheFile ($hash, 'dwdcatalog', $dwdcatalog);                             # DWD Stationskatalog speichern
 
       if (!$err) {
           debugLog ($paref, 'dwdComm', qq{DWD catalog saved into file: }.$dwdcatalog);
@@ -8895,15 +8925,15 @@ sub _attrconsumer {                      ## no critic "not used"
       my ($c) = $aName =~ /consumer([0-9]+)/xs;
 
       $paref->{c} = $c;
-      delConsumerFromMem ($paref);                                                                 # Consumerdaten aus Speicher löschen
+      delConsumerFromMem ($paref);                                                                  # Consumerdaten aus Speicher löschen
       delete $paref->{c};
 
       deleteReadingspec ($hash, "consumer${c}.*");
   }
 
-  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                          # Cache File Consumer schreiben
+  writeCacheFile ($hash, 'consumers', $csmcache.$name);                                             # Cache File Consumer schreiben
 
-  $data{$name}{current}{consumerCollected} = 0;                                                    # Consumerdefinitionen neu sammeln
+  $data{$name}{current}{consumerCollected} = 0;                                                     # Consumerdefinitionen neu sammeln
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
@@ -9439,7 +9469,7 @@ sub _attrplantControl {                  ## no critic "not used"
       consForecastBase          => { comp => $cforegex,                                           act => 1 },
       showLink                  => { comp => '(0|1)',                                             act => 0 },
       comforttemp               => { comp => '.*',                                                act => 1 },
-      writeForceType            => { comp => '(auto|file)',                                       act => 0 },
+      writeForceType            => { comp => '(auto|db|file)',                                    act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -9469,6 +9499,13 @@ sub _attrplantControl {                  ## no critic "not used"
       }
 
       for my $key (keys %{$h}) {
+          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+          ########################################################################################################################
+          if ($key eq 'writeForceType' && $h->{$key} eq 'auto') {            # 25.07.
+              $h->{$key} = 'db';
+          }
+          ########################################################################################################################
+          
           $data{$name}{current}{$key} = $h->{$key};
       }
   }
@@ -9554,7 +9591,7 @@ sub _attrEnvironment {                   ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9648,7 +9685,7 @@ sub _attrMeterDev {                      ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9706,7 +9743,7 @@ sub _attrProducerDev {                   ## no critic "not used"
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9849,7 +9886,7 @@ sub _attrInverterDev {                   ## no critic "not used"
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9885,7 +9922,7 @@ sub _attrInverterStrings {               ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9935,7 +9972,7 @@ sub _attrStringPeak {                    ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9988,7 +10025,7 @@ sub _attrstringAzimuth {                  ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10036,7 +10073,7 @@ sub _attrstringDeclination {             ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10083,7 +10120,7 @@ sub _attrRoofTops {                      ## no critic "not used"
       }
   }
 
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10209,7 +10246,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10412,7 +10449,7 @@ sub _attrRadiationAPI {                  ## no critic "not used"
   InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::__harmonizeAPIdelayed', $hash, 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::setModel',              $hash, 0);                                 # Model setzen
   InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::createAssociatedWith',  $hash, 0);
-  InternalTimer (gettimeofday() + 4, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 4, 'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -11275,13 +11312,14 @@ sub Shutdown {
   
   BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
 
-  writeCacheToFile ($hash, 'pvhist',          $pvhcache.$name, 'nolog');             # Cache File für PV History schreiben
-  writeCacheToFile ($hash, 'circular',        $pvccache.$name, 'nolog');             # Cache File für PV Circular schreiben
-  writeCacheToFile ($hash, 'consumers',       $csmcache.$name, 'nolog');             # Cache File Consumer schreiben
-  writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name, 'nolog');             # Cache File SolCast API Werte schreiben
-  writeCacheToFile ($hash, 'statusapi',      $statcache.$name, 'nolog');             # Status-API Cache sichern
-  writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name, 'nolog');             # Weather-API Cache sichern
-  writeCacheToFile ($hash, 'messages',    $messagecache.$name, 'nolog');             # Nachrichten Cache sichern
+  writeCacheFile ($hash, 'initfirst',      $initcache.$name, 'nolog');              # Cache File für Initialisierung schreiben
+  writeCacheFile ($hash, 'pvhist',          $pvhcache.$name, 'nolog');              # Cache File für PV History schreiben
+  writeCacheFile ($hash, 'circular',        $pvccache.$name, 'nolog');              # Cache File für PV Circular schreiben
+  writeCacheFile ($hash, 'consumers',       $csmcache.$name, 'nolog');              # Cache File Consumer schreiben
+  writeCacheFile ($hash, 'solcastapi',     $scpicache.$name, 'nolog');              # Cache File SolCast API Werte schreiben
+  writeCacheFile ($hash, 'statusapi',      $statcache.$name, 'nolog');              # Status-API Cache sichern
+  writeCacheFile ($hash, 'weatherapi',  $weathercache.$name, 'nolog');              # Weather-API Cache sichern
+  writeCacheFile ($hash, 'messages',    $messagecache.$name, 'nolog');              # Nachrichten Cache sichern
 
 return;
 }
@@ -11353,12 +11391,13 @@ sub periodicWriteMemcache {
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
 
-  writeCacheToFile ($hash, 'circular',        $pvccache.$name);             # Cache File PV Circular schreiben
-  writeCacheToFile ($hash, 'pvhist',          $pvhcache.$name);             # Cache File PV History schreiben
-  writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name);             # Cache File Strahlungsdaten-API Werte schreiben
-  writeCacheToFile ($hash, 'statusapi',      $statcache.$name);             # Status-API Cache sichern
-  writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name);             # Weather-API Cache sichern
-  writeCacheToFile ($hash, 'messages',    $messagecache.$name);             # Nachrichten Cache sichern
+  writeCacheFile ($hash, 'initfirst',      $initcache.$name);               # Cache File für Initialisierung schreiben
+  writeCacheFile ($hash, 'circular',        $pvccache.$name);               # Cache File PV Circular schreiben
+  writeCacheFile ($hash, 'pvhist',          $pvhcache.$name);               # Cache File PV History schreiben
+  writeCacheFile ($hash, 'solcastapi',     $scpicache.$name);               # Cache File Strahlungsdaten-API Werte schreiben
+  writeCacheFile ($hash, 'statusapi',      $statcache.$name);               # Status-API Cache sichern
+  writeCacheFile ($hash, 'weatherapi',  $weathercache.$name);               # Weather-API Cache sichern
+  writeCacheFile ($hash, 'messages',    $messagecache.$name);               # Nachrichten Cache sichern
 
   $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." whole Operating Memory";
 
@@ -11368,11 +11407,11 @@ sub periodicWriteMemcache {
       my $tstr = (timestampToTimestring ($name, time))[2];
       $tstr    =~ s/[-: ]/_/g;
 
-      writeCacheToFile ($hash, 'circular',  $pvccache.$name.'_'.$tstr);        # Cache File PV Circular Sicherung schreiben
-      writeCacheToFile ($hash, 'pvhist',    $pvhcache.$name.'_'.$tstr);        # Cache File PV History Sicherung schreiben
-      writeCacheToFile ($hash, 'neuralnet', $neuralnet.$name.'_'.$tstr);       # NN Consumption Sicherung schreiben
+      writeCacheFile ($hash, 'circular',  $pvccache.$name.'_'.$tstr);           # Cache File PV Circular Sicherung schreiben
+      writeCacheFile ($hash, 'pvhist',    $pvhcache.$name.'_'.$tstr);           # Cache File PV History Sicherung schreiben
+      writeCacheFile ($hash, 'neuralnet', $neuralnet.$name.'_'.$tstr);          # NN Consumption Sicherung schreiben
 
-      deleteOldBckpFiles ($name, 'PVH_SolarForecast_'.$name);                  # alte Backup Files löschen
+      deleteOldBckpFiles ($name, 'PVH_SolarForecast_'.$name);                   # alte Backup Files löschen
       deleteOldBckpFiles ($name, 'PVC_SolarForecast_'.$name);
       deleteOldBckpFiles ($name, 'NeuralNet_SolarForecast_'.$name);
   }
@@ -11480,7 +11519,7 @@ sub delConsumerFromMem {
   }
   
   if ($dosave) {
-      my $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+      my $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
   }
   
   delete $data{$name}{consumers}{$c};                                           # Consumerhash löschen
@@ -11522,7 +11561,15 @@ sub reloadCacheFiles {
   my $name  = $paref->{name};
 
   return if(CurrentVal ($name, 'cachefilesloaded', 0));
+  
+  # --- zuerst immer! Initialisierung einlesen
+  $paref->{file}      = $initcache.$name;                       # Cache File Initialisierung einlesen wenn vorhanden
+  $paref->{cachename} = 'initfirst';
+  $paref->{title}     = 'Initialize';
+  readCacheFile ($paref);
 
+
+  # --- folgende Cache Files
   $paref->{file}      = $pvhcache.$name;                       # Cache File PV History einlesen wenn vorhanden
   $paref->{cachename} = 'pvhist';
   $paref->{title}     = 'pvHistory';
@@ -11593,7 +11640,6 @@ sub readCacheFile {
   my $title     = $paref->{title};
   
   my $hash = $defs{$name};
-  my $lang = getLang ($hash);
 
   if ($cachename eq 'aitrained') {
       my ($err, $objref) = fileRetrieve ($file);
@@ -11727,9 +11773,35 @@ sub readCacheFile {
 
       return ('', $nr, $na);
   }
-  
+  elsif ($cachename eq 'initfirst') {
+      my ($err, @init) = FileRead ( { FileName  => $file,
+                                      ForceType => PERSISTDEST,                         # wird immer! aus dem Filesystem gelesen
+                                    } ); 
 
-  my ($error, @content) = FileRead ($file);
+      if (!$err) {
+          my $ijson      = join "", @init;
+          my ($isuccess) = evaljson ($hash, $ijson);
+
+          if ($isuccess) {
+              $data{$name}{$cachename} = decode_json ($ijson);
+
+              Log3 ($name, 3, qq{$name - cached data "$title" restored});
+
+              _initfirstSync ( { name => $name, cachename => $cachename, direction => 'apply' } );
+          }
+          else {
+              Log3 ($name, 1, qq{$name - WARNING - The content of file "$file" is not readable or may be corrupt});
+          }
+      }        
+      
+      return;
+  }
+  
+  my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
+
+  my ($error, @content) = FileRead ( { FileName  => $file,
+                                       ForceType => $forceType,
+                                     } );
 
   if (!$error) {
       my $json      = join "", @content;
@@ -11750,7 +11822,7 @@ return;
 ################################################################
 #             Daten in File wegschreiben
 ################################################################
-sub writeCacheToFile {
+sub writeCacheFile {
   my $hash      = shift;
   my $cachename = shift;
   my $file      = shift;
@@ -11790,9 +11862,8 @@ sub writeCacheToFile {
       singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
 
       return;
-  }
-  
-  if ($cachename eq 'airaw') {
+  }  
+  elsif ($cachename eq 'airaw') {
       my $dat = AiRawdataVal ($hash, '', '', undef);
 
       if (defined $dat) {
@@ -11811,8 +11882,7 @@ sub writeCacheToFile {
 
       return;
   }
-  
-  if ($cachename eq 'neuralnet') {
+  elsif ($cachename eq 'neuralnet') {
       if (scalar keys %{$data{$name}{neuralnet}}) {
           my $nnref = $data{$name}{neuralnet};
           my %saved_models;
@@ -11869,8 +11939,7 @@ sub writeCacheToFile {
           return "The AI FANN data cache is empty";
       }
   }
-
-  if ($cachename eq 'dwdcatalog') {
+  elsif ($cachename eq 'dwdcatalog') {
       if (scalar keys %{$data{$name}{dwdcatalog}}) {
           $error = fileStore ($data{$name}{dwdcatalog}, $file);
 
@@ -11886,8 +11955,7 @@ sub writeCacheToFile {
 
       return;
   }
-
-  if ($cachename eq 'statusapi') {
+  elsif ($cachename eq 'statusapi') {
       if (scalar keys %{$data{$name}{statusapi}}) {
           $error = fileStore ($data{$name}{statusapi}, $file);
 
@@ -11903,8 +11971,7 @@ sub writeCacheToFile {
 
       return;
   }
-
-  if ($cachename eq 'weatherapi') {
+  elsif ($cachename eq 'weatherapi') {
       if (scalar keys %{$data{$name}{weatherapi}}) {
           $error = fileStore ($data{$name}{weatherapi}, $file);
 
@@ -11920,8 +11987,7 @@ sub writeCacheToFile {
 
       return;
   }
-
-  if ($cachename eq 'plantconfig') {
+  elsif ($cachename eq 'plantconfig') {
       my ($plantcfg, $nr, $na) = _storePlantConfig ($hash);
 
       if (scalar keys %{$plantcfg}) {
@@ -11940,6 +12006,26 @@ sub writeCacheToFile {
 
       return ('', $nr, $na);
   }
+  elsif ($cachename eq 'initfirst') {                                                           # --- Initialisierungswerte (werden beim Load zuerst geladen!)
+      _initfirstSync ( { name => $name, cachename => $cachename, direction => 'collect' } );
+      
+      push my @inits, encode_json ($data{$name}{$cachename});
+      
+      delete $data{$name}{$cachename};                                                          # den Zwischencache löschen
+      
+      $error = FileWrite ( { FileName  => $file,
+                             ForceType => PERSISTDEST,                                          # muß immer! 'file' sein
+                           }, @inits 
+                         );
+
+      if ($error) {
+          $err = qq{ERROR writing cache file "$file": $error};
+          Log3 ($name, 1, "$name - $err");
+          return $err;
+      }
+      
+      return;
+  }
 
   if (!keys %{$data{$name}{$cachename}}) {
       if (-e $file) {
@@ -11955,7 +12041,7 @@ sub writeCacheToFile {
 
   push my @arr, encode_json ($data{$name}{$cachename});
   
-  my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+  my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
   
   $error = FileWrite ( { FileName  => $file,
                          ForceType => $forceType,
@@ -11970,6 +12056,51 @@ sub writeCacheToFile {
   $lw                 = gettimeofday();
   $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
   singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
+
+return;
+}
+
+################################################################
+#  Sammelt (collect) oder verteilt (apply) die initfirst-Werte
+################################################################
+sub _initfirstSync {
+  my $paref     = shift;
+  my $name      = $paref->{name};
+  my $cachename = $paref->{cachename};
+  my $dir       = $paref->{direction};                                                      # 'collect' (Schreiben) | 'apply' (Lesen)
+
+  if ($dir eq 'collect') {                                                                  # --- Werte aus den Quellbereichen einsammeln ---
+      $data{$name}{$cachename} = {};
+      
+      for my $key (keys %initfirstMap) {
+          my $val = $initfirstMap{$key}{get}->($name);
+          next if !defined $val;
+          
+          $data{$name}{$cachename}{$key} = $val;
+      }
+      
+      return;
+  }
+
+  if ($dir eq 'apply') {                                                                    # --- Werte in die Zielbereiche zurückschreiben ---
+      for my $key (keys %{$data{$name}{$cachename} // {}}) {
+          my $val = delete $data{$name}{$cachename}{$key};
+
+          if (!defined $val) {
+              next;
+          }
+
+          if (!exists $initfirstMap{$key}) {                                                # unbekannter/veralteter Key im Cache-File
+              Log3 ($name, 2, qq{$name - WARNING - unknown $cachename key "$key" ignored});
+              next;
+          }
+
+          $initfirstMap{$key}{set}->($name, $val);
+          Log3 ($name, 3, qq{$name - set init data $key=$val before load over data});
+      }
+      
+      return;
+  }
 
 return;
 }
@@ -12903,13 +13034,13 @@ sub _specialActivities {
           delete $data{$name}{circular}{99}{tdayDvtn};
           delete $data{$name}{circular}{99}{tdayConDvtn};
 
-          delete $data{$name}{pvhist}{$day};                                                     # den (alten) aktuellen Tag aus History löschen
+          delete $data{$name}{pvhist}{$day};                                                    # den (alten) aktuellen Tag aus History löschen
 
-          if (int $day == 1) {                                                                   # Monatswechsel: überhängende Tage löschen
-              my $dtp  = timestringsFromOffset ($name, $t, -86000);                              # Berechne die Anzahl der Tage im Vormonat
+          if (int $day == 1) {                                                                  # Monatswechsel: überhängende Tage löschen
+              my $dtp  = timestringsFromOffset ($name, $t, -86000);                             # Berechne die Anzahl der Tage im Vormonat
               my $dipm = int $dtp->{day};
 
-              for my $dtr ($dipm + 1 .. 31) {                                                    # Lösche ungültige Tage des Vormonats
+              for my $dtr ($dipm + 1 .. 31) {                                                   # Lösche ungültige Tage des Vormonats
                   if (exists $data{$name}{pvhist}{$dtr}) {
                       delete $data{$name}{pvhist}{$dtr};
                       Log3 ($name, 3, "$name - history day >$dtr< deleted");
@@ -12917,7 +13048,7 @@ sub _specialActivities {
               }
           }
 
-          writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration sichern
+          writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                               # Anlagenkonfiguration sichern
 
           Log3 ($name, 3, "$name - history day >$day< deleted");
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 finished");
@@ -12940,7 +13071,7 @@ sub _specialActivities {
               deleteConsumerPlanning ($hash, $c);
           }
 
-          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                               # Cache File Consumer schreiben
+          writeCacheFile ($hash, 'consumers', $csmcache.$name);                                 # Cache File Consumer schreiben
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
       }
@@ -12957,12 +13088,12 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
 
-          __delObsoleteAPIData     ($paref);                                                   # Bereinigung obsoleter Daten im solcastapi Hash
+          __delObsoleteAPIData ($paref);                                                        # Bereinigung obsoleter Daten im solcastapi Hash
 
-          my $ttl    = 24 * 3600;                                                              # Logsperrhash: Lebenszeit eines Eintrags bevor er entfernt wird
+          my $ttl    = 24 * 3600;                                                               # Logsperrhash: Lebenszeit eines Eintrags bevor er entfernt wird
           my $cutoff = $t - $ttl;
 
-          for my $sh1 (keys %{ $data{$name}{log} }) {                                          # Logsperrhash bereinigen
+          for my $sh1 (keys %{ $data{$name}{log} }) {                                           # Logsperrhash bereinigen
               delete $data{$name}{log}{$sh1} if($data{$name}{log}{$sh1}{ts} // 0 < $cutoff);
           }
 
@@ -17236,7 +17367,7 @@ sub _manageConsumerData {
   
   # --- Consumer Cache File schreiben
   if (CurrentVal ($name, 'consumerCacheDirty', 0)) {
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);
+      writeCacheFile ($hash, 'consumers', $csmcache.$name);
       delete $data{$name}{current}{consumerCacheDirty};
   }
 
@@ -26037,7 +26168,7 @@ sub __aiAddRawData {
   debugLog ($paref, 'aiProcess', "AI raw add - $dosave entities added to raw data pool ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
 
   if ($dosave) {
-      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+      $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
@@ -26083,7 +26214,7 @@ sub aiDelRawData {
   }
 
   if ($dosave) {
-      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+      $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
@@ -26950,7 +27081,7 @@ sub aiFannTrain {
       
       delete $data{$name}{$fanntyp.'temp'};
 
-      my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
+      my $err = writeCacheFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
 
       if ($err) {
           $retref->{$fanntyp.'NNTrainstate'} = $err;
@@ -30795,7 +30926,7 @@ sub aiFannDetectDrift {
       ) );
   }
   
-  my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
+  my $err = writeCacheFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
 
   if ($err) {
       Log3 ($name, 1, "$name - ERROR while writing file: ".$neuralnet.$name);
@@ -31913,7 +32044,7 @@ sub aiTrain {
   }
 
   $data{$name}{aidectree}{aitrained} = \@ensemble;
-  $err = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
+  $err = writeCacheFile ($hash, 'aitrained', $aitrained.$name);
   delete $data{$name}{aidectree}{aitrained};
 
   my $rn;
@@ -33637,7 +33768,7 @@ sub _writeAsCsv {
       }
   }
   
-  my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+  my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
   
   my $err = FileWrite ( { FileName  => $outfile,
                           ForceType => $forceType,
@@ -38883,16 +39014,16 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="17%"> <col width="83%"> </colgroup>
-            <tr><td> <b>backup</b>               </td><td>Saves the active in-memory structures with the current timestamp.                                                                             </td></tr>
-            <tr><td>                             </td><td><a href="#SolarForecast-attr-plantControl">plantControl->backupFilesKeep</a> generations of the files are saved. Older versions are deleted.  </td></tr>
-            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;                                     </td></tr>
-            <tr><td>                             </td><td>                                                                                                                                              </td></tr>
-            <tr><td> <b>save</b>                 </td><td>The active in-memory structures are saved.                                                                                                    </td></tr>
-            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                         </td></tr>
-            <tr><td>                             </td><td>                                                                                                                                              </td></tr>
-            <tr><td> <b>recover-&lt;File&gt;</b> </td><td>Restores the data of the selected backup file as an active in-memory structure.                                                               </td></tr>
-            <tr><td>                             </td><td>To avoid inconsistencies, the PVH.* and PVC.* files should be restored in pairs                                                               </td></tr>
-            <tr><td>                             </td><td>with the same time stamp.                                                                                                                     </td></tr>
+            <tr><td> <b>backup</b>                </td><td>Saves the active in-memory structures with the current timestamp.                                                                             </td></tr>
+            <tr><td>                              </td><td><a href="#SolarForecast-attr-plantControl">plantControl->backupFilesKeep</a> generations of the files are saved. Older versions are deleted.  </td></tr>
+            <tr><td>                              </td><td>Files: PVH_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;                                     </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                              </td></tr>
+            <tr><td> <b>save</b>                  </td><td>The active in-memory structures are saved:                                                                                                    </td></tr>
+            <tr><td>                              </td><td><b>File(s):</b> ./FHEM/FhemUtils/X_SolarForecast_&lt;name&gt; with X = PVH, PVC, Messages, ScApi, StatApi, WeatherApi, Init                   </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                              </td></tr>
+            <tr><td> <b>recover-&lt;File&gt;</b>  </td><td>Restores the data of the selected backup file as an active in-memory structure.                                                               </td></tr>
+            <tr><td>                              </td><td>To avoid inconsistencies, the PVH.* and PVC.* files should be restored in pairs                                                               </td></tr>
+            <tr><td>                              </td><td>with the same time stamp.                                                                                                                     </td></tr>
          </table>
       </ul>
       <br>
@@ -41080,7 +41211,7 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                                                                </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>writeForceType</b>            </td><td>Specifies the persistence type for storing transaction data. (Some data is always persisted in the file system.)                                                         </td></tr>
-            <tr><td>                                  </td><td><b>auto</b> - Storage in the file system or ConfigDB, if available, <b>file</b> - Storage in the file system, default: auto                                              </td></tr>
+            <tr><td>                                  </td><td><b>db</b> - stored in ConfigDB if available; otherwise, in the file system <b>file</b> - Stored in the file system, default: file                                        </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
          </table>
          </ul>
@@ -42013,8 +42144,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                              </td><td>Es werden <a href="#SolarForecast-attr-backupFilesKeep">plantControl->backupFilesKeep</a> Generationen der Dateien gespeichert. Ältere Versionen werden gelöscht.  </td></tr>
             <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;                                                    </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                                   </td></tr>
-            <tr><td> <b>save</b>                  </td><td>Die aktiven In-Memory Strukturen werden gespeichert.                                                                                                               </td></tr>
-            <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                                            </td></tr>
+            <tr><td> <b>save</b>                  </td><td>Die aktiven In-Memory Strukturen werden gesichert:                                                                                                                 </td></tr>
+            <tr><td>                              </td><td><b>Datei(en):</b> ./FHEM/FhemUtils/X_SolarForecast_&lt;name&gt; mit X = PVH, PVC, Messages, ScApi, StatApi, WeatherApi, Init                                       </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                                   </td></tr>
             <tr><td> <b>recover-&lt;Datei&gt;</b> </td><td>Stellt die Daten der ausgewählten Sicherungsdatei als aktive In-Memory Struktur wieder her.                                                                        </td></tr>
             <tr><td>                              </td><td>Um Inkonsistenzen zu vermeiden, sollten die Dateien PVH.* und PVC.* mit dem gleichen                                                                               </td></tr>
@@ -44213,9 +44344,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>showLink</b>                  </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                                                              </td></tr>
             <tr><td>                                  </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
-            <tr><td> <b>writeForceType</b>            </td><td>Legt den Persistenztyp für die Speicherung der Bewegungsdaten fest. (Manche Daten werden grundsätzlich im Filesystem persistiert)     </td></tr>
-            <tr><td>                                  </td><td><b>auto</b> - Speicherung in Filesystem oder ConfigDB wenn vorhanden, <b>file</b> - Speicherung im Filesystem, default: auto          </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                      </td></tr>
+            <tr><td> <b>writeForceType</b>            </td><td>Legt den Persistenztyp für die Speicherung der Bewegungsdaten fest. (Manche Daten werden grundsätzlich im Filesystem persistiert)                                    </td></tr>
+            <tr><td>                                  </td><td><b>db</b> - Speicherung in ConfigDB wenn vorhanden, sonst im Dateisystem <b>file</b> - Speicherung im Dateisystem, default: file                                     </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
          </table>
          </ul>
 
