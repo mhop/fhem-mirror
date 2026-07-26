@@ -30,6 +30,7 @@
 #########################################################################################################################
 use strict; 
 use warnings;
+use feature 'state';
 
 main::LoadModule ('Astro');                                                          # Astro Modul für Sonnenkennzahlen laden
 
@@ -70,13 +71,14 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.2"  => "25.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
+  "2.9.2"  => "26.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
                            "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
                            "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
                            "Ergänzung Datensammlung und Training für consumerXX->type heatpump->opmode 'eco' ".
                            "vermeide zu wenig Datensätze im Drift-Retrain Prüfungskontext ".
                            "Änderung plantControl->writeForceType: 'file' ist Standardspeicher, 'auto' ist deprecated, verwende 'db' anstatt (incl. BugFix FileRead) ".
                            "Integration initialen Cache-Load 'initfirst' um vor dem Laden weiterer Daten Voreinstellungen festzulegen ".
+                           "Setter 'reset consumptionHistory' in 'reset consumptionShort' umbenannt ".
                            "Intern: writeCacheToFile nach writeCacheFile umbenannt ",
   "2.9.1"  => "16.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ".
                            "neuer Befehl set .. reset aiData setValue ... ".
@@ -2811,7 +2813,7 @@ sub Set {
                batteryTriggerSet
                consumerMaster
                consumerPlanning
-               consumptionHistory
+               consumptionShort
                energyH4TriggerSet
                powerTriggerSet
                pvCorrection
@@ -3443,7 +3445,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($args[0] eq 'consumptionHistory') {
+  if ($args[0] eq 'consumptionShort') {
       my $dday  = $args[1] // "";                                              # ein bestimmter Tag der pvHistory angegeben ?
       my $dhour = $args[2] // "";                                              # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
@@ -3504,8 +3506,8 @@ sub _setreset {                          ## no critic "not used"
                   delete $data{$name}{circular}{$circh}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
               }
 
-              for my $hid (keys %{$data{$name}{pvhist}}) {
-                  delete $data{$name}{pvhist}{$hid}{$circh}{pvcorrf};
+              for my $day (keys %{$data{$name}{pvhist}}) {
+                  delete $data{$name}{pvhist}{$day}{$circh}{pvcorrf};
               }
 
               Log3 ($name, 3, qq{$name - stored PV correction factor of hour "$circh" from pvCircular and pvHistory deleted});
@@ -3523,9 +3525,9 @@ sub _setreset {                          ## no critic "not used"
                   }
               }
 
-              for my $hid (keys %{$data{$name}{pvhist}}) {
-                  for my $hidh (keys %{$data{$name}{pvhist}{$hid}}) {
-                      delete $data{$name}{pvhist}{$hid}{$hidh}{pvcorrf};
+              for my $day (keys %{$data{$name}{pvhist}}) {
+                  for my $hod (keys %{$data{$name}{pvhist}{$day}}) {
+                      delete $data{$name}{pvhist}{$day}{$hod}{pvcorrf};
                   }
               }
 
@@ -9540,22 +9542,24 @@ sub _attrEnvironment {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
+  my $cmd   = $paref->{cmd};
 
   return if(!$init_done);
 
   my $hash = $defs{$name};
 
   my $valid = {
-      outsideTemp => { comp => '.*:.*',          act => 0 },
-      presence    => { comp => '.*:.*:.*',       act => 0 },
-      windSpeed   => { comp => '.*:.*',          act => 0 },
+      outsideTemp => { comp => '.*:.*',          act => 1 },
+      presence    => { comp => '.*:.*:.*',       act => 1 },
+      windSpeed   => { comp => '.*:.*',          act => 1 },
+      gridStatus  => { comp => '.*:.*:.*',       act => 1 },
   };
   
   my ($a, $h) = parseParams ($aVal);
 
-  if ($paref->{cmd} eq 'set') {
+  if ($cmd eq 'set') {
       for my $key (keys %{$h}) {
-          return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);           # Absturzschutz!
+          return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);         # Absturzschutz!
 
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
@@ -9564,29 +9568,25 @@ sub _attrEnvironment {                   ## no critic "not used"
           my $comp = $valid->{$key}{comp};
           next if(!$comp);
 
-          if ($h->{$key} !~ /^$comp$/xs) {
+          if ($h->{$key} =~ /^$comp$/xs) {
+              if ($valid->{$key}{act}) {
+                  my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                                aName   => $aName,
+                                                pphash  => $h,                                              # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                akey    => $key,
+                                                akeyval => $h->{$key},
+                                                cmd     => $cmd,
+                                              } );
+
+                  return $err if($err);
+              }
+          }
+          else {
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
       }
-
-      for my $akey (keys %{$h}) {          
-          my ($dv, $rd, $regex) = split ':', $h->{$akey};
-          my ($err)             = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
-          return $err if($err);
-
-          my $val = ReadingsVal ($dv, $rd, undef);
-          
-          if (!defined $val) {
-              return "The reading '$rd' of device '$dv' is invalid or doesn't contain a defined value";
-          }
-          
-          if (defined $regex) {
-              $err = checkRegex ($regex);
-              return "$akey Regex check failed: $err" if($err);
-          }
-      }
   }
-  elsif ($paref->{cmd} eq 'del') {
+  elsif ($cmd eq 'del') {
 
   }
 
@@ -10525,7 +10525,7 @@ sub __attrKeyAction {
               my @hse = split ",", $akeyval;
 
               for my $env (@hse) {
-                  if (!grep /^$env$/, qw (outsideTemp presence windSpeed)) {
+                  if (!grep /^$env$/, qw (outsideTemp presence windSpeed gridStatus)) {
                       return qq{The value '$env' is not valid for key '$akey'};
                   }
               }
@@ -10550,7 +10550,7 @@ sub __attrKeyAction {
               for my $hnum (keys %{$h}) {                                
                   my ($cfodev, $cford, $def) = split ":", $h->{$hnum}; 
                   
-                  if ($cfodev && $cford) {                                                                  # Auswertung Device/Reading Kombi
+                  if ($cfodev && $cford) {                                                          # Auswertung Device/Reading Kombi
                       ($err) = isDeviceValid ( { name   => $name,
                                                  obj    => $cfodev,
                                                  method => 'string',
@@ -10567,35 +10567,37 @@ sub __attrKeyAction {
 
           if ($akey eq 'reductionState') {
               my $rdcinfo = CurrentVal ($name, 'reductionState', '');
-              my ($rdcdev, $rdcrd, $code) = split ":", $rdcinfo, 3;
-
-              ($err) = isDeviceValid ( { name   => $name,
-                                         obj    => $rdcdev,
-                                         method => 'string',
-                                       }
-                                     );
-
-              if ($err) {
-                  delete $data{$name}{current}{$akey};
-                  return $err;
-              }
-
-              if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # prüft Perl-Code
-                  $code  =~ s/\s//xg;
-                  ($err) = checkCode ($name, $code);
-              }
-              else {                                                                                   # prüft Regex
-                  $err = checkRegex ($code);
-              }
+              
+              $err = checkDevRdCond ($name, $akey, $rdcinfo, 1, 0, 1);                              # mit Device-Check, Code check
 
               if ($err) {
                   delete $data{$name}{current}{$akey};
                   return $err;
               }
           }
+          
+          state %devCodeKeys    = map { $_ => 1 } qw(swoncond swoffcond spignorecond);              # Device + Code/Regex Pflicht
+          state %devRdgCodeKeys = map { $_ => 1 } qw(presence gridStatus);                          # Device + Reading + Code/Regex Pflicht
+          state %devRdgKeys     = map { $_ => 1 } qw(outsideTemp windSpeed);                        # Device + Reading, Code optional
+
+          if ($devCodeKeys{$akey}) {
+              $err = checkDevRdCond ($name, $akey, $akeyval, 1, 0, 1);                              # mit Device-Check, Code check
+              return $err if $err;
+          }
+
+          if ($devRdgCodeKeys{$akey}) {
+              $err = checkDevRdCond ($name, $akey, $akeyval, 1, 1, 1);                              # mit Device-Check, Reading check, Code check
+              return $err if $err;
+          }
+
+          if ($devRdgKeys{$akey}) {
+              $err = checkDevRdCond ($name, $akey, $akeyval, 1, 1, 0);                              # mit Device-Check, Reading check
+              return $err if $err;
+          }         
       }
       
       # --- Ende init_done Sektion
+
 
       if ($akey eq 'capacity') {
           if (!isNumeric ($akeyval)) {
@@ -10901,60 +10903,6 @@ sub __attrKeyAction {
           else {
               my $valid = checkhhmm ($akeyval);
               return qq{The syntax "notafter=$akeyval" is wrong!} if(!$valid);
-          }
-      }
-      
-      if ($akey eq 'swoncond') {
-          my ($dev, $rd, $code) = split ":", $akeyval, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'swoncond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoncond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "swoncond: $err" if($err);
-          }
-          else {                                                                                   # swoncond prüft Regex
-              $err = checkRegex ($code);
-              return "swoncond: $err" if($err);
-          }
-      }
-
-      if ($akey eq 'swoffcond') {
-          my ($dev, $rd, $code) = split ":", $akeyval, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'swoffcond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoffcond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "swoffcond: $err" if($err);
-          }
-          else {                                                                                   # swoffcond prüft Regex
-              $err = checkRegex ($code);
-              return "swoffcond: $err" if($err);
-          }
-      }
-      
-      if ($akey eq 'spignorecond') {
-          my ($dev, $rd, $code) = split ":", $akeyval, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'spignorecond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # spignorecond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "spignorecond: $err" if($err);
-          }
-          else {                                                                                   # spignorecond prüft Regex
-              $err = checkRegex ($code);
-              return "spignorecond: $err" if($err);
           }
       }
       
@@ -11510,8 +11458,8 @@ sub delConsumerFromMem {
   for my $ridx (sort keys %{ $data{$name}{aidectree}{airaw} // {} }) {          # Consumer aus AI Raw Data löschen
       my $row = $data{$name}{aidectree}{airaw}{$ridx};
 
-      my @ckeys = ("csme${c}", "bevcsmSoC${c}", "bevcsmTargSoC${c}",
-                   "bevcsmBatCap${c}", "bevcsmPwr${c}");
+      my @ckeys = ("csme${c}", "bevcsmSoC${c}", "bevcsmTargSoC${c}", "exconfc${c}", 
+                   "rcmdcsm${c}", "bevcsmBatCap${c}", "bevcsmPwr${c}");
 
       next if !grep { defined $row->{$_} } @ckeys;                              # keiner der Keys vorhanden -> Zeile betrifft Consumer $c nicht
       delete @{$row}{@ckeys};                                                   # alle vorhandenen Keys in einem Rutsch entfernen
@@ -15200,7 +15148,6 @@ sub _transferEnvironmentValues {
   
   my $peh = __parseAttrEnvironment ($name);                                                         # Parsed Hash
   my $err;
-  #return if(!$peh);
              
   # --- Anwesenheit auswerten
   my $presence_weighted;
@@ -15242,6 +15189,23 @@ sub _transferEnvironmentValues {
   }
   else {
       delete $data{$name}{circular}{99}{accum_presence_seconds};                                    # Dauerwert entfernen wenn kein presence
+  }
+  
+  # --- Grid Status ermitteln
+  if (defined $peh->{gridstdev}) {
+      my $gridstdev = $peh->{gridstdev};
+      my $gridstrdg = $peh->{gridstrdg};
+      my $gridstrgx = $peh->{gridstrgx} // '';
+      
+      my $gridstring = ReadingsVal ($gridstdev, $gridstrdg, 0);
+      my $gridstat   = $gridstring =~ m/^$gridstrgx$/x ? 1 : 0;
+      
+      $data{$name}{current}{gridStatus} = $gridstat;
+      
+      debugLog ($paref, 'collectData_long', "collect Grid state - device=$gridstdev, Reading=$gridstrdg, Value=$gridstring => Result=$gridstat");  
+  }
+  else {
+      delete $data{$name}{current}{gridStatus};
   }
   
   # --- Komforttemperatur auslesen
@@ -15587,6 +15551,7 @@ sub __parseAttrEnvironment {
   my ($oustmpdev, $oustmprdg)             = split (':', $ph->{outsideTemp}, 2) if(defined $ph->{outsideTemp});
   my ($winddev,     $windrdg)             = split (':', $ph->{windSpeed},   2) if(defined $ph->{windSpeed});
   my ($presendev, $presenrdg, $presenrgx) = split (':', $ph->{presence},    3) if(defined $ph->{presence});
+  my ($gridstdev, $gridstrdg, $gridstrgx) = split (':', $ph->{gridStatus},  3) if(defined $ph->{gridStatus});
 
 
   my $parsed = {
@@ -15596,7 +15561,10 @@ sub __parseAttrEnvironment {
       windRdg         => $windrdg,     
       presenceDev     => $presendev,
       presenceRdg     => $presenrdg,  
-      presenceRgx     => $presenrgx,     
+      presenceRgx     => $presenrgx,   
+      gridstdev       => $gridstdev,
+      gridstrdg       => $gridstrdg,
+      gridstrgx       => $gridstrgx,
   };
 
 return $parsed;
@@ -21858,8 +21826,15 @@ sub _graphicHeader {
       
       my $dt       = timestringsFromOffset ($name, $paref->{t}, 0);
       my $hod      = sprintf "%02d", ($dt->{hour} + 1);
-      my $presence = CurrentVal ($name, 'presence', undef);                                             # Anwesenheit                 
+      my $presence = CurrentVal ($name, 'presence',   undef);                                           # Anwesenheit 
+      my $gridstat = CurrentVal ($name, 'gridStatus', undef);                                           # Netz Verfügbarkeit       
       
+      my $gridimg  = !defined $gridstat                         
+                     ? FW_makeImage ('scene_power_grid@grey')
+                     : $gridstat
+                     ? FW_makeImage ('scene_power_grid')
+                     : FW_makeImage ('scene_power_grid_crossed_red@grey');
+
       my $presimg  = !defined $presence                         
                      ? FW_makeImage ('user_unknown@grey')
                      : $presence
@@ -22124,7 +22099,8 @@ sub _graphicHeader {
       
       my @parts1;
 
-      push @parts1, [ $presimg, 3 ]                    if(grep /^presence$/,    @$sa);              # Anwesenheitssymbol  
+      push @parts1, [ $presimg, 3 ]                    if(grep /^presence$/,    @$sa);              # Anwesenheitssymbol
+      push @parts1, [ $gridimg, 3 ]                    if(grep /^gridStatus$/,  @$sa);              # Grid verfügbar Symbol      
       push @parts1, [ $windimg, 1 ], [ $windspeed, 1 ] if(grep /^windSpeed$/,   @$sa);              # Windanzeige  
       push @parts1, [ $tempimg, 0 ], [ $temptxt,   3 ] if(grep /^outsideTemp$/, @$sa);              # Außentemperatur
       
@@ -34368,7 +34344,7 @@ sub checkPlantConfig {
 
           if ($hcon < 0 || $hcon > $conlim) {                                                                              
               $conpvhfault++;
-              Log3 ($name, 1, "$name - WARNING - The stored Energy con=$hcon of day/hour $dy/$hh in pvHistory is faulty. The incorrect value can be deleted with 'set $name reset consumptionHistory $dy $hh'.");
+              Log3 ($name, 1, "$name - WARNING - The stored Energy con=$hcon of day/hour $dy/$hh in pvHistory is faulty. The incorrect value can be deleted with 'set $name reset consumptionShort $dy $hh'.");
           }
       }
   }
@@ -36724,24 +36700,6 @@ return length ($decoded);
 }
 
 ################################################################
-#  Prüfung eines übergebenen Regex
-################################################################
-sub checkRegex {
-  my $regexp = shift;
-
-  return 'no Regex is provided' if(!defined $regexp);
-
-  eval { "Hallo" =~ m/^$regexp$/;
-         1;
-       }
-       or do { my $err = (split " at", $@)[0];
-               return "Bad regexp: ".$err;
-             };
-
-return;
-}
-
-################################################################
 #  Hilfsfunktion Sortierung numerische und 
 #  nicht numerische Daten zur Verwendung in sort ...
 ################################################################
@@ -36750,6 +36708,66 @@ sub naturalSort {
     return ( $a =~ /^-?\d+(\.\d+)?$/ && $b =~ /^-?\d+(\.\d+)?$/ )
         ? $a <=> $b
         : $a cmp $b;
+}
+
+########################################################################
+# Prüft eine "Device:Reading:Regex/Code" Angabe für die
+# angegebenen Condition-Keys (z.B. swoncond, swoffcond, spignorecond)
+#
+# $name     - Devicename
+# $akey     - der aktuelle Attribut-Key (für die Fehlermeldung)
+# $akeyval  - der Wert, "Device:Reading[:Code|Regex]"
+# $checkdev - optionaler Check auf vorhandenes Device
+# $checkrdg - optionaler Check auf definierten Reading-Wert
+# $codereq  - ob Code/Regex-Teil zwingend erforderlich ist
+#
+# Rückgabe: Fehlertext oder undef bei Erfolg
+########################################################################
+sub checkDevRdCond {
+  my $name     = shift;
+  my $akey     = shift;
+  my $akeyval  = shift;
+  my $checkdev = shift // 0;
+  my $checkrdg = shift // 0;
+  my $codereq  = shift // 0;
+
+  my ($dev, $rdg, $code) = split ":", $akeyval, 3;
+
+  if (!$dev || !$rdg || ($codereq && !defined $code)) {
+      return qq{A Device, Reading and Regex/Code must be specified for the '$akey' key};
+  }
+
+  my $err;
+
+  if ($checkdev) {
+      ($err) = isDeviceValid ( { name   => $name,               # prüft Device vorhanden
+                                 obj    => $dev,
+                                 method => 'string',
+                               } );
+      return "$akey: $err" if $err;
+  }
+
+  if ($checkrdg) {
+      my $val = ReadingsVal ($dev, $rdg, undef);
+      
+      if (!defined $val) {
+          return "The reading '$rdg' of device '$dev' is invalid or doesn't contain a defined value";
+      }
+  }
+
+  if (defined $code) {
+      if ($code =~ m/^\s*\{.*\}\s*$/xs) {                       # prüft Perl-Code
+          $code =~ s/\s//xg;
+          ($err) = checkCode ($name, $code);
+          return "$akey: $err" if $err;
+      }
+      else {                                                    # prüft Regex
+          $err = checkRegex ($code);
+          return "$akey: $err" if $err;
+      }
+  }
+
+return;
 }
 
 ################################################################
@@ -36765,6 +36783,24 @@ sub checkhhmm {
   }
 
 return $valid;
+}
+
+################################################################
+#  Prüfung eines übergebenen Regex
+################################################################
+sub checkRegex {
+  my $regexp = shift;
+
+  return 'no Regex is provided' if(!defined $regexp);
+
+  eval { "Hallo" =~ m/^$regexp$/;
+         1;
+       }
+       or do { my $err = (split " at", $@)[0];
+               return "Bad regexp: ".$err;
+             };
+
+return;
 }
 
 ################################################################
@@ -39227,22 +39263,20 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                                                                    </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                                                         </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
-            <tr><td> <b>consumptionHistory</b> </td><td>deletes the stored consumption values of the house from the pvHistory memory                                                                                    </td></tr>
+            <tr><td> <b>consumptionShort</b>   </td><td>Deletes the stored energy consumption data for the house from the short-term memory (pvHistory).                                                                </td></tr>
             <tr><td>                           </td><td>To delete the consumption values of a specific day:                                                                                                             </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumptionHistory 08) </ul>                                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionShort &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumptionShort 08) </ul>                                               </td></tr>
             <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                                                                   </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumptionHistory 08 10) </ul>                             </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionShort &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumptionShort 08 10) </ul>                                 </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                                                        </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                                                             </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>Deletes the readings pvCorrectionFactor* and hidden control readings of the correction system.                                                                  </td></tr>
-            <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                                            </td></tr>
-            <tr><td>                           </td><td>To delete stored PV correction factors of a certain hour from the caches:                                                                                       </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;  </ul>                                                                                              </td></tr>
-            <tr><td>                           </td><td><ul>(e.g. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                                            </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>Deletes the pvCorrectionFactor* readings as well as hidden control readings from the correction system.                                                         </td></tr>
+            <tr><td>                           </td><td>Adding 'cached' will also delete the PV data/factors from short-term storage (pvHistory) and long-term storage (pvCircular).                                    </td></tr>
+            <tr><td>                           </td><td><b>set &lt;name&gt; reset pvCorrection cached</b> - deletes PV data/factors for each hour                                                                       </td></tr>
+            <tr><td>                           </td><td><b>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;</b> - deletes PV data/factors for the given hour (e.g. set &lt;name&gt; reset pvCorrection cached 10)</td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>pvHistory</b>          </td><td>deletes the memory of all historical days (01 ... 31)                                                                                                           </td></tr>
             <tr><td>                           </td><td>To delete a specific historical day:                                                                                                                            </td></tr>
@@ -40870,6 +40904,7 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>headerShowEnv</b>       </td><td>Select the environmental values to display in the header section of the graph. The selected options are separated by commas.              </td></tr>
             <tr><td>                            </td><td>The environment variables are set using the <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment attribute.                    </td></tr>
+            <tr><td>                            </td><td><b>gridStatus</b>  - current availability/current connection status to the public network                                                 </td></tr>
 			<tr><td>                            </td><td><b>outsideTemp</b> - the current outdoor temperature                                                                                      </td></tr>
             <tr><td>                            </td><td><b>presence</b>    - presence status                                                                                                      </td></tr>
             <tr><td>                            </td><td><b>windSpeed</b>   - the current wind speed (smoothed)                                                                                    </td></tr>
@@ -41339,11 +41374,15 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
+            <tr><td> <b>gridStatus</b>            </td><td>A &lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt; combination for the connection status to the public grid. The specified regular expression         </td></tr>
+            <tr><td>                              </td><td>must evaluate to the Boolean value 'true' for the status 'Network available/connected', otherwise 'false'.                                        </td></tr>
+            <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                              </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>outsideTemp</b>           </td><td>A &lt;Device&gt;:&lt;Reading&gt; combination that provides the currently measured outside temperature in °C.                                      </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;                                                                                                            </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>presence</b>              </td><td>A &lt;device&gt;:&lt;reading&gt;:&lt;regex&gt; combination that provides the presence status of the residents. The specified regular expression   </td></tr>
-            <tr><td>                              </td><td>must return 'true' for the 'presence' status, otherwise 'false'.                                                                                  </td></tr>
+            <tr><td>                              </td><td>must return Boolean value 'true' for the 'presence' status, otherwise 'false'.                                                                    </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                              </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>         
             <tr><td> <b>windSpeed</b>             </td><td>A <Device>:<Reading> combination that provides the currently measured wind speed in m/s.                                                          </td></tr>
@@ -42357,27 +42396,25 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                                                                     </td></tr>
             <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                                                                    </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                                                                    </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>Löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher.                                                                   </td></tr>
             <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                                                         </td></tr>
             <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                                                                   </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                                                                       </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
-            <tr><td> <b>consumptionHistory</b> </td><td>löscht die gespeicherten Verbrauchswerte des Hauses aus dem pvHistory Speicher                                                                                  </td></tr>
+            <tr><td> <b>consumptionShort</b>   </td><td>Löscht die gespeicherten Verbrauchswerte des Hauses aus dem Kurzzeit-Speicher (pvHistory).                                                                      </td></tr>
             <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                                                                       </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumptionHistory 08) </ul>                                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionShort &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumptionShort 08) </ul>                                               </td></tr>
             <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumptionHistory 08 10) </ul>                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionShort &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumptionShort 08 10) </ul>                               </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                                                                      </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                                                                 </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>pvCorrection</b>       </td><td>Löscht die Readings pvCorrectionFactor* sowie verborgene Steuerreadings des Korrektursystems.                                                                   </td></tr>
-            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                                                                    </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                                            </td></tr>
-            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                                                         </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                                                            </td></tr>
-            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                                            </td></tr>
+            <tr><td>                           </td><td>Mit dem Zusatz 'cached' werden die PV Daten/Faktoren aus Kurzzeit-Speicher (pvHistory) und Langzeit-Speicher (pvCircular) ebenfalls gelöscht.                   </td></tr>
+            <tr><td>                           </td><td><b>set &lt;name&gt; reset pvCorrection cached</b> - löscht PV Daten/Faktoren jeder Stunde                                                                       </td></tr>
+            <tr><td>                           </td><td><b>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;</b> - löscht PV Daten/Faktoren der Stunde (z.B. set &lt;name&gt; reset pvCorrection cached 10)     </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                                                         </td></tr>
             <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                                                                </td></tr>
@@ -42650,7 +42687,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Die Angabe 'exportToCsv' exportiert den gesamten Inhalt, oder bei Angabe von Filterparametern einen Teilinhalt der pvHistory 
       in eine CSV-Datei. <br><br>
       
-      Mit den Filterparamtern können nur bestimmte Tage, ausgewählte Stunden oder bestimmte Felder gefiltert werden. Diese 
+      Mit den Filterparametern können nur bestimmte Tage, ausgewählte Stunden oder bestimmte Felder gefiltert werden. Diese 
       Angaben können als Komma getrennte Liste den Filterschlüsseln übergeben werden, zum Beispiel:  <br><br>
       
            <ul><i> day=1,2,4 hod=12,13,99 key=pvfc,pvrl    </i></ul>   <br>
@@ -44006,7 +44043,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>headerShowEnv</b>       </td><td>Auswahl der anzuzeigenden Umgebungswerte im Grafik Kopfbereich. Die gewählten Optionen werden durch Komma getrennt angegeben.   </td></tr>
             <tr><td>                            </td><td>Die Einrichtung der Umgebungswerte erfolgt mit Attribut <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment</a>.    </td></tr>
-			<tr><td>                            </td><td><b>outsideTemp</b> - die aktuelle Außentemperatur                                                                               </td></tr>
+            <tr><td>                            </td><td><b>gridStatus</b>  - aktuelle Verfügbarkeit/aktueller Verbindungsstatus zum öffentlichen Netz                                   </td></tr>
+            <tr><td>                            </td><td><b>outsideTemp</b> - die aktuelle Außentemperatur                                                                               </td></tr>
             <tr><td>                            </td><td><b>presence</b>    - der Anwesenheitsstatus                                                                                     </td></tr>
             <tr><td>                            </td><td><b>windSpeed</b>   - die aktuelle Windgeschwindigkeit (geglätted)                                                               </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
@@ -44473,11 +44511,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
+            <tr><td> <b>gridStatus</b>            </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt; Kombination für den Verbindungsstatus zum öffentlichen Netz. Der angegebene reguläre Ausdruck    </td></tr>
+            <tr><td>                              </td><td>muß Boolean 'true' für den Status 'Netz verfügbar/verbunden' ergeben, sonst 'false'.                                                              </td></tr>
+            <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                               </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                  </td></tr>         
             <tr><td> <b>outsideTemp</b>           </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt; Kombination, die die aktuell gemessene Außentemperatur in °C liefert.                                          </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;                                                                                                             </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>presence</b>              </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt; Kombination, die den Anwesenheitsstatus der Bewohner liefert. Der angegebene reguläre Ausdruck   </td></tr>
-            <tr><td>                              </td><td>muß 'true' für den Status 'Anwesenheit' ergeben, sonst 'false'.                                                                                   </td></tr>
+            <tr><td>                              </td><td>muß Boolean 'true' für den Status 'Anwesenheit' ergeben, sonst 'false'.                                                                           </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                               </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>         
             <tr><td> <b>windSpeed</b>             </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt; Kombination, die die aktuell gemessene Windgeschwindigkeit in m/s liefert.                                     </td></tr>
