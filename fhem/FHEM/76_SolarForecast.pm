@@ -30,6 +30,7 @@
 #########################################################################################################################
 use strict; 
 use warnings;
+use feature 'state';
 
 main::LoadModule ('Astro');                                                          # Astro Modul für Sonnenkennzahlen laden
 
@@ -67,100 +68,18 @@ use Blocking;
 use Storable qw(dclone freeze thaw nstore retrieve);
 use MIME::Base64;
 
-# Run before module compilation
-BEGIN {
-  # Import from main::
-  GP_Import(
-      qw (attr
-          asyncOutput
-          AnalyzePerlCommand
-          AnalyzeCommandChain
-          AttrVal
-          AttrNum
-          BlockingCall
-          BlockingKill
-          CommandAttr
-          CommandGet
-          CommandSet
-          CommandSetReading
-          data
-          defs
-          delFromDevAttrList
-          delFromAttrList
-          devspec2array
-          deviceEvents
-          DoTrigger
-          Debug
-          fhemTimeLocal
-          fhemTimeGm
-          fhem
-          FileWrite
-          FileRead
-          FileDelete
-          FmtTime
-          FmtDateTime
-          FW_makeImage
-          getKeyValue
-          getAllAttr
-          getAllGets
-          getAllSets
-          HttpUtils_NonblockingGet
-          HttpUtils_BlockingGet
-          GetFileFromURL
-          GetHttpFile
-          init_done
-          InternalTimer
-          InternalVal
-          IsDisabled
-          Log
-          Log3
-          modules
-          parseParams
-          perlSyntaxCheck
-          readingsSingleUpdate
-          readingsBulkUpdate
-          readingsBulkUpdateIfChanged
-          readingsBeginUpdate
-          readingsDelete
-          readingsEndUpdate
-          ReadingsNum
-          ReadingsTimestamp
-          ReadingsVal
-          RemoveInternalTimer
-          ReplaceEventMap
-          readingFnAttributes
-          setKeyValue
-          sunrise_abs_dat
-          sunset_abs_dat
-          FW_cmd
-          FW_directNotify
-          FW_pH
-          FW_room
-          FW_detail
-          FW_widgetOverride
-          FW_wname
-          readyfnlist
-         )
-  );
-
-  # Export to main context with different name
-  #     my $pkg  = caller(0);
-  #     my $main = $pkg;
-  #     $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
-  #     foreach (@_) {
-  #         *{ $main . $_ } = *{ $pkg . '::' . $_ };
-  #     }
-  GP_Export(
-      qw(
-          Initialize
-          pageAsHtml
-          NexthoursVal
-        )
-  );
-}
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.9.2"  => "26.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
+                           "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
+                           "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
+                           "Ergänzung Datensammlung und Training für consumerXX->type heatpump->opmode 'eco' ".
+                           "vermeide zu wenig Datensätze im Drift-Retrain Prüfungskontext ".
+                           "Änderung plantControl->writeForceType: 'file' ist Standardspeicher, 'auto' ist deprecated, verwende 'db' anstatt (incl. BugFix FileRead) ".
+                           "Integration initialen Cache-Load 'initfirst' um vor dem Laden weiterer Daten Voreinstellungen festzulegen ".
+                           "Setter 'reset consumptionHistory' in 'reset consumptionShort' umbenannt ".
+                           "Intern: writeCacheToFile nach writeCacheFile umbenannt ",
   "2.9.1"  => "16.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ".
                            "neuer Befehl set .. reset aiData setValue ... ".
                            "das Gemini Model kann im Schlüssel aiControl->geminiAPIkey nach dem API-Key angegeben werden ".
@@ -250,7 +169,7 @@ my %vNotesIntern = (
   "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
                            "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
                            "aiFannConDataLoad: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
-                           "extended/refactored: writeCacheToFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
+                           "extended/refactored: writeCacheFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
                            "new key graphicControl->headerShowEnv, _saveEnergyConsumption: implemntation of MAXCONLIMIT ".
                            "new key plantControl->conEnergyHourLimit ",
   "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",  
@@ -288,14 +207,105 @@ my %vNotesIntern = (
 );
 
 
-# Locale-abhängige Kurz-Wochentage erzeugen (Mo, Tue, lun., …)
+# --- Block vor Modul-Kompilierung ausführen
+##############################################
 my @LOCALE_DAYNAMES;
 
-my $sunday_epoch = 3 * 86400;  # 259200                                             # 1970-01-04 00:00:00 UTC war ein Sonntag -> wday = 0
+BEGIN {
+  GP_Import(                                                            # Import from main::
+      qw (attr
+          asyncOutput
+          AnalyzePerlCommand
+          AnalyzeCommandChain
+          AttrVal
+          AttrNum
+          BlockingCall
+          BlockingKill
+          CommandAttr
+          CommandGet
+          CommandSet
+          CommandSetReading
+          data
+          defs
+          delFromDevAttrList
+          delFromAttrList
+          devspec2array
+          deviceEvents
+          DoTrigger
+          Debug
+          fhemTimeLocal
+          fhemTimeGm
+          fhem
+          FileWrite
+          FileRead
+          FileDelete
+          FmtTime
+          FmtDateTime
+          FW_makeImage
+          getKeyValue
+          getAllAttr
+          getAllGets
+          getAllSets
+          HttpUtils_NonblockingGet
+          HttpUtils_BlockingGet
+          GetFileFromURL
+          GetHttpFile
+          init_done
+          InternalTimer
+          InternalVal
+          IsDisabled
+          Log
+          Log3
+          modules
+          parseParams
+          perlSyntaxCheck
+          readingsSingleUpdate
+          readingsBulkUpdate
+          readingsBulkUpdateIfChanged
+          readingsBeginUpdate
+          readingsDelete
+          readingsEndUpdate
+          ReadingsNum
+          ReadingsTimestamp
+          ReadingsVal
+          RemoveInternalTimer
+          ReplaceEventMap
+          readingFnAttributes
+          setKeyValue
+          sunrise_abs_dat
+          sunset_abs_dat
+          FW_cmd
+          FW_directNotify
+          FW_pH
+          FW_room
+          FW_detail
+          FW_widgetOverride
+          FW_wname
+          readyfnlist
+         )
+  );
 
-for my $wday (0..6) {
-    my $epoch = $sunday_epoch + $wday * 86400;
-    push @LOCALE_DAYNAMES, POSIX::strftime("%a", localtime($epoch));
+  # Export to main context with different name
+  #     my $pkg  = caller(0);
+  #     my $main = $pkg;
+  #     $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
+  #     foreach (@_) {
+  #         *{ $main . $_ } = *{ $pkg . '::' . $_ };
+  #     }
+  GP_Export(
+      qw (Initialize
+          pageAsHtml
+          NexthoursVal
+         )
+  );
+  
+  # Locale-abhängige Kurz-Wochentage erzeugen (Mo, Tue, lun., …)
+  my $sunday_epoch = 3 * 86400;  # 259200                                             # 1970-01-04 00:00:00 UTC war ein Sonntag -> wday = 0
+
+  for my $wday (0..6) {
+      my $epoch = $sunday_epoch + $wday * 86400;
+      push @LOCALE_DAYNAMES, POSIX::strftime("%a", localtime($epoch));
+  }
 }
 
 ## Konstanten    
@@ -317,6 +327,7 @@ use constant {
   AIACCUPLIM      => 150,                                                           # obere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCLOWLIM     => 50,                                                            # untere Abweichungsgrenze (%) AI 'Accurate' von API Prognose
   AIACCTRNMIN     => 3500,                                                          # Mindestanzahl KI Regeln für Verwendung "KI Accurate"
+  AILRATEMIN      => 0.0001,                                                        # untere Grenze mögliche Lerrate
   AIMODELMINAGE   => 6,                                                             # Alter eines trainierten AI FANN Model bis zu dem es als "neu/frisch" gilt 
   APITIMEOUT      => 30,                                                            # default Timeout HTTP API-Call
   
@@ -390,7 +401,7 @@ use constant {
   HOMEICONDEF     => 'control_building_control@grey',                               # default Home-Icon
   HPOPMODEDEF     => 'off',                                                         # WP default Operation Mode
   HPDEFMODULATN   => 100,                                                           # WP default Modulation (%)
-  HPOPMODES       => 'off|heating|defrost|hotwater|cooling|pool|poolheating',       # WP mögliche Operating Modes
+  HPOPMODES       => 'off|heating|defrost|hotwater|cooling|pool|poolheating|eco',   # WP mögliche Operating Modes
   
   INFINITE        => ~0 >> 1,                                                       # "Unendlich"
   INPUTSIZE       => 10,                                                            # default Breite eines Textfeldes in graphicHeaderOwnspec
@@ -434,6 +445,7 @@ use constant {
   
   PI              => 3.141592653589793,                                             # die Konstante π
   PERCCONINSOC    => 0.75,                                                          # Batterie SoC-Management: Anteilsfaktor für Verbrauch
+  PERSISTDEST     => 'file',                                                        # Standard Ziel für Datenpersistenz ist das Dateisystem
   PRDEF           => 0.9,                                                           # default Performance Ratio (PR)
   PRDCRROWSHIFT   => 100,                                                           # Flußgrafik: Verschiebung bei Anzeige Producer/Inverter-Zeile
   PRODICONDEF     => 'sani_garden_pump',                                            # default Producer-Icon
@@ -484,6 +496,7 @@ my %MCache_Stats;                                                               
 my @chours         = (5..21);                                                       # Stunden des Tages mit möglichen Korrekturwerten
 my $root           = $attr{global}{modpath};                                        # Pfad zu dem Verzeichnis der FHEM Module
 my $cachedir       = $root."/FHEM/FhemUtils";                                       # Directory für Cachefiles
+my $initcache      = $root."/FHEM/FhemUtils/Init_SolarForecast_";                   # Filename-Fragment für Initialisierung (wird mit Devicename ergänzt), muß vor allen anderen Files geladen werden!
 my $pvhcache       = $root."/FHEM/FhemUtils/PVH_SolarForecast_";                    # Filename-Fragment für PV History (wird mit Devicename ergänzt)
 my $pvccache       = $root."/FHEM/FhemUtils/PVC_SolarForecast_";                    # Filename-Fragment für PV Circular (wird mit Devicename ergänzt)
 my $plantcfg       = $root."/FHEM/FhemUtils/PVCfg_SolarForecast_";                  # Filename-Fragment für PV Anlagenkonfiguration (wird mit Devicename ergänzt)
@@ -966,8 +979,10 @@ my %epoche_translations = (
                DE => "Konvergenz erfolgt früh, Momentum/Lernrate sind bereits konservativ: um mehr nützliche Epochen vor dem Early-Stopping zu ermöglichen, aiConSteepness leicht reduzieren (z.B. um 0.1) für langsamere, feinere Konvergenz - bei zu niedrigen aiConSteepness-Wert kann das Netz komplett aufhören zu lernen (Slope≈0); alternativ Hidden-Layer-Größe/Tiefe (aiConHiddenLayers) leicht erhöhen für mehr Lernkapazität, was aber ggf. mehr Trainingsdaten erfordert" },
   hint24  => { EN => "High momentum (%.2f) likely amplifies shuffle-event overshooting (validation loss jumps at each shuffle boundary): reduce momentum to 0.4–0.5 (aiControl->aiConMomentum). This stabilizes the validation curve and typically improves Slope, as the optimizer can settle into narrower minima without bouncing out on each data reshuffle.",
                DE => "Hohes Momentum (%.2f) verstärkt wahrscheinlich Shuffle-Event-Overshooting (Validierungsfehler springt an jedem Shuffle-Ereignis nach oben): Momentum auf 0.4–0.5 reduzieren (aiControl->aiConMomentum). Dies stabilisiert den Validierungsverlauf und verbessert typischerweise die Slope, da der Optimizer in engere Minima einsinken kann ohne bei jedem Datenshuffle herauszuschießen." },
-  hint25 =>  { EN => "Consider switching training algorithm: use RPROP instead of INCREMENTAL - RPROP adapts its step size automatically without manual learning rate tuning, which often converges faster when slope remains flat despite healthy training (aiControl->aiConTrainAlgo)",
+  hint25  => { EN => "Consider switching training algorithm: use RPROP instead of INCREMENTAL - RPROP adapts its step size automatically without manual learning rate tuning, which often converges faster when slope remains flat despite healthy training (aiControl->aiConTrainAlgo)",
                DE => "Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL verwenden - RPROP passt seine Schrittweite automatisch an und kommt ohne manuelle Lernraten-Einstellung aus, was bei anhaltend flacher Slope trotz gesunden Trainings oft deutlich schneller zum Ziel führt (aiControl->aiConTrainAlgo)" },
+  hint26 =>  { EN => "Learning rate already at floor (%.4f) – network still converges very early. In some cases a moderate increase of the learning rate (e.g. +50-100%%) combined with a matching momentum (currently %.2f) can help escape a flat plateau.",
+               DE => "Lernrate bereits am unteren Limit (%.4f) – Netz konvergiert dennoch sehr früh. In manchen Fällen hilft hier ausnahmsweise eine moderate Erhöhung der Lernrate (z.B. +50-100%%) in Kombination mit passend abgestimmtem Momentum (aktuell %.2f), um ein flaches Plateau zu verlassen." },
 ); 
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -1425,6 +1440,30 @@ my %htitles = (                                                                 
                 DE => qq{kein Abregelungsstatus verf&uuml;gbar\nSetzen sie bitte den Schl&uuml;ssel 'reductionState' mit 'attr <NAME> plantControl'}                                    },
 );
 
+# -----------------------------------------------------------------------------------------------------------------
+# Zentrale Zuordnung: welcher Key liegt wo in %data und wie wird er
+# gelesen (get) bzw. zurückgeschrieben (set).
+# Hier alle Keys eintragen, die im 'initfirst' Cache landen sollen -
+# unabhängig davon aus welchem Datenbereich (current, circular, ...)
+# sie stammen.
+# -----------------------------------------------------------------------------------------------------------------
+my %initfirstMap = (
+  writeForceType => {
+      get => sub { my $name = shift;      return CurrentVal ($name, 'writeForceType', undef); },
+      set => sub { my ($name, $val) = @_; $data{$name}{current}{writeForceType} = $val;       },
+  },
+
+  # Beispiel für einen Wert aus 'circular' (Index 99):
+  # someCircKey => {
+  #     get => sub { my $name = shift; return CircularVal ($name, 99, 'someCircKey', undef); },
+  #     set => sub { my ($name, $val) = @_; $data{$name}{circular}{99}{someCircKey} = $val;  },
+  # },
+
+  # beliebig erweiterbar
+);
+
+
+# -----------------------------------------------------------------------------------------------------------------
 # Wetterintertretation
 # https://www.dwd.de/DE/forschung/wettervorhersage/num_modellierung/01_num_vorhersagemodelle/01c_wetterinterpretation/wetter_interpretation.pdf?__blob=publicationFile&v=7
 #
@@ -1442,7 +1481,7 @@ my %htitles = (                                                                 
 # ww = 01 leicht bewölkt
 # ww = 02 wolkig
 # ww = 03 stark bewölkt bis bedeckt
-#################################################
+# -----------------------------------------------------------------------------------------------------------------
 my %weather_ids = (
   '0'   => { s => '0', icon => 'weather_sun',                       txtd => 'wolkenloser Himmel',                                                       txte => 'cloudless sky'                                                              },
   '1'   => { s => '0', icon => 'weather_cloudy_light',              txtd => 'leicht bewölkt',                                                           txte => 'slightly cloudy'                                                            },
@@ -2344,6 +2383,7 @@ heatpump_opmode => sub {
           $f->{hp_cooling_frac_lag1},                                               # Kühlen Anteil Vorstunde
           $f->{hp_pool_frac_lag1},                                                  # Pool Anteil Vorstunde
           $f->{hp_poolheating_frac_lag1},                                           # Poolheizung Anteil Vorstunde
+          $f->{hp_eco_frac_lag1},                                                   # WP Eco Modus Anteil Vorstunde
       ];
   },
 
@@ -2552,6 +2592,7 @@ sandbox => sub {
 # Information zu verwendeten internen Datenhashes
 ####################################################
 # Daten die nach einem Restart mit reloadCacheFiles nachgeladen werden müssen:
+# $data{$name}{initfirst}                                                     # erste Initialisierungen bevor weitere Loads erfolgen (auch vor Attr)
 # $data{$name}{pvhist}                                                        # historische Werte
 # $data{$name}{weatherapi}                                                    # Zwischenspeicher API-Wetterdaten
 # $data{$name}{solcastapi}                                                    # Zwischenspeicher API-Solardaten
@@ -2772,7 +2813,7 @@ sub Set {
                batteryTriggerSet
                consumerMaster
                consumerPlanning
-               consumptionHistory
+               consumptionShort
                energyH4TriggerSet
                powerTriggerSet
                pvCorrection
@@ -2938,8 +2979,8 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
 
   $paref->{consumer} = $c;
   $paref->{ps}       = 'planned:';
-  $paref->{startts}  = $startts;                                                               # Unix Timestamp für geplanten Switch on
-  $paref->{stopts}   = $stopts;                                                                # Unix Timestamp für geplanten Switch off
+  $paref->{startts}  = $startts;                                                                # Unix Timestamp für geplanten Switch on
+  $paref->{stopts}   = $stopts;                                                                 # Unix Timestamp für geplanten Switch off
 
   ___setConsumerPlanningState ($paref);
   ___saveEhodpieces           ($paref);
@@ -2948,7 +2989,7 @@ sub _setconsumerImmediatePlanning {      ## no critic "not used"
   my $planstate = ConsumerVal ($name, $c, 'planstate', '');
   my $calias    = ConsumerVal ($name, $c, 'alias',     '');
 
-  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                      # Cache File Consumer schreiben
+  writeCacheFile ($hash, 'consumers', $csmcache.$name);                                         # Cache File Consumer schreiben
 
   Log3 ($name, 3, qq{$name - Consumer "$calias" $planstate}) if($planstate);
 
@@ -2972,7 +3013,7 @@ sub _setconsumerNewPlanning {            ## no critic "not used"
 
   if ($c) {
       deleteConsumerPlanning ($hash, $c);
-      writeCacheToFile       ($hash, 'consumers', $csmcache.$name);                            # Cache File Consumer schreiben
+      writeCacheFile         ($hash, 'consumers', $csmcache.$name);                            # Cache File Consumer schreiben
   }
 
   centralTask ($hash, $evt);
@@ -3114,7 +3155,7 @@ sub _setroofIdentPair {                 ## no critic "not used"
   $data{$name}{statusapi}{'?IdPair'}{'?'.$pk}{rtid}   = $h->{rtid};
   $data{$name}{statusapi}{'?IdPair'}{'?'.$pk}{apikey} = $h->{apikey};
 
-  writeCacheToFile ($hash, 'statusapi', $statcache.$name);                               # Status-API Cache sichern
+  writeCacheFile ($hash, 'statusapi', $statcache.$name);                                # Status-API Cache sichern
 
   my $msg = qq{The Roof identification pair "$pk" has been saved. }.
             qq{Repeat the command if you want to save more Roof identification pairs.};
@@ -3162,7 +3203,7 @@ sub _setVictronCredentials {                 ## no critic "not used"
       $msg = qq{Credentials for the Victron VRM API has been saved.};
   }
 
-  writeCacheToFile ($hash, 'statusapi', $statcache.$name);                               # Status-API Cache sichern
+  writeCacheFile ($hash, 'statusapi', $statcache.$name);                                # Status-API Cache sichern
 
 return $msg;
 }
@@ -3222,7 +3263,7 @@ sub _setTrigger {                        ## no critic "not used"
       readingsSingleUpdate ($hash, 'energyH4Trigger', $arg, 1);
   }
 
-  writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration File schreiben
+  writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                               # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -3249,7 +3290,7 @@ sub _setplantConfiguration {             ## no critic "not used"
   }
 
   if ($arg eq "save") {
-      ($err, $nr, $na) = writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);             # Anlagenkonfiguration fileStore schreiben
+      ($err, $nr, $na) = writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                # Anlagenkonfiguration fileStore schreiben
 
       if ($err) {
           return $err;
@@ -3350,7 +3391,7 @@ sub _setpvCorrectionFactorAuto {         ## no critic "not used"
       }
   }
 
-  writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                    # Anlagenkonfiguration sichern
+  writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                       # Anlagenkonfiguration sichern
 
 return;
 }
@@ -3404,7 +3445,7 @@ sub _setreset {                          ## no critic "not used"
       return;
   }
 
-  if ($args[0] eq 'consumptionHistory') {
+  if ($args[0] eq 'consumptionShort') {
       my $dday  = $args[1] // "";                                              # ein bestimmter Tag der pvHistory angegeben ?
       my $dhour = $args[2] // "";                                              # eine bestimmte Stunde eines Tages der pvHistory angegeben ?
 
@@ -3465,8 +3506,8 @@ sub _setreset {                          ## no critic "not used"
                   delete $data{$name}{circular}{$circh}{$k} if($k =~ /^(pvrl_|pvfc_)/xs);
               }
 
-              for my $hid (keys %{$data{$name}{pvhist}}) {
-                  delete $data{$name}{pvhist}{$hid}{$circh}{pvcorrf};
+              for my $day (keys %{$data{$name}{pvhist}}) {
+                  delete $data{$name}{pvhist}{$day}{$circh}{pvcorrf};
               }
 
               Log3 ($name, 3, qq{$name - stored PV correction factor of hour "$circh" from pvCircular and pvHistory deleted});
@@ -3484,9 +3525,9 @@ sub _setreset {                          ## no critic "not used"
                   }
               }
 
-              for my $hid (keys %{$data{$name}{pvhist}}) {
-                  for my $hidh (keys %{$data{$name}{pvhist}{$hid}}) {
-                      delete $data{$name}{pvhist}{$hid}{$hidh}{pvcorrf};
+              for my $day (keys %{$data{$name}{pvhist}}) {
+                  for my $hod (keys %{$data{$name}{pvhist}{$day}}) {
+                      delete $data{$name}{pvhist}{$day}{$hod}{pvcorrf};
                   }
               }
 
@@ -3503,21 +3544,21 @@ sub _setreset {                          ## no critic "not used"
 
   if ($args[0] eq 'powerTriggerSet') {
       deleteReadingspec ($hash, "powerTrigger.*");
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);                    # Anlagenkonfiguration File schreiben
+      writeCacheFile  ($hash, "plantconfig", $plantcfg.$name);                      # Anlagenkonfiguration File schreiben
       Log3 ($name, 1, qq{$name - data of 'powerTrigger' were deleted});
       return;
   }
 
   if ($args[0] eq 'batteryTriggerSet') {
       deleteReadingspec ($hash, "batteryTrigger.*");
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);
+      writeCacheFile  ($hash, "plantconfig", $plantcfg.$name);
       Log3 ($name, 1, qq{$name - data of 'batteryTrigger' were deleted});
       return;
   }
 
   if ($args[0] eq 'energyH4TriggerSet') {
       deleteReadingspec ($hash, "energyH4Trigger.*");
-      writeCacheToFile  ($hash, "plantconfig", $plantcfg.$name);
+      writeCacheFile  ($hash, "plantconfig", $plantcfg.$name);
       Log3 ($name, 1, qq{$name - data of 'energyH4Trigger' were deleted});
       return;
   }
@@ -3536,7 +3577,7 @@ sub _setreset {                          ## no critic "not used"
           Log3($name, 3, qq{$name - roofIdentPair: all pair keys deleted});
       }
 
-      writeCacheToFile ($hash, 'solcastapi', $scpicache.$name);                      # Cache File SolCast API Werte schreiben
+      writeCacheFile ($hash, 'solcastapi', $scpicache.$name);                       # Cache File SolCast API Werte schreiben
       return;
   }
 
@@ -3552,27 +3593,27 @@ sub _setreset {                          ## no critic "not used"
           }
       }
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                        # Cache File Consumer schreiben
+      writeCacheFile ($hash, 'consumers', $csmcache.$name);                         # Cache File Consumer schreiben
   }
 
-  if ($args[0] eq 'consumerMaster') {                                                # Verbraucherhash löschen
-      my $c = $args[1] // '';                                                        # bestimmten Verbraucher setzen falls angegeben
+  if ($args[0] eq 'consumerMaster') {                                               # Verbraucherhash löschen
+      my $c = $args[1] // '';                                                       # bestimmten Verbraucher setzen falls angegeben
 
       if ($c) {
           $paref->{c} = $c;
-          delConsumerFromMem ($paref);                                               # spezifischen Consumer aus Speichern löschen
+          delConsumerFromMem ($paref);                                              # spezifischen Consumer aus Speichern löschen
       }
       else {
           for my $c (keys %{$data{$name}{consumers}}) {
               $paref->{c} = $c;
-              delConsumerFromMem ($paref);                                           # alle Consumer aus Speichern löschen
+              delConsumerFromMem ($paref);                                          # alle Consumer aus Speichern löschen
           }
       }
 
       delete $paref->{c};
-      $data{$name}{current}{consumerCollected} = 0;                                  # Consumer neu sammeln
+      $data{$name}{current}{consumerCollected} = 0;                                 # Consumer neu sammeln
 
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);                        # Cache File Consumer schreiben
+      writeCacheFile ($hash, 'consumers', $csmcache.$name);                         # Cache File Consumer schreiben
       centralTask      ($hash, 0);
   }
 
@@ -3713,7 +3754,7 @@ sub __resetAiData {
   }
   
   if ($dosave) {
-      my $err = writeCacheToFile ($defs{$name}, 'airaw', $airaw.$name);
+      my $err = writeCacheFile ($defs{$name}, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
@@ -6145,7 +6186,7 @@ sub __openMeteo_ApiResponse {
   }
 
   if ($nghi) {
-      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+      $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
@@ -6791,7 +6832,7 @@ sub __generateCatOut {
 
       push @data, '</gpx>';
 
-      my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+      my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
       
       $err = FileWrite ( { FileName  => $dwdcatgpx,
                            ForceType => $forceType,
@@ -6952,12 +6993,12 @@ sub __dwdStatCatalog_Response {
           $tail    = trim   (substr ($tail, 0, $ri));
 
           $ri      = rindex ($tail, " ");
-          my $lat  = substr ($tail, $ri + 1);                                                # Latitude
+          my $lat  = substr ($tail, $ri + 1);                                               # Latitude
           $tail    = trim   (substr ($tail, 0, $ri));
 
-          my ($icao, $stnam) = split " ", $tail, 2;                                          # ICAO = International Civil Aviation Organization, Stationsname
+          my ($icao, $stnam) = split " ", $tail, 2;                                         # ICAO = International Civil Aviation Organization, Stationsname
 
-          my ($latg, $latm) = split /\./, $lat;                                              # in Grad und Minuten splitten
+          my ($latg, $latm) = split /\./, $lat;                                             # in Grad und Minuten splitten
           my ($long, $lonm) = split /\./, $lon;
           my $latdec        = round2 ($latg + ($latm / 60));
           my $londec        = round2 ($long + ($lonm / 60));
@@ -6966,13 +7007,13 @@ sub __dwdStatCatalog_Response {
           $data{$name}{dwdcatalog}{$id}{stnam}  = $stnam;
           $data{$name}{dwdcatalog}{$id}{icao}   = $icao;
           $data{$name}{dwdcatalog}{$id}{lat}    = $lat;
-          $data{$name}{dwdcatalog}{$id}{latdec} = $latdec;                                # Latitude Dezimalgrad
+          $data{$name}{dwdcatalog}{$id}{latdec} = $latdec;                                  # Latitude Dezimalgrad
           $data{$name}{dwdcatalog}{$id}{lon}    = $lon;
-          $data{$name}{dwdcatalog}{$id}{londec} = $londec;                                # Longitude Dezimalgrad
+          $data{$name}{dwdcatalog}{$id}{londec} = $londec;                                  # Longitude Dezimalgrad
           $data{$name}{dwdcatalog}{$id}{elev}   = $elev;
       }
 
-      $err = writeCacheToFile ($hash, 'dwdcatalog', $dwdcatalog);                            # DWD Stationskatalog speichern
+      $err = writeCacheFile ($hash, 'dwdcatalog', $dwdcatalog);                             # DWD Stationskatalog speichern
 
       if (!$err) {
           debugLog ($paref, 'dwdComm', qq{DWD catalog saved into file: }.$dwdcatalog);
@@ -7148,7 +7189,7 @@ sub __getaiFannPromptExport {          ## no critic "not used"
 
   if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
       return $lang eq 'DE'
-           ? "Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause"
+           ? encode('utf8', "Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause")
            : "The AI for forecasting $fanntyp is not yet operational.\n<b>Cause:</b> $cause";
   }
 
@@ -7512,13 +7553,13 @@ sub __getaiFannState {            ## no critic "not used"
   my $aiAlpha = 1;
   
   if ($fanntyp eq 'con') {
-      ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp);
+      ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp, $lang);
       $aiAlpha                  = CurrentVal ($name, 'aiConAlpha', 1);                      # eingestellte Gewichtung AI
   }
   
   if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
       return $lang eq 'DE'
-           ? "Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause"
+           ? encode('utf8', "Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause")
            : "The AI for forecasting $fanntyp is not yet operational.\n<b>Cause:</b> $cause";
   }
   
@@ -8181,7 +8222,7 @@ sub _aiFannGeminiApiAssess {
   
   unless ($apiKey) {
       my $ret = $lang eq 'DE' 
-              ? "Der benötigte geminiAPIkey ist nicht gesetzt. <br>"
+              ? "Der geminiAPIkey ist nicht gesetzt. <br>"
                 ."Kostenlosen Key unter aistudio.google.com->'Get API key' generieren und im Attribut aiControl->geminiAPIkey hinterlegen."
               : "The required geminiAPIkey is not set. <br>"
                 ."Generate a free key at aistudio.google.com -> “Get API key” and enter it in the aiControl->geminiAPIkey attribute.";
@@ -8886,15 +8927,15 @@ sub _attrconsumer {                      ## no critic "not used"
       my ($c) = $aName =~ /consumer([0-9]+)/xs;
 
       $paref->{c} = $c;
-      delConsumerFromMem ($paref);                                                                 # Consumerdaten aus Speicher löschen
+      delConsumerFromMem ($paref);                                                                  # Consumerdaten aus Speicher löschen
       delete $paref->{c};
 
       deleteReadingspec ($hash, "consumer${c}.*");
   }
 
-  writeCacheToFile ($hash, 'consumers', $csmcache.$name);                                          # Cache File Consumer schreiben
+  writeCacheFile ($hash, 'consumers', $csmcache.$name);                                             # Cache File Consumer schreiben
 
-  $data{$name}{current}{consumerCollected} = 0;                                                    # Consumerdefinitionen neu sammeln
+  $data{$name}{current}{consumerCollected} = 0;                                                     # Consumerdefinitionen neu sammeln
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask',          [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash,      0);
@@ -8971,6 +9012,7 @@ sub _attrconsumerControl {               ## no critic "not used"
       dummyIcon     => { comp => '.*',                                          act => 0 },
       globalMode    => { comp => '(can|must|mustNot|unset)',                    act => 0 },
       showLegend    => { comp => '(icon_top|icon_bottom|text_top|text_bottom)', act => 0 },
+      iconFix       => { comp => '(panel|flow)(,(?!\1)(panel|flow))?',          act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -9429,7 +9471,7 @@ sub _attrplantControl {                  ## no critic "not used"
       consForecastBase          => { comp => $cforegex,                                           act => 1 },
       showLink                  => { comp => '(0|1)',                                             act => 0 },
       comforttemp               => { comp => '.*',                                                act => 1 },
-      writeForceType            => { comp => '(auto|file)',                                       act => 0 },
+      writeForceType            => { comp => '(auto|db|file)',                                    act => 0 },
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -9459,6 +9501,13 @@ sub _attrplantControl {                  ## no critic "not used"
       }
 
       for my $key (keys %{$h}) {
+          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+          ########################################################################################################################
+          if ($key eq 'writeForceType' && $h->{$key} eq 'auto') {            # 25.07.
+              $h->{$key} = 'db';
+          }
+          ########################################################################################################################
+          
           $data{$name}{current}{$key} = $h->{$key};
       }
   }
@@ -9493,22 +9542,24 @@ sub _attrEnvironment {                   ## no critic "not used"
   my $name  = $paref->{name};
   my $aVal  = $paref->{aVal};
   my $aName = $paref->{aName};
+  my $cmd   = $paref->{cmd};
 
   return if(!$init_done);
 
   my $hash = $defs{$name};
 
   my $valid = {
-      outsideTemp => { comp => '.*:.*',          act => 0 },
-      presence    => { comp => '.*:.*:.*',       act => 0 },
-      windSpeed   => { comp => '.*:.*',          act => 0 },
+      outsideTemp => { comp => '.*:.*',          act => 1 },
+      presence    => { comp => '.*:.*:.*',       act => 1 },
+      windSpeed   => { comp => '.*:.*',          act => 1 },
+      gridStatus  => { comp => '.*:.*:.*',       act => 1 },
   };
   
   my ($a, $h) = parseParams ($aVal);
 
-  if ($paref->{cmd} eq 'set') {
+  if ($cmd eq 'set') {
       for my $key (keys %{$h}) {
-          return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);           # Absturzschutz!
+          return 'The keys entered must not contain square brackets [...]' if($key =~ /[\[\]]+/xs);         # Absturzschutz!
 
           if (!grep /^$key$/, keys %{$valid}) {
               return qq{The key '$key' is not a valid key in attribute '$aName'};
@@ -9517,34 +9568,30 @@ sub _attrEnvironment {                   ## no critic "not used"
           my $comp = $valid->{$key}{comp};
           next if(!$comp);
 
-          if ($h->{$key} !~ /^$comp$/xs) {
+          if ($h->{$key} =~ /^$comp$/xs) {
+              if ($valid->{$key}{act}) {
+                  my $err = __attrKeyAction ( { name    => $name,                                                                               
+                                                aName   => $aName,
+                                                pphash  => $h,                                              # parsed Param Hash: wichtig für Abhängigkeitsprüfungen                                                      
+                                                akey    => $key,
+                                                akeyval => $h->{$key},
+                                                cmd     => $cmd,
+                                              } );
+
+                  return $err if($err);
+              }
+          }
+          else {
               return "The key '$key=$h->{$key}' is not specified correctly. Please refer to the command reference.";
           }
       }
-
-      for my $akey (keys %{$h}) {          
-          my ($dv, $rd, $regex) = split ':', $h->{$akey};
-          my ($err)             = isDeviceValid ( { name => $name, obj => $dv, method => 'string' } );
-          return $err if($err);
-
-          my $val = ReadingsVal ($dv, $rd, undef);
-          
-          if (!defined $val) {
-              return "The reading '$rd' of device '$dv' is invalid or doesn't contain a defined value";
-          }
-          
-          if (defined $regex) {
-              $err = checkRegex ($regex);
-              return "$akey Regex check failed: $err" if($err);
-          }
-      }
   }
-  elsif ($paref->{cmd} eq 'del') {
+  elsif ($cmd eq 'del') {
 
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9638,7 +9685,7 @@ sub _attrMeterDev {                      ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9696,7 +9743,7 @@ sub _attrProducerDev {                   ## no critic "not used"
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9839,7 +9886,7 @@ sub _attrInverterDev {                   ## no critic "not used"
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9875,7 +9922,7 @@ sub _attrInverterStrings {               ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9925,7 +9972,7 @@ sub _attrStringPeak {                    ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -9978,7 +10025,7 @@ sub _attrstringAzimuth {                  ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10026,7 +10073,7 @@ sub _attrstringDeclination {             ## no critic "not used"
   }
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10073,7 +10120,7 @@ sub _attrRoofTops {                      ## no critic "not used"
       }
   }
 
-  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10199,7 +10246,7 @@ sub _attrBatteryDev {                    ## no critic "not used"
 
   InternalTimer (gettimeofday() + 0.5, 'FHEM::SolarForecast::centralTask', [$name, 0], 0);
   InternalTimer (gettimeofday() + 2,   'FHEM::SolarForecast::createAssociatedWith', $hash, 0);
-  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 3,   'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);   # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10402,7 +10449,7 @@ sub _attrRadiationAPI {                  ## no critic "not used"
   InternalTimer (gettimeofday() + 1, 'FHEM::SolarForecast::__harmonizeAPIdelayed', $hash, 0);
   InternalTimer (gettimeofday() + 2, 'FHEM::SolarForecast::setModel',              $hash, 0);                                 # Model setzen
   InternalTimer (gettimeofday() + 3, 'FHEM::SolarForecast::createAssociatedWith',  $hash, 0);
-  InternalTimer (gettimeofday() + 4, 'FHEM::SolarForecast::writeCacheToFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
+  InternalTimer (gettimeofday() + 4, 'FHEM::SolarForecast::writeCacheFile', [$name, 'plantconfig', $plantcfg.$name], 0);    # Anlagenkonfiguration File schreiben
 
 return;
 }
@@ -10478,7 +10525,7 @@ sub __attrKeyAction {
               my @hse = split ",", $akeyval;
 
               for my $env (@hse) {
-                  if (!grep /^$env$/, qw (outsideTemp presence windSpeed)) {
+                  if (!grep /^$env$/, qw (outsideTemp presence windSpeed gridStatus)) {
                       return qq{The value '$env' is not valid for key '$akey'};
                   }
               }
@@ -10503,7 +10550,7 @@ sub __attrKeyAction {
               for my $hnum (keys %{$h}) {                                
                   my ($cfodev, $cford, $def) = split ":", $h->{$hnum}; 
                   
-                  if ($cfodev && $cford) {                                                                  # Auswertung Device/Reading Kombi
+                  if ($cfodev && $cford) {                                                          # Auswertung Device/Reading Kombi
                       ($err) = isDeviceValid ( { name   => $name,
                                                  obj    => $cfodev,
                                                  method => 'string',
@@ -10520,35 +10567,37 @@ sub __attrKeyAction {
 
           if ($akey eq 'reductionState') {
               my $rdcinfo = CurrentVal ($name, 'reductionState', '');
-              my ($rdcdev, $rdcrd, $code) = split ":", $rdcinfo, 3;
-
-              ($err) = isDeviceValid ( { name   => $name,
-                                         obj    => $rdcdev,
-                                         method => 'string',
-                                       }
-                                     );
-
-              if ($err) {
-                  delete $data{$name}{current}{$akey};
-                  return $err;
-              }
-
-              if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # prüft Perl-Code
-                  $code  =~ s/\s//xg;
-                  ($err) = checkCode ($name, $code);
-              }
-              else {                                                                                   # prüft Regex
-                  $err = checkRegex ($code);
-              }
+              
+              $err = checkDevRdCond ($name, $akey, $rdcinfo, 1, 0, 1);                              # mit Device-Check, Code check
 
               if ($err) {
                   delete $data{$name}{current}{$akey};
                   return $err;
               }
           }
+          
+          state %devCodeKeys    = map { $_ => 1 } qw(swoncond swoffcond spignorecond);              # Device + Code/Regex Pflicht
+          state %devRdgCodeKeys = map { $_ => 1 } qw(presence gridStatus);                          # Device + Reading + Code/Regex Pflicht
+          state %devRdgKeys     = map { $_ => 1 } qw(outsideTemp windSpeed);                        # Device + Reading, Code optional
+
+          if ($devCodeKeys{$akey}) {
+              $err = checkDevRdCond ($name, $akey, $akeyval, 1, 0, 1);                              # mit Device-Check, Code check
+              return $err if $err;
+          }
+
+          if ($devRdgCodeKeys{$akey}) {
+              $err = checkDevRdCond ($name, $akey, $akeyval, 1, 1, 1);                              # mit Device-Check, Reading check, Code check
+              return $err if $err;
+          }
+
+          if ($devRdgKeys{$akey}) {
+              $err = checkDevRdCond ($name, $akey, $akeyval, 1, 1, 0);                              # mit Device-Check, Reading check
+              return $err if $err;
+          }         
       }
       
       # --- Ende init_done Sektion
+
 
       if ($akey eq 'capacity') {
           if (!isNumeric ($akeyval)) {
@@ -10854,60 +10903,6 @@ sub __attrKeyAction {
           else {
               my $valid = checkhhmm ($akeyval);
               return qq{The syntax "notafter=$akeyval" is wrong!} if(!$valid);
-          }
-      }
-      
-      if ($akey eq 'swoncond') {
-          my ($dev, $rd, $code) = split ":", $akeyval, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'swoncond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoncond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "swoncond: $err" if($err);
-          }
-          else {                                                                                   # swoncond prüft Regex
-              $err = checkRegex ($code);
-              return "swoncond: $err" if($err);
-          }
-      }
-
-      if ($akey eq 'swoffcond') {
-          my ($dev, $rd, $code) = split ":", $akeyval, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'swoffcond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # swoffcond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "swoffcond: $err" if($err);
-          }
-          else {                                                                                   # swoffcond prüft Regex
-              $err = checkRegex ($code);
-              return "swoffcond: $err" if($err);
-          }
-      }
-      
-      if ($akey eq 'spignorecond') {
-          my ($dev, $rd, $code) = split ":", $akeyval, 3;
-
-          if (!$dev || !$rd || !defined $code) {
-              return qq{A Device, Reading and Regex/Code must be specified for the 'spignorecond' key};
-          }
-
-          if ($code =~ m/^\s*\{.*\}\s*$/xs) {                                                      # spignorecond prüft Perl-Code
-              $code  =~ s/\s//xg;
-              ($err) = checkCode ($name, $code);
-              return "spignorecond: $err" if($err);
-          }
-          else {                                                                                   # spignorecond prüft Regex
-              $err = checkRegex ($code);
-              return "spignorecond: $err" if($err);
           }
       }
       
@@ -11265,13 +11260,14 @@ sub Shutdown {
   
   BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
 
-  writeCacheToFile ($hash, 'pvhist',          $pvhcache.$name, 'nolog');             # Cache File für PV History schreiben
-  writeCacheToFile ($hash, 'circular',        $pvccache.$name, 'nolog');             # Cache File für PV Circular schreiben
-  writeCacheToFile ($hash, 'consumers',       $csmcache.$name, 'nolog');             # Cache File Consumer schreiben
-  writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name, 'nolog');             # Cache File SolCast API Werte schreiben
-  writeCacheToFile ($hash, 'statusapi',      $statcache.$name, 'nolog');             # Status-API Cache sichern
-  writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name, 'nolog');             # Weather-API Cache sichern
-  writeCacheToFile ($hash, 'messages',    $messagecache.$name, 'nolog');             # Nachrichten Cache sichern
+  writeCacheFile ($hash, 'initfirst',      $initcache.$name, 'nolog');              # Cache File für Initialisierung schreiben
+  writeCacheFile ($hash, 'pvhist',          $pvhcache.$name, 'nolog');              # Cache File für PV History schreiben
+  writeCacheFile ($hash, 'circular',        $pvccache.$name, 'nolog');              # Cache File für PV Circular schreiben
+  writeCacheFile ($hash, 'consumers',       $csmcache.$name, 'nolog');              # Cache File Consumer schreiben
+  writeCacheFile ($hash, 'solcastapi',     $scpicache.$name, 'nolog');              # Cache File SolCast API Werte schreiben
+  writeCacheFile ($hash, 'statusapi',      $statcache.$name, 'nolog');              # Status-API Cache sichern
+  writeCacheFile ($hash, 'weatherapi',  $weathercache.$name, 'nolog');              # Weather-API Cache sichern
+  writeCacheFile ($hash, 'messages',    $messagecache.$name, 'nolog');              # Nachrichten Cache sichern
 
 return;
 }
@@ -11343,12 +11339,13 @@ sub periodicWriteMemcache {
   my (undef, $disabled, $inactive) = controller ($name);
   return if($disabled || $inactive);
 
-  writeCacheToFile ($hash, 'circular',        $pvccache.$name);             # Cache File PV Circular schreiben
-  writeCacheToFile ($hash, 'pvhist',          $pvhcache.$name);             # Cache File PV History schreiben
-  writeCacheToFile ($hash, 'solcastapi',     $scpicache.$name);             # Cache File Strahlungsdaten-API Werte schreiben
-  writeCacheToFile ($hash, 'statusapi',      $statcache.$name);             # Status-API Cache sichern
-  writeCacheToFile ($hash, 'weatherapi',  $weathercache.$name);             # Weather-API Cache sichern
-  writeCacheToFile ($hash, 'messages',    $messagecache.$name);             # Nachrichten Cache sichern
+  writeCacheFile ($hash, 'initfirst',      $initcache.$name);               # Cache File für Initialisierung schreiben
+  writeCacheFile ($hash, 'circular',        $pvccache.$name);               # Cache File PV Circular schreiben
+  writeCacheFile ($hash, 'pvhist',          $pvhcache.$name);               # Cache File PV History schreiben
+  writeCacheFile ($hash, 'solcastapi',     $scpicache.$name);               # Cache File Strahlungsdaten-API Werte schreiben
+  writeCacheFile ($hash, 'statusapi',      $statcache.$name);               # Status-API Cache sichern
+  writeCacheFile ($hash, 'weatherapi',  $weathercache.$name);               # Weather-API Cache sichern
+  writeCacheFile ($hash, 'messages',    $messagecache.$name);               # Nachrichten Cache sichern
 
   $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." whole Operating Memory";
 
@@ -11358,11 +11355,11 @@ sub periodicWriteMemcache {
       my $tstr = (timestampToTimestring ($name, time))[2];
       $tstr    =~ s/[-: ]/_/g;
 
-      writeCacheToFile ($hash, 'circular',  $pvccache.$name.'_'.$tstr);        # Cache File PV Circular Sicherung schreiben
-      writeCacheToFile ($hash, 'pvhist',    $pvhcache.$name.'_'.$tstr);        # Cache File PV History Sicherung schreiben
-      writeCacheToFile ($hash, 'neuralnet', $neuralnet.$name.'_'.$tstr);       # NN Consumption Sicherung schreiben
+      writeCacheFile ($hash, 'circular',  $pvccache.$name.'_'.$tstr);           # Cache File PV Circular Sicherung schreiben
+      writeCacheFile ($hash, 'pvhist',    $pvhcache.$name.'_'.$tstr);           # Cache File PV History Sicherung schreiben
+      writeCacheFile ($hash, 'neuralnet', $neuralnet.$name.'_'.$tstr);          # NN Consumption Sicherung schreiben
 
-      deleteOldBckpFiles ($name, 'PVH_SolarForecast_'.$name);                  # alte Backup Files löschen
+      deleteOldBckpFiles ($name, 'PVH_SolarForecast_'.$name);                   # alte Backup Files löschen
       deleteOldBckpFiles ($name, 'PVC_SolarForecast_'.$name);
       deleteOldBckpFiles ($name, 'NeuralNet_SolarForecast_'.$name);
   }
@@ -11461,8 +11458,8 @@ sub delConsumerFromMem {
   for my $ridx (sort keys %{ $data{$name}{aidectree}{airaw} // {} }) {          # Consumer aus AI Raw Data löschen
       my $row = $data{$name}{aidectree}{airaw}{$ridx};
 
-      my @ckeys = ("csme${c}", "bevcsmSoC${c}", "bevcsmTargSoC${c}",
-                   "bevcsmBatCap${c}", "bevcsmPwr${c}");
+      my @ckeys = ("csme${c}", "bevcsmSoC${c}", "bevcsmTargSoC${c}", "exconfc${c}", 
+                   "rcmdcsm${c}", "bevcsmBatCap${c}", "bevcsmPwr${c}");
 
       next if !grep { defined $row->{$_} } @ckeys;                              # keiner der Keys vorhanden -> Zeile betrifft Consumer $c nicht
       delete @{$row}{@ckeys};                                                   # alle vorhandenen Keys in einem Rutsch entfernen
@@ -11470,7 +11467,7 @@ sub delConsumerFromMem {
   }
   
   if ($dosave) {
-      my $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+      my $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
   }
   
   delete $data{$name}{consumers}{$c};                                           # Consumerhash löschen
@@ -11512,7 +11509,15 @@ sub reloadCacheFiles {
   my $name  = $paref->{name};
 
   return if(CurrentVal ($name, 'cachefilesloaded', 0));
+  
+  # --- zuerst immer! Initialisierung einlesen
+  $paref->{file}      = $initcache.$name;                       # Cache File Initialisierung einlesen wenn vorhanden
+  $paref->{cachename} = 'initfirst';
+  $paref->{title}     = 'Initialize';
+  readCacheFile ($paref);
 
+
+  # --- folgende Cache Files
   $paref->{file}      = $pvhcache.$name;                       # Cache File PV History einlesen wenn vorhanden
   $paref->{cachename} = 'pvhist';
   $paref->{title}     = 'pvHistory';
@@ -11583,7 +11588,6 @@ sub readCacheFile {
   my $title     = $paref->{title};
   
   my $hash = $defs{$name};
-  my $lang = getLang ($hash);
 
   if ($cachename eq 'aitrained') {
       my ($err, $objref) = fileRetrieve ($file);
@@ -11717,9 +11721,35 @@ sub readCacheFile {
 
       return ('', $nr, $na);
   }
-  
+  elsif ($cachename eq 'initfirst') {
+      my ($err, @init) = FileRead ( { FileName  => $file,
+                                      ForceType => PERSISTDEST,                         # wird immer! aus dem Filesystem gelesen
+                                    } ); 
 
-  my ($error, @content) = FileRead ($file);
+      if (!$err) {
+          my $ijson      = join "", @init;
+          my ($isuccess) = evaljson ($hash, $ijson);
+
+          if ($isuccess) {
+              $data{$name}{$cachename} = decode_json ($ijson);
+
+              Log3 ($name, 3, qq{$name - cached data "$title" restored});
+
+              _initfirstSync ( { name => $name, cachename => $cachename, direction => 'apply' } );
+          }
+          else {
+              Log3 ($name, 1, qq{$name - WARNING - The content of file "$file" is not readable or may be corrupt});
+          }
+      }        
+      
+      return;
+  }
+  
+  my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
+
+  my ($error, @content) = FileRead ( { FileName  => $file,
+                                       ForceType => $forceType,
+                                     } );
 
   if (!$error) {
       my $json      = join "", @content;
@@ -11740,7 +11770,7 @@ return;
 ################################################################
 #             Daten in File wegschreiben
 ################################################################
-sub writeCacheToFile {
+sub writeCacheFile {
   my $hash      = shift;
   my $cachename = shift;
   my $file      = shift;
@@ -11780,9 +11810,8 @@ sub writeCacheToFile {
       singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
 
       return;
-  }
-  
-  if ($cachename eq 'airaw') {
+  }  
+  elsif ($cachename eq 'airaw') {
       my $dat = AiRawdataVal ($hash, '', '', undef);
 
       if (defined $dat) {
@@ -11801,8 +11830,7 @@ sub writeCacheToFile {
 
       return;
   }
-  
-  if ($cachename eq 'neuralnet') {
+  elsif ($cachename eq 'neuralnet') {
       if (scalar keys %{$data{$name}{neuralnet}}) {
           my $nnref = $data{$name}{neuralnet};
           my %saved_models;
@@ -11859,8 +11887,7 @@ sub writeCacheToFile {
           return "The AI FANN data cache is empty";
       }
   }
-
-  if ($cachename eq 'dwdcatalog') {
+  elsif ($cachename eq 'dwdcatalog') {
       if (scalar keys %{$data{$name}{dwdcatalog}}) {
           $error = fileStore ($data{$name}{dwdcatalog}, $file);
 
@@ -11876,8 +11903,7 @@ sub writeCacheToFile {
 
       return;
   }
-
-  if ($cachename eq 'statusapi') {
+  elsif ($cachename eq 'statusapi') {
       if (scalar keys %{$data{$name}{statusapi}}) {
           $error = fileStore ($data{$name}{statusapi}, $file);
 
@@ -11893,8 +11919,7 @@ sub writeCacheToFile {
 
       return;
   }
-
-  if ($cachename eq 'weatherapi') {
+  elsif ($cachename eq 'weatherapi') {
       if (scalar keys %{$data{$name}{weatherapi}}) {
           $error = fileStore ($data{$name}{weatherapi}, $file);
 
@@ -11910,8 +11935,7 @@ sub writeCacheToFile {
 
       return;
   }
-
-  if ($cachename eq 'plantconfig') {
+  elsif ($cachename eq 'plantconfig') {
       my ($plantcfg, $nr, $na) = _storePlantConfig ($hash);
 
       if (scalar keys %{$plantcfg}) {
@@ -11930,6 +11954,26 @@ sub writeCacheToFile {
 
       return ('', $nr, $na);
   }
+  elsif ($cachename eq 'initfirst') {                                                           # --- Initialisierungswerte (werden beim Load zuerst geladen!)
+      _initfirstSync ( { name => $name, cachename => $cachename, direction => 'collect' } );
+      
+      push my @inits, encode_json ($data{$name}{$cachename});
+      
+      delete $data{$name}{$cachename};                                                          # den Zwischencache löschen
+      
+      $error = FileWrite ( { FileName  => $file,
+                             ForceType => PERSISTDEST,                                          # muß immer! 'file' sein
+                           }, @inits 
+                         );
+
+      if ($error) {
+          $err = qq{ERROR writing cache file "$file": $error};
+          Log3 ($name, 1, "$name - $err");
+          return $err;
+      }
+      
+      return;
+  }
 
   if (!keys %{$data{$name}{$cachename}}) {
       if (-e $file) {
@@ -11945,7 +11989,7 @@ sub writeCacheToFile {
 
   push my @arr, encode_json ($data{$name}{$cachename});
   
-  my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+  my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
   
   $error = FileWrite ( { FileName  => $file,
                          ForceType => $forceType,
@@ -11960,6 +12004,52 @@ sub writeCacheToFile {
   $lw                 = gettimeofday();
   $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
   singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
+
+return;
+}
+
+################################################################
+#  Sammelt (collect) oder verteilt (apply) die initfirst-Werte
+################################################################
+sub _initfirstSync {
+  my $paref     = shift;
+  my $name      = $paref->{name};
+  my $cachename = $paref->{cachename};
+  my $dir       = $paref->{direction};                                                      # 'collect' (Schreiben) | 'apply' (Lesen)
+
+  if ($dir eq 'collect') {                                                                  # --- Werte aus den Quellbereichen einsammeln ---
+      $data{$name}{$cachename} = {};
+      
+      for my $key (keys %initfirstMap) {
+          my $val = $initfirstMap{$key}{get}->($name);
+          next if !defined $val;
+          
+          $data{$name}{$cachename}{$key} = $val;
+      }
+      
+      return;
+  }
+
+  if ($dir eq 'apply') {                                                                    # --- Werte in die Zielbereiche zurückschreiben ---
+      for my $key (keys %{$data{$name}{$cachename} // {}}) {
+          my $val = delete $data{$name}{$cachename}{$key};
+
+          if (!defined $val) {
+              next;
+          }
+
+          if (!exists $initfirstMap{$key}) {                                                # unbekannter/veralteter Key im Cache-File
+              Log3 ($name, 2, qq{$name - WARNING - unknown $cachename key "$key" ignored});
+              next;
+          }
+
+          $initfirstMap{$key}{set}->($name, $val);
+          
+          Log3 ($name, 3, qq{$name - set initial $key=$val before load other data});
+      }
+      
+      return;
+  }
 
 return;
 }
@@ -12260,7 +12350,10 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
   
-  readingsDelete ($hash, 'Tomorrow_ConsumptionForecast');               # 07.06.
+  if (!CurrentVal($name, 'TCF_cleanup_done', 0)) {
+      readingsDelete ($hash, 'Tomorrow_ConsumptionForecast');               # 07.06.
+      $data{$name}{current}{TCF_cleanup_done} = 1;                          # läuft nur einmal pro Session
+  }
   
   if (!CurrentVal($name, 'pvh_00_cleanup_done', 0)) {             # 09.07.
       for my $dy (1..31) {
@@ -12893,13 +12986,13 @@ sub _specialActivities {
           delete $data{$name}{circular}{99}{tdayDvtn};
           delete $data{$name}{circular}{99}{tdayConDvtn};
 
-          delete $data{$name}{pvhist}{$day};                                                     # den (alten) aktuellen Tag aus History löschen
+          delete $data{$name}{pvhist}{$day};                                                    # den (alten) aktuellen Tag aus History löschen
 
-          if (int $day == 1) {                                                                   # Monatswechsel: überhängende Tage löschen
-              my $dtp  = timestringsFromOffset ($name, $t, -86000);                              # Berechne die Anzahl der Tage im Vormonat
+          if (int $day == 1) {                                                                  # Monatswechsel: überhängende Tage löschen
+              my $dtp  = timestringsFromOffset ($name, $t, -86000);                             # Berechne die Anzahl der Tage im Vormonat
               my $dipm = int $dtp->{day};
 
-              for my $dtr ($dipm + 1 .. 31) {                                                    # Lösche ungültige Tage des Vormonats
+              for my $dtr ($dipm + 1 .. 31) {                                                   # Lösche ungültige Tage des Vormonats
                   if (exists $data{$name}{pvhist}{$dtr}) {
                       delete $data{$name}{pvhist}{$dtr};
                       Log3 ($name, 3, "$name - history day >$dtr< deleted");
@@ -12907,7 +13000,7 @@ sub _specialActivities {
               }
           }
 
-          writeCacheToFile ($hash, 'plantconfig', $plantcfg.$name);                              # Anlagenkonfiguration sichern
+          writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                               # Anlagenkonfiguration sichern
 
           Log3 ($name, 3, "$name - history day >$day< deleted");
           Log3 ($name, 4, "$name - Daily special tasks - Task 2 finished");
@@ -12930,7 +13023,7 @@ sub _specialActivities {
               deleteConsumerPlanning ($hash, $c);
           }
 
-          writeCacheToFile ($hash, 'consumers', $csmcache.$name);                               # Cache File Consumer schreiben
+          writeCacheFile ($hash, 'consumers', $csmcache.$name);                                 # Cache File Consumer schreiben
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
       }
@@ -12947,12 +13040,12 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
 
-          __delObsoleteAPIData     ($paref);                                                   # Bereinigung obsoleter Daten im solcastapi Hash
+          __delObsoleteAPIData ($paref);                                                        # Bereinigung obsoleter Daten im solcastapi Hash
 
-          my $ttl    = 24 * 3600;                                                              # Logsperrhash: Lebenszeit eines Eintrags bevor er entfernt wird
+          my $ttl    = 24 * 3600;                                                               # Logsperrhash: Lebenszeit eines Eintrags bevor er entfernt wird
           my $cutoff = $t - $ttl;
 
-          for my $sh1 (keys %{ $data{$name}{log} }) {                                          # Logsperrhash bereinigen
+          for my $sh1 (keys %{ $data{$name}{log} }) {                                           # Logsperrhash bereinigen
               delete $data{$name}{log}{$sh1} if($data{$name}{log}{$sh1}{ts} // 0 < $cutoff);
           }
 
@@ -15058,7 +15151,6 @@ sub _transferEnvironmentValues {
   
   my $peh = __parseAttrEnvironment ($name);                                                         # Parsed Hash
   my $err;
-  #return if(!$peh);
              
   # --- Anwesenheit auswerten
   my $presence_weighted;
@@ -15100,6 +15192,23 @@ sub _transferEnvironmentValues {
   }
   else {
       delete $data{$name}{circular}{99}{accum_presence_seconds};                                    # Dauerwert entfernen wenn kein presence
+  }
+  
+  # --- Grid Status ermitteln
+  if (defined $peh->{gridstdev}) {
+      my $gridstdev = $peh->{gridstdev};
+      my $gridstrdg = $peh->{gridstrdg};
+      my $gridstrgx = $peh->{gridstrgx} // '';
+      
+      my $gridstring = ReadingsVal ($gridstdev, $gridstrdg, 0);
+      my $gridstat   = $gridstring =~ m/^$gridstrgx$/x ? 1 : 0;
+      
+      $data{$name}{current}{gridStatus} = $gridstat;
+      
+      debugLog ($paref, 'collectData_long', "collect Grid state - device=$gridstdev, Reading=$gridstrdg, Value=$gridstring => Result=$gridstat");  
+  }
+  else {
+      delete $data{$name}{current}{gridStatus};
   }
   
   # --- Komforttemperatur auslesen
@@ -15445,6 +15554,7 @@ sub __parseAttrEnvironment {
   my ($oustmpdev, $oustmprdg)             = split (':', $ph->{outsideTemp}, 2) if(defined $ph->{outsideTemp});
   my ($winddev,     $windrdg)             = split (':', $ph->{windSpeed},   2) if(defined $ph->{windSpeed});
   my ($presendev, $presenrdg, $presenrgx) = split (':', $ph->{presence},    3) if(defined $ph->{presence});
+  my ($gridstdev, $gridstrdg, $gridstrgx) = split (':', $ph->{gridStatus},  3) if(defined $ph->{gridStatus});
 
 
   my $parsed = {
@@ -15454,7 +15564,10 @@ sub __parseAttrEnvironment {
       windRdg         => $windrdg,     
       presenceDev     => $presendev,
       presenceRdg     => $presenrdg,  
-      presenceRgx     => $presenrgx,     
+      presenceRgx     => $presenrgx,   
+      gridstdev       => $gridstdev,
+      gridstrdg       => $gridstrdg,
+      gridstrgx       => $gridstrgx,
   };
 
 return $parsed;
@@ -17226,7 +17339,7 @@ sub _manageConsumerData {
   
   # --- Consumer Cache File schreiben
   if (CurrentVal ($name, 'consumerCacheDirty', 0)) {
-      writeCacheToFile ($hash, 'consumers', $csmcache.$name);
+      writeCacheFile ($hash, 'consumers', $csmcache.$name);
       delete $data{$name}{current}{consumerCacheDirty};
   }
 
@@ -19350,7 +19463,7 @@ sub _calcConsForecast {                  ## no critic "not used"
   
   _calcConsForecast_legacy ($paref);                                                # legacy Verbrauchsprognose
   
-  my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, 'con');
+  my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, 'con', 'EN');
   
   if ($rdy) {                                                                       # NN Verbrauch ist ready to use      
       my $err = aiFannConInfer ($paref);                                            # Verbrauchsprognose via neuronales Netz
@@ -21716,8 +21829,15 @@ sub _graphicHeader {
       
       my $dt       = timestringsFromOffset ($name, $paref->{t}, 0);
       my $hod      = sprintf "%02d", ($dt->{hour} + 1);
-      my $presence = CurrentVal ($name, 'presence', undef);                                             # Anwesenheit                 
+      my $presence = CurrentVal ($name, 'presence',   undef);                                           # Anwesenheit 
+      my $gridstat = CurrentVal ($name, 'gridStatus', undef);                                           # Netz Verfügbarkeit       
       
+      my $gridimg  = !defined $gridstat                         
+                     ? FW_makeImage ('scene_power_grid@grey')
+                     : $gridstat
+                     ? FW_makeImage ('scene_power_grid')
+                     : FW_makeImage ('scene_power_grid_crossed_red@grey');
+
       my $presimg  = !defined $presence                         
                      ? FW_makeImage ('user_unknown@grey')
                      : $presence
@@ -21982,7 +22102,8 @@ sub _graphicHeader {
       
       my @parts1;
 
-      push @parts1, [ $presimg, 3 ]                    if(grep /^presence$/,    @$sa);              # Anwesenheitssymbol  
+      push @parts1, [ $presimg, 3 ]                    if(grep /^presence$/,    @$sa);              # Anwesenheitssymbol
+      push @parts1, [ $gridimg, 3 ]                    if(grep /^gridStatus$/,  @$sa);              # Grid verfügbar Symbol      
       push @parts1, [ $windimg, 1 ], [ $windspeed, 1 ] if(grep /^windSpeed$/,   @$sa);              # Windanzeige  
       push @parts1, [ $tempimg, 0 ], [ $temptxt,   3 ] if(grep /^outsideTemp$/, @$sa);              # Außentemperatur
       
@@ -22837,20 +22958,27 @@ sub _graphicConsumerLegend {
       
       my $caicon                  = $paref->{caicon};                                               # Consumer AdviceIcon
       my ($err, $cname, $dswname) = getCDnames  ($name, $c);                                        # Consumer und Switch Device Name
-      my $calias                  = ConsumerVal ($name, $c, 'alias',   $cname);                     # Alias des Consumerdevices
-      #my $cicon                   = ConsumerVal ($name, $c, 'icon',        '');                     # Icon des Consumerdevices
+      my $calias                  = ConsumerVal ($name, $c, 'alias', $cname);                       # Alias des Consumerdevices
+      my $iconfix                 = CurrentVal  ($name, 'iconFix',       '');                       # Icon Darstellung fixiert (nicht dynamisiert)
+      
+      my $cicon;
+      
+      if ($iconfix =~ /panel/xs) {
+          $cicon = ConsumerVal ($name, $c, 'icon', '');                                             # Icon des Consumerdevices
+      }
+      else {
+          ($cicon) = __substituteIcon ( { name  => $name,                                           # dynamisches Icon verwenden
+                                          pn    => $c,
+                                          ptyp  => 'consumer',
+                                          pcurr => ConsumerVal ($name, $c, 'currpower', 0),                              
+                                          lang  => $lang
+                                        } );
+      }
 
-      my ($cicon) = __substituteIcon ( { name  => $name,                                            # Icon des Consumerdevices
-                                         pn    => $c,
-                                         ptyp  => 'consumer',
-                                         pcurr => ConsumerVal ($name, $c, 'currpower', 0),                              
-                                         lang  => $lang
-                                       } );
-
-      my $oncom                   = ConsumerVal ($name, $c, 'oncom',       '');                     # Consumer Einschaltkommando
-      my $offcom                  = ConsumerVal ($name, $c, 'offcom',      '');                     # Consumer Ausschaltkommando
-      my $autord                  = ConsumerVal ($name, $c, 'autoreading', '');                     # Readingname f. Automatiksteuerung
-      my $auto                    = ConsumerVal ($name, $c, 'auto',         1);                     # Automatic Mode
+      my $oncom   = ConsumerVal ($name, $c, 'oncom',       '');                                     # Consumer Einschaltkommando
+      my $offcom  = ConsumerVal ($name, $c, 'offcom',      '');                                     # Consumer Ausschaltkommando
+      my $autord  = ConsumerVal ($name, $c, 'autoreading', '');                                     # Readingname f. Automatiksteuerung
+      my $auto    = ConsumerVal ($name, $c, 'auto',         1);                                     # Automatic Mode
       
       my $cactive = __queryConsumerActiveState ( { name     => $name, 
                                                    consumer => $c,
@@ -24429,15 +24557,23 @@ END0
       $cons_left      = $consumer_start + 15;
 
       for my $c (@consumers) {
-          my $calias  = ConsumerVal ($name, $c, 'alias', '');                                              # Name des Consumerdevices
+          my $calias  = ConsumerVal ($name, $c, 'alias', '');                                               # Name des Consumerdevices
           $cnsmrpower = $cnsmr->{$c}{p};
-
-          my ($cicon) = __substituteIcon ( { name  => $name,                                               # Icon des Consumerdevices
-                                             pn    => $c,
-                                             ptyp  => $cnsmr->{$c}{ptyp},
-                                             pcurr => $cnsmrpower,
-                                             lang  => $lang
-                                           } );
+          my $iconfix = CurrentVal  ($name, 'iconFix', '');                                                 # Icon Darstellung fixiert (nicht dynamisiert)
+          
+          my $cicon;
+          
+          if ($iconfix =~ /flow/xs) {
+              $cicon = ConsumerVal ($name, $c, 'icon', '');                                                 
+          }
+          else {
+              ($cicon) = __substituteIcon ( { name  => $name,                                               
+                                              pn    => $c,
+                                              ptyp  => $cnsmr->{$c}{ptyp},
+                                              pcurr => $cnsmrpower,
+                                              lang  => $lang
+                                            } );
+          }
 
           my $ccicon = (split '@', $cicon)[1];
           $cicon     = FW_makeImage         ($cicon, '');
@@ -26012,7 +26148,7 @@ sub __aiAddRawData {
   debugLog ($paref, 'aiProcess', "AI raw add - $dosave entities added to raw data pool ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
 
   if ($dosave) {
-      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+      $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
@@ -26058,7 +26194,7 @@ sub aiDelRawData {
   }
 
   if ($dosave) {
-      $err = writeCacheToFile ($hash, 'airaw', $airaw.$name);
+      $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
@@ -26095,7 +26231,7 @@ sub aiEnterTrain {
   my $blkkey = 'AINNTRAIN_' . uc($fanntyp) . '_BLOCKRUN';
   my $hash   = $defs{$name};
 
-  my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp);
+  my ($prepared, $rdy, $cause) = _aiFannModelReady ($name, $fanntyp, 'EN');
       
   my $ai_attr   = $fanntyp eq 'con' ? 'aiConActivate' : 'aiPvActivate';
   my $targettyp = $fanntyp eq 'con' ? 'consumption'   : 'PV';
@@ -26137,7 +26273,7 @@ sub aiEnterTrain {
   
   if (defined $hash->{HELPER}{$blkkey}) {
       $data{$name}{current}{$fanntyp.'NNTrainstate'} = 'is just retrained';
-      $hash->{HELPER}{$blkkey}{loglevel}             = 3;                                           # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
+      $hash->{HELPER}{$blkkey}{loglevel}             = 3;                                               # Forum https://forum.fhem.de/index.php/topic,77057.msg689918.html#msg689918
       
       debugLog ($paref, 'aiProcess', qq{AI FANN Training for $targettyp Forecast BlockingCall PID "$hash->{HELPER}{$blkkey}{pid}" with Timeout } . AINNTRBLTO . " s started");
   }
@@ -26185,7 +26321,7 @@ sub aiFannConDataLoad {
   my (@bev_active_values, @bev_load_values, @bev_n_active_values, @bev_soc_deficit_norm_values);
   my (@bev_energy_remaining_values, @bev_charge_intensity_values);
   my (@hp_heating_frac_values, @hp_defrost_frac_values, @hp_hotwater_frac_values, @hp_cooling_frac_values,  
-      @hp_pool_frac_values,   @hp_poolheating_frac_values, @hp_active_frac_values);
+      @hp_pool_frac_values, @hp_poolheating_frac_values, @hp_eco_frac_values, @hp_active_frac_values);
   my @cycle_csme_values;
   
   # einstellbare Parameter
@@ -26397,6 +26533,7 @@ sub aiFannConDataLoad {
       push @hp_cooling_frac_values,      $hp_sig->{cooling_frac};
       push @hp_pool_frac_values,         $hp_sig->{pool_frac};
       push @hp_poolheating_frac_values,  $hp_sig->{poolheating_frac};
+      push @hp_eco_frac_values,          $hp_sig->{eco_frac};
       push @hp_active_frac_values,       $hp_sig->{active_frac};
    
       push @cycle_csme_values,           $cycle_csme;
@@ -26479,6 +26616,7 @@ sub aiFannConDataLoad {
                                              hp_cooling_frac_series            => \@hp_cooling_frac_values,
                                              hp_pool_frac_series               => \@hp_pool_frac_values,
                                              hp_poolheating_frac_series        => \@hp_poolheating_frac_values,
+                                             hp_eco_frac_series                => \@hp_eco_frac_values,
                                              hp_active_frac_series             => \@hp_active_frac_values, 
                                              
                                              cycle_csme_norm_series            => $cycle_csme_norm,                                             
@@ -26637,6 +26775,7 @@ sub aiFannConDataLoad {
                          hp_cooling_frac_lag1      => $lags->{hp_cooling_frac_lag1},            # WP Kühlen Anteil Vorstunde
                          hp_pool_frac_lag1         => $lags->{hp_pool_frac_lag1},               # WP Pool Anteil Vorstunde
                          hp_poolheating_frac_lag1  => $lags->{hp_poolheating_frac_lag1},        # WP Poolheizung Anteil Vorstunde
+                         hp_eco_frac_lag1          => $lags->{hp_eco_frac_lag1},                # WP Eco Anteil Vorstunde
                          hp_active_frac_lag1       => $lags->{hp_active_frac_lag1},             # WP Aktivitätsgrad Vorstunde (0..1)
                          
                          cycle_csme_lag1_norm      => $lags->{cycle_csme_lag1_norm},            # Zyklus-Consumer Energiemenge Vorstunde (normiert)
@@ -26922,7 +27061,7 @@ sub aiFannTrain {
       
       delete $data{$name}{$fanntyp.'temp'};
 
-      my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
+      my $err = writeCacheFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
 
       if ($err) {
           $retref->{$fanntyp.'NNTrainstate'} = $err;
@@ -27774,7 +27913,7 @@ sub aiFannConInfer {
 
   my ($hp_heating_ref, $hp_defrost_ref, $hp_hotwater_ref,
       $hp_cooling_ref, $hp_pool_ref,    $hp_poolheating_ref,
-      $hp_active_ref) =
+      $hp_eco_ref,     $hp_active_ref) =
       _aiFannHpOpmodeHistArray ( { name    => $name,
                                    fanntyp => $fanntyp,
                                    t       => $paref->{t},
@@ -27962,7 +28101,8 @@ sub aiFannConInfer {
                                              hp_cooling_frac_series            => $hp_cooling_ref,
                                              hp_pool_frac_series               => $hp_pool_ref,
                                              hp_poolheating_frac_series        => $hp_poolheating_ref,
-                                             hp_active_frac_series             => $hp_active_ref,      
+                                             hp_active_frac_series             => $hp_active_ref,
+                                             hp_eco_frac_series                => $hp_eco_ref,
 
                                              cycle_csme_norm_series            => \@cycle_csme_norm_hist,                                             
                                            } );      
@@ -28089,6 +28229,7 @@ sub aiFannConInfer {
                             hp_cooling_frac_lag1        => $lags->{hp_cooling_frac_lag1},               # WP Kühlen Anteil Vorstunde
                             hp_pool_frac_lag1           => $lags->{hp_pool_frac_lag1},                  # WP Pool Anteil Vorstunde
                             hp_poolheating_frac_lag1    => $lags->{hp_poolheating_frac_lag1},           # WP Poolheizung Anteil Vorstunde
+                            hp_eco_frac_lag1            => $lags->{hp_eco_frac_lag1},                   # WP Eco Anteil Vorstunde
                             hp_active_frac_lag1         => $lags->{hp_active_frac_lag1},                # WP Aktivitätsgrad Vorstunde (0..1)
                             
                             cycle_csme_lag1_norm        => $lags->{cycle_csme_lag1_norm},               # Zyklus-Consumer Energiemenge Vorstunde (normiert)
@@ -28184,6 +28325,7 @@ sub aiFannConInfer {
       push @$hp_cooling_ref,     0;
       push @$hp_pool_ref,        0;
       push @$hp_poolheating_ref, 0;
+      push @$hp_eco_ref,         0;
       push @$hp_active_ref,      0; 
 
       
@@ -28675,6 +28817,7 @@ sub _aiFannBuildLagFeatures {
   my $hp_cooling_frac_lag1     = $paref->{hp_cooling_frac_series}[$i-1]     // 0;
   my $hp_pool_frac_lag1        = $paref->{hp_pool_frac_series}[$i-1]        // 0;
   my $hp_poolheating_frac_lag1 = $paref->{hp_poolheating_frac_series}[$i-1] // 0;
+  my $hp_eco_frac_lag1         = $paref->{hp_eco_frac_series}[$i-1]         // 0;
   my $hp_active_frac_lag1      = $paref->{hp_active_frac_series}[$i-1]      // 0;
   
   # -----------------------------------------------------------------------
@@ -28760,7 +28903,8 @@ sub _aiFannBuildLagFeatures {
       hp_hotwater_frac_lag1     => $hp_hotwater_frac_lag1,    
       hp_cooling_frac_lag1      => $hp_cooling_frac_lag1,     
       hp_pool_frac_lag1         => $hp_pool_frac_lag1,        
-      hp_poolheating_frac_lag1  => $hp_poolheating_frac_lag1, 
+      hp_poolheating_frac_lag1  => $hp_poolheating_frac_lag1,
+      hp_eco_frac_lag1          => $hp_eco_frac_lag1,      
       hp_active_frac_lag1       => $hp_active_frac_lag1,
 
       cycle_csme_lag1_norm      => $cycle_csme_lag1_norm,  
@@ -29332,7 +29476,8 @@ sub _aiFannEpochDiagnostic {
   my $rmse_rel_warn  = $profileweights{$profile}{rmse_rel_warn};  
   my $is_dead_net    = defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7;
   my $lim_bitfail    = AIBITFAILLIMIT;                                                         # Bit_Fail-Limit für rprop-Guard
-
+  my $lr_at_floor    = $learning_rate <= AILRATEMIN;
+  
   my $code  = 'ok';
   my $label = '';
   my @hints;
@@ -29343,11 +29488,13 @@ sub _aiFannEpochDiagnostic {
   my $thr_early      = $dpr > 20 ? 0.04  : $dpr > 6  ? 0.06 : 0.12;
 
   # --- 1. Relative Epochen-Position
-  if ($rel < $thr_very_early) {                                                                    
+  if ($rel < $thr_very_early) {      
       $code  = 'very_early';
       $label = $epoche_translations{vearly}{$lang};
         
-      push @hints, $epoche_translations{hint1}{$lang} unless $is_dead_net;
+      push @hints, $epoche_translations{hint1}{$lang} unless ($is_dead_net || $lr_at_floor);
+      push @hints, sprintf $epoche_translations{hint26}{$lang}, $learning_rate, $learning_momentum
+          if ($lr_at_floor && !$is_dead_net);      
       
       my $ratio_ok = !$dpr || $dpr > 20;                                                # hint2 nur wenn DPR sehr hoch → Architektur ist gemessen an den Daten zu klein
       
@@ -29360,7 +29507,7 @@ sub _aiFannEpochDiagnostic {
       if ($best_epoch < 200) {
           push @hints, $epoche_translations{hint3}{$lang};
       }
-  }
+  }  
   elsif ($rel < $thr_early) {                                               
       $code  = 'early';
       $label = $epoche_translations{early}{$lang};
@@ -29609,7 +29756,7 @@ sub __aiFannArchHint {
       return { hints => \@hints };                                                                      # weitere Architekturhinweise sinnlos
   }
   
-  my $lr_hint = (defined $learning_rate && abs($sug_lr - $learning_rate) < 0.0001)                      # Hilfssub-äquivalent: hint19 nur ausgeben wenn Empfehlung von aktueller LR abweicht
+  my $lr_hint = (defined $learning_rate && abs($sug_lr - $learning_rate) < AILRATEMIN)                  # Hilfssub-äquivalent: hint19 nur ausgeben wenn Empfehlung von aktueller LR abweicht
                 ? ''
                 : sprintf $epoche_translations{hint19}{$lang}, $sug_arch, $num_inputs, $sug_lr;  
   
@@ -30097,9 +30244,9 @@ sub _aiFannHpOpmodeHistArray {
   my $limit   = $paref->{limit} // 200;
   my $fanntyp = $paref->{fanntyp};
 
-  my (@heating, @defrost, @hotwater, @cooling, @pool, @poolheating, @active);
+  my (@heating, @defrost, @hotwater, @cooling, @pool, @poolheating, @eco, @active);
 
-  return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active)
+  return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active)
       unless exists $data{$name}{pvhist};
 
   # --- Cache-Objekt initialisieren ---
@@ -30146,6 +30293,7 @@ sub _aiFannHpOpmodeHistArray {
           push @pool,        $hp_sig->{pool_frac};
           push @poolheating, $hp_sig->{poolheating_frac};
           push @active,      $hp_sig->{active_frac};
+          push @eco,         $hp_sig->{eco_frac};
       }
   }
 
@@ -30159,10 +30307,11 @@ sub _aiFannHpOpmodeHistArray {
   @pool        = @pool       [-$min .. -1];
   @poolheating = @poolheating[-$min .. -1];
   @active      = @active     [-$min .. -1];
+  @eco         = @eco        [-$min .. -1];
 
-  LRU_insert ($name, $cache, $key, [ \@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active ]);
+  LRU_insert ($name, $cache, $key, [ \@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active ]);
 
-return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active);
+return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active);
 }
 
 ################################################################
@@ -30757,7 +30906,7 @@ sub aiFannDetectDrift {
       ) );
   }
   
-  my $err = writeCacheToFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
+  my $err = writeCacheFile ($defs{$name}, 'neuralnet', $neuralnet.$name);
 
   if ($err) {
       Log3 ($name, 1, "$name - ERROR while writing file: ".$neuralnet.$name);
@@ -31001,7 +31150,11 @@ sub _aiFannRetrainRecommended {
       return { recommendation => 'none', reason => '-' };
   }
     
-  my @recent      = @{$hist}[-12 .. -1];
+  #my @recent      = @{$hist}[-12 .. -1];
+  my $len    = @$hist;
+  my $start  = $len >= 12 ? $len - 12 : 0;
+  my @recent = @{$hist}[$start .. $len - 1];
+
   my $persist_cnt = grep { /^(moderate|severe)$/ } @recent;
     
   # --- Strukturelle Blocks: Modell ist das Problem
@@ -31376,8 +31529,9 @@ return $med;
 #       neurales Network Readiness prüfen
 ################################################################
 sub _aiFannModelReady {
-  my ($name, $fanntyp) = @_;
+  my ($name, $fanntyp, $lang) = @_;
 
+  $lang      //= 'EN';
   my $cause    = '';
   my $prepared = 1;                                                             # Netz ist vorbereitet
   my $ready    = 1;                                                             # Netz ist bereit
@@ -31390,27 +31544,37 @@ sub _aiFannModelReady {
   my $aiconact = CurrentVal ($name, $nactive, 0);
   
   if ($aifannabs) { 
-      $cause    = "Perl Modul AI::FANN is missing"; 
+      $cause    = $lang eq 'DE' 
+                ? "das Perl-Modul AI::FANN ist nicht installiert" 
+                : "Perl Modul AI::FANN is missing";  
       $ready    = 0;
       $prepared = 0;
   }
   elsif (!$aiconact) { 
-      $cause    = "the neural network for consumption forecasting is not activated"; 
+      $cause    = $lang eq 'DE' 
+                ? "das neuronale Netzwerk zur Verbrauchsprognose ist nicht aktiviert" 
+                : "the neural network for consumption forecasting is not activated"; 
       $ready    = 0;
       $prepared = 0;   
   }
   elsif ($aiconact == 2) {
-      $cause    = "the neural network for consumption forecasting is in 'Training only' mode";
+      $cause    = $lang eq 'DE' 
+                ? "das neuronale Netzwerk für die Verbrauchsprognose befindet sich im Modus 'nur Training'" 
+                : "the neural network for consumption forecasting is in 'Training only' mode";
       $ready    = 0;
       $prepared = 2;       
   }
   elsif (!defined $nctst) {
-      $cause    = "the neural network for consumption forecasting has not yet been trained";
+      $cause    = $lang eq 'DE' 
+                ? "das neuronale Netzwerk zur Verbrauchsprognose wurde noch nicht trainiert" 
+                : "the neural network for consumption forecasting has not yet been trained";
       $ready    = 0;
       $prepared = 1;
   }
   elsif ($nctst eq 'is just retrained') {
-      $cause    = "the neural network for consumption forecasting is just being trained";
+      $cause    = $lang eq 'DE' 
+                ? "das neuronale Netzwerk für die Verbrauchsprognose wird gerade trainiert" 
+                : "the neural network for consumption forecasting is just being trained";
       $ready    = 0;
       $prepared = 1;
   }
@@ -31860,7 +32024,7 @@ sub aiTrain {
   }
 
   $data{$name}{aidectree}{aitrained} = \@ensemble;
-  $err = writeCacheToFile ($hash, 'aitrained', $aitrained.$name);
+  $err = writeCacheFile ($hash, 'aitrained', $aitrained.$name);
   delete $data{$name}{aidectree}{aitrained};
 
   my $rn;
@@ -33584,7 +33748,7 @@ sub _writeAsCsv {
       }
   }
   
-  my $forceType = CurrentVal ($name, 'writeForceType', 'auto');
+  my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
   
   my $err = FileWrite ( { FileName  => $outfile,
                           ForceType => $forceType,
@@ -34183,7 +34347,7 @@ sub checkPlantConfig {
 
           if ($hcon < 0 || $hcon > $conlim) {                                                                              
               $conpvhfault++;
-              Log3 ($name, 1, "$name - WARNING - The stored Energy con=$hcon of day/hour $dy/$hh in pvHistory is faulty. The incorrect value can be deleted with 'set $name reset consumptionHistory $dy $hh'.");
+              Log3 ($name, 1, "$name - WARNING - The stored Energy con=$hcon of day/hour $dy/$hh in pvHistory is faulty. The incorrect value can be deleted with 'set $name reset consumptionShort $dy $hh'.");
           }
       }
   }
@@ -36539,24 +36703,6 @@ return length ($decoded);
 }
 
 ################################################################
-#  Prüfung eines übergebenen Regex
-################################################################
-sub checkRegex {
-  my $regexp = shift;
-
-  return 'no Regex is provided' if(!defined $regexp);
-
-  eval { "Hallo" =~ m/^$regexp$/;
-         1;
-       }
-       or do { my $err = (split " at", $@)[0];
-               return "Bad regexp: ".$err;
-             };
-
-return;
-}
-
-################################################################
 #  Hilfsfunktion Sortierung numerische und 
 #  nicht numerische Daten zur Verwendung in sort ...
 ################################################################
@@ -36565,6 +36711,66 @@ sub naturalSort {
     return ( $a =~ /^-?\d+(\.\d+)?$/ && $b =~ /^-?\d+(\.\d+)?$/ )
         ? $a <=> $b
         : $a cmp $b;
+}
+
+########################################################################
+# Prüft eine "Device:Reading:Regex/Code" Angabe für die
+# angegebenen Condition-Keys (z.B. swoncond, swoffcond, spignorecond)
+#
+# $name     - Devicename
+# $akey     - der aktuelle Attribut-Key (für die Fehlermeldung)
+# $akeyval  - der Wert, "Device:Reading[:Code|Regex]"
+# $checkdev - optionaler Check auf vorhandenes Device
+# $checkrdg - optionaler Check auf definierten Reading-Wert
+# $codereq  - ob Code/Regex-Teil zwingend erforderlich ist
+#
+# Rückgabe: Fehlertext oder undef bei Erfolg
+########################################################################
+sub checkDevRdCond {
+  my $name     = shift;
+  my $akey     = shift;
+  my $akeyval  = shift;
+  my $checkdev = shift // 0;
+  my $checkrdg = shift // 0;
+  my $codereq  = shift // 0;
+
+  my ($dev, $rdg, $code) = split ":", $akeyval, 3;
+
+  if (!$dev || !$rdg || ($codereq && !defined $code)) {
+      return qq{A Device, Reading and Regex/Code must be specified for the '$akey' key};
+  }
+
+  my $err;
+
+  if ($checkdev) {
+      ($err) = isDeviceValid ( { name   => $name,               # prüft Device vorhanden
+                                 obj    => $dev,
+                                 method => 'string',
+                               } );
+      return "$akey: $err" if $err;
+  }
+
+  if ($checkrdg) {
+      my $val = ReadingsVal ($dev, $rdg, undef);
+      
+      if (!defined $val) {
+          return "The reading '$rdg' of device '$dev' is invalid or doesn't contain a defined value";
+      }
+  }
+
+  if (defined $code) {
+      if ($code =~ m/^\s*\{.*\}\s*$/xs) {                       # prüft Perl-Code
+          $code =~ s/\s//xg;
+          ($err) = checkCode ($name, $code);
+          return "$akey: $err" if $err;
+      }
+      else {                                                    # prüft Regex
+          $err = checkRegex ($code);
+          return "$akey: $err" if $err;
+      }
+  }
+
+return;
 }
 
 ################################################################
@@ -36580,6 +36786,24 @@ sub checkhhmm {
   }
 
 return $valid;
+}
+
+################################################################
+#  Prüfung eines übergebenen Regex
+################################################################
+sub checkRegex {
+  my $regexp = shift;
+
+  return 'no Regex is provided' if(!defined $regexp);
+
+  eval { "Hallo" =~ m/^$regexp$/;
+         1;
+       }
+       or do { my $err = (split " at", $@)[0];
+               return "Bad regexp: ".$err;
+             };
+
+return;
 }
 
 ################################################################
@@ -38830,16 +39054,16 @@ to ensure that the system configuration is correct.
       <ul>
          <table>
          <colgroup> <col width="17%"> <col width="83%"> </colgroup>
-            <tr><td> <b>backup</b>               </td><td>Saves the active in-memory structures with the current timestamp.                                                                             </td></tr>
-            <tr><td>                             </td><td><a href="#SolarForecast-attr-plantControl">plantControl->backupFilesKeep</a> generations of the files are saved. Older versions are deleted.  </td></tr>
-            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;                                     </td></tr>
-            <tr><td>                             </td><td>                                                                                                                                              </td></tr>
-            <tr><td> <b>save</b>                 </td><td>The active in-memory structures are saved.                                                                                                    </td></tr>
-            <tr><td>                             </td><td>Files: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                         </td></tr>
-            <tr><td>                             </td><td>                                                                                                                                              </td></tr>
-            <tr><td> <b>recover-&lt;File&gt;</b> </td><td>Restores the data of the selected backup file as an active in-memory structure.                                                               </td></tr>
-            <tr><td>                             </td><td>To avoid inconsistencies, the PVH.* and PVC.* files should be restored in pairs                                                               </td></tr>
-            <tr><td>                             </td><td>with the same time stamp.                                                                                                                     </td></tr>
+            <tr><td> <b>backup</b>                </td><td>Saves the active in-memory structures with the current timestamp.                                                                             </td></tr>
+            <tr><td>                              </td><td><a href="#SolarForecast-attr-plantControl">plantControl->backupFilesKeep</a> generations of the files are saved. Older versions are deleted.  </td></tr>
+            <tr><td>                              </td><td>Files: PVH_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Timestamp&gt;                                     </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                              </td></tr>
+            <tr><td> <b>save</b>                  </td><td>The active in-memory structures are saved:                                                                                                    </td></tr>
+            <tr><td>                              </td><td><b>File(s):</b> ./FHEM/FhemUtils/X_SolarForecast_&lt;name&gt; with X = PVH, PVC, Messages, ScApi, StatApi, WeatherApi, Init                   </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                              </td></tr>
+            <tr><td> <b>recover-&lt;File&gt;</b>  </td><td>Restores the data of the selected backup file as an active in-memory structure.                                                               </td></tr>
+            <tr><td>                              </td><td>To avoid inconsistencies, the PVH.* and PVC.* files should be restored in pairs                                                               </td></tr>
+            <tr><td>                              </td><td>with the same time stamp.                                                                                                                     </td></tr>
          </table>
       </ul>
       <br>
@@ -39042,22 +39266,20 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td>To delete the data of only one consumer use:                                                                                                                    </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Consumer number&gt; </ul>                                                                                         </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
-            <tr><td> <b>consumptionHistory</b> </td><td>deletes the stored consumption values of the house from the pvHistory memory                                                                                    </td></tr>
+            <tr><td> <b>consumptionShort</b>   </td><td>Deletes the stored energy consumption data for the house from the short-term memory (pvHistory).                                                                </td></tr>
             <tr><td>                           </td><td>To delete the consumption values of a specific day:                                                                                                             </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumptionHistory 08) </ul>                                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionShort &lt;Day&gt;   (e.g. set &lt;name&gt; reset consumptionShort 08) </ul>                                               </td></tr>
             <tr><td>                           </td><td>To delete the consumption values of a specific hour of a day:                                                                                                   </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumptionHistory 08 10) </ul>                             </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionShort &lt;Day&gt; &lt;Hour&gt; (e.g. set &lt;name&gt; reset consumptionShort 08 10) </ul>                                 </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>deletes the 4-hour energy trigger points                                                                                                                        </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>powerTriggerSet</b>    </td><td>deletes the trigger points for PV generation values                                                                                                             </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
-            <tr><td> <b>pvCorrection</b>       </td><td>Deletes the readings pvCorrectionFactor* and hidden control readings of the correction system.                                                                  </td></tr>
-            <tr><td>                           </td><td>To delete all previously stored PV correction factors from the caches:                                                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                                            </td></tr>
-            <tr><td>                           </td><td>To delete stored PV correction factors of a certain hour from the caches:                                                                                       </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;  </ul>                                                                                              </td></tr>
-            <tr><td>                           </td><td><ul>(e.g. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                                            </td></tr>
+            <tr><td> <b>pvCorrection</b>       </td><td>Deletes the pvCorrectionFactor* readings as well as hidden control readings from the correction system.                                                         </td></tr>
+            <tr><td>                           </td><td>Adding 'cached' will also delete the PV data/factors from short-term storage (pvHistory) and long-term storage (pvCircular).                                    </td></tr>
+            <tr><td>                           </td><td><b>set &lt;name&gt; reset pvCorrection cached</b> - deletes PV data/factors for each hour                                                                       </td></tr>
+            <tr><td>                           </td><td><b>set &lt;name&gt; reset pvCorrection cached &lt;Hour&gt;</b> - deletes PV data/factors for the given hour (e.g. set &lt;name&gt; reset pvCorrection cached 10)</td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>pvHistory</b>          </td><td>deletes the memory of all historical days (01 ... 31)                                                                                                           </td></tr>
             <tr><td>                           </td><td>To delete a specific historical day:                                                                                                                            </td></tr>
@@ -39884,6 +40106,11 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td><b>must</b> - Consumers will be optimally scheduled even if there is likely to be insufficient surplus PV power available.                         </td></tr>
             <tr><td>                            </td><td><b>mustNot</b> - Consumers must not be scheduled or started. Consumers that have been started will be stopped.                                     </td></tr>
             <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>iconFix</b>             </td><td>By default, the consumer icons in the flow chart and the consumer panel are dynamically colored and, if necessary, updated based on their status.  </td></tr>
+            <tr><td>                            </td><td>This feature can be disabled for both displays. The settings are specified using a comma-separated list.                                           </td></tr>
+            <tr><td>                            </td><td><b>panel</b> - The icons in the user panel are displayed statically as defined.                                                                    </td></tr>
+            <tr><td>                            </td><td><b>flow</b> - The icons in the flowchart are displayed statically as defined.                                                                      </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>showLegend</b>          </td><td>Defines the position or display method of the consumer legend if consumers are registered.                                                         </td></tr>
             <tr><td>                            </td><td>To hide the consumer panel, please use <a href="#SolarForecast-attr-graphicSelect">graphicSelect</a>.                                              </td></tr>
             <tr><td>                            </td><td><b>icon_top</b> - the legend is displayed above the bar chart with consumer icons (default)                                                        </td></tr>
@@ -39895,7 +40122,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; consumerControl dummyIcon=status_comfort@#ff8c00 adviceIcon=times showLegend=icon_bottom globalMode=mustNot
+         attr &lt;name&gt; consumerControl dummyIcon=status_comfort@#ff8c00 adviceIcon=times showLegend=icon_bottom globalMode=mustNot iconFix=panel,flow
        </ul>
 
        </li>
@@ -40169,7 +40396,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmode</b>         </td><td>defines a &lt;Device&gt;:&lt;Reading&gt; combination that provides the current operating mode (Required Information).                              </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
-            <tr><td>                       </td><td>The return value must be exactly one of the following: <b>off heating defrost hotwater cooling pool poolheating </b>                               </td></tr>
+            <tr><td>                       </td><td>The return value must be exactly one of the following: <b>off heating defrost hotwater cooling pool poolheating eco</b>                            </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmodeIcons</b>    </td><td>Each possible operating mode (opmode) can be assigned a unique icon and color. The entries are specified as a comma-separated list.                </td></tr>
             <tr><td>                       </td><td>Syntax: <b> &lt;opmode&gt;->&lt;Icon&gt;[@&lt;Color&gt;],&lt;opmode&gt;->&lt;Icon&gt;[@&lt;Color&gt;],... </b>                                     </td></tr>
@@ -40680,6 +40907,7 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>headerShowEnv</b>       </td><td>Select the environmental values to display in the header section of the graph. The selected options are separated by commas.              </td></tr>
             <tr><td>                            </td><td>The environment variables are set using the <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment attribute.                    </td></tr>
+            <tr><td>                            </td><td><b>gridStatus</b>  - current availability/current connection status to the public network                                                 </td></tr>
 			<tr><td>                            </td><td><b>outsideTemp</b> - the current outdoor temperature                                                                                      </td></tr>
             <tr><td>                            </td><td><b>presence</b>    - presence status                                                                                                      </td></tr>
             <tr><td>                            </td><td><b>windSpeed</b>   - the current wind speed (smoothed)                                                                                    </td></tr>
@@ -41022,7 +41250,7 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td><b>0</b> - Display off, <b>1</b> - Display on, default: 0                                                                                                                </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>writeForceType</b>            </td><td>Specifies the persistence type for storing transaction data. (Some data is always persisted in the file system.)                                                         </td></tr>
-            <tr><td>                                  </td><td><b>auto</b> - Storage in the file system or ConfigDB, if available, <b>file</b> - Storage in the file system, default: auto                                              </td></tr>
+            <tr><td>                                  </td><td><b>db</b> - stored in ConfigDB if available; otherwise, in the file system <b>file</b> - Stored in the file system, default: file                                        </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
          </table>
          </ul>
@@ -41149,11 +41377,15 @@ to ensure that the system configuration is correct.
          <ul>
          <table>
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
+            <tr><td> <b>gridStatus</b>            </td><td>A &lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt; combination for the connection status to the public grid. The specified regular expression         </td></tr>
+            <tr><td>                              </td><td>must evaluate to the Boolean value 'true' for the status 'Network available/connected', otherwise 'false'.                                        </td></tr>
+            <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                              </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>outsideTemp</b>           </td><td>A &lt;Device&gt;:&lt;Reading&gt; combination that provides the currently measured outside temperature in °C.                                      </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;                                                                                                            </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>presence</b>              </td><td>A &lt;device&gt;:&lt;reading&gt;:&lt;regex&gt; combination that provides the presence status of the residents. The specified regular expression   </td></tr>
-            <tr><td>                              </td><td>must return 'true' for the 'presence' status, otherwise 'false'.                                                                                  </td></tr>
+            <tr><td>                              </td><td>must return Boolean value 'true' for the 'presence' status, otherwise 'false'.                                                                    </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                              </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>         
             <tr><td> <b>windSpeed</b>             </td><td>A <Device>:<Reading> combination that provides the currently measured wind speed in m/s.                                                          </td></tr>
@@ -41955,8 +42187,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                              </td><td>Es werden <a href="#SolarForecast-attr-backupFilesKeep">plantControl->backupFilesKeep</a> Generationen der Dateien gespeichert. Ältere Versionen werden gelöscht.  </td></tr>
             <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;, PVC_SolarForecast_&lt;name&gt;_&lt;Zeitstempel&gt;                                                    </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                                   </td></tr>
-            <tr><td> <b>save</b>                  </td><td>Die aktiven In-Memory Strukturen werden gespeichert.                                                                                                               </td></tr>
-            <tr><td>                              </td><td>Dateien: PVH_SolarForecast_&lt;name&gt;, PVC_SolarForecast_&lt;name&gt;                                                                                            </td></tr>
+            <tr><td> <b>save</b>                  </td><td>Die aktiven In-Memory Strukturen werden gesichert:                                                                                                                 </td></tr>
+            <tr><td>                              </td><td><b>Datei(en):</b> ./FHEM/FhemUtils/X_SolarForecast_&lt;name&gt; mit X = PVH, PVC, Messages, ScApi, StatApi, WeatherApi, Init                                       </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                                   </td></tr>
             <tr><td> <b>recover-&lt;Datei&gt;</b> </td><td>Stellt die Daten der ausgewählten Sicherungsdatei als aktive In-Memory Struktur wieder her.                                                                        </td></tr>
             <tr><td>                              </td><td>Um Inkonsistenzen zu vermeiden, sollten die Dateien PVH.* und PVC.* mit dem gleichen                                                                               </td></tr>
@@ -42167,27 +42399,25 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                                                                     </td></tr>
             <tr><td>                           </td><td>Das Modul führt eine automatische Neuplanung der Verbraucherschaltung durch.                                                                                    </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
-            <tr><td> <b>consumerMaster</b>     </td><td>löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher                                                                    </td></tr>
+            <tr><td> <b>consumerMaster</b>     </td><td>Löscht die aktuellen und historischen Daten aller registrierten Verbraucher aus dem Speicher.                                                                   </td></tr>
             <tr><td>                           </td><td>Die definierten Consumer Attribute bleiben bestehen und die Daten werden neu gesammelt.                                                                         </td></tr>
             <tr><td>                           </td><td>Um die Daten nur eines Verbrauchers zu löschen verwendet man:                                                                                                   </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerMaster &lt;Verbrauchernummer&gt; </ul>                                                                                       </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
-            <tr><td> <b>consumptionHistory</b> </td><td>löscht die gespeicherten Verbrauchswerte des Hauses aus dem pvHistory Speicher                                                                                  </td></tr>
+            <tr><td> <b>consumptionShort</b>   </td><td>Löscht die gespeicherten Verbrauchswerte des Hauses aus dem Kurzzeit-Speicher (pvHistory).                                                                      </td></tr>
             <tr><td>                           </td><td>Um die Verbrauchswerte eines bestimmten Tages zu löschen:                                                                                                       </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumptionHistory 08) </ul>                                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionShort &lt;Tag&gt;   (z.B. set &lt;name&gt; reset consumptionShort 08) </ul>                                               </td></tr>
             <tr><td>                           </td><td>Um die Verbrauchswerte einer bestimmten Stunde eines Tages zu löschen:                                                                                          </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionHistory &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumptionHistory 08 10) </ul>                           </td></tr>
+            <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumptionShort &lt;Tag&gt; &lt;Stunde&gt; (z.B. set &lt;name&gt; reset consumptionShort 08 10) </ul>                               </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>energyH4TriggerSet</b> </td><td>löscht die 4-Stunden Energie Triggerpunkte                                                                                                                      </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>powerTriggerSet</b>    </td><td>löscht die Triggerpunkte für PV Erzeugungswerte                                                                                                                 </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>pvCorrection</b>       </td><td>Löscht die Readings pvCorrectionFactor* sowie verborgene Steuerreadings des Korrektursystems.                                                                   </td></tr>
-            <tr><td>                           </td><td>Um alle bisher gespeicherten PV Korrekturfaktoren aus den Caches zu löschen:                                                                                    </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached </ul>                                                                                                            </td></tr>
-            <tr><td>                           </td><td>Um gespeicherte PV Korrekturfaktoren einer bestimmten Stunde aus den Caches zu löschen:                                                                         </td></tr>
-            <tr><td>                           </td><td><ul>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;  </ul>                                                                                            </td></tr>
-            <tr><td>                           </td><td><ul>(z.B. set &lt;name&gt; reset pvCorrection cached 10)       </ul>                                                                                            </td></tr>
+            <tr><td>                           </td><td>Mit dem Zusatz 'cached' werden die PV Daten/Faktoren aus Kurzzeit-Speicher (pvHistory) und Langzeit-Speicher (pvCircular) ebenfalls gelöscht.                   </td></tr>
+            <tr><td>                           </td><td><b>set &lt;name&gt; reset pvCorrection cached</b> - löscht PV Daten/Faktoren jeder Stunde                                                                       </td></tr>
+            <tr><td>                           </td><td><b>set &lt;name&gt; reset pvCorrection cached &lt;Stunde&gt;</b> - löscht PV Daten/Faktoren der Stunde (z.B. set &lt;name&gt; reset pvCorrection cached 10)     </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>pvHistory</b>          </td><td>löscht den Speicher aller historischen Tage (01 ... 31)                                                                                                         </td></tr>
             <tr><td>                           </td><td>Um einen bestimmten historischen Tag zu löschen:                                                                                                                </td></tr>
@@ -42460,7 +42690,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
       Die Angabe 'exportToCsv' exportiert den gesamten Inhalt, oder bei Angabe von Filterparametern einen Teilinhalt der pvHistory 
       in eine CSV-Datei. <br><br>
       
-      Mit den Filterparamtern können nur bestimmte Tage, ausgewählte Stunden oder bestimmte Felder gefiltert werden. Diese 
+      Mit den Filterparametern können nur bestimmte Tage, ausgewählte Stunden oder bestimmte Felder gefiltert werden. Diese 
       Angaben können als Komma getrennte Liste den Filterschlüsseln übergeben werden, zum Beispiel:  <br><br>
       
            <ul><i> day=1,2,4 hod=12,13,99 key=pvfc,pvrl    </i></ul>   <br>
@@ -43013,6 +43243,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td><b>must</b> - Verbraucher werden optimiert eingeplant auch wenn wahrscheinlich nicht genügend PV Überschuß vorhanden sein wird                     </td></tr>
             <tr><td>                            </td><td><b>mustNot</b> - Verbraucher dürfen nicht geplant bzw. gestartet werden. Gestartete Verbraucher werden gestoppt                                    </td></tr>
             <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
+            <tr><td> <b>iconFix</b>             </td><td>Die Verbrauchericons werden im Standard in der Flußgrafik und im Verbraucherpaneel entsprechend ihres Status dynamisch gefärbt und ggf. geändert.  </td></tr>
+            <tr><td>                            </td><td>Diese Dynamik kann für beide Anzeigen ausgeschaltet werden. Die Angabe erfolgt durch eine Komma getrennte Liste.                                   </td></tr>
+            <tr><td>                            </td><td><b>panel</b> - die Icons im Verbraucherpaneel werden wie definiert statisch angezeigt                                                              </td></tr>
+            <tr><td>                            </td><td><b>flow</b> - die Icons in der Flußgrafik werden wie definiert statisch angezeigt                                                                  </td></tr>
+            <tr><td>                            </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>showLegend</b>          </td><td>Definiert die Lage bzw. Darstellungsweise der Verbraucherlegende sofern Verbraucher registriert sind.                                              </td></tr>
             <tr><td>                            </td><td>Zur Ausblendung des Verbraucherpaneels bitte <a href="#SolarForecast-attr-graphicSelect ">graphicSelect</a> verwenden.                             </td></tr>
             <tr><td>                            </td><td><b>icon_top</b> - die Legende wird oberhalb der Balkengrafik mit Verbrauchericons angezeigt (default)                                              </td></tr>
@@ -43025,7 +43260,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; consumerControl dummyIcon=status_comfort@#ff8c00 adviceIcon=times showLegend=icon_bottom globalMode=mustNot
+         attr &lt;name&gt; consumerControl dummyIcon=status_comfort@#ff8c00 adviceIcon=times showLegend=icon_bottom globalMode=mustNot iconFix=panel,flow
        </ul>
 
        </li>
@@ -43299,7 +43534,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmode</b>         </td><td>definiert eine &lt;Device&gt;:&lt;Reading&gt; Kombination welche den aktuellen Betriebsmodus liefert (Pflichtangabe).                              </td></tr>
             <tr><td>                       </td><td>Syntax: <b>&lt;Device&gt;:&lt;Reading&gt;</b>                                                                                                      </td></tr>
-            <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating </b>                          </td></tr>
+            <tr><td>                       </td><td>Die Rückgabe muß genau ein Wert der folgenden Auswahl sein: <b>off heating defrost hotwater cooling pool poolheating eco</b>                       </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>opmodeIcons</b>    </td><td>Jedem möglichen Betriebsmodus (opmode) kann ein inividuelles Icon und Farbe zugewiesen werden. Die Eingabe erfolgt als Komma getrennte Liste.      </td></tr>
             <tr><td>                       </td><td>Syntax: <b> &lt;opmode&gt;->&lt;Icon&gt;[@&lt;Farbe&gt;],&lt;opmode&gt;->&lt;Icon&gt;[@&lt;Farbe&gt;],... </b>                                     </td></tr>
@@ -43811,7 +44046,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>headerShowEnv</b>       </td><td>Auswahl der anzuzeigenden Umgebungswerte im Grafik Kopfbereich. Die gewählten Optionen werden durch Komma getrennt angegeben.   </td></tr>
             <tr><td>                            </td><td>Die Einrichtung der Umgebungswerte erfolgt mit Attribut <a href="#SolarForecast-attr-setupEnvironment">setupEnvironment</a>.    </td></tr>
-			<tr><td>                            </td><td><b>outsideTemp</b> - die aktuelle Außentemperatur                                                                               </td></tr>
+            <tr><td>                            </td><td><b>gridStatus</b>  - aktuelle Verfügbarkeit/aktueller Verbindungsstatus zum öffentlichen Netz                                   </td></tr>
+            <tr><td>                            </td><td><b>outsideTemp</b> - die aktuelle Außentemperatur                                                                               </td></tr>
             <tr><td>                            </td><td><b>presence</b>    - der Anwesenheitsstatus                                                                                     </td></tr>
             <tr><td>                            </td><td><b>windSpeed</b>   - die aktuelle Windgeschwindigkeit (geglätted)                                                               </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
@@ -44150,9 +44386,9 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>showLink</b>                  </td><td>Anzeige eines Links zur Detailansicht des Device über dem Grafikbereich                                                                                              </td></tr>
             <tr><td>                                  </td><td><b>0</b> - Anzeige aus, <b>1</b> - Anzeige an, default: 0                                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
-            <tr><td> <b>writeForceType</b>            </td><td>Legt den Persistenztyp für die Speicherung der Bewegungsdaten fest. (Manche Daten werden grundsätzlich im Filesystem persistiert)     </td></tr>
-            <tr><td>                                  </td><td><b>auto</b> - Speicherung in Filesystem oder ConfigDB wenn vorhanden, <b>file</b> - Speicherung im Filesystem, default: auto          </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                      </td></tr>
+            <tr><td> <b>writeForceType</b>            </td><td>Legt den Persistenztyp für die Speicherung der Bewegungsdaten fest. (Manche Daten werden grundsätzlich im Filesystem persistiert)                                    </td></tr>
+            <tr><td>                                  </td><td><b>db</b> - Speicherung in ConfigDB wenn vorhanden, sonst im Dateisystem <b>file</b> - Speicherung im Dateisystem, default: file                                     </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
          </table>
          </ul>
 
@@ -44278,11 +44514,15 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          <ul>
          <table>
          <colgroup> <col width="23%"> <col width="77%"> </colgroup>
+            <tr><td> <b>gridStatus</b>            </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt; Kombination für den Verbindungsstatus zum öffentlichen Netz. Der angegebene reguläre Ausdruck    </td></tr>
+            <tr><td>                              </td><td>muß Boolean 'true' für den Status 'Netz verfügbar/verbunden' ergeben, sonst 'false'.                                                              </td></tr>
+            <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                               </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                  </td></tr>         
             <tr><td> <b>outsideTemp</b>           </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt; Kombination, die die aktuell gemessene Außentemperatur in °C liefert.                                          </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;                                                                                                             </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>presence</b>              </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt; Kombination, die den Anwesenheitsstatus der Bewohner liefert. Der angegebene reguläre Ausdruck   </td></tr>
-            <tr><td>                              </td><td>muß 'true' für den Status 'Anwesenheit' ergeben, sonst 'false'.                                                                                   </td></tr>
+            <tr><td>                              </td><td>muß Boolean 'true' für den Status 'Anwesenheit' ergeben, sonst 'false'.                                                                           </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                               </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>         
             <tr><td> <b>windSpeed</b>             </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt; Kombination, die die aktuell gemessene Windgeschwindigkeit in m/s liefert.                                     </td></tr>
