@@ -71,6 +71,7 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.9.3"  => "27.07.2026  Die reset-Funktion 'set ... reset ..' kann Daten in pvCircular suchen, löschen und bearbeiten ",
   "2.9.2"  => "26.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
                            "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
                            "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
@@ -2811,6 +2812,7 @@ sub Set {
 
   my @re = qw( aiData
                batteryTriggerSet
+               circularData
                consumerMaster
                consumerPlanning
                consumptionShort
@@ -3406,8 +3408,8 @@ sub _setreset {                          ## no critic "not used"
 
   my $hash  = $defs{$name};
 
-  if   ( $arg =~ /=/ ) { $arg =~ s/,(?=[^=]*=)/ /g; }
-  else                 { $arg =~ s/,/ /g; }
+  if ( $arg =~ /=/ ) { $arg =~ s/,(?=[^=]*=)/ /g; }
+  else               { $arg =~ s/,/ /g; }
 
   $arg     = trim ($arg);                                                        # trim it
   my @args = split " ", $arg;
@@ -3539,7 +3541,11 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if ($args[0] eq 'aiData') {
-      __resetAiData ($name, $arg, \@args);
+      return  __resetAiData ($name, $arg, \@args);
+  }
+  
+  if ($args[0] eq 'circularData') {
+      return __resetCircularArrData ($name, $arg, \@args);
   }
 
   if ($args[0] eq 'powerTriggerSet') {
@@ -3689,7 +3695,7 @@ sub __resetAiData {
           }
       }
   }
-  elsif ($ha->{delValue} || $ha->{searchValue}) {                                    # den Wert einen Schlüssels suchen oder löschen
+  elsif ($ha->{delValue} || $ha->{searchValue}) {                                               # den Wert einen Schlüssels suchen oder löschen
       my ($key, $op, $operand);
       my $del  = 0;
       my $done = '';
@@ -3704,7 +3710,7 @@ sub __resetAiData {
           ($key, $op, $operand) = ($1, $2, $3);         
       }
       
-      return "the arguments of 'delValue' are not specified correctly" if(!defined $key || !defined $op || !defined $operand);
+      return "The arguments of 'delValue' are not specified correctly" if(!defined $key || !defined $op || !defined $operand);
       
       my %ops = (
           '==' => sub { $_[0] == $_[1] },
@@ -3736,18 +3742,18 @@ sub __resetAiData {
       my $key = $ha->{key};
       my $val = $ha->{value};
 
-      return "the arguments of 'setValue' are not specified correctly, use: setValue Index=<idx> key=<key> value=<value>"
+      return "The arguments of 'setValue' are not specified correctly, use: setValue Index=<idx> key=<key> value=<value>"
           if (!defined $idx || !defined $key || !defined $val || !length $idx || !length $key || !length $val);
 
       return "Index '$idx' must be numeric" if ($idx !~ /^\d+$/);
-      return "key '$key' contains invalid characters"
+      return "The key '$key' contains invalid characters"
           if ($key !~ /^[A-Za-z0-9_]+$/);
       return "AI Raw data index '$idx' doesn't exist"
           if (!exists $data{$name}{aidectree}{airaw}{$idx});
 
-      my $old = AiRawdataVal ($name, $idx, $key, undef);
+      my $old                                    = AiRawdataVal ($name, $idx, $key, undef);
       $data{$name}{aidectree}{airaw}{$idx}{$key} = $val;
-      $dosave = 1;
+      $dosave                                    = 1;
 
       Log3 ($name, 1, qq{$name - AI Raw data set - idx: $idx -> key=$key, old value=}.
                        (defined $old ? $old : '<undef>').qq{, new value=$val});
@@ -3759,6 +3765,139 @@ sub __resetAiData {
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
           Log3 ($name, 1, qq{$name - AI raw data saved into file: }.$airaw.$name);
+      }
+  }
+
+return;
+}
+
+################################################################
+#    Circular Array-Daten (con_all/gcons_a) löschen/ändern
+################################################################
+sub __resetCircularArrData {
+  my ($name, $arg, $argsref) = @_;
+
+  my @args   = @$argsref;
+  my $dosave = 0;
+
+  my ($aa, $ha) = parseParams ($arg);
+
+  my %ops = (
+      '==' => sub { $_[0] == $_[1] },
+      '>'  => sub { $_[0] >  $_[1] },
+      '>=' => sub { $_[0] >= $_[1] },
+      '<'  => sub { $_[0] <  $_[1] },
+      '<=' => sub { $_[0] <= $_[1] },
+  );
+
+  if ($ha->{delValue} || $ha->{searchValue}) {                                                  # Werte in con_all/gcons_a suchen oder löschen
+      my ($key, $op, $operand);
+      my $del  = 0;
+      my $done = '';
+
+      if ($ha->{delValue}) {
+          $ha->{delValue} =~ /^(con_all|gcons_a)(==|>=|<=|<|>)(-?\d+(?:\.\d+)?)$/xs;
+          ($key, $op, $operand) = ($1, $2, $3);
+          $del = 1;
+      }
+      elsif ($ha->{searchValue}) {
+          $ha->{searchValue} =~ /^(con_all|gcons_a)(==|>=|<=|<|>)(-?\d+(?:\.\d+)?)$/xs;
+          ($key, $op, $operand) = ($1, $2, $3);
+      }
+
+      return "The arguments of 'delValue'/'searchValue' are not specified correctly, use: delValue=<con_all|gcons_a><op><value> [hod=<hod>] [wday=<wday>]"
+          if(!defined $key || !defined $op || !defined $operand);
+
+      my $hodfilter = $ha->{hod};                                                               # optional: auf eine Stunde beschränken
+      
+      if (defined $hodfilter) {
+          return "The hod '$hodfilter' must be numeric" if($hodfilter !~ /^\d{1,2}$/xs);
+          
+          $hodfilter = sprintf "%02d", $hodfilter;
+          
+          return "The circular hod '$hodfilter' doesn't exist" if(!exists $data{$name}{circular}{$hodfilter});
+      }
+
+      my $wdayfilter = $ha->{wday};                                                             # optional: auf einen Wochentag beschränken
+      my $hits_total = 0;
+
+      for my $hod (sort keys %{$data{$name}{circular}}) {
+          next if($hodfilter && $hod ne $hodfilter);
+          next if(!exists $data{$name}{circular}{$hod}{$key} || ref $data{$name}{circular}{$hod}{$key} ne 'HASH');
+
+          for my $wday (sort keys %{$data{$name}{circular}{$hod}{$key}}) {
+              next if($wdayfilter && $wday ne $wdayfilter);
+
+              my $aref = $data{$name}{circular}{$hod}{$key}{$wday};
+              next if(ref $aref ne 'ARRAY');
+
+              my @hits;
+              
+              for my $i (0..$#{$aref}) {
+                  push @hits, $i if(isNumeric($aref->[$i]) && $ops{$op}->($aref->[$i], $operand));
+              }
+              
+              next if(!@hits);
+
+              $hits_total += scalar @hits;
+
+              my @hitvals = @{$aref}[@hits];                                         # Werte VOR dem Löschen sichern
+
+              if ($del) {
+                  for my $i (reverse @hits) {                                        # rückwärts löschen -> keine Indexverschiebung
+                      splice (@{$aref}, $i, 1);
+                  }
+                  $dosave = 1;
+                  $done   = 'deleted';
+              }
+              else {
+                  $done = 'found';
+              }
+
+              Log3 ($name, 1, "$name - Circular data $done - hod=$hod key=$key wday=$wday pos=".
+                               join(',', @hits)." value=".join(',', @hitvals));
+          }
+      }
+
+      Log3 ($name, 1, "$name - Circular data search/delete finished - key=$key, total matches: $hits_total")
+          if(!$hodfilter || !$wdayfilter);                                                      # zusammenfassende Meldung bei bereichsübergreifender Suche
+  }
+  elsif ($args[1] eq 'setValue') {                                                              # einen Einzelwert an Position pos setzen/ändern -> hod PFLICHT
+      my $hod  = $ha->{hod};
+      my $key  = $ha->{key};
+      my $wday = $ha->{wday};
+      my $pos  = $ha->{pos};
+      my $val  = $ha->{value};
+
+      return "The arguments of 'setValue' are not specified correctly, use: setValue hod=<hod> key=<con_all|gcons_a> wday=<wday> pos=<pos> value=<value>"
+          if (!defined $hod || !defined $key || !defined $wday || !defined $pos || !defined $val
+              || !length $hod || !length $key || !length $wday || !length $pos || !length $val);
+
+      return "The hod '$hod' must be numeric"                            if ($hod !~ /^\d{1,2}$/xs);
+      $hod = sprintf "%02d", $hod;
+
+      return "The key '$key' is not a valid array key (con_all|gcons_a)" if ($key !~ /^(con_all|gcons_a)$/xs);
+      return "The circular hod '$hod' doesn't exist"                     if (!exists $data{$name}{circular}{$hod});
+
+      my $aref = $data{$name}{circular}{$hod}{$key}{$wday};
+      return "The key '$key'/wday '$wday' doesn't exist in circular hod '$hod'" if(ref $aref ne 'ARRAY');
+      return "The pos '$pos' must be numeric"                                        if ($pos !~ /^\d+$/xs);
+      return "The pos '$pos' out of range (Array has ".scalar(@{$aref})." elements)" if ($pos > $#{$aref});
+      return "The value '$val' is not numeric"                                       if (!isNumeric($val));
+
+      my $old       = $aref->[$pos];
+      $aref->[$pos] = $val;
+      $dosave       = 1;
+
+      Log3 ($name, 1, qq{$name - Circular data set - hod=$hod key=$key wday=$wday pos=$pos -> }.
+                       qq{old value=$old, new value=$val});
+  }
+
+  if ($dosave) {
+      my $err = writeCacheFile ($defs{$name}, 'circular', $pvccache.$name);
+
+      if (!$err) {
+          Log3 ($name, 1, qq{$name - Circular data saved into file: }.$pvccache.$name);
       }
   }
 
@@ -12350,7 +12489,10 @@ sub centralTask {
   #    ::CommandDeleteAttr (undef, "$name graphicBeamWidth");
   #}
   
-  readingsDelete ($hash, 'Tomorrow_ConsumptionForecast');               # 07.06.
+  if (!CurrentVal($name, 'TCF_cleanup_done', 0)) {
+      readingsDelete ($hash, 'Tomorrow_ConsumptionForecast');               # 07.06.
+      $data{$name}{current}{TCF_cleanup_done} = 1;                          # läuft nur einmal pro Session
+  }
   
   if (!CurrentVal($name, 'pvh_00_cleanup_done', 0)) {             # 09.07.
       for my $dy (1..31) {
@@ -42390,6 +42532,19 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td>Beispiele: <b>1.)</b> setValue Index=2026071416 key=presence value=0 <b>2.)</b> setValue Index=2026071418 key=pvrl value=1722                                   </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                                                  </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>circularData</b>       </td><td>Mit den nachfolgenden Argumenten können die Array-Werte von 'con_all' oder 'gcons_a' im Circular-Cache manipuliert werden:                                      </td></tr>
+            <tr><td>                           </td><td><b>searchValue</b> - sucht den Zahlenwert im Schlüssel (con_all | gcons_a). Mögliche Vergleichsoperatoren sind: > | >= | == | <= | < (Findings sind im Logfile) </td></tr>
+            <tr><td>                           </td><td>Die Angabe von <i>hod</i> (Stunde) und <i>wday</i> (Wochentagskürzel) ist optional. Fehlen sie, wird über alle Stunden bzw. alle Wochentage gesucht.            </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> searchValue=con_all>1500 <b>2.)</b> searchValue=gcons_a==0 hod=05  <b>3.)</b> searchValue=con_all>=1000 hod=05 wday=Mo                    </td></tr>
+            <tr><td>                           </td><td><b>delValue</b> - löscht den Zahlenwert im Schlüssel (con_all | gcons_a). Mögliche Vergleichsoperatoren sind: > | >= | == | <= | < (Löschbestätigung im Logfile)</td></tr>
+            <tr><td>                           </td><td>Die Angabe von <i>hod</i> und <i>wday</i> ist optional. Fehlen sie, wird über alle Stunden bzw. alle Wochentage gelöscht.                                       </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> delValue=con_all>2000 <b>2.)</b> delValue=gcons_a==500 hod=02 wday=Do <b>3.)</b> delValue=con_all==0 hod=05                               </td></tr>
+            <tr><td>                           </td><td><b>setValue</b> - setzt bzw. ändert den Wert an einer bestimmten Position eines Wochentags-Arrays einer Stunde. (Bestätigung der Operation erfolgt im Logfile)  </td></tr>
+            <tr><td>                           </td><td><i>hod, key, wday, pos</i> und <i>value</i> sind hierbei zwingend anzugeben. <i>pos</i> ist die Array-Position (Zählung beginnt bei 0!).                        </td></tr>
+            <tr><td>                           </td><td>In der list-Ausgabe wird ein Wochentag ggf. auf mehrere Zeilen zu je 20 Werten umgebrochen. Die Zählung von <i>pos</i> setzt sich zeilenübergreifend fort,      </td></tr>
+            <tr><td>                           </td><td>d.h. Position 25 eines Wochentages befindet sich in der zweiten Anzeigezeile dieses Wochentages an der 6. Stelle (Zeile 1: pos 0-19, Zeile 2: pos 20-39, usw.). </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> setValue hod=05 key=con_all wday=Mo pos=3 value=999 <b>2.)</b> setValue hod=12 key=gcons_a wday=Fr pos=0 value=0                          </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                                                        </td></tr>
             <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                                                           </td></tr>
