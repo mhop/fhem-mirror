@@ -71,7 +71,8 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.3"  => "27.07.2026  Die reset-Funktion 'set ... reset ..' kann Daten in pvCircular suchen, löschen und bearbeiten ",
+  "2.9.3"  => "29.07.2026  Die reset-Funktion 'set ... reset ..' kann Daten in pvCircular suchen, löschen und bearbeiten ".
+                           "Einbau hint27 und hint28 sowie Überprüfung hint12 abhängig von aiConShuffleMode und aiConShufflePeriod ",
   "2.9.2"  => "26.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
                            "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
                            "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
@@ -658,25 +659,25 @@ my %fann_valid_versions = map { $_ => 1 } qw(v1 v2);                          # 
 my %fann_valid_flags    = map { $_ => 1 } qw(active pv heatpump bev);         # valide Flags für Profil-Synthese CON-Training
 
 my %profileweights = (                                                        # Gewichte für FANN Training und Inferenz profilabhängig     
-  v1_sandbox            => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_active      => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_pv          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_active_pv   => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_heatpump           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_pv        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_pv => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_sandbox            => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_common             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_common_active      => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_common_pv          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_common_active_pv   => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_heatpump           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_active    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_pv        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_active_pv => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
 
   # --- BEV-Varianten (Startwerte, gespiegelt von common/heatpump; nach erstem realen Training rekalibrieren) ---
-  v1_bev                    => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_active_bev             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_pv_bev                 => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_active_pv_bev          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_heatpump_bev           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_bev    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_pv_bev        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_pv_bev => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_bev                    => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_active_bev             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_pv_bev                 => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_active_pv_bev          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_heatpump_bev           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_active_bev    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_pv_bev        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_active_pv_bev => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
 );
 
 my %hset = (                                                                  # Hash der Set-Funktion
@@ -982,8 +983,12 @@ my %epoche_translations = (
                DE => "Hohes Momentum (%.2f) verstärkt wahrscheinlich Shuffle-Event-Overshooting (Validierungsfehler springt an jedem Shuffle-Ereignis nach oben): Momentum auf 0.4–0.5 reduzieren (aiControl->aiConMomentum). Dies stabilisiert den Validierungsverlauf und verbessert typischerweise die Slope, da der Optimizer in engere Minima einsinken kann ohne bei jedem Datenshuffle herauszuschießen." },
   hint25  => { EN => "Consider switching training algorithm: use RPROP instead of INCREMENTAL - RPROP adapts its step size automatically without manual learning rate tuning, which often converges faster when slope remains flat despite healthy training (aiControl->aiConTrainAlgo)",
                DE => "Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL verwenden - RPROP passt seine Schrittweite automatisch an und kommt ohne manuelle Lernraten-Einstellung aus, was bei anhaltend flacher Slope trotz gesunden Trainings oft deutlich schneller zum Ziel führt (aiControl->aiConTrainAlgo)" },
-  hint26 =>  { EN => "Learning rate already at floor (%.4f) – network still converges very early. In some cases a moderate increase of the learning rate (e.g. +50-100%%) combined with a matching momentum (currently %.2f) can help escape a flat plateau.",
+  hint26  => { EN => "Learning rate already at floor (%.4f) – network still converges very early. In some cases a moderate increase of the learning rate (e.g. +50-100%%) combined with a matching momentum (currently %.2f) can help escape a flat plateau.",
                DE => "Lernrate bereits am unteren Limit (%.4f) – Netz konvergiert dennoch sehr früh. In manchen Fällen hilft hier ausnahmsweise eine moderate Erhöhung der Lernrate (z.B. +50-100%%) in Kombination mit passend abgestimmtem Momentum (aktuell %.2f), um ein flaches Plateau zu verlassen." },
+  hint27  => { EN => "Validation curve remains unstable despite maximum shuffle period (30) (StdDev/Mean=%.2f): momentum is unremarkable, so the noise is likely data-inherent (e.g. stochastic consumption profile). Check aiControl->aiConBitFailLimit and consider a moderate reduction of the learning rate (aiControl->aiConLearnRate) instead of further shuffle tuning.",
+               DE => "Validierungsverlauf bleibt trotz maximaler Shuffle-Periode (30) instabil (StdDev/Mean=%.2f): Momentum ist unauffällig, daher wahrscheinlich datenbedingtes Rauschen (z.B. stochastisches Verbrauchsprofil). Prüfe aiControl->aiConBitFailLimit und erwäge eine moderate Reduktion der Lernrate (aiControl->aiConLearnRate) statt weiterer Shuffle-Anpassungen." },
+  hint28  => { EN => "Periodic shuffle is active (aiConShufflePeriod=%d), but validation curve is still unstable (StdDev/Mean=%.2f): increase the period step by step to %d to further improve stability (aiControl->aiConShufflePeriod).", 
+               DE => "Periodisches Shuffle ist aktiv (aiConShufflePeriod=%d), Validierungsverlauf aber weiterhin instabil (StdDev/Mean=%.2f): Periode schrittweise erhöhen auf %d, um die Stabilität weiter zu verbessern (aiControl->aiConShufflePeriod)." },
 ); 
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -27773,6 +27778,8 @@ sub aiFannRunTrain {
                                               hidden_layers      => $hidden_layers, 
                                               learning_rate      => $learning_rate,
                                               learning_momentum  => $learning_momentum,
+                                              shuffle_mode       => $shuffle_mode,
+                                              shuffle_period     => $shuffle_period,
                                               cur_ratio          => $cur_ratio,
                                               dataParamRatio     => $dataParamRatio,
                                               profile            => $profile,
@@ -29579,7 +29586,6 @@ sub _aiFannEpochDiagnostic {
   my $r2                 = $paref->{r2};
   my $rmse_rel           = $paref->{rmse_rel};
   my $bitfail            = $paref->{bitfail};                                        
-  my $num_epoch          = $paref->{num_epoch} // AINUMEPOCHS;
   my $num_inputs         = $paref->{num_inputs};
   my $split_index        = $paref->{split_index};
   my $num_train_datasets = $paref->{num_train_datasets};
@@ -29587,6 +29593,9 @@ sub _aiFannEpochDiagnostic {
   my $learning_rate      = $paref->{learning_rate};
   my $learning_momentum  = $paref->{learning_momentum};
   my $cur_ratio          = $paref->{cur_ratio};
+  my $num_epoch          = $paref->{num_epoch}      // AINUMEPOCHS;
+  my $shuffle_mode       = $paref->{shuffle_mode}   // 0;
+  my $shuffle_period     = $paref->{shuffle_period} // 0;
   my $dpr                = $paref->{dataParamRatio} // $cur_ratio // 0;        
   my $profile            = $paref->{profile};
   my $haf                = $paref->{haf};
@@ -29610,12 +29619,16 @@ sub _aiFannEpochDiagnostic {
   $slope    = round2 ($slope);
   $rmse_rel = round2 ($rmse_rel);
   
-  my $r2_threshold   = $profileweights{$profile}{r2_thld};
-  my $slope_warn_min = $profileweights{$profile}{slope_warn_min};
-  my $rmse_rel_warn  = $profileweights{$profile}{rmse_rel_warn};  
-  my $is_dead_net    = defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7;
-  my $lim_bitfail    = AIBITFAILLIMIT;                                                         # Bit_Fail-Limit für rprop-Guard
-  my $lr_at_floor    = $learning_rate <= AILRATEMIN;
+  my $r2_threshold    = $profileweights{$profile}{r2_thld};
+  my $slope_warn_min  = $profileweights{$profile}{slope_warn_min};
+  my $rmse_rel_warn   = $profileweights{$profile}{rmse_rel_warn};
+  my $stability_warn  = $profileweights{$profile}{stability_warn} // 0.15;                      # Fallback auf bisherigen Fixwert  
+  
+  my $is_dead_net     = defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7;
+  my $lim_bitfail     = AIBITFAILLIMIT;                                                         # Bit_Fail-Limit für rprop-Guard
+  my $lr_at_floor     = $learning_rate <= AILRATEMIN;
+  my $shuffle_active  = $shuffle_mode == 1;
+  my $shuffle_maxed   = $shuffle_active && $shuffle_period >= 30;
   
   my $code  = 'ok';
   my $label = '';
@@ -29702,20 +29715,32 @@ sub _aiFannEpochDiagnostic {
   }
   
   if (   $stability          >  0.05                                                    # Momentum-getriebene Oszillation + flache Slope ...
-      && $stability          <= 0.15                                                    # (moderate Instabilität, die hint12 noch nicht auslöst, aber Slope drückt)
+      && $stability          <= $stability_warn                                         # (moderate Instabilität, die hint12 noch nicht auslöst, aber Slope drückt)
       && $learning_momentum  >= 0.65
       && $slope              <  $slope_warn_min
       && !$is_dead_net) {
       push @hints, sprintf $epoche_translations{hint24}{$lang}, $learning_momentum;
   }
   
-  if ($stability > 0.15) {                                                              # Instabiler Validierungsverlauf
-      push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability;
-    
+  if ($stability > $stability_warn) {                                                   # Instabiler Validierungsverlauf
+      if (!$shuffle_active) {
+          push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability;
+      }
+      elsif (!$shuffle_maxed) {
+          my $next_period = $shuffle_period < 20 ? 20
+                          : $shuffle_period < 25 ? 25
+                          :                        30;
+                          
+          push @hints, sprintf $epoche_translations{hint28}{$lang}, $shuffle_period, $stability, $next_period;
+      }
+      elsif ($learning_momentum < 0.65) {                                               # Shuffle bereits maximal, Momentum unauffällig -> andere Ursache
+          push @hints, sprintf $epoche_translations{hint27}{$lang}, $stability;
+      }
+   
       if ($learning_momentum >= 0.65) {                                                 # hohes Momentum ist wahrscheinlich primärer Treiber der Instabilität
           push @hints, sprintf $epoche_translations{hint24}{$lang}, $learning_momentum;
       }
-    
+          
       $code = 'unstable' unless $code =~ /very/;
   }
 
@@ -42535,7 +42560,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>circularData</b>       </td><td>Mit den nachfolgenden Argumenten können die Array-Werte von 'con_all' oder 'gcons_a' im Circular-Cache manipuliert werden:                                      </td></tr>
             <tr><td>                           </td><td><b>searchValue</b> - sucht den Zahlenwert im Schlüssel (con_all | gcons_a). Mögliche Vergleichsoperatoren sind: > | >= | == | <= | < (Findings sind im Logfile) </td></tr>
-            <tr><td>                           </td><td>Die Angabe von <i>hod</i> (Stunde) und <i>wday</i> (Wochentagskürzel) ist optional. Fehlen sie, wird über alle Stunden bzw. alle Wochentage gesucht.            </td></tr>
+            <tr><td>                           </td><td>Die Angabe von <i>hod</i> (Stunde des Tages) und <i>wday</i> (Wochentagskürzel) ist optional. Fehlen sie, wird über alle Stunden bzw. alle Wochentage gesucht.  </td></tr>
             <tr><td>                           </td><td>Beispiele: <b>1.)</b> searchValue=con_all>1500 <b>2.)</b> searchValue=gcons_a==0 hod=05  <b>3.)</b> searchValue=con_all>=1000 hod=05 wday=Mo                    </td></tr>
             <tr><td>                           </td><td><b>delValue</b> - löscht den Zahlenwert im Schlüssel (con_all | gcons_a). Mögliche Vergleichsoperatoren sind: > | >= | == | <= | < (Löschbestätigung im Logfile)</td></tr>
             <tr><td>                           </td><td>Die Angabe von <i>hod</i> und <i>wday</i> ist optional. Fehlen sie, wird über alle Stunden bzw. alle Wochentage gelöscht.                                       </td></tr>
