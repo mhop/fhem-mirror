@@ -38,8 +38,9 @@ sub HTTPAPI_Initialize {
   $hash->{DefFn} = "HTTPAPI_Define";
   $hash->{ReadFn}  = "HTTPAPI_Read";
   $hash->{UndefFn} = "HTTPAPI_Undef";
-  $hash->{AttrList} = "disable:0,1 devicesCtrl " . $readingFnAttributes;
+  $hash->{AttrList} = "disable:0,1 disabledForIntervals devicesCtrl " . $readingFnAttributes;
   $hash->{parseParams} = 1;
+  $hash->{CanAuthenticate} = 1;
   return undef;
 }
 
@@ -602,7 +603,7 @@ sub HTTPAPI_Undef {
   <ul>
     <li>All links are relative to <code>http://&lt;ip-addr&gt;:&lt;port&gt;/</code>.</li>
     <li>Get und Set commands are not executed if the disable or ignore attribute of the device is set. See also <a href="#HTTPAPI-attr-devicesCtrl">devicesCtrl</a>.</li>
-    <li>Ecex commands are not executed if the disable attribute is set or command execution and device modification are not authorized by the permissions control. See the `validFor` attribute of the `allowed` module for more information.</li>
+    <li>Exec commands are not executed if the disable attribute is set or command execution and device modification are not authorized by the permissions control. See the `validFor` attribute of the `allowed` module for more information.</li>
     <li>The <code>http://&lt;ip-addr&gt;:&lt;port&gt;/&lt;apiName&gt;/</code> command displays the module-specific commandref.</li>
     <li>The response message is encoded to UTF-8.</li>
   </ul>
