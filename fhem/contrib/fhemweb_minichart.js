@@ -1,4 +1,4 @@
-FW_version["fhemweb_minichart.js"] = "$Id: fhemweb_minichart.js 0.6.4 schwatter $";
+FW_version["fhemweb_minichart.js"] = "$Id: fhemweb_minichart.js 0.6.5 schwatter $";
 FW_widgets['minichart'] = { createFn: miniChartCreate };
 
 function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -35,6 +35,7 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
     let chartType = chartParts[0] || "line";
     let color1 = chartParts[1] || "#3b82f6";
     let color2 = chartParts[2] || "#3b82f6";
+    const forceMobile = (chartParts[3] || "").toLowerCase() === "forcemobile";
 
     let currentValue01 = "-";
     let currentValue02 = "-";
@@ -48,17 +49,25 @@ function miniChartCreate(elName, devName, vArr, currVal, set, params, cmd) {
         id: dev + "_wrapper", 
         style: `display:block !important; width:100%; min-height:90px; position:relative; font-family:sans-serif; visibility:hidden; opacity:0; transition:opacity 0.2s ease;` // --- NEU ---
     });
+    
+    const styleRules = forceMobile ? `
+        <style>
+            #${dev}-mobile { display:block !important; }
+            #${dev}-desktop { display:none !important; }
+        </style>
+    ` : `
+        <style>
+            #${dev}-mobile { display:block; }
+            #${dev}-desktop { display:none; }
+            @media screen and (min-width: 900px) {
+                #${dev}-mobile { display:none !important; }
+                #${dev}-desktop { display:block !important; }
+            }
+        </style>
+    `;
 
     const html = `
-    <style>
-        #${dev}-mobile { display:block; }
-        #${dev}-desktop { display:none; }
-        @media screen and (min-width: 900px) {
-            #${dev}-mobile { display:none !important; }
-            #${dev}-desktop { display:block !important; }
-        }
-    </style>
-
+    ${styleRules}
     <!-- MOBILE -->
     <div id="${dev}-mobile" style="width:365px; padding:10px; border:1px solid transparent; border-radius:6px; box-shadow:none; height:90px; position:relative; box-sizing:border-box;">
         <div style="position:absolute; top:10px; left:0px; width:90px; font-size:14px; line-height:26px; text-align:left;">
