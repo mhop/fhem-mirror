@@ -23483,23 +23483,9 @@ sub _beamGraphicFirstHour {
       $beam_val{batsocRealSum}     = round1(100 * $socwhsum     / $bcapsum);
   }
 
-  # --- Texte für Balken
+  # --- Preisreferenzen für Textbildung
   my $epc = CurrentVal($name, 'ePurchasePriceCcy', 0);
   my $efc = CurrentVal($name, 'eFeedInTariffCcy',  0);
-
-  my %beam_txt = (
-      pvForecast          => $htitles{pvgenefc}{$lang}." ($kw)",
-      pvForecastLimited   => $htitles{pvgenefclim}{$lang}." ($kw)",             # statischer Text, kein Pro-Stunde-Hinweis
-      pvReal              => $htitles{pvgenerl}{$lang}." ($kw)",
-      gridconsumption     => $htitles{enppubgd}{$lang}." ($kw)",
-      consumptionForecast => $htitles{enconsfc}{$lang}." ($kw)",
-      consumption         => $htitles{enconsrl}{$lang}." ($kw)",
-      energycosts         => $htitles{enpchcst}{$lang}." ($epc)",
-      gridfeedin          => $htitles{enfeedgd}{$lang}." ($kw)",
-      feedincome          => $htitles{rengfeed}{$lang}." ($efc)",
-      batsocForecastSum   => $htitles{socfcsum}{$lang},
-      batsocRealSum       => $htitles{socresum}{$lang},
-  );
 
   # --- beam1 / beam2 + Texte setzen
   for my $slot (
@@ -23511,19 +23497,24 @@ sub _beamGraphicFirstHour {
 
       if (exists $beam_val{$bcont}) {
           $hfcg->{0}{$bval_key} = $beam_val{$bcont} // 0;
-          $hfcg->{0}{$btxt_key} = $beam_txt{$bcont} // '';
       }
       elsif ($bcont =~ /^batsoc/xs) {
           $hfcg->{0}{$bval_key} = $hbsocs->{0}{$bnum}{$bsoc_key} // 0;
-          $hfcg->{0}{$btxt_key} = $bcont =~ /batsocCombi_/xs    ? $htitles{socrfcba}{$lang}." $bnum (%)" :
-                                  $bcont =~ /batsocForecast_/xs ? $htitles{socfcbat}{$lang}." $bnum (%)" :
-                                  $bcont =~ /batsocReal_/xs     ? $htitles{socrebat}{$lang}." $bnum (%)" :
-                                  '';
       }
       else {
           $hfcg->{0}{$bval_key} = 0;
-          $hfcg->{0}{$btxt_key} = '';
       }
+      
+      $hfcg->{0}{$btxt_key} = __beamTxtFor ( { name    => $name,
+                                              bcont    => $bcont,
+                                              lang     => $lang,
+                                              kw       => $kw,
+                                              epc      => $epc,
+                                              efc      => $efc,
+                                              isHist   => 1,
+                                              day_str  => $day_str,
+                                              time_str => $time_str,
+                                             } );
   }
 
   # --- Differenz berechnen
@@ -23553,6 +23544,7 @@ sub _beamGraphicRemainingHours {
   my $hourstyle = $paref->{hourstyle};
   my $beam1cont = $paref->{beam1cont};
   my $beam2cont = $paref->{beam2cont};
+  my $lang      = $paref->{lang};
   my $kw        = $paref->{kw};
 
   my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8, $val9, $val10, $val11);
@@ -23564,7 +23556,9 @@ sub _beamGraphicRemainingHours {
   my $maxDif   = $hfcg->{0}{diff};                                                                      # für Typ diff
   my $minDif   = $hfcg->{0}{diff};                                                                      # für Typ diff
   my $bcapsum  = CurrentVal ($name, 'batcapsum', 0);                                                    # Summe installierte Batterie Kapazität in Wh
-
+  my $epc      = CurrentVal ($name, 'ePurchasePriceCcy', 0);                                            # für __beamTxtFor (energycosts)
+  my $efc      = CurrentVal ($name, 'eFeedInTariffCcy',  0);                                            # für __beamTxtFor (feedincome)
+  
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
       ($val1, $val2, $val3 ,$val4 ,$val5, $val6, $val7 ,$val8, $val9, $val10, $val11) = 
                 (0,0,0,0,0,0,0,0,0,0,0);
@@ -23578,9 +23572,12 @@ sub _beamGraphicRemainingHours {
       $hfcg->{$i}{time_str} = sprintf '%02d', $hfcg->{$i}{time};
 
       my $nh;                                                                                           # next hour
+      my $isHist_i = 0;                                                                                 # 1 = Werte kommen aus History, 0 = aus NextHours
 
       if ($offset < 0) {
           if ($i <= abs($offset)) {                                                                     # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !                 
+              $isHist_i = 1;
+
               my $base = $hfcg->{0}{mktime};
 
               my $ds = timestringsFromOffset (
@@ -23719,6 +23716,32 @@ sub _beamGraphicRemainingHours {
                               $beam2cont =~ /^batsoc/xs           ? $hbsocs->{$i}{(split '_', $beam2cont)[1]}{beam2cont} :
                               undef;
 
+      # --- Hover-Texte pro Stunde ermitteln
+      ########################################
+      $hfcg->{$i}{beam1txt} = __beamTxtFor ( { name     => $name,
+                                               bcont    => $beam1cont,
+                                               lang     => $lang,
+                                               kw       => $kw,
+                                               epc      => $epc,
+                                               efc      => $efc,
+                                               isHist   => $isHist_i,
+                                               day_str  => $hfcg->{$i}{day_str},
+                                               time_str => $hfcg->{$i}{time_str},
+                                               nh       => $nh,
+                                             } );
+
+      $hfcg->{$i}{beam2txt} = __beamTxtFor ( { name     => $name,
+                                               bcont    => $beam2cont,
+                                               lang     => $lang,
+                                               kw       => $kw,
+                                               epc      => $epc,
+                                               efc      => $efc,
+                                               isHist   => $isHist_i,
+                                               day_str  => $hfcg->{$i}{day_str},
+                                               time_str => $hfcg->{$i}{time_str},
+                                               nh       => $nh,
+                                             } );
+
       $hfcg->{$i}{time_str} = sprintf ('%02d', $hfcg->{$i}{time}-1).$hourstyle;
 
       $hfcg->{$i}{beam1} //= 0;
@@ -23743,6 +23766,72 @@ sub _beamGraphicRemainingHours {
   };
 
 return $back;
+}
+
+################################################################
+#   liefert Anzeigetext für einen Balken-Content, dynamisch
+#   für Contents mit stundenabhängigem Zusatzstatus
+#   (z.B. pvForecastLimited: limitiert oder Fallback)
+################################################################
+sub __beamTxtFor {
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $bcont    = $paref->{bcont};
+  my $lang     = $paref->{lang};
+  my $kw       = $paref->{kw};
+  my $epc      = $paref->{epc};
+  my $efc      = $paref->{efc};
+  my $isHist   = $paref->{isHist};                                        # 1 = Vergangenheit (History), 0 = Zukunft (NextHours)
+  my $day_str  = $paref->{day_str};                                       # nur bei isHist
+  my $time_str = $paref->{time_str};                                      # nur bei isHist
+  my $nh       = $paref->{nh};                                            # nur bei !isHist
+
+  ## dynamischer Content: PV-Prognose mit Einspeisebegrenzung
+  ###############################################################
+  if ($bcont eq 'pvForecastLimited') {
+      my $active = $isHist
+                 ? defined CachedHistoryVal ($name, $day_str, $time_str, 'pvfcfeedlim', undef)
+                 : defined NexthoursVal     ($name, 'NextHour'.$nh,      'pvfcfeedlim', undef);
+
+      my $key = $active ? 'pvgenefclim' : 'pvgenefc';                     # Fallback -> identischer Text wie unlimitierte Prognose
+      
+      return $htitles{$key}{$lang}." ($kw)";
+  }
+
+  ## statische Contents (Text unabhängig von der Stunde)
+  ###########################################################
+  my %unit_kw = map { $_ => 1 } qw(pvForecast pvReal gridconsumption consumptionForecast consumption gridfeedin);
+
+  my %static_key = (
+      pvForecast          => 'pvgenefc',
+      pvReal              => 'pvgenerl',
+      gridconsumption     => 'enppubgd',
+      consumptionForecast => 'enconsfc',
+      consumption         => 'enconsrl',
+      gridfeedin          => 'enfeedgd',
+      batsocForecastSum   => 'socfcsum',
+      batsocRealSum       => 'socresum',
+  );
+
+  return $htitles{enpchcst}{$lang}." ($epc)" if($bcont eq 'energycosts');
+  return $htitles{rengfeed}{$lang}." ($efc)" if($bcont eq 'feedincome');
+
+  if (exists $static_key{$bcont}) {
+      my $suffix = $unit_kw{$bcont} ? " ($kw)" : '';                      # batsocXSum ohne Einheit, wie bisher
+      
+      return $htitles{$static_key{$bcont}}{$lang}.$suffix;
+  }
+
+  if ($bcont =~ /^batsoc/xs) {
+      my $bnum = (split '_', $bcont)[1] // '';
+      
+      return $bcont =~ /batsocCombi_/xs    ? $htitles{socrfcba}{$lang}." $bnum (%)" :
+             $bcont =~ /batsocForecast_/xs ? $htitles{socfcbat}{$lang}." $bnum (%)" :
+             $bcont =~ /batsocReal_/xs     ? $htitles{socrebat}{$lang}." $bnum (%)" :
+             '';
+  }
+
+return '';
 }
 
 ################################################################
@@ -23960,7 +24049,7 @@ sub _beamGraphic {
                                      } 
                                    );
                                    
-          $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
+          $titz3 = qq/title="$hfcg->{$i}{beam1txt}"/;
       }
 
       if ($lotype eq 'double') {
@@ -23972,22 +24061,22 @@ sub _beamGraphic {
           if ($scm eq 'staple') {
               $z2    = $hfcg->{$i}{beam1};
               $z3    = $hfcg->{$i}{beam2};
-              $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
-              $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
+              $titz2 = qq/title="$hfcg->{$i}{beam1txt}"/;
+              $titz3 = qq/title="$hfcg->{$i}{beam2txt}"/;
               $mbdf  = $maxStVal - ($z2 + $z3);                             # Wertedifferenz abs. Maxwert und größerem Balkenwert
           }
           else {
               if ($hfcg->{$i}{beam1} >= $hfcg->{$i}{beam2}) {
                   $z2    = $hfcg->{$i}{beam1};
                   $z3    = $hfcg->{$i}{beam2};
-                  $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
-                  $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
+                  $titz2 = qq/title="$hfcg->{$i}{beam1txt}"/;
+                  $titz3 = qq/title="$hfcg->{$i}{beam2txt}"/;
               }
               else {                                                                                                                        # tauschen, Betrag Beam1 < Betrag Beam2
                   $z2    = $hfcg->{$i}{beam2};
                   $z3    = $hfcg->{$i}{beam1};
-                  $titz2 = qq/title="$hfcg->{0}{beam2txt}"/;
-                  $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
+                  $titz2 = qq/title="$hfcg->{$i}{beam2txt}"/;
+                  $titz3 = qq/title="$hfcg->{$i}{beam1txt}"/;
               }
 
               $mbdf = $maxVal - $z2;                                         # Wertedifferenz abs. Maxwert und größerem Balkenwert
@@ -24045,8 +24134,8 @@ sub _beamGraphic {
               $z3 = abs ($hfcg->{$i}{diff});                                                                    # Nur Betrag ohne Vorzeichen
           }
 
-          $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
-          $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
+          $titz2 = qq/title="$hfcg->{$i}{beam1txt}"/;
+          $titz3 = qq/title="$hfcg->{$i}{beam2txt}"/;
                                                                                                                 # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
           $z1 = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2) / $maxDif * $px_pos);                            # Teilung durch 0 vermeiden
           $z2 = ($px_pos - $z1) ;
