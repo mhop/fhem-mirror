@@ -450,6 +450,7 @@ MQTT2_SERVER_Read($@)
     $shash->{connects}++;
     if(!$cid) {
       $cid = "mosq_$shash->{connects}"; # avoid autocreate
+      Log3 $sname, 5, "  got an empty cid, setting it to $cid";
       $hash->{cidByServer} = 1;
     }
     $hash->{cid} = $cid; #124699
