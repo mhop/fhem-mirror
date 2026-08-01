@@ -10726,9 +10726,13 @@ sub __attrKeyAction {
               }
           }
           
-          state %devCodeKeys    = map { $_ => 1 } qw(swoncond swoffcond spignorecond);              # Device + Code/Regex Pflicht
-          state %devRdgCodeKeys = map { $_ => 1 } qw(presence gridStatus);                          # Device + Reading + Code/Regex Pflicht
-          state %devRdgKeys     = map { $_ => 1 } qw(outsideTemp windSpeed);                        # Device + Reading, Code optional
+          state %devCodeKeys;
+          state %devRdgCodeKeys;
+          state %devRdgKeys;
+          
+          %devCodeKeys    = map { $_ => 1 } qw(swoncond swoffcond spignorecond) unless %devCodeKeys;        # Device + Code/Regex Pflicht
+          %devRdgCodeKeys = map { $_ => 1 } qw(presence gridStatus)             unless %devRdgCodeKeys;     # Device + Reading + Code/Regex Pflicht         
+          %devRdgKeys     = map { $_ => 1 } qw(outsideTemp windSpeed)           unless %devRdgKeys;         # Device + Reading, Code optional
 
           if ($devCodeKeys{$akey}) {
               $err = checkDevRdCond ($name, $akey, $akeyval, 1, 0, 1);                              # mit Device-Check, Code check
