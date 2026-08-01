@@ -1062,6 +1062,10 @@ my %hqtxt = (                                                                   
               DE => qq{Warte auf weitere Tage mit einer Verbrauchszahl}                                                     },
   autoct => { EN => qq{Autocorrection:},
               DE => qq{Autokorrektur:}                                                                                      },
+  atomrs => { EN => qq{Automatic resumed},
+              DE => qq{Automatik fortgesetzt}                                                                               },
+  manrst => { EN => qq{Automatic resumed after a cycle}, 
+              DE => qq{Automatik nach Rundlauf fortgesetzt}                                                                 },
   plrdct => { EN => qq{Reduction:},
               DE => qq{Abregelung:}                                                                                         },
   plntck => { EN => qq{Plant Configurationcheck Information},
@@ -17445,16 +17449,32 @@ sub _manageConsumerData {
       $data{$name}{consumers}{$c}{state}          = $cstate;
       my ($pstate,$starttime,$stoptime,$supplmnt) = __getPlanningStateAndTimes ($paref);
 
-      my ($iilt,$rlt) = isInLocktime    ($paref);                                                                 # Sperrzeit Status ermitteln
-      my $cplmode     = getConsumerMode ($name, $c);                                                              # Planungsmode 'can' oder 'must'
+      my $autoHint = ConsumerVal ($name, $c, 'autoResumeHint', '');                                             # one-shot Hinweis (Fortsetzung Automatikmodus)
+
+      if ($autoHint) {
+          $supplmnt .= $supplmnt ? " / $autoHint" : "$autoHint";
+
+          my $ttl = ConsumerVal ($name, $c, 'autoResumeHintTTL', 1) - 1;
+
+          if ($ttl > 0) {
+              $data{$name}{consumers}{$c}{autoResumeHintTTL} = $ttl;                                            # noch nicht fertig -> Restlaufzeit weiterzählen
+          }
+          else {
+              delete $data{$name}{consumers}{$c}{autoResumeHint};
+              delete $data{$name}{consumers}{$c}{autoResumeHintTTL};                                            # TTL abgelaufen -> beide Keys entfernen
+          }
+      }
+
+      my ($iilt,$rlt) = isInLocktime    ($paref);                                                               # Sperrzeit Status ermitteln
+      my $cplmode     = getConsumerMode ($name, $c);                                                            # Planungsmode 'can' oder 'must'
       my $constate    = "name='$calias' state='$cstate'";
       $constate      .= " mode='$cplmode' planningstate='$pstate'";
       $constate      .= " remainLockTime='$rlt'" if($rlt);
       $constate      .= " info='$supplmnt'"      if($supplmnt);
 
-      storeReading ("consumer${c}",               $constate);                                                     # Consumer Infos
-      storeReading ("consumer${c}_planned_start", $starttime) if($starttime);                                     # Consumer Start geplant
-      storeReading ("consumer${c}_planned_stop",  $stoptime)  if($stoptime);                                      # Consumer Stop geplant
+      storeReading ("consumer${c}",               $constate);                                                   # Consumer Infos
+      storeReading ("consumer${c}_planned_start", $starttime) if($starttime);                                   # Consumer Start geplant
+      storeReading ("consumer${c}_planned_stop",  $stoptime)  if($stoptime);                                    # Consumer Stop geplant
 
       delete $paref->{consumer};
       delete $paref->{pcurr};
@@ -17471,7 +17491,7 @@ sub _manageConsumerData {
   writeToHistory ( { paref => $paref, key => 'hpcsm',  val => $hpcsm,  day => $day, hour => $hod } ) if($hpcsm);
   writeToHistory ( { paref => $paref, key => 'bevcsm', val => $bevcsm, day => $day, hour => $hod } ) if($bevcsm);
 
-  $data{$name}{current}{dummyConsumption} = CurrentVal ($name, 'consumption', 0) - $pcurrsum;                     # aktueller Verbrauch - Summe aller ConsumerPower
+  $data{$name}{current}{dummyConsumption} = CurrentVal ($name, 'consumption', 0) - $pcurrsum;                   # aktueller Verbrauch - Summe aller ConsumerPower
 
   # --- Consumer Cache File schreiben
   if (CurrentVal ($name, 'consumerCacheDirty', 0)) {
@@ -17791,7 +17811,11 @@ sub ___resyncPlanStateOnAutoResume {
   delete $paref->{stopts};
   delete $paref->{supplement};
 
-  $data{$name}{current}{consumerCacheDirty} = 1;
+  $data{$name}{consumers}{$c}{autoResumeHint}    = encode ('utf8', $hqtxt{atomrs}{$paref->{lang}}); # Fall 1 - Automatik AUS->EIN-Flanke                              
+  $data{$name}{consumers}{$c}{autoResumeHintTTL} = 2;                                               # für diesen + 1 weiteren Zyklus anzeigen
+  $data{$name}{current}{consumerCacheDirty}      = 1;
+  
+  delete $data{$name}{consumers}{$c}{manualInterruptFlag};                                          # Fall 1 - Automatik AUS->EIN-Flanke hat Vorrang vor evtl. noch offenem Fall-2-Tracking (symmetrische Wiederherstellung ohne Automatik-Toggle)
 
   debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - Automatic OFF->ON detected, plan state resynchronized from "$pstate" ($simpCstat) to "$newlabel", physoffon=} . ($physon ? 'on' : 'off'));
 
@@ -19187,7 +19211,7 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOnTs};
 
       $state = qq{Consumer '$calias' switched on (continued)};
-      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                               # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
   elsif (isConsumerPhysOff ($name, $c) && $simpCstat eq 'interrupting') {
@@ -19200,24 +19224,42 @@ sub ___setConsumerSwitchingState {
       delete $paref->{lastAutoOffTs};
 
       $state = qq{Consumer '$calias' switched off (interrupted)};
-      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                           # eigener Schaltbefehl bestätigt
+      $data{$name}{consumers}{$c}{lastOwnSwitchCmd} = $t;                               # eigener Schaltbefehl bestätigt
       $dowri = 1;
   }
   elsif ($oldpsw eq 'off' && isConsumerPhysOn ($name, $c) && ($t - $lastOwnSwitch > BLINDTIME)){
+      my $flag = ConsumerVal ($name, $c, 'manualInterruptFlag', '');
+
+      if ($flag eq 'on') {                                                              # Rundlauf komplett: Baseline war ein, jetzt wieder ein (WaMa-Fall)
+          delete $data{$name}{consumers}{$c}{manualInterruptFlag};
+          $data{$name}{consumers}{$c}{autoResumeHint}    = encode ('utf8', $hqtxt{manrst}{$paref->{lang}});
+          $data{$name}{consumers}{$c}{autoResumeHintTTL} = 2;
+      }
+      else {
+          $data{$name}{consumers}{$c}{manualInterruptFlag} = 'off';                     # Beginn einer manuellen Aktivierung (Baseline: aus)
+      }
+
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
-
       ___setConsumerPlanningState ($paref);
-
       delete $paref->{supplement};
 
       $state = qq{Consumer '$calias' was switched on externally};
       $dowri = 1;
   }
   elsif ($oldpsw eq 'on' && isConsumerPhysOff ($name, $c) && ($t - $lastOwnSwitch > BLINDTIME)) {
+      my $flag = ConsumerVal ($name, $c, 'manualInterruptFlag', '');
+
+      if ($flag eq 'off') {                                                             # Rundlauf komplett: Baseline war aus, jetzt wieder aus
+          delete $data{$name}{consumers}{$c}{manualInterruptFlag};
+          $data{$name}{consumers}{$c}{autoResumeHint}    = encode ('utf8', $hqtxt{manrst}{$paref->{lang}});
+          $data{$name}{consumers}{$c}{autoResumeHintTTL} = 2;
+      }
+      else {
+          $data{$name}{consumers}{$c}{manualInterruptFlag} = 'on';                      # Beginn einer manuellen Unterbrechung (Baseline: ein)
+      }
+
       $paref->{supplement} = "$hqtxt{wexso}{$paref->{lang}}";
-
       ___setConsumerPlanningState ($paref);
-
       delete $paref->{supplement};
 
       $state = qq{Consumer '$calias' was switched off externally};
@@ -19226,7 +19268,7 @@ sub ___setConsumerSwitchingState {
 
   if ($dowri) {
       if (!$fscss) {
-          $data{$name}{current}{consumerCacheDirty} = 1;                            # Cache File Consumer schreiben
+          $data{$name}{current}{consumerCacheDirty} = 1;                                # Cache File Consumer schreiben
       }
 
       Log3 ($name, 3, "$name - $state");
