@@ -71,6 +71,11 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.9.3"  => "31.07.2026  Die reset-Funktion 'set ... reset ..' kann Daten in pvCircular suchen, löschen und bearbeiten ".
+                           "Einbau hint27 und hint28 sowie Überprüfung hint12 abhängig von aiConShuffleMode und aiConShufflePeriod ".
+                           "_calcConsForecast_legacy: eigener consForecastBase-Durchlauf auf conraw, konsistent zu confc/confcex ".
+                           "neuer Wert 'pvfcfeedlim' in Datenpool pvHistory und NextHours ".
+                           "neue Auswahl pvForecastLimited im Attr 'graphicBeamXContent' zur Anzeige der Einspeise-limitierten PV-Prognose ",
   "2.9.2"  => "26.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
                            "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
                            "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
@@ -657,25 +662,25 @@ my %fann_valid_versions = map { $_ => 1 } qw(v1 v2);                          # 
 my %fann_valid_flags    = map { $_ => 1 } qw(active pv heatpump bev);         # valide Flags für Profil-Synthese CON-Training
 
 my %profileweights = (                                                        # Gewichte für FANN Training und Inferenz profilabhängig     
-  v1_sandbox            => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_active      => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_pv          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_common_active_pv   => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_heatpump           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_pv        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_pv => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_sandbox            => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_common             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_common_active      => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_common_pv          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_common_active_pv   => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_heatpump           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_active    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_pv        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_active_pv => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
 
   # --- BEV-Varianten (Startwerte, gespiegelt von common/heatpump; nach erstem realen Training rekalibrieren) ---
-  v1_bev                    => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_active_bev             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_pv_bev                 => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_active_pv_bev          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35 },
-  v1_heatpump_bev           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_bev    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_pv_bev        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
-  v1_heatpump_active_pv_bev => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20 },
+  v1_bev                    => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_active_bev             => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_pv_bev                 => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_active_pv_bev          => { slope_min => 0.25, bias_factor => 3.0, bias_abs_min => 500, bias_w => 2.0, slope_w => 5.0,  thd_retrain => 45, thd_borderline => 60, z2_slope_min => 0.20, z2_bias_max => 3.5, z2_rmse_max => 60, r2_thld => 0.20, slope_warn_min => 0.20, rmse_rel_warn => 35, stability_warn => 0.22 },
+  v1_heatpump_bev           => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_active_bev    => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_pv_bev        => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
+  v1_heatpump_active_pv_bev => { slope_min => 0.60, bias_factor => 1.5, bias_abs_min => 360, bias_w => 5.0, slope_w => 10.0, thd_retrain => 60, thd_borderline => 75, z2_slope_min => 0.65, z2_bias_max => 2.0, z2_rmse_max => 40, r2_thld => 0.45, slope_warn_min => 0.55, rmse_rel_warn => 20, stability_warn => 0.12 },
 );
 
 my %hset = (                                                                  # Hash der Set-Funktion
@@ -981,8 +986,12 @@ my %epoche_translations = (
                DE => "Hohes Momentum (%.2f) verstärkt wahrscheinlich Shuffle-Event-Overshooting (Validierungsfehler springt an jedem Shuffle-Ereignis nach oben): Momentum auf 0.4–0.5 reduzieren (aiControl->aiConMomentum). Dies stabilisiert den Validierungsverlauf und verbessert typischerweise die Slope, da der Optimizer in engere Minima einsinken kann ohne bei jedem Datenshuffle herauszuschießen." },
   hint25  => { EN => "Consider switching training algorithm: use RPROP instead of INCREMENTAL - RPROP adapts its step size automatically without manual learning rate tuning, which often converges faster when slope remains flat despite healthy training (aiControl->aiConTrainAlgo)",
                DE => "Trainingsalgorithmus wechseln: RPROP statt INCREMENTAL verwenden - RPROP passt seine Schrittweite automatisch an und kommt ohne manuelle Lernraten-Einstellung aus, was bei anhaltend flacher Slope trotz gesunden Trainings oft deutlich schneller zum Ziel führt (aiControl->aiConTrainAlgo)" },
-  hint26 =>  { EN => "Learning rate already at floor (%.4f) – network still converges very early. In some cases a moderate increase of the learning rate (e.g. +50-100%%) combined with a matching momentum (currently %.2f) can help escape a flat plateau.",
+  hint26  => { EN => "Learning rate already at floor (%.4f) – network still converges very early. In some cases a moderate increase of the learning rate (e.g. +50-100%%) combined with a matching momentum (currently %.2f) can help escape a flat plateau.",
                DE => "Lernrate bereits am unteren Limit (%.4f) – Netz konvergiert dennoch sehr früh. In manchen Fällen hilft hier ausnahmsweise eine moderate Erhöhung der Lernrate (z.B. +50-100%%) in Kombination mit passend abgestimmtem Momentum (aktuell %.2f), um ein flaches Plateau zu verlassen." },
+  hint27  => { EN => "Validation curve remains unstable despite maximum shuffle period (30) (StdDev/Mean=%.2f): momentum is unremarkable, so the noise is likely data-inherent (e.g. stochastic consumption profile). Check aiControl->aiConBitFailLimit and consider a moderate reduction of the learning rate (aiControl->aiConLearnRate) instead of further shuffle tuning.",
+               DE => "Validierungsverlauf bleibt trotz maximaler Shuffle-Periode (30) instabil (StdDev/Mean=%.2f): Momentum ist unauffällig, daher wahrscheinlich datenbedingtes Rauschen (z.B. stochastisches Verbrauchsprofil). Prüfe aiControl->aiConBitFailLimit und erwäge eine moderate Reduktion der Lernrate (aiControl->aiConLearnRate) statt weiterer Shuffle-Anpassungen." },
+  hint28  => { EN => "Periodic shuffle is active (aiConShufflePeriod=%d), but validation curve is still unstable (StdDev/Mean=%.2f): increase the period step by step to %d to further improve stability (aiControl->aiConShufflePeriod).", 
+               DE => "Periodisches Shuffle ist aktiv (aiConShufflePeriod=%d), Validierungsverlauf aber weiterhin instabil (StdDev/Mean=%.2f): Periode schrittweise erhöhen auf %d, um die Stabilität weiter zu verbessern (aiControl->aiConShufflePeriod)." },
 ); 
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -1278,166 +1287,168 @@ my %hqtxt = (                                                                   
 
 
 my %htitles = (                                                                                                 # Hash Hilfetexte (Mouse Over)
-  iaaf     => { EN => qq{Automatic mode off -> Enable automatic mode},
-                DE => qq{Automatikmodus aus -> Automatik freigeben}                                                },
-  ieas     => { EN => qq{Automatic mode on -> Lock automatic mode},
-                DE => qq{Automatikmodus ein -> Automatik sperren}                                                  },
-  iave     => { EN => qq{Off -> Switch on consumer},
-                DE => qq{Aus -> Verbraucher einschalten}                                                           },
-  ians     => { EN => qq{Off -> no on-command defined!},
-                DE => qq{Aus -> kein on-Kommando definiert!}                                                       },
-  ieva     => { EN => qq{On -> Switch off consumer},
-                DE => qq{Ein -> Verbraucher ausschalten}                                                           },
-  iens     => { EN => qq{On -> no off-command defined!},
-                DE => qq{Ein -> kein off-Kommando definiert!}                                                      },
-  natc     => { EN => qq{automatic cycle:},
-                DE => qq{automatischer Zyklus:}                                                                    },
-  predtime => { EN => qq{Prediction time Radiation data:},
-                DE => qq{Vorhersagezeitpunkt Strahlungsdaten:}                                                     },
-  dwdtime  => { EN => qq{Forecast time Weather data},
-                DE => qq{Vorhersagezeitpunkt Wetterdaten}                                                          },
-  upd      => { EN => qq{Click for update},
-                DE => qq{Klick f&#252;r Update}                                                                    },
-  on       => { EN => qq{switched on},
-                DE => qq{eingeschaltet}                                                                            },
-  off      => { EN => qq{switched off},
-                DE => qq{ausgeschaltet}                                                                            },
-  undef    => { EN => qq{undefined},
-                DE => qq{undefiniert}                                                                              },
-  ischawth => { EN => qq{is charged with},
-                DE => qq{wird aufgeladen mit}                                                                      },
-  isdchawt => { EN => qq{is discharged with},
-                DE => qq{wird entladen mit}                                                                        },
-  dela     => { EN => qq{delayed},
-                DE => qq{verzoegert}                                                                               },
-  autarky  => { EN => qq{Autarky rate},
-                DE => qq{Autarkierate}                                                                             },
-  azimuth  => { EN => qq{Azimuth},
-                DE => qq{Azimut}                                                                                   },
-  elevatio => { EN => qq{Elevation},
-                DE => qq{H&#246;he}                                                                                },
-  sunpos   => { EN => qq{Sun position (decimal degrees)},
-                DE => qq{Sonnenstand (Dezimalgrad)}                                                                },
-  enconsrl => { EN => qq{real Energy consumption},
-                DE => qq{realer Energieverbrauch}                                                                  },
-  enconsfc => { EN => qq{forecasted energy consumption},
-                DE => qq{prognostizierter Energieverbrauch}                                                        },
-  enpchcst => { EN => qq{Energy purchase costs},
-                DE => qq{Kosten Energiebezug}                                                                      },
-  rengfeed => { EN => qq{Remuneration for the grid feed-in},
-                DE => qq{Verg&#252;tung Netzeinspeisung}                                                           },
-  enppubgd => { EN => qq{Energy purchase from the public grid},
-                DE => qq{Energiebezug aus dem &#246;ffentlichen Netz}                                              },
-  enfeedgd => { EN => qq{Feed-in},
-                DE => qq{Einspeisung}                                                                              },
-  pvgenerl => { EN => qq{real PV generation},
-                DE => qq{reale PV-Erzeugung}                                                                       },
-  pvgenefc => { EN => qq{forecasted PV generation},
-                DE => qq{prognostizierte PV-Erzeugung}                                                             },
-  onlybatw => { EN => qq{Battery},
-                DE => qq{Batterie}                                                                                 },
-  simplyes => { EN => qq{yes},
-                DE => qq{ja}                                                                                       },
-  simpleno => { EN => qq{no},
-                DE => qq{nein}                                                                                     },
-  socrfcba => { EN => qq{real battery charge achieved or SoC forecast Battery},
-                DE => qq{real erreichte Batterieladung bzw. SoC Prognose Batterie}                                 },
-  socfcbat => { EN => qq{SoC forecast Battery},
-                DE => qq{SoC Prognose Batterie}                                                                    },
-  socfcsum => { EN => qq{SoC forecast (%) summarized across all batteries},
-                DE => qq{SoC Prognose (%) zusammengefasst &#252;ber alle Batterien}                                },
-  socrebat => { EN => qq{real achieved charge Battery},
-                DE => qq{real erreichte Ladung Batterie}                                                           },
-  socresum => { EN => qq{real SoC achieved (%) summarized across all batteries},
-                DE => qq{real errreichter SoC (%) zusammengefasst &#252;ber alle Batterien}                        },
-  socbacur => { EN => qq{SoC current},
-                DE => qq{SoC aktuell}                                                                              },
-  socbatfc => { EN => qq{SoC forecast},
-                DE => qq{SoC Prognose}                                                                             },
-  socbaths => { EN => qq{SoC at the end of the hour},
-                DE => qq{SoC am Ende der Stunde}                                                                   },
-  lcenable => { EN => qq{Charge management enabled},
-                DE => qq{Lademanagement aktiviert}                                                                 },
-  ldstratg => { EN => qq{Loading strategy},
-                DE => qq{Ladestrategie}                                                                            },
-  ldreleas => { EN => qq{load release},
-                DE => qq{Ladefreigabe}                                                                             },
-  optchpow => { EN => qq{optimized charging power},
-                DE => qq{optimierte Ladeleistung}                                                                  },
-  smtchpow => { EN => qq{Target-optimized charging power},
-                DE => qq{zieloptimierte Ladeleistung}                                                              },
-  bcharrel => { EN => qq{Charging release (activate release for charging the battery if necessary)},
-                DE => qq{Ladefreigabe (evtl. Freigabe zum Laden der Batterie aktivieren)}                          },
-  bncharel => { EN => qq{only charge if the feed-in limit is exceeded},
-                DE => qq{nur laden wenn Einspeiselimit &#252;berschritten}                                         },
-  conrec   => { EN => qq{Current time is within the consumption planning},
-                DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                                      },
-  conrecba => { EN => qq{Current time is within the consumption planning, Priority charging Battery is active},
-                DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung, Vorrangladen Batterie ist aktiv}     },
-  connorec => { EN => qq{Consumption planning is outside current time\n(Click for immediate planning)},
-                DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit\n(Klick f&#252;r sofortige Einplanung)} },
-  connoact => { EN => qq{the consumer is not activated},
-                DE => qq{der Verbraucher ist nicht aktiviert}                                                      },  
-  akorron  => { EN => qq{switched off\nenable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on*},
-                DE => qq{ausgeschaltet\nAutokorrektur einschalten mit:\nset <NAME> pvCorrectionFactor_Auto on*}    },
-  splus    => { EN => qq{PV surplus sufficient},
-                DE => qq{PV-&#220;berschu&#223; ausreichend}                                                       },
-  nosplus  => { EN => qq{PV surplus insufficient},
-                DE => qq{PV-&#220;berschu&#223; unzureichend}                                                      },
-  plchk    => { EN => qq{Configuration check of the plant},
-                DE => qq{Konfigurationspr&#252;fung der Anlage}                                                    },
-  jtsfft   => { EN => qq{Open the SolarForecast Forum},
-                DE => qq{&#214;ffne das SolarForecast Forum}                                                       },
-  opwiki   => { EN => qq{Open the Wiki (German language)},
-                DE => qq{&#214;ffne das Wiki}                                                                      },
-  outpmsg  => { EN => qq{Messages are available - press the button to open them},
-                DE => qq{Mitteilungen sind vorhanden - dr&#252;cke die Taste um sie zu &#246;ffnen}                },
-  nomsgfo  => { EN => qq{there are no new messages},
-                DE => qq{es sind keine neuen Mitteilungen vorhanden}                                               },
-  lstmsgc  => { EN => qq{last message call},
-                DE => qq{letzter Mitteilungsabruf}                                                                 },
-  nxtmsgc  => { EN => qq{next message call},
-                DE => qq{n&auml;chster Mitteilungsabruf}                                                           },
-  scaresps => { EN => qq{API request successful},
-                DE => qq{API Abfrage erfolgreich}                                                                  },
-  dwfcrsu  => { EN => qq{Weather data are up to date according to used DWD model},
-                DE => qq{Wetterdaten sind aktuell entsprechend des verwendeten DWD Modell}                         },
-  scarespf => { EN => qq{API request failed},
-                DE => qq{API Abfrage fehlgeschlagen}                                                               },
-  dapic    => { EN => qq{API requests or request equivalents already carried out today},
-                DE => qq{Heute bereits durchgef&#252;hrte API-Anfragen bzw. Anfragen-&#196;quivalente}             },
-  rapic    => { EN => qq{remaining API requests},
-                DE => qq{verf&#252;gbare API-Anfragen}                                                             },
-  yheyfdl  => { EN => qq{You have exceeded your free daily limit!},
-                DE => qq{Sie haben Ihr kostenloses Tageslimit &#252;berschritten!}                                 },
-  rlfaccpr => { EN => qq{Rate limit for API requests reached in current period!},
-                DE => qq{Abfragegrenze f&#252;r API-Anfragen im aktuellen Zeitraums erreicht!}                     },
-  raricp   => { EN => qq{remaining API requests in the current period},
-                DE => qq{verf&#252;gbare API-Anfragen der laufenden Periode}                                       },
-  scakdne  => { EN => qq{API key does not exist},
-                DE => qq{API Schl&#252;ssel existiert nicht}                                                       },
-  scrsdne  => { EN => qq{Rooftop site does not exist or is not accessible},
-                DE => qq{Rooftop ID existiert nicht oder ist nicht abrufbar}                                       },
-  norate   => { EN => qq{not rated},
-                DE => qq{nicht bewertet}                                                                           },
-  aimstt   => { EN => qq{Perl module AI::DecisionTree is missing},
-                DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                          },
-  dumtxt   => { EN => qq{unassignable consumption (takes into account any hidden consumers)},
-                DE => qq{nicht zuordenbarer Verbrauch (ber&#252;cksichtigt evtl. versteckte Verbraucher)}          },
-  rdcactiv => { EN => qq{Plant derating active},
-                DE => qq{Anlagenabregelung aktiv}                                                                  },
-  rdcnoact => { EN => qq{no Plant derating},
-                DE => qq{keine Anlagenabregelung}                                                                  },
-  pstate   => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nMode:&nbsp;<mode>\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
-                DE => qq{Planungsstatus:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nModus:&nbsp;<mode>\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}  },
-  ainuse   => { EN => qq{AI Perl module is installed, but the AI support is not used.\nRun 'set <NAME> plantConfiguration check' for hints.},
-                DE => qq{KI Perl Modul ist installiert, aber die KI Unterst&uuml;tzung wird nicht verwendet.\nPr&uuml;fen sie 'set <NAME> plantConfiguration check' f&uuml;r Hinweise.} },
-  arsrad2o => { EN => qq{API query successful but the radiation values are outdated.\nCheck the plant with 'set <NAME> plantConfiguration check'.},
-                DE => qq{API Abfrage erfolgreich aber die Strahlungswerte sind veraltet.\nPr&uuml;fen sie die Anlage mit 'set <NAME> plantConfiguration check'.}                        },
-  aswfc2o  => { EN => qq{The weather data is outdated.\nCheck the plant with 'set <NAME> plantConfiguration check'.},
-                DE => qq{Die Wetterdaten sind veraltet.\nPr&uuml;fen sie die Anlage mit 'set <NAME> plantConfiguration check'.}                                                         },
-  rdcstat  => { EN => qq{no reduction status available\nPlease set the key 'reductionState' with 'attr <NAME> plantControl'},
-                DE => qq{kein Abregelungsstatus verf&uuml;gbar\nSetzen sie bitte den Schl&uuml;ssel 'reductionState' mit 'attr <NAME> plantControl'}                                    },
+  iaaf        => { EN => qq{Automatic mode off -> Enable automatic mode},
+                   DE => qq{Automatikmodus aus -> Automatik freigeben}                                                },
+  ieas        => { EN => qq{Automatic mode on -> Lock automatic mode},
+                   DE => qq{Automatikmodus ein -> Automatik sperren}                                                  },
+  iave        => { EN => qq{Off -> Switch on consumer},
+                   DE => qq{Aus -> Verbraucher einschalten}                                                           },
+  ians        => { EN => qq{Off -> no on-command defined!},
+                   DE => qq{Aus -> kein on-Kommando definiert!}                                                       },
+  ieva        => { EN => qq{On -> Switch off consumer},
+                   DE => qq{Ein -> Verbraucher ausschalten}                                                           },
+  iens        => { EN => qq{On -> no off-command defined!},
+                   DE => qq{Ein -> kein off-Kommando definiert!}                                                      },
+  natc        => { EN => qq{automatic cycle:},
+                   DE => qq{automatischer Zyklus:}                                                                    },
+  predtime    => { EN => qq{Prediction time Radiation data:},
+                   DE => qq{Vorhersagezeitpunkt Strahlungsdaten:}                                                     },
+  dwdtime     => { EN => qq{Forecast time Weather data},
+                   DE => qq{Vorhersagezeitpunkt Wetterdaten}                                                          },
+  upd         => { EN => qq{Click for update},
+                   DE => qq{Klick f&#252;r Update}                                                                    },
+  on          => { EN => qq{switched on},
+                   DE => qq{eingeschaltet}                                                                            },
+  off         => { EN => qq{switched off},
+                   DE => qq{ausgeschaltet}                                                                            },
+  undef       => { EN => qq{undefined},
+                   DE => qq{undefiniert}                                                                              },
+  ischawth    => { EN => qq{is charged with},
+                   DE => qq{wird aufgeladen mit}                                                                      },
+  isdchawt    => { EN => qq{is discharged with},
+                   DE => qq{wird entladen mit}                                                                        },
+  dela        => { EN => qq{delayed},
+                   DE => qq{verzoegert}                                                                               },
+  autarky     => { EN => qq{Autarky rate},
+                   DE => qq{Autarkierate}                                                                             },
+  azimuth     => { EN => qq{Azimuth},
+                   DE => qq{Azimut}                                                                                   },
+  elevatio    => { EN => qq{Elevation},
+                   DE => qq{H&#246;he}                                                                                },
+  sunpos      => { EN => qq{Sun position (decimal degrees)},
+                   DE => qq{Sonnenstand (Dezimalgrad)}                                                                },
+  enconsrl    => { EN => qq{real Energy consumption},
+                   DE => qq{realer Energieverbrauch}                                                                  },
+  enconsfc    => { EN => qq{forecasted energy consumption},
+                   DE => qq{prognostizierter Energieverbrauch}                                                        },
+  enpchcst    => { EN => qq{Energy purchase costs},
+                   DE => qq{Kosten Energiebezug}                                                                      },
+  rengfeed    => { EN => qq{Remuneration for the grid feed-in},
+                   DE => qq{Verg&#252;tung Netzeinspeisung}                                                           },
+  enppubgd    => { EN => qq{Energy purchase from the public grid},
+                   DE => qq{Energiebezug aus dem &#246;ffentlichen Netz}                                              },
+  enfeedgd    => { EN => qq{Feed-in},
+                   DE => qq{Einspeisung}                                                                              },
+  pvgenerl    => { EN => qq{real PV generation},
+                   DE => qq{reale PV-Erzeugung}                                                                       },
+  pvgenefc    => { EN => qq{PV forecast},
+                   DE => qq{PV-Prognose}                                                                              },
+  pvgenefclim => { EN => qq{PV forecast with feed-in limitation},
+                   DE => qq{PV-Prognose mit Einspeisebegrenzung}                                                      },
+  onlybatw    => { EN => qq{Battery},
+                   DE => qq{Batterie}                                                                                 },
+  simplyes    => { EN => qq{yes},
+                   DE => qq{ja}                                                                                       },
+  simpleno    => { EN => qq{no},
+                   DE => qq{nein}                                                                                     },
+  socrfcba    => { EN => qq{real battery charge achieved or SoC forecast Battery},
+                   DE => qq{real erreichte Batterieladung bzw. SoC Prognose Batterie}                                 },
+  socfcbat    => { EN => qq{SoC forecast Battery},
+                   DE => qq{SoC Prognose Batterie}                                                                    },
+  socfcsum    => { EN => qq{SoC forecast (%) summarized across all batteries},
+                   DE => qq{SoC Prognose (%) zusammengefasst &#252;ber alle Batterien}                                },
+  socrebat    => { EN => qq{real achieved charge Battery},
+                   DE => qq{real erreichte Ladung Batterie}                                                           },
+  socresum    => { EN => qq{real SoC achieved (%) summarized across all batteries},
+                   DE => qq{real errreichter SoC (%) zusammengefasst &#252;ber alle Batterien}                        },
+  socbacur    => { EN => qq{SoC current},
+                   DE => qq{SoC aktuell}                                                                              },
+  socbatfc    => { EN => qq{SoC forecast},
+                   DE => qq{SoC Prognose}                                                                             },
+  socbaths    => { EN => qq{SoC at the end of the hour},
+                   DE => qq{SoC am Ende der Stunde}                                                                   },
+  lcenable    => { EN => qq{Charge management enabled},
+                   DE => qq{Lademanagement aktiviert}                                                                 },
+  ldstratg    => { EN => qq{Loading strategy},
+                   DE => qq{Ladestrategie}                                                                            },
+  ldreleas    => { EN => qq{load release},
+                   DE => qq{Ladefreigabe}                                                                             },
+  optchpow    => { EN => qq{optimized charging power},
+                   DE => qq{optimierte Ladeleistung}                                                                  },
+  smtchpow    => { EN => qq{Target-optimized charging power},
+                   DE => qq{zieloptimierte Ladeleistung}                                                              },
+  bcharrel    => { EN => qq{Charging release (activate release for charging the battery if necessary)},
+                   DE => qq{Ladefreigabe (evtl. Freigabe zum Laden der Batterie aktivieren)}                          },
+  bncharel    => { EN => qq{only charge if the feed-in limit is exceeded},
+                   DE => qq{nur laden wenn Einspeiselimit &#252;berschritten}                                         },
+  conrec      => { EN => qq{Current time is within the consumption planning},
+                   DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung}                                      },
+  conrecba    => { EN => qq{Current time is within the consumption planning, Priority charging Battery is active},
+                   DE => qq{Aktuelle Zeit liegt innerhalb der Verbrauchsplanung, Vorrangladen Batterie ist aktiv}     },
+  connorec    => { EN => qq{Consumption planning is outside current time\n(Click for immediate planning)},
+                   DE => qq{Verbrauchsplanung liegt ausserhalb aktueller Zeit\n(Klick f&#252;r sofortige Einplanung)} },
+  connoact    => { EN => qq{the consumer is not activated},
+                   DE => qq{der Verbraucher ist nicht aktiviert}                                                      },  
+  akorron     => { EN => qq{switched off\nenable auto correction with:\nset <NAME> pvCorrectionFactor_Auto on*},
+                   DE => qq{ausgeschaltet\nAutokorrektur einschalten mit:\nset <NAME> pvCorrectionFactor_Auto on*}    },
+  splus       => { EN => qq{PV surplus sufficient},
+                   DE => qq{PV-&#220;berschu&#223; ausreichend}                                                       },
+  nosplus     => { EN => qq{PV surplus insufficient},
+                   DE => qq{PV-&#220;berschu&#223; unzureichend}                                                      },
+  plchk       => { EN => qq{Configuration check of the plant},
+                   DE => qq{Konfigurationspr&#252;fung der Anlage}                                                    },
+  jtsfft      => { EN => qq{Open the SolarForecast Forum},
+                   DE => qq{&#214;ffne das SolarForecast Forum}                                                       },
+  opwiki      => { EN => qq{Open the Wiki (German language)},
+                   DE => qq{&#214;ffne das Wiki}                                                                      },
+  outpmsg     => { EN => qq{Messages are available - press the button to open them},
+                   DE => qq{Mitteilungen sind vorhanden - dr&#252;cke die Taste um sie zu &#246;ffnen}                },
+  nomsgfo     => { EN => qq{there are no new messages},
+                   DE => qq{es sind keine neuen Mitteilungen vorhanden}                                               },
+  lstmsgc     => { EN => qq{last message call},
+                   DE => qq{letzter Mitteilungsabruf}                                                                 },
+  nxtmsgc     => { EN => qq{next message call},
+                   DE => qq{n&auml;chster Mitteilungsabruf}                                                           },
+  scaresps    => { EN => qq{API request successful},
+                   DE => qq{API Abfrage erfolgreich}                                                                  },
+  dwfcrsu     => { EN => qq{Weather data are up to date according to used DWD model},
+                   DE => qq{Wetterdaten sind aktuell entsprechend des verwendeten DWD Modell}                         },
+  scarespf    => { EN => qq{API request failed},
+                   DE => qq{API Abfrage fehlgeschlagen}                                                               },
+  dapic       => { EN => qq{API requests or request equivalents already carried out today},
+                   DE => qq{Heute bereits durchgef&#252;hrte API-Anfragen bzw. Anfragen-&#196;quivalente}             },
+  rapic       => { EN => qq{remaining API requests},
+                   DE => qq{verf&#252;gbare API-Anfragen}                                                             },
+  yheyfdl     => { EN => qq{You have exceeded your free daily limit!},
+                   DE => qq{Sie haben Ihr kostenloses Tageslimit &#252;berschritten!}                                 },
+  rlfaccpr    => { EN => qq{Rate limit for API requests reached in current period!},
+                   DE => qq{Abfragegrenze f&#252;r API-Anfragen im aktuellen Zeitraums erreicht!}                     },
+  raricp      => { EN => qq{remaining API requests in the current period},
+                   DE => qq{verf&#252;gbare API-Anfragen der laufenden Periode}                                       },
+  scakdne     => { EN => qq{API key does not exist},
+                   DE => qq{API Schl&#252;ssel existiert nicht}                                                       },
+  scrsdne     => { EN => qq{Rooftop site does not exist or is not accessible},
+                   DE => qq{Rooftop ID existiert nicht oder ist nicht abrufbar}                                       },
+  norate      => { EN => qq{not rated},
+                   DE => qq{nicht bewertet}                                                                           },
+  aimstt      => { EN => qq{Perl module AI::DecisionTree is missing},
+                   DE => qq{Perl Modul AI::DecisionTree ist nicht vorhanden}                                          },
+  dumtxt      => { EN => qq{unassignable consumption (takes into account any hidden consumers)},
+                   DE => qq{nicht zuordenbarer Verbrauch (ber&#252;cksichtigt evtl. versteckte Verbraucher)}          },
+  rdcactiv    => { EN => qq{Plant derating active},
+                   DE => qq{Anlagenabregelung aktiv}                                                                  },
+  rdcnoact    => { EN => qq{no Plant derating},
+                   DE => qq{keine Anlagenabregelung}                                                                  },
+  pstate      => { EN => qq{Planning&nbsp;status:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nMode:&nbsp;<mode>\nOn:&nbsp;<start>\nOff:&nbsp;<stop>\nRemaining lock time:&nbsp;<RLT> seconds},
+                   DE => qq{Planungsstatus:&nbsp;<pstate>\nInfo:&nbsp;<supplmnt>\n\nModus:&nbsp;<mode>\nEin:&nbsp;<start>\nAus:&nbsp;<stop>\nverbleibende Sperrzeit:&nbsp;<RLT> Sekunden}  },
+  ainuse      => { EN => qq{AI Perl module is installed, but the AI support is not used.\nRun 'set <NAME> plantConfiguration check' for hints.},
+                   DE => qq{KI Perl Modul ist installiert, aber die KI Unterst&uuml;tzung wird nicht verwendet.\nPr&uuml;fen sie 'set <NAME> plantConfiguration check' f&uuml;r Hinweise.} },
+  arsrad2o    => { EN => qq{API query successful but the radiation values are outdated.\nCheck the plant with 'set <NAME> plantConfiguration check'.},
+                   DE => qq{API Abfrage erfolgreich aber die Strahlungswerte sind veraltet.\nPr&uuml;fen sie die Anlage mit 'set <NAME> plantConfiguration check'.}                        },
+  aswfc2o     => { EN => qq{The weather data is outdated.\nCheck the plant with 'set <NAME> plantConfiguration check'.},
+                   DE => qq{Die Wetterdaten sind veraltet.\nPr&uuml;fen sie die Anlage mit 'set <NAME> plantConfiguration check'.}                                                         },
+  rdcstat     => { EN => qq{no reduction status available\nPlease set the key 'reductionState' with 'attr <NAME> plantControl'},
+                   DE => qq{kein Abregelungsstatus verf&uuml;gbar\nSetzen sie bitte den Schl&uuml;ssel 'reductionState' mit 'attr <NAME> plantControl'}                                    },
 );
 
 # -----------------------------------------------------------------------------------------------------------------
@@ -1813,6 +1824,7 @@ my %hfspvh = (
   socprogwhsum      => { fn => \&_saveHistP2, storname => 'socprogwhsum',   validkey => undef,    fpar => undef    },    # prognostizierter SoC (Wh) zusammengefasst über alle Batterien
   pvapifcraw        => { fn => \&_saveHistP2, storname => 'pvapifcraw',     validkey => undef,    fpar => undef    },    # prognostizierter Energieertrag Raw
   pvfc              => { fn => \&_saveHistP2, storname => 'pvfc',           validkey => undef,    fpar => 'calc99' },    # prognostizierter Energieertrag
+  pvfcfeedlim       => { fn => \&_saveHistP2, storname => 'pvfcfeedlim',    validkey => undef,    fpar => 'calc99' },    # prognostizierter Energieertrag mit Berücksichtigung Einspeiselimit/Nulleinspeiser
   confc             => { fn => \&_saveHistP2, storname => 'confc',          validkey => undef,    fpar => 'calc99' },    # durch KI oder herkömmlich prognostizierter Hausverbrauch
   conaifc           => { fn => \&_saveHistP2, storname => 'conaifc',        validkey => undef,    fpar => undef    },    # Hilfswert: durch KI prognostizierter Hausverbrauch
   conbiascorr       => { fn => \&_saveHistP2, storname => 'conbiascorr',    validkey => undef,    fpar => undef    },    # in der KI Verbrauchsprognose enthaltene kombinierte Bias- und Driftkorrektur 
@@ -2811,6 +2823,7 @@ sub Set {
 
   my @re = qw( aiData
                batteryTriggerSet
+               circularData
                consumerMaster
                consumerPlanning
                consumptionShort
@@ -3406,8 +3419,8 @@ sub _setreset {                          ## no critic "not used"
 
   my $hash  = $defs{$name};
 
-  if   ( $arg =~ /=/ ) { $arg =~ s/,(?=[^=]*=)/ /g; }
-  else                 { $arg =~ s/,/ /g; }
+  if ( $arg =~ /=/ ) { $arg =~ s/,(?=[^=]*=)/ /g; }
+  else               { $arg =~ s/,/ /g; }
 
   $arg     = trim ($arg);                                                        # trim it
   my @args = split " ", $arg;
@@ -3539,7 +3552,11 @@ sub _setreset {                          ## no critic "not used"
   }
 
   if ($args[0] eq 'aiData') {
-      __resetAiData ($name, $arg, \@args);
+      return  __resetAiData ($name, $arg, \@args);
+  }
+  
+  if ($args[0] eq 'circularData') {
+      return __resetCircularArrData ($name, $arg, \@args);
   }
 
   if ($args[0] eq 'powerTriggerSet') {
@@ -3689,7 +3706,7 @@ sub __resetAiData {
           }
       }
   }
-  elsif ($ha->{delValue} || $ha->{searchValue}) {                                    # den Wert einen Schlüssels suchen oder löschen
+  elsif ($ha->{delValue} || $ha->{searchValue}) {                                               # den Wert einen Schlüssels suchen oder löschen
       my ($key, $op, $operand);
       my $del  = 0;
       my $done = '';
@@ -3704,7 +3721,7 @@ sub __resetAiData {
           ($key, $op, $operand) = ($1, $2, $3);         
       }
       
-      return "the arguments of 'delValue' are not specified correctly" if(!defined $key || !defined $op || !defined $operand);
+      return "The arguments of 'delValue' are not specified correctly" if(!defined $key || !defined $op || !defined $operand);
       
       my %ops = (
           '==' => sub { $_[0] == $_[1] },
@@ -3736,18 +3753,18 @@ sub __resetAiData {
       my $key = $ha->{key};
       my $val = $ha->{value};
 
-      return "the arguments of 'setValue' are not specified correctly, use: setValue Index=<idx> key=<key> value=<value>"
+      return "The arguments of 'setValue' are not specified correctly, use: setValue Index=<idx> key=<key> value=<value>"
           if (!defined $idx || !defined $key || !defined $val || !length $idx || !length $key || !length $val);
 
       return "Index '$idx' must be numeric" if ($idx !~ /^\d+$/);
-      return "key '$key' contains invalid characters"
+      return "The key '$key' contains invalid characters"
           if ($key !~ /^[A-Za-z0-9_]+$/);
       return "AI Raw data index '$idx' doesn't exist"
           if (!exists $data{$name}{aidectree}{airaw}{$idx});
 
-      my $old = AiRawdataVal ($name, $idx, $key, undef);
+      my $old                                    = AiRawdataVal ($name, $idx, $key, undef);
       $data{$name}{aidectree}{airaw}{$idx}{$key} = $val;
-      $dosave = 1;
+      $dosave                                    = 1;
 
       Log3 ($name, 1, qq{$name - AI Raw data set - idx: $idx -> key=$key, old value=}.
                        (defined $old ? $old : '<undef>').qq{, new value=$val});
@@ -3759,6 +3776,139 @@ sub __resetAiData {
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
           Log3 ($name, 1, qq{$name - AI raw data saved into file: }.$airaw.$name);
+      }
+  }
+
+return;
+}
+
+################################################################
+#    Circular Array-Daten (con_all/gcons_a) löschen/ändern
+################################################################
+sub __resetCircularArrData {
+  my ($name, $arg, $argsref) = @_;
+
+  my @args   = @$argsref;
+  my $dosave = 0;
+
+  my ($aa, $ha) = parseParams ($arg);
+
+  my %ops = (
+      '==' => sub { $_[0] == $_[1] },
+      '>'  => sub { $_[0] >  $_[1] },
+      '>=' => sub { $_[0] >= $_[1] },
+      '<'  => sub { $_[0] <  $_[1] },
+      '<=' => sub { $_[0] <= $_[1] },
+  );
+
+  if ($ha->{delValue} || $ha->{searchValue}) {                                                  # Werte in con_all/gcons_a suchen oder löschen
+      my ($key, $op, $operand);
+      my $del  = 0;
+      my $done = '';
+
+      if ($ha->{delValue}) {
+          $ha->{delValue} =~ /^(con_all|gcons_a)(==|>=|<=|<|>)(-?\d+(?:\.\d+)?)$/xs;
+          ($key, $op, $operand) = ($1, $2, $3);
+          $del = 1;
+      }
+      elsif ($ha->{searchValue}) {
+          $ha->{searchValue} =~ /^(con_all|gcons_a)(==|>=|<=|<|>)(-?\d+(?:\.\d+)?)$/xs;
+          ($key, $op, $operand) = ($1, $2, $3);
+      }
+
+      return "The arguments of 'delValue'/'searchValue' are not specified correctly, use: delValue=<con_all|gcons_a><op><value> [hod=<hod>] [wday=<wday>]"
+          if(!defined $key || !defined $op || !defined $operand);
+
+      my $hodfilter = $ha->{hod};                                                               # optional: auf eine Stunde beschränken
+      
+      if (defined $hodfilter) {
+          return "The hod '$hodfilter' must be numeric" if($hodfilter !~ /^\d{1,2}$/xs);
+          
+          $hodfilter = sprintf "%02d", $hodfilter;
+          
+          return "The circular hod '$hodfilter' doesn't exist" if(!exists $data{$name}{circular}{$hodfilter});
+      }
+
+      my $wdayfilter = $ha->{wday};                                                             # optional: auf einen Wochentag beschränken
+      my $hits_total = 0;
+
+      for my $hod (sort keys %{$data{$name}{circular}}) {
+          next if($hodfilter && $hod ne $hodfilter);
+          next if(!exists $data{$name}{circular}{$hod}{$key} || ref $data{$name}{circular}{$hod}{$key} ne 'HASH');
+
+          for my $wday (sort keys %{$data{$name}{circular}{$hod}{$key}}) {
+              next if($wdayfilter && $wday ne $wdayfilter);
+
+              my $aref = $data{$name}{circular}{$hod}{$key}{$wday};
+              next if(ref $aref ne 'ARRAY');
+
+              my @hits;
+              
+              for my $i (0..$#{$aref}) {
+                  push @hits, $i if(isNumeric($aref->[$i]) && $ops{$op}->($aref->[$i], $operand));
+              }
+              
+              next if(!@hits);
+
+              $hits_total += scalar @hits;
+
+              my @hitvals = @{$aref}[@hits];                                         # Werte VOR dem Löschen sichern
+
+              if ($del) {
+                  for my $i (reverse @hits) {                                        # rückwärts löschen -> keine Indexverschiebung
+                      splice (@{$aref}, $i, 1);
+                  }
+                  $dosave = 1;
+                  $done   = 'deleted';
+              }
+              else {
+                  $done = 'found';
+              }
+
+              Log3 ($name, 1, "$name - Circular data $done - hod=$hod key=$key wday=$wday pos=".
+                               join(',', @hits)." value=".join(',', @hitvals));
+          }
+      }
+
+      Log3 ($name, 1, "$name - Circular data search/delete finished - key=$key, total matches: $hits_total")
+          if(!$hodfilter || !$wdayfilter);                                                      # zusammenfassende Meldung bei bereichsübergreifender Suche
+  }
+  elsif ($args[1] eq 'setValue') {                                                              # einen Einzelwert an Position pos setzen/ändern -> hod PFLICHT
+      my $hod  = $ha->{hod};
+      my $key  = $ha->{key};
+      my $wday = $ha->{wday};
+      my $pos  = $ha->{pos};
+      my $val  = $ha->{value};
+
+      return "The arguments of 'setValue' are not specified correctly, use: setValue hod=<hod> key=<con_all|gcons_a> wday=<wday> pos=<pos> value=<value>"
+          if (!defined $hod || !defined $key || !defined $wday || !defined $pos || !defined $val
+              || !length $hod || !length $key || !length $wday || !length $pos || !length $val);
+
+      return "The hod '$hod' must be numeric"                            if ($hod !~ /^\d{1,2}$/xs);
+      $hod = sprintf "%02d", $hod;
+
+      return "The key '$key' is not a valid array key (con_all|gcons_a)" if ($key !~ /^(con_all|gcons_a)$/xs);
+      return "The circular hod '$hod' doesn't exist"                     if (!exists $data{$name}{circular}{$hod});
+
+      my $aref = $data{$name}{circular}{$hod}{$key}{$wday};
+      return "The key '$key'/wday '$wday' doesn't exist in circular hod '$hod'" if(ref $aref ne 'ARRAY');
+      return "The pos '$pos' must be numeric"                                        if ($pos !~ /^\d+$/xs);
+      return "The pos '$pos' out of range (Array has ".scalar(@{$aref})." elements)" if ($pos > $#{$aref});
+      return "The value '$val' is not numeric"                                       if (!isNumeric($val));
+
+      my $old       = $aref->[$pos];
+      $aref->[$pos] = $val;
+      $dosave       = 1;
+
+      Log3 ($name, 1, qq{$name - Circular data set - hod=$hod key=$key wday=$wday pos=$pos -> }.
+                       qq{old value=$old, new value=$val});
+  }
+
+  if ($dosave) {
+      my $err = writeCacheFile ($defs{$name}, 'circular', $pvccache.$name);
+
+      if (!$err) {
+          Log3 ($name, 1, qq{$name - Circular data saved into file: }.$pvccache.$name);
       }
   }
 
@@ -12287,7 +12437,7 @@ sub _addDynAttr {
       push @deva, "ctrlNextHoursSoCForecastReadings:multiple-strict,$hod";
   }
 
-  $gbc .= 'consumption,consumptionForecast,energycosts,feedincome,gridconsumption,gridfeedin,pvForecast,pvReal';
+  $gbc .= 'consumption,consumptionForecast,energycosts,feedincome,gridconsumption,gridfeedin,pvForecast,pvForecastLimited,pvReal';
 
   for my $n (1..6) {
       push @deva, "graphicBeam${n}Content:$gbc";
@@ -12459,6 +12609,7 @@ sub centralTask {
   _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
   
   _calcConsForecast           ($centpars);                                            # Verbrauchsprognose
+  _corrPVforecast4ZeroFeedIn  ($centpars);                                            # PV-Prognose für Nulleinspeiser/Einspeiselimit korrigieren
   
   _evaluateTrigger            ($centpars);                                            # Schwellenwerte der Trigger bewerten und signalisieren
   _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
@@ -19556,6 +19707,7 @@ sub _calcConsForecast_legacy {
       my $nhn      = (split 'NextHour', $nh)[1];
       my $u        = $usage->{nxt}{$hod};                                                           # Kurzreferenz
       my $con_base = $u->{con} // 0;                                                                # Basiswert lesen, NICHT modifizieren
+      my $conraw   = $con_base;  
       
       my ($msg1, $msg2, $msg3, $msg4) = ('', '', '', '');
 
@@ -19597,11 +19749,17 @@ sub _calcConsForecast_legacy {
                                           debug     => $paref->{debug},
                                        });
 
+      my $conlegfc = __considerConsBase ({ name      => $name,                                     # V 2.9.3: eigener consForecastBase-Durchlauf auf conraw, konsistent zu confc/confcex
+                                           confc_raw => round0 ($conraw),
+                                           hod       => $hod, 
+                                           debug     => $paref->{debug},
+                                        });
+                                  
       # --- Ergebnisse in nexthours speichern
       my $nhref          = $data{$name}{nexthours}{$nh};
       $nhref->{confcEx}  = $confcex;
       $nhref->{confc}    = $confc;
-      $nhref->{conlegfc} = $confc;
+      $nhref->{conlegfc} = $conlegfc;
 
       $msg3 = "STORE NextHour$nhn -> confc=$confc Wh, confcEx=$confcex Wh";
 
@@ -19609,8 +19767,8 @@ sub _calcConsForecast_legacy {
       if ($isToday) {
           $data{$name}{circular}{$hod}{confc} = $confc;
 
-          writeToHistory ({ paref => $paref, key => 'confc',    val => $confc, day => $day, hour => $hod });
-          writeToHistory ({ paref => $paref, key => 'conlegfc', val => $confc, day => $day, hour => $hod });
+          writeToHistory ({ paref => $paref, key => 'confc',    val => $confc,    day => $day, hour => $hod });
+          writeToHistory ({ paref => $paref, key => 'conlegfc', val => $conlegfc, day => $day, hour => $hod });
 
           $msg4 = " ,STORE pvCircular/pvHistory -> confc=$confc Wh";
       }
@@ -19893,6 +20051,85 @@ sub __considerConsBase {
   
 return $confc;
 } 
+
+################################################################
+#   Korrektur der PV-Prognose für Nulleinspeiser / Anlagen
+#   mit Einspeiselimit unter Berücksichtigung von Verbrauchs-
+#   prognose und der bereits durch _batChargeMgmt berechneten
+#   Batterie-SoC-Prognose (socprogwhsum)
+#
+#   Muss NACH _calcConsForecast im centralTask-Ablauf aufgerufen
+#   werden, da sie auf 'confc' (Legacy/Hybrid-AI final) und
+#   'socprogwhsum' in NextHours zugreift.
+################################################################
+sub _corrPVforecast4ZeroFeedIn {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $day   = $paref->{day};
+  my $chour = $paref->{chour};
+
+  my $feedinlim = CurrentVal ($name, 'feedinPowerLimit', INFINITE);             # Einspeiselimit in W (bei Nulleinspeisung = 0)
+
+  return if($feedinlim == INFINITE);                                            # keine Limitierung eingestellt -> Korrektur entfällt automatisch
+
+  my $hasBat = isBatteryUsed ($name);                                           # kann false sein -> darf NICHT zum Abbruch führen
+
+  debugLog ($paref, 'pvCorrectionWrite', "PVFCFeedLim - Start: feed-in limit $feedinlim W, battery used: ".($hasBat ? 'yes' : 'no'));
+
+  # aktuellen Gesamt-SoC (Wh) als Startwert für Stunde 0 ermitteln
+  # ohne Batterie bleibt soc_prev dauerhaft 0
+  # ----------------------------------------------------------------
+  my $soc_prev = CurrentVal ($name, 'batwhtotal', 0);                           # aktuelle Ist-Ladung in Wh, bereits vorhandene Aggregation
+
+  # Stundenschleife über NextHours (analog zu _batChargeMgmt)
+  # ----------------------------------------------------------------
+  for my $num (0..MAXNEXTHOURS) {
+      my ($fd, $fh) = calcDayHourMove ($chour, $num);
+      last if($fd > MAXNEXTDAYS);
+
+      my $nhr = sprintf "%02d", $num;
+      my $hod = NexthoursVal ($name, 'NextHour'.$nhr, 'hourofday', undef);
+      my $stt = NexthoursVal ($name, 'NextHour'.$nhr, 'starttime', undef);
+
+      next if(!defined $hod || !defined $stt);
+
+      my $today     = NexthoursVal ($name, 'NextHour'.$nhr, 'today', 0);
+      my $pvfc_raw  = NexthoursVal ($name, 'NextHour'.$nhr, 'pvfc',  0);        # Roh-PV-Prognose der Stunde
+      my $confc_raw = NexthoursVal ($name, 'NextHour'.$nhr, 'confc', 0);        # Verbrauchsprognose der Stunde (Legacy oder Hybrid-AI final)
+
+      # Batterie-Ladeenergie dieser Stunde aus bereits vorhandener
+      # SoC-Prognose ableiten (respektiert automatisch Soll-SoC-Deckel,
+      # Ladestrategie, Zeitfenster etc. aus _batChargeMgmt)
+      # ----------------------------------------------------------------
+      my $batchg = 0;
+
+      if ($hasBat) {
+          my $soc_now = NexthoursVal ($name, 'NextHour'.$nhr, 'socprogwhsum', undef);
+
+          if (defined $soc_now) {
+              $batchg   = max (0, $soc_now - $soc_prev);                       # nur Ladeanteil relevant, Entladung schafft keinen zusätzlichen PV-Spielraum
+              $soc_prev = $soc_now;                                            # Fortschreibung für Folgestunde
+          }
+      }
+
+      # Korrektur anwenden
+      # Vereinfachung: Stundenraster -> W und Wh numerisch gleichgesetzt
+      # ----------------------------------------------------------------
+      my $pvfc_feedlim = min ($pvfc_raw, $confc_raw + $batchg + $feedinlim);
+      $pvfc_feedlim    = max (0, round0 ($pvfc_feedlim));
+
+      $data{$name}{nexthours}{'NextHour'.$nhr}{pvfcfeedlim} = $pvfc_feedlim;
+
+      debugLog ($paref, 'pvCorrectionWrite',
+                "PVFCFeedLim NextHour$nhr $stt - raw: $pvfc_raw Wh, confc: $confc_raw Wh, batchg: $batchg Wh, limit: $feedinlim W -> pvfcfeedlim: $pvfc_feedlim Wh");
+
+      if ($today && $hod) {
+          writeToHistory ( { paref => $paref, key => 'pvfcfeedlim', val => $pvfc_feedlim, day => $day, hour => $hod } );
+      }
+  }
+
+return;
+}
 
 ################################################################
 #     Schwellenwerte für Trigger auswerten und signalisieren
@@ -23204,11 +23441,12 @@ sub _beamGraphicFirstHour {
   my $val7 = CachedHistoryVal ($name, $day_str, $time_str, 'gfeedin', 0);
 
   my %beam_val = (
-      pvForecast          => CachedHistoryVal ($name, $day_str, $time_str, 'pvfc',  0),
-      pvReal              => CachedHistoryVal ($name, $day_str, $time_str, 'pvrl',  0),
+      pvForecastLimited   => __pvHistOrFeedlim ($name, $day_str, $time_str),
+      pvForecast          => CachedHistoryVal  ($name, $day_str, $time_str, 'pvfc',  0),      
+      pvReal              => CachedHistoryVal  ($name, $day_str, $time_str, 'pvrl',  0),
       gridconsumption     => $val3,
-      consumptionForecast => CachedHistoryVal ($name, $day_str, $time_str, 'confc', 0),
-      consumption         => CachedHistoryVal ($name, $day_str, $time_str, 'con',   0),
+      consumptionForecast => CachedHistoryVal  ($name, $day_str, $time_str, 'confc', 0),
+      consumption         => CachedHistoryVal  ($name, $day_str, $time_str, 'con',   0),
       energycosts         => round2 (CachedHistoryVal ($name, $day_str, $time_str, 'conprice', 0) * $val3 / 1000),
       gridfeedin          => $val7,
       feedincome          => round2 (CachedHistoryVal ($name, $day_str, $time_str, 'feedprice', 0) * $val7 / 1000),
@@ -23245,22 +23483,9 @@ sub _beamGraphicFirstHour {
       $beam_val{batsocRealSum}     = round1(100 * $socwhsum     / $bcapsum);
   }
 
-  # --- Texte für Balken
+  # --- Preisreferenzen für Textbildung
   my $epc = CurrentVal($name, 'ePurchasePriceCcy', 0);
   my $efc = CurrentVal($name, 'eFeedInTariffCcy',  0);
-
-  my %beam_txt = (
-      pvForecast          => $htitles{pvgenefc}{$lang}." ($kw)",
-      pvReal              => $htitles{pvgenerl}{$lang}." ($kw)",
-      gridconsumption     => $htitles{enppubgd}{$lang}." ($kw)",
-      consumptionForecast => $htitles{enconsfc}{$lang}." ($kw)",
-      consumption         => $htitles{enconsrl}{$lang}." ($kw)",
-      energycosts         => $htitles{enpchcst}{$lang}." ($epc)",
-      gridfeedin          => $htitles{enfeedgd}{$lang}." ($kw)",
-      feedincome          => $htitles{rengfeed}{$lang}." ($efc)",
-      batsocForecastSum   => $htitles{socfcsum}{$lang},
-      batsocRealSum       => $htitles{socresum}{$lang},
-  );
 
   # --- beam1 / beam2 + Texte setzen
   for my $slot (
@@ -23272,23 +23497,28 @@ sub _beamGraphicFirstHour {
 
       if (exists $beam_val{$bcont}) {
           $hfcg->{0}{$bval_key} = $beam_val{$bcont} // 0;
-          $hfcg->{0}{$btxt_key} = $beam_txt{$bcont} // '';
       }
       elsif ($bcont =~ /^batsoc/xs) {
           $hfcg->{0}{$bval_key} = $hbsocs->{0}{$bnum}{$bsoc_key} // 0;
-          $hfcg->{0}{$btxt_key} = $bcont =~ /batsocCombi_/xs    ? $htitles{socrfcba}{$lang}." $bnum (%)" :
-                                  $bcont =~ /batsocForecast_/xs ? $htitles{socfcbat}{$lang}." $bnum (%)" :
-                                  $bcont =~ /batsocReal_/xs     ? $htitles{socrebat}{$lang}." $bnum (%)" :
-                                  '';
       }
       else {
           $hfcg->{0}{$bval_key} = 0;
-          $hfcg->{0}{$btxt_key} = '';
       }
+      
+      $hfcg->{0}{$btxt_key} = __beamTxtFor ( { name    => $name,
+                                              bcont    => $bcont,
+                                              lang     => $lang,
+                                              kw       => $kw,
+                                              epc      => $epc,
+                                              efc      => $efc,
+                                              isHist   => 1,
+                                              day_str  => $day_str,
+                                              time_str => $time_str,
+                                             } );
   }
 
   # --- Differenz berechnen
-  my %roundable = map { $_ => 1 } qw(pvForecast pvReal consumptionForecast consumption);
+  my %roundable = map { $_ => 1 } qw(pvForecast pvForecastLimited pvReal consumptionForecast consumption);
 
   $hfcg->{0}{diff} = round1($hfcg->{0}{beam1} - $hfcg->{0}{beam2});
 
@@ -23314,9 +23544,10 @@ sub _beamGraphicRemainingHours {
   my $hourstyle = $paref->{hourstyle};
   my $beam1cont = $paref->{beam1cont};
   my $beam2cont = $paref->{beam2cont};
+  my $lang      = $paref->{lang};
   my $kw        = $paref->{kw};
 
-  my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8, $val9, $val10);
+  my ($val1, $val2, $val3, $val4, $val5, $val6, $val7, $val8, $val9, $val10, $val11);
   my $hbsocs;
 
   my $hash     = $defs{$name};
@@ -23325,9 +23556,12 @@ sub _beamGraphicRemainingHours {
   my $maxDif   = $hfcg->{0}{diff};                                                                      # für Typ diff
   my $minDif   = $hfcg->{0}{diff};                                                                      # für Typ diff
   my $bcapsum  = CurrentVal ($name, 'batcapsum', 0);                                                    # Summe installierte Batterie Kapazität in Wh
-
+  my $epc      = CurrentVal ($name, 'ePurchasePriceCcy', 0);                                            # für __beamTxtFor (energycosts)
+  my $efc      = CurrentVal ($name, 'eFeedInTariffCcy',  0);                                            # für __beamTxtFor (feedincome)
+  
   for my $i (1..($maxhours*2)-1) {                                                                      # doppelte Anzahl berechnen    my $val1 = 0;
-      ($val1, $val2, $val3 ,$val4 ,$val5, $val6, $val7 ,$val8, $val9, $val10) = (0,0,0,0,0,0,0,0,0,0);
+      ($val1, $val2, $val3 ,$val4 ,$val5, $val6, $val7 ,$val8, $val9, $val10, $val11) = 
+                (0,0,0,0,0,0,0,0,0,0,0);
 
       $hfcg->{$i}{time} = $hfcg->{0}{time} + $i;
 
@@ -23338,9 +23572,12 @@ sub _beamGraphicRemainingHours {
       $hfcg->{$i}{time_str} = sprintf '%02d', $hfcg->{$i}{time};
 
       my $nh;                                                                                           # next hour
+      my $isHist_i = 0;                                                                                 # 1 = Werte kommen aus History, 0 = aus NextHours
 
       if ($offset < 0) {
           if ($i <= abs($offset)) {                                                                     # $daystr stimmt nur nach Mitternacht, vor Mitternacht muß $hfcg->{0}{day_str} als Basis verwendet werden !                 
+              $isHist_i = 1;
+
               my $base = $hfcg->{0}{mktime};
 
               my $ds = timestringsFromOffset (
@@ -23358,14 +23595,15 @@ sub _beamGraphicRemainingHours {
               $hfcg->{$i}{sunaz}   = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'sunaz',     '-');
               $hfcg->{$i}{don}     = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'DoN',         0);
 
-              $val1 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
-              $val2 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
-              $val3 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
-              $val4 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
-              $val5 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'con',   0);
-              $val6 = round2 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);  # Energiekosten der Stunde
-              $val7 = CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
-              $val8 = round2 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);  # Einspeisevergütung der Stunde
+              $val1  = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'pvfc',  0);
+              $val2  = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'pvrl',  0);
+              $val3  = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'gcons', 0);
+              $val4  = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'confc', 0);
+              $val5  = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'con',   0);
+              $val6  = round2 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'conprice',  0) * $val3 / 1000);            # Energiekosten der Stunde
+              $val7  = CachedHistoryVal  ($name, $ds, $hfcg->{$i}{time_str}, 'gfeedin', 0);
+              $val8  = round2 (CachedHistoryVal ($name, $ds, $hfcg->{$i}{time_str}, 'feedprice', 0) * $val7 / 1000);            # Einspeisevergütung der Stunde
+              $val11 = __pvHistOrFeedlim ($name, $ds, $hfcg->{$i}{time_str});
 
               ## Batterien Selektionshash erstellen
               #######################################
@@ -23414,8 +23652,9 @@ sub _beamGraphicRemainingHours {
           $hfcg->{$i}{don}     = NexthoursVal ($name, 'NextHour'.$nh, 'DoN',         0);
           my $stt              = NexthoursVal ($name, 'NextHour'.$nh, 'starttime',  '');
 
-          $val1 = NexthoursVal ($name, 'NextHour'.$nh, 'pvfc',  0);
-          $val4 = NexthoursVal ($name, 'NextHour'.$nh, 'confc', 0);
+          $val1  = NexthoursVal      ($name, 'NextHour'.$nh, 'pvfc',  0);        
+          $val4  = NexthoursVal      ($name, 'NextHour'.$nh, 'confc', 0);
+          $val11 = __pvNextOrFeedlim ($name, 'NextHour'.$nh);
 
           ## Batterien Selektionshash anreichern
           ########################################
@@ -23450,6 +23689,7 @@ sub _beamGraphicRemainingHours {
       ## Zuordnung Werte zu den Balken entsprechend Selektion
       #########################################################
       $hfcg->{$i}{beam1}    = $beam1cont eq 'pvForecast'          ? $val1  :
+                              $beam1cont eq 'pvForecastLimited'   ? $val11 :
                               $beam1cont eq 'pvReal'              ? $val2  :
                               $beam1cont eq 'gridconsumption'     ? $val3  :
                               $beam1cont eq 'consumptionForecast' ? $val4  :
@@ -23463,6 +23703,7 @@ sub _beamGraphicRemainingHours {
                               undef;
 
       $hfcg->{$i}{beam2}    = $beam2cont eq 'pvForecast'          ? $val1  :
+                              $beam2cont eq 'pvForecastLimited'   ? $val11 :
                               $beam2cont eq 'pvReal'              ? $val2  :
                               $beam2cont eq 'gridconsumption'     ? $val3  :
                               $beam2cont eq 'consumptionForecast' ? $val4  :
@@ -23475,11 +23716,37 @@ sub _beamGraphicRemainingHours {
                               $beam2cont =~ /^batsoc/xs           ? $hbsocs->{$i}{(split '_', $beam2cont)[1]}{beam2cont} :
                               undef;
 
+      # --- Hover-Texte pro Stunde ermitteln
+      ########################################
+      $hfcg->{$i}{beam1txt} = __beamTxtFor ( { name     => $name,
+                                               bcont    => $beam1cont,
+                                               lang     => $lang,
+                                               kw       => $kw,
+                                               epc      => $epc,
+                                               efc      => $efc,
+                                               isHist   => $isHist_i,
+                                               day_str  => $hfcg->{$i}{day_str},
+                                               time_str => $hfcg->{$i}{time_str},
+                                               nh       => $nh,
+                                             } );
+
+      $hfcg->{$i}{beam2txt} = __beamTxtFor ( { name     => $name,
+                                               bcont    => $beam2cont,
+                                               lang     => $lang,
+                                               kw       => $kw,
+                                               epc      => $epc,
+                                               efc      => $efc,
+                                               isHist   => $isHist_i,
+                                               day_str  => $hfcg->{$i}{day_str},
+                                               time_str => $hfcg->{$i}{time_str},
+                                               nh       => $nh,
+                                             } );
+
       $hfcg->{$i}{time_str} = sprintf ('%02d', $hfcg->{$i}{time}-1).$hourstyle;
 
       $hfcg->{$i}{beam1} //= 0;
       $hfcg->{$i}{beam2} //= 0;
-      my %roundable        = map { $_ => 1 } qw(pvForecast pvReal consumptionForecast consumption);
+      my %roundable        = map { $_ => 1 } qw(pvForecast pvForecastLimited pvReal consumptionForecast consumption);
       my @beams            = ($beam1cont, $beam2cont);
       $hfcg->{$i}{diff}    = round1 ($hfcg->{$i}{beam1} - $hfcg->{$i}{beam2});
       $hfcg->{$i}{diff}    = round0 ($hfcg->{$i}{diff}) if($kw eq 'Wh' && grep { $roundable{$_} } @beams);
@@ -23499,6 +23766,98 @@ sub _beamGraphicRemainingHours {
   };
 
 return $back;
+}
+
+################################################################
+#   liefert Anzeigetext für einen Balken-Content, dynamisch
+#   für Contents mit stundenabhängigem Zusatzstatus
+#   (z.B. pvForecastLimited: limitiert oder Fallback)
+################################################################
+sub __beamTxtFor {
+  my $paref    = shift;
+  my $name     = $paref->{name};
+  my $bcont    = $paref->{bcont};
+  my $lang     = $paref->{lang};
+  my $kw       = $paref->{kw};
+  my $epc      = $paref->{epc};
+  my $efc      = $paref->{efc};
+  my $isHist   = $paref->{isHist};                                        # 1 = Vergangenheit (History), 0 = Zukunft (NextHours)
+  my $day_str  = $paref->{day_str};                                       # nur bei isHist
+  my $time_str = $paref->{time_str};                                      # nur bei isHist
+  my $nh       = $paref->{nh};                                            # nur bei !isHist
+
+  ## dynamischer Content: PV-Prognose mit Einspeisebegrenzung
+  ###############################################################
+  if ($bcont eq 'pvForecastLimited') {
+      my $active = $isHist
+                 ? defined CachedHistoryVal ($name, $day_str, $time_str, 'pvfcfeedlim', undef)
+                 : defined NexthoursVal     ($name, 'NextHour'.$nh,      'pvfcfeedlim', undef);
+
+      my $key = $active ? 'pvgenefclim' : 'pvgenefc';                     # Fallback -> identischer Text wie unlimitierte Prognose
+      
+      return $htitles{$key}{$lang}." ($kw)";
+  }
+
+  ## statische Contents (Text unabhängig von der Stunde)
+  ###########################################################
+  my %unit_kw = map { $_ => 1 } qw(pvForecast pvReal gridconsumption consumptionForecast consumption gridfeedin);
+
+  my %static_key = (
+      pvForecast          => 'pvgenefc',
+      pvReal              => 'pvgenerl',
+      gridconsumption     => 'enppubgd',
+      consumptionForecast => 'enconsfc',
+      consumption         => 'enconsrl',
+      gridfeedin          => 'enfeedgd',
+      batsocForecastSum   => 'socfcsum',
+      batsocRealSum       => 'socresum',
+  );
+
+  return $htitles{enpchcst}{$lang}." ($epc)" if($bcont eq 'energycosts');
+  return $htitles{rengfeed}{$lang}." ($efc)" if($bcont eq 'feedincome');
+
+  if (exists $static_key{$bcont}) {
+      my $suffix = $unit_kw{$bcont} ? " ($kw)" : '';                      # batsocXSum ohne Einheit, wie bisher
+      
+      return $htitles{$static_key{$bcont}}{$lang}.$suffix;
+  }
+
+  if ($bcont =~ /^batsoc/xs) {
+      my $bnum = (split '_', $bcont)[1] // '';
+      
+      return $bcont =~ /batsocCombi_/xs    ? $htitles{socrfcba}{$lang}." $bnum (%)" :
+             $bcont =~ /batsocForecast_/xs ? $htitles{socfcbat}{$lang}." $bnum (%)" :
+             $bcont =~ /batsocReal_/xs     ? $htitles{socrebat}{$lang}." $bnum (%)" :
+             '';
+  }
+
+return '';
+}
+
+################################################################
+#   PV-Prognosewert aus pvHistory liefern, bevorzugt die
+#   Feed-in-Limit-korrigierte Variante falls vorhanden
+################################################################
+sub __pvHistOrFeedlim {
+  my ($name, $day_str, $time_str) = @_;
+
+  my $v = CachedHistoryVal ($name, $day_str, $time_str, 'pvfcfeedlim', undef);
+  $v    = CachedHistoryVal ($name, $day_str, $time_str, 'pvfc', 0) if(!defined $v);
+
+return $v;
+}
+
+################################################################
+#   PV-Prognosewert aus NextHours liefern, bevorzugt die
+#   Feed-in-Limit-korrigierte Variante falls vorhanden
+################################################################
+sub __pvNextOrFeedlim {
+  my ($name, $nh) = @_;
+
+  my $v = NexthoursVal ($name, $nh, 'pvfcfeedlim', undef);
+  $v    = NexthoursVal ($name, $nh, 'pvfc', 0) if(!defined $v);
+
+return $v;
 }
 
 ################################################################
@@ -23690,7 +24049,7 @@ sub _beamGraphic {
                                      } 
                                    );
                                    
-          $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
+          $titz3 = qq/title="$hfcg->{$i}{beam1txt}"/;
       }
 
       if ($lotype eq 'double') {
@@ -23702,22 +24061,22 @@ sub _beamGraphic {
           if ($scm eq 'staple') {
               $z2    = $hfcg->{$i}{beam1};
               $z3    = $hfcg->{$i}{beam2};
-              $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
-              $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
+              $titz2 = qq/title="$hfcg->{$i}{beam1txt}"/;
+              $titz3 = qq/title="$hfcg->{$i}{beam2txt}"/;
               $mbdf  = $maxStVal - ($z2 + $z3);                             # Wertedifferenz abs. Maxwert und größerem Balkenwert
           }
           else {
               if ($hfcg->{$i}{beam1} >= $hfcg->{$i}{beam2}) {
                   $z2    = $hfcg->{$i}{beam1};
                   $z3    = $hfcg->{$i}{beam2};
-                  $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
-                  $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
+                  $titz2 = qq/title="$hfcg->{$i}{beam1txt}"/;
+                  $titz3 = qq/title="$hfcg->{$i}{beam2txt}"/;
               }
               else {                                                                                                                        # tauschen, Betrag Beam1 < Betrag Beam2
                   $z2    = $hfcg->{$i}{beam2};
                   $z3    = $hfcg->{$i}{beam1};
-                  $titz2 = qq/title="$hfcg->{0}{beam2txt}"/;
-                  $titz3 = qq/title="$hfcg->{0}{beam1txt}"/;
+                  $titz2 = qq/title="$hfcg->{$i}{beam2txt}"/;
+                  $titz3 = qq/title="$hfcg->{$i}{beam1txt}"/;
               }
 
               $mbdf = $maxVal - $z2;                                         # Wertedifferenz abs. Maxwert und größerem Balkenwert
@@ -23775,8 +24134,8 @@ sub _beamGraphic {
               $z3 = abs ($hfcg->{$i}{diff});                                                                    # Nur Betrag ohne Vorzeichen
           }
 
-          $titz2 = qq/title="$hfcg->{0}{beam1txt}"/;
-          $titz3 = qq/title="$hfcg->{0}{beam2txt}"/;
+          $titz2 = qq/title="$hfcg->{$i}{beam1txt}"/;
+          $titz3 = qq/title="$hfcg->{$i}{beam2txt}"/;
                                                                                                                 # Alle vorbesetzen Werte umrechnen auf echte Ausgabe px
           $z1 = (!$px_pos || !$maxDif) ? 0 : int(($maxDif-$z2) / $maxDif * $px_pos);                            # Teilung durch 0 vermeiden
           $z2 = ($px_pos - $z1) ;
@@ -27634,6 +27993,8 @@ sub aiFannRunTrain {
                                               hidden_layers      => $hidden_layers, 
                                               learning_rate      => $learning_rate,
                                               learning_momentum  => $learning_momentum,
+                                              shuffle_mode       => $shuffle_mode,
+                                              shuffle_period     => $shuffle_period,
                                               cur_ratio          => $cur_ratio,
                                               dataParamRatio     => $dataParamRatio,
                                               profile            => $profile,
@@ -29440,7 +29801,6 @@ sub _aiFannEpochDiagnostic {
   my $r2                 = $paref->{r2};
   my $rmse_rel           = $paref->{rmse_rel};
   my $bitfail            = $paref->{bitfail};                                        
-  my $num_epoch          = $paref->{num_epoch} // AINUMEPOCHS;
   my $num_inputs         = $paref->{num_inputs};
   my $split_index        = $paref->{split_index};
   my $num_train_datasets = $paref->{num_train_datasets};
@@ -29448,6 +29808,9 @@ sub _aiFannEpochDiagnostic {
   my $learning_rate      = $paref->{learning_rate};
   my $learning_momentum  = $paref->{learning_momentum};
   my $cur_ratio          = $paref->{cur_ratio};
+  my $num_epoch          = $paref->{num_epoch}      // AINUMEPOCHS;
+  my $shuffle_mode       = $paref->{shuffle_mode}   // 0;
+  my $shuffle_period     = $paref->{shuffle_period} // 0;
   my $dpr                = $paref->{dataParamRatio} // $cur_ratio // 0;        
   my $profile            = $paref->{profile};
   my $haf                = $paref->{haf};
@@ -29471,12 +29834,16 @@ sub _aiFannEpochDiagnostic {
   $slope    = round2 ($slope);
   $rmse_rel = round2 ($rmse_rel);
   
-  my $r2_threshold   = $profileweights{$profile}{r2_thld};
-  my $slope_warn_min = $profileweights{$profile}{slope_warn_min};
-  my $rmse_rel_warn  = $profileweights{$profile}{rmse_rel_warn};  
-  my $is_dead_net    = defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7;
-  my $lim_bitfail    = AIBITFAILLIMIT;                                                         # Bit_Fail-Limit für rprop-Guard
-  my $lr_at_floor    = $learning_rate <= AILRATEMIN;
+  my $r2_threshold    = $profileweights{$profile}{r2_thld};
+  my $slope_warn_min  = $profileweights{$profile}{slope_warn_min};
+  my $rmse_rel_warn   = $profileweights{$profile}{rmse_rel_warn};
+  my $stability_warn  = $profileweights{$profile}{stability_warn} // 0.15;                      # Fallback auf bisherigen Fixwert  
+  
+  my $is_dead_net     = defined $slope && abs($slope) < 0.05 && $mse_val < $mse_train * 0.7;
+  my $lim_bitfail     = AIBITFAILLIMIT;                                                         # Bit_Fail-Limit für rprop-Guard
+  my $lr_at_floor     = $learning_rate <= AILRATEMIN;
+  my $shuffle_active  = $shuffle_mode == 1;
+  my $shuffle_maxed   = $shuffle_active && $shuffle_period >= 30;
   
   my $code  = 'ok';
   my $label = '';
@@ -29563,20 +29930,32 @@ sub _aiFannEpochDiagnostic {
   }
   
   if (   $stability          >  0.05                                                    # Momentum-getriebene Oszillation + flache Slope ...
-      && $stability          <= 0.15                                                    # (moderate Instabilität, die hint12 noch nicht auslöst, aber Slope drückt)
+      && $stability          <= $stability_warn                                         # (moderate Instabilität, die hint12 noch nicht auslöst, aber Slope drückt)
       && $learning_momentum  >= 0.65
       && $slope              <  $slope_warn_min
       && !$is_dead_net) {
       push @hints, sprintf $epoche_translations{hint24}{$lang}, $learning_momentum;
   }
   
-  if ($stability > 0.15) {                                                              # Instabiler Validierungsverlauf
-      push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability;
-    
+  if ($stability > $stability_warn) {                                                   # Instabiler Validierungsverlauf
+      if (!$shuffle_active) {
+          push @hints, sprintf $epoche_translations{hint12}{$lang}, $stability;
+      }
+      elsif (!$shuffle_maxed) {
+          my $next_period = $shuffle_period < 20 ? 20
+                          : $shuffle_period < 25 ? 25
+                          :                        30;
+                          
+          push @hints, sprintf $epoche_translations{hint28}{$lang}, $shuffle_period, $stability, $next_period;
+      }
+      elsif ($learning_momentum < 0.65) {                                               # Shuffle bereits maximal, Momentum unauffällig -> andere Ursache
+          push @hints, sprintf $epoche_translations{hint27}{$lang}, $stability;
+      }
+   
       if ($learning_momentum >= 0.65) {                                                 # hohes Momentum ist wahrscheinlich primärer Treiber der Instabilität
           push @hints, sprintf $epoche_translations{hint24}{$lang}, $learning_momentum;
       }
-    
+          
       $code = 'unstable' unless $code =~ /very/;
   }
 
@@ -32544,6 +32923,7 @@ sub _listDataPoolPvHist {
           $entry{pvrl}           = HistoryVal ($name, $day, $key, 'pvrl',           '-');
           $entry{pvrlvd}         = HistoryVal ($name, $day, $key, 'pvrlvd',         '-');
           $entry{pvfc}           = HistoryVal ($name, $day, $key, 'pvfc',           '-');
+          $entry{pvfcfeedlim}    = HistoryVal ($name, $day, $key, 'pvfcfeedlim',    '-');
           $entry{pvapifcraw}     = HistoryVal ($name, $day, $key, 'pvapifcraw',     '-');
           $entry{gcons}          = HistoryVal ($name, $day, $key, 'gcons',          '-');
           $entry{con}            = HistoryVal ($name, $day, $key, 'con',            '-');
@@ -32633,6 +33013,7 @@ sub _listDataPoolPvHist {
                   pvrl           => 'PVreal',
                   pvrlvd         => 'PVrealValid',
                   pvfc           => 'PVforecast',
+                  pvfcfeedlim    => 'PVforecastFeedLim',
                   pvapifcraw     => 'PVapiForecastRaw',
                   gcons          => 'GridConsumption',
                   con            => 'Consumption',
@@ -32761,7 +33142,7 @@ sub _listDataPoolPvHist {
           };
 
           # --- PV-Erzeugung (Summenfelder, alle hod) ----------------------------
-          $ret .= $line->(qw (pvapifcraw pvfc pvrl pvrlvd plantderated rad1h));
+          $ret .= $line->(qw (pvapifcraw pvfc pvfcfeedlim pvrl pvrlvd plantderated rad1h));
 
           # --- Inverter (etotali nur Stunden, pvrl alle hod) --------------------
           if ($key ne '99') {                                                                               # Gesamtertrag je Inverter – nur Stundensätze
@@ -33221,40 +33602,41 @@ sub _listDataPoolNextHours {
   }
 
   for my $idx (sort keys %{$h}) {
-      my $nhts       = NexthoursVal ($name, $idx, 'starttime',      '-');
-      my $day        = NexthoursVal ($name, $idx, 'day',            '-');
-      my $weekday    = NexthoursVal ($name, $idx, 'weekday',        '-');
-      my $holiday    = NexthoursVal ($name, $idx, 'holiday',        '-');                      
-      my $hod        = NexthoursVal ($name, $idx, 'hourofday',      '-');
-      my $today      = NexthoursVal ($name, $idx, 'today',          '-');
-      my $pvfc       = NexthoursVal ($name, $idx, 'pvfc',           '-');
-      my $pvapifc    = NexthoursVal ($name, $idx, 'pvapifc',        '-');       # PV Forecast der API incl. angewendeten Korrekturfaktor
-      my $pvapifcraw = NexthoursVal ($name, $idx, 'pvapifcraw',     '-');       # PV Forecast der API Raw
-      my $pvaifc     = NexthoursVal ($name, $idx, 'pvaifc',         '-');       # PV Forecast der KI
-      my $aihit      = NexthoursVal ($name, $idx, 'aihit',          '-');       # KI ForeCast Treffer Status
-      my $wid        = NexthoursVal ($name, $idx, 'weatherid',      '-');
-      my $wcc        = NexthoursVal ($name, $idx, 'wcc',            '-');
-      my $windspeed  = NexthoursVal ($name, $idx, 'windspeed',      '-');
-      my $wind_fast  = NexthoursVal ($name, $idx, 'windspeed_fast', '-');                    
-      my $crang      = NexthoursVal ($name, $idx, 'cloudrange',     '-');
-      my $rr1c       = NexthoursVal ($name, $idx, 'rr1c',           '-');
-      my $rrange     = NexthoursVal ($name, $idx, 'rainrange',      '-');
-      my $rad1h      = NexthoursVal ($name, $idx, 'rad1h',          '-');
-      my $pvcorrf    = NexthoursVal ($name, $idx, 'pvcorrf',        '-');
-      my $temp       = NexthoursVal ($name, $idx, 'temp',           '-');
-      my $confc      = NexthoursVal ($name, $idx, 'confc',          '-');
-      my $conaifc    = NexthoursVal ($name, $idx, 'conaifc',        '-');
-      my $conbiascor = NexthoursVal ($name, $idx, 'conbiascorr',    '-');
-      my $conlegfc   = NexthoursVal ($name, $idx, 'conlegfc',       '-');
-      my $confcex    = NexthoursVal ($name, $idx, 'confcEx',        '-');
-      my $don        = NexthoursVal ($name, $idx, 'DoN',            '-');
-      my $sunaz      = NexthoursVal ($name, $idx, 'sunaz',          '-');
-      my $sunalt     = NexthoursVal ($name, $idx, 'sunalt',         '-');
-      my $socprgs    = NexthoursVal ($name, $idx, 'socprogwhsum',   '-');
-      my $dinrang    = NexthoursVal ($name, $idx, 'DaysInRange',    '-');
+      my $nhts        = NexthoursVal ($name, $idx, 'starttime',      '-');
+      my $day         = NexthoursVal ($name, $idx, 'day',            '-');
+      my $weekday     = NexthoursVal ($name, $idx, 'weekday',        '-');
+      my $holiday     = NexthoursVal ($name, $idx, 'holiday',        '-');                      
+      my $hod         = NexthoursVal ($name, $idx, 'hourofday',      '-');
+      my $today       = NexthoursVal ($name, $idx, 'today',          '-');
+      my $pvfc        = NexthoursVal ($name, $idx, 'pvfc',           '-');
+      my $pvfcfeedlim = NexthoursVal ($name, $idx, 'pvfcfeedlim',    '-');
+      my $pvapifc     = NexthoursVal ($name, $idx, 'pvapifc',        '-');          # PV Forecast der API incl. angewendeten Korrekturfaktor
+      my $pvapifcraw  = NexthoursVal ($name, $idx, 'pvapifcraw',     '-');          # PV Forecast der API Raw
+      my $pvaifc      = NexthoursVal ($name, $idx, 'pvaifc',         '-');          # PV Forecast der KI
+      my $aihit       = NexthoursVal ($name, $idx, 'aihit',          '-');          # KI ForeCast Treffer Status
+      my $wid         = NexthoursVal ($name, $idx, 'weatherid',      '-');
+      my $wcc         = NexthoursVal ($name, $idx, 'wcc',            '-');
+      my $windspeed   = NexthoursVal ($name, $idx, 'windspeed',      '-');
+      my $wind_fast   = NexthoursVal ($name, $idx, 'windspeed_fast', '-');                    
+      my $crang       = NexthoursVal ($name, $idx, 'cloudrange',     '-');
+      my $rr1c        = NexthoursVal ($name, $idx, 'rr1c',           '-');
+      my $rrange      = NexthoursVal ($name, $idx, 'rainrange',      '-');
+      my $rad1h       = NexthoursVal ($name, $idx, 'rad1h',          '-');
+      my $pvcorrf     = NexthoursVal ($name, $idx, 'pvcorrf',        '-');
+      my $temp        = NexthoursVal ($name, $idx, 'temp',           '-');
+      my $confc       = NexthoursVal ($name, $idx, 'confc',          '-');
+      my $conaifc     = NexthoursVal ($name, $idx, 'conaifc',        '-');
+      my $conbiascor  = NexthoursVal ($name, $idx, 'conbiascorr',    '-');
+      my $conlegfc    = NexthoursVal ($name, $idx, 'conlegfc',       '-');
+      my $confcex     = NexthoursVal ($name, $idx, 'confcEx',        '-');
+      my $don         = NexthoursVal ($name, $idx, 'DoN',            '-');
+      my $sunaz       = NexthoursVal ($name, $idx, 'sunaz',          '-');
+      my $sunalt      = NexthoursVal ($name, $idx, 'sunalt',         '-');
+      my $socprgs     = NexthoursVal ($name, $idx, 'socprogwhsum',   '-');
+      my $dinrang     = NexthoursVal ($name, $idx, 'DaysInRange',    '-');
 
       my ($rcdbat, $socs, $lcintime, $lcstrategy);
-      for my $bn (1..MAXBATTERIES) {                                            # alle Batterien
+      for my $bn (1..MAXBATTERIES) {                                                # alle Batterien
           $bn = sprintf "%02d", $bn;
           my $rcdcharge = NexthoursVal ($name, $idx, 'rcdchargebat'.$bn, '-');
           my $intime    = NexthoursVal ($name, $idx, 'lcintimebat'.$bn,  '-');
@@ -33274,7 +33656,7 @@ sub _listDataPoolNextHours {
       $sq .= $idx." => ";
       $sq .= "starttime: $nhts, day: $day, weekday: $weekday, holiday: $holiday, hourofday: $hod, today: $today";
       $sq .= "\n              ";
-      $sq .= "pvapifcraw: $pvapifcraw, pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, aihit: $aihit";
+      $sq .= "pvapifcraw: $pvapifcraw, pvapifc: $pvapifc, pvaifc: $pvaifc, pvfc: $pvfc, pvfcfeedlim: $pvfcfeedlim, aihit: $aihit";
       $sq .= "\n              ";
       $sq .= "conlegfc: $conlegfc, conaifc: $conaifc, confc: $confc, conbiascorr: $conbiascor, confcEx: $confcex, weatherid: $wid, wcc: $wcc, rr1c: $rr1c";
       $sq .= "\n              ";
@@ -39256,6 +39638,19 @@ to ensure that the system configuration is correct.
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>deletes the trigger points of the battery storage                                                                                                               </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>circularData</b>       </td><td>The following arguments can be used to manipulate the array values of 'con_all' or 'gcons_a' in the circular cache:                                                             </td></tr>
+            <tr><td>                           </td><td><b>searchValue</b> - searches for the numeric value in the key (con_all | gcons_a). Possible comparison operators are: > | >= | == | <= | < (Results are in the log file)       </td></tr>
+            <tr><td>                           </td><td>Specifying <i>hod</i> (hour of the day) and <i>wday</i> (weekday abbreviation) is optional. If they are omitted, the search will cover all hours or all weekdays, respectively. </td></tr>
+            <tr><td>                           </td><td>Examples: <b>1.)</b> searchValue=con_all>1500 <b>2.)</b> searchValue=gcons_a==0 hod=05  <b>3.)</b> searchValue=con_all>=1000 hod=05 wday=Mo                                     </td></tr>
+            <tr><td>                           </td><td><b>delValue</b> - Deletes the numeric value in the key (con_all | gcons_a). Possible comparison operators are: > | >= | == | <= | < (deletion confirmation in the log file)     </td></tr>
+            <tr><td>                           </td><td>Specifying <i>hod</i> and <i>wday</i> is optional. If they are omitted, all hours or all days of the week will be deleted.                                                      </td></tr>
+            <tr><td>                           </td><td>Examples: <b>1.)</b> delValue=con_all>2000 <b>2.)</b> delValue=gcons_a==500 hod=02 wday=Do <b>3.)</b> delValue=con_all==0 hod=05                                                </td></tr>
+            <tr><td>                           </td><td><b>setValue</b> - Sets or changes the value at a specific position in a weekday array for a given hour. (The operation is confirmed in the log file.)                           </td></tr>
+            <tr><td>                           </td><td><i>hod, key, wday, pos</i>, and <i>value</i> must be specified here. <i>pos</i> is the array position (counting starts at 0!).                                                  </td></tr>
+            <tr><td>                           </td><td>In the list output, a day of the week may be split across multiple lines, each containing 20 values. The counting of <i>pos</i> continues across lines,                         </td></tr>
+            <tr><td>                           </td><td>i.e., position 25 of a day of the week is located in the second display line of that day of the week at the 6th position (line 1: pos 0–19, line 2: pos 20–39, etc.).           </td></tr>
+            <tr><td>                           </td><td>Examples: <b>1.)</b> setValue hod=05 key=con_all wday=Mo pos=3 value=999 <b>2.)</b> setValue hod=12 key=gcons_a wday=Fr pos=0 value=0                                           </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>consumerPlanning</b>   </td><td>deletes the planning data of all registered consumers                                                                                                           </td></tr>
             <tr><td>                           </td><td>To delete the planning data of only one consumer, use:                                                                                                          </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Consumer number&gt; </ul>                                                                                       </td></tr>
@@ -39519,6 +39914,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>pvapifc</b>         </td><td>expected PV generation (Wh) of the used API incl. a possible correction                </td></tr>
             <tr><td> <b>pvaifc</b>          </td><td>expected PV generation of the AI (Wh)                                                  </td></tr>
             <tr><td> <b>pvfc</b>            </td><td>PV generation forecast used (Wh)                                                       </td></tr>
+            <tr><td> <b>pvfcfeedlim</b>     </td><td>the projected PV output (Wh), taking into account a statutory feed-in limit            </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>predicted global radiation                                                             </td></tr>
             <tr><td> <b>starttime</b>       </td><td>start time of the record                                                               </td></tr>
             <tr><td> <b>sunaz</b>           </td><td>Azimuth of the sun (in decimal degrees)                                                </td></tr>
@@ -39609,6 +40005,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>presence</b>        </td><td>time-weighted attendance status of household residents                                                                   </td></tr>
             <tr><td> <b>pvapifcraw</b>      </td><td>expected PV generation (Wh) of the API used (raw)                                                                        </td></tr>
             <tr><td> <b>pvfc</b>            </td><td>the predicted PV yield (Wh)                                                                                              </td></tr>
+            <tr><td> <b>pvfcfeedlim</b>     </td><td>the projected PV output (Wh), taking into account a statutory feed-in limit                                              </td></tr>
             <tr><td> <b>pvrlXX</b>          </td><td>real PV generation (Wh) of inverter XX                                                                                   </td></tr>
             <tr><td> <b>pvrl</b>            </td><td>Sum real PV generation (Wh) of all inverters                                                                             </td></tr>
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' is valid and is taken into account in the learning process, 0-'pvrl' is assessed as copromitted                 </td></tr>
@@ -40850,7 +41247,8 @@ to ensure that the system configuration is correct.
             <tr><td> <b>feedincome</b>          </td><td>Remuneration for feeding into the grid. The currency is defined in the setupMeterDev, key feedprice.   </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energy purchase from the public grid                                                                   </td></tr>
             <tr><td> <b>gridfeedin</b>          </td><td>Feed into the public grid                                                                              </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>predicted PV generation (default for graphicBeam2Content)                                              </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>PV forecast (default for graphicBeam2Content)                                                          </td></tr>
+            <tr><td> <b>pvForecastLimited</b>   </td><td>PV forecast taking into account the set feed-in limit (attribute `plantControl->feedinPowerLimit`)     </td></tr>
             <tr><td> <b>pvReal</b>              </td><td>real PV generation (default for graphicBeam1Content)                                                   </td></tr>
          </table>
          </ul>
@@ -42394,6 +42792,19 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>batteryTriggerSet</b>  </td><td>löscht die Triggerpunkte des Batteriespeichers                                                                                                                  </td></tr>
             <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
+            <tr><td> <b>circularData</b>       </td><td>Mit den nachfolgenden Argumenten können die Array-Werte von 'con_all' oder 'gcons_a' im Circular-Cache manipuliert werden:                                      </td></tr>
+            <tr><td>                           </td><td><b>searchValue</b> - sucht den Zahlenwert im Schlüssel (con_all | gcons_a). Mögliche Vergleichsoperatoren sind: > | >= | == | <= | < (Findings sind im Logfile) </td></tr>
+            <tr><td>                           </td><td>Die Angabe von <i>hod</i> (Stunde des Tages) und <i>wday</i> (Wochentagskürzel) ist optional. Fehlen sie, wird über alle Stunden bzw. alle Wochentage gesucht.  </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> searchValue=con_all>1500 <b>2.)</b> searchValue=gcons_a==0 hod=05  <b>3.)</b> searchValue=con_all>=1000 hod=05 wday=Mo                    </td></tr>
+            <tr><td>                           </td><td><b>delValue</b> - löscht den Zahlenwert im Schlüssel (con_all | gcons_a). Mögliche Vergleichsoperatoren sind: > | >= | == | <= | < (Löschbestätigung im Logfile)</td></tr>
+            <tr><td>                           </td><td>Die Angabe von <i>hod</i> und <i>wday</i> ist optional. Fehlen sie, wird über alle Stunden bzw. alle Wochentage gelöscht.                                       </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> delValue=con_all>2000 <b>2.)</b> delValue=gcons_a==500 hod=02 wday=Do <b>3.)</b> delValue=con_all==0 hod=05                               </td></tr>
+            <tr><td>                           </td><td><b>setValue</b> - setzt bzw. ändert den Wert an einer bestimmten Position eines Wochentags-Arrays einer Stunde. (Bestätigung der Operation erfolgt im Logfile)  </td></tr>
+            <tr><td>                           </td><td><i>hod, key, wday, pos</i> und <i>value</i> sind hierbei zwingend anzugeben. <i>pos</i> ist die Array-Position (Zählung beginnt bei 0!).                        </td></tr>
+            <tr><td>                           </td><td>In der list-Ausgabe wird ein Wochentag ggf. auf mehrere Zeilen zu je 20 Werten umgebrochen. Die Zählung von <i>pos</i> setzt sich zeilenübergreifend fort,      </td></tr>
+            <tr><td>                           </td><td>d.h. Position 25 eines Wochentages befindet sich in der zweiten Anzeigezeile dieses Wochentages an der 6. Stelle (Zeile 1: pos 0-19, Zeile 2: pos 20-39, usw.). </td></tr>
+            <tr><td>                           </td><td>Beispiele: <b>1.)</b> setValue hod=05 key=con_all wday=Mo pos=3 value=999 <b>2.)</b> setValue hod=12 key=gcons_a wday=Fr pos=0 value=0                          </td></tr>
+            <tr><td>                           </td><td>                                                                                                                                                                </td></tr>
             <tr><td> <b>consumerPlanning</b>   </td><td>löscht die Planungsdaten aller registrierten Verbraucher                                                                                                        </td></tr>
             <tr><td>                           </td><td>Um die Planungsdaten nur eines Verbrauchers zu löschen verwendet man:                                                                                           </td></tr>
             <tr><td>                           </td><td><ul>set &lt;name&gt; reset consumerPlanning &lt;Verbrauchernummer&gt; </ul>                                                                                     </td></tr>
@@ -42656,6 +43067,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>pvapifc</b>         </td><td>erwartete PV Erzeugung (Wh) der verwendeten API inkl. einer eventuellen Korrektur          </td></tr>
             <tr><td> <b>pvaifc</b>          </td><td>erwartete PV Erzeugung der KI (Wh)                                                         </td></tr>
             <tr><td> <b>pvfc</b>            </td><td>verwendete PV Erzeugungsprognose (Wh)                                                      </td></tr>
+            <tr><td> <b>pvfcfeedlim</b>     </td><td>der prognostizierte PV Ertrag (Wh) unter Berücksichtigung eines gesetzten Einspeiselimits  </td></tr>
             <tr><td> <b>rad1h</b>           </td><td>vorhergesagte Globalstrahlung                                                              </td></tr>
             <tr><td> <b>starttime</b>       </td><td>Startzeit des Datensatzes                                                                  </td></tr>
             <tr><td> <b>sunaz</b>           </td><td>Azimuth der Sonne (in Dezimalgrad)                                                         </td></tr>
@@ -42747,6 +43159,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>presence</b>        </td><td>zeitlich gewichteter Anwesenheitsstatus der Bewohner des Haushalts                                     </td></tr>
             <tr><td> <b>pvapifcraw</b>      </td><td>erwartete PV Erzeugung (Wh) der verwendeten API (raw)                                                  </td></tr>
             <tr><td> <b>pvfc</b>            </td><td>der prognostizierte PV Ertrag (Wh)                                                                     </td></tr>
+            <tr><td> <b>pvfcfeedlim</b>     </td><td>der prognostizierte PV Ertrag (Wh) unter Berücksichtigung eines gesetzten Einspeiselimits              </td></tr>
             <tr><td> <b>pvrlXX</b>          </td><td>reale PV Erzeugung (Wh) von Inverter XX                                                                </td></tr>
             <tr><td> <b>pvrl</b>            </td><td>Summe reale PV Erzeugung (Wh) aller Inverter                                                           </td></tr>
             <tr><td> <b>pvrlvd</b>          </td><td>1-'pvrl' ist gültig und wird im Lernprozess berücksichtigt, 0-'pvrl' ist als komprimittiert bewertet   </td></tr>
@@ -43989,7 +44402,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>feedincome</b>          </td><td>Vergütung für die Netzeinspeisung. Die Währung ist im setupMeterDev, Schlüssel feedprice, definiert.         </td></tr>
             <tr><td> <b>gridconsumption</b>     </td><td>Energiebezug aus dem öffentlichen Netz                                                                       </td></tr>
             <tr><td> <b>gridfeedin</b>          </td><td>Einspeisung in das öffentliche Netz                                                                          </td></tr>
-            <tr><td> <b>pvForecast</b>          </td><td>prognostizierte PV-Erzeugung (default für graphicBeam2Content)                                               </td></tr>
+            <tr><td> <b>pvForecast</b>          </td><td>PV-Prognose (default für graphicBeam2Content)                                                                </td></tr>
+            <tr><td> <b>pvForecastLimited</b>   </td><td>PV-Prognose mit Berücksichtigung der gesetzten Einspeisebegrenzung (Attribut plantControl->feedinPowerLimit) </td></tr>       
             <tr><td> <b>pvReal</b>              </td><td>reale PV-Erzeugung (default für graphicBeam1Content)                                                         </td></tr>
          </table>
          </ul>
