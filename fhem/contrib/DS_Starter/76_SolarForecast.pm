@@ -72,8 +72,10 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.4"  => "01.08.2026  Resync Consumer Schaltstatus an der Flanke Automatik AUS→EIN beim Umlegen des Automatik-Schalters ".
-                           "Post-Icon für Schweregrad '2' geändert ",
+  "2.9.4"  => "02.08.2026  Resync Consumer Schaltstatus an der Flanke Automatik AUS→EIN beim Umlegen des Automatik-Schalters ".
+                           "Post-Icon für Schweregrad '2' geändert, Bugfix in _addDynAttr: Regexfilter für statische Platzhalter korrigiert ".
+                           "Mitteilungssystem: es wird immer das Icon für die Severity der letzten Message und nicht die höchste Severity aller Messages angezeigt ".
+                           "Debug consumerSwitchingXX erweitert ",
   "2.9.3"  => "31.07.2026  Die reset-Funktion 'set ... reset ..' kann Daten in pvCircular suchen, löschen und bearbeiten ".
                            "Einbau hint27 und hint28 sowie Überprüfung hint12 abhängig von aiConShuffleMode und aiConShufflePeriod ".
                            "_calcConsForecast_legacy: eigener consForecastBase-Durchlauf auf conraw, konsistent zu confc/confcex ".
@@ -7185,7 +7187,8 @@ sub _getaiDecTree {                   ## no critic "not used"
 
   $arg              = trim ($arg);                                               # trim it
   my ($scom, $args) = split (" ", $arg, 2);                                      # in den Sub-Befehl und Befehlsargumente splitten
-
+  $args           //= '';
+  
   my $ret;
   my $hash = $defs{$name};
 
@@ -12387,7 +12390,7 @@ sub _addDynAttr {
   ## Attributhüllen entfernen
   #############################
   my @deva = split " ", $modules{$type}{AttrList};
-  my $atd  = 'setupWeatherDev|setupRadiationAPI|graphicBeam*Content|ctrlNextHoursSoCForecastReadings';
+  my $atd  = 'setupWeatherDev|setupRadiationAPI|graphicBeam\d+Content|ctrlNextHoursSoCForecastReadings';   # --- !Regex, kein Glob – Ziffern im Attributnamen brauchen \d+!
   @deva    = grep {!/$atd/} @deva;
 
   ## Attr setupWeatherDevX / setupRadiationAPI zur Laufzeit hinzufügen
@@ -12433,6 +12436,8 @@ sub _addDynAttr {
   }
 
   $hash->{".AttrList"} = join " ", @deva;
+  
+  $hash->{HELPER}{DYNATTRDONE} = 1;                                 # unabhängig vom Minuten-Throttle -> "wurde mind. 1x befüllt"
 
 return;
 }
@@ -17464,6 +17469,8 @@ sub _manageConsumerData {
               delete $data{$name}{consumers}{$c}{autoResumeHintTTL};                                            # TTL abgelaufen -> beide Keys entfernen
           }
       }
+      
+      debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - Reading supplement: $supplmnt \n});
 
       my ($iilt,$rlt) = isInLocktime    ($paref);                                                               # Sperrzeit Status ermitteln
       my $cplmode     = getConsumerMode ($name, $c);                                                            # Planungsmode 'can' oder 'must'
@@ -17817,7 +17824,7 @@ sub ___resyncPlanStateOnAutoResume {
   
   delete $data{$name}{consumers}{$c}{manualInterruptFlag};                                          # Fall 1 - Automatik AUS->EIN-Flanke hat Vorrang vor evtl. noch offenem Fall-2-Tracking (symmetrische Wiederherstellung ohne Automatik-Toggle)
 
-  debugLog ($paref, 'consumerPlanning', qq{consumer "$c" - Automatic OFF->ON detected, plan state resynchronized from "$pstate" ($simpCstat) to "$newlabel", physoffon=} . ($physon ? 'on' : 'off'));
+  debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - Automatic OFF->ON detected, plan state resynchronized from "$pstate" ($simpCstat) to "$newlabel", physoffon=} . ($physon ? 'on' : 'off'));
 
   Log3 ($name, 3, qq{$name - consumer "$c" - Automatic reactivated, scheduling status resynchronized ($newlabel)});
 
@@ -18703,6 +18710,7 @@ sub __setConsRcmdState {
   my $name  = $paref->{name};
   my $c     = $paref->{consumer};
   my $debug = $paref->{debug};
+  my $cname = $paref->{cname};
 
   my $hash       = $defs{$name};
   my $nompower   = ConsumerVal ($name, $c, 'power',     0);                               # Consumer nominale Leistungsaufnahme (W)
@@ -18726,6 +18734,7 @@ sub __setConsRcmdState {
       my $spser  = ref $splref eq 'ARRAY' ? join ' ', @{$splref} : undef;
 
       Log3 ($name, 1, qq{$name DEBUG> ############### consumerSwitching consumer "$c" ###############});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - Device name: $cname});
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - ConsumptionRecommended calc method: $method, surplus: }.
                         (defined $surplus ? $surplus : 'undef'));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - method base: $spser}) if($method =~ /average|median/xs);
@@ -18939,7 +18948,7 @@ sub ___switchConsumerOn {
       && $isInTime) {                                                                               # Verbraucher Start ist geplant && Startzeit überschritten
       my $enabybatprio = ___enableSwitchByBatPrioCharge ($paref);                                   # Vorrangladung Batterie ?
 
-      debugLog ($paref, "consumerSwitching${c}", qq{Consumer switch enable by battery state: $enabybatprio});
+      debugLog ($paref, "consumerSwitching${c}", qq{consumer "$c" - Consumer switch enable by battery state: $enabybatprio});
 
       if ($cplmode eq 'can' && !$enabybatprio) {                                                    # Batterieladung - keine Verbraucher "Einschalten" Freigabe
           $paref->{ps} = "priority charging battery";
@@ -19461,7 +19470,7 @@ sub __getCyclesAndRuntime {
 
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - cycleDayNum: }.ConsumerVal ($name, $c, 'cycleDayNum', 0));
       Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle start time: $cst});
-      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle end time: $son \n});
+      Log3 ($name, 1, qq{$name DEBUG> consumer "$c" - last cycle end time: $son});
   }
 
   ## History schreiben
@@ -22785,6 +22794,9 @@ sub __createOwnSpec {
   my $hdrDetail = $paref->{hdrDetail};
   my $pah       = $paref->{pah};                                                       # 1 wenn durch pageAsHtml abgerufen
 
+  my $hash = $defs{$name};
+  _addDynAttr ($hash) if(!$hash->{HELPER}{DYNATTRDONE});                               # vor ersten runTask-Durchlauf rendern falls noch nicht passiert!
+
   my $vinr = 4;                                                                        # Spezifikationen in einer Zeile
   my $spec = AttrVal    ($name, 'graphicHeaderOwnspec', '');
   my $uatr = CurrentVal ($name, 'energyUnit', 'Wh');
@@ -22795,6 +22807,8 @@ sub __createOwnSpec {
   my $allsets  = ' '.FW_widgetOverride ($name, getAllSets ($name),  'set').' ';
   my $allattrs = ' '.FW_widgetOverride ($name, getAllAttr ($name), 'attr').' ';        # Leerzeichen wichtig für Regexvergleich
 
+  #debugLog ($paref, 'graphic', "ownSpec - allattrs: ".($allattrs =~ /graphicBeam1Content/ ? 'ENTHALTEN' : 'FEHLT')."\n".$allattrs);
+  
   my @fields = split (/\s+/sx, $spec);
 
   my (@props, @cats, @vals);                                                           # @props - Eigenschaften, @cats - Kategorien, @vals - Label:Werte Paare
@@ -26380,9 +26394,10 @@ sub fillupMessageSystem {
   my $midx = max ($midx1, $midx2);
 
   if ($midx && ($data{$name}{messages}{999999}{RD} // 0) != 1) {                                # RD = Read-Bit (undef -> Messages nicht gelesen)
-      my @aidx   = map { $_ } (1..$midx);                                                       # größte vorhandene Severity finden ...
-      my @values = map { $data{$name}{messages}{$_}{SV} } @aidx;
-      $max_sv    = max(@values);
+      #my @aidx   = map { $_ } (1..$midx);                                                       # größte vorhandene Severity finden ...
+      #y @values = map { $data{$name}{messages}{$_}{SV} } @aidx;
+      #$max_sv    = max(@values);
+      $max_sv    = $data{$name}{messages}{$midx}{SV};                                           # der Schweregrad der letzten Meldung
   }
 
   my $max_icon = $svicons{$max_sv};                                                             # ... und das dazugehörige Icon
@@ -40689,7 +40704,7 @@ to ensure that the system configuration is correct.
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>auto</b>           </td><td>Value: <b>&lt;Reading&gt;</b> - A reading in the load device that enables or disables the load (optional)                                               </td></tr>
             <tr><td>                       </td><td>If the key switchdev is given, the reading is set and evaluated in this device.                                                                         </td></tr>
-            <tr><td>                       </td><td>Reading value = 1 - switching enabled (default), 0: switching blocked                                                                                   </td></tr>
+            <tr><td>                       </td><td>Reading value = 1 - switching enabled (default), 0 - switching blocked                                                                                  </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                        </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Total energy consumed by the appliance (optional).                                                                                                      </td></tr>
             <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;unit&gt;[:&lt;threshold&gt]</b> - Consumer reading and unit (Wh/kWh)                                                             </td></tr>
@@ -43842,7 +43857,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>auto</b>           </td><td>Wert: <b>&lt;Reading&gt;</b> - Reading im Verbraucherdevice welches das Schalten des Verbrauchers freigibt bzw. blockiert (optional)               </td></tr>
             <tr><td>                       </td><td>Ist der Schlüssel switchdev angegeben, wird das Reading in diesem Device gesetzt und ausgewertet.                                                  </td></tr>
-            <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0: Schalten blockiert                                                                           </td></tr>
+            <tr><td>                       </td><td>Readingwert = 1 - Schalten freigegeben (default),  0 - Schalten blockiert                                                                          </td></tr>
             <tr><td>                       </td><td>                                                                                                                                                   </td></tr>
             <tr><td> <b>etotal</b>         </td><td>Gesamte verbrauchte Energie des Verbrauchers (optional).                                                                                           </td></tr>
             <tr><td>                       </td><td><b>&lt;Reading&gt;:&lt;Einheit&gt;[:&lt;Schwellenwert&gt]</b> - Reading des Verbrauchers und Einheit (Wh/kWh)                                      </td></tr>
