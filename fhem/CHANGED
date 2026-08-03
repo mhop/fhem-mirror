@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 76_SolarForecast: Version 2.9.4
  - feature: 76_SolarForecast: Version 2.9.3
  - feature: 76_SolarForecast: Version 2.9.2
  - feature: 76_SolarForecast: Version 2.9.1
