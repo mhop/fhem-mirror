@@ -119,7 +119,7 @@ JeeLink_Define($$)
   $hash->{MatchList} = \%matchListPCA301;
 
   if( !defined( $attr{$name}{flashCommand} ) ) {
-    $attr{$name}{flashCommand} = "avrdude -p atmega328P -c arduino -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]"
+    $attr{$name}{flashCommand} = "avrdude -p atmega328P -c arduino -b 57600 -P [PORT] -D -U flash:w:[HEXFILE] 2>[LOGFILE]"
   }
 
   if($dev eq "none") {
