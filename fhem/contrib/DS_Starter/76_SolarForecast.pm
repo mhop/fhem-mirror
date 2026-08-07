@@ -72,6 +72,7 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.9.5"  => "07.08.2026  kleinere Patches, __saveBEVBatteryValues: Batteriedaten auch bei nicht aktivierten BEV-Consumer speichern ",
   "2.9.4"  => "02.08.2026  Resync Consumer Schaltstatus an der Flanke Automatik AUS→EIN beim Umlegen des Automatik-Schalters ".
                            "Post-Icon für Schweregrad '2' geändert, Bugfix in _addDynAttr: Regexfilter für statische Platzhalter korrigiert ".
                            "Mitteilungssystem: es wird immer das Icon für die Severity der letzten Message und nicht die höchste Severity aller Messages angezeigt ".
@@ -17393,7 +17394,7 @@ sub _manageConsumerData {
 
       $paref->{cactive} = $cactive;
 
-      __saveBEVvalues ($paref);                                                     # BEV Consumer (vor __savePowerAndEnergy) auslesen
+      __saveBEVBatteryValues ($paref);                                              # BEV Consumer (vor __savePowerAndEnergy) auslesen
 
       my $pcurr = __savePowerAndEnergy ($paref);                                    # aktuelle Leistung und Energieverbrauch auslesen + speichern
 
@@ -17551,7 +17552,7 @@ return $cactive;
 ################################################################
 #               BEV auslesen
 ################################################################
-sub __saveBEVvalues {
+sub __saveBEVBatteryValues {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $chour   = $paref->{chour};
@@ -17562,7 +17563,7 @@ sub __saveBEVvalues {
   my $ctype   = $paref->{ctype};
   my $cactive = $paref->{cactive};
 
-  return if($ctype ne 'bev' || !$cactive);                                                              # kein BEV oder Consumer nicht aktiviert
+  return if($ctype ne 'bev');                                                                           # kein BEV
 
   my $hod = sprintf "%02d", ($chour + 1);
 
@@ -28777,6 +28778,14 @@ sub aiFannConInfer {
                       +      $blend_alpha  * $hist_ref;
 
       $forward_val    = round0 ($forward_val);
+      
+      if ($debug =~ /aiProcess/xs && $hod >= 19 && $hod <= 24) {
+          $hist_ref    = round2 ($hist_ref);
+          $blend_alpha = round2 ($blend_alpha);
+          Log3 ($name, 1, "$name DEBUG> AI FANN '$fanntyp' forecast blend - hod: $hod -> prediction=$prediction, ".
+                           "hist_ref=$hist_ref, blend_alpha=$blend_alpha, forward_val=$forward_val")
+              if(askLogtime ($name, "conBlendLog_$hod", 3600));
+      }
 
       push @flat_targets,     $forward_val;                                                 # V 2.6.10 statt direkt $prediction
       push @temp_norm_values, $temp_norm;                                                   # wichtig: Temperaturreihe auch erweitern
@@ -31024,6 +31033,7 @@ sub _aiFannApplyBiasCorrection {
       }
       else {
           $bias_zone = 3;                                                                       # --- Zone 3: Rote Zone (Baseline erkannt, aber die Modellqualität ist zu schlecht, um eine additive Bias-Korrektur zuzulassen)
+                                                                                                # keine zusätzliche additive Feinkorrektur (Drift-Korrektur bleibt davon unberührt und aktiv)
       }
   }
   elsif ($is_baseline && $cal_addon) {
@@ -31031,7 +31041,8 @@ sub _aiFannApplyBiasCorrection {
   }
 
   if ($cal_addon) { $bias_zone .= '+OSL' }                                                      # Anwendung OLS = Ordinary Least Squares = Methode der kleinsten Quadrate
-
+  
+  $res         = max (0, $res);         
   my $corr_val = $res - $val_predict;
 
 return ($res, $corr_val, $bias_zone, $drift_zone);
