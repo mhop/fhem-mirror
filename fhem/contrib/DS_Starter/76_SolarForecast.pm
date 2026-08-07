@@ -72,7 +72,8 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.5"  => "07.08.2026  kleinere Patches, __saveBEVBatteryValues: Batteriedaten auch bei nicht aktivierten BEV-Consumer speichern ",
+  "2.9.5"  => "07.08.2026  kleinere Patches, __saveBEVBatteryValues: Batteriedaten auch bei nicht aktivierten BEV-Consumer speichern ".
+                           "Logausgabe des ausgeführten set reset Befehls zum Datenspeicher Management vor Ausgabe der Ergebnisse ",
   "2.9.4"  => "02.08.2026  Resync Consumer Schaltstatus an der Flanke Automatik AUS→EIN beim Umlegen des Automatik-Schalters ".
                            "Post-Icon für Schweregrad '2' geändert, Bugfix in _addDynAttr: Regexfilter für statische Platzhalter korrigiert ".
                            "Mitteilungssystem: es wird immer das Icon für die Severity der letzten Message und nicht die höchste Severity aller Messages angezeigt ".
@@ -3635,6 +3636,8 @@ sub __resetAiData {
 
   my @args   = @$argsref;
   my $dosave = 0;
+  
+  Log3 ($name, 1, qq{$name - Execute command to manage the data storage: $arg});
 
   if ($args[1] eq 'delDataAll') {
       delete $data{$name}{current}{aiinitstate};
@@ -3778,6 +3781,8 @@ sub __resetCircularArrData {
 
   my @args   = @$argsref;
   my $dosave = 0;
+  
+  Log3 ($name, 1, qq{$name - Execute command to manage the data storage: $arg});
 
   my ($aa, $ha) = parseParams ($arg);
 
@@ -19621,7 +19626,7 @@ sub __hpConsumerOpmode {
 
       if ($chour == $lchkhour) {
           my $wsecs  = CircularVal ($name, 99, $key, 0);
-          $wsecs    += $delta * $modulation / 100 if $s eq $opmode;                         # nur der aktive Status akkumuliert gewichtete Zeit
+          $wsecs    += $delta * $modulation / 100 if($s eq $opmode);                        # nur der aktive Status akkumuliert gewichtete Zeit
           $data{$name}{circular}{99}{$key} = $wsecs;
       }
       else {
