@@ -1,4 +1,4 @@
-REV 31544
+REV 31548
 DIR unused
 UPD 2026-08-04_07:45:03 458882 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -773,8 +773,8 @@ UPD 2026-08-04_07:45:12 5586405 docs/commandref.html
 UPD 2026-08-04_07:45:17 3562431 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-08-07_07:45:18 331688 docs/commandref_modular.html
-UPD 2026-08-07_07:45:19 343488 docs/commandref_modular_DE.html
+UPD 2026-08-08_07:45:18 331688 docs/commandref_modular.html
+UPD 2026-08-08_07:45:19 343488 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -2342,6 +2342,7 @@ UPD 2015-07-28_14:05:33 1756 www/images/openautomation/scene_night.svg
 UPD 2015-07-28_14:05:33 2621 www/images/openautomation/scene_office.svg
 UPD 2015-07-28_14:05:33 1732 www/images/openautomation/scene_party.svg
 UPD 2015-07-28_14:05:33 2995 www/images/openautomation/scene_pool.svg
+UPD 2026-08-08_07:45:04 3920 www/images/openautomation/scene_power_grid.svg
 UPD 2026-07-24_07:45:03 3903 www/images/openautomation/scene_power_grid_crossed.svg
 UPD 2026-07-24_07:45:03 3892 www/images/openautomation/scene_power_grid_crossed_red.svg
 UPD 2015-07-28_14:05:33 3865 www/images/openautomation/scene_robo_lawnmower.svg
