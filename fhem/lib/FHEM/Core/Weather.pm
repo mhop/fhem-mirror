@@ -2,7 +2,7 @@
 ##############################################################################
 #
 #     59_Weather.pm
-#     (c) 2009-2025 Copyright by Dr. Boris Neubert
+#     (c) 2009-2026 Copyright by Dr. Boris Neubert
 #     e-mail: omega at online dot de
 #
 #       Contributors:

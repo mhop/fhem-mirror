@@ -3,7 +3,7 @@
 #
 # Developed with VSCodium and richterger perl plugin
 #
-#  (c) 2019-2025 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
+#  (c) 2019-2026 Copyright: Marko Oldenburg (fhemdevelopment at cooltux dot net)
 #  All rights reserved
 #
 #   Special thanks goes to:
@@ -413,11 +413,10 @@ sub _ProcessingRetrieveData {
     my $self     = shift;
     my $response = shift;
 
-    if (   $self->{cached}->{status} eq 'ok'
-        && defined($response)
-        && $response )
+    if ( $self->{cached}->{status} eq 'ok'
+        && defined($response) )
     {
-        if ( $response =~ m/^{.*}$/x ) {
+        if ( $response && $response =~ m/^{.*}$/x ) {
             my $data = eval { decode_json($response) };
 
             if ($@) {
@@ -443,10 +442,13 @@ sub _ProcessingRetrieveData {
       if ( $self->{endpoint} eq 'onecall'
         or $self->{endpoint} eq 'forecast' );
 
-    _RetrieveDataFromOpenWeatherMap($self)
-      if ( $self->{endpoint} eq 'weather' );
+    if ( $self->{cached}->{status} eq 'ok' ) {
+        _RetrieveDataFromOpenWeatherMap($self)
+          if ( $self->{endpoint} eq 'weather' );
+    }
 
-    _CallWeatherCallbackFn($self) if ( $self->{endpoint} eq 'none' );
+    _CallWeatherCallbackFn($self)
+      if ( $self->{endpoint} eq 'none' || $self->{cached}->{status} ne 'ok' );
 
     return;
 }
@@ -676,6 +678,16 @@ sub _FillSelfHashWithWeatherResponseForForecastHourly {
                     ? $data->{list}->[$i]->{rain}->{'3h'}
                     : 0
                 ),
+                'pop1h' => (
+                      $data->{list}->[$i]->{pop}->{'1h'}
+                    ? $data->{list}->[$i]->{pop}->{'1h'}
+                    : 0
+                ),
+                'pop3h' => (
+                      $data->{list}->[$i]->{pop}->{'3h'}
+                    ? $data->{list}->[$i]->{pop}->{'3h'}
+                    : 0
+                ),
                 'snow1h' => (
                       $data->{list}->[$i]->{snow}->{'1h'}
                     ? $data->{list}->[$i]->{snow}->{'1h'}
@@ -725,6 +737,7 @@ sub _FillSelfHashWithWeatherResponseForOnecallCurrent {
         ),
         'wind_direction' => $data->{current}->{wind_deg},
         'rain_1h'    => ( $data->{rain}->{'1h'} ? $data->{rain}->{'1h'} : 0 ),
+        'pop_1h'     => ( $data->{pop}->{'1h'}  ? $data->{pop}->{'1h'}  : 0 ),
         'cloudCover' => $data->{current}->{clouds},
         'code'       => $codes{ $data->{current}->{weather}->[0]->{id} },
         'owmAPICode' => $data->{current}->{weather}->[0]->{id},
@@ -855,6 +868,10 @@ sub _FillSelfHashWithWeatherResponseForOnecallDaily {
                     $data->{daily}->[$i]->{rain} ? $data->{daily}->[$i]->{rain}
                     : 0
                 ),
+                'pop' => (
+                    $data->{daily}->[$i]->{pop} ? $data->{daily}->[$i]->{pop}
+                    : 0
+                ),
                 'snow' => (
                     $data->{daily}->[$i]->{snow} ? $data->{daily}->[$i]->{snow}
                     : 0
@@ -922,6 +939,11 @@ sub _FillSelfHashWithWeatherResponseForOnecallHourly {
                 'rain1h'     => (
                       $data->{hourly}->[$i]->{rain}->{'1h'}
                     ? $data->{hourly}->[$i]->{rain}->{'1h'}
+                    : 0
+                ),
+
+                'pop' => (
+                    $data->{hourly}->[$i]->{pop} ? $data->{hourly}->[$i]->{pop}
                     : 0
                 ),
                 'snow1h' => (
@@ -1029,7 +1051,7 @@ sub _strftimeWrapper {
 	  ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.8",
+  "version": "v3.2.11",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
