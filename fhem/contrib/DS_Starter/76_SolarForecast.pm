@@ -72,7 +72,7 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.5"  => "07.08.2026  kleinere Patches, __saveBEVBatteryValues: Batteriedaten auch bei nicht aktivierten BEV-Consumer speichern ".
+  "2.9.5"  => "08.08.2026  kleinere Patches, __saveBEVBatteryValues: Batteriedaten auch bei nicht aktivierten BEV-Consumer speichern ".
                            "Logausgabe des ausgeführten set reset Befehls zum Datenspeicher Management vor Ausgabe der Ergebnisse ",
   "2.9.4"  => "02.08.2026  Resync Consumer Schaltstatus an der Flanke Automatik AUS→EIN beim Umlegen des Automatik-Schalters ".
                            "Post-Icon für Schweregrad '2' geändert, Bugfix in _addDynAttr: Regexfilter für statische Platzhalter korrigiert ".
@@ -17555,7 +17555,7 @@ return $cactive;
 }
 
 ################################################################
-#               BEV auslesen
+#            BEV Batteriedaten auslesen
 ################################################################
 sub __saveBEVBatteryValues {
   my $paref   = shift;
@@ -17594,21 +17594,20 @@ sub __saveBEVBatteryValues {
   }
 
   # --- aktueller SoC
-  my $currSoC = ConsumerVal ($name, $c, 'currSoC', '');
-  my $csocval = ReadingsNum ($cname, $currSoC,  undef);
+  my $cSoCRdg = ConsumerVal ($name, $c, 'currSoC', '');
+  my $csocval = ReadingsNum ($cname, $cSoCRdg,  undef);
 
   if (defined $csocval) {                                                                               # BEV aktueller SoC
       writeToHistory ( { paref => $paref, key => 'bevcsmSoC'.$c, val => round0 ($csocval), day => $day, hour => $hod } );
   }
 
-  # --- targetSoC
+  # --- targetSoC                                                                                       # BEV Ziel-SoC
   my $targetsoc = ConsumerVal ($name, $c, 'targetSoC', BEVTGTSOC);
   my $tgtsocval = isNumeric ($targetsoc) ? $targetsoc : ReadingsNum ($cname, $targetsoc, '');
   $tgtsocval    = BEVTGTSOC if(!isNumeric ($tgtsocval));
-
-  if (defined $tgtsocval) {                                                                             # BEV Ziel-SoC
-      writeToHistory ( { paref => $paref, key => 'bevcsmTargSoC'.$c, val => round0 ($tgtsocval), day => $day, hour => $hod } );
-  }
+  $tgtsocval    = max (0, min (100, $tgtsocval));
+                                                                              
+  writeToHistory ( { paref => $paref, key => 'bevcsmTargSoC'.$c, val => round0 ($tgtsocval), day => $day, hour => $hod } );
 
   debugLog ($paref, 'collectData', "BEV - $calias -> bevcsmSoC${c}=$csocval bevcsmTargSoC${c}=$tgtsocval ".
                                    (defined $batCapVal ? "batCapBev${c}=$batCapVal bevcsmBatCap${c}=$batCapVal" : "batCapBev${c}=undef") );
@@ -28900,7 +28899,7 @@ sub _aiFannBevConsumerAggregate {
       active           => $n_active ? 1 : 0,
       load             => $load,                                                        # später zu normieren
       n_active_ratio   => $n           ? ($n_active             / $n)           : 0,
-      soc_deficit      => $n_reporting ? ($deficit_sum          / $n_reporting) : 0,
+      soc_deficit      => $n_reporting ? ($deficit_sum          / $n_reporting) : 0,    # Wert jetzt unabhängig vom Ladekontext -> ständige Aufzeichnung SOC auch wenn BEV nicht zuHause
       energy_remaining => $n_batcap    ? ($energy_remaining_sum / $n_batcap)    : 0,    # später zu normieren
       charge_intensity => $n_intensity ? ($charge_intensity_sum / $n_intensity) : 0,
   };
