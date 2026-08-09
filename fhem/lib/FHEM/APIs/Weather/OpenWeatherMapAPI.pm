@@ -668,7 +668,11 @@ sub _FillSelfHashWithWeatherResponseForForecastHourly {
                 'code' => $codes{ $data->{list}->[$i]->{weather}->[0]->{id} },
                 'owmAPICode' => $data->{list}->[$i]->{weather}->[0]->{id},
                 'iconAPI'    => $data->{list}->[$i]->{weather}->[0]->{icon},
-                'rain1h'     => (
+                'pop'        => (
+                    $data->{list}->[$i]->{pop} ? $data->{list}->[$i]->{pop}
+                    : 0
+                ),
+                'rain1h' => (
                       $data->{list}->[$i]->{rain}->{'1h'}
                     ? $data->{list}->[$i]->{rain}->{'1h'}
                     : 0
@@ -676,16 +680,6 @@ sub _FillSelfHashWithWeatherResponseForForecastHourly {
                 'rain3h' => (
                       $data->{list}->[$i]->{rain}->{'3h'}
                     ? $data->{list}->[$i]->{rain}->{'3h'}
-                    : 0
-                ),
-                'pop1h' => (
-                      $data->{list}->[$i]->{pop}->{'1h'}
-                    ? $data->{list}->[$i]->{pop}->{'1h'}
-                    : 0
-                ),
-                'pop3h' => (
-                      $data->{list}->[$i]->{pop}->{'3h'}
-                    ? $data->{list}->[$i]->{pop}->{'3h'}
                     : 0
                 ),
                 'snow1h' => (
@@ -737,7 +731,6 @@ sub _FillSelfHashWithWeatherResponseForOnecallCurrent {
         ),
         'wind_direction' => $data->{current}->{wind_deg},
         'rain_1h'    => ( $data->{rain}->{'1h'} ? $data->{rain}->{'1h'} : 0 ),
-        'pop_1h'     => ( $data->{pop}->{'1h'}  ? $data->{pop}->{'1h'}  : 0 ),
         'cloudCover' => $data->{current}->{clouds},
         'code'       => $codes{ $data->{current}->{weather}->[0]->{id} },
         'owmAPICode' => $data->{current}->{weather}->[0]->{id},
@@ -1051,7 +1044,7 @@ sub _strftimeWrapper {
 	  ],
   "release_status": "stable",
   "license": "GPL_2",
-  "version": "v3.2.11",
+  "version": "v3.2.12",
   "author": [
     "Marko Oldenburg <fhemdevelopment@cooltux.net>"
   ],
