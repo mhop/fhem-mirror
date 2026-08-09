@@ -72,8 +72,9 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.9.5"  => "08.08.2026  kleinere Patches, __saveBEVBatteryValues: Batteriedaten auch bei nicht aktivierten BEV-Consumer speichern ".
-                           "Logausgabe des ausgeführten set reset Befehls zum Datenspeicher Management vor Ausgabe der Ergebnisse ",
+  "2.9.5"  => "09.08.2026  kleinere Patches, __saveBEVBatteryValues: Batteriedaten auch bei nicht aktivierten BEV-Consumer speichern ".
+                           "Logausgabe des ausgeführten set reset Befehls zum Datenspeicher Management vor Ausgabe der Ergebnisse ".
+                           "neuer Debug Modus aiData_long ",
   "2.9.4"  => "02.08.2026  Resync Consumer Schaltstatus an der Flanke Automatik AUS→EIN beim Umlegen des Automatik-Schalters ".
                            "Post-Icon für Schweregrad '2' geändert, Bugfix in _addDynAttr: Regexfilter für statische Platzhalter korrigiert ".
                            "Mitteilungssystem: es wird immer das Icon für die Severity der letzten Message und nicht die höchste Severity aller Messages angezeigt ".
@@ -510,6 +511,7 @@ my $messagefile    = MSGFILEPROD;
 my @dd = qw( aiProcess
              aiProcess_long
              aiData
+             aiData_long
              apiCall
              apiProcess
              batteryManagement
@@ -28346,7 +28348,8 @@ sub aiFannConInfer {
   my $hash = $defs{$name};
   my ($msg, $presence, $comftemp);
 
-  debugLog ($paref, 'aiData', "Start AI FANN consumption result check");
+  debugLog ($paref, 'aiData', "AI FANN - Start checking consumption values (further output depends on content and time of the last log entry)");
+  
   $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
 
   my $pv_max_limit = _pvMaxLimit ($name);
@@ -28354,6 +28357,7 @@ sub aiFannConInfer {
   if (!$pv_max_limit) {
       $msg = 'no peak output is provided by the PV system';
       $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
+      
       debugLog ($paref, 'aiData', "AI FANN - consumption prediction aborted: No peak output is provided by the PV system");
 
       return $msg;
@@ -28452,7 +28456,7 @@ sub aiFannConInfer {
       }
   }
 
-  debugLog ($paref, 'aiData', "AI FANN - using profile: $profile");
+  debugLog ($paref, 'aiData', "AI FANN - using profile: $profile") if(askLogtime ($name, "Infer_$profile", 1800));
 
   # Rohdaten in Reihenfolge extrahieren und vorbereiten
   #######################################################
@@ -28507,7 +28511,9 @@ sub aiFannConInfer {
            && defined $temp
            && defined $isday) {
 
-             debugLog ($paref, 'aiData', "AI FANN - Record $nhstr skipped: data needed are incomplete or legacyconfc < 0");
+             debugLog ($paref, 'aiData', "AI FANN - Record $nhstr skipped: data needed are incomplete or legacyconfc < 0")
+                        if(askLogtime ($name, "Infer_$nhstr", 1800));
+             
              next;
       }
 
@@ -28783,12 +28789,13 @@ sub aiFannConInfer {
 
       $forward_val    = round0 ($forward_val);
       
-      if ($debug =~ /aiProcess/xs && $hod >= 19 && $hod <= 24) {
+      if ($debug =~ /aiData_long/xs && $hod >= 19 && $hod <= 24) {
           $hist_ref    = round2 ($hist_ref);
           $blend_alpha = round2 ($blend_alpha);
+          
           Log3 ($name, 1, "$name DEBUG> AI FANN '$fanntyp' forecast blend - hod: $hod -> prediction=$prediction, ".
                            "hist_ref=$hist_ref, blend_alpha=$blend_alpha, forward_val=$forward_val")
-              if(askLogtime ($name, "conBlendLog_$hod", 3600));
+              if(askLogtime ($name, "conBlendLog_$hod", 1800));
       }
 
       push @flat_targets,     $forward_val;                                                 # V 2.6.10 statt direkt $prediction
@@ -28821,7 +28828,9 @@ sub aiFannConInfer {
 
       if ($debug =~ /aiData/xs) {
           my $dthr = (split ':', $starttime, 2)[0];
-          Log3 ($name, 1, "$name DEBUG> AI FANN con fc - $dthr, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)");
+          $msg     = "AI FANN con fc - $dthr, hod: $hod -> AI=$denorm_val, legacy=$legacyconfc, ".
+                     "final: $confc_final Wh (alpha=$alpha, tot_corr=$tc Wh, bias/drift zone=$bias_zone/$drift_zone)";
+          Log3 ($name, 1, "$name DEBUG> $msg") if(askLogtime ($name, "${dthr}_$hod", 1800));
       }
 
       # Daten speichern
@@ -32654,7 +32663,7 @@ sub aiGetResult {
 
   my $cst = [gettimeofday];                                                         # Startzeit
 
-  debugLog ($paref, 'aiData', "Start AI result check for hod: $hod");
+  debugLog ($paref, 'aiData', "Start AI result check for hod: $hod") if(askLogtime ($name, "${nhtstr}_$hod", 1800));
 
   my $wcc    = NexthoursVal ($hash, $nhtstr, 'wcc',       0);
   my $wid    = NexthoursVal ($name, $nhtstr, 'weatherid', 0);
@@ -32695,7 +32704,7 @@ sub aiGetResult {
                    return $@;
                  };
 
-      debugLog ($paref, 'aiData', "got AI result from Tree number $tn: $res") if(defined $res);
+      debugLog ($paref, 'aiData', "got AI result from Tree number $tn: $res") if(defined $res && askLogtime ($name, "${nhtstr}_$hod", 1800));
   }
 
   my $tprnum = scalar @total_prediction;
@@ -32703,7 +32712,9 @@ sub aiGetResult {
   if ($tprnum) {
       my $avg_prediction = round0 (avgArray (\@total_prediction, $tprnum));
 
-      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $avg_prediction (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)});
+      debugLog ($paref, 'aiData', qq{AI accurate result found: pvaifc: $avg_prediction (hod: $hod, sunaz: $sunaz, sunalt: $sabin, Rad1h: $rad1h, wcc: $wcc, rr1c: $rr1c, temp: $tbin)})
+               if(askLogtime ($name, "${nhtstr}_$hod", 1800));
+               
       return ('accurate', $avg_prediction);
   }
 
@@ -41092,6 +41103,7 @@ to ensure that the system configuration is correct.
             <tr><td> <b>aiProcess</b>            </td><td>Data enrichment and training process for AI support                              </td></tr>
             <tr><td> <b>aiProcess_long</b>       </td><td>like aiProcess with extended output                                              </td></tr>
             <tr><td> <b>aiData</b>               </td><td>Data use AI in the forecasting process                                           </td></tr>
+            <tr><td> <b>aiData_long</b>          </td><td>like aiData with extended output                                                 </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Retrieval API interface without data output                                      </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>API data retrieval and processing                                                </td></tr>
             <tr><td> <b>batteryManagement</b>    </td><td>Battery management control values (SoC)                                          </td></tr>
@@ -44247,6 +44259,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>aiProcess</b>            </td><td>Datenanreicherung und Trainingsprozess der KI Unterstützung                      </td></tr>
             <tr><td> <b>aiProcess_long</b>       </td><td>wie aiProcess mit erweiterten Ausgaben                                           </td></tr>
             <tr><td> <b>aiData</b>               </td><td>Datennutzung KI im Prognoseprozess                                               </td></tr>
+            <tr><td> <b>aiData_long</b>          </td><td>wie aiData mit erweiterten Ausgaben                                              </td></tr>
             <tr><td> <b>apiCall</b>              </td><td>Abruf API Schnittstelle ohne Datenausgabe                                        </td></tr>
             <tr><td> <b>apiProcess</b>           </td><td>Abruf und Verarbeitung von API Daten                                             </td></tr>
             <tr><td> <b>batteryManagement</b>    </td><td>Steuerungswerte des Batterie Managements (SoC)                                   </td></tr>
