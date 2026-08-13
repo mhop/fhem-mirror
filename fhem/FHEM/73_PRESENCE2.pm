@@ -43,7 +43,7 @@ eval "use Net::Async::Ping;1"       or $missingModul .= "Net::Async::Ping ";
 eval "use List::Util qw(pairmap);1" or $missingModul .= "List::Util ";
 
 my $ModuleName = "PRESENCE2";
-my $ModuleVersion = "01.04";
+my $ModuleVersion = "01.05";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -300,7 +300,8 @@ sub PRESENCE2_Define($$) {
         $hash->{helper}{disp}{verbose}     = 0;
         $hash->{helper}{updateConfig}      = $name . ".Initialize";
 
-        Log3 $name, 3, "$ModuleName ($name) - 'missingModul: $missingModul";
+        Log3 $name, 3, "$ModuleName ($name) - 'missingModul: $missingModul" if($missingModul ne "");
+
         $hash->{helper}{Ping}           = ($missingModul !~ /Net::Ping/) ? 1 : 0;
         $hash->{helper}{IO_Async_Loop}  = ($missingModul !~ /IO::Async::Loop/) ? 1 : 0;
         $hash->{helper}{Net_Async_Ping} = ($missingModul !~ /Net::Async::Ping/) ? 1 : 0;
@@ -448,6 +449,8 @@ sub PRESENCE2_Define($$) {
         }
         elsif ($a[2] eq "bluetooth") {
 
+            my $hciDev = qx(hcitool dev);
+ 
             delete $attr{$name}{nonblockingTimeOut};
 
             if ($^O !~ m/linux/) {
@@ -482,8 +485,6 @@ sub PRESENCE2_Define($$) {
                       . "prGroupDisp:condense,verbose "
                       . "FhemLog3Std:0,1 "
                       . "hcitoolParam:name,info ";
-
-            my $hciDev = qx(hcitool dev);
 
             if ($hciDev =~ /Devices:/) {
               $hciDev =~ s/\s+/ /g;
@@ -2156,7 +2157,12 @@ Options:
     <b>child-processes only</b>
     <a id="PRESENCE2-attr-thresholdAbsence"></a>
     <li>
-        <dt><code>attr &lt;name&gt; thresholdAbsence &lt;seconds&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; thresholdAbsence &lt;check count&gt;</code></dt>
+        The number of checks that have to result in "present" before the state of the PRESENCE definition is changed to "present".<br>
+        This can be used to verify the permanent presence of a device with multiple check runs before the state is finally changed to "present".<br>
+        If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe present" during the presence verification.<br>
+        <br>
+        Default Value is 1 (no presence verification control)<br>
     </li><br>
 
     <b>for readings that shall be monitored</b>
@@ -2618,7 +2624,13 @@ Optionen:
     <b>Kind-Prozesse</b>
     <a id="PRESENCE2-attr-thresholdAbsence"></a>
     <li>
-        <dt><code>attr &lt;name&gt; thresholdAbsence &lt;Sekunden&gt;</code></dt>
+        <dt><code>attr &lt;name&gt; thresholdAbsence &lt;Anzahl Prüfungen&gt;</code></dt>
+        Die Anzahl der Prüfungen, welche in "present" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "present" wechselt.<br>
+        Mit dieser Funktion kann man die Anwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "present" ge&auml;ndert wird.<br>
+        Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, werden die Readings "state" und "presence" auf den Wert "maybe present" gesetzt,
+        bis der Status final auf "present" wechselt.<br>
+        <br>
+        Standardwert ist 1 (keine Kontrolle der Anwesenheitsverifizierung)<br>
     </li><br>
 
     <b>für Readings, die überwacht werden sollen</b>
