@@ -731,6 +731,7 @@ my %hget = (                                                                    
   ftuiFramefiles     => { fn => \&_ftuiFramefiles,              needcred => 0 },
   dwdCatalog         => { fn => \&_getdwdCatalog,               needcred => 0 },
   outputMessages     => { fn => \&_getoutputMessages,           needcred => 0 },
+  stepTimes          => { fn => \&_getCtStepTimes,              needcred => 0 },
 );
 
 my %hattr = (                                                                # Hash für Attr-Funktion
@@ -4100,7 +4101,7 @@ sub Get {
   return "\"get X\" needs at least an argument" if ( @a < 2 );
   my $name  = shift @a;
   my $opt   = shift @a;
-  my $arg   = join " ", map { my $p = $_; $p =~ s/\s+/ /xg; $p; } @a;     ## no critic 'Map blocks'
+  my $arg   = join " ", map { my $p = $_; $p =~ s/\s+/ /xg; $p; } @a;               ## no critic 'Map blocks'
 
   my $cl = $hash->{CL};
 
@@ -4148,7 +4149,8 @@ sub Get {
                 "radiationApiData:noArg ".
                 "statusApiData:noArg ".
                 "valCurrent:noArg ".
-                "weatherApiData:noArg "
+                "weatherApiData:noArg ".
+                "stepTimes:avg,last,max,reset "
                 ;
 
   ## KI spezifische Getter
@@ -6878,6 +6880,54 @@ sub _getlistStatusApiData {
   $ret   .= lineFromSpaces ($ret, 20);
 
 return $ret;
+}
+
+###############################################################
+#                       Getter stepTimes
+###############################################################
+sub _getCtStepTimes {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  my $arg   = $paref->{arg} // 'max';
+  
+  if ($arg eq 'reset') {
+      delete $data{$name}{substeps};
+      return "stepTimes data cleared.";
+  }
+  
+  return "No step timing data collected yet in this session."
+      if(!$data{$name}{substeps} || !keys %{$data{$name}{substeps}});
+  
+  my @rows;
+  
+  for my $label (keys %{$data{$name}{substeps}}) {
+      my $cnt = SubstepVal ($name, $label, 'cnt',  0);
+      my $sum = SubstepVal ($name, $label, 'sum',  0);
+      my $min = SubstepVal ($name, $label, 'min',  0);
+      my $max = SubstepVal ($name, $label, 'max',  0);
+      my $lst = SubstepVal ($name, $label, 'last', 0);
+      my $avg = $cnt ? $sum / $cnt : 0;
+      
+      push @rows, [$label, $cnt, $avg, $min, $max, $lst];
+  }
+  
+  if    ($arg eq 'max')  { @rows = sort { $b->[4] <=> $a->[4] } @rows; }                     # absteigend nach Max-Zeit
+  elsif ($arg eq 'avg')  { @rows = sort { $b->[2] <=> $a->[2] } @rows; }                     # absteigend nach Avg-Zeit
+  elsif ($arg eq 'last') { @rows = sort { $b->[5] <=> $a->[5] } @rows; }                     # absteigend nach last-Zeit
+  
+  my $out = sprintf ("%-30s %6s %8s %8s %8s %8s\n", 'Substep', 'Count', 'Avg[s]', 'Min[s]', 'Max[s]', 'Last[s]');
+  $out   .= ('-' x 78)."\n";
+  
+  for my $r (@rows) {
+      $out .= sprintf ("%-30s %6d %8.3f %8.3f %8.3f %8.3f\n", @$r);
+  }
+  
+  my $sumavg = 0;
+  $sumavg   += $_->[2] for @rows;
+  $out      .= ('-' x 78)."\n";
+  $out      .= sprintf ("Total average phase times: %.3f s (compared to special_runTimeCentralTask)\n", $sumavg);     
+  
+return $out;
 }
 
 ###############################################################
@@ -12669,55 +12719,54 @@ sub centralTask {
 
   singleUpdateState ( {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}} );
 
-  $centpars->{state} = 'updated';                                                     # kann durch Subs überschrieben werden!
+  $centpars->{state} = 'updated';                                                                           # kann durch Subs überschrieben werden!
 
-  _collectAllRegConsumers     ($centpars);                                            # alle Verbraucher Infos laden
-  _specialActivities          ($centpars);                                            # zusätzliche Events generieren + Sonderaufgaben
-  _collectAstronomyData       ($centpars);                                            # !!vor weiteren Dingen!! berechnet Sonnenposition + Mondphase + Speicherung
-  _transferWeatherValues      ($centpars);                                            # Wetterwerte übertragen
-  readingsDelete              ($hash, 'AllPVforecastsToEvent');
+  _ctStepTiming ($name, 'collectAllRegConsumers',     sub { _collectAllRegConsumers     ($centpars) });     # alle Verbraucher Infos laden
+  _ctStepTiming ($name, 'specialActivities',          sub { _specialActivities          ($centpars) });     # zusätzliche Events generieren + Sonderaufgaben
+  _ctStepTiming ($name, 'collectAstronomyData',       sub { _collectAstronomyData       ($centpars) });     # !!vor weiteren Dingen!! berechnet Sonnenposition + Mondphase + Speicherung
+  _ctStepTiming ($name, 'transferWeatherValues',      sub { _transferWeatherValues      ($centpars) });     # Wetterwerte übertragen
+  
+  readingsDelete ($hash, 'AllPVforecastsToEvent');
 
-  _getRoofTopData             ($centpars);                                            # Strahlungs/Wetter-Daten der gewählten API's abrufen und in internen Strukturen speichern
+  _ctStepTiming ($name, 'getRoofTopData',             sub { _getRoofTopData             ($centpars) });     # Strahlungs/Wetter-Daten der gewählten API's abrufen und in internen Strukturen speichern
+  _ctStepTiming ($name, 'transferInverterValues',     sub { _transferInverterValues     ($centpars) });     # WR Werte übertragen
+  _ctStepTiming ($name, 'transferAPIRadiationValues', sub { _transferAPIRadiationValues ($centpars) });     # Raw Erzeugungswerte aus solcastapi-Hash übertragen, Sonnenpsosition bestimmen, Forecast mit/ohne Korrektur erstellen
+  _ctStepTiming ($name, 'calcMaxEstimateToday',       sub { _calcMaxEstimateToday       ($centpars) });     # heutigen Max PV Estimate & dessen Tageszeit ermitteln
+  _ctStepTiming ($name, 'transferProducerValues',     sub { _transferProducerValues     ($centpars) });     # Werte anderer Erzeuger übertragen
+  _ctStepTiming ($name, 'transferMeterValues',        sub { _transferMeterValues        ($centpars) });     # Energy Meter auswerten
+  _ctStepTiming ($name, 'transferBatteryValues',      sub { _transferBatteryValues      ($centpars) });     # Batteriewerte einsammeln
+  _ctStepTiming ($name, 'transferEnvironmentValues',  sub { _transferEnvironmentValues  ($centpars) });     # Umweltsensorik einsammeln
+  _ctStepTiming ($name, 'transferHolidayValues',      sub { _transferHolidayValues      ($centpars) });     # Wochentage, Feiertage und Urlaubstage einsammeln
 
-  _transferInverterValues     ($centpars);                                            # WR Werte übertragen
-  _transferAPIRadiationValues ($centpars);                                            # Raw Erzeugungswerte aus solcastapi-Hash übertragen, Sonnenpsosition bestimmen, Forecast mit/ohne Korrektur erstellen
-  _calcMaxEstimateToday       ($centpars);                                            # heutigen Max PV Estimate & dessen Tageszeit ermitteln
-  _transferProducerValues     ($centpars);                                            # Werte anderer Erzeuger übertragen
-  _transferMeterValues        ($centpars);                                            # Energy Meter auswerten
-  _transferBatteryValues      ($centpars);                                            # Batteriewerte einsammeln
-  _transferEnvironmentValues  ($centpars);                                            # Umweltsensorik einsammeln
-  _transferHolidayValues      ($centpars);                                            # Wochentage, Feiertage und Urlaubstage einsammeln
+  _ctStepTiming ($name, 'batSocTarget',               sub { _batSocTarget               ($centpars) });     # Batterie Optimum Ziel SOC berechnen
+  _ctStepTiming ($name, 'batChargeMgmt',              sub { _batChargeMgmt              ($centpars) });     # Batterie Ladefreigabe berechnen und erstellen
+  _ctStepTiming ($name, 'manageConsumerData',         sub { _manageConsumerData         ($centpars) });     # Consumer Daten sammeln und Zeiten planen
 
-  _batSocTarget               ($centpars);                                            # Batterie Optimum Ziel SOC berechnen
-  _batChargeMgmt              ($centpars);                                            # Batterie Ladefreigabe berechnen und erstellen
-  _manageConsumerData         ($centpars);                                            # Consumer Daten sammeln und Zeiten planen
+  _ctStepTiming ($name, 'calcConsForecast',           sub { _calcConsForecast           ($centpars) });     # Verbrauchsprognose
+  _ctStepTiming ($name, 'corrPVforecast4ZeroFeedIn',  sub { _corrPVforecast4ZeroFeedIn  ($centpars) });     # PV-Prognose für Nulleinspeiser/Einspeiselimit korrigieren 
 
-  _calcConsForecast           ($centpars);                                            # Verbrauchsprognose
-  _corrPVforecast4ZeroFeedIn  ($centpars);                                            # PV-Prognose für Nulleinspeiser/Einspeiselimit korrigieren
+  _ctStepTiming ($name, 'evaluateTrigger',            sub { _evaluateTrigger            ($centpars) });     # Schwellenwerte der Trigger bewerten und signalisieren
+  _ctStepTiming ($name, 'calcReadingsTomorrowPVFc',   sub { _calcReadingsTomorrowPVFc   ($centpars) });     # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
+  _ctStepTiming ($name, 'calcTodayDeviation',         sub { _calcTodayDeviation         ($centpars) });     # Vorhersageabweichung erstellen
+  _ctStepTiming ($name, 'calcDataEveryFullHour',      sub { _calcDataEveryFullHour      ($centpars) });     # Daten berechnen/speichern die nur einmal nach jeder vollen Stunde ermittelt werden
+  _ctStepTiming ($name, 'saveEnergyConsumption',      sub { _saveEnergyConsumption      ($centpars) });     # Energie Hausverbrauch speichern
+  _ctStepTiming ($name, 'createSummaries',            sub { _createSummaries            ($centpars) });     # Zusammenfassungen erstellen
+  _ctStepTiming ($name, 'genSpecialReadings',         sub { _genSpecialReadings         ($centpars) });     # optionale Spezialreadings erstellen
+  _ctStepTiming ($name, 'userExit',                   sub { userExit                    ($centpars) });     # User spezifische Funktionen ausführen
 
-  _evaluateTrigger            ($centpars);                                            # Schwellenwerte der Trigger bewerten und signalisieren
-  _calcReadingsTomorrowPVFc   ($centpars);                                            # zusätzliche Readings Tomorrow_HourXX_PVforecast berechnen
-  _calcTodayDeviation         ($centpars);                                            # Vorhersageabweichung erstellen
-  _calcDataEveryFullHour      ($centpars);                                            # Daten berechnen/speichern die nur einmal nach jeder vollen Stunde ermittelt werden
-  _saveEnergyConsumption      ($centpars);                                            # Energie Hausverbrauch speichern
-  _createSummaries            ($centpars);                                            # Zusammenfassungen erstellen
-  _genSpecialReadings         ($centpars);                                            # optionale Spezialreadings erstellen
+  _ctStepTiming ($name, 'createReadingsFromArray',    sub { createReadingsFromArray   ($hash, $evt) });     # Readings erzeugen
 
-  userExit                    ($centpars);                                            # User spezifische Funktionen ausführen
-
-  createReadingsFromArray     ($hash, $evt);                                          # Readings erzeugen
-
-  MC_update_internals         ($name);                                                # Internals für Mini-Caches aktualisieren
-  LRU_update_internals        ($name);                                                # Internals für LRU-Caches aktualisieren
-
-  setTimeTracking             ($name, $cst, 'runTimeCentralTask');                    # Zyklus-Laufzeit ermitteln
-  _readSystemMessages         ($centpars);                                            # Notification System - System Messages zusammenstellen
+  _ctStepTiming ($name, 'MC_update_internals',        sub { MC_update_internals             ($name) });     # Internals für Mini-Caches aktualisieren
+  _ctStepTiming ($name, 'LRU_update_internals',       sub { LRU_update_internals            ($name) });     # Internals für LRU-Caches aktualisieren
+  
+  _ctStepTiming ($name, 'readSystemMessages',         sub { _readSystemMessages         ($centpars) });     # Notification System - System Messages zusammenstellen
 
 
   # --- Finalisierungen ---
-  $data{$name}{circular}{99}{last_transfer} = $t;                                     # Zeit des letzten Transfers
+  setTimeTracking ($name, $cst, 'runTimeCentralTask');                                                      # Zyklus-Laufzeit ermitteln
+  $data{$name}{circular}{99}{last_transfer} = $t;                                                           # Zeit des letzten Transfers
 
-  if ($debug =~ /miniCache/xs) {                                                      # Mini Cache Inhalt ausgeben
+  if ($debug =~ /miniCache/xs) {                                                                            # Mini Cache Inhalt ausgeben
       MC_debug ($name) if(askLogtime ($name, 'Dummy_Entry', 300));
   }
 
@@ -12731,6 +12780,30 @@ sub centralTask {
   }
 
   undef %{$centpars};
+
+return;
+}
+
+################################################################
+#  Zeitmessung einzelner centralTask-Schritte 
+#  (Session-Aggregation)
+################################################################
+sub _ctStepTiming {
+  my $name  = shift;                                    # centpars Hashref
+  my $label = shift;                                    # Bezeichner des Subschritts
+  my $code  = shift;                                    # Coderef mit dem eigentlichen Aufruf
+
+  my $t0 = gettimeofday();
+  $code->();
+  my $rt = gettimeofday() - $t0;
+
+  my $st = $data{$name}{substeps}{$label} //= { cnt => 0, sum => 0, min => $rt, max => $rt, last => $rt };
+  
+  $st->{cnt}++;
+  $st->{sum} += $rt;
+  $st->{min}  = $rt if($rt < $st->{min});
+  $st->{max}  = $rt if($rt > $st->{max});
+  $st->{last} = $rt;
 
 return;
 }
@@ -39147,6 +39220,29 @@ sub StatusAPIVal {
 return $def;
 }
 
+##########################################################################################################################################################
+# Wert des Zeit-Hash zurückliefern
+# Usage:
+# SubstepVal ($hash or $name, $label, $key, $def)
+#
+# $apiname:  Routinenlabel (z.B. calcConsForecast)
+# $key:      Parameter (z.B. cnt, sum, min, max, last)
+# $def:      Defaultwert
+#
+##########################################################################################################################################################
+sub SubstepVal {
+  my $name  = shift;
+  my $label = shift;
+  my $key   = shift;
+  my $def   = shift;
+  
+  if (ref $name eq 'HASH') {
+      $name = $name->{NAME};
+  }
+
+  return $data{$name}{substeps}{$label}{$key} // $def;
+}
+
 ################################################################
 #        Glättung des übergebenen Wertes $newval
 # $chan - ID der Glättungsgruppe
@@ -40716,6 +40812,25 @@ to ensure that the system configuration is correct.
             <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Number of SolCast API calls still possible on the current day     </td></tr>
             <tr><td>                                  </td><td>(one call can execute several SolCast API requests)               </td></tr>
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Maximum number of possible SolCast API calls per day              </td></tr>
+         </table>
+      </ul>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-stepTimes"></a>
+      <li><b>stepTimes </b> <br><br>
+      Displays a detailed list of the processing times for relevant process steps.
+      <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="5%"> <col width="95%"> </colgroup>
+            <tr><td> <b>avg</b>   </td><td>- sorts the list in descending order by the 'avg' column (average processing time) </td></tr>
+            <tr><td> <b>last</b>  </td><td>- sorts the list in descending order by the 'last' column (last processing time)   </td></tr>
+            <tr><td> <b>max</b>   </td><td>- sorts the list in descending order by the 'max' column (maximum processing time) </td></tr>
+            <tr><td> <b>reset</b> </td><td>- deletes the recorded phase times                                                 </td></tr>
          </table>
       </ul>
       </li>
@@ -43882,6 +43997,25 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>todayRemainingAPIcalls</b>    </td><td>Anzahl der noch möglichen SolCast API Abrufe am aktuellen Tag      </td></tr>
             <tr><td>                                  </td><td>(ein Abruf kann mehrere SolCast API Requests ausführen)            </td></tr>
             <tr><td> <b>todayMaxAPIcalls</b>          </td><td>Anzahl der maximal möglichen SolCast API Abrufe pro Tag            </td></tr>
+         </table>
+      </ul>
+      </li>
+    </ul>
+    <br>
+    
+    <ul>
+      <a id="SolarForecast-get-stepTimes"></a>
+      <li><b>stepTimes </b> <br><br>
+      Zeigt eine detaillierte Liste der Bearbeitungszeiten für die jeweiligen Prozessschritte an.
+      <br><br>
+
+      <ul>
+         <table>
+         <colgroup> <col width="5%"> <col width="95%"> </colgroup>
+            <tr><td> <b>avg</b>   </td><td>- sortiert die Liste absteigend nach der Spalte 'avg' (durchschnittliche Verarbeitungszeit) </td></tr>
+            <tr><td> <b>last</b>  </td><td>- sortiert die Liste absteigend nach der Spalte 'last' (letzte Verarbeitungszeit)           </td></tr>
+            <tr><td> <b>max</b>   </td><td>- sortiert die Liste absteigend nach der Spalte 'max' (maximale Verarbeitungszeit)          </td></tr>
+            <tr><td> <b>reset</b> </td><td>- löscht die aufgezeichneten Phasenzeiten                                                   </td></tr>
          </table>
       </ul>
       </li>
