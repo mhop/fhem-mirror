@@ -5,6 +5,7 @@
  - bugfix:  59_Weather: OpenWeatherMapAPI.pm - Updates data processing to
                         handle empty responses more safely and ensures
 consistent callback execution regardless of cache status.
+ - bugfix:  73_PRESENCE2.pm: kleinere Sachen
  - feature: 76_SolarForecast: Version 2.9.4
  - feature: 76_SolarForecast: Version 2.9.3
  - feature: 76_SolarForecast: Version 2.9.2
