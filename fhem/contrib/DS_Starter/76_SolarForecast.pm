@@ -8785,11 +8785,13 @@ sub _ftuiFramefiles {
   my $ret;
   my $upddo = 0;
   my $cfurl = BPATH.CFILE.PPATH;
+  
+  my %cfCache;
 
   for my $file (@fs) {
       my $lencheck = 1;
 
-      my ($cmerr, $cmupd, $cmmsg, $cmrec, $cmfile, $cmlen) = checkModVer ($name, $file, $cfurl);
+      my ($cmerr, $cmupd, $cmmsg, $cmrec, $cmfile, $cmlen) = checkModVerBatch ($name, $file, $cfurl, \%cfCache);
 
       if ($cmerr && $cmmsg =~ /Automatic\scheck/xs && $cmrec =~ /Compare\syour\slocal/xs) {        # lokales control file ist noch nicht vorhanden -> update ohne Längencheck
           $cmfile   = 'FHEM/'.CFILE;
@@ -12757,7 +12759,7 @@ sub centralTask {
   _ctStepTiming ($name, 'genSpecialReadings',         sub { _genSpecialReadings         ($centpars) });     # optionale Spezialreadings erstellen
   _ctStepTiming ($name, 'userExit',                   sub { userExit                    ($centpars) });     # User spezifische Funktionen ausführen
 
-  _ctStepTiming ($name, 'createReadingsFromArray',    sub { createReadingsFromArray   ($hash, $evt) });     # Readings erzeugen
+  _ctStepTiming ($name, 'createReadingsFromArrayFast',sub { _createReadingsFromArrayFast ($hash, $evt) });  # Readings erzeugen
 
   _ctStepTiming ($name, 'MC_update_internals',        sub { MC_update_internals             ($name) });     # Internals für Mini-Caches aktualisieren
   _ctStepTiming ($name, 'LRU_update_internals',       sub { LRU_update_internals            ($name) });     # Internals für LRU-Caches aktualisieren
@@ -34842,10 +34844,10 @@ sub checkPlantConfig {
   my $version     = $hash->{HELPER}{VERSION} // '-';
   my ($acu, $aln) = isAutoCorrUsed ($name);
 
-  my $ok     = FW_makeImage ('10px-kreis-gruen.png',     '');
-  my $nok    = FW_makeImage ('10px-kreis-rot.png',       '');
-  my $warn   = FW_makeImage ('message_attention@orange', '');
-  my $info   = FW_makeImage ('message_info',             '');
+  my $ok   = FW_makeImage ('10px-kreis-gruen.png',     '');
+  my $nok  = FW_makeImage ('10px-kreis-rot.png',       '');
+  my $warn = FW_makeImage ('message_attention@orange', '');
+  my $info = FW_makeImage ('message_info',             '');
 
   my $result = {                                                                                    # Ergebnishash
       'String Configuration'  => { 'state' => $ok, 'result' => '', 'note' => '', 'info' => 0, 'warn' => 0, 'fault' => 0 },
@@ -35176,17 +35178,25 @@ sub checkPlantConfig {
   ## Allgemeine Settings (auch API spezifisch)
   ##############################################
   my $eocr                     = AttrVal       ($name, 'event-on-change-reading', '');
+  my $eour                     = AttrVal       ($name, 'event-on-update-reading', '');
+  
   my $gdn                      = AttrVal       ('global', 'dnsServer', '');
   my $aiprep                   = isPrepared4AI ($hash, 'full');
   my $aiusemsg                 = CurrentVal    ($hash, 'aicanuse', '');
   my ($cset, $lat, $lon, $alt) = locCoordinates();
-  my $einstds                  = "";
+  
+  my @eocrar = split ',', $eocr; 
+  my @eourar = split ',', $eour; 
+  my @merged = (@eocrar, @eourar);
+  
+  my $find = 0;
+  $find++ if !@merged;
+  $find++ if grep { $_ eq 'state' || $_ eq '.*' } @merged;
 
-  if (!$eocr || $eocr ne '.*') {
-      $einstds                              = 'to .*' if($eocr ne '.*');
+  if (!$find) {
       $result->{'Common Settings'}{state}   = $info;
-      $result->{'Common Settings'}{result} .= qq{Attribute 'event-on-change-reading' is not set $einstds. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Setting attribute 'event-on-change-reading = .*' is recommended to improve the runtime performance.<br>};
+      $result->{'Common Settings'}{result} .= qq{Attribute 'event-on-change-reading' and/or 'event-on-update-reading' is not set or not set properly. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Setting attribute 'event-on-change-reading' or 'event-on-update-reading' at least to 'state' or '.*' when using these attributes. It is needed to update SolarForecast garphics.<br>};
       $result->{'Common Settings'}{info}    = 1;
   }
 
@@ -35418,16 +35428,28 @@ sub checkPlantConfig {
           }
       }
   }
+  
+  my $airaw = $data{$name}{aidectree}{airaw};               # einmaliger Zugriff
+  my @faults;
 
-  for my $aidx (sort{$a<=>$b} keys %{$data{$name}{aidectree}{airaw}}) {
-          my $aicon = $data{$name}{aidectree}{airaw}{$aidx}{con} // 0;                                      # historische Verbrauchswerte
+  while (my ($aidx, $href) = each %$airaw) {                # schnelle Iteration
+      my $aicon = $href->{con} // 0;
 
-          if ($aicon < 0 || $aicon > $conlim) {
-              $conairfault++;
-              Log3 ($name, 1, "$name - WARNING - The stored Energy con=$aicon of index=$aidx in aiRawData is faulty. The incorrect value can be deleted with 'set $name reset aiData delValue=con==$aicon'.");
-          }
+      if ($aicon < 0 || $aicon > $conlim) {
+          $conairfault++;                                   # Zähler für fehlerhafte Einträge
+          push @faults, [$aidx, $aicon];
+      }
   }
 
+  if (@faults) {
+      my $msg = join("\n", map {
+                  "$name - WARNING - The stored Energy con=$_->[1] of index=$_->[0] in aiRawData is faulty. ".
+                  "The incorrect value can be deleted with 'set $name reset aiData delValue=con==$_->[1]'."
+                } @faults);
+
+      Log3 ($name, 1, $msg);
+  }
+  
   if ($conpvhfault) {
       $result->{'Data Memory'}{state}   = $warn;
       $result->{'Data Memory'}{result} .= qq{There are '$conpvhfault' incorrect value(s) in the 'con' key of the pvHistory Storage. <br>};
@@ -35459,7 +35481,6 @@ sub checkPlantConfig {
       $result->{'Plant Control'}{state}   = $info;
       $result->{'Plant Control'}{result} .= qq{It may be useful setting <br>'plantControl->reductionState'. <br>};
       $result->{'Plant Control'}{note}   .= qq{The 'reductionState' parameter informs $name whether the PV system is down-regulated. (see Command Reference) <br>};
-      # $result->{'Plant Control'}{note}   .= qq{(see <a href='https://toolkit.solcast.com.au/rooftop-sites/' target='_blank'>SolCast API</a>) <br>};
       $result->{'Plant Control'}{info}    = 1;
   }
 
@@ -35477,6 +35498,7 @@ sub checkPlantConfig {
        $result->{'Plant Control'}{note}   .= qq{keys 'reductionState', 'feedinPowerLimit' <br>};
   }
 
+
   ## FTUI Widget Support
   ########################
   my $tpath = "$root/www/tablet/css";
@@ -35484,14 +35506,15 @@ sub checkPlantConfig {
   $err      = 0;
 
   if (!-d $tpath) {
-      $result->{'FTUI Widget Files'}{result}  .= $hqtxt{widnin}{$lang};
-      $result->{'FTUI Widget Files'}{note}    .= qq{There is no need to install SolarForecast FTUI widgets.<br>};
+      $result->{'FTUI Widget Files'}{result} .= $hqtxt{widnin}{$lang};
+      $result->{'FTUI Widget Files'}{note}   .= qq{There is no need to install SolarForecast FTUI widgets.<br>};
   }
   else {
       my $cfurl = BPATH.CFILE.PPATH;
-
+      my %cfCache;
+    
       for my $file (@fs) {
-          ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVer ($name, $file, $cfurl);
+          ($cmerr, $cmupd, $cmmsg, $cmrec) = checkModVerBatch ($name, $file, $cfurl, \%cfCache);
 
           $err = 1 if($cmerr);
           $upd = 1 if($cmupd);
@@ -36164,6 +36187,48 @@ sub createReadingsFromArray {
 
   $data{$name}{readingarray} = [];                                # completely empty ARRAY
   
+return;
+}
+
+################################################################
+#         Readings aus Array erstellen (Fast Ansatz)
+# $doevt:  1-Events erstellen, 0-keine Events erstellen
+#
+# readingsBulkUpdate($hash,$reading,$value,$changed,$timestamp)
+#
+################################################################
+sub _createReadingsFromArrayFast {
+  my $hash  = shift;
+  my $doevt = shift // 0;
+  my $name  = $hash->{NAME};
+  
+  return if(!$data{$name}{readingarray} || !scalar @{$data{$name}{readingarray}});
+
+  # Schutz: wenn event-on-update-reading gesetzt ist, muss das Reading bei
+  # jedem Update ein Event bekommen, auch wenn der Wert gleich bleibt.
+  # Fast-Path dann NICHT anwenden (sonst semantischer Bruch).
+  my $hasEour = $hash->{".attreour"};
+  my $hasTocr = $hash->{".attrtocr"};                               # timestamp-on-change-reading gesetzt?
+
+  readingsBeginUpdate ($hash);
+  
+  for my $elem (@{$data{$name}{readingarray}}) {
+      my ($rn, $rval, $ts) = split "<>", $elem, 3;
+
+      my $changed;
+      
+      if (!$hasEour && !$hasTocr) {
+          my $old  = $hash->{READINGS}{$rn}{VAL};
+          $changed = (!defined($old) || $old ne $rval) ? undef : 0;
+      }                                                             # sonst: $changed bleibt undef -> normales FHEM-Verhalten
+
+      readingsBulkUpdate ($hash, $rn, $rval, $changed, $ts);
+  }
+
+  readingsEndUpdate ($hash, $doevt);
+  
+  $data{$name}{readingarray} = [];                                  # completely empty ARRAY
+ 
 return;
 }
 
@@ -37933,6 +37998,116 @@ sub checkCode1 {
   return $@ if($@);
 
 return ('', $val);
+}
+
+################################################################
+#  Prüft mehrere Dateien gegen EINE bereits geladene SVN
+#  Control-Datei (vermeidet Mehrfach-Download bei @fs-Loop)
+#  Rückgabe wie checkModVer: (err, upd, msg, rec, fName, size)
+################################################################
+sub checkModVerBatch {
+  my $name  = shift;
+  my $mod   = shift;
+  my $src   = shift;                                                                             # URL der Control-Datei
+  my $cache = shift; 
+
+  if (!exists $cache->{$src}) {
+      my %uch;
+      my $url          = $src;
+      $url             =~ s/%/%25/g;
+      $uch{url}        = $url;
+      $uch{timeout}    = 5;
+      $uch{ipv4}       = 1;                                                                     # falls von HttpUtils unterstützt, IPv4 erzwingen für svn.fhem.de
+      $uch{keepalive}  = 0;
+
+      my ($err, $data) = HttpUtils_BlockingGet (\%uch);
+
+      if ($err) {
+          $cache->{$src} = { err => "Check of SVN version not possible: $err." };
+      }
+      elsif (!$data) {
+          $cache->{$src} = { err => "$url -> empty file received" };
+      }
+      else {
+          $cache->{$src} = { data => $data };
+      }
+  }
+
+  my $c = $cache->{$src};
+
+  if ($c->{err}) {
+      my $msg = $c->{err};
+      my $rec = "Try to execute the configCheck later again. Inform the Maintainer if it seems to be a permanent problem.";
+      return (1, 0, $msg, $rec);
+  }
+
+  if ($src !~ m,^(.*)/([^/]*)$,) {
+      return (1, 0, "Cannot parse $src, probably not a valid http control file.",
+                    "Please inform the Maintainer about the Error Message.");
+  }
+
+  my $ctrlFileName = (split /\?/, $2)[0];
+  my @remList      = split /\R/, $c->{data};
+  my $root         = $attr{global}{modpath};
+
+  open (FD, "$root/FHEM/$ctrlFileName") or
+      return (1, 0, "Automatic check of SVN $mod version not possible: $!.",
+                    "Try to solve the problem that has occurred. Compare your local $mod version with the public version manually.");
+
+  my @locList = map { $_ =~ s/[\r\n]//; $_ } <FD>;
+  close (FD);
+
+  my %lh;
+  my $found = 0;
+
+  for my $l (@locList) {
+      my @l = split " ", $l, 4;
+      next if($l[0] ne "UPD" || $l[3] !~ /$mod/);
+
+      $lh{$l[3]}{TS}  = $l[1];
+      $lh{$l[3]}{LEN} = $l[2];
+      $found          = 1;
+      last;
+  }
+
+  for my $rem (@remList) {
+      my @r = split " ", $rem, 4;
+      next if($r[0] ne "UPD" || $r[3] !~ /$mod/);
+
+      my $fName  = $r[3];
+      my $fPath  = "$root/$fName";
+      my $fileOk = ($lh{$fName} && $lh{$fName}{TS} eq $r[1] && $lh{$fName}{LEN} eq $r[2]);
+
+      if (!$found) {
+          return (0, 1, "The $mod file does not appear to exist in your system.",
+                        "You should do a complete FHEM update first. Inform the Maintainer if it seems to be a permanent problem.",
+                        $fName, $r[2]);
+      }
+
+      if (!$fileOk) {
+          return (0, 1, "Another official $fName version is available on SVN (creation time: $r[1], size: $r[2] Bytes).",
+                        "You should update FHEM to get the recent $fName version from Repository.",
+                        $fName, $r[2]);
+      }
+
+      my $sz = -s $fPath;
+
+      if (!defined $sz) {
+          return (0, 1, "The local $mod file is not installed or not reachable.",
+                        "You should update FHEM to get the recent $mod version from Repository.",
+                        $fName, $r[2]);
+      }
+
+      if ($fileOk && $sz ne $r[2]) {
+          return (0, 1, "Your local $mod module is modified ($sz Bytes). The SVN version of $fName has creation time: $r[1] ($r[2] Bytes).",
+                        "You should update FHEM to get the recent $mod version from Repository.",
+                        $fName, $r[2]);
+      }
+
+      last;
+  }
+
+return (0, 0, "Your local $mod module is up to date.", "Update of $mod is not needed.");
 }
 
 ################################################################
