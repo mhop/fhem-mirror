@@ -29,9 +29,10 @@ et_addEvt($$$$)
 {
   my ($h, $name, $evt, $cnt) = @_;
   return 0 if($evt =~ m/ CULHM (SND|RCV) /); # HM
+  return 0 if($evt =~ m/DMSG/);              # SIGNALduino
   return 0 if($evt =~ m/RAWMSG/);            # HM
   return 0 if($evt =~ m/^R-/);               # HM register values
-  return 0 if($evt =~ m/ UNKNOWNCODE /);
+  return 0 if($evt =~ m/UNKNOWNCODE /);      # CUL_0 UNKNOWNCODE K2124, sduinoUSB0 UNKNOWNCODE TX31E84690C
   return 0 if($evt =~ m/^\d+ global /);      # update
   return 0 if($evt =~ m/[<>]/);              # HTML
   return 0 if($evt =~ m/googlecom$/);        # Kalender
@@ -123,9 +124,10 @@ eventTypes_Notify($$)
     return undef;
   }
 
-  my $ret = "";
   foreach my $oe (@{$events}) {
     next if(!defined($oe) || $oe =~ m/^\s*$/);
+    my ($reading) = split(/[\s:]+/, $oe, 2);
+    next if($me->{ignoreList}{$reading});
     et_addEvt($h, $n, $oe, 1);
   }
   return undef;
@@ -143,6 +145,15 @@ eventTypes_Attr(@)
     foreach my $i (split(',', $a[3])) {
       $h{$i} = 1;
       delete $ldata->{$i};
+      foreach my $device (keys %{$ldata}) {
+        if (ref($ldata->{$device}) eq 'HASH') {
+          foreach my $eventKey (keys %{$ldata->{$device}}) {
+            if ($eventKey =~ /^\Q$i\E(?::|$)/) {
+              delete $ldata->{$device}{$eventKey};
+            }
+          }
+        }
+      }
     }
     $defs{$a[1]}{ignoreList} = \%h;
   }
@@ -189,7 +200,7 @@ eventTypes_Set($@)
 {
   my ($hash, @a) = @_;
 
-  return $modules{eventTypes}{ldata} = undef
+  return %{$modules{eventTypes}{ldata}} = undef
         if($a[1] eq "clear");
   return eventTypes_Shutdown($hash, $hash->{NAME})
         if($a[1] eq "flush");
@@ -277,7 +288,7 @@ eventTypes_Get($@)
     <li><a href="#disable">disable</a></li><br>
     <a name="ignoreList"></a>
     <li>ignoreList<br>
-      Comma separated device names to ignore whe collecting the events.
+      Comma separated device or reading names to ignore whe collecting the events.
       E.g. ECMD-Devices are used to post RAW data as events.
       </li><br>
   </ul>
