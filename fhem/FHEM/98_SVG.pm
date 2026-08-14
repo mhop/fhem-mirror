@@ -1834,6 +1834,8 @@ SVG_render($$$$$$$$$$)
     #-- tics handling
     my $yt="y".($idx+1)."tics";
     $yt="ytics" if ($yt eq"y1tics");
+    $conf{$yt} = AnalyzeCommand(undef, $1)      # 145279
+        if(defined($conf{$yt}) && $conf{$yt} =~ /^(\{.*\})$/);
     $htics{$a} = defined($conf{$yt}) ? $conf{$yt} : "";
 
     #-- Round values, compute a nice step  
