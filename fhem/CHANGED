@@ -1,5 +1,12 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  70_PylonLowVoltage: neue Version 1.3.0 mit:
+                - Ersatz der gegenseitigen 'Busy-Loop'- und 'Random-Retry'-
+                  Mechanismen durch eine FIFO-Warteschlange pro Gateway
+                - neuer Befehl 'listQueue' zum Abrufen des aktuellen 
+                  Warteschlangenstatus
+                - neue Readings cellVoltageMax,cellVoltageMin,cmdChainDuration
+                - Slider für waitTimeBetweenRS485Cmd angepasst
  - bugfix:  59_Weather: OpenWeatherMapAPI.pm - update openweathermap
                         probability of precipitation mapping 
  - bugfix:  59_Weather: OpenWeatherMapAPI.pm - Updates data processing to

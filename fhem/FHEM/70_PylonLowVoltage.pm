@@ -121,6 +121,12 @@ BEGIN {
 
 # Versions History intern (Versions history by Heiko Maaz)
 my %vNotesIntern = (
+  "1.3.0"  => "16.08.2026 Ersatz der gegenseitigen 'Busy-Loop'- und 'Random-Retry'-Mechanismen durch eine FIFO-Warteschlange ".
+                          "pro Gateway (im Bereich Host:Port), ".
+                          "Sofortige Übergabe an das nächste wartende Gerät statt einer zufälligen Verzögerung; deaktivierte/gelöschte Geräte werden übersprungen ".
+                          "neuer Befehl 'listQueue' zum Abrufen des aktuellen Warteschlangenstatus ".
+                          "neue Readings cellVoltageMax, cellVoltageMin, cmdChainDuration ".
+                          "Slider für waitTimeBetweenRS485Cmd angepasst ",
   "1.2.2"  => "14.03.2026 _composeAddr: bug fix addressing batteries with address 9 and above ",
   "1.2.1"  => "29.12.2024 manageUpdate: use random time delay ",
   "1.2.0"  => "05.10.2024 _composeAddr: bugfix of effective battaery addressing ",
@@ -344,7 +350,7 @@ sub Initialize {
                         "interval ".
                         "timeout ".
                         "userBatterytype ".
-                        "waitTimeBetweenRS485Cmd:slider,0.1,0.1,2.0,1 ".
+                        "waitTimeBetweenRS485Cmd:slider,0.01,0.01,0.2,1 ".
                         $readingFnAttributes;
 
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
@@ -426,7 +432,8 @@ sub Get {
   my $arg  = join " ", map { my $p = $_; $p =~ s/\s//xg; $p; } @a;     ## no critic 'Map blocks'
 
   my $getlist = "Unknown argument $opt, choose one of ".
-                "data:noArg "
+                "data:noArg ".
+                "listQueue:noArg "
                 ;
 
   return if(IsDisabled($name));
@@ -434,6 +441,10 @@ sub Get {
   if ($opt eq 'data') {
       manageUpdate ($hash);
       return;
+  }
+
+  if ($opt eq 'listQueue') {
+      return _gwListQueue ($hash);
   }
 
 return $getlist;
@@ -472,6 +483,7 @@ sub Attr {
           deleteReadingspec ($hash);
           readingsDelete    ($hash, 'nextCycletime');
           _closeSocket      ($hash);
+          _gwDequeue        ($hash);
       }
   }
 
@@ -533,27 +545,29 @@ sub manageUpdate {
   }
   
   delete $hash->{HELPER}{BKRUNNING} if(defined $hash->{HELPER}{BKRUNNING} && $hash->{HELPER}{BKRUNNING}{pid} =~ /DEAD/xs);
- 
-  for my $dev ( devspec2array ('TYPE=PylonLowVoltage') ) {
-      if (defined $defs{$dev}->{HELPER}{BKRUNNING} || defined $defs{$dev}->{HELPER}{GWSESSION}) {          
-          RemoveInternalTimer ($hash);
-          $new = gettimeofday() + rand (6);
-          InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0); 
-          
-          $readings->{nextCycletime} = FmtTime ($new);
-          $readings->{state}         = "cycle postponed due to active gateway connection of $dev";
-          createReadings ($hash, 1, $readings);                                             
-          
-          if (defined $defs{$dev}->{HELPER}{BKRUNNING}) {
-              Log3 ($name, 4, qq{$name - another Gateway Call from $dev with PID "$defs{$dev}->{HELPER}{BKRUNNING}{pid}" is already running ... start Update postponed});
-          }
-          else {
-              Log3 ($name, 4, qq{$name - another Gateway Call from $dev is already running ... start Update postponed});
-          }
-          
-          return;
-      }
+
+  my $busyDev = _gwBusyBy ($hash);                                                          # anderes Device am selben Gateway (Host:Port) aktiv ?
+
+  if ($busyDev) {
+      _gwEnqueue ($hash);                                                                   # in Gateway-Warteschlange einreihen (dedupliziert)
+
+      # Sicherheitsnetz: falls das Dispatch-Signal verloren geht (z.B. FHEM-Neustart
+      # während ein anderes Device dran war), wird nach angemessener Zeit trotzdem
+      # nochmal geprüft, statt dauerhaft in der Warteschlange zu verharren
+      RemoveInternalTimer ($hash);
+      $new = gettimeofday() + $timeout * 4 + 10;
+      InternalTimer ($new, "FHEM::PylonLowVoltage::manageUpdate", $hash, 0);
+
+      $readings->{nextCycletime} = FmtTime ($new);
+      $readings->{state}         = "queued, waiting for gateway (busy with $busyDev)";
+      createReadings ($hash, 1, $readings);
+
+      Log3 ($name, 4, qq{$name - Gateway busy with $busyDev, $name enqueued and waiting for its turn});
+
+      return;
   }
+
+  _gwDequeue ($hash);                                                                       # eigenen Eintrag entfernen (z.B. nach Sicherheitsnetz-Timer)
 
   Log3 ($name, 4, "$name - START request cycle to battery number >$hash->{HELPER}{BATADDRESS}<, group >$hash->{HELPER}{GROUP}< at host:port $hash->{HOST}:$hash->{PORT}");
 
@@ -563,7 +577,10 @@ sub manageUpdate {
       startUpdate  ({name => $name, timeout => $timeout, readings => $readings, age1 => $age1});
   }
   else {
-     my $blto = sprintf "%.0f", ($timeout + (AttrVal ($name, 'waitTimeBetweenRS485Cmd', $wtbRS485cmd) * 15));
+     my $ncmd = scalar keys %fncls;                                                         # Anzahl möglicher Kommandos, automatisch synchron mit %fncls
+     my $ovh  = 1.0;                                                                        # Overhead-Puffer: Fork, Serialize/Deserialize, Socket-Aufbau
+
+     my $blto = sprintf "%.1f", ($timeout + (AttrVal ($name, 'waitTimeBetweenRS485Cmd', $wtbRS485cmd) * $ncmd) + $ovh);
 
      $hash->{HELPER}{BKRUNNING} = BlockingCall ( "FHEM::PylonLowVoltage::startUpdate",
                                                  {name => $name, timeout => $timeout, readings => $readings, age1 => $age1, block => 1},
@@ -598,34 +615,35 @@ sub startUpdate {
 
   my $hash     = $defs{$name};
   my $success  = 0;
-  my $wtb      = AttrVal ($name, 'waitTimeBetweenRS485Cmd', $wtbRS485cmd);                            # Wartezeit zwischen RS485 Kommandos
-  my $uat      = $block ? $timeout * 1000000 + $wtb * 1000000 : $timeout * 1000000; 
+  my $wtb      = AttrVal ($name, 'waitTimeBetweenRS485Cmd', $wtbRS485cmd);                              # Wartezeit zwischen RS485 Kommandos
+  my $uat      = $timeout * 1000000; 
 
   Log3 ($name, 4, "$name - used wait time between RS485 commands: ".($block ? $wtb : 0)." seconds");  
 
   my ($socket, $serial);
+  my $cmdChainStart = gettimeofday();                                                                   # Start Zeitmessung Befehlskette
 
-  eval {                                                                                              ## no critic 'eval'
+  eval {                                                                                                ## no critic 'eval'
       local $SIG{ALRM} = sub { croak 'gatewaytimeout' };
-      ualarm ($timeout * 1000000);                                                                    # ualarm in Mikrosekunden -> 1s
+      ualarm ($timeout * 1000000);                                                                      # ualarm in Mikrosekunden -> 1s
 
       $socket = _openSocket ($hash, $timeout, $readings);
 
       if (!$socket) {
           $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
-          $block ? return ($serial) : return \&finishUpdate ($serial);
+          $block ? return ($serial) : return \&finishUpdate ($serial);                                  # Fehler-Return
       }
       
       local $SIG{ALRM} = sub { croak 'batterytimeout' };
       
       for my $idx (sort keys %fncls) {                                                                 
-          next if($fncls{$idx}{class} eq 'sta' && ReadingsAge ($name, "serialNumber", 6000) < $age1);    # Funktionsklasse statische Werte seltener abrufen
+          next if($fncls{$idx}{class} eq 'sta' && ReadingsAge ($name, "serialNumber", 6000) < $age1);   # Funktionsklasse statische Werte seltener abrufen
           
           ualarm ($uat);   
           
           if (&{$fncls{$idx}{fn}} ($hash, $socket, $readings)) {
               $serial = encode_base64 (Serialize ( {name => $name, readings => $readings} ), "");
-              $block ? return ($serial) : return \&finishUpdate ($serial);
+              $block ? return ($serial) : return \&finishUpdate ($serial);                              # Fehler-Return
           }
           
           ualarm(0);
@@ -634,9 +652,12 @@ sub startUpdate {
 
       $success = 1;
   };  # eval
+  
+  $readings->{cmdChainDuration} = gettimeofday() - $cmdChainStart; 
 
   if ($@) {
       my $errtxt;
+      
       if ($@ =~ /gatewaytimeout/xs) {
           $errtxt = 'Timeout while establish RS485 gateway connection';
       }
@@ -699,6 +720,8 @@ sub finishUpdate {
 
   createReadings ($hash, $success, $readings);                                        # Readings erstellen
 
+  _gwDispatchNext ($hash);                                                            # nächstes wartendes Device am selben Gateway anstoßen
+
 return;
 }
 
@@ -717,6 +740,8 @@ sub abortUpdate {
 
   deleteReadingspec    ($hash);
   readingsSingleUpdate ($hash, 'state', 'Update (Child) process timed out', 1);
+
+  _gwDispatchNext ($hash);                                                            # nächstes wartendes Device am selben Gateway anstoßen
 
 return;
 }
@@ -789,6 +814,134 @@ sub _closeSocket {
   }
 
 return;
+}
+
+###############################################################
+#  Gateway Key (Host:Port) für Warteschlangen-Verwaltung
+###############################################################
+sub _gwKey {
+  my $hash = shift;
+
+return $hash->{HOST}.':'.$hash->{PORT};
+}
+
+###############################################################
+#  Device in die Gateway-Warteschlange einreihen (falls noch
+#  nicht enthalten)
+###############################################################
+sub _gwEnqueue {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $gwk  = _gwKey ($hash);
+
+  $data{PylonLowVoltage}{GWQUEUE}{$gwk} //= [];
+  my $queue = $data{PylonLowVoltage}{GWQUEUE}{$gwk};
+
+  return if(grep { $_ eq $name } @{$queue});                                 # schon eingereiht
+
+  push @{$queue}, $name;
+
+return;
+}
+
+###############################################################
+#  Device aus der Gateway-Warteschlange entfernen
+###############################################################
+sub _gwDequeue {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $gwk  = _gwKey ($hash);
+
+  return if(!defined $data{PylonLowVoltage}{GWQUEUE}{$gwk});
+
+  $data{PylonLowVoltage}{GWQUEUE}{$gwk} =
+      [ grep { $_ ne $name } @{$data{PylonLowVoltage}{GWQUEUE}{$gwk}} ];
+
+return;
+}
+
+###############################################################
+#  prüft ob am selben Gateway (Host:Port) bereits ein anderes
+#  Device eine aktive Session (BlockingCall oder synchron im
+#  Hauptprozess) unterhält
+###############################################################
+sub _gwBusyBy {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  my $gwk  = _gwKey ($hash);
+
+  for my $dev ( devspec2array ('TYPE=PylonLowVoltage') ) {
+      next if($dev eq $name);
+      next if(!defined $defs{$dev});
+      next if(_gwKey ($defs{$dev}) ne $gwk);                                 # anderes Gateway -> ignorieren
+
+      if (defined $defs{$dev}->{HELPER}{BKRUNNING} || defined $defs{$dev}->{HELPER}{GWSESSION}) {
+          return $dev;
+      }
+  }
+
+return;
+}
+
+###############################################################
+#  nächstes wartendes Device der Gateway-Warteschlange sofort
+#  anstoßen (kein Zufalls-Delay mehr nötig)
+###############################################################
+sub _gwDispatchNext {
+  my $hash = shift;
+  my $gwk  = _gwKey ($hash);
+
+  return if(!defined $data{PylonLowVoltage}{GWQUEUE}{$gwk});
+
+  while (@{$data{PylonLowVoltage}{GWQUEUE}{$gwk}}) {
+      my $next = shift @{$data{PylonLowVoltage}{GWQUEUE}{$gwk}};
+
+      next if(!defined $next || !defined $defs{$next});                     # Device zwischenzeitlich gelöscht -> nächstes probieren
+      next if(IsDisabled ($next));                                          # Device disabled -> nächstes probieren
+
+      RemoveInternalTimer ($defs{$next});
+      InternalTimer (gettimeofday() + 0.3, "FHEM::PylonLowVoltage::manageUpdate", $defs{$next}, 0);
+
+      return;
+  }
+
+return;
+}
+
+###############################################################
+#  liefert eine lesbare Übersicht der Gateway-Warteschlange
+#  für "get <name> listQueue"
+###############################################################
+sub _gwListQueue {
+  my $hash = shift;
+  my $gwk  = _gwKey ($hash);
+
+  my $busyDev = _gwBusyBy ($hash);
+  my $self    = $hash->{NAME};
+
+  if (defined $hash->{HELPER}{BKRUNNING} || defined $hash->{HELPER}{GWSESSION}) {
+      $busyDev = $self;
+  }
+
+  my @queue = defined $data{PylonLowVoltage}{GWQUEUE}{$gwk} ? @{$data{PylonLowVoltage}{GWQUEUE}{$gwk}} : ();
+
+  my $out = "Gateway: $gwk\n";
+  $out   .= $busyDev ? "active:  $busyDev\n" : "active:  -\n";
+
+  if (!@queue) {
+      $out .= "queue:   empty\n";
+  }
+  else {
+      $out   .= "queue:   (".scalar(@queue)." waiting)\n";
+      my $pos = 1;
+      
+      for my $dev (@queue) {
+          $out .= sprintf "  %2d. %s\n", $pos, $dev;
+          $pos++;
+      }
+  }
+
+return $out;
 }
 
 ###############################################################
@@ -1352,6 +1505,9 @@ sub Undef {
   _closeSocket       ($hash);
   BlockingKill       ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
 
+  _gwDequeue      ($hash);
+  _gwDispatchNext ($hash);                                                            # falls dieses Device gerade "dran" war, nächstes anstoßen
+
 return;
 }
 
@@ -1364,6 +1520,9 @@ sub Shutdown {
   RemoveInternalTimer ($hash);
   _closeSocket        ($hash);
   BlockingKill        ($hash->{HELPER}{BKRUNNING}) if(defined $hash->{HELPER}{BKRUNNING});
+
+  _gwDequeue      ($hash);
+  _gwDispatchNext ($hash);
 
 return;
 }
@@ -1558,9 +1717,10 @@ sub additionalReadings {
 
     my ($vmax, $vmin);
 
-    $readings->{averageCellVolt} = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount}                  if($readings->{packCellcount});
-    $readings->{packSOC}         = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100) if($readings->{packCapacity});
-    $readings->{packPower}       = sprintf "%.2f", $readings->{packCurrent} * $readings->{packVolt};
+    $readings->{averageCellVolt}  = sprintf "%.3f", $readings->{packVolt} / $readings->{packCellcount}                  if($readings->{packCellcount});
+    $readings->{packSOC}          = sprintf "%.2f", ($readings->{packCapacityRemain} / $readings->{packCapacity} * 100) if($readings->{packCapacity});
+    $readings->{cmdChainDuration} = sprintf "%.3f", $readings->{cmdChainDuration}                                       if(defined $readings->{cmdChainDuration});
+    $readings->{packPower}        = sprintf "%.2f", $readings->{packCurrent} * $readings->{packVolt};
 
     for (my $i=1; $i <= $readings->{packCellcount}; $i++) {
         $i    = sprintf "%02d", $i;
@@ -1571,8 +1731,11 @@ sub additionalReadings {
     if ($vmax && $vmin) {
         my $maxdf = $vmax - $vmin;
         $readings->{packImbalance} = sprintf "%.3f", 100 * $maxdf / $readings->{averageCellVolt};
+        
+        $readings->{cellVoltageMax} = $vmax;
+        $readings->{cellVoltageMin} = $vmin;
     }
-
+    
     $readings->{packState} = $readings->{packCurrent} < 0 ? 'discharging' :
                              $readings->{packCurrent} > 0 ? 'charging'    :
                              'idle';
@@ -1765,6 +1928,13 @@ return;
     <br>
   </li>
  <br>
+  <li><b>listQueue</b><br>
+    Shows which device is currently accessing the gateway (if any) and lists the devices currently waiting in the
+    per-gateway queue (devices sharing the same host:port), in the order they will be served. Useful to verify that
+    several devices sharing one RS485/Ethernet gateway are being serialized correctly.
+    <br>
+  </li>
+ <br>
  </ul>
 
  <a id="PylonLowVoltage-attr"></a>
@@ -1825,12 +1995,16 @@ return;
  <li><b>cellVoltage_XX</b><br>         Cell voltage (V) of the cell pack XX. In the battery module "packCellcount"
                                        cell packs are connected in series. Each cell pack consists of single cells
                                        connected in parallel.                                                             </li>
+ <li><b>cellVoltageMax</b><br>         highest cell voltage (V) of all cells in the current cycle                         </li>
+ <li><b>cellVoltageMin</b><br>         lowest cell voltage (V) of all cells in the current cycle                          </li>
  <li><b>chargeCurrentLimit</b><br>     current limit value for the charging current (A)                                   </li>
  <li><b>chargeEnable</b><br>           current flag loading allowed                                                       </li>
  <li><b>chargeFullRequest</b><br>      current flag charge battery module fully (from the mains if necessary)             </li>
  <li><b>chargeImmediatelySOCXX</b><br> current flag charge battery module immediately
                                        (05: SOC limit 5-9%, 09: SOC limit 9-13%)                                          </li>
  <li><b>chargeVoltageLimit</b><br>     current charge voltage limit (V) of the battery module                             </li>
+ <li><b>cmdChainDuration</b><br>       real processing time (s) of the last command chain (connection setup + all 
+                                       executed BMS commands of the cycle)                                                </li>
  <li><b>dischargeCurrentLimit</b><br>  current limit value for the discharge current (A)                                  </li>
  <li><b>dischargeEnable</b><br>        current flag unloading allowed                                                     </li>
  <li><b>dischargeVoltageLimit</b><br>  current discharge voltage limit (V) of the battery module                          </li>
@@ -2011,6 +2185,14 @@ return;
     <br>
   </li>
  <br>
+  <li><b>listQueue</b><br>
+    Zeigt an, welches Device gerade auf das Gateway zugreift (falls aktiv) und listet die Devices auf, die aktuell
+    in der gateway-bezogenen Warteschlange (Devices mit gleichem host:port) auf ihre Bedienung warten, in der
+    Reihenfolge der Abarbeitung. Nützlich, um bei mehreren Devices an einem RS485/Ethernet-Gateway die korrekte
+    Serialisierung zu überprüfen.
+    <br>
+  </li>
+ <br>
  </ul>
 
  <a id="PylonLowVoltage-attr"></a>
@@ -2072,12 +2254,16 @@ return;
  <li><b>cellVoltage_XX</b><br>         Zellenspannung (V) des Zellenpacks XX. In dem Batteriemodul sind "packCellcount"
                                        Zellenpacks in Serie geschaltet verbaut. Jedes Zellenpack besteht aus parallel
                                        geschalten Einzelzellen.                                                           </li>
+ <li><b>cellVoltageMax</b><br>         höchste Zellenspannung (V) aller Zellen des aktuellen Zyklus                       </li>
+ <li><b>cellVoltageMin</b><br>         niedrigste Zellenspannung (V) aller Zellen des aktuellen Zyklus                    </li>
  <li><b>chargeCurrentLimit</b><br>     aktueller Grenzwert für den Ladestrom (A)                                          </li>
  <li><b>chargeEnable</b><br>           aktuelles Flag Laden erlaubt                                                       </li>
  <li><b>chargeFullRequest</b><br>      aktuelles Flag Batteriemodul voll laden (notfalls aus dem Netz)                    </li>
  <li><b>chargeImmediatelySOCXX</b><br> aktuelles Flag Batteriemodul sofort laden
                                        (05: SOC Grenze 5-9%, 09: SOC Grenze 9-13%)                                        </li>
  <li><b>chargeVoltageLimit</b><br>     aktuelle Ladespannungsgrenze (V) des Batteriemoduls                                </li>
+ <li><b>cmdChainDuration</b><br>       reale Verarbeitungszeit (s) der letzten Befehlskette (Verbindungsaufbau + alle 
+                                       ausgeführten BMS-Kommandos des Zyklus)                                             </li>
  <li><b>dischargeCurrentLimit</b><br>  aktueller Grenzwert für den Entladestrom (A)                                       </li>
  <li><b>dischargeEnable</b><br>        aktuelles Flag Entladen erlaubt                                                    </li>
  <li><b>dischargeVoltageLimit</b><br>  aktuelle Entladespannungsgrenze (V) des Batteriemoduls                             </li>
