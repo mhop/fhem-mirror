@@ -49,6 +49,7 @@ MQTT2_SERVER_Initialize($)
     rePublish:1,0
     rawEvents
     respectRetain:1,0
+    retainDelay
     sslVersion
     sslCertPrefix
     topicConversion:0,1
@@ -524,7 +525,8 @@ MQTT2_SERVER_Read($@)
 
     if(!$hash->{answerScheduled} && $shash->{retain}) {
       $hash->{answerScheduled} = 1;
-      InternalTimer($hash->{lastMsgTime}+1, sub(){
+      my $rd = AttrNum($sname,"retainDelay",1); #145310
+      InternalTimer($hash->{lastMsgTime}+$rd, sub(){
         return if(!$hash->{FD}); # Closed in the meantime, #114425
         delete($hash->{answerScheduled});
         my $r = $shash->{retain};
@@ -1089,6 +1091,13 @@ MQTT2_SERVER_ReadDebug($$)
       for featurelevel > 6.1. Set this attribute to 1 if you have external
       devices relying on this feature.
       </li>
+
+    <a id="MQTT2_SERVER-attr-retainDelay"></a>
+    <li>retainDelay &lt;seconds&gt;<br>
+      To avoid sending retained messages more than once, they are sent one
+      second after the first subscription, as more than one subscription is
+      expected. For appliances with a short connect time this might bee too
+      long, and can be changed with this attribute.</li>
 
     <a id="MQTT2_SERVER-attr-SSL"></a>
     <li>SSL<br>
