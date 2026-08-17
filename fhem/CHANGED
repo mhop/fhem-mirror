@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  - 72_FritzSmart: Fehler bei FritzOS < 721
+            - Attribute Fritz!Gateway
+            - Parameter XML::Hash
  - feature: 76_SolarForecast: Version 2.10.4
  - change:  70_PylonLowVoltage: neue Version 1.3.0 mit:
                 - Ersatz der gegenseitigen 'Busy-Loop'- und 'Random-Retry'-
