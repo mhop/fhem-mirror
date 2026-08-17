@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.07.16";
+our $ModulVersion = "26.08.17";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -733,6 +733,7 @@ our %LuaData = (
         wTime           => { cmd => "xhr 1 lang de page wTime xhrId all"},
         wlanChannels    => { cmd => "xhr 1 lang de page chan xhrId all"},
         wlanEnvironment => { cmd => "xhr 1 lang de page chan xhrId environment"},
+        wlanAirTime     => { cmd => "xhr 1 lang de page chan xhrId airtime"},
         wlanmesh        => { cmd => "xhr 1 lang de page wlanmesh xhrId all"}
 );
 
@@ -858,12 +859,14 @@ our %LuaQueryCmd = (
 # https://www.pcwelt.de/article/1196302/die-neuesten-updates-fuer-fritzbox-co.html
 our %FB_Model = (
        '7690'        => { version => "8.22", date => "26.02.2026"},
-       '7682'        => { version => "8.03", date => "21.01.2025"},
-       '7632'        => { version => "8.03", date => "21.01.2025"},
+       '7682'        => { version => "8.25", date => "28.07.2026"},
+       '7632'        => { version => "8.25", date => "14.07.2026"},
+       '7630'        => { version => "8.25", date => "02.07.2026"},
+       '7620'        => { version => "8.25", date => "30.07.2026"},
        '7590 AX'     => { version => "8.25", date => "26.03.2026"},
        '7590'        => { version => "8.25", date => "26.03.2026"},
-       '7583 VDSL'   => { version => "8.20", date => "28.08.2025"},
-       '7583'        => { version => "8.20", date => "28.08.2025"},
+       '7583 VDSL'   => { version => "8.26", date => "01.07.2026"},
+       '7583'        => { version => "8.26", date => "01.07.2026"},
        '7582'        => { version => "7.18", date => "19.08.2024"},
        '7581'        => { version => "7.18", date => "19.08.2024"},
        '7580'        => { version => "7.30", date => "04.09.2023"},
@@ -872,7 +875,7 @@ our %FB_Model = (
        '7530'        => { version => "8.25", date => "21.04.2026"},
        '7520 B'      => { version => "8.10", date => "14.08.2025"},
        '7520'        => { version => "8.10", date => "14.08.2025"},
-       '7510'        => { version => "8.20", date => "23.09.2025"},
+       '7510'        => { version => "8.26", date => "21.07.2026"},
        '7490'        => { version => "7.62", date => "08.01.2026"},
        '7430'        => { version => "7.31", date => "04.09.2023"},
        '7412'        => { version => "6.88", date => "04.09.2023"},
@@ -892,12 +895,16 @@ our %FB_Model = (
        '7270_v1'     => { version => "6.06", date => "20.10.2015"},
        '7270'        => { version => "6.06", date => "20.10.2015"},
        '6890 LTE'    => { version => "7.57", date => "04.09.2023"},
-       '6860 5G'     => { version => "8.20", date => "26.11.2025"},
-       '6850 5G'     => { version => "8.20", date => "07.10.2025"},
-       '6850 4G'     => { version => "8.20", date => "01.02.2026"},
-       '6850 LTE'    => { version => "8.20", date => "07.10.2025"},
+       '6860 5G V2'  => { version => "8.25", date => "04.08.2026"},
+       '6860 5G'     => { version => "8.25", date => "09.07.2026"},
+       '6850 5G V2'  => { version => "8.25", date => "23.07.2026"},
+       '6850 5G'     => { version => "8.25", date => "09.07.2026"},
+       '6850 4G'     => { version => "8.25", date => "02.07.2026"},
+       '6850 LTE'    => { version => "8.25", date => "02.07.2026"},
        '6842 LTE'    => { version => "6.35", date => "07.09.2023"},
        '6840 LTE'    => { version => "6.88", date => "07.09.2023"},
+       '6825 4G'     => { version => "8.25", date => "02.07.2026"},
+       '6820 LTE v4' => { version => "7.57", date => "04.09.2023"},
        '6820 LTE v3' => { version => "7.57", date => "04.09.2023"},
        '6820 LTE v2' => { version => "7.57", date => "04.09.2023"},
        '6820 LTE'    => { version => "7.30", date => "04.09.2023"},
@@ -910,15 +917,16 @@ our %FB_Model = (
        '6490 Cable'  => { version => "7.57", date => "04.09.2023"},
        '6430 Cable'  => { version => "7.30", date => "04.09.2023"},
        '5690 XGS'    => { version => "8.20", date => "05.02.2026"},
-       '5690 Pro'    => { version => "8.22", date => "26.02.2026"},
-       '5690'        => { version => "8.22", date => "26.02.2026"},
+       '5690 Pro'    => { version => "8.25", date => "21.07.2026"},
+       '5690'        => { version => "8.25", date => "30.06.2026"},
        '5590 Fiber'  => { version => "8.20", date => "12.02.2026"},
        '5530 Fiber'  => { version => "8.20", date => "03.09.2025"},
        '5491'        => { version => "7.31", date => "04.09.2023"},
        '5490'        => { version => "7.31", date => "04.09.2023"},
-       '4690'        => { version => "8.22", date => "26.02.2026"},
-       '4060'        => { version => "8.02", date => "09.01.2025"},
-       '4050'        => { version => "8.02", date => "02.02.2026"},
+       '4690'        => { version => "8.25", date => "02.07.2026"},
+       '4630'        => { version => "8.25", date => "25.06.2026"},
+       '4060'        => { version => "8.25", date => "02.07.2026"},
+       '4050'        => { version => "8.25", date => "01.07.2026"},
        '4040'        => { version => "8.02", date => "30.01.2025"},
        '4020'        => { version => "7.04", date => "19.08.2024"},
        '3490'        => { version => "7.31", date => "04.09.2023"},
@@ -926,7 +934,8 @@ our %FB_Model = (
    );
 
 our %RP_Model = (
-       'Mesh Set 4200'    => { version => "8.20", date => "20.01.2026"},
+       'Stick'            => { version => "8.25", date => "17.06.2026"},
+       'Mesh Set 4200'    => { version => "8.25", date => "25.06.2026"},
        'Mesh Set 1600'    => { version => "8.20", date => "20.01.2026"},
        'Smart Gateway'    => { version => "8.26", date => "09.04.2026"},
        'Smart Energy 250' => { version => "3.70", date => "06.08.2025"},
@@ -942,14 +951,14 @@ our %RP_Model = (
        'DECT 301'         => { version => "5.23", date => "25.07.2025"},
        'DVB-C'            => { version => "7.04", date => "06.08.2024"},
        '6000'             => { version => "8.20", date => "16.12.2025"},
-       '3000 AX'          => { version => "8.20", date => "20.01.2026"},
+       '3000 AX'          => { version => "8.25", date => "25.06.2026"},
        '3000'             => { version => "8.10", date => "29.08.2025"},
        '2700'             => { version => "8.06", date => "18.09.2025"},
        '2600'             => { version => "8.06", date => "23.09.2025"},
        '2400'             => { version => "8.20", date => "17.10.2025"},
        '1750E'            => { version => "7.32", date => "19.03.2024"},
        '1700'             => { version => "8.06", date => "18.09.2025"},
-       '1610 Oudoor'      => { version => "8.20", date => "10.02.2026"},
+       '1610 Oudoor'      => { version => "8.25", date => "08.07.2026"},
        '1200 AX'          => { version => "8.20", date => "16.12.2025"},
        '1200'             => { version => "8.20", date => "23.09.2025"},
        '1160'             => { version => "7.15", date => "12.09.2023"},
@@ -1174,14 +1183,14 @@ sub Fritz_Get_attrList($@) {
                                 ."Fritz_Helper_removeAfA,Fritz_Helper_reformat "
 
               ."enableDocsisInfo:0,1 ";
-              my $retPara = "enableBoxReadings:multiple-strict,";
-                   $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
-                   $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
-                   $retPara .= "box_energyMode,box_globalFilter,box_wan,"  if ($fwVersion == 0 || $fwVersion >= 721);
-                   $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
-                   $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
-                   $retPara =~ s/.$/ /;
-  $retAttr .= $retPara;
+#              my $retPara = "enableBoxReadings:multiple-strict,";
+#                   $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
+#                   $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
+#                   $retPara .= "box_energyMode,box_globalFilter,box_wan,"  if ($fwVersion == 0 || $fwVersion >= 721);
+#                   $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
+#                   $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
+#                   $retPara =~ s/.$/ /;
+#  $retAttr .= $retPara;
 
   if($avmModel =~ /Box/) {
     $retAttr .= "userTickets:0,1,2,3,4,5,6,7,8,9,10,11,12 "
@@ -1230,7 +1239,7 @@ sub Fritz_Get_attrList($@) {
                      $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
                      $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
                      $retPara .= "box_energyMode,box_globalFilter,box_wan,"  if ($fwVersion == 0 || $fwVersion >= 721);
-                     $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
+                     $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >  731);
                      $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
                      $retPara =~ s/.$/ /;
           $retAttr .= $retPara;
@@ -1245,7 +1254,7 @@ sub Fritz_Get_attrList($@) {
                      $retPara .= "box_led,"                          if ($fwVersion == 0 || $fwVersion >= 680);
                      $retPara .= "box_guestWlan,box_usb,box_notify," if ($fwVersion == 0 || $fwVersion >= 700);
                      $retPara .= "box_energyMode,box_globalFilter,"  if ($fwVersion == 0 || $fwVersion >= 721);
-                     $retPara .= "box_dns,"                          if ($fwVersion == 0 || $fwVersion >= 731);
+                     $retPara .= "box_dns,"                          if ($fwVersion == 0 || $fwVersion >  731);
                      $retPara .= "box_pwr,"                          if ($fwVersion == 0 || ($fwVersion >= 700 && ($fwVersion < 790 || $fwVersion >= 804)) );
                      $retPara .= "box_user,"                         if ($fwVersion == 0 || $fwVersion >= 752);
                      $retPara  =~ s/.$/ /;
@@ -1310,8 +1319,10 @@ sub Fritz_Get_attrList($@) {
                                 ."shdeviceID_powerPerHour,shdeviceID_powerInWatt,"
                                 ."shdeviceID_state,shdeviceID_status,shdeviceID_summerTimeAction,shdeviceID_summerTimeEnabled,shdeviceID_summerTimePeriod,shdeviceID_summerTimeRepetition,"
                                 ."shdeviceID_targetTemp,shdeviceID_tempOffset,shdeviceID_temperature,shdeviceID_temperatureDropMinutes,shdeviceID_temperatureDropSens,shdeviceID_timeControl,shdeviceID_type,"
-                                ."shdeviceID_uid,shdeviceID_voltage ";
+                                ."shdeviceID_uid,shdeviceID_voltage "
 
+               ."enableBoxReadings:multiple-strict,"
+                                ."box_led,box_guestWlan,box_user ";
   } 
 
   if ($fwVersion == 0 || $fwVersion >= 800) {
@@ -1682,7 +1693,7 @@ sub Fritz_Define_Modul($$)
 
    if ($hash->{helper}{XML_Hash_XS}) {
      eval {
-       $outhash = xml2hash($xmlTest);
+       $outhash = xml2hash($xmlTest, keep_root => 0);
      };
      if ($@) {
        Fritz_Log $hash, 2, "eval: XML_Hash_XS $@";
@@ -5016,7 +5027,7 @@ sub Fritz_Get_Modul($@)
          };
        } else {
          eval {
-           $outhash = xml2hash($tmp);
+           $outhash = xml2hash($tmp, keep_root => 0);
          };
        }
 
@@ -6957,7 +6968,7 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
 
      Fritz_Readout_Add_Reading $hash, $roReadings, "box_IPv6_Uptime",       $result->{box_ipv6_Uptime};     # in date/time
 
-     if ($hash->{fhem}{fwVersion} < 731 && main::AttrVal($name, "enableBoxReadings", "") =~ /box_dns/) {
+     if ($hash->{fhem}{fwVersion} <= 731 && main::AttrVal($name, "enableBoxReadings", "") =~ /box_dns/) {
        Fritz_Readout_Add_Reading $hash, $roReadings, "box_dns_Srv1_used_IPv6",      $result->{box_ipv6_1st_DNS};
        Fritz_Readout_Add_Reading $hash, $roReadings, "box_dns_Srv2_used_IPv6",      $result->{box_ipv6_2nd_DNS};
      }
@@ -7165,8 +7176,13 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
    $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
 
-   Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}->{vars}, 5) if $resultData->{data}->{vars};
-   Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}->{rep_data}, 5) if $resultData->{data}->{rep_data};
+   my $wlanmesh = 0;
+
+   if (exists($resultData->{data}) && ref($resultData->{data}) eq "HASH") {
+     $wlanmesh = 1;
+     Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}->{vars}, 5) if $resultData->{data}->{vars};
+     Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}->{rep_data}, 5) if $resultData->{data}->{rep_data};
+   }
 
    #-------------------------------------------------------------------------------------
    # getting error notify 
@@ -7184,6 +7200,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
        $oldNotiDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^box_notify_/ && defined $hash->{READINGS}{$_}{VAL};
      }
 
+     ################################################ only for testing #######################################
      if ($name eq "FritzBox-Test") {
        my $tmsg  = "<html><div id=\"button\"><button id=\"delLED\" onclick=\"JS:FW_cmd(FW_root+\'?cmd=set ";
           $tmsg .= $name;
@@ -7203,6 +7220,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
        Fritz_Log $hash, 3, "tmsg: \n " . $content;
        Fritz_Readout_Add_Reading $hash, $roReadings, "a_Test", $content;
      }
+     ################################################ only for testing #######################################
 
      if ($hash->{fhem}{fwVersion} >= 800) {
 
@@ -7270,44 +7288,42 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
        }
 
      } else {
-       if (defined $resultData->{data}->{notify}) {
-         if ( ref $resultData->{data}->{notify} eq 'ARRAY' ) {
+       if ($wlanmesh && (exists($resultData->{data}->{notify}) && ref($resultData->{data}->{notify} eq 'ARRAY')) ) {
 
-           foreach ( @{ $resultData->{data}->{notify}} ) {
+         foreach ( @{ $resultData->{data}->{notify}} ) {
 
-             my ($urlID) = ($_->{url} =~ /hilfe_syslog_(\d+).html/);
-             my $msg  = '<html>' . $_->{category} . " " . $_->{event};
-             if ($urlID) {
-               $msg .= " <a href='http://" . $hash->{HOST} . $_->{url} . "' target='_blank'>" . $urlID . "</a>";
-             }
-
-             $uid = $_->{id};
-             my $rUID = $rName . $uid;
-
-             # $msg .= " <a href='/fhem?cmd=set%20" .$name. "%20ledSetting%20notifyoff:" . $uid . $FW_CSRF . "' target='_self'>&lt;quittieren&gt;</a></html>";
-
-             $msg  = "<html><div id=\"button\"><button id=\"delLED\" onclick=\"JS:FW_cmd(FW_root+\'?cmd=set ";
-             $msg .= $name;
-             $msg .= " ledSetting notifyoff:";
-             $msg .= $uid;
-             $msg .= "&XHR=1\', function(data){FW_okDialog(data)})\">quittieren</button></div></html>";
-
-             Fritz_Readout_Add_Reading $hash, $roReadings, $rUID, $msg;
-             delete $oldNotiDevice{$rUID} if exists $oldNotiDevice{$rUID};
-
-             $infText = $_->{message} if $_->{message};
-
-             my $iFrame = "<html><div id='button'><button id='dis' onclick='JS:FW_okDialog(" . '"' .$infText. '"' . ")'>Information anzeigen</button></div></html>";
-
-             $rUID .= "_info";
-
-             Fritz_Readout_Add_Reading $hash, $roReadings, $rUID, $iFrame;
-             delete $oldNotiDevice{$rUID} if exists $oldNotiDevice{$rUID};
-
-             Fritz_Readout_Add_Reading $hash, $roReadings, "helper->infoActive->id$uid", 1;
-
-             $id ++;
+           my ($urlID) = ($_->{url} =~ /hilfe_syslog_(\d+).html/);
+           my $msg  = '<html>' . $_->{category} . " " . $_->{event};
+           if ($urlID) {
+             $msg .= " <a href='http://" . $hash->{HOST} . $_->{url} . "' target='_blank'>" . $urlID . "</a>";
            }
+
+           $uid = $_->{id};
+           my $rUID = $rName . $uid;
+
+           # $msg .= " <a href='/fhem?cmd=set%20" .$name. "%20ledSetting%20notifyoff:" . $uid . $FW_CSRF . "' target='_self'>&lt;quittieren&gt;</a></html>";
+
+           $msg  = "<html><div id=\"button\"><button id=\"delLED\" onclick=\"JS:FW_cmd(FW_root+\'?cmd=set ";
+           $msg .= $name;
+           $msg .= " ledSetting notifyoff:";
+           $msg .= $uid;
+           $msg .= "&XHR=1\', function(data){FW_okDialog(data)})\">quittieren</button></div></html>";
+
+           Fritz_Readout_Add_Reading $hash, $roReadings, $rUID, $msg;
+           delete $oldNotiDevice{$rUID} if exists $oldNotiDevice{$rUID};
+
+           $infText = $_->{message} if $_->{message};
+
+           my $iFrame = "<html><div id='button'><button id='dis' onclick='JS:FW_okDialog(" . '"' .$infText. '"' . ")'>Information anzeigen</button></div></html>";
+
+           $rUID .= "_info";
+
+           Fritz_Readout_Add_Reading $hash, $roReadings, $rUID, $iFrame;
+           delete $oldNotiDevice{$rUID} if exists $oldNotiDevice{$rUID};
+
+           Fritz_Readout_Add_Reading $hash, $roReadings, "helper->infoActive->id$uid", 1;
+
+           $id ++;
          }
        }
      }
@@ -7352,41 +7368,44 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
    #-------------------------------------------------------------------------------------
    # now, evaluating mesh role
-   if (defined $resultData->{data}->{vars}->{role}->{value}) {
-     Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshRole", $resultData->{data}->{vars}->{role}->{value};
+   if ($wlanmesh) {
 
-     if ($resultData->{data}->{vars}->{role}->{value} ne "slave") {
-       Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 1;
+     if(exists($resultData->{data}->{vars}->{role}->{value}) && ref($resultData->{data}->{vars}->{role}->{value}) eq "SCALAR") {
+       Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshRole", $resultData->{data}->{vars}->{role}->{value};
 
-       $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 1;
-       $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 1;
-     } else {
-       Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 0;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 0;
+       if ($resultData->{data}->{vars}->{role}->{value} ne "slave") {
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 1;
 
-       $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 0;
-       $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 0;
-     }
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 1;
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 1;
+       } else {
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 0;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 0;
 
-   } elsif (defined $resultData->{data}->{rep_data}->{is_repeater}) {
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 0;
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 0;
+       }
 
-     my $meshRole = $resultData->{data}->{rep_data}->{is_repeater} ? "slave" : "master";
+     } elsif (exists($resultData->{data}->{rep_data}->{is_repeater}) && ref($resultData->{data}->{rep_data}->{is_repeater} eq "SCALAR") ) {
 
-     Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshRole", $meshRole;
+       my $meshRole = $resultData->{data}->{rep_data}->{is_repeater} ? "slave" : "master";
 
-     if ($meshRole ne "slave") {
-       Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 1;
+       Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshRole", $meshRole;
 
-       $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 1;
-       $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 1;
-     } else {
-       Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 0;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 0;
+       if ($meshRole ne "slave") {
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 1;
 
-       $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 0;
-       $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 0;
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 1;
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 1;
+       } else {
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 0;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 0;
+
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 0;
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 0;
+       }
      }
    } else {
      Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
@@ -8239,7 +8258,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
              };
            } else {
              eval {
-               $outhash = xml2hash($XMLtmp);
+               $outhash = xml2hash($XMLtmp, keep_root => 0);
              };
            }
 
@@ -8534,9 +8553,9 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
      # End Fritz!OS >= 700
 
      #-------------------------------------------------------------------------------------
-     # Start Fritz!OS >= 731
+     # Start Fritz!OS > 731
 
-     if ( $hash->{fhem}{fwVersion} < 731 ) {
+     if ( $hash->{fhem}{fwVersion} <= 731 ) {
 
        Fritz_Log $hash, 4, "wrong Fritz!OS for active DNS servers: $hash->{fhem}{fwVersionStr}" if $enableBoxReading =~ /box_dns/;
        Fritz_Log $hash, 4, "wrong Fritz!OS for net Monitor: $hash->{fhem}{fwVersionStr}";
@@ -8668,7 +8687,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
        Fritz_Log $hash, 4, "net Monitor - end getting data";
 
      }
-     # End Fritz!OS >= 731
+     # End Fritz!OS > 731
 
      #-------------------------------------------------------------------------------------
      # FON log
@@ -10770,7 +10789,7 @@ sub Fritz_Readout_API_Check($)
            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
            $hash->{MODEL} = $1;
          }
-         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1) if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
 
          if($content =~ /<j:Version>(.*)<\/j:Version>/) {
            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_fwVersion", $1);
@@ -10845,7 +10864,7 @@ sub Fritz_Readout_API_Check($)
 
      # Check for defined user in Fritz!Device, only if $osVersion >= 725
 
-     if ($osVersion && $osVersion >= 725 && $hash->{MODEL} !~ /Repeater/ ) {
+     if ($osVersion && $osVersion >= 725 && ($hash->{MODEL} !~ /Repeater/ || $hash->{MODEL} =~ /1700/) ) {
 
        # Fritz_Log $hash, 3, "boxUser for: $osVersion $hash->{MODEL}";
        $url       = "http://" . $host;
@@ -16941,7 +16960,7 @@ sub Fritz_SOAP_Request($$$;@)
              };
            } else {
              eval {
-               $outHash = xml2hash($decContent);
+               $outHash = xml2hash($decContent, keep_root => 0, suppress_empty => undef);
              };
            }
 
@@ -22049,7 +22068,7 @@ sub Fritz_Helper_Dumper($$;@) {
     "Dect",
     "Consumer"
   ],
-  "version": "260701",
+  "version": "260817",
   "release_status": "stable",
   "author": [
     "Jörg Wiemann <jowiemann@debitel.net>"
