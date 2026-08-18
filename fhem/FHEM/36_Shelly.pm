@@ -25,80 +25,6 @@
 #
 ########################################################################################
 
-# 5.01      attr defchannel for single mode devices with multiple relays (eg Shelly4Pro)
-#           improved support for wall display
-#           Bug Fix: Shelly_onoff (causing delays)
-#           added wifi data to Gen.1 devices
-#           Bug Fix: inttemp for ShellyPro2
-# 5.02      Bug Fix: on/off-for-timer for ShellyPlus2 temporarely taken out
-# 5.03      Bug Fix: Refresh: removed fixed name of FHEMWEB device
-#           Bug Fix: Gen.2: on/off-for-timer
-#           Bug Fix: update interval of GetStatus call
-# 5.04      Bug Fix: undefined values on restart
-#           Energymeter activated
-# 5.05      Bug Fix: Begin/End-Update in sub ()
-# 5.06      Bug Fix: undefined value for ShellyPMmini and others
-#           Change: Model of ShellyPMmini changed to shellypmmini
-# 5.07      BugFix: shellyrgbw (white mode): set ... toggle
-# 5.08      Add: set ... ON and OFF to switch all channels of a multichannel device
-#           Change: set default of MaxAge to 600 hrs
-#           Change: remove attribute 'ShellyName', use 'set ... name' instead
-#           Bug Fix: misc. 'undefined value'
-#           internal Optimization of Shelly_Set()
-# 5.09      Bug Fix (dimmer-devices): set..pct will not turn on or off
-#           Add (dimmer-devices): set..dim will turn on or off
-# 5.10      Add (dimmer-devices): set..dimup / dimdown
-#           Add (sensor-addon): temperatures
-# 5.11      internal reorganisation of status calls
-#           internal optimization of webhook handling
-#           Bug Fix: dimmer: settings call set to lights
-#           Feature: ShellyPro3EM attribute Balancing
-# 5.12      Add Gen3 Mini devices (fw gen2 compatibility)
-#           Add: Roller devices: use 'set ... pos' equivalent to 'pct'
-#           Add (dimmer-devices): set..dim-for-timer
-#           Bug Fix: store newkeys in helper after init
-# 5.13      Bug Fix: handling of attr 'shellyuser' for gen2 devices
-# 5.14      Add: set ... reset to set counters to zero
-#           Bug Fix: rollers (gen2 only): numberof power related readings
-# 5.15      change cmdref to attr ... model
-# 5.16      Bug Fix: function of dimmer
-# 5.17      Add: Roller devices: 'set ... position' equivalent to 'pct'
-# 5.18      Bug Fix: function of all Gen1 relay devices
-# 5.19      change back: roller devices: use 'set ... pct' as command
-# 5.20      Bug Fix: suppress status calls for disabled devices
-# 5.21      Bug Fix: Shelly-dimmer: convert dim-command with brightness=0 to an off-command
-#           Bug Fix: Shelly-dimmer, Shelly-bulb: slider for pct starts with 1
-# 5.21.1    Bug Fix: $oldtimer removed
-# 6.00 beta 1      Internal optimization HTTP-communication, use of timers, optimization of lights-devices procedure, minor bug fixes
-#           ShellyRGBW: using effects
-#           added: set extensions
-#           added: shellyplusUni / in work
-#           fix: do not loose timer on other commands or retriggering
-#           new devices: Shelly Plus 0-10V Dimmer, Shelly Pro Dimmer, Shelly Plus Uni
-#           Add: range extender
-#           Change: control of actions now by set commands; attribute webhook is only used to set the correspondending FHEMWEB-Device.
-#           Add: BLE.CloudRelay.List
-#           open issues:  shellypro3em not running properly
-# 6.00 Beta_2      ShellyPro3EM: reading 'errors' changed to 'error_EM', interval for power values setable separately, fixed total reactive power
-#           removed reading 'timestamp'
-#           increase interval in case of network error, reset when reconnected
-#           added: commands 'set config ap_enable|ap_disable' to change access point of Gen2 devices
-#           reading 'state' is set to 'disabled' when interval is set to 0
-#           reading 'network_threshold' moved to 'network_wifi_roaming', may be set to 'disabled'
-#           internal 'SHELLY' moved to reading 'model_ID'; according new readings model_family, model_function, model_name
-#           new gen3 models
-#           added: reading 'energy_returned' & 'energy_purchased' for Plus&Pro devices with PM
-#           changed: reading 'firmware' with hint 'check internet' when device seems not to have internet connection
-# 6.00 Beta_3 fix: dimmable devices: command allowed 'set <device> pct 0' to switch off the device
-#           added:  humidity, input and voltmeter to Shelly Plus Addon;
-#           changed:readings name of analog input of Shelly Plus Uni will be renamed
-#           added:  definition of the device by DNS-name instead of ip-address, new reading 'network_ip-address' with the ip-address of the device
-#                   Pro devices only: separate readings, indexed by 'LAN' resp. 'Wifi'
-#           added:  new reading 'ap_clients_<nr>_model' with the model of the connected Shelly device (when connection via range extender is established)
-#           changed:  command 'set <name> reset <reading>' changed to 'set ... clear ...'
-#           added:  readings timer... are supported for shelly4pro (gen1)
-# 6.00 Beta_4  add: client without definition --> reading 'no definition'
-#           new: attr timeout controls write out readings with response times
 # 6.00      fix some details in commandref (german only)
 # 6.00.1    fix: selection of readings for command 'set clear responsetimes' improved;
 # 6.00.2    fix: reading ble (bluetooth) may be set to disabled
@@ -201,14 +127,13 @@
 # 6.05.19   fix: key of S3SN-0U53X
 #           add: readings 'relay' and 'source' for ShellyPro3EM prooutput addon
 # 6.05.20   add: commands 'on', 'off' etc for ShellyPro3EM prooutput addon
+# 6.05.21   basically(!) added gen3 bulbs, blu gateway and gen4 flood
 
-# outstanded readings, to be deleted:  firmware, firmware_beta, source_, state_, timer_
 package main;
 
 use strict;
 use warnings;
 use 5.10.0;     # defined-or:  //
-#use v5.32;       # chained comparisions eg. a<x<b
 
 use JSON;
 use HttpUtils;
@@ -223,7 +148,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.20 21.06.2026";
+my $version = "6.05.21 18.08.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -363,7 +288,7 @@ my %shelly_vendor_ids = (
     "SNPM-001PCEU16"  => [ 2, "shellypmmini",   "Shelly Plus PM Mini",     0x9999,   'PM1'],
     ## Gen3 Devices
     "S3BL-D010009AEU" => [ 3, "shellybulbG3",   "Shelly Duo Bulb E27 Gen3",0x1814],   # added 04/2026 untested
-  # "S3BL-D010009AEU" => [ 3, "shellybulbG3",   "Shelly RGBCCT Bulb E27 Gen3",0x1814],   # added 04/2026 untested
+    "S3BL-C010007AEU" => [ 3, "shellycolorblbG3","Shelly Multicolor Bulb E27 Gen3",0x1818],   # added 08/2026 untested
     "S3SW-001X16EU"   => [ 3, "shellyplus1",    "Shelly 1 Gen3",           0x1018],   ##new
     "S3SW-001P16EU"   => [ 3, "shellyplus1pm",  "Shelly 1PM Gen3",         0x1019],   ##new
     "S3SW-002P16EU"   => [ 3, "shellyplus2pm",  "Shelly 2PM Gen3",         0x1005],   # added 10/2024
@@ -383,6 +308,7 @@ my %shelly_vendor_ids = (
     "S3PL-30110EU"    => [ 3, "shellyplusplug", "Shelly Plug M Gen3",      0x1865,   "PLUGS_UI"],   # added 02/2026
     "S3PL-30116EU"    => [ 3, "shellyplugpm",   "Shelly Plug PM Gen3",     0x1854,   "PLUGPM_UI"],   # added 01/2026       PM1
     "S3SH-0A2P4EU"    => [ 3, "shellyshutter",  "Shelly Shutter",          0x1039],   # added 09/2025
+    "S3GW-1DBT001"    => [ 3, "shellyblugwG3",  "Shelly Blu Gateway G3"    0x1817],   # added 08/2026
     ## Mini Gen3 Devices
     "S3SW-001X8EU"    => [ 3, "shellyplus1",    "Shelly 1 Mini Gen3",      0x1015],
     "S3SW-001P8EU"    => [ 3, "shellyplus1pm",  "Shelly 1PM Mini Gen3",    0x1016],
@@ -395,6 +321,8 @@ my %shelly_vendor_ids = (
     "S4PL-00416EU"    => [ 4, "shellypstrip4", "Shelly Power Strip 4 Gen4",0x1851,   "POWERSTRIP_UI"],   # added 12/2025   ADE7953
     "S4PL-10416EU"    => [ 4, "shellypstrip4", "Shelly Power Strip 4 Gen4",0x1851,   "POWERSTRIP_UI"],   # added 12/2025   BL0973
     "S4DM-0A101WWL"   => [ 4, "shellydimmerg4", "Shelly Dimmer Gen4",      0x1075],   # added 01/2026
+    "S4SN-0071A"      => [ 4, "shellyfloodG4",  "Shelly Flood Gen4",       0x1822],   # added 08/2026
+    "S4SN-0071Z"      => [ 4, "shellyfloodG4",  "Shelly Flood S Gen4",     0x1822],   # added 08/2026
     ## Mini Gen4 Devices
     "S4SW-001X8EU"    => [ 4, "shellyplus1",    "Shelly 1 Mini Gen4",      0x1030],   # added 03/2025
     "S4SW-001P8EU"    => [ 4, "shellyplus1pm",  "Shelly 1PM Mini Gen4",    0x1031],   # added 03/2025
@@ -524,7 +452,9 @@ my %shelly_models = (
     "shellyprodual" => [0,2,0, 4,1,4,  0,0,0],
     "shellyprorgbwpm"=>[0,0,5, 5,2,5,  0,1,4],    # profiles:  light,rgbcct,cctx2,rgbx2light // not really supported yet
     #-- 3rd generation devices (Gen3)
-    "shellybulbg3"  => [0,0,1, 1,3,0,  0,1,2],    # NOT TESTED
+    "shellyblugwG3" => [0,0,0, 0,3,0,  0,0,0],
+    "shellybulbg3"  => [0,0,1, 1,3,0,  0,0,0, 1], # components: 1xCCT       NOT TESTED 
+    "shellycolorblbG3"=>[0,0,1,1,3,0,  0,1,0, 1], # components: 1xRGBCCT    NOT TESTED
     "shellypill"    => [0,0,0, 0,3,0,  0,0,0],    #
     "shelly1LG3"    => [1,0,0, 0,3,2,  0,0,0],    # two inputs
     "shelly2LG3"    => [2,0,0, 0,3,2,  0,0,0],
@@ -538,6 +468,7 @@ my %shelly_models = (
     "shellypstrip4" => [4,0,0, 4,4,-4, 0,0,0],    # buttons?
     "shellydimmerg4"=> [0,0,1, 1,4,2,  0,0,0],
     "shellyemmini"  => [0,0,0, 1,4,0,  1,0,0],    # similar to 'shellypmmini'    changed 11.1.26
+    "shellyfloodG4" => [0,0,0, 0,4,0,  0,0,0],
     #-- Android devices
     "walldisplay1"  => [1,0,0, 0,2,1,  0,0,0]      # similar to ShellyPlus1PM
     );
