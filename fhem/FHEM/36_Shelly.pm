@@ -308,7 +308,7 @@ my %shelly_vendor_ids = (
     "S3PL-30110EU"    => [ 3, "shellyplusplug", "Shelly Plug M Gen3",      0x1865,   "PLUGS_UI"],   # added 02/2026
     "S3PL-30116EU"    => [ 3, "shellyplugpm",   "Shelly Plug PM Gen3",     0x1854,   "PLUGPM_UI"],   # added 01/2026       PM1
     "S3SH-0A2P4EU"    => [ 3, "shellyshutter",  "Shelly Shutter",          0x1039],   # added 09/2025
-    "S3GW-1DBT001"    => [ 3, "shellyblugwG3",  "Shelly Blu Gateway G3"    0x1817],   # added 08/2026
+    "S3GW-1DBT001"    => [ 3, "shellyblugwG3",  "Shelly Blu Gateway G3",   0x1817],   # added 08/2026
     ## Mini Gen3 Devices
     "S3SW-001X8EU"    => [ 3, "shellyplus1",    "Shelly 1 Mini Gen3",      0x1015],
     "S3SW-001P8EU"    => [ 3, "shellyplus1pm",  "Shelly 1PM Mini Gen3",    0x1016],
