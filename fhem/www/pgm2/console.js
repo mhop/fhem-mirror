@@ -4,6 +4,7 @@ FW_version["console.js"] = "$Id$";
 var consConn;
 var consName="#console";
 var htmlInEventMonitor;
+var consReadyFn; // #134312
 
 var consFilter, oldFilter, consFType="";
 var consLastIndex = 0;
@@ -129,6 +130,7 @@ consFill()
     }
     consConn = new WebSocket(loc.replace(/[&?].*/,'')
                                 .replace(/^http/i, "ws")+query);
+    consConn.onopen = consReadyFn;
     consConn.onclose = 
     consConn.onerror = 
     consConn.onmessage = consUpdate;
@@ -139,6 +141,8 @@ consFill()
       consConn.abort();
     }
     consConn = new XMLHttpRequest();
+    if(consReadyFn)
+      setTimeout(consReadyFn, 10);
     consConn.open("GET", loc+query, true);
     consConn.onreadystatechange = consUpdate;
     consConn.send(null);
@@ -153,10 +157,12 @@ consFill()
 }
 
 function
-consStart()
+consStart(readyFn)
 {
   if($(consName).length != 1)
     return;
+
+  consReadyFn = readyFn;
 
   if($("a#eventFilter").length)
     consFilter = $("a#eventFilter").html();
@@ -438,10 +444,7 @@ cons4dev(screenId, filter, feedFn, devName)
         .css({overflow:"auto"});
       $(screenId+">a").html($(screenId+">a").html().replace("Show", "Hide"));
       FW_closeConn();
-      consStart();
-      // Leave time for establishing the connection, else the "feeder" may
-      // clear the flag
-      setTimeout(function(){ FW_cmd(cmd) }, 100);
+      consStart(function(){ FW_cmd(cmd); });
 
       $(screenId+" .reset").click(function(){ $(consName+" table").html("") });
       $(screenId+" .filter").click(function(){
@@ -480,6 +483,7 @@ cons4dev(screenId, filter, feedFn, devName)
         consConn.onclose = undefined;
         cons_closeConn();
       }
+      consReadyFn = undefined;
       FW_longpoll();
     }
     opened = !opened;
@@ -488,4 +492,4 @@ cons4dev(screenId, filter, feedFn, devName)
   toggleOpen();
 }
 
-window.onload = consStart;
+window.onload = function() { consStart() };
