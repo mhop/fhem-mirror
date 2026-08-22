@@ -72,6 +72,9 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.1" => "20.08.2026  writeCacheFile: singleUpdateState entfernt (Forum: https://forum.fhem.de/index.php?msg=1368075) ".
+                           "weitere singleUpdateState in Getter entfernt ".
+                           "isGhoValFormValid geändert: die Prüfung erfolgt nun zuverlässig bei Eingabe des graphicHeaderOwnspecValForm-Attributs ",
   "2.10.0" => "11.08.2026  __saveBEVBatteryValues: Batteriedaten auch bei nicht aktivierten BEV-Consumer speichern ".
                            "neuer Debug Modus aiData_long ".
                            "vollständige Pipeline-Integration (Training + Inferenz) für die BEV opmode-Fraktionen 'auto' und 'prio' ".
@@ -4385,8 +4388,9 @@ sub __solCast_ApiRequest {
   my $apikey = StatusAPIVal ($hash, '?IdPair', '?'.$pk, 'apikey', '');
 
   if (!$roofid || !$apikey) {
-      my $err = qq{The roofIdentPair "$pk" of String "$string" has no Rooftop-ID and/or SolCast-API key assigned !};
-      singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+      my $err = qq{ERROR - The roofIdentPair "$pk" of String "$string" has no Rooftop-ID and/or SolCast-API key assigned !};
+      Log3 ($name, 1, "$name - $err");
+      #singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
       return $err;
   }
 
@@ -4605,7 +4609,7 @@ sub ___solCastErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{SolCast}{'?All'}{response_message} = $msg;
-  singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -4815,8 +4819,9 @@ sub __forecastSolar_ApiRequest {
   my ($set, $lat, $lon) = locCoordinates();
 
   if (!$set) {
-      my $err = qq{the attribute 'latitude' and/or 'longitude' in global device is not set};
-      singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
+      my $err = qq{ERROR - the attribute 'latitude' and/or 'longitude' in global device is not set};
+      Log3 ($name, 1, "$name - $err");
+      #singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
       return $err;
   }
 
@@ -5008,7 +5013,7 @@ sub ___forecastSolarErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{ForecastSolar}{'?All'}{response_message} = $msg;
-  singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -5465,9 +5470,9 @@ sub __VictronVRM_ApiRequestLogin {
       debugLog ($paref, "apiCall", qq{Used credentials for Login: user->$user, authtype->$authtype, idsite->$idsite});
   }
   else {
-      my $msg = "Victron VRM API credentials are not set or couldn't be decrypted. Use 'set $name vrmCredentials' to set it.";
-      Log3              ($name, 2, "$name - $msg");
-      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+      my $msg = "ERROR - Victron VRM API credentials are not set or couldn't be decrypted. Use 'set $name vrmCredentials' to set it.";
+      Log3 ($name, 1, "$name - $msg");
+      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $msg;
       return;
   }
@@ -5536,9 +5541,9 @@ sub __VictronVRM_ApiResponseLogin {
   my $sta  = [gettimeofday];                                                                                                # Start Response Verarbeitung
 
   if ($err ne "") {
-      $msg = 'Victron VRM API error response: '.$err;
-      Log3              ($name, 1, "$name - $msg");
-      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+      $msg = 'ERROR - Victron VRM API error response: '.$err;
+      Log3 ($name, 1, "$name - $msg");
+      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
       $data{$name}{current}{runTimeLastAPIProc}                    = round4 (tv_interval($sta));                            # Verarbeitungszeit ermitteln
@@ -5551,8 +5556,8 @@ sub __VictronVRM_ApiResponseLogin {
 
       if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
-          Log3              ($name, 1, "$name - $msg");
-          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+          Log3 ($name, 1, "$name - $msg");
+          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                     # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                 # API Laufzeit ermitteln
@@ -5563,9 +5568,9 @@ sub __VictronVRM_ApiResponseLogin {
       my $jdata = decode_json ($myjson);
 
       if (defined $jdata->{'error_code'}) {
-          $msg = 'Victron VRM API error_code response: '.$jdata->{'error_code'};
-          Log3              ($name, 3, "$name - $msg");
-          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+          $msg = 'ERROR - Victron VRM API error_code response: '.$jdata->{'error_code'};
+          Log3 ($name, 3, "$name - $msg");
+          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
@@ -5680,9 +5685,9 @@ sub __VictronVRM_ApiResponseForecast {
   my $sta  = [gettimeofday];                                                                                                # Start Response Verarbeitung
 
   if ($err ne "") {
-      $msg = 'Victron VRM API Forecast response: '.$err;
-      Log3              ($name, 1, "$name - $msg");
-      singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+      $msg = 'ERROR - Victron VRM API Forecast response: '.$err;
+      Log3 ($name, 1, "$name - $msg");
+      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
       $data{$name}{current}{runTimeLastAPIProc}                    = round4 (tv_interval($sta));                            # Verarbeitungszeit ermitteln
@@ -5695,8 +5700,8 @@ sub __VictronVRM_ApiResponseForecast {
 
       if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API Forecast response';
-          Log3              ($name, 1, "$name - $msg");
-          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+          Log3 ($name, 1, "$name - $msg");
+          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                         # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                     # API Laufzeit ermitteln
@@ -5707,9 +5712,9 @@ sub __VictronVRM_ApiResponseForecast {
       my $jdata = decode_json ($myjson);                                                                                    # Daten dekodieren
       
       if (defined $jdata->{'error_code'}) {
-          $msg = 'Victron VRM API Forecast response: '.$jdata->{'error_code'};
-          Log3              ($name, 3, "$name - $msg");
-          singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+          $msg = 'ERROR - Victron VRM API Forecast response: '.$jdata->{'error_code'};
+          Log3 ($name, 3, "$name - $msg");
+          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                         # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                     # API Laufzeit ermitteln
@@ -5741,7 +5746,8 @@ sub __VictronVRM_ApiResponseForecast {
 
           if (ref $syforecast ne 'ARRAY') {
               $msg = 'ERROR - invalid Victron VRM API Forecast response';
-              singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+              Log3 ($name, 1, "$name - $msg");
+              #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
               $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
               $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
@@ -6433,7 +6439,7 @@ sub ___openMeteoErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $msg;
-  singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
+  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -12099,7 +12105,6 @@ sub writeCacheFile {
 
       $lw                 = gettimeofday();
       $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
-      singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
 
       return;
   }
@@ -12118,7 +12123,6 @@ sub writeCacheFile {
 
       $lw                 = gettimeofday();
       $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
-      singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
 
       return;
   }
@@ -12242,7 +12246,6 @@ sub writeCacheFile {
 
       $lw                 = gettimeofday();
       $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
-      singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
 
       return ('', $nr, $na);
   }
@@ -12295,7 +12298,6 @@ sub writeCacheFile {
 
   $lw                 = gettimeofday();
   $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
-  singleUpdateState ( {hash => $hash, state => "wrote cachefile $cachename successfully", evt => 1} );
 
 return;
 }
@@ -12680,8 +12682,8 @@ sub centralTask {
           if (!CurrentVal ($name, 'setupcomplete', 0)) {
               $ret = 'The setup routine is still incomplete';
           }
+          
           singleUpdateState ( {hash => $hash, state => $ret, evt => 1} );                       # Central Task running Statusbit
-
           return;
       }
   }
@@ -23462,14 +23464,12 @@ sub ___ghoValForm {
   my $READING = $rdg;
   my $VALUE   = $val;
   my $UNIT    = $unit;
-  my $err;
 
   if (!ref $fn && $fn =~ m/^\{.*\}$/xs) {                                       # normale Funktionen
       my $efn = eval $fn;
 
       if ($@) {
           Log3 ($name, 1, "$name - ERROR in function graphicHeaderOwnspecValForm: ".$@);
-          $err = $@;
       }
       else {
           if (ref $efn ne 'HASH') {
@@ -23498,7 +23498,6 @@ sub ___ghoValForm {
 
           if ($@) {
               Log3 ($name, 1, "$name - ERROR in graphicHeaderOwnspecValForm Hash resolution -> '$fn': ".$@);
-              $err = $@;
           }
           else {
               $val = $vnew;
@@ -23509,12 +23508,6 @@ sub ___ghoValForm {
   if ($val =~ /^\s*(-?\d+(\.\d+)?)/xs) {                                       # Value und Unit numerischer Werte trennen
       ($val, my $u1) = split /\s+/, $val;
       $unit          = $u1 ? $u1 : $unit;
-  }
-
-  if ($err) {
-      $err            = (split "at", $err)[0];
-      $paref->{state} = 'ERROR - graphicHeaderOwnspecValForm: '.$err;
-      singleUpdateState ($paref);
   }
 
 return ($val, $unit);
@@ -37625,10 +37618,34 @@ sub isGhoValFormValid {
   my $name = shift;
   my $code = shift;
 
-  my $err       = q{};
-  ($err, $code) = checkCode ($name, $code);
+  my $num     = 1;
+  my $DEVICE  = 'dev';
+  my $READING = 'rdg';
+  my $VALUE   = 1;
+  my $UNIT    = 'kW';
+  my $val;
 
-return $err;
+  if (!ref $code && $code =~ m/^\{.*\}$/xs) {                                   # normale Funktionen
+      my $href = eval $code;
+      return $@ if $@;
+      $code = $href;
+  }
+
+  if (ref $code eq 'HASH') {                                                    # Funktionshash
+      for my $hkey (keys %{$code}) {
+          my $arg = $code->{$hkey};
+          
+          if ($arg =~ m/^%/xs) {
+              $val = sprintf $arg, $num;
+          }
+          elsif ($arg ne "") {
+              my $vnew = eval $arg;
+              return $@ if $@;
+          }
+      }
+  }
+
+return;
 }
 
 ###################################################################
@@ -37960,12 +37977,12 @@ sub checkCode {
   if (!$val || $val !~ m/^\s*\{.*\}\s*$/xs) {
       return qq{Usage of $name is wrong. The function has to be specified as "{<your own code>}"};
   }
-
+                 
   if ($cc1) {
       ($err, $val) = checkCode1 ($name, $val);
       return ($err, $val);
   }
-
+  
   my %specials = ( "%DEVICE"  => $name,
                    "%READING" => $name,
                    "%VALUE"   => 1,
@@ -37995,7 +38012,7 @@ sub checkCode1 {
   my $val  = shift;
 
   my $hash = $defs{$name};
-
+  
   $val =~ m/^\s*(\{.*\})\s*$/xs;
   $val = $1;
   $val = eval $val;

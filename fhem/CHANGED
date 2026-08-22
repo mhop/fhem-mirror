@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change: 76_SolarForecast: Version 2.10.1 - kleinere Anpassungen Events
  - bugfix:  - 72_FritzSmart: Fehler bei FritzOS < 721
             - Attribute Fritz!Gateway
             - Parameter XML::Hash
