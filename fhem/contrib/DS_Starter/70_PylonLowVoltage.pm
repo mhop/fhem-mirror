@@ -717,7 +717,7 @@ sub _gwStopSubprocess {
   }
   
   my $name = $hash->{NAME};
-  Log3 ($name, 3, "Gateway subprocess >$gw->{pid}< for $gwk stpped [killed by $name]");
+  Log3 ($name, 3, "Gateway subprocess >$gw->{pid}< for $gwk stopped [killed by $name]");
 
   _gwUnregisterSelect ($gwk);
   
@@ -1167,30 +1167,52 @@ return { type => 'response', device => $req->{device}, success => 1, readings =>
 sub GW_sendToParent {
   my $subprocess = shift;
   my $data       = shift;
+  
+  GW_sanitize ($data);
 
   my $serial = eval { freeze ($data) };
-
+    
   if (!$serial) {
-      # WICHTIG: freeze() kann scheitern (z.B. bei UTF8/Byte-Inkonsistenzen in aus
-      # Binärdaten dekodierten Strings wie batteryType/Manufacturer). Ohne diesen
-      # Fallback würde HIER GAR NICHTS an den Parent gesendet - der Pending-Eintrag
-      # des Device bliebe (bis zum gwCheckProgress-Watchdog) auf eine Antwort warten,
-      # die nie kommt (das Device würde sich "nach und nach" nicht mehr aktualisieren,
-      # siehe Testrückmeldung). Deshalb wird zwingend eine garantiert serialisierbare
-      # Minimalantwort nachgeschoben.
       my $err = $@ || 'unknown freeze error';
-
-      my $logserial = eval { freeze ({ type => 'log3parent', name => ($data->{device} // 'PylonLowVoltage'), level => 1,
-                                       msg  => "ERROR - could not serialize response for parent ($err) - sending minimal fallback response" }) };
-      $subprocess->writeToParent ($logserial) if($logserial);
-
-      my $fallback = { type => 'log3parent', device => ($data->{device} // '?'), level => 1, msg => "internal error: response could not be serialized ($err)" };
-      $serial = eval { freeze ($fallback) };
+        
+      my $fallback = { type => 'log3parent', name => ($data->{device} // 'PylonLowVoltage'), level => 1,
+                       msg => "ERROR - could not serialize response for parent ($err) - sending minimal fallback" };
+        
+      $serial = eval { freeze($fallback) };
+        
+      if (!$serial) {                                                       # Ultima Ratio: einfache Textantwort, die immer serialisierbar ist
+          my $text = "ERROR: serialization failed, device=" . ($data->{device}//'?');
+          $serial = eval { freeze({ type => 'log3parent', name => 'PylonLowVoltage', level => 1, msg => $text }) };
+      }
   }
-
-  $subprocess->writeToParent ($serial) if($serial);
-
+    
+  $subprocess->writeToParent($serial) if($serial);
+    
 return;
+}
+
+###############################################################
+# Rekursive Bereinigung: alle Strings auf Byte-Repräsentation 
+# zwingen
+###############################################################
+sub GW_sanitize {
+  my $ref = shift;
+      
+  if (ref $ref eq 'HASH') {
+      for my $k (keys %$ref) {
+          $ref->{$k} = GW_sanitize ($ref->{$k});
+      }
+  }
+  elsif (ref $ref eq 'ARRAY') {
+      for my $i (0..$#$ref) {
+          $ref->[$i] = GW_sanitize ($ref->[$i]);
+      }
+  }
+  elsif (!ref $ref && defined $ref) {
+      utf8::downgrade ($ref, 1);                                            # 1 = kein Croak bei Fehlschlag
+  }
+      
+return $ref;
 }
 
 ###############################################################
@@ -1895,14 +1917,13 @@ return $rtnerr;
 sub GW_pseudoHexToText {
    my $string = shift;
 
-   my $charcode;
    my $text = '';
 
    for (my $i = 0; $i < length($string); $i += 2) {
-      $charcode = hex substr ($string, $i, 2);                  # charcode = aquivalente Dezimalzahl der angegebenen Hexadezimalzahl
-      next if($charcode == 45);                                 # Hyphen '-' ausblenden
+      my $charcode = hex substr ($string, $i, 2);                           # charcode = aquivalente Dezimalzahl der angegebenen Hexadezimalzahl
+      next if($charcode == 45);                                             # Hyphen '-' ausblenden
 
-      $text = $text.chr ($charcode);
+      $text .= chr ($charcode);
    }
 
    # defensiv: reine Byte-Repräsentation erzwingen. chr() kann für Codepoints >127 intern
@@ -1911,7 +1932,7 @@ sub GW_pseudoHexToText {
    # kann zu Storable-Fehlern führen ("Wide character..."), die GW_sendToParent zum Scheitern
    # bringen - mit dem Effekt, dass der Parent NIE eine Antwort erhält (siehe GW_sendToParent).
    # fail_ok=1 -> stirbt nicht, falls echte Wide-Chars vorhanden sind.
-   utf8::downgrade ($text, 1);
+   utf8::downgrade ($text, 1);                                              # 1 = kein Croak bei Fehlschlag
 
 return $text;
 }
