@@ -267,7 +267,13 @@ MQTT2_SERVER_State()
 
   if($name eq "RETAIN" || $name eq ".RETAIN") {
     my $now = gettimeofday;
-    my $ret = json2nameValue($val);
+
+    my $ret;
+    {
+      # do not convert retained MQTT-Payloads again, #145363
+      local $unicodeEncoding = 1;
+      $ret = json2nameValue($val);
+    }
     for my $k (keys %{$ret}) {
       my %h = ( ts=>$now, val=>$ret->{$k} );
       $hash->{retain}{$k} = \%h;
