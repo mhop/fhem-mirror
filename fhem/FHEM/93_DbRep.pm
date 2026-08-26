@@ -58,6 +58,9 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
+  "8.54.21" => "25.08.2026  Fix: DbRep_nextMultiCmd - \%data{DbRep}{\$name}{multicmd} wird nicht vollständig bereinigt ".
+                            "DbRep_fetchrows: undef \@row_array ".
+                            "DbRep_Undef gepatcht ",
   "8.54.20" => "25.03.2026  consider attr limit lines for output in all relevant *_Done Subs ",
   "8.54.19" => "27.07.2025  DbReadingsVal: Code change Forum:https://forum.fhem.de/index.php?msg=1345204, remove obsolete att allowDeletion ".
                             "new sub DbRep_convert2oneLine: attr device/reading can now be entered in multiple lines ",
@@ -66,25 +69,6 @@ my %DbRep_vNotesIntern = (
                             "DbRep_sqlCmd / DbRep_sqlCmdBlocking: add commands analyze, check ",
   "8.53.16" => "01.12.2024  fix check changeValue Forum: #139950.0, Role Agent can use executeBeforeProc, executeAfterProc ",
   "8.53.15" => "18.08.2024  DbRep_diffvalDone: change loglevel to 2, Forum:#138986 ",
-  "8.53.14" => "29.05.2024  _DbRep_avgTimeWeightMean: accept if \$val1=0 (use looks_like_number) ",
-  "8.53.13" => "25.05.2024  replace Smartmatch Forum:#137776 ",
-  "8.53.12" => "09.05.2024  DbRep_dbConnect: change PRAGMA temp_store=MEMORY to FILE, Forum: https://forum.fhem.de/index.php?msg=1312722 ",
-  "8.53.11" => "08.05.2024  reduceLog: fix bug if EXCL/INCL-devices end with a digit ",  
-  "8.53.10" => "27.03.2024  multicmd: add attr seqDoubletsVariance ",            
-  "8.53.9"  => "18.03.2024  multicmd: add nextHop Keyword ",
-  "8.53.8"  => "17.03.2024  sqlCmdBlocking able to use sql Keywords (§timestamp_end§ etc.) ",
-  "8.53.7"  => "16.03.2024  prevent some attribute evaluation as long as init_done is not set ",
-  "8.53.6"  => "15.03.2024  change verbose level of DbRep_beforeproc, DbRep_afterproc to 3 ",
-  "8.53.5"  => "11.03.2024  some changes for MariaDB Perl driver usage, change DbRep_dbConnect".
-                            "support compression between client and server ",
-  "8.53.4"  => "09.03.2024  Ready for support of MariaDB Perl driver ",
-  "8.53.3"  => "06.03.2024  delete attribute allowDeletion, multiCmd: executeBeforeProc, executeAfterProc as attributes ".
-                            "Set: all commands are executable even if \$dbloghash->{HELPER}{REOPEN_RUNS_UNTIL}is set ".
-                            "prepare support of MariaDB ",
-  "8.53.2"  => "02.03.2024  delEntries, reduceLog: execute next DbRep_nextMultiCmd even if time check got failed ".
-                            "Forum:https://forum.fhem.de/index.php?msg=1305266 ",
-  "8.53.1"  => "16.02.2024  sqlCmd: executing ckey:latest possible ",
-  "8.53.0"  => "10.01.2024  new setter multiCmd, change DbRep_autoForward, fix reducelog problem Forum:#136581 ",
   "1.0.0"   => "19.05.2016  Initial"
 );
 
@@ -1916,12 +1900,30 @@ sub DbRep_Undef {
  my $dbh = $hash->{DBH};
  DbRep_clearConn ($dbh);
 
- BlockingKill($hash->{HELPER}{RUNNING_PID}) if (exists($hash->{HELPER}{RUNNING_PID}));
- BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT}) if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT}));
- BlockingKill($hash->{HELPER}{RUNNING_RESTORE}) if (exists($hash->{HELPER}{RUNNING_RESTORE}));
- BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER}) if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER}));
- BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE}) if (exists($hash->{HELPER}{RUNNING_OPTIMIZE}));
- BlockingKill($hash->{HELPER}{RUNNING_REPAIR}) if (exists($hash->{HELPER}{RUNNING_REPAIR}));
+ if (exists($hash->{HELPER}{RUNNING_PID})) {
+     BlockingKill($hash->{HELPER}{RUNNING_PID});
+     delete $hash->{HELPER}{RUNNING_PID};
+ }
+ if (exists($hash->{HELPER}{RUNNING_BACKUP_CLIENT})) {
+     BlockingKill($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
+     delete $hash->{HELPER}{RUNNING_BACKUP_CLIENT};
+ }
+ if (exists($hash->{HELPER}{RUNNING_RESTORE})) {
+     BlockingKill($hash->{HELPER}{RUNNING_RESTORE});
+     delete $hash->{HELPER}{RUNNING_RESTORE};
+ }
+ if (exists($hash->{HELPER}{RUNNING_BCKPREST_SERVER})) {
+     BlockingKill($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
+     delete $hash->{HELPER}{RUNNING_BCKPREST_SERVER};
+ }
+ if (exists($hash->{HELPER}{RUNNING_OPTIMIZE})) {
+     BlockingKill($hash->{HELPER}{RUNNING_OPTIMIZE});
+     delete $hash->{HELPER}{RUNNING_OPTIMIZE};
+ }
+ if (exists($hash->{HELPER}{RUNNING_REPAIR})) {
+     BlockingKill($hash->{HELPER}{RUNNING_REPAIR});
+     delete $hash->{HELPER}{RUNNING_REPAIR};
+ }
 
  DbRep_delread($hash,1);
 
@@ -5942,7 +5944,9 @@ sub DbRep_fetchrows {
   else {
       $rowlist = join('|', @row_array);
   }
-
+  
+  undef @row_array;
+  
   Log3 ($name, 5, "DbRep $name -> row result list:\n$rowlist");
 
   my $rt = tv_interval($st);                                                            # SQL-Laufzeit ermitteln
@@ -13206,6 +13210,9 @@ sub DbRep_nextMultiCmd {
 
       last;                                                             # immer nur den ersten verbliebenen Eintrag abarbeiten
   }
+  
+  delete $data{DbRep}{$name}{multicmd} unless (defined $data{DbRep}{$name}{multicmd}{cmdhash} 
+                                               && scalar keys %{$data{DbRep}{$name}{multicmd}{cmdhash}});
 
   if ($ok) {
       CommandSet (undef, "$name $cmd");
