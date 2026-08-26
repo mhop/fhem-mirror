@@ -3,8 +3,7 @@
 #########################################################################################################################
 #       49_SSCamSTRM.pm
 #
-#       (c) 2018-2024 by Heiko Maaz
-#       forked from 98_weblink.pm by Rudolf König
+#       (c) 2018-2026 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This Module is used by module 49_SSCam to create Streaming devices.
@@ -91,6 +90,7 @@ BEGIN {
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.15.6" => "24.08.2026  Funktion _setadoptForTimer Freigabe des Speichers nachdem der Timer abgelaufen ist ",
   "2.15.5" => "11.05.2024  optimize memory consumption ",
   "2.15.4" => "14.01.2023  change ptzButtonSize, ptzButtonSizeFTUI starting with 10 ",
   "2.15.3" => "13.01.2023  change behavior of hideDisplayName, hideDisplayNameFTUI if device is disabled ",
@@ -478,18 +478,19 @@ sub _setadoptForTimer {                 ## no critic "not used"
   my $hash  = $paref->{hash};
   my $name  = $paref->{name};
   my $opt   = $paref->{opt};
-  my $odev  = $paref->{odev};                                                        # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
+  my $odev  = $paref->{odev};                                                               # bisheriges adoptiertes Device (wird erst im InternalTimer gesetzt und verwendet)
 
   return if(IsDisabled($name) || $init_done != 1);
   
   my $sdev;
-  my $atime = ReadingsVal($name, "adoptTimer", 10);
+  my $atime = ReadingsVal ($name, "adoptTimer", 10);
   
-  if(!$odev) {                                                                       # Step 1 -> erster Durchlauf ohne odef
+  if(!$odev) {                                                                              # Step 1 -> erster Durchlauf ohne odef
       $hash->{HELPER}{SWITCHED} = $hash->{LINKNAME} if(!$hash->{HELPER}{SWITCHED});
-      $paref->{odev}            = $hash->{HELPER}{SWITCHED};                         # bisheriges adoptiertes Device in %params aufnehmen, InternalTimer mitgeben
-  
-  } else {                                                                           # Step 2 -> zweiter Durchlauf mit odef gesetzt
+      $paref->{odev}            = $hash->{HELPER}{SWITCHED};                                # bisheriges adoptiertes Device in %params aufnehmen, InternalTimer mitgeben
+      delete $hash->{HELPER}{ARG}; 
+  } 
+  else {                                                                                    # Step 2 -> zweiter Durchlauf mit odef gesetzt
       my @a;
       delete $hash->{HELPER}{SWITCHED};
       $sdev = $odev eq $name ? "--reset--" : $odev;
@@ -501,22 +502,23 @@ sub _setadoptForTimer {                 ## no critic "not used"
       $paref->{aref} = \@a;
   }
     
-  no strict "refs";                                                                  ## no critic 'NoStrict'  
+  no strict "refs";                                                                         ## no critic 'NoStrict'  
   &{$hset{adopt}{fn}} ($paref); 
   use strict "refs";
   
-  Log3($name, 5, "$name - new => $hash->{LINKNAME}, odev => ".($odev // "")." , sdev => ".($sdev // "")." ,Helper SWITCHED => ".($hash->{HELPER}{SWITCHED} // "").", switch time => $atime");
+  Log3 ($name, 5, "$name - new => $hash->{LINKNAME}, odev => ".($odev // "")." , sdev => ".($sdev // "")." ,Helper SWITCHED => ".($hash->{HELPER}{SWITCHED} // "").", switch time => $atime");
   
   if($odev) {
-      Log3($name, 4, qq{$name - Switched Stream Device back to "$sdev"});
+      Log3 ($name, 4, qq{$name - Switched Stream Device back to "$sdev"});
+      delete $hash->{HELPER}{ARG};                                                          # <-- Referenz auf $paref freigeben
       return;
   }
   
-  Log3($name, 4, qq{$name - Switched to Stream Device "$hash->{LINKNAME}" for $atime seconds});
+  Log3 ($name, 4, qq{$name - Switched to Stream Device "$hash->{LINKNAME}" for $atime seconds});
   
-  RemoveInternalTimer($hash->{HELPER}{ARG}, "FHEM::SSCamSTRM::_setadoptForTimer");                   
-  $hash->{HELPER}{ARG} = $paref;                                                           # $paref ist Unikat !
-  InternalTimer(gettimeofday()+$atime, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
+  RemoveInternalTimer ($hash->{HELPER}{ARG}, "FHEM::SSCamSTRM::_setadoptForTimer");                   
+  $hash->{HELPER}{ARG} = $paref;                                                            # $paref ist Unikat !
+  InternalTimer (gettimeofday()+$atime, "FHEM::SSCamSTRM::_setadoptForTimer", $paref, 0);
   
 return;
 }
