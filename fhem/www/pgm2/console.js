@@ -174,7 +174,7 @@ consStart(readyFn)
   
   $("#eventReset").click(function(evt){  // Event Monitor Reset
     log("Console resetted by user");
-    $(consName).html("");
+    $(consName).html("&#x200B;"); // zero-width-space for safari bug, #145358
   });
   
   $("#eventFilter").click(function(evt){  // Event-Filter Dialog

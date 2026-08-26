@@ -617,6 +617,7 @@ log(txt)
   if(typeof window.console != "undefined")
     console.log(lTxt);
 
+  // not impemented for the console to avoid an endless loop
   if(FW_jsLog==1 && FW_longpollType == "websocket") {
     FW_logStack.push(txt);
     if(FW_pollConn && FW_pollConn.readyState == FW_pollConn.OPEN) {
