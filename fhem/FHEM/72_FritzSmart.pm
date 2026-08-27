@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.08.17";
+our $ModulVersion = "26.08.27";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -486,8 +486,16 @@ our %TR064   = (
 #get Fritz tr064command InternetGatewayDevice:1      deviceinfo       GetInfo
 
 our %JavaScript = (
+        beta_dns_excepted_domains => { 840 => "generic/dns_excepted_domains"},
+        beta_dnsfilter            => { 840 => "beta/dnsfilter"},
+        beta_fritzmesh            => { 840 => "beta/fritzmesh"},
+        beta_trafficprio          => { 840 => "beta/trafficprioritization/automatic/networkDevices"},
+        beta_route                => { 840 => "generic/route"},
+        beta_ipv6route            => { 840 => "generic/ipv6route"},
         aura                  => { 800 => "generic?ui=aura",
                                    810 => "generic/aura"},
+        apps                  => { 800 => "generic?ui=apps",
+                                   810 => "generic/apps"},
         phonebook             => { 800 => "phonebook/books",
                                    810 => "dino/phonebook/books"},
         box                   => { 800 => "generic?ui=box",
@@ -638,6 +646,8 @@ our %JavaScript = (
                                    810 => "generic/telcfg"},
         tempsmarthome         => { 800 => "tempsmarthome",
                                    810 => "dino/tempsmarthome"},
+        time                  => { 800 => "generic?ui=time",
+                                   810 => "generic/time"},
         trafficprio           => { 800 => "generic?ui=trafficprio",
                                    810 => "generic/trafficprio"},
         tr064                 => { 800 => "generic?ui=tr064",
@@ -712,6 +722,7 @@ our %LuaData = (
         portoverview    => { cmd => "xhr 1 lang de page portoverview xhrId all"},
         radio           => { cmd => "xhr 1 lang de page rdio xhrId all"},
         ring_tones      => { cmd => "xhr 1 idx 0 page edit_dect_ring_tone"},
+        repMode         => { cmd => "xhr 1 lang de page repMode xhrId all"},
         save_energy     => { cmd => "xhr 1 lang de page save_energy xhrId all"},
         secCheck        => { cmd => "xhr 1 lang de page secCheck xhrId all"},
         shareUsb        => { cmd => "xhr 1 lang de page shareUsb xhrId all"},
@@ -1050,8 +1061,8 @@ sub Fritz_Get_attrList($@) {
   my $name = $hash->{NAME};
 
   my $avmModel;
-  if( defined($hash->{MODEL}) && $hash->{MODEL} ne "") {
-    $avmModel = $hash->{MODEL};
+  if( defined($hash->{FRITZ_MODEL}) && $hash->{FRITZ_MODEL} ne "") {
+    $avmModel = $hash->{FRITZ_MODEL};
   } else {
     $avmModel = "Initial";
   }
@@ -1102,6 +1113,7 @@ sub Fritz_Get_attrList($@) {
                                 ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_Active,box_wlan_LogExtended "
 
               ."disableDectInfo:0,1 "
+              ."enableDNSFilterInfo:0,1 "
               ."disableFonInfo:0,1 "
               ."disableHostIPv4check:0,1 "
               ."disableTableFormat:multiple-strict,border(8),cellspacing(10),cellpadding(20) "
@@ -1241,6 +1253,7 @@ sub Fritz_Get_attrList($@) {
                      $retPara .= "box_energyMode,box_globalFilter,box_wan,"  if ($fwVersion == 0 || $fwVersion >= 721);
                      $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >  731);
                      $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
+                     $retPara .= "box_ntpTime,"                              if ($fwVersion == 0 || $fwVersion >= 800);
                      $retPara =~ s/.$/ /;
           $retAttr .= $retPara;
       }
@@ -1257,6 +1270,7 @@ sub Fritz_Get_attrList($@) {
                      $retPara .= "box_dns,"                          if ($fwVersion == 0 || $fwVersion >  731);
                      $retPara .= "box_pwr,"                          if ($fwVersion == 0 || ($fwVersion >= 700 && ($fwVersion < 790 || $fwVersion >= 804)) );
                      $retPara .= "box_user,"                         if ($fwVersion == 0 || $fwVersion >= 752);
+                     $retPara .= "box_ntpTime,"                      if ($fwVersion == 0 || $fwVersion >= 800);
                      $retPara  =~ s/.$/ /;
         $retAttr .= $retPara;
       }
@@ -1278,11 +1292,12 @@ sub Fritz_Get_attrList($@) {
 
     if ($fwVersion == 0 || $fwVersion >= 750) {
       $retAttr .= "enableMobileInfo:0,1 "
-               ."enableMeshMonitor:textField-long ";
+               .  "enableMeshMonitor:textField-long ";
     }
 
     if ($fwVersion == 0 || $fwVersion >= 800) {
-      $retAttr .= "enablePowerLine:0,1 ";
+      $retAttr .= "enablePowerLine:0,1 "
+               .  "enableDNSFilterInfo:0,1 ";
     }
 
   } elsif($avmModel =~ /Repeater/) {
@@ -1294,7 +1309,33 @@ sub Fritz_Get_attrList($@) {
                                 ."box_ppp_name,box_ppp_IPv4_Extern,box_ppp_connection_Type,box_ppp_connect,box_ppp_last_connect_err,box_ppp_last_auth_err,box_ppp_mac_Address,box_ppp_connection_Trigger,box_ppp_uptimeConnect,"
                                 ."box_tr064,box_tr069,"
                                 ."box_upnp,box_upnp_control_activated,box_uptime,"
-                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_LogExtended "
+                                ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_LogExtended ";
+
+    if (($fwVersion == 0 || $fwVersion >= 800) && $avmModel =~ /1700/) {
+      if( exists($hash->{fhem}{intBoxUsers}) && $hash->{fhem}{intBoxUsers} eq "&lt;none&gt;") {
+        $retAttr .= "boxUser ";
+      } elsif (!defined($hash->{fhem}{intBoxUsers}) || $hash->{fhem}{intBoxUsers} eq "") {
+        $retAttr .= "boxUser ";
+      } else {
+        $retAttr .= "boxUser:" . $hash->{fhem}{intBoxUsers} . " ";
+      }
+
+#      $retAttr .= "enableBoxReadings:multiple-strict,"
+#			                    ."box_led,box_vdsl,box_guestWlan,box_usb,box_notify,box_pwr,box_energyMode,"
+
+       my $retPara = "enableBoxReadings:multiple-strict,";
+                     $retPara .= "box_led,";
+                     $retPara .= "box_energyMode,";
+                     $retPara .= "box_pwr,";
+                     $retPara .= "box_user,";
+                     $retPara .= "box_ntpTime,";
+#                     $retPara .= "box_guestWlan,box_usb,box_notify," if ($fwVersion == 0 || $fwVersion >= 700);
+#                     $retPara .= "box_energyMode,box_globalFilter,"  if ($fwVersion == 0 || $fwVersion >= 721);
+#                     $retPara .= "box_dns,"                          if ($fwVersion == 0 || $fwVersion >  731);
+                     $retPara  =~ s/.$/ /;
+        $retAttr .= $retPara;
+
+    }
 
   } elsif($avmModel =~ /Powerline/) {
 
@@ -1395,10 +1436,10 @@ sub Fritz_Log($$$)
    }
 
    my $avmModel = "Initial";
-   if ( exists($instHash->{MODEL}) && ref($instHash->{MODEL}) eq "SCALAR" ) {
-     $avmModel = $instHash->{MODEL};
+   if ( exists($instHash->{FRITZ_MODEL}) && ref($instHash->{FRITZ_MODEL}) eq "SCALAR" ) {
+     $avmModel = $instHash->{FRITZ_MODEL};
    } else {
-     $avmModel = main::InternalVal($instName, "MODEL", "Initial");
+     $avmModel = main::InternalVal($instName, "FRITZ_MODEL", "Initial");
    }
 
    my $fwV = main::ReadingsVal($instName, "box_fwVersion", "0.0.0.0");
@@ -1735,7 +1776,8 @@ sub Fritz_Define_Modul($$)
      $hash->{SID_RENEW_ERR_CNT}      = 0;
      $hash->{SID_RENEW_CNT}          = 0;
      $hash->{STATUS}                 = "active";
-     $hash->{MODEL}                  = "";
+     $hash->{FRITZ_MODEL}            = "";
+     $hash->{FRITZ_OS}               = "";
      $hash->{XML_PARSER}             = main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default});
 
      $hash->{fhem}{readOutState}     = 0;
@@ -1746,7 +1788,6 @@ sub Fritz_Define_Modul($$)
      $hash->{fhem}{multiple_wlan}{cnt}   = 1;
      $hash->{fhem}{multiple_wlan}{names} = "wlan2.4";
 
-#     $hash->{helper}{TimerReadout}   = $name . ".Readout";
      $hash->{helper}{TimerCmd}       = $name . ".Cmd";
      $hash->{helper}{TimerSHInfoExt} = $name . ".SHExt";
      $hash->{helper}{FhemLog3Std}    = main::AttrVal($name, "FhemLog3Std", 0);
@@ -1908,7 +1949,7 @@ sub Fritz_Attr_Modul($@)
       # aName and aVal are Attribute name and value
 
    my $hash      = $defs{$name};
-   my $avmModel  = main::InternalVal($name, "MODEL", $hash->{MODEL});
+   my $avmModel  = main::InternalVal($name, "FRITZ_MODEL", $hash->{FRITZ_MODEL});
    my $URL_MATCH = Fritz_Helper_Url_Regex();
    my $attrList  = Fritz_Get_attrList($hash);
 
@@ -1991,14 +2032,14 @@ sub Fritz_Attr_Modul($@)
 
    if ($aName eq "userTickets") {
      if ($cmd eq "set") {
-       return "the amount of userTicket is 1 to 12. If zero no Tickets will be displayed (Only for Fritz!Box)" if (($aVal < 0 || $aVal > 12) || (defined($avmModel) && $avmModel !~ /Box/));
+       return "the amount of userTicket is 1 to 12. If zero no Tickets will be displayed (Only for Fritz!Box)" if ($aVal < 0 || $aVal > 12);
        $hash->{helper}{LuaQueryCmd}{userTicket}{AttrVal} = 1;
      }
      if ($cmd eq "del" || $aVal == 0) {
        $hash->{helper}{LuaQueryCmd}{userTicket}{AttrVal} = 0;
-       foreach (keys %{ $hash->{READINGS} }) {
-         main::readingsDelete($hash, $_) if $_ =~ /^userTicket.*?/ && defined $hash->{READINGS}{$_}{VAL};
-       }
+     }
+     foreach (keys %{ $hash->{READINGS} }) {
+       main::readingsDelete($hash, $_) if $_ =~ /^userTicket.*?/ && defined $hash->{READINGS}{$_}{VAL};
      }
    }
 
@@ -2065,7 +2106,7 @@ sub Fritz_Attr_Modul($@)
 #   }
 
    if ($aName eq "enableBoxReadings") {
-     my @reading_list = qw(box_led box_energyMode box_globalFilter box_vdsl box_dns box_pwr box_guestWlan box_usb box_user box_notify box_wan);
+     my @reading_list = qw(box_led box_energyMode box_globalFilter box_vdsl box_dns box_pwr box_guestWlan box_usb box_user box_notify box_wan box_ntpTime);
      my @para_list    = split(",", $aVal);
 
      if ($cmd eq "set" && $init_done) {
@@ -2176,11 +2217,21 @@ sub Fritz_Attr_Modul($@)
    if ($aName eq "enableDocsisInfo") {
      if ($cmd eq "set") {
        return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
-#       return "$aName: only for FritzBoxCable." if defined($avmModel) && lc($avmModel) !~ "6[4,5,6][3,6,9][0,1]";
      }
      if ($cmd eq "del" || $aVal == 0) {
        foreach (keys %{ $hash->{READINGS} }) {
          main::readingsDelete($hash, $_) if $_ =~ /^docsis.*?/ && defined $hash->{READINGS}{$_}{VAL};
+       }
+     }
+   }
+
+   if ($aName eq "enableDNSFilterInfo") {
+     if ($cmd eq "set") {
+       return "$aName: $aVal. Valid is 0 or 1." if $aVal !~ /[0-1]/;
+     }
+     if ($cmd eq "del" || $aVal == 0) {
+       foreach (keys %{ $hash->{READINGS} }) {
+         main::readingsDelete($hash, $_) if $_ =~ /^dnsFilter_.*?/ && defined $hash->{READINGS}{$_}{VAL};
        }
      }
    }
@@ -2886,7 +2937,7 @@ sub Fritz_Set_Modul($$@)
      if ($hash->{TR064} == 1 && $hash->{SECPORT}) {
        $list    .= " reboot";
 
-       if (defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box")) {
+       if (defined ($hash->{FRITZ_MODEL}) && ($hash->{FRITZ_MODEL} =~ "Box")) {
  
          $list .= " call"
                .  " dectRing"
@@ -2922,8 +2973,8 @@ sub Fritz_Set_Modul($$@)
      # set abhängig von data.lua
      if ($hash->{LUADATA} == 1) {
 
-       if (defined ($hash->{MODEL})) {
-         if ( $hash->{MODEL} =~ "Box" ) {
+       if (defined ($hash->{FRITZ_MODEL})) {
+         if ( $hash->{FRITZ_MODEL} =~ "Box" ) {
 
            $list .= " switchIPv4DNS:provider,other"
                  .  " dect:on,off"
@@ -2939,9 +2990,10 @@ sub Fritz_Set_Modul($$@)
                     if ($hash->{fhem}{fwVersion} >= 721);
 
            $list .= " energyMode:default,eco" if ($hash->{fhem}{fwVersion} >= 750);
+           $list .= " dnsFilter:on,off,updNow,never,updEvery8h,updDayly,updWeeky,updMonthly" if ($hash->{fhem}{fwVersion} >= 840);
          }
       
-         if ( $hash->{MODEL} =~ "Box|Smart" ) {
+         if ( $hash->{FRITZ_MODEL} =~ "Box|Smart" ) {
            $list .= " smartHome" if ($hash->{fhem}{fwVersion} >= 721);
          }
 
@@ -2957,8 +3009,64 @@ sub Fritz_Set_Modul($$@)
 
      # Auswertung der set-Befehle
 
+     # set dns filter
+     if ( lc($cmd) eq "dnsfilter" ) {
+
+       if (int @val != 1) {
+         $retMsg = "ERROR: required on, off, updNow, never, updEvery8h, updDayly, updWeeky or updMonthly";
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+
+       if (int $val[0] !~ /on|off|updNow|never|updEvery8h|updDayly|updWeeky|updMonthly/) {
+         $retMsg = "ERROR: required on, off, updEvery8h, updDayly, updWeeky or updMonthly";
+         return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+       }
+
+       my $result;
+
+       if($val[0] =~ /on|off/) {
+         $result = Fritz_write_javaScript($hash,"beta/dnsfilter", '{"enabled":' . ($val[0] eq "on" ? 'true' : 'false') . ',"automaticUpdate":{"interval":86400,"enabled":true}}', "put");
+
+         # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+         if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
+           $retMsg = "ERROR: dnsFilter: $val[0] - " . $result->{Error};
+           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
+
+       } elsif($val[0] eq "updNow") {
+         $result = Fritz_write_javaScript($hash,"beta/dnsfilter", '{"manualUpdate":{"trigger":true}}', "put");
+
+         # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+         if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
+           $retMsg = "ERROR: dnsFilter: $val[0] - " . $result->{Error};
+           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
+
+       } elsif ($val[0] =~ /never|updEvery8h|updDayly|updWeeky|updMonthly/) {
+         my %dnsUpdInt = (
+            'never'      => '0',
+            'updEvery8h' => '28800',
+            'updDayly'   => '86400',
+            'updWeeky'   => '604800',
+            'updMonthly' => '2592000'
+            );
+
+         $result = Fritz_write_javaScript($hash,"beta/dnsfilter", '{"enabled":true,"automaticUpdate":{"interval":' .$dnsUpdInt{$val[0]}. ',"enabled":' . ($val[0] eq "never" ? 'false' : 'true') . '}}', "put");
+
+         # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+         if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
+           $retMsg = "ERROR: dnsFilter: $val[0] - " . $result->{Error};
+           return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
+         }
+       }
+
+       $retMsg = "dnsFilter: " . $val[0] . " - applied";
+       return Fritz_Helper_retMsg($hash, $retMsg, "all");
+
+     } #end dns filter
+
      # set <name> smarthome
-     if ( lc $cmd eq 'smarthome') {
+     elsif ( lc $cmd eq 'smarthome') {
 
        if (int @val < 1 || int @val > 2) {
          $retMsg = "ERROR: required <apply> <scenario:ID | template:ID> or <routine> <enable:ID | disable:ID> or <deviceID> <tempOffset:value | tmpAdjust:value | tmpPerm:0|1 | switch:0|1 | automatic:0|1  | preDefSave:name | preDefDel:name| preDefLoad[:deviceID]:name[:A|:G]>";
@@ -3469,7 +3577,7 @@ sub Fritz_Set_Modul($$@)
        }         
      } # end call
 
-     elsif ( (lc $cmd eq 'blockincomingphonecall') && ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721) ) {
+     elsif ( (lc $cmd eq 'blockincomingphonecall') && ($hash->{LUADATA} == 1) && defined ($hash->{FRITZ_MODEL}) && ($hash->{FRITZ_MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721) ) {
 
        # set <name> blockIncomingPhoneCall <new> <name> <number> <home|work|mobile|fax_work>
        # set <name> blockIncomingPhoneCall <new> <name> <number> <home|work|mobile|fax_work> <yyyy-mm-ddThh:mm:ss>
@@ -4140,7 +4248,7 @@ sub Fritz_Set_Modul($$@)
        #         PhoneBookID VIP EntryName      NumberType:PhoneNumber
        # del     PhoneBookID     Mein_Test_Name
 
-       unless ( defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT} ) { #tr064
+       unless ( defined ($hash->{FRITZ_MODEL}) && ($hash->{FRITZ_MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT} ) { #tr064
          $retMsg = "ERROR: 'set ... PhonebookEntry' is not supported by the limited interfaces of your Fritz!OS firmware.";
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
        }
@@ -4722,7 +4830,7 @@ sub Fritz_Set_Modul($$@)
 
      } # end enablevpnshare
 
-     elsif ( (lc $cmd eq 'wakeupcall') && ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721) ) {
+     elsif ( (lc $cmd eq 'wakeupcall') && ($hash->{LUADATA} == 1) && defined ($hash->{FRITZ_MODEL}) && ($hash->{FRITZ_MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721) ) {
        # xhr 1 lang de page alarm xhrId all / get Info
 
        # xhr: 1
@@ -4887,7 +4995,7 @@ sub Fritz_Get_Modul($@)
    my ($hash, $name, $cmd, @val) = @_;
    my $returnStr;
 
-   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
+   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
 
    my $retMsg = "";
@@ -5269,7 +5377,7 @@ sub Fritz_Get_Modul($@)
          return Fritz_Get_Fritz_Log_Info_Std( $hash, $val[0], $val[1]);
        }
 
-     } elsif( lc $cmd eq "luainfo")  {
+     } elsif( lc $cmd eq "deviceinfo")  {
 
        Fritz_Log $hash, 4, "get $name $cmd [" . int(@val) . "] " . join(" ", @val);
 
@@ -5280,7 +5388,7 @@ sub Fritz_Get_Modul($@)
 
        return "Wrong number of arguments, usage: get $name argName1 argValue1" if int @val != 1;
 
-       my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
+       my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
 
        if ( $val[0] eq "mobileInfo" && $hash->{LUADATA} == 1) {
          $returnStr = Fritz_Get_MobileInfo($hash);
@@ -5316,6 +5424,9 @@ sub Fritz_Get_Modul($@)
 
        } elsif ( $val[0] eq "userInfos" && $hash->{LUAQUERY} == 1) {
          $returnStr = Fritz_Get_User_Info_List($hash);
+
+       } elsif ( $val[0] eq "dnsFilter" && $hash->{LUAQUERY} == 1) {
+         $returnStr = Fritz_Get_dns_Filter($hash);
        }
 
        return $returnStr;
@@ -5614,15 +5725,16 @@ sub Fritz_Get_Modul($@)
 
            foreach my $key (sort { $a cmp $b } keys %JavaScript) {
 
-             if($JavaScript{$key}{$javacmd}) {
+             if($JavaScript{$key}{$javacmd} || $JavaScript{$key}{840}) {
+               my $javaVers = ($JavaScript{$key}{$javacmd} ? "810" : "840");
                my $klickcmd = $command;
                   $klickcmd =~ s/keyButton/$key/g;
-                  $klickcmd =~ s/PERLcmd/get $name javaScript $JavaScript{$key}{$javacmd}/g;
+                  $klickcmd =~ s/PERLcmd/get $name javaScript $JavaScript{$key}{$javaVers}/g;
                   $klickcmd =~ s/quittieren/$key/g;
 
                $returnStr .= "<tr>\n";
                $returnStr .= "<td>" . $klickcmd . "</td>";
-               $returnStr .= "<td>" . $JavaScript{$key}{$javacmd} . "</td>";
+               $returnStr .= "<td>" . $JavaScript{$key}{$javaVers} . "</td>";
                $returnStr .= "</tr>\n";
              }
            }
@@ -5748,7 +5860,7 @@ sub Fritz_Get_Modul($@)
 
      # luaData
      if (($hash->{LUADATA} == 1 || $hash->{LUAQUERY} == 1) && ($hash->{fhem}{fwVersion} >= 700) ){
-       $list .= " luaInfo:";
+       $list .= " deviceInfo:";
          $list .= "lanDevices,ledSettings,vpnShares,wlanNeighborhood" if $hash->{LUADATA} == 1;
          $list .= ",mobileInfo,globalFilters"                         if $hash->{LUADATA} == 1  && ($avmModel =~ "Box");
          $list .= ",smartHomeDevices"                                 if $hash->{LUADATA} == 1  && ($avmModel =~ "Box|Smart");
@@ -5756,6 +5868,7 @@ sub Fritz_Get_Modul($@)
          $list .= ",kidProfiles"                                      if $hash->{LUAQUERY} == 1 && ($avmModel =~ "Box");
          $list .= ",userInfos"                                        if $hash->{LUAQUERY} == 1 && ($avmModel =~ "Box") && ($hash->{fhem}{fwVersion} >= 725);
          $list .= ",docsisInformation"                                if $hash->{LUADATA} == 1  && ($avmModel =~ "Box") && (lc($avmModel) =~ "6[4,5,6][3,6,9][0,1]");
+         $list .= ",dnsFilter"                                        if $hash->{LUADATA} == 1  && ($avmModel =~ "Box") && ($hash->{fhem}{fwVersion} >= 840);
 
        $list .= " smartHomePreDef";
      }
@@ -5889,11 +6002,21 @@ sub Fritz_Readout_Start($)
    my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
    my $name = substr $timerpara, 0, $index;                         # name extrahieren
    my $hash = $defs{$name};
-
    my $runFn;
 
    $hash->{SID_RENEW_ERR_CNT} =  $hash->{fhem}{sidErrCount} if defined $hash->{fhem}{sidErrCount};
    $hash->{SID_RENEW_CNT}     += $hash->{fhem}{sidNewCount} if defined $hash->{fhem}{sidNewCount};
+
+   if( main::AttrVal( $name, "disable", 0 ) == 1 && $hash->{fhem}{readOutState} != 1) {
+
+      Fritz_Log $hash, 2, "stopped while disabled and readOutState != 1";
+      main::RemoveInternalTimer($hash->{helper}{TimerReadout});
+
+      main::readingsSingleUpdate( $hash, "state", "disabled", 1 );
+
+      $hash->{STATUS} = "disabled";
+      return "ERROR: starting ReadOutTimer not possible: disabled.";
+   }
 
    if( defined $hash->{fhem}{sidErrCount} && $hash->{fhem}{sidErrCount} < 0 ) {
       main::RemoveInternalTimer($hash->{helper}{TimerReadout});
@@ -5947,17 +6070,6 @@ sub Fritz_Readout_Start($)
 
       $hash->{STATUS} = "inactive";
       return "ERROR: starting ReadOutTimer not possible: inactiv.";
-   }
-
-   if( main::AttrVal( $name, "disable", 0 ) == 1 && $hash->{fhem}{readOutState} != 1) {
-
-      Fritz_Log $hash, 2, "stopped while disabled and readOutState != 1";
-      main::RemoveInternalTimer($hash->{helper}{TimerReadout});
-
-      main::readingsSingleUpdate( $hash, "state", "disabled", 1 );
-
-      $hash->{STATUS} = "disabled";
-      return "ERROR: starting ReadOutTimer not possible: disabled.";
    }
 
 # Set timer value (min. 60)
@@ -6049,7 +6161,7 @@ sub Fritz_Readout_Run_Web($)
    my $sid = "";
    my $sidNew = 0;
 
-   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
+   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
 
    my $startTime = time();
 
@@ -6116,7 +6228,7 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
    my $views;
    my $nbViews;
 
-   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
+   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
 
    my @webCmdArray;
@@ -7137,16 +7249,16 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
    my $views;
    my $nbViews;
 
-   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
-
-   my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
-
-   my $logFilter = main::AttrVal($name, "enableLogReadings", "");
+   my $avmModel          = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
+   my $mesh              = main::ReadingsVal($name, "box_meshRole", "master");
+   my $logFilter         = main::AttrVal($name, "enableLogReadings", "");
    my $enableBoxReading  = main::AttrVal($name, "enableBoxReadings", "");
    my $disableBoxReading = main::AttrVal($name, "disableBoxReadings", "");
 
    my @webCmdArray;
    my $resultData;
+   my $attrEnable = "";
+   my $ReadingTxT = "";
    my $tmpData;
 
    #-------------------------------------------------------------------------------------
@@ -7287,7 +7399,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
        }
 
-     } else {
+     } else { # $hash->{fhem}{fwVersion} < 800
        if ($wlanmesh && (exists($resultData->{data}->{notify}) && ref($resultData->{data}->{notify} eq 'ARRAY')) ) {
 
          foreach ( @{ $resultData->{data}->{notify}} ) {
@@ -7416,127 +7528,14 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
    }
    Fritz_Log $hash, 4, "mesh_role/error notify - end getting data";
 
-   #-------------------------------------------------------------------------------------
-   # Getting phone WakeUpCall Device Nr
-   # uses $dectFonID (# Dect device list) and $dectFonID (phone device list)
-
-   # xhr 1 lang de page alarm xhrId all
-
-   Fritz_Log $hash, 4, "WakeUpCall - start getting data";
-
-   @webCmdArray = ();
-   push @webCmdArray, "xhr"         => "1";
-   push @webCmdArray, "lang"        => "de";
-   push @webCmdArray, "page"        => "alarm";
-   push @webCmdArray, "xhrId"       => "all";
-      
-   $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
-
-   # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
-   return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
-
-   $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
-
-   Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}, 5);
-
-   my $devname;
-   my $device;
-   my %devID;
-
-   # proof on redundant phone names
-   if (defined $resultData->{data}->{phonoptions}) {
-     if ( ref $resultData->{data}->{phonoptions} eq 'ARRAY' ) {
-
-       my $id = 0;
-
-       foreach ( @{ $resultData->{data}->{phonoptions}} ) {
-         $devname = $_->{text};
-         $device  = $_->{value};
-
-         Fritz_Log $hash, 4, "phone name($id): $devname $device";
-
-         if ($devID{$devname}) {
-           my $defNewName = $devname . "[" . $devID{$devname} ."] redundant name in FB:" . $devname;
-           $devID{$defNewName} = $devID{$devname};
-           $devID{$devname} = "";
-           $defNewName = $devname . "[" . $device ."] redundant name in FB:" . $devname;
-           $devID{$defNewName} = $device;
-         } else {
-           $devID{$devname} = $device;
-         }
-
-         $id ++;
-       }
-     }
-
-     my $fonDisable  = main::AttrVal( $name, "disableFonInfo", "0");
-     my $dectDisable = main::AttrVal( $name, "disableDectInfo", "0");
-
-#     #collect current dect/fon devices (to delete the ones that are inactive or disappeared)
-#     my %oldFonDevice;
-#     foreach (keys %{ $hash->{READINGS} }) {
-#       $oldFonDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^dect(\d+)|fon(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
-#     }
-
-     for(keys %devID) {
-
-       next if $devID{$_} eq "";
-       $devname = $_;
-       $device  = $devID{$_};
-
-       my $dectFonID = $hash->{helper}{dectFonID}{$devname};
-       my $fonFonID  = $hash->{helper}{fonFonID}{$devname};
-
-       if ($dectFonID && !$dectDisable) {
-         $rName = "dect" . $dectFonID . "_device";
-         Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $device;
-#         foreach ( keys %oldFonDevice ) {
-#           delete $oldFonDevice{$_} if exists $oldFonDevice{$_} && ( $_ =~ /^dect${dectFonID}/ );
-#         }
-       }
-
-       if ($fonFonID && !$fonDisable) {
-         $rName = "fon"  . $fonFonID  . "_device";
-         Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $device;
-#         delete $oldFonDevice{$rName} if exists $oldFonDevice{$rName};
-       }
-
-       if (!$fonFonID && !$dectFonID && !$fonDisable) {
-         $rName = "fon" . $device;
-         Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $devname ;
-#         delete $oldFonDevice{$rName} if exists $oldFonDevice{$rName};
-
-         $rName = "fon" . $device . "_device";
-         Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $device ;
-#         delete $oldFonDevice{$rName} if exists $oldFonDevice{$rName};
-       }
-
-       $devname =~ s/\|/&#0124/g;
-
-       my $fd_devname = "fdn_" . $devname;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->$fd_devname", $device;
-
-       my $fd_device = "fd_" . $device;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->$fd_device", $devname;
-     }
-
-#     # Remove inactive or non existing dect/fon devices-readings in two steps
-#     foreach ( keys %oldFonDevice ) {
-#       # set the dect/fon devices readings to 'inactive' and delete at next readout
-#       if ( $oldFonDevice{$_} ne "inactive" ) {
-#         Fritz_Readout_Add_Reading $hash, $roReadings, $_, "inactive";
-#       } else {
-#         Fritz_Readout_Add_Reading $hash, $roReadings, $_, "";
-#       }
-#     }
-   }
-
-   Fritz_Log $hash, 4, "WakeUpCall - end getting data";
  
    #-------------------------------------------------------------------------------------
    # WLAN channels
 
    # xhr 1 lang de page chan xhrId all
+   # xhr 1 lang de page repMode xhrId all
+
+#   if ($hash->{fhem}{fwVersion} >= 750 && (($hash->{fhem}{fwVersion} < 840) || ($avmModel =~ /Gateway|1700/))) {
 
    if ($hash->{fhem}{fwVersion} >= 750) {
      Fritz_Log $hash, 4, "wlanChannels - start getting data";
@@ -7556,47 +7555,48 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
      Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}, 5);
 
-     $nbViews = 0;
-     if (defined $resultData->{data}->{bands}) {
+     my $wNames = "";
+
+     if (exists($resultData->{data}->{bands}) && ref($resultData->{data}->{bands}) eq "ARRAY" ) {
+
+       $nbViews = 0;
        $views = $resultData->{data}->{bands};
        $nbViews = scalar @$views;
-     }
 
-     if ($nbViews > 0) {
-       my $wNames = "";
-       eval {
-         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+       if ($nbViews > 0) {
+         $wNames = "";
+         eval {
+           for(my $i = 0; $i <= $nbViews - 1; $i++) {
 
-           my $bandOrg  = $resultData->{data}->{bands}->[$i];
-           my $bandName = $bandOrg;
-           $bandName    =~ s/24/2.4/;
-           $bandName    =~ s/ghz/GHz/;
-           $wNames .= "wlan" . $bandName . " ";
-           $bandName = "box_wlanBand_" . $bandName; 
+             my $bandOrg  = $resultData->{data}->{bands}->[$i];
+             my $bandName = $bandOrg;
+             $bandName    =~ s/24/2.4/;
+             $bandName    =~ s/ghz/GHz/;
+             $wNames .= "wlan" . $bandName . " ";
+             $bandName = "box_wlanBand_" . $bandName; 
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{$bandOrg}->{active}, "onoff";
-           Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{$bandOrg}->{useable}, "yesno";
-         }
-       };
+             Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{$bandOrg}->{active}, "onoff";
+             Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{$bandOrg}->{useable}, "yesno";
+           }
+         };
 
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", $nbViews;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", $nbViews;
 
-       chop ($wNames);
-       $wNames =~ s/GHz//g;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
+         chop ($wNames);
+         $wNames =~ s/GHz//g;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
+       }
 
-     } else {
+     } elsif(exists($resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) && ref( $resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) eq "ARRAY" ) {
 
        $nbViews = 0;
 
-       if (defined $resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) {
-         $views = $resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo};
-         $nbViews = scalar @$views;
-       }
+       $views = $resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo};
+       $nbViews = scalar @$views;
 
        if ($nbViews > 0) {
-         my $wNames = "";
+         $wNames = "";
          eval {
            for(my $i = 0; $i <= $nbViews - 1; $i++) {
 
@@ -7621,10 +7621,51 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
          $wNames =~ s/GHz//g;
          Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
        }
-     }
 
+     } else {
+
+       $wNames = "";
+       $nbViews = 0;
+
+       if (defined($resultData->{data}->{'24ghz'}) && ref($resultData->{data}->{'24ghz'}) eq "HASH") {
+         my $bandName = "box_wlanBand_2.4GHz"; 
+         $wNames .= "wlan2.4 ";
+
+         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{'24ghz'}->{active}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{'24ghz'}->{useable}, "yesno";
+
+         $nbViews += 1;
+       }
+
+       if (exists($resultData->{data}->{'5ghz'}) && ref($resultData->{data}->{'5ghz'}) eq "HASH") {
+         my $bandName = "box_wlanBand_5GHz"; 
+         $wNames .= "wlan5 ";
+
+         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{'5ghz'}->{active}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{'5ghz'}->{useable}, "yesno";
+
+         $nbViews += 1;
+       }
+
+       if (exists($resultData->{data}->{'6ghz'}) && ref($resultData->{data}->{'6ghz'}) eq "HASH") {
+         my $bandName = "box_wlanBand_6GHz"; 
+         $wNames .= "wlan6 ";
+
+         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{'6ghz'}->{active}, "onoff";
+         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{'6ghz'}->{useable}, "yesno";
+
+         $nbViews += 1;
+       }
+
+       Fritz_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
+       Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", $nbViews;
+
+       chop ($wNames);
+       Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
+
+     }
      Fritz_Log $hash, 4, "wlanChannels - end getting data";
-   }
+   } 
 
    #-------------------------------------------------------------------------------------
    # WLAN neighbors
@@ -8396,6 +8437,123 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
      }
 
      #-------------------------------------------------------------------------------------
+     # Getting phone WakeUpCall Device Nr
+     # uses $dectFonID (# Dect device list) and $dectFonID (phone device list)
+
+     # xhr 1 lang de page alarm xhrId all
+
+     Fritz_Log $hash, 4, "WakeUpCall - start getting data";
+
+     @webCmdArray = ();
+     push @webCmdArray, "xhr"         => "1";
+     push @webCmdArray, "lang"        => "de";
+     push @webCmdArray, "page"        => "alarm";
+     push @webCmdArray, "xhrId"       => "all";
+      
+     $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
+
+     # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+     return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+     $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+
+     Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}, 5);
+
+     my $devname;
+     my $device;
+     my %devID;
+
+     # proof on redundant phone names
+     if (defined $resultData->{data}->{phonoptions}) {
+       if ( ref $resultData->{data}->{phonoptions} eq 'ARRAY' ) {
+
+         my $id = 0;
+
+         foreach ( @{ $resultData->{data}->{phonoptions}} ) {
+           $devname = $_->{text};
+           $device  = $_->{value};
+
+           Fritz_Log $hash, 4, "phone name($id): $devname $device";
+
+           if ($devID{$devname}) {
+             my $defNewName = $devname . "[" . $devID{$devname} ."] redundant name in FB:" . $devname;
+             $devID{$defNewName} = $devID{$devname};
+             $devID{$devname} = "";
+             $defNewName = $devname . "[" . $device ."] redundant name in FB:" . $devname;
+             $devID{$defNewName} = $device;
+           } else {
+             $devID{$devname} = $device;
+           }
+
+           $id ++;
+         }
+       }
+
+       my $fonDisable  = main::AttrVal( $name, "disableFonInfo", "0");
+       my $dectDisable = main::AttrVal( $name, "disableDectInfo", "0");
+
+#       #collect current dect/fon devices (to delete the ones that are inactive or disappeared)
+#       my %oldFonDevice;
+#       foreach (keys %{ $hash->{READINGS} }) {
+#         $oldFonDevice{$_} = $hash->{READINGS}{$_}{VAL} if $_ =~ /^dect(\d+)|fon(\d+)/ && defined $hash->{READINGS}{$_}{VAL};
+#       }
+
+       for(keys %devID) {
+
+         next if $devID{$_} eq "";
+         $devname = $_;
+         $device  = $devID{$_};
+
+         my $dectFonID = $hash->{helper}{dectFonID}{$devname};
+         my $fonFonID  = $hash->{helper}{fonFonID}{$devname};
+
+         if ($dectFonID && !$dectDisable) {
+           $rName = "dect" . $dectFonID . "_device";
+           Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $device;
+#           foreach ( keys %oldFonDevice ) {
+#             delete $oldFonDevice{$_} if exists $oldFonDevice{$_} && ( $_ =~ /^dect${dectFonID}/ );
+#           }
+         }
+
+         if ($fonFonID && !$fonDisable) {
+           $rName = "fon"  . $fonFonID  . "_device";
+           Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $device;
+#           delete $oldFonDevice{$rName} if exists $oldFonDevice{$rName};
+         }
+
+         if (!$fonFonID && !$dectFonID && !$fonDisable) {
+           $rName = "fon" . $device;
+           Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $devname ;
+#           delete $oldFonDevice{$rName} if exists $oldFonDevice{$rName};
+
+           $rName = "fon" . $device . "_device";
+           Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $device ;
+#           delete $oldFonDevice{$rName} if exists $oldFonDevice{$rName};
+         }
+
+         $devname =~ s/\|/&#0124/g;
+
+         my $fd_devname = "fdn_" . $devname;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->$fd_devname", $device;
+
+         my $fd_device = "fd_" . $device;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->$fd_device", $devname;
+       }
+
+#       # Remove inactive or non existing dect/fon devices-readings in two steps
+#       foreach ( keys %oldFonDevice ) {
+#         # set the dect/fon devices readings to 'inactive' and delete at next readout
+#         if ( $oldFonDevice{$_} ne "inactive" ) {
+#           Fritz_Readout_Add_Reading $hash, $roReadings, $_, "inactive";
+#         } else {
+#           Fritz_Readout_Add_Reading $hash, $roReadings, $_, "";
+#         }
+#       }
+     }
+
+     Fritz_Log $hash, 4, "WakeUpCall - end getting data";
+
+     #-------------------------------------------------------------------------------------
      # Start Fritz!OS >= 700
 
      if ( $hash->{fhem}{fwVersion} < 700 ) {
@@ -8624,9 +8782,17 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
        $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
 
+       my $connection;
+
+       if(exists($resultData->{data}->{connections}) && ref($resultData->{data}->{connections}) eq "ARRAY") {
+         $connection = $resultData->{data}->{connections};
+       } elsif( exists($resultData->{data}->{internet}->{connections}) && ref($resultData->{data}->{internet}->{connections}) eq "ARRAY") {
+         $connection = $resultData->{data}->{internet}->{connections};
+       }
+
        $nbViews = 0;
-       if (defined $resultData->{data}->{connections}) {
-         $views = $resultData->{data}->{connections};
+       if (ref($connection) eq "ARRAY") {
+         $views = $connection;
          $nbViews = scalar @$views;
        }
 
@@ -8639,37 +8805,37 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
              my $nbViews2nd = 0;
 
-             if (defined $resultData->{data}->{connections}->[$i]->{ipv4}->{ip}) {
-               Fritz_Readout_Add_Reading $hash, $roReadings, "box_IPv4_Extern", $resultData->{data}->{connections}->[$i]->{ipv4}->{ip};
+             if (defined $connection->[$i]->{ipv4}->{ip}) {
+               Fritz_Readout_Add_Reading $hash, $roReadings, "box_IPv4_Extern", $connection->[$i]->{ipv4}->{ip};
              }
-             if (defined $resultData->{data}->{connections}->[$i]->{ipv6}->{ip}) {
+             if (defined $connection->[$i]->{ipv6}->{ip}) {
 
              }
 
              if ($getDNSInfo) {
-               if (defined $resultData->{data}->{connections}->[$i]->{ipv4}->{dns}) {
-                 $views = $resultData->{data}->{connections}->[$i]->{ipv4}->{dns};
+               if (defined $connection->[$i]->{ipv4}->{dns}) {
+                 $views = $connection->[$i]->{ipv4}->{dns};
                  $nbViews2nd = scalar @$views;
 
                  if ($nbViews2nd > 0) {
 
                    eval {
                      for(my $j = 0; $j <= $nbViews2nd - 1; $j++) {
-                       Fritz_Readout_Add_Reading $hash, $roReadings, "box_dns_Srv" . $i . "_used_IPv4_" .$j, $resultData->{data}->{connections}->[$i]->{ipv4}->{dns}->[$j]->{ip};
+                       Fritz_Readout_Add_Reading $hash, $roReadings, "box_dns_Srv" . $i . "_used_IPv4_" .$j, $connection->[$i]->{ipv4}->{dns}->[$j]->{ip};
                      }
                    }
                  }
                }
 
-               if (defined $resultData->{data}->{connections}->[$i]->{ipv6}->{dns}) {
-                 $views = $resultData->{data}->{connections}->[$i]->{ipv6}->{dns};
+               if (defined $connection->[$i]->{ipv6}->{dns}) {
+                 $views = $connection->[$i]->{ipv6}->{dns};
                  $nbViews2nd = scalar @$views;
 
                  if ($nbViews2nd > 0) {
 
                    eval {
                      for($j = 0; $j <= $nbViews2nd - 1; $j++) {
-                       Fritz_Readout_Add_Reading $hash, $roReadings, "box_dns_Srv" . $i . "_used_IPv6_" .$j, $resultData->{data}->{connections}->[$i]->{ipv6}->{dns}->[$j]->{ip};
+                       Fritz_Readout_Add_Reading $hash, $roReadings, "box_dns_Srv" . $i . "_used_IPv6_" .$j, $connection->[$i]->{ipv6}->{dns}->[$j]->{ip};
                      }
                    }
                  }
@@ -9164,124 +9330,264 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
      } # end, DOCSIS Informationen FB Cable
 
-     #-------------------------------------------------------------------------------------
-     # CPU informations
+     if ( $hash->{fhem}{fwVersion} >= 800 ) {
 
-     my $cpuInfo = main::AttrVal($name, "enableCPUInfo", 0);
+       #-------------------------------------------------------------------------------------
+       # CPU informations
 
-     if ($cpuInfo != 0 && ($hash->{fhem}{fwVersion} >= 800) ) {
-       Fritz_Log $hash, 4, "CPU-Info - start getting data";
+       $attrEnable = main::AttrVal($name, "enableCPUInfo", 0);
 
-       if ($hash->{fhem}{fwVersion} < 810) {
-         $resultData = Fritz_call_javaScript($hash, "cpu");
-       } else {
-         $resultData = Fritz_call_javaScript($hash, "generic/cpu");
-       }
+       if ($attrEnable) {
+         Fritz_Log $hash, 4, "CPU-Info - start getting data";
 
-       # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
-       return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+         if ($hash->{fhem}{fwVersion} < 810) {
+           $resultData = Fritz_call_javaScript($hash, "cpu");
+         } else {
+           $resultData = Fritz_call_javaScript($hash, "generic/cpu");
+         }
 
-       if (defined($resultData) && !defined($resultData->{Error}) ) {
+         # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+         return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
 
-         if ( defined($resultData->{data}) ) {
-           Fritz_Log $hash, 5, "CPU-Info - process data\n" . Fritz_Helper_Dumper($hash, $resultData, 5);
+         if (defined($resultData) && !defined($resultData->{Error}) ) {
 
-           my $intValLeft  = 0; #-1
-           my $intValRight = 0; #-1 
-           if ($cpuInfo >= 1) {
-#            $intValLeft = 10 * $cpuInfo * (-1);
-             $intValRight = 10 * $cpuInfo;
-           }
+           if ( defined($resultData->{data}) ) {
+             Fritz_Log $hash, 5, "CPU-Info - process data\n" . Fritz_Helper_Dumper($hash, $resultData, 5);
 
-           if( defined($resultData->{data}{StatCPU})) {
-             my $cntComma = $resultData->{data}{StatCPU} =~ tr/,//;
-             Fritz_Log $hash, 4, "CPU-Info - Comma: " . $cntComma;
-             # $intValLeft = $cntComma * (-1) if ($cntComma * (-1) > $intValLeft);
-             $intValRight = $cntComma if ($cntComma < $intValRight);
-           } else {
-             Fritz_Log $hash, 3, "CPU-Info - StatCPU: not defined";
-           }
+             my $intValLeft  = 0; #-1
+             my $intValRight = 0; #-1 
+             if ($attrEnable >= 1) {
+#              $intValLeft = 10 * $attrEnable * (-1);
+               $intValRight = 10 * $attrEnable;
+             }
 
-#           my $StatCPU             = join(",", reverse ((split /,/, $resultData->{data}{StatCPU})[$intValLeft..$intValRight]));
-#           my $StatTemperature     = join(",", reverse ((split /,/, $resultData->{data}{StatTemperature})[$intValLeft..$intValRight]));
-#           my $StatRAMCacheUsed    = join(",", reverse ((split /,/, $resultData->{data}{StatRAMCacheUsed})[$intValLeft..$intValRight]));
-#           my $StatRAMStrictlyUsed = join(",", reverse ((split /,/, $resultData->{data}{StatRAMStrictlyUsed})[$intValLeft..$intValRight]));
-#           my $StatRAMPhysFree     = join(",", reverse ((split /,/, $resultData->{data}{StatRAMPhysFree})[$intValLeft..$intValRight]));
+             if( defined($resultData->{data}{StatCPU})) {
+               my $cntComma = $resultData->{data}{StatCPU} =~ tr/,//;
+               Fritz_Log $hash, 4, "CPU-Info - Comma: " . $cntComma;
+               # $intValLeft = $cntComma * (-1) if ($cntComma * (-1) > $intValLeft);
+               $intValRight = $cntComma if ($cntComma < $intValRight);
+             } else {
+               Fritz_Log $hash, 3, "CPU-Info - StatCPU: not defined";
+             }
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuCurrentInterval_Data", $resultData->{data}{StatCurrentInterval}
+#             my $StatCPU             = join(",", reverse ((split /,/, $resultData->{data}{StatCPU})[$intValLeft..$intValRight]));
+#             my $StatTemperature     = join(",", reverse ((split /,/, $resultData->{data}{StatTemperature})[$intValLeft..$intValRight]));
+#             my $StatRAMCacheUsed    = join(",", reverse ((split /,/, $resultData->{data}{StatRAMCacheUsed})[$intValLeft..$intValRight]));
+#             my $StatRAMStrictlyUsed = join(",", reverse ((split /,/, $resultData->{data}{StatRAMStrictlyUsed})[$intValLeft..$intValRight]));
+#             my $StatRAMPhysFree     = join(",", reverse ((split /,/, $resultData->{data}{StatRAMPhysFree})[$intValLeft..$intValRight]));
+
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuCurrentInterval_Data", $resultData->{data}{StatCurrentInterval}
                                                                                  if $resultData->{data}{StatCurrentInterval};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpu_Data",                join(",", reverse ((split /,/, $resultData->{data}{StatCPU})[$intValLeft..$intValRight]))
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpu_Data",                join(",", reverse ((split /,/, $resultData->{data}{StatCPU})[$intValLeft..$intValRight]))
                                                                                  if $resultData->{data}{StatCPU};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuTemp_Data",            join(",", reverse ((split /,/, $resultData->{data}{StatTemperature})[$intValLeft..$intValRight]))
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuTemp_Data",            join(",", reverse ((split /,/, $resultData->{data}{StatTemperature})[$intValLeft..$intValRight]))
                                                                                  if $resultData->{data}{StatTemperature};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuRAMCacheUsed_Data",    join(",", reverse ((split /,/, $resultData->{data}{StatRAMCacheUsed})[$intValLeft..$intValRight]))
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuRAMCacheUsed_Data",    join(",", reverse ((split /,/, $resultData->{data}{StatRAMCacheUsed})[$intValLeft..$intValRight]))
                                                                                  if $resultData->{data}{StatRAMCacheUsed};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuRAMStrictlyUsed_Data", join(",", reverse ((split /,/, $resultData->{data}{StatRAMStrictlyUsed})[$intValLeft..$intValRight]))
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuRAMStrictlyUsed_Data", join(",", reverse ((split /,/, $resultData->{data}{StatRAMStrictlyUsed})[$intValLeft..$intValRight]))
                                                                                  if $resultData->{data}{StatRAMStrictlyUsed};
 
-           Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuRAMPhysFree_Data",     join(",", reverse ((split /,/, $resultData->{data}{StatRAMPhysFree})[$intValLeft..$intValRight]))
+             Fritz_Readout_Add_Reading $hash, $roReadings, "box_cpuRAMPhysFree_Data",     join(",", reverse ((split /,/, $resultData->{data}{StatRAMPhysFree})[$intValLeft..$intValRight]))
                                                                                  if $resultData->{data}{StatRAMPhysFree};
 
+           }
+         } else {
+           Fritz_Log $hash, 4, "CPU-Info - process data - " . $resultData->{Error} if defined $resultData->{Error};
+           Fritz_Log $hash, 2, "CPU-Info - process data - No data received" if !defined $resultData->{data};
          }
-       } else {
-         Fritz_Log $hash, 4, "CPU-Info - process data - " . $resultData->{Error} if defined $resultData->{Error};
-         Fritz_Log $hash, 2, "CPU-Info - process data - No data received" if !defined $resultData->{data};
+         Fritz_Log $hash, 4, "CPU-Info - end getting data";
        }
-       Fritz_Log $hash, 4, "CPU-Info - end getting data";
+
+       #-------------------------------------------------------------------------------------
+       # PLC informations
+
+       $attrEnable = main::AttrVal($name, "enablePowerLine", 0);
+
+       if ($attrEnable) {
+         Fritz_Log $hash, 4, "PLC-Info - start getting data";
+
+         if ($hash->{fhem}{fwVersion} < 810) {
+           $resultData = Fritz_call_javaScript($hash, "generic?ui=plc");
+         } else {
+           $resultData = Fritz_call_javaScript($hash, "generic/plc");
+         }
+
+         # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+         return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+         if (defined($resultData) && !defined($resultData->{Error}) ) {
+
+           if ( defined($resultData->{data}) ) {
+             Fritz_Log $hash, 5, "PLC-Info - process data\n" . Fritz_Helper_Dumper($hash, $resultData, 5);
+
+             if( exists($resultData->{data}->{device}) && ref($resultData->{data}->{device}) eq "ARRAY") {
+               $views   = $resultData->{data}->{device};
+               $nbViews = scalar @$views;
+
+               for(my $i = 0; $i < $nbViews; $i++) {
+                 $ReadingTxT = "plc" .$i. "_";
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT. "UID",            $views->[$i]->{UID};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT. "status",         $views->[$i]->{status};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT. "remoteAdapters", $views->[$i]->{remoteAdapters};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT. "model",          $views->[$i]->{model};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT. "coupling",       $views->[$i]->{coupling};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT. "phyRateTX",      $views->[$i]->{phyRateTX};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT. "phyRateRX",      $views->[$i]->{phyRateRX};
+                 Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT. "mac",            $views->[$i]->{mac};
+               }
+             } else {
+               Fritz_Log $hash, 3, "PLC-Info: not defined.";
+             }
+           }
+         } else {
+           Fritz_Log $hash, 4, "PLC-Info - process data - " . $resultData->{Error} if defined $resultData->{Error};
+           Fritz_Log $hash, 2, "PLC-Info - process data - No data received" if !defined $resultData->{data};
+         }
+         Fritz_Log $hash, 4, "PLC-Info - end getting data";
+       }
      }
 
-     #-------------------------------------------------------------------------------------
-     # PLC informations
+     if ($hash->{fhem}{fwVersion} >= 840) {
+       #-------------------------------------------------------------------------------------
+       # DNS Filter informations
 
-     my $plcInfo = main::AttrVal($name, "enablePowerLine", 0);
+       $attrEnable = main::AttrVal($name, "enableDNSFilterInfo", 0);
 
-     if ($plcInfo != 0 && ($hash->{fhem}{fwVersion} >= 800) ) {
-       Fritz_Log $hash, 4, "PLC-Info - start getting data";
+       if ($attrEnable) {
 
-       if ($hash->{fhem}{fwVersion} < 810) {
-         $resultData = Fritz_call_javaScript($hash, "generic?ui=plc");
-       } else {
-         $resultData = Fritz_call_javaScript($hash, "generic/plc");
-       }
+         Fritz_Log $hash, 4, "DNS-Filter-Info - start getting data";
 
-       # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
-       return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+         $result = Fritz_call_javaScript($hash, "beta/dnsfilter");
 
-       if (defined($resultData) && !defined($resultData->{Error}) ) {
+         # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+         return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
 
-         if ( defined($resultData->{data}) ) {
-           Fritz_Log $hash, 5, "PLC-Info - process data\n" . Fritz_Helper_Dumper($hash, $resultData, 5);
+         if (!defined($resultData->{Error}) && exists($result->{data}) && ref($result->{data}) eq "HASH") {
+           $ReadingTxT = "dnsFilter_";
 
-           if( exists($resultData->{data}->{device}) && ref($resultData->{data}->{device}) eq "ARRAY") {
-             $views   = $resultData->{data}->{device};
-             $nbViews = scalar @$views;
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "enabled", $result->{data}->{enabled}, "yesno";
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "autoUpdate_enabled", $result->{data}->{automaticUpdate}->{enabled}, "yesno";
+           my %dnsUpdInt = (
+                '0'       => "nie",
+                '28800'   => "8 Stunden",
+                '86400'   => "täglich",
+                '604800'  => "wöchentlich",
+                '2592000' => "monatlich"
+              );
 
-             for(my $i = 0; $i < $nbViews; $i++) {
-               Fritz_Readout_Add_Reading $hash, $roReadings, "plc" .$i. "_UID",            $views->[$i]->{UID};
-               Fritz_Readout_Add_Reading $hash, $roReadings, "plc" .$i. "_status",         $views->[$i]->{status};
-               Fritz_Readout_Add_Reading $hash, $roReadings, "plc" .$i. "_remoteAdapters", $views->[$i]->{remoteAdapters};
-               Fritz_Readout_Add_Reading $hash, $roReadings, "plc" .$i. "_model",          $views->[$i]->{model};
-               Fritz_Readout_Add_Reading $hash, $roReadings, "plc" .$i. "_coupling",       $views->[$i]->{coupling};
-               Fritz_Readout_Add_Reading $hash, $roReadings, "plc" .$i. "_phyRateTX",      $views->[$i]->{phyRateTX};
-               Fritz_Readout_Add_Reading $hash, $roReadings, "plc" .$i. "_phyRateRX",      $views->[$i]->{phyRateRX};
-               Fritz_Readout_Add_Reading $hash, $roReadings, "plc" .$i. "_mac",            $views->[$i]->{mac};
-             }
+           my $autoInt = $dnsUpdInt{$result->{data}->{automaticUpdate}->{interval}};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "autoUpdate_interval", $autoInt;
+
+           if($result->{data}->{automaticUpdate}->{lastTimestamp}) {
+             my @t = localtime($result->{data}->{automaticUpdate}->{lastTimestamp});
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "autoUpdate_time", sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
            } else {
-             Fritz_Log $hash, 3, "PLC-Info: not defined.";
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "autoUpdate_time", " --- ";
            }
+
+           if($result->{data}->{manualUpdate}->{lastTimestamp}) {
+             my @t = localtime($result->{data}->{manualUpdate}->{lastTimestamp});
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "manualUpdate_time", sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+           } else {
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "manualUpdate_time", " --- ";
+           }
+
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "queriesBlocked", $result->{data}->{statistics}->{dnsQueryCount}->{blocked};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "queriesTotal",   $result->{data}->{statistics}->{dnsQueryCount}->{total};
          }
-       } else {
-         Fritz_Log $hash, 4, "PLC-Info - process data - " . $resultData->{Error} if defined $resultData->{Error};
-         Fritz_Log $hash, 2, "PLC-Info - process data - No data received" if !defined $resultData->{data};
        }
-       Fritz_Log $hash, 4, "PLC-Info - end getting data";
+
+       if ( ref $result->{data}->{filterlists} eq 'ARRAY' ) {
+         my $filterCnt = 0;
+         foreach ( @{ $result->{data}->{filterlists} } ) {
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_name",    $_->{name};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_UID",     $_->{UID};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_URL",     $_->{url};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_action",  $_->{action};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_enabled", $_->{enabled}, "yesno";
+           $filterCnt ++;
+         }
+         Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "filterlists", $filterCnt;
+       }
+
+       if ( ref $result->{data}->{domains} eq 'ARRAY' ) {
+         my $filterCnt = 0;
+         foreach ( @{ $result->{data}->{domains} } ) {
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_name",    $_->{comment};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_UID",     $_->{UID};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_domain",  $_->{domain};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_action",  $_->{action};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_enabled", $_->{enabled}, "yesno";
+           $filterCnt ++;
+         }
+         Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "domains", $filterCnt;
+       }
+
+       if ( ref $result->{data}->{clients} eq 'ARRAY' ) {
+         my $filterCnt = 0;
+         foreach ( @{ $result->{data}->{clients} } ) {
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_name",    $_->{comment};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_UID",     $_->{UID};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_client",  $_->{client};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_action",  $_->{action};
+           Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . $_->{UID} . "_enabled", $_->{enabled}, "yesno";
+           $filterCnt ++;
+         }
+         Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "clients", $filterCnt;
+       }
+
+       Fritz_Log $hash, 4, "DNS-Filter-Info - end getting data";
      }
 
    } # end for Model == "Box"
+
+   if ( $avmModel =~ "Box" || $avmModel =~ "1700") {
+   #-------------------------------------------------------------------------------------
+
+     if ( $hash->{fhem}{fwVersion} >= 800 ) {
+
+       #-------------------------------------------------------------------------------------
+       # ntp/time informations
+
+       if ($enableBoxReading =~ /box_ntpTime/) {
+         Fritz_Log $hash, 4, "ntp-Info - start getting data";
+
+         if ($hash->{fhem}{fwVersion} < 810) {
+           $resultData = Fritz_call_javaScript($hash, "generic?ui=time");
+         } else {
+           $resultData = Fritz_call_javaScript($hash, "generic/time");
+         }
+
+         # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+         return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+         if (defined($resultData) && !defined($resultData->{Error}) ) {
+
+           if ( defined($resultData->{data}) ) {
+             Fritz_Log $hash, 5, "ntp-Info - process data\n" . Fritz_Helper_Dumper($hash, $resultData, 5);
+             $ReadingTxT = "box_ntpTime_";
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "chronyEnabled", $resultData->{data}->{chrony_enabled};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "ntpServer", $resultData->{data}->{ntp_server};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "tzDstEnabled", $resultData->{data}->{tz_dst_enabled};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "tzEnabled", $resultData->{data}->{tz_enabled};
+             Fritz_Readout_Add_Reading $hash, $roReadings, $ReadingTxT . "tzOffsetMinutes", $resultData->{data}->{tz_offset_minutes};
+           } else {
+             Fritz_Log $hash, 3, "ntp-Info: not defined.";
+           }
+         } else {
+           Fritz_Log $hash, 4, "ntp-Info-Info - process data - " . $resultData->{Error} if defined $resultData->{Error};
+           Fritz_Log $hash, 2, "ntp-Info-Info - process data - No data received" if !defined $resultData->{data};
+         }
+         Fritz_Log $hash, 4, "ntp-Info-Info - end getting data";
+       }
+     } # end ntp/time informations
+
+   } # end for Model == "Box || 1700"
+
 
    return "";
 
@@ -9310,7 +9616,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
    my $views;
    my $nbViews;
 
-   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
+   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
 
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
    my $enBoxReadings = main::AttrVal($name, "enableBoxReadings", "");
@@ -10030,9 +10336,13 @@ sub Fritz_Readout_Process($$@)
      }
  
      elsif ($rName eq "box_model") {
-       $hash->{MODEL} = $rValue;
+       $hash->{FRITZ_MODEL} = $rValue;
 
        $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
+     }
+
+     elsif ($rName eq "box_fwVersion") {
+       $hash->{FRITZ_OS} = $rValue;
      }
 
      if ($rName !~ /-\<|-\>|box_fwUpdate|readoutTime|Error/) {
@@ -10658,9 +10968,9 @@ sub Fritz_Readout_API_Check($)
 
    my $attrList   = "";
 
-   Fritz_Log $hash, 3, "boxUser for checkAPIs: " . $boxUser;
+   Fritz_Log $hash, 3, "boxUser for checkAPIs: " . ($boxUser ? $boxUser : "not set/necessary");
 
-   $hash->{MODEL} = $name;
+   $hash->{FRITZ_MODEL} = $name;
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", "";
@@ -10730,7 +11040,7 @@ sub Fritz_Readout_API_Check($)
          if ($content =~ /\<modelName\>/) {
            if ($content =~ /\<modelName\>(.*)\<\/modelName\>/) {
              Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-             $hash->{MODEL} = $1;
+             $hash->{FRITZ_MODEL} = $1;
            }
 
            if ($content =~ /\<modelNumber\>(.*)\<\/modelNumber\>/) {
@@ -10787,7 +11097,7 @@ sub Fritz_Readout_API_Check($)
 
          if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-           $hash->{MODEL} = $1;
+           $hash->{FRITZ_MODEL} = $1;
          }
          Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1) if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
 
@@ -10846,7 +11156,7 @@ sub Fritz_Readout_API_Check($)
          # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
 
          Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-         $hash->{MODEL} = $result[0];
+         $hash->{FRITZ_MODEL} = $result[0];
 
          my $FBOS = $result[7];
          $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
@@ -10863,10 +11173,9 @@ sub Fritz_Readout_API_Check($)
      } # end 3. Versuch: Ermitteln Box Model, Fritz!OS Version, OEM aus cgi-bin/system_status
 
      # Check for defined user in Fritz!Device, only if $osVersion >= 725
+     if ($osVersion && $osVersion >= 725 ) {
 
-     if ($osVersion && $osVersion >= 725 && ($hash->{MODEL} !~ /Repeater/ || $hash->{MODEL} =~ /1700/) ) {
-
-       # Fritz_Log $hash, 3, "boxUser for: $osVersion $hash->{MODEL}";
+       Fritz_Log $hash, 4, "boxUser for: $osVersion $hash->{FRITZ_MODEL}";
        $url       = "http://" . $host;
        $response  = $agent->get( $url );
        $apiError .= " boxUser:" . $response->status_line;
@@ -10901,18 +11210,19 @@ sub Fritz_Readout_API_Check($)
 
            if (ref($cData) eq "ARRAY") {
              my $nbViews = scalar @$cData;
-             for(my $j = 0; $j <= $nbViews - 1; $j++) {
-               if (ref(@$cData[$j]) eq 'HASH') { # $hash_ref is reference to hash
-                 $bUsers .= $cData->[$j]->{value} . ",";
-                 if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
-                   Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
-                   $hash->{DEFAULT_USER} = $1;
+             if($nbViews) {
+               $bUsers = "";
+
+               for(my $j = 0; $j < $nbViews; $j++) {
+                 if (ref(@$cData[$j]) eq 'HASH') { # $hash_ref is reference to hash
+                   $bUsers .= $cData->[$j]->{value} . ",";
+                   if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
+                     Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
+                     $hash->{DEFAULT_USER} = $1;
+                   }
                  }
                }
-             }
-             if($nbViews != 0) {
-               chop($bUsers) if($nbViews != 0);
-               $bUsers =~ s/&lt;pWd&gt;//;
+               chop($bUsers);
              }
 
              $boxUser = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
@@ -10941,10 +11251,6 @@ sub Fritz_Readout_API_Check($)
            Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
          }
        }
-       
-     } else {
-       $boxUser = main::AttrVal( $name, "boxUser", "" );
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
      }
      # End check for defined user in Fritz!Device
 
@@ -11038,7 +11344,7 @@ sub Fritz_Readout_API_Check($)
            Fritz_Log $hash, 2, $passErr;
            Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
 
-           if ($osVersion && $osVersion < 725 && $hash->{MODEL} !~ /Repeater/) {
+           if ($osVersion && $osVersion < 725 && $hash->{FRITZ_MODEL} !~ /Repeater/) {
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
            }
 
@@ -11071,7 +11377,7 @@ sub Fritz_Readout_API_Check($)
            # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
 
            Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-           $hash->{MODEL} = $result[0];
+           $hash->{FRITZ_MODEL} = $result[0];
 
            my $FBOS = $result[7];
            $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
@@ -11138,7 +11444,7 @@ sub Fritz_Readout_API_Check($)
            Fritz_Log $hash, 2, $passErr;
            Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
 
-           if ($osVersion && $osVersion < 725 && $hash->{MODEL} !~ /Repeater/) {
+           if ($osVersion && $osVersion < 725 && $hash->{FRITZ_MODEL} !~ /Repeater/) {
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
            }
          } elsif( $statusLine =~ /\(No route to host\)/) {
@@ -11156,7 +11462,7 @@ sub Fritz_Readout_API_Check($)
 
          if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-           $hash->{MODEL} = $1;
+           $hash->{FRITZ_MODEL} = $1;
          }
 
          Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
@@ -11408,7 +11714,7 @@ sub Fritz_Readout_API_Check($)
          Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN?";
        }
 
-       my $avmModel = main::InternalVal($name, "MODEL", $hash->{MODEL});
+       my $avmModel = main::InternalVal($name, "FRITZ_MODEL", $hash->{FRITZ_MODEL});
        my $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "tr64" . "desc.xml");
 
        Fritz_Log $hash, 4, "ApiCheck TR64 serviceList\n" . $serviceList;
@@ -13585,7 +13891,7 @@ sub Fritz_Set_GuestWlan_OnOff($)
        # reread WLAN-Status
        my $queryStr = "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
        $queryStr   .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
-       $queryStr   .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # GÃ¤ste WLAN
+       $queryStr   .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # Gäste WLAN
        $queryStr   .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
        $queryStr   .= "&box_macFilter_active=wlan:settings/is_macfilter_active";
 
@@ -13807,8 +14113,254 @@ sub Fritz_Set_Wlan_OnOff($)
 
 } # end Fritz_Set_Wlan_OnOff
 
-# get list of mobile informations
+# get dns Filter informations
+############################################
+sub Fritz_Get_dns_Filter($) {
 
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   my $returnStr;
+
+   my $result = Fritz_call_javaScript($hash, 'beta/dnsfilter' );
+
+   if(defined $result->{Error}) {
+     $returnStr .= "DNS Filter\n";
+     $returnStr .= "---------------------------------\n";
+     my $tmp = Fritz_ERR_Result($hash, $result);
+     return $returnStr . $tmp;
+   }
+
+   if (!defined($result->{Error}) && exists($result->{data}) && ref($result->{data}) eq "HASH") {
+
+     my $tableFormat = main::AttrVal($name, "disableTableFormat", "undef");
+
+     $returnStr .= '<table';
+     $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+     $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+     $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+     $returnStr .= '>';
+     $returnStr .= "<tr>\n";
+     $returnStr .= '<td colspan="2">DNS Filter</td>';
+     $returnStr .= "</tr>\n";
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>Parameter</td><td>Status</td>\n";
+     $returnStr .= "</tr>\n";
+
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>enabled</td>";
+     $returnStr .= "<td>" . $result->{data}->{enabled} . "</td>";
+     $returnStr .= "</tr>\n";
+
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>autoUpdate_enabled</td>";
+     $returnStr .= "<td>" . $result->{data}->{automaticUpdate}->{enabled} . "</td>";
+     $returnStr .= "</tr>\n";
+
+     my %dnsUpdInt = (
+          '0'       => "nie",
+          '28800'   => "8 Stunden",
+          '86400'   => "täglich",
+          '604800'  => "wöchentlich",
+          '2592000' => "monatlich"
+        );
+
+     my $autoInt = $dnsUpdInt{$result->{data}->{automaticUpdate}->{interval}};
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>autoUpdate_interval</td>";
+     $returnStr .= "<td>" . $dnsUpdInt{$result->{data}->{automaticUpdate}->{interval}} . "</td>";
+     $returnStr .= "</tr>\n";
+
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>manualUpdate_time</td>";
+     if($result->{data}->{manualUpdate}->{lastTimestamp}) {
+       my @t = localtime($result->{data}->{manualUpdate}->{lastTimestamp});
+       $returnStr .= "<td>" . sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]) . "</td>";
+     } else {
+       $returnStr .= "<td> --- </td>";
+     }
+     $returnStr .= "</tr>\n";
+
+     my @t = localtime($result->{data}->{automaticUpdate}->{lastTimestamp});
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>autoUpdate_time</td>";
+     $returnStr .= "<td>" . sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]) . "</td>";
+     $returnStr .= "</tr>\n";
+
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>queriesBlocked</td>";
+     $returnStr .= "<td>" . $result->{data}->{statistics}->{dnsQueryCount}->{blocked} . "</td>";
+     $returnStr .= "</tr>\n";
+
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>queriesTotal</td>";
+     $returnStr .= "<td>" . $result->{data}->{statistics}->{dnsQueryCount}->{total} . "</td>";
+     $returnStr .= "</tr>\n";
+
+     $returnStr .= "</table>\n";
+
+
+     $returnStr .= '<table';
+     $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+     $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+     $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+     $returnStr .= '>';
+     $returnStr .= "<tr>\n";
+     $returnStr .= '<td colspan="5">Filterlisten</td>';
+     $returnStr .= "</tr>\n";
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>Enabled</td><td>Aktion</td><td>UID</td><td>Name</td><td>URL</td>\n";
+     $returnStr .= "</tr>\n";
+
+     if ( ref $result->{data}->{filterlists} eq 'ARRAY' ) {
+
+       foreach ( @{ $result->{data}->{filterlists} } ) {
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . ($_->{enabled} ? "yes" : "no") . "</td>";
+         $returnStr .= "<td>" . $_->{action} . "</td>";
+         $returnStr .= "<td>" . $_->{UID} . "</td>";
+         $returnStr .= "<td>" . $_->{name} . "</td>";
+         $returnStr .= "<td>" . $_->{url} . "</td>\n";
+         $returnStr .= '<td colspan="2">letztes Update</td>\n';
+         $returnStr .= "</tr>\n";
+         $returnStr .= "<tr>\n";
+         $returnStr .= '<td colspan="5"></td><td colspan="2">' . $_->{latestUpdate}->{cause} . '</td>\n';
+         $returnStr .= "</tr>\n";
+         $returnStr .= "<tr>\n";
+         $returnStr .= '<td colspan="5"></td><td>Status</td><td>' . $_->{latestUpdate}->{status} . "</td>\n";
+         $returnStr .= "</tr>\n";
+         $returnStr .= "<tr>\n";
+         my @t = localtime($_->{latestUpdate}->{timestamp});
+         $returnStr .= '<td colspan="5"></td><td>Datum</td><td>' . (sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0])) . "</td>";
+         $returnStr .= "</tr>\n";
+         $returnStr .= "<tr>\n";
+         my $errUpd = ($_->{latestUpdate}->{error}->{message} ? $_->{latestUpdate}->{error}->{message} : " --- ");
+         $returnStr .= '<td colspan="5"></td><td>Fehler</td><td>' . $_->{latestUpdate}->{error}->{code} . ': ' . $errUpd . "</td>\n";
+         $returnStr .= "</tr>\n";
+         $returnStr .= '<td colspan="5"></td><td colspan="2">Status</td>';
+         $returnStr .= "</tr>\n";
+         $returnStr .= "<tr>\n";
+         $returnStr .= '<td colspan="5"></td><td>Bereit</td><td>' . ($_->{status}->{isReady} ? "yes" : "no") . "</td>\n";
+         $returnStr .= "</tr>\n";
+         $returnStr .= "<tr>\n";
+         $returnStr .= '<td colspan="5"></td><td>Einträge</td><td>' . $_->{status}->{entryCount} . "</td>\n";
+         $returnStr .= "</tr>\n";
+         $returnStr .= "<tr>\n";
+         @t = localtime($_->{status}->{lastSuccessfulUpdateTimestamp});
+         $returnStr .= '<td colspan="5"></td><td>Update</td><td>' . (sprintf("%04d.%02d.%02d %02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0])) . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+     }
+     $returnStr .= "</table>\n";
+
+     $returnStr .= '<table';
+     $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+     $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+     $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+     $returnStr .= '>';
+     $returnStr .= "<tr>\n";
+     $returnStr .= '<td colspan="5">Domänen</td>';
+     $returnStr .= "</tr>\n";
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>Enabled</td><td>Aktion</td><td>UID</td><td>Kommentar</td><td>Domäne</td>\n";
+     $returnStr .= "</tr>\n";
+
+     if ( ref $result->{data}->{domains} eq 'ARRAY' ) {
+
+       foreach ( @{ $result->{data}->{domains} } ) {
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . ($_->{enabled} ? "yes" : "no") . "</td>";
+         $returnStr .= "<td>" . $_->{action} . "</td>";
+         $returnStr .= "<td>" . $_->{UID} . "</td>";
+         $returnStr .= "<td>" . $_->{comment} . "</td>";
+         $returnStr .= "<td>" . $_->{domain} . "</td>\n";
+         $returnStr .= "</tr>\n";
+       }
+     }
+     $returnStr .= "</table>\n";
+
+     $returnStr .= '<table';
+     $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+     $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+     $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+     $returnStr .= '>';
+     $returnStr .= "<tr>\n";
+     $returnStr .= '<td colspan="5">Clients</td>';
+     $returnStr .= "</tr>\n";
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>Enabled</td><td>Aktion</td><td>UID</td><td>Kommentar</td><td>Domäne</td>\n";
+     $returnStr .= "</tr>\n";
+
+     if ( ref $result->{data}->{clients} eq 'ARRAY' ) {
+
+       foreach ( @{ $result->{data}->{clients} } ) {
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . ($_->{enabled} ? "yes" : "no") . "</td>";
+         $returnStr .= "<td>" . $_->{action} . "</td>";
+         $returnStr .= "<td>" . $_->{UID} . "</td>";
+         $returnStr .= "<td>" . $_->{comment} . "</td>";
+         $returnStr .= "<td>" . $_->{domain} . "</td>\n";
+         $returnStr .= "</tr>\n";
+       }
+     }
+     $returnStr .= "</table>\n";
+
+   } else {
+     $returnStr .= "DNS Filter\n";
+     $returnStr .= "---------------------------------\n";
+     my $tmp = Fritz_ERR_Result($hash, $result);
+     return $returnStr . $tmp;
+   }
+
+   $result = Fritz_call_javaScript($hash, 'generic/dns_excepted_domains' );
+
+   if(defined $result->{Error}) {
+     $returnStr .= "DNS Filter\n";
+     $returnStr .= "---------------------------------\n";
+     my $tmp = Fritz_ERR_Result($hash, $result);
+     return $returnStr . $tmp;
+   }
+
+   if (!defined($result->{Error}) && exists($result->{data}) && ref($result->{data}) eq "HASH") {
+
+     my $tableFormat = main::AttrVal($name, "disableTableFormat", "undef");
+
+     $returnStr .= '<table';
+     $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+     $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+     $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+     $returnStr .= '>';
+     $returnStr .= "<tr>\n";
+     $returnStr .= '<td colspan="2">ausgenommene Domänen</td>';
+     $returnStr .= "</tr>\n";
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>UID</td><td>Kommentar</td><td>Domäne</td>\n";
+     $returnStr .= "</tr>\n";
+
+     if ( ref $result->{data}->{domain} eq 'ARRAY' ) {
+
+       foreach ( @{ $result->{data}->{domain} } ) {
+         $returnStr .= "<tr>\n";
+         $returnStr .= "<td>" . $_->{UID} . "</td>";
+         $returnStr .= "<td>" . $_->{name} . "</td>";
+         $returnStr .= "</tr>\n";
+       }
+     }
+     $returnStr .= "</table>\n";
+
+   } else {
+     $returnStr .= "DNS Filter\n";
+     $returnStr .= "---------------------------------\n";
+     my $tmp = Fritz_ERR_Result($hash, $result);
+     return $returnStr . $tmp;
+   }
+
+   return $returnStr;
+
+
+} # end Fritz_Get_dns_Filter
+
+# get list of mobile informations
 ############################################
 sub Fritz_Get_MobileInfo($) {
 
@@ -14089,37 +14641,6 @@ sub Fritz_Get_MobileInfo($) {
    return $returnStr;
 
 } # end Fritz_Get_MobileInfo
-
-# make a table row
-############################################
-sub Fritz_Helper_make_TableRow($@) {
-
-   my ($hash, $column1, $column2, $format2) = @_;
-   my $name = $hash->{NAME};
-
-   my $trtd = "<tr>\n" . "<td>";
-   my $tdtd = "</td><td> ";
-   my $tdtr = "</td>" . "</tr>\n";
-
-   return $trtd . " " . $tdtd . " " . $tdtr if $column1 eq "emptyRow";
-
-   if (defined $format2) {
-     if ($format2 eq "onoff") {
-       $column2 = $column2 == 0 ? "off" : "on" if defined $column2;
-     } elsif ($format2 ne "") {
-       $column2 = $format2;
-     }
-   }
-
-   return "" unless defined $column2;
-
-   my $returnStr;
-
-   $returnStr .= $trtd . $column1 . $tdtd . $column2 . $tdtr;
-
-   return $returnStr;
-  
-} # end Fritz_Helper_make_TableRow
 
 # get list of global filters
 ############################################
@@ -17272,7 +17793,7 @@ sub Fritz_open_Web_Connection ($)
       Fritz_Log $hash, 4, "renewing SID while: " . $msg;
    }
 
-   my $avmModel = main::InternalVal($name, "MODEL", $hash->{MODEL});
+   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", $hash->{FRITZ_MODEL});
    my $user = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
 
    Fritz_Log $hash, 4, "Fritz_Get_Lan_Device_Info (Fritz!OS: $hash->{fhem}{fwVersionStr}) ";
@@ -17480,10 +18001,35 @@ sub Fritz_call_LuaData($$$@)
 
    # handling fon_devices informations
    ###########  HTML #################################
+   # data: import login from "\/js\/login.js";.*?setConfig\((\{.*?\})\);
+   # xhr 1 lang de page overview xhrId all
+
+   if ( $data =~ m/import login from "\/js\/login.js";.*?setConfig\((\{.*?\})\);/igs ) {
+     Fritz_Log $hash, 4, "Response Data overview: \n" . $1;
+     #Fritz_Log $hash, 3, "Response Content: \n" . $response->content;
+
+     my $overview = $1;
+     my $tmp = "";
+     my $profile_content;
+
+     $profile_content  = '{"sid":"'.$result->{sid}.'",';
+     $profile_content .= '"status":"' . $response->status_line . '",' if ($response->status_line && $response->status_line ne "");
+     $profile_content .= '"pid":"overview","data":{"overview":' . $overview;
+     $profile_content .= '}}';
+
+     Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
+
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+   }
+
+   # handling fon_devices informations
+   ###########  HTML #################################
    # data: var data = <form id="uiMainForm" method="POST" action="/fon_devices/edit_dect_ring_tone.lua.*?">
    # xhr 1 page telDev
 
    if ( ($data =~ m/\<form id="uiMainForm" class="narrow" name="main_form" method="POST" action="\/fon_devices\/fondevices_list.lua"\>/igs) ) {
+
+     Fritz_Log $hash, 4, "Response Data telDev: \n" . $1;
 
      if ( ($data =~ m/fonDevices: (.*?)fonNumbers:/gsm) ) {
        my $fonDev = $1;
@@ -17555,7 +18101,7 @@ sub Fritz_call_LuaData($$$@)
    # data: <form id="main_form" method="POST" action="/fon_devices/edit_tam.lua">
    # xhr 1 back_to_page tam TamNr 0 page edit_tam
 
-   if ( ($data =~ m/\<form id="main_form" method="POST" action="\/fon_devices\/edit_tam.lua"\>(.*?)\<\/form\>/igs) ) {
+   if ( ($data =~ m/\<form id="main_form" .*?method="POST" action="\/fon_devices\/edit_tam.lua"\>(.*?)\<\/form\>/igs) ) {
 
      Fritz_Log $hash, 4, "Response Data: \n" . $1;
      # Fritz_Log $hash, 3, "Response Content: \n" . $response->content;
@@ -17571,8 +18117,11 @@ sub Fritz_call_LuaData($$$@)
      ($tmp) = ($tamCont =~ m/\<label for="uiTamName"\>Name\<\/label\>.*?value="(.*?)"\>/igs);
      $profile_content .= '"tam_name":"'       . $tmp . '",'; #AB Wohnbereich
 
+     ($tmp) = ($tamCont =~ m/id="uiCallDelay1" name="call_delay".*?"(\d+)" selected\>sofort annehmen\<\/option\>/igs);
+     $profile_content .= '"call_delay":"'     . $tmp . '",' if($tmp); # 35
+
      ($tmp) = ($tamCont =~ m/id="uiCallDelay1" name="call_delay".*?"(\d+)" selected\>\d+ Sekunden\<\/option\>/igs);
-     $profile_content .= '"call_delay":"'     . $tmp . '",'; # 35
+     $profile_content .= '"call_delay":"'     . $tmp . '",' if($tmp); # 35
 
      ($tmp) = ( $tamCont =~ m/\<input type="radio" id="uiSelNums" name="num_selection" value="(.*?)" checked\>\<label for="uiSelNums"\>/igs );
 
@@ -17584,7 +18133,7 @@ sub Fritz_call_LuaData($$$@)
        my @finding = $tamCont =~ m/name="num_(\d+)" value=/gm;
 
        if (@finding) {
-         my $numList;
+         my $numList = "";
          for ( my $i = 0; $i < @finding; $i ++) {
            my $suchText = 'checked\>\<label for="uiNum_' .$finding[$i]. '"\>(.*?)\<\/label\>';
            if( $tamCont =~ m/$suchText/gm) {
@@ -17592,7 +18141,7 @@ sub Fritz_call_LuaData($$$@)
              $numList .= $1 . ',';
            }
          }
-         chop $numList;
+         chop $numList if($numList);
          $profile_content .= '"num_List":"' .$numList. '",';
        }
      }
@@ -18621,6 +19170,37 @@ sub Fritz_ConvertRingTone ($@)
 
 } # end Fritz_ConvertRingTone
 
+# make a table row
+############################################
+sub Fritz_Helper_make_TableRow($@) {
+
+   my ($hash, $column1, $column2, $format2) = @_;
+   my $name = $hash->{NAME};
+
+   my $trtd = "<tr>\n" . "<td>";
+   my $tdtd = "</td><td> ";
+   my $tdtr = "</td>" . "</tr>\n";
+
+   return $trtd . " " . $tdtd . " " . $tdtr if $column1 eq "emptyRow";
+
+   if (defined $format2) {
+     if ($format2 eq "onoff") {
+       $column2 = $column2 == 0 ? "off" : "on" if defined $column2;
+     } elsif ($format2 ne "") {
+       $column2 = $format2;
+     }
+   }
+
+   return "" unless defined $column2;
+
+   my $returnStr;
+
+   $returnStr .= $trtd . $column1 . $tdtd . $column2 . $tdtr;
+
+   return $returnStr;
+  
+} # end Fritz_Helper_make_TableRow
+
 # Process JSON from lua response
 ############################################
 sub Fritz_Helper_process_JSON($$$@) {
@@ -19490,15 +20070,10 @@ sub Fritz_Helper_Dumper($$;@) {
          Needs FRITZ!OS 7.21 or higher.
       </li><br>
 
-      <li><a name="diversity"></a>
-         <dt><code>set &lt;name&gt; callHandling &lt;reading index&gt; &lt;on|off&gt;</code></dt>
+      <li><a name="dnsFilter"></a>
+         <dt><code>set &lt;name&gt; dnsFilter &lt;on|off|updNow|never|updEvery8h|updDayly|updWeeky|updMonthly&gt;</code></dt>
          <br>
-         Switches the call forwarding/handling reading index (1,2,3 ...) on or off.
-         A call forwarding/handling for an incoming number has to be created with the FRITZ!BOX web interface. Requires TR064 (>=6.50).
-         <br>
-         The Attribut enableCallHandling has to be set to 1.
-         <br>
-         Note! Only a call forwarding/handling for a concret home number and <u>without</u> filter for the calling number can be set. Hence, an approbriate <i>callHandling</i>-reading must exist.
+         Needs FRITZ!OS 8.40 or higher.
       </li><br>
 
       <li><a name="enableVPNshare"></a>
@@ -19538,7 +20113,7 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>set &lt;name&gt; ledSetting &lt;led:on|off&gt; and/or &lt;bright:1..3&gt; and/or &lt;env:on|off&gt;</code></dt>
          <br>
          The number of parameters varies from FritzBox to Fritzbox to Repeater to FritzSmart Device.<br>
-         The options can be checked using get &lt;name&gt; luaInfo ledSettings.<br><br>
+         The options can be checked using get &lt;name&gt; deviceInfo ledSettings.<br><br>
          &lt;led:<on|off&gt; switches the LEDs on or off.<br>
          &lt;bright:1..3&gt; regulates the brightness of the LEDs from 1=weak, 2=medium to 3=very bright.<br>
          &lt;env:on|off&gt; switches the brightness control on or off depending on the ambient brightness.<br><br>
@@ -19632,7 +20207,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="smartHome"></a>
          <dt><code>set &lt;name&gt; smartHome &lt;list of parameters&gt;</code></dt><br>
       &lt;-------------------------------------------------------------------------------------------------------------------------&gt;<br>
-         The ID can be obtained via <code>get &lt;name&gt; luaInfo &lt;smartHomeAutomation&gt;</code> can be determined.<br>
+         The ID can be obtained via <code>get &lt;name&gt; deviceInfo &lt;smartHomeAutomation&gt;</code> can be determined.<br>
          The result of the command is stored in the Reading retStat_smartHome.
       &lt;-------------------------------------------------------------------------------------------------------------------------&gt;<br>
          <br>
@@ -19885,8 +20460,8 @@ sub Fritz_Helper_Dumper($$;@) {
          function: <code>internet/inetstat_monitor.lua?myXhr=1&action=disconnect&useajax=1&xhr=1</code> gets a new IP address for the Fritz device.
       </li><br>
 
-      <li><a name="luaInfo"></a>
-         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|ledSettings|smartHomeDevices|smartHomeAutomation|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation&gt;</code></dt>
+      <li><a name="deviceInfo"></a>
+         <dt><code>get &lt;name&gt; deviceInfo &lt;landevices|ledSettings|smartHomeDevices|smartHomeAutomation|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation|dnsFilter&gt;</code></dt>
          <br>
          Needs FRITZ!OS 7.21 or higher.<br>
          lanDevices -> Shows a list of active and inactive lan devices.<br>
@@ -19900,6 +20475,7 @@ sub Fritz_Helper_Dumper($$;@) {
          wlanNeighborhood -> Shows a list of WLAN neighborhood devices.<br>
          docsisInformation -> Shows DOCSIS informations (only Cable).<br>
          mobileInfo -> Shows cell phone informations.<br>
+         dnsFilter -> Shows dns filter informations.<br>
       </li><br>
 
       <li><a name="luaQuery"></a>
@@ -19928,7 +20504,7 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>get &lt;name&gt; smartHomePreDef [deviceID [Saved-PreDef-Name]]</code></dt>
          <br>
          <dt><code>get &lt;name&gt; smartHomePreDef</code></dt>
-         <dd>lists all saved settings. This list is also displayed with get <name> luaInfo smartHome.</dd>
+         <dd>lists all saved settings. This list is also displayed with get <name> deviceInfo smartHome.</dd>
          <dt><code>get &lt;name&gt; smartHomePreDef &lt;deviceID&gt;</code></dt>
          <dd>lists all settings saved for the device.</dd>
          <dt><code>get &lt;name&gt; smartHomePreDef &lt;deviceID&gt; &lt;Saved-PreDef-Name&gt;</code></dt>
@@ -20003,8 +20579,8 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>attr &lt;name&gt; boxUser &lt;user name&gt;</code></dt>
          <br>
          Username for TR064 or other web-based access. Starting with FRITZ!OS 7.25 —currently for FRITZ!Boxes only— a username is strictly required for login.<br>
-         If the username does not appear in the selection list, please execute `set ... checkApis basic` or 'get ... luaInfo userInfos' and reload the page after the message `check API: done` appears.<br>
-         Alternatively, 'get ... luaInfo userInfos' can be executed. After closing the displayed table, reload the page.<br>
+         If the username does not appear in the selection list, please execute `set ... checkApis basic` or 'get ... deviceInfo userInfos' and reload the page after the message `check API: done` appears.<br>
+         Alternatively, 'get ... deviceInfo userInfos' can be executed. After closing the displayed table, reload the page.<br>
          The user information is automatically updated with each interval cycle.
       </li><br>
 
@@ -20031,31 +20607,6 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="disableBoxReadings"></a>
          <dt><code>attr &lt;name&gt; disableBoxReadings &lt;list&gt;</code></dt>
          <br>
-      </li><br>
-
-      <li><a name="enableBoxReadings"></a>
-         <dt><code>attr &lt;name&gt; enableBoxReadings &lt;list&gt;</code></dt>
-         <br>
-         If the following readings are activated, an entire group of readings is always activated.<br>
-         <b>box_energyMode</b> -&gt; activates all readings <b>box_energyMode</b><i>.*</i> Fritz!OS >= 7.21<br>
-         <b>box_globalFilter</b> -&gt; activates all readings <b>box_globalFilter</b><i>.*</i> Fritz!OS >= 7.21<br>
-         <b>box_led</b> -&gt; activates all readings <b>box_led</b><i>.*</i> Fritz!OS >= 6.00<br>
-         <b>box_vdsl</b> -&gt; activates all readings <b>box_vdsl</b><i>.*</i> Fritz!OS >= 7.80<br>
-         <b>box_dns</b> -&gt; activates all readings <b>box_dns</b><i>n</i> Fritz!OS > 7.31<br>
-         <b>box_pwr</b> -&gt; activates all readings <b>box_pwr</b><i>...</i> Fritz!OS >= 7.00. ! not available for Cable with Fritz!OS 8.00<br>
-         <b>box_guestWlan</b> -&gt; activates all readings <b>box_guestWlan</b><i>...</i> Fritz!OS >= 7.00<br>
-         <b>box_usb</b> -&gt; activates all readings <b>box_usb</b><i>...</i> Fritz!OS >= 7.00<br>
-         <b>box_user</b> -&gt; activates all readings <b>box_user</b><i>...</i> Fritz!OS >= 7.52<br>
-         <b>box_notify</b> -&gt; activates all readings <b>box_notify</b><i>...</i> Fritz!OS > 7.00<br>
-      </li><br>
-
-      <li><a name="enableLogReadings"></a>
-         <dt><code>attr &lt;name&gt; enableLogReadings &lt;list&gt;</code></dt>
-         <br>
-         If the following readings are activated, the corresponding system log of the Fritz device is retrieved.<br>
-         <b>box_sys_Log</b> -&gt; gets the system log. Last log date in reading: box_sys_LogNewest<br>
-         <b>box_wlan_Log</b> -&gt; gets the WLAN log. Last log date in reading: box_wlan_LogNewest<br>
-         <b>box_fon_Log</b> -&gt; gets the phone log. Last log date in reading: box_fon_LogNewest<br>
       </li><br>
 
       <li><a name="disableDectInfo"></a>
@@ -20086,6 +20637,23 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>attr &lt;name&gt; enableAlarmInfo &lt;0 | 1&gt;</code></dt>
          <br>
          Enables/disables the display of alarm as Readings.
+      </li><br>
+
+      <li><a name="enableBoxReadings"></a>
+         <dt><code>attr &lt;name&gt; enableBoxReadings &lt;list&gt;</code></dt>
+         <br>
+         If the following readings are activated, an entire group of readings is always activated.<br>
+         <b>box_energyMode</b> -&gt; activates all readings <b>box_energyMode</b><i>.*</i> Fritz!OS >= 7.21<br>
+         <b>box_globalFilter</b> -&gt; activates all readings <b>box_globalFilter</b><i>.*</i> Fritz!OS >= 7.21<br>
+         <b>box_led</b> -&gt; activates all readings <b>box_led</b><i>.*</i> Fritz!OS >= 6.00<br>
+         <b>box_vdsl</b> -&gt; activates all readings <b>box_vdsl</b><i>.*</i> Fritz!OS >= 7.80<br>
+         <b>box_dns</b> -&gt; activates all readings <b>box_dns</b><i>n</i> Fritz!OS > 7.31<br>
+         <b>box_pwr</b> -&gt; activates all readings <b>box_pwr</b><i>...</i> Fritz!OS >= 7.00. ! not available for Cable with Fritz!OS 8.00<br>
+         <b>box_guestWlan</b> -&gt; activates all readings <b>box_guestWlan</b><i>...</i> Fritz!OS >= 7.00<br>
+         <b>box_usb</b> -&gt; activates all readings <b>box_usb</b><i>...</i> Fritz!OS >= 7.00<br>
+         <b>box_user</b> -&gt; activates all readings <b>box_user</b><i>...</i> Fritz!OS >= 7.52<br>
+         <b>box_notify</b> -&gt; activates all readings <b>box_notify</b><i>...</i> Fritz!OS > 7.00<br>
+         <b>box_ntpTime</b> -&gt; activates all readings <b>box_ntpTime</b><i>...</i> Fritz!OS >= 8.00<br>
       </li><br>
 
       <li><a name="enableCallHandling"></a>
@@ -20123,6 +20691,12 @@ sub Fritz_Helper_Dumper($$;@) {
          If the attribute is >= 1, the readings are set to 1..24 hours * 10 values ​​per hour.<br>
       </li><br>
 
+      <li><a name="enableDNSFilterInfo"></a>
+         <dt><code>attr &lt;name&gt; enableDNSFilterInfo &lt;0 | 1&gt;</code></dt> 
+         <br>
+         Enables/disables the display of DNS Filter informations as Readings<br>
+      </li><br>
+
       <li><a name="enableDocsisInfo"></a>
          <dt><code>attr &lt;name&gt; enableDocsisInfo &lt;0 | 1&gt;</code></dt> 
          <br>
@@ -20130,11 +20704,19 @@ sub Fritz_Helper_Dumper($$;@) {
          Only available for FritzBox Cable.
       </li><br>
 
-
       <li><a name="enableKidProfiles"></a>
          <dt><code>attr &lt;name&gt; enableKidProfiles &lt;0 | 1&gt;</code></dt>
          <br>
          Enables/disables the display of kid profiles as Readings.
+      </li><br>
+
+      <li><a name="enableLogReadings"></a>
+         <dt><code>attr &lt;name&gt; enableLogReadings &lt;list&gt;</code></dt>
+         <br>
+         If the following readings are activated, the corresponding system log of the Fritz device is retrieved.<br>
+         <b>box_sys_Log</b> -&gt; gets the system log. Last log date in reading: box_sys_LogNewest<br>
+         <b>box_wlan_Log</b> -&gt; gets the WLAN log. Last log date in reading: box_wlan_LogNewest<br>
+         <b>box_fon_Log</b> -&gt; gets the phone log. Last log date in reading: box_fon_LogNewest<br>
       </li><br>
 
       <li><a name="enableMeshMonitor"></a>
@@ -20311,6 +20893,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_wlan_lastScanTime</b> - Last scan of the WLAN environment. Only available if the enableWLANneighbors attribute is set.</li>
       <li><b>box_wlan_LogExtended</b> - Status -> "Also log logins and logouts and extended WLAN information."</li>
       <li><b>box_wlan_LogNewest</b> - Most recent WLAN event: ID Date Time </li>
+
       <br>
       <li><b>box_cpu...</b>Readings CPU informations. Available when enabled in the enableCPUInfo attribute.</li>
       <li><b>box_cpuCurrentInterval_Data</b> </li>
@@ -20319,11 +20902,13 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_cpuRAMCacheUsed_Data</b> </li>
       <li><b>box_cpuRAMStrictlyUsed_Data</b> </li>
       <li><b>box_box_cpuRAMPhysFree_Data</b> </li>
+
       <br>
       <li><b>box_dns...</b>Readings DNS information. Available when enabled in the enableBoxReadings attribute</li> 
       <li><b>box_dns_Server</b><i>n</i> - Provider DNS Server</li> 
       <li><b>box_dns_Srv</b><i>n</i><b>_used_IPv4_</b><i>n</i> - used IPv4 DNS server</li> 
       <li><b>box_dns_Srv</b><i>n</i><b>_used_IPv6_</b><i>n</i> - used IPv6 DNS server</li> 
+
       <br> 
       <li><b>box_globalFilter...</b>Readings global filters. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_globalFilterNetbios</b> - Current status: NetBIOS filter active.</li>
@@ -20331,7 +20916,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_globalFilterStealth</b> - Current status: Firewall in stealth mode.</li>
       <li><b>box_globalFilterTeredo</b> - Current status: Teredo filter active.</li>
       <li><b>box_globalFilterWpad</b> - Current status: WPAD filter active.</li>
-      <br>
+
       <br> 
       <li><b>box_guestWlan...</b>Readings guest WiFi. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_guestWlan</b> - Current status of the guest Wi-Fi network.</li>
@@ -20342,6 +20927,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_guestWlan_defPrivSSID</b> - Default private name (SSID) of the guest Wi-Fi network.</li> 
       <li><b>box_guestWlan_groupAccess</b> - group access possible</li> 
       <li><b>box_guestWlan_tmoActive</b> - Time limit active</li> 
+
       <br> 
       <li><b>box_led...</b>Readings LED's. Available if the enableBoxReadings attribute is enabled.</li>
       <li><b>box_ledCanDim</b> - Indicates whether setting the LED brightness is implemented in the Fritzbox/Repeater.</li>
@@ -20349,6 +20935,15 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_ledDisplay</b> - Indicates whether the LEDs are on or off.</li>
       <li><b>box_ledEnvLight</b> - Indicates whether the ambient brightness controls the LED brightness.</li>
       <li><b>box_ledHasEnv</b> - Indicates whether setting the LED brightness by the ambient brightness is implemented in the Fritzbox/Repeater.</li>
+
+      <br> 
+      <li><b>box_ntpTime...</b>Readings ntpTime. Available if the enableBoxReadings attribute is enabled.</li>
+      <li><b>box_ntpTime_chronyEnabled</b> - if set, the Fritz!Box acts as a time server.</li>
+      <li><b>box_ntpTime_ntpServer</b> - time server from which the Fritz!Box obtains its time.</li>
+      <li><b>box_ntpTime_tzDstEnabled</b> - Daylight Saving Time enabled</li>
+      <li><b>box_ntpTime_tzEnabled</b> - manual time zone setting enabled</li>
+      <li><b>box_ntpTime_tzOffsetMinutes</b> - offset from GMT</li>
+
       <br>
       <li><b>box_notify...</b>Readings error notifications. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_notify_</b><i>...</i> - the two readings are created when the FritzBox activates the red info LED and displays a corresponding notification.</li>
@@ -20357,6 +20952,7 @@ sub Fritz_Helper_Dumper($$;@) {
                                                      readings to -solved by click-. If the information is withdrawn from the FritzBox, the readings receive the<br>
                                                      suffix -solved by FB-. The button is set to '-solved by FB- delete readings'. Using this button, the two readings box_notify_<notify_ID> and box_notify_<notify_ID>_info can now be deleted.<br>
                                                      The readings must be activated using the attribute: enableBoxReadings.</li>
+
       <br>
       <li><b>box_pwr...</b>Readings Energy consumption. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_pwr_Rate_Act</b>Total system - Current energy consumption</li>
@@ -20371,6 +20967,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_pwr_FON_24avg</b>FON - 24-hour average energy consumption</li>
       <li><b>box_pwr_USB_Act</b>USB - Current energy consumption</li>
       <li><b>box_pwr_USB_24avg</b>USB - 24-hour average energy consumption</li>
+
       <br>
       <li><b>box_usb...</b>Readings of USB ports. Available when enabled in the enableBoxReadings attribute</li> 
       <li><b>box_usb_FTP_activ</b></li> 
@@ -20388,12 +20985,14 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_usb_</b><i>n</i><b>_devStorageTotal</b></li> 
       <li><b>box_usb_</b><i>n</i><b>_devStorageUsed</b></li> 
       <li><b>box_usb_</b><i>n</i><b>_devType</b></li> 
+
       <br>
       <li><b>box_vdsl...</b>VDSL Readings. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_vdsl_downStreamRate</b> - Current downstream data rate (Mbps)</li>
       <li><b>box_vdsl_downStreamMaxRate</b> - Maximum downstream data rate (Mbps)</li>
       <li><b>box_vdsl_upStreamRate</b> - Current upstream data rate (Mbps)</li>
       <li><b>box_vdsl_upStreamMaxRate</b> - Maximum upstream data rate (Mbps)</li>
+
       <br>
       <li><b>box_user...</b>Readings user informations.  Available when the enableBoxReadings attribute is enabled.</li>
       <li><b>box_user</b><i>n</i><b>_admin_rights</b></li>
@@ -20403,41 +21002,43 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_user</b><i>n</i><b>_name</b></li>
       <li><b>box_user</b><i>n</i><b>_nas_rights</b></li>
       <li><b>box_user</b><i>n</i><b>_vpn_access</b></li>
+
       <br>
       <li><b>box_sys_Log...</b>Readings System logs. Available when the enableBoxReadings attribute is enabled.</li>
       <li><b>box_sys_LogNewest</b><i>n</i>Last log date system log.</li>
       <li><b>box_wlan_LogNewest</b><i>n</i>Last log date WLAN log.</li>
       <li><b>box_fon_LogNewest</b><i>n</i>Last log date phone log.</li>
-      <br>
 
+      <br>
       <li><b>alarm...</b>Alarm Readings. Available when the enableAlarmInfo attribute is enabled.</li>
       <li><b>alarm</b><i>n</i> - Name of alarm <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_state</b> - Current status of alarm <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_target</b> - Internal number of alarm <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_time</b> - Wake-up time of alarm <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_wdays</b> - Weekdays of alarm <i>1</i></li>
-      <br>
 
+      <br>
       <li><b>callHandling...</b>Readings callHandling. Available when the enableCallRedi attribute is enabled.</li>
+
       <br>
       <li>Redings available for Fritz!OS < 271</li>
       <li><b>callHandling</b><i>n</i> - Own call forwarding number <i>n</i></li> 
       <li><b>callHandling</b><i>n</i><b>_dest</b> - Destination number of call forwarding <i>n</i></li> 
       <li><b>callHandling</b><i>n</i><b>_state</b> - Current status of call forwarding <i>n</i></li> 
-      <br>
 
+      <br>
       <li>Redings available for Fritz!OS >= 271</li>
       <li><b>callHandling</b><i>n</i> - ID of the call forwarding/handling system.<i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_active</b> - Current status of the call forwarding/handling system.<i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_from</b> - (Partial) number being forwarded/handled.<i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_to</b> - Destination of the call forwarding/handling system.<i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_type</b> - Type of call forwarding/handling.<i>1</i></li>
-      <br>
 
+      <br>
       <li><b>kidprofile...</b>Readings kidprofile. Available when the enableKidProfiles attribute is enabled.</li>
       <li><b>kidprofile</b><i>n</i>Internet access profiles.</li>
-      <br>
 
+      <br>
       <li><b>docsis...</b>Readings docsis. Available when the enableDocsisInfo attribute is enabled</li>
       <li><b>docsis_Available</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Ds_channelIDs</b> - Fritz!Box Cable only</li> 
@@ -20467,8 +21068,8 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>docsis31_Us_frequencys</b> - Fritz!Box Cable only</li> 
       <li><b>docsis31_Us_powerLevels</b> - Fritz!Box only Cable</li> 
       <li><b>docsis31_Us_modulations</b> - Fritz!Box Cable only</li> 
-      <br> 
 
+      <br> 
       <li><b>dect</b><i>n</i> - Name of the DECT telephone <i>n</i></li> 
       <li><b>dect</b><i>n</i><b>_alarmRingTone</b> - Ringtone when waking up via the DECT telephone <i>n</i></li> 
       <li><b>dect</b><i>n</i><b>_custRingTone</b> - User-specific ringtone of the DECT telephone <i>n</i></li> 
@@ -20481,38 +21082,67 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Do not signal any events for the DECT when the ring tone is active Telephone <i>n</i></li> 
       <li><b>dect</b><i>n</i><b>_radio</b> - current Internet radio ringtone of the DECT telephone <i>n</i></li> 
       <li><b>dect</b><i>n</i><b>_NoRingTime</b> - Doorbell blocking of the DECT telephone <i>n</i></li> 
+
+      <br>
+      <li><b>dnsFilter_autoUpdate_enabled</b> - Status of DNS filter automatic update</li>
+      <li><b>dnsFilter_autoUpdate_interval</b> - Update interval: "never", 8 hours, daily, weekly, monthly</li>
+      <li><b>dnsFilter_autoUpdate_time</b> - Timestamp of the last update</li>
+      <li><b>dnsFilter_enabled</b> - DNS filter active</li>
+      <li><b>dnsFilter_filterlists</b> - filters defined</li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_UID</b> - Unique ID of filter list <i>n</i></li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_URL</b> - URL of filter list <i>n</i></li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_action</b> - Handling of filter list <i>n</i></li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_enabled</b> - Status of filter list <i>n</i></li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_name</b> - Name of filter list <i>n</i></li>
+      <li><b>dnsFilter_domains</b> - domains defined</li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_UID</b> - Unique ID of domain <i>n</i></li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_domain</b> - URL of domain <i>n</i></li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_action</b> - Handling of domain <i>n</i></li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_enabled</b> - Status of domain <i>n</i></li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_name</b> - Name of domain <i>n</i></li>
+      <li><b>dnsFilter_clients</b> - clients defined</li>
+
       <br> 
       <li><b>fon</b><i>n</i> - Name of the analog telephone connection <i>n</i> on the FRITZ!BOX</li> 
       <li><b>fon</b><i>n</i><b>_device</b> - Internal device number of the analog telephone connection <i>n</i></li> 
-      <li><b>fon</b><i>n</i><b>_intern</b> - Internal telephone number of the analog telephone connection <i>n</i></li> 
+      <li><b>fon</b><i>n</i><b>_intern</b> - Internal telephone number of the analog telephone connection <i>n</i></li>
       <li><b>fon</b><i>n</i><b>_out</b> - outgoing telephone number of the connection <i>n</i></li> 
+
+      <br>
       <li><b>fon_phoneBook_IDs</b> - ID's of the existing phone books </li> 
       <li><b>fon_phoneBook_</b><i>n</i> - Name of the phone book <i>n</i></li>
       <li><b>fon_phoneBook_URL_</b><i>n</i> - URL to the phone book <i>n</i></li>
+
       <br>
       <li><b>gsm_internet</b> - Internet connection established via cellular dongle </li>
       <li><b>gsm_rssi</b> - Indicator of the received GSM signal strength (0-100)</li>
       <li><b>gsm_state</b> - Status of the cellular connection</li>
       <li><b>gsm_technology</b> - GSM technology used for data transmission (GPRS, EDGE, UMTS, HSPA)</li>
+
       <br>
       <li><b>matter_</b><i>...</i><b>_node</b> - matter node (SmartGateWay or FB with Matter).</li>
       <li><b>matter_</b><i>...</i><b>_vendor</b> - matter vendor/fabric (SmartGateWay or FB with Matter).</li>
+
       <br>
       <li><b>mobileInfo_</b><i>...</i> - Mobile readings (USB mobile stick or FritzBox LTE).</li>
+
       <br>
       <li><b>mac_</b><i>nn_nn_nn_nn_nn_nn</i> - MAC address and name of an active network device.<br>
                                              If no MAC address is provided, e.g., switch or VPN, the Fritz DeviceID is used instead of the MAC address.<br>
                                              For a WLAN connection, "WLAN" and (as seen by the box) the transmission and reception speed and the reception strength are appended. For a LAN connection, the LAN port and the LAN speed are appended. Guest connections are labeled "gWLAN" or "gLAN".<br>
                                              Inactive or remote devices initially receive the value "inactive: IP address" or "inactive: DeviceID" if no IP address is available.<br>
                                              and are deleted during the next update.</li>
+
       <br>
       <li><b>ip_</b><i>nnn.nnn.nnn.nnn</i> - IP address and name of an active network device.<br>
                                              For a WLAN connection, "WLAN" and (as seen by the box) the transmission and reception speed and the reception strength are appended. For a LAN connection, the LAN port and the LAN speed are appended. Guest connections are labeled "gWLAN" or "gLAN".<br>
                                              Inactive or remote devices initially receive the value "inactive: DeviceID" and are deleted during the next update.</li>
+
       <br>
       <li><b>nbh_</b><i>nn_nn_nn_nn_nn_nn</i> - MAC address and name of an active WAN device.<br>
                                              The SSID, channel, and frequency band are displayed.<br>
                                              Inactive or remote devices initially receive the value "inactive" and are deleted during the next update.</li>
+
       <br>
       <li><b>plc</b><i>n</i><b>_UID</b> - unique ID in the form plc<i>MAC</i></li>
       <li><b>plc</b><i>n</i><b>_coupling</b> - Type of connection between the PLC devices</li>
@@ -20522,18 +21152,22 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>plc</b><i>n</i><b>_phyRateTX</b> - Transfer rate: Send</li>
       <li><b>plc</b><i>n</i><b>_remoteAdapters</b> - MAC of the remote PLC device</li>
       <li><b>plc</b><i>n</i><b>_status</b> - Device status</li>
+
       <br>
       <li><b>radio</b><i>nn</i> - Name of the Internet radio station <i>01</i></li>
+
       <br>
       <li><b>tam</b><i>n</i> - Name of the answering machine <i>n</i></li>
       <li><b>tam</b><i>n</i><b>_newMsg</b> - Number of new messages on the answering machine <i>n</i></li>
       <li><b>tam</b><i>n</i><b>_oldMsg</b> - Number of old messages on the answering machine <i>n</i></li>
       <li><b>tam</b><i>n</i><b>_state</b> - Current status of the answering machine <i>n</i></li>
+
       <br>
       <li><b>user</b><i>nn</i> - Name of user/IP <i>n</i> for whom access restrictions (parental controls) are set up</li>
       <li><b>user</b><i>nn</i>_thisMonthTime - Internet usage of user/IP <i>n</i> in the current month (parental controls)</li>
       <li><b>user</b><i>nn</i>_todaySeconds - Today's internet usage of user/IP <i>n</i> in seconds (parental controls)</li>
       <li><b>user</b><i>nn</i>_todayTime - Today's internet usage of user/IP <i>n</i> (parental controls)</li>
+
       <br>
       <li><b>vpn</b><i>n</i> - Name of the VPN</li>
       <li><b>vpn</b><i>n</i><b>_access_type</b> - Connection type: User VPN | Network value to network | Corporate VPN</li> 
@@ -20543,11 +21177,13 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>vpn</b><i>n</i><b>_remote_ip</b> - IP of the remote site</li> 
       <li><b>vpn</b><i>n</i><b>_state</b> - not active | ready | none</li>
       <li><b>vpn</b><i>n</i><b>_user_connected</b> - Status of whether the VPN user is connected</li>
+
       <br>
       <li><b>sip</b><i>n</i>_<i>phone_number</i> - Status</li>
       <li><b>sip_active</b> - Shows the number of active SIP connections.</li>
       <li><b>sip_inactive</b> - Shows the number of inactive SIP connections.</li>
       <li><b>sip_error</b> - Shows the number of faulty SIP connections. 0 == everything OK.</li> 
+
       <br> 
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingActive</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingEnabled</b> - </li>
@@ -20590,6 +21226,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>shdevice</b><i>n</i><b>_valve_motions</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_valve_steps</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_RXItem</b> - </li>
+
       <br> 
       <li><b>retStat_blockIncomingPhoneCall</b> - Return Status: set &lt;name&gt; blockIncomingPhoneCall ...</li> 
       <li><b>retStat_chgProfile</b> - Return Status: set &lt;name&gt; chgProfile &lt;number&gt; &lt;filtprofn&gt;</li> 
@@ -20782,6 +21419,19 @@ sub Fritz_Helper_Dumper($$;@) {
          Die Ausführung erfolgt non Blocking. Die Rückmeldung erfolgt im Reading: retStat_ring<br>
       </li><br>
 
+      <li><a name="callHandling"></a>
+         <dt><code>set &lt;name&gt; callHandling &lt;Reading-Index&gt; &lt;on|off&gt;</code></dt>
+         <br>
+         Schaltet die Rufumleitung/-behandlung (Reading-Index 1,2,3 ...) für einzelne Rufnummern an oder aus.
+         <br>
+         Achtung! Es lassen sich nur Rufumleitungen/-behandlungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten.
+         Es muss also einen <i>callHandling</i>-Gerätewert geben.
+         <br>
+         Das Attribut enableCallHandling muss auf 1 gesetzt sein.
+         <br>
+         Benötigt die API: TR064 (>=6.50).
+      </li><br>
+
       <li><a name="checkAPIs"></a>
          <dt><code>set &lt;name&gt; checkAPIs &lt;[basic|full]&gt;</code></dt>
          <br>
@@ -20843,17 +21493,10 @@ sub Fritz_Helper_Dumper($$;@) {
          Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
-      <li><a name="callHandling"></a>
-         <dt><code>set &lt;name&gt; callHandling &lt;Reading-Index&gt; &lt;on|off&gt;</code></dt>
+      <li><a name="dnsFilter"></a>
+         <dt><code>set &lt;name&gt; dnsFilter &lt;on|off|updNow|never|updEvery8h|updDayly|updWeeky|updMonthly&gt;</code></dt>
          <br>
-         Schaltet die Rufumleitung/-behandlung (Reading-Index 1,2,3 ...) für einzelne Rufnummern an oder aus.
-         <br>
-         Achtung! Es lassen sich nur Rufumleitungen/-behandlungen für einzelne angerufene Telefonnummern (also nicht "alle") und <u>ohne</u> Abhängigkeit von der anrufenden Nummer schalten.
-         Es muss also einen <i>callHandling</i>-Gerätewert geben.
-         <br>
-         Das Attribut enableCallHandling muss auf 1 gesetzt sein.
-         <br>
-         Benötigt die API: TR064 (>=6.50).
+         Benötigt FRITZ!OS 8.40 oder höher.
       </li><br>
 
       <li><a name="enableVPNshare"></a>
@@ -20893,7 +21536,7 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>set &lt;name&gt; ledSetting &lt;led:on|off&gt; und/oder &lt;bright:1..3&gt; und/oder &lt;env:on|off&gt;</code></dt>
          <br>
          Die Anzahl der Parameter variiert von FritzBox zu Fritzbox zu Repeater zu FritzSmart Device.<br>
-         Die Möglichkeiten können über get &lt;name&gt; luaInfo ledSettings geprüft werden.<br><br>
+         Die Möglichkeiten können über get &lt;name&gt; deviceInfo ledSettings geprüft werden.<br><br>
          &lt;led:<on|off&gt; schaltet die LED's ein oder aus.<br>
          &lt;bright:1..3&gt; reguliert die Helligkeit der LED's von 1=schwach, 2=mittel bis 3=sehr hell.<br>
          &lt;env:on|off&gt; schaltet Regelung der Helligkeit in abhängigkeit der Umgebungshelligkeit an oder aus.<br><br>
@@ -20988,7 +21631,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><a name="smartHome"></a>
          <dt><code>set &lt;name&gt; smartHome &lt;Liste von Parametern&gt;</code></dt><br>
        &lt;-------------------------------------------------------------------------------------------------------------&gt;<br>
-         Die ID kann über <code>get &lt;name&gt; luaInfo &lt;smartHomeAutomation&gt;</code> ermittelt werden.<br>
+         Die ID kann über <code>get &lt;name&gt; deviceInfo &lt;smartHomeAutomation&gt;</code> ermittelt werden.<br>
          Das Ergebnis des get wird im Reading retStat_smartHome abgelegt.<br>
        &lt;-------------------------------------------------------------------------------------------------------------&gt;<br>
          <ul>
@@ -21238,8 +21881,8 @@ sub Fritz_Helper_Dumper($$;@) {
          funktion: <code>internet/inetstat_monitor.lua?myXhr=1&action=disconnect&useajax=1&xhr=1</code> holt eine neue IP-Adresse für das Fritz-Device.
       </li><br>
 
-      <li><a name="luaInfo"></a>
-         <dt><code>get &lt;name&gt; luaInfo &lt;landevices|ledSettings|smartHomeDevices|smartHomeAutomation|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation&gt;</code></dt>
+      <li><a name="deviceInfo"></a>
+         <dt><code>get &lt;name&gt; deviceInfo &lt;landevices|ledSettings|smartHomeDevices|smartHomeAutomation|vpnShares|globalFilters|kidProfiles|userInfos|wlanNeighborhood|mobileInfo|docsisInformation|dnsFilter&gt;</code></dt>
          <br>
          Benötigt FRITZ!OS 7.21 oder höher.<br>
          lanDevices -> Generiert eine Liste der aktiven und inaktiven Netzwerkgeräte.<br>
@@ -21253,6 +21896,7 @@ sub Fritz_Helper_Dumper($$;@) {
          wlanNeighborhood -> Generiert eine Liste der WLAN Nachbarschaftsgeräte.<br>
          mobileInfo -> Informationen über Mobilfunk.<br>
          docsisInformation -> Zeigt Informationen zu DOCSIS an (nur Cable).<br>
+         dnsFilter -> Zeigt Informationen zu den DNS Filtern.<br>
       </li><br>
 
       <li><a name="luaQuery"></a>
@@ -21267,7 +21911,7 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>get &lt;name&gt; smartHomePreDef [deviceID [Saved-PreDef-Name]]</code></dt>
          <br>
          <dt><code>get &lt;name&gt; smartHomePreDef</code></dt>
-         <dd>listet alle gespeicherten Einstellungen auf. Diese Auflistung wird auch bei get <name> luaInfo smartHome mit angezeigt.</dd>
+         <dd>listet alle gespeicherten Einstellungen auf. Diese Auflistung wird auch bei get <name> deviceInfo smartHome mit angezeigt.</dd>
          <dt><code>get &lt;name&gt; smartHomePreDef &lt;deviceID&gt;</code></dt>
          <dd>listet alle für das Device gespeicherten Einstellungen auf.</dd>
          <dt><code>get &lt;name&gt; smartHomePreDef &lt;deviceID&gt; &lt;Saved-PreDef-Name&gt;</code></dt>
@@ -21356,7 +22000,7 @@ sub Fritz_Helper_Dumper($$;@) {
          <br>
          Benutzername für den TR064- oder einen anderen webbasierten Zugang. Ab Fritz!OS 7.25 wird, bisher nur für Fritz!Boxen, zwingend einen Benutzername für das Login verlangt.<br>
          Sollte der Benutzername nicht in der Auswahlliste bereitgestellt werden bitte ein 'set ... checkApis basic' und nach der Meldung 'check API: done' die Seite neu laden.<br>
-         Alternativ kann ein 'get ... luaInfo userInfos' aufgerufen werden. Nach dem schließen der angezeigten Tabelle die Seite neu laden.<br>
+         Alternativ kann ein 'get ... deviceInfo userInfos' aufgerufen werden. Nach dem schließen der angezeigten Tabelle die Seite neu laden.<br>
          Die Benutzerinfo wird automatisch mit jedem Intervall durchlauf aktualisiert.<br>
       </li><br>
 
@@ -21386,31 +22030,6 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>attr &lt;name&gt; disableBoxReadings &lt;liste&gt;</code></dt>
          <br>
          Abwählen einzelner box_ Readings.<br>
-      </li><br>
-
-      <li><a name="enableBoxReadings"></a>
-         <dt><code>attr &lt;name&gt; enableBoxReadings &lt;liste&gt;</code></dt>
-         <br>
-         Werden folgende Readings aktiviert, so wird immer eine ganze Gruppe von Readings aktiviert.<br>
-         <b>box_energyMode</b> -&gt; aktiviert alle Readings <b>box_energyMode</b><i>.*</i> Fritz!OS >= 7.21<br>
-         <b>box_globalFilter</b> -&gt; aktiviert alle Readings <b>box_globalFilter</b><i>.*</i> Fritz!OS >= 7.21<br>
-         <b>box_led</b> -&gt; aktiviert alle Readings <b>box_led</b><i>.*</i> Fritz!OS >= 6.00<br>
-         <b>box_vdsl</b> -&gt; aktiviert alle Readings <b>box_vdsl</b><i>.*</i> Fritz!OS >= 7.80<br>
-         <b>box_dns</b> -&gt; aktiviert alle Readings <b>box_dns</b><i>n</i> Fritz!OS > 7.31<br>
-         <b>box_pwr</b> -&gt; aktiviert alle Readings <b>box_pwr</b><i>...</i> Fritz!OS >= 7.00. Nicht verfügbar für Cable mit Fritz!OS 8.00<br>
-         <b>box_guestWlan</b> -&gt; aktiviert alle Readings <b>box_guestWlan</b><i>...</i> Fritz!OS > 7.00<br>
-         <b>box_usb</b> -&gt; aktiviert alle Readings <b>box_usb</b><i>...</i> Fritz!OS > 7.00<br>
-         <b>box_user</b> -&gt; aktiviert alle Readings <b>box_user</b><i>...</i> Fritz!OS >= 7.52<br>
-         <b>box_notify</b> -&gt; aktiviert alle Readings <b>box_notify</b><i>...</i> Fritz!OS > 7.00<br>
-      </li><br>
-
-      <li><a name="enableLogReadings"></a>
-         <dt><code>attr &lt;name&gt; enableLogReadings &lt;liste&gt;</code></dt>
-         <br>
-         Werden folgende Readings aktiviert, wird das entsprechende SystemLog des Fritz Gerätes abgeholt.<br>
-         <b>box_sys_Log</b> -&gt; holt das System-Log. Letztes Log-Datum im Reading: box_sys_LogNewest<br>
-         <b>box_wlan_Log</b> -&gt; holt das WLAN-Log. Letztes Log-Datum im Reading: box_wlan_LogNewest<br>
-         <b>box_fon_Log</b> -&gt; holt das Telefon-Log. Letztes Log-Datum im Reading: box_fon_LogNewest<br>
       </li><br>
 
       <li><a name="disableDectInfo"></a>
@@ -21443,6 +22062,23 @@ sub Fritz_Helper_Dumper($$;@) {
          Schaltet die Anzeige von Alarm Informationen als Readings aus/ein.
       </li><br>
 
+      <li><a name="enableBoxReadings"></a>
+         <dt><code>attr &lt;name&gt; enableBoxReadings &lt;liste&gt;</code></dt>
+         <br>
+         Werden folgende Readings aktiviert, so wird immer eine ganze Gruppe von Readings aktiviert.<br>
+         <b>box_energyMode</b> -&gt; aktiviert alle Readings <b>box_energyMode</b><i>.*</i> Fritz!OS >= 7.21<br>
+         <b>box_globalFilter</b> -&gt; aktiviert alle Readings <b>box_globalFilter</b><i>.*</i> Fritz!OS >= 7.21<br>
+         <b>box_led</b> -&gt; aktiviert alle Readings <b>box_led</b><i>.*</i> Fritz!OS >= 6.00<br>
+         <b>box_vdsl</b> -&gt; aktiviert alle Readings <b>box_vdsl</b><i>.*</i> Fritz!OS >= 7.80<br>
+         <b>box_dns</b> -&gt; aktiviert alle Readings <b>box_dns</b><i>n</i> Fritz!OS > 7.31<br>
+         <b>box_pwr</b> -&gt; aktiviert alle Readings <b>box_pwr</b><i>...</i> Fritz!OS >= 7.00. Nicht verfügbar für Cable mit Fritz!OS 8.00<br>
+         <b>box_guestWlan</b> -&gt; aktiviert alle Readings <b>box_guestWlan</b><i>...</i> Fritz!OS > 7.00<br>
+         <b>box_usb</b> -&gt; aktiviert alle Readings <b>box_usb</b><i>...</i> Fritz!OS > 7.00<br>
+         <b>box_user</b> -&gt; aktiviert alle Readings <b>box_user</b><i>...</i> Fritz!OS >= 7.52<br>
+         <b>box_notify</b> -&gt; aktiviert alle Readings <b>box_notify</b><i>...</i> Fritz!OS > 7.00<br>
+         <b>box_ntpTime</b> -&gt; aktiviert alle Readings <b>box_ntpTime</b><i>...</i> Fritz!OS >= 8.00<br>
+      </li><br>
+
       <li><a name="enableCallHandling"></a>
          <dt><code>attr &lt;name&gt; enableCallHandling &lt;0 | 1&gt;</code></dt>
          <br>
@@ -21472,6 +22108,12 @@ sub Fritz_Helper_Dumper($$;@) {
          Ist das Attribut auf >= 1 werden die Readings auf 1..24 Stunden * 10 Werte pro Stunde gesetzt.<br>
       </li><br>
 
+      <li><a name="enableDNSFilterInfo"></a>
+         <dt><code>attr &lt;name&gt; enableDNSFilterInfo &lt;0 | 1&gt;</code></dt> 
+         <br>
+         Schaltet die Anzeige von DNS Filter Informationen als Reading aus/ein.<br>
+      </li><br>
+
       <li><a name="enableDocsisInfo"></a>
          <dt><code>attr &lt;name&gt; enableDocsisInfo &lt;0 | 1&gt;</code></dt> 
          <br>
@@ -21483,6 +22125,15 @@ sub Fritz_Helper_Dumper($$;@) {
          <dt><code>attr &lt;name&gt; enableKidProfiles &lt;0 | 1&gt;</code></dt> 
          <br>
          Schaltet die Anzeige von Kid-Profilen als Reading aus/ein.
+      </li><br>
+
+      <li><a name="enableLogReadings"></a>
+         <dt><code>attr &lt;name&gt; enableLogReadings &lt;liste&gt;</code></dt>
+         <br>
+         Werden folgende Readings aktiviert, wird das entsprechende SystemLog des Fritz Gerätes abgeholt.<br>
+         <b>box_sys_Log</b> -&gt; holt das System-Log. Letztes Log-Datum im Reading: box_sys_LogNewest<br>
+         <b>box_wlan_Log</b> -&gt; holt das WLAN-Log. Letztes Log-Datum im Reading: box_wlan_LogNewest<br>
+         <b>box_fon_Log</b> -&gt; holt das Telefon-Log. Letztes Log-Datum im Reading: box_fon_LogNewest<br>
       </li><br>
 
       <li><a name="enableMeshMonitor"></a>
@@ -21671,6 +22322,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_wlan_lastScanTime</b> - Letzter Scan der WLAN Umgebung. Ist nur vorhanden, wenn das Attribut enableWLANneighbors gesetzt ist.</li>
       <li><b>box_wlan_LogExtended</b> - Status -> "Auch An- und Abmeldungen und erweiterte WLAN-Informationen protokollieren".</li>
       <li><b>box_wlan_LogNewest</b> - aktuellstes WLAN-Ereignis: ID Datum Zeit </li>
+
       <br>
       <li><b>box_cpu...</b>Readings CPU Informationen. Verfügbar, wenn im Attribut enableCPUInfo aktiviert</li>
       <li><b> box_cpuCurrentInterval_Data</b> </li>
@@ -21679,11 +22331,13 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_cpuRAMCacheUsed_Data</b> </li>
       <li><b>box_cpuRAMStrictlyUsed_Data</b> </li>
       <li><b>box_box_cpuRAMPhysFree_Data</b> </li>
+
       <br>
       <li><b>box_dns...</b>Readings DNS Informationen. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_dns_Server</b><i>n</i> - Provider DNS Server</li>
       <li><b>box_dns_Srv</b><i>n</i><b>_used_IPv4_</b><i>n</i> - benutzte IPv4 DNS Server</li>
       <li><b>box_dns_Srv</b><i>n</i><b>_used_IPv6_</b><i>n</i> - benutzte IPv6 DNS Server</li>
+
       <br>
       <li><b>box_globalFilter...</b>Readings globale Filter. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_globalFilterNetbios</b> - Aktueller Status: NetBIOS-Filter aktiv</li>
@@ -21691,6 +22345,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_globalFilterStealth</b> - Aktueller Status: Firewall im Stealth Mode</li>
       <li><b>box_globalFilterTeredo</b> - Aktueller Status: Teredo-Filter aktiv</li>
       <li><b>box_globalFilterWpad</b> - Aktueller Status: WPAD-Filter aktiv</li>
+
       <br>
       <li><b>box_guestWlan...</b>Readings Gäste WLAN. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_guestWlan</b> - Aktueller Status des Gäste-WLAN</li>
@@ -21701,6 +22356,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_guestWlan_defPrivSSID</b> - Standard privater Name (SSID) des Gäste-WLAN</li>
       <li><b>box_guestWlan_groupAccess</b> - Gruppenzugriff möglich</li>
       <li><b>box_guestWlan_tmoActive</b> - Zeitbrenzung aktiv</li>
+
       <br>
       <li><b>box_led...</b>Readings LED's. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_ledCanDim</b> - zeigt an, ob das setzen der Helligkeit der Led's in der Fritzbox/dem Repeater implementiert ist</li>
@@ -21708,6 +22364,15 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_ledDisplay</b> - zeigt an, ob die Led's an oder aus sind</li>
       <li><b>box_ledEnvLight</b> - zeigt an, ob die Umgebungshelligkeit die Helligkeit der Led's steuert</li>
       <li><b>box_ledHasEnv</b> - zeigt an, ob das setzen der Led Helligkeit durch die Umgebungshelligkeit in der Fritzbox/dem Repeater implementiert ist</li>
+
+      <br> 
+      <li><b>box_ntpTime...</b>Readings ntpTime. Verfügbar, wenn im Attribut enableBoxReadings aktiviert.</li>
+      <li><b>box_ntpTime_chronyEnabled</b> - wenn gesetzt, dann arbeitet die Fritz!Box als Zeitserver.</li>
+      <li><b>box_ntpTime_ntpServer</b> - Zeitserver von dem die Fritz!Box ihre Zeit erhält.</li>
+      <li><b>box_ntpTime_tzDstEnabled</b> - Sommerzeit aktiviert</li>
+      <li><b>box_ntpTime_tzEnabled</b> - manuelles Einstellen der Zeitzone aktiviert</li>
+      <li><b>box_ntpTime_tzOffsetMinutes</b> - Abweichung zu GMT</li>
+
       <br>
       <li><b>box_notify...</b>Readings Fehlerhinweise. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_notify_</b><i>...</i> - die beiden Readings werden erstellt, wenn die FritzBox die Info LED rot aktiviert und einen entsprechenden Hinweis</li>
@@ -21717,6 +22382,7 @@ sub Fritz_Helper_Dumper($$;@) {
                                                      Ergänzung -solved by FB-. Der Button wird auf '-solved by FB- Readings löschen' gesetzt. Über diesen Button können die<br>
                                                      beiden Readings box_notify_<notify_ID> und box_notify_<notify_ID>_info nun gelöscht werden.<br>
                                                      Die Readings müssen über das Attribut: enableBoxReadings aktiviert werden.</li>
+
       <br>
       <li><b>box_pwr...</b>Readings Energieverbrauch. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_pwr_Rate_Act</b>Gesamtsystem - Energieverbrauch aktuell</li>
@@ -21731,6 +22397,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_pwr_FON_24avg</b>FON - Energieverbrauch 24-Stunden-Mittel</li>
       <li><b>box_pwr_USB_Act</b>USB - Energieverbrauch aktuell</li>
       <li><b>box_pwr_USB_24avg</b>USB - Energieverbrauch 24-Stunden-Mittel</li>
+
       <br>
       <li><b>box_usb...</b>Readings USB Anschlüsse. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_usb_FTP_activ</b></li>
@@ -21748,6 +22415,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_usb_</b><i>n</i><b>_devStorageTotal</b></li>
       <li><b>box_usb_</b><i>n</i><b>_devStorageUsed</b></li>
       <li><b>box_usb_</b><i>n</i><b>_devType</b></li>
+
       <br>
       <li><b>box_user...</b>Readings Benutzer Informationen. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_user</b><i>n</i><b>_admin_rights</b></li>
@@ -21757,33 +22425,37 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_user</b><i>n</i><b>_name</b></li>
       <li><b>box_user</b><i>n</i><b>_nas_rights</b></li>
       <li><b>box_user</b><i>n</i><b>_vpn_access</b></li>
+
       <br>
       <li><b>box_vdsl...</b>Readings VDSL. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_vdsl_downStreamRate</b> - Aktuelle DownStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_downStreamMaxRate</b> - Maximale DownStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamRate</b> - Aktuelle UpStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamMaxRate</b> - Maximale UpStream Datenrate (MBit/s)</li>
+
       <br>
       <li><b>box_sys_Log...</b>Readings System-Logs. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_sys_LogNewest</b><i>n</i>Letztes Log-Datum System-Log</li>
       <li><b>box_wlan_LogNewest</b><i>n</i>Letztes Log-Datum WLAN-Log</li>
       <li><b>box_fon_LogNewest</b><i>n</i>Letztes Log-Datum Telefon-Log</li>
-      <br>
 
+      <br>
       <li><b>alarm...</b>Readings alarm. Verfügbar, wenn das Attribut enableAlarmInfo aktiviert ist</li>
       <li><b>alarm</b><i>n</i> - Name des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_state</b> - Aktueller Status des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_target</b> - Interne Nummer des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_time</b> - Weckzeit des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
-      <br>
 
+      <br>
       <li><b>callHandling...</b>Readings callHandling. Verfügbar, wenn das Attribut enableCallRedi aktiviert ist</li>
+
       <br>
       <li>Readings für Fritz!OS < 721</li>
       <li><b>callHandling</b><i>n</i> - Eigene Rufnummer der Rufumleitung <i>n</i></li>
       <li><b>callHandling</b><i>n</i><b>_dest</b> - Zielnummer der Rufumleitung <i>n</i></li>
       <li><b>callHandling</b><i>n</i><b>_state</b> - Aktueller Status der Rufumleitung <i>n</i></li>
+
       <br>
       <li>Readings für Fritz!OS >= 721</li>
       <li><b>callHandling</b><i>n</i> - ID der Rufumleitung/-behandlung <i>1</i></li>
@@ -21791,12 +22463,12 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>callHandling</b><i>n</i><b>_from</b> - (Teil)Nummer die umgeleitet/behandelt wird <i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_to</b> - Ziel der Rufumleitung/-behandlung <i>1</i></li>
       <li><b>callHandling</b><i>n</i><b>_type</b> - Typ der Rufumleitung/-behandlung <i>1</i></li>
-      <br>
 
+      <br>
       <li><b>kidprofile...</b>Readings kidprofile. Verfügbar, wenn das Attribut enableKidProfiles aktiviert ist</li>
       <li><b>kidprofile</b><i>n</i>Internet Zugriffsprofile</li>
-      <br>
 
+      <br>
       <li><b>docsis...</b>Readings docsis. Verfügbar, wenn das Attribut enabledocsisInfo aktiviert ist</li>
       <li><b>docsis_Available</b> - Nur Fritz!Box Cable</li> 
       <li><b>docsis30_Ds_channelIDs</b> - Nur Fritz!Box Cable</li>
@@ -21840,24 +22512,50 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>dect</b><i>n</i><b>_NoRingWithNightSetting</b> - Bei aktiver Klingelsperre keine Ereignisse signalisieren für das DECT Telefon <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_radio</b> - aktueller Internet-Radio-Klingelton des DECT Telefons <i>n</i></li>
       <li><b>dect</b><i>n</i><b>_NoRingTime</b> - Klingelsperren des DECT Telefons <i>n</i></li>
+
+      <br>
+      <li><b>dnsFilter_autoUpdate_enabled</b> - Status des automatischen Updates des DNS Filters</li>
+      <li><b>dnsFilter_autoUpdate_interval</b> - Update Interval:"nie", 8 Stunden, täglich, wöchentlich, monatlich</li>
+      <li><b>dnsFilter_autoUpdate_time</b> - Zeitstempel des letzten Updates</li>
+      <li><b>dnsFilter_enabled</b> - DNS Filter aktiv</li>
+      <li><b>dnsFilter_filterlists</b> - Anzahl DNS Filter</li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_UID</b> - Unique ID der Filterliste <i>n</i></li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_URL</b> - URL der Filterliste <i>n</i></li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_action</b> - Umgang mit der Filterliste <i>n</i></li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_enabled</b> - Status der Filterliste <i>n</i></li>
+      <li><b>dnsFilter_filterlist</b><i>n</i><b>_name</b> - Name der Filterliste <i>n</i></li>
+      <li><b>dnsFilter_domains</b> - Anzahl DNS domains</li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_UID</b> - Unique ID der Domain <i>n</i></li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_domain</b> - URL der Domain <i>n</i></li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_action</b> - Umgang mit der Domain <i>n</i></li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_enabled</b> - Status der Domain <i>n</i></li>
+      <li><b>dnsFilter_domain</b><i>n</i><b>_name</b> - Name der Domain <i>n</i></li>
+      <li><b>dnsFilter_clients</b> - Anzahl DNS Clients</li>
+
       <br>
       <li><b>fon</b><i>n</i> - Name des analogen Telefonanschlusses <i>n</i> an der FRITZ!BOX</li>
       <li><b>fon</b><i>n</i><b>_device</b> - Interne Device Nummer des analogen Telefonanschlusses <i>n</i></li>
       <li><b>fon</b><i>n</i><b>_intern</b> - Interne Telefonnummer des analogen Telefonanschlusses <i>n</i></li>
       <li><b>fon</b><i>n</i><b>_out</b> - ausgehende Telefonnummer des Anschlusses <i>n</i></li>
+
+      <br>
       <li><b>fon_phoneBook_IDs</b> - ID's of the existing phone books </li>
       <li><b>fon_phoneBook_</b><i>n</i> - Name of the phone book <i>n</i></li>
       <li><b>fon_phoneBook_URL_</b><i>n</i> - URL to the phone book <i>n</i></li>
+
       <br>
       <li><b>gsm_internet</b> - Internetverbindung errichtet über Mobilfunk-Stick </li>
       <li><b>gsm_rssi</b> - Indikator der empfangenen GSM-Signalstärke (0-100)</li>
       <li><b>gsm_state</b> - Status der Mobilfunk-Verbindung</li>
       <li><b>gsm_technology</b> - GSM-Technologie, die für die Datenübertragung genutzt wird (GPRS, EDGE, UMTS, HSPA)</li>
+
       <br>
       <li><b>matter_</b><i>...</i><b>_node</b> - matter node (SmartGateWay oder FB mit Matter).</li>
       <li><b>matter_</b><i>...</i><b>_vendor</b> - matter vendor/fabric (SmartGateWay oder FB mit Matter).</li>
+
       <br>
       <li><b>mobileInfo_</b><i>...</i> - Mobilfunk Readings (USB-Mobilfunk-Stick oder FritzBox LTE).</li>
+
       <br>
       <li><b>mac_</b><i>nn_nn_nn_nn_nn_nn</i> - MAC Adresse und Name eines aktiven Netzwerk-Gerätes.<br>
       Wird keine MAC-Adresse bereit gestellt,z.B. Switch oder VPN, dann wird anstatt der MAC-Adresse die Fritz-Device DeviceID genommen.<br>
@@ -21872,6 +22570,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>nbh_</b><i>nn_nn_nn_nn_nn_nn</i> - MAC-Adresse und Name eines aktiven WAN-Gerätes.<br>
       Es wird die SSID, der Kanal und das Frequenzband angezeigt.<br>
       Inaktive oder entfernte Geräte erhalten zuerst den Werte "inactive" und werden beim nächsten Update gelöscht.</li>
+
       <br>
       <li><b>plc</b><i>n</i><b>_UID</b> - eindeutige ID in der Form plc<i>MAC</i></li>
       <li><b>plc</b><i>n</i><b>_coupling</b> - Art der Verbindung zwischen den PLC Geräten</li>
@@ -21881,18 +22580,22 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>plc</b><i>n</i><b>_phyRateTX</b> - Transferrate: Senden</li>
       <li><b>plc</b><i>n</i><b>_remoteAdapters</b> - MAC der/des remote PLC Gerätes</li>
       <li><b>plc</b><i>n</i><b>_status</b> - Gerätestatus</li>
+
       <br>
       <li><b>radio</b><i>nn</i> - Name der Internetradiostation <i>01</i></li>
+
       <br>
       <li><b>tam</b><i>n</i> - Name des Anrufbeantworters <i>n</i></li>
       <li><b>tam</b><i>n</i><b>_newMsg</b> - Anzahl neuer Nachrichten auf dem Anrufbeantworter <i>n</i></li>
       <li><b>tam</b><i>n</i><b>_oldMsg</b> - Anzahl alter Nachrichten auf dem Anrufbeantworter <i>n</i></li>
       <li><b>tam</b><i>n</i><b>_state</b> - Aktueller Status des Anrufbeantworters <i>n</i></li>
+
       <br>
       <li><b>user</b><i>nn</i> - Name von Nutzer/IP <i>n</i> für den eine Zugangsbeschränkung (Kindersicherung) eingerichtet ist</li>
       <li><b>user</b><i>nn</i>_thisMonthTime - Internetnutzung des Nutzers/IP <i>n</i> im aktuellen Monat (Kindersicherung)</li>
       <li><b>user</b><i>nn</i>_todaySeconds - heutige Internetnutzung des Nutzers/IP <i>n</i> in Sekunden (Kindersicherung)</li>
       <li><b>user</b><i>nn</i>_todayTime - heutige Internetnutzung des Nutzers/IP <i>n</i> (Kindersicherung)</li>
+
       <br>
       <li><b>vpn</b><i>n</i> - Name des VPN</li>
       <li><b>vpn</b><i>n</i><b>_access_type</b> - Verbindungstyp: Benutzer VPN | Netzwert zu Netzwerk | Firmen VPN</li>
@@ -21902,11 +22605,13 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>vpn</b><i>n</i><b>_remote_ip</b> - IP der Gegenstelle</li>
       <li><b>vpn</b><i>n</i><b>_state</b> - not active | ready | none</li>
       <li><b>vpn</b><i>n</i><b>_user_connected</b> - Status, ob Benutzer VPN <i>n</i> verbunden ist</li>
+
       <br>
       <li><b>sip</b><i>n</i>_<i>Telefon-Nummer</i> - Status</li>
       <li><b>sip_active</b> - zeigt die Anzahl aktiver SIP.</li>
       <li><b>sip_inactive</b> - zeigt die Anzahl inaktiver SIP.</li>
       <li><b>sip_error</b> - zeigt die Anzahl fehlerhafter SIP. 0 == alles Ok.</li>
+
       <br>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingActive</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_adaptivHeatingEnabled</b> - </li>
@@ -21949,6 +22654,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>shdevice</b><i>n</i><b>_valve_motions</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_valve_steps</b> - </li>
       <li><b>shdevice</b><i>n</i><b>_RXItem</b> - </li>
+
       <br>
       <li><b>retStat_blockIncomingPhoneCall</b> - Return Status: set &lt;name&gt; blockIncomingPhoneCall ...</li>
       <li><b>retStat_chgProfile</b> - Return Status: set &lt;name&gt; chgProfile &lt;number&gt; &lt;filtprofn&gt;</li>
@@ -21974,21 +22680,21 @@ sub Fritz_Helper_Dumper($$;@) {
    <a name="Fritz Ereignis-Codes"></a>
    <b>Ereignis-Codes</b>
    <ul><br>
-       <li><b>1</b> IGMPv3 multicast router n.n.n.n active</li>
-      <li><b>11</b> DSL ist verfügbar (DSL-Synchronisierung besteht mit n/n kbit/s).</li>
-      <li><b>12</b> DSL-Synchronisierung beginnt (Training).</li>
-      <li><b>14</b> Mobilfunkmodem initialisiert.</li>
-      <li><b>23</b> Internetverbindung wurde getrennt.</li>
-      <li><b>24</b> Internetverbindung wurde erfolgreich hergestellt. IP-Adresse: ..., DNS-Server: ... und ..., Gateway: ..., Breitband-PoP: ..., LineID:...</li>
-      <li><b>25</b> Internetverbindung IPv6 wurde erfolgreich hergestellt. IP-Adresse: ...:...:...:...:...:...:...:...</li>
-      <li><b>26</b> Internetverbindung wurde getrennt.</li>
-      <li><b>27</b> IPv6-Präfix wurde erfolgreich bezogen. Neues Präfix: ....:....:....:....:/nn</li>
-      <li><b>28</b> Internetverbindung IPv6 wurde getrennt, Präfix nicht mehr gültig.</li>
-      <br>
-      <li><b>71</b> Anmeldung der Internetrufnummer &lt;Nummer&gt; war nicht erfolgreich. Ursache: DNS-Fehler.</li>
-      <li><b>73</b> Anmeldung der Internetrufnummer &lt;Nummer&gt; war nicht erfolgreich. Ursache: Gegenstelle antwortet nicht. Zeitüberschreitung.</li>
-      <li><b>85</b> Die Internetverbindung wird kurz unterbrochen, um der Zwangstrennung durch den Anbieter zuvorzukommen.</li>
-      <br>
+     <li><b>1</b> IGMPv3 multicast router n.n.n.n active</li>
+     <li><b>11</b> DSL ist verfügbar (DSL-Synchronisierung besteht mit n/n kbit/s).</li>
+     <li><b>12</b> DSL-Synchronisierung beginnt (Training).</li>
+     <li><b>14</b> Mobilfunkmodem initialisiert.</li>
+     <li><b>23</b> Internetverbindung wurde getrennt.</li>
+     <li><b>24</b> Internetverbindung wurde erfolgreich hergestellt. IP-Adresse: ..., DNS-Server: ... und ..., Gateway: ..., Breitband-PoP: ..., LineID:...</li>
+     <li><b>25</b> Internetverbindung IPv6 wurde erfolgreich hergestellt. IP-Adresse: ...:...:...:...:...:...:...:...</li>
+     <li><b>26</b> Internetverbindung wurde getrennt.</li>
+     <li><b>27</b> IPv6-Präfix wurde erfolgreich bezogen. Neues Präfix: ....:....:....:....:/nn</li>
+     <li><b>28</b> Internetverbindung IPv6 wurde getrennt, Präfix nicht mehr gültig.</li>
+     <br>
+     <li><b>71</b> Anmeldung der Internetrufnummer &lt;Nummer&gt; war nicht erfolgreich. Ursache: DNS-Fehler.</li>
+     <li><b>73</b> Anmeldung der Internetrufnummer &lt;Nummer&gt; war nicht erfolgreich. Ursache: Gegenstelle antwortet nicht. Zeitüberschreitung.</li>
+     <li><b>85</b> Die Internetverbindung wird kurz unterbrochen, um der Zwangstrennung durch den Anbieter zuvorzukommen.</li>
+     <br>
      <li><b>119</b> Information des Anbieters über die Geschwindigkeit des Internetzugangs (verfügbare Bitrate): nnnn/nnnn kbit/s</li>
      <li><b>131</b> USB-Gerät ..., Klasse 'USB 2.0 (hi-speed) storage', angesteckt</li>
      <li><b>132</b> USB-Gerät ... abgezogen</li>
