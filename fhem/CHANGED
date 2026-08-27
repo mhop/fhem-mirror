@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix: 72_FritzSmart: Korrektur Attributen, kleinere Optimierungen
+ - feature: 72_FritzSmart: Vorbereitung auf kommendes Fritz!OS
+                           Unterstützung Beta DNS Filter
  - change:  93_DbRep: kleine Codeanpassung
  - feature: 70_PylonLowVoltage: v2.0.0 - Implementierung SubProcess
  - change: 49_SSCamSTRM: Codeanpassung
