@@ -2,9 +2,11 @@
 // dashboard.js
 //###########################################################################################################################################
 // Released : 14.11.2013 Sascha Hermann
-// Modified : 19.05.2020 Heiko Maaz
+// Modified : 28.08.2026 Heiko Maaz
 //
-// Version : 
+// Version :
+// 2.1.0:   Funktionen und Änderungen zur Kompatibilität Dashboard v3.18.0 (Navigationselemente für SVG-Plots)
+// 2.0.10:  adddashboardButton: remove a possibly existing button first to avoid duplicate ids/handlers on repeated calls 
 // 2.0.9:   FW_readingsGroupReadyFn in if-condition, avoid "ReferenceError: FW_readingsGroupReadyFn is not defined"
 // 2.0.8:   dashboard_load_tab(tabIndex) test of defined fhemUrl
 // 2.0.7:   Insert Configdialog for Tabs. Change handling of parameters in both directions.
@@ -435,7 +437,8 @@ function dashboard_openModal(tabid) {
 }
 
 function adddashboardButton(position, text, id, hint) {
-    $("#" + id).button();
+	$("#" + id).remove();                                                       // adddashboardButton: remove a possibly existing button first to avoid duplicate ids/handlers on repeated calls
+	$("#" + id).button();
 	var my_button = '<span id="' + id + '" title="'+hint+'" class="dashboard dashboard-button dashboard-button-custom dashboard-button-'+id+' dashboard-state-default" style="">'+text+'</span>';
 	$("#dashboard_tabnav").prepend(my_button);	 
 }
@@ -485,12 +488,64 @@ function dashboard_load_tab(tabIndex) {
 	}
 }
 
+// Faengt Klicks auf die SVG Zoom-in/Zoom-out/Prev/Next-Buttons (SVG_zoomLink() aus 98_SVG.pm) ab.
+// Normalerweise wuerden diese Links das komplette FHEMWEB-#content durch die Detailseite des
+// SVG-Devices ersetzen (volle Seitennavigation). Stattdessen holen wir per AJAX nur das eine
+// betroffene Dashboard-Widget (Buttons + Plot) neu und tauschen es im DOM aus.
+//
+// Wichtig: einmalig GLOBAL delegiert (nicht pro Tab neu gebunden) und in der CAPTURING-Phase
+// (3. Parameter "true" bei addEventListener) registriert. FHEMWEBs eigener Link-Handler
+// (z.B. aus fhemweb.js) ist vermutlich ebenfalls delegiert (auf #content/document) - ein
+// normaler jQuery .on("click", ...) in der Bubbling-Phase kaeme dagegen im Zweifel zu spaet.
+// Capturing garantiert, dass wir vor JEDEM Bubbling-Handler an der Reihe sind.
+document.addEventListener("click", function(event) {
+	var target = event.target.closest ?
+	             event.target.closest(".SVGlabel[data-name='svgZoomControl'] a") : null;
+	if (!target)
+		return;
+
+	var $link      = $(target);
+	var $container = $link.closest(".dashboard_dev_container");
+	if (!$container.length)
+		return;                                      // kein Dashboard-Kontext -> normales Verhalten zulassen
+
+	var deviceName = $container.attr("informId");
+	if (!deviceName)
+		return;
+
+	event.preventDefault();
+	event.stopPropagation();
+	if (event.stopImmediatePropagation) { event.stopImmediatePropagation(); }
+
+	var href     = target.getAttribute("href") || "";
+	var posMatch = href.match(/[?&]pos=([^&]*)/);
+	var pos      = posMatch ? posMatch[1] : "";
+
+	dashboard_getData(
+		fhemUrl + "?cmd=get " + $('#dashboard_define').text(),
+		"svgdevice " + deviceName + "&pos=" + pos,
+		"html",
+		function ($container, data) {
+			var $newContent = $(data);
+			$container.replaceWith($newContent);
+			FW_replaceWidgets($newContent);
+			if (typeof svg_init == 'function') { svg_init(); }   // plotembed_2 (lazy AJAX-Loading) nachladen
+			// kein Re-Binding noetig: der Handler ist global delegiert und greift automatisch
+			// auch fuer die soeben neu eingefuegten Zoom-Links
+		}.bind(null, $container)
+	);
+}, true);
+
 function dashboard_insert_tab(tabIndex, content) {
   $('#dashboardtabs').append(content);
   $("#dashboardtabs").tabs('refresh');
 
   // call FHEM specific widget replacement
   FW_replaceWidgets($("#dashboard_tab" + tabIndex));
+
+  // svg.js laedt plotembed_2-SVGs (lazy AJAX) nur beim initialen $(document).ready();
+  // fuer per AJAX nachgeladene Tabs (Tab 2, 3, ...) muss das hier nachgeholt werden.
+  if (typeof svg_init == 'function') { svg_init(); }
 
   dashboard_init_tab(tabIndex);
 }
@@ -516,7 +571,10 @@ function dashboard_init_tab(tabIndex) {
 	} else { $("#dashboard_tab" + tabIndex + " .dashboard_widgetheader").addClass( "dashboard_widgetheader ui-corner-all" );}
 
 	  // call FHEMWEB specific link replacement
-	  $("#dashboard_tab" + tabIndex + " a").each(function() { FW_replaceLink(this); });
+	  // SVG-Zoom/Pan-Links werden bewusst ausgenommen: die sollen NICHT das ganze
+	  // Dashboard durch die Detailseite ersetzen, sondern per AJAX nur ihr eigenes
+	  // Widget aktualisieren -> siehe globaler, delegierter Capturing-Handler weiter oben
+	  $("#dashboard_tab" + tabIndex + " a").not(".SVGlabel[data-name='svgZoomControl'] a").each(function() { FW_replaceLink(this); });
 
 	  restoreOrder(tabIndex);
 	  if (gridSize = is_dashboard_flexible()) {

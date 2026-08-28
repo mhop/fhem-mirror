@@ -48,6 +48,7 @@ use vars qw(%FW_icons); 	# List of icons
 use vars qw($FW_dir);      	# base directory for web server
 use vars qw($FW_icondir);   # icon base directory
 use vars qw($FW_room);      # currently selected room
+use vars qw($FW_detail);    # currently selected device for detail view, used to fix SVG zoom links
 use vars qw(%defs);		    # FHEM device/button definitions
 #use vars qw(%FW_groups);	# List of Groups
 use vars qw($FW_wname);     # Web instance
@@ -56,6 +57,8 @@ use vars qw($FW_ss);      	# is smallscreen, needed by 97_GROUP/95_VIEW
 
 # Versions History intern
 our %Dashboard_vNotesIntern = (
+  "3.18.0" => "28.08.2026  Funktionen und Änderungen zur Implementierungen Navigationselemente für SVG-Plots ",
+  "3.17.3" => "27.08.2026  Dashboard_Attr: RemoveInternalTimer(\$hash, 'Dashboard_init') hinzugefügt ",
   "3.17.2" => "10.04.2022  fix perl warnings, Forum: #127216 ",
   "3.17.1" => "10.02.2020  fix perl warning, Forum: https://forum.fhem.de/index.php/topic,16503.msg1023004.html#msg1023004 ",
   "3.17.0" => "06.10.2019  Path handling of backgroundimage changed ",
@@ -84,8 +87,8 @@ use vars qw($FW_dir);     # base directory for web server
 
 #########################
 # Global variables
-my %group;
-my $dashboard_groupListfhem;
+#my %group;
+#my $dashboard_groupListfhem;
 my $fwjquery         = "jquery.min.js";
 my $fwjqueryui       = "jquery-ui.min.js";
 
@@ -268,6 +271,9 @@ sub Dashboard_Get($@) {
   elsif ($arg eq "tab" && $arg2 =~ /^\d+$/) {
       return Dashboard_BuildDashboardTab($arg2, $hash->{NAME});
   } 
+  elsif ($arg eq "svgdevice" && $arg2 && $defs{$arg2}) {                                            # AJAX partial-refresh for a single SVG-Plot (Zoom/Pan-Buttons)
+      return Dashboard_BuildSvgDevice($arg2);
+  } 
   elsif ($arg eq "icon") {
       shift @a;
       shift @a;
@@ -300,8 +306,7 @@ sub Dashboard_Attr($$$) {
           addToDevAttrList($name, "dashboard_tab" . ($1 + 1) . "backgroundimage");
       }
 
-      if ($aName =~ m/alias/) {
-          # if an alias is set to the dashboard, replace the name shown in the left navigation by this alias
+      if ($aName =~ m/alias/) {                                     # if an alias is set to the dashboard, replace the name shown in the left navigation by this alias
           my $url = '/dashboard/'.$name;
           $data{FWEXT}{$url}{NAME} = $aVal;
       }
@@ -322,16 +327,19 @@ sub Dashboard_Attr($$$) {
       }
       
       delete $hash->{HELPER}{BIMG}{$ct};
+      
       if($cmd eq "set") {
           Dashboard_searchImage($name, "$FW_dir/images", $aVal,$ct); 
+          
           if (!$hash->{HELPER}{BIMG}{$ct}) {       
               Log3 ($name, 2, "Dashboard $name - Background image file not found: $aVal");          
               return "Background image file not found: $aVal";   
           } 
       }
   }
-      
-  InternalTimer (time()+2, 'Dashboard_init', $hash, 0);
+  
+  RemoveInternalTimer ($hash, 'Dashboard_init');
+  InternalTimer       (time()+2, 'Dashboard_init', $hash, 0);
 
 return;  
 }
@@ -886,27 +894,35 @@ sub Dashboard_BuildGroup ($$$$$$) {
 	  my $devName = AttrVal($d, "alias", $d);
 	  my $icon    = AttrVal($d, "icon", "");
 	  $icon       = FW_makeImage($icon,$icon,"icon dashboard_groupicon")."&nbsp;" if($icon);
-      $devName    = "" if($modules{$defs{$d}{TYPE}}{FW_hideDisplayName});                    # Forum 88667
+      $devName    = "" if($modules{$defs{$d}{TYPE}}{FW_hideDisplayName});                   # Forum 88667
       
-	  if (!$modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {                                        # Don't show Link for "atEnd"-devices
+	  if (!$modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {                                       # Don't show Link for "atEnd"-devices
 	      if(AttrVal($name, "dashboard_noLinks", 0)) {
-              $ret .= "<td>$icon$devName</td>";                                              # keine Links zur Detailansicht des Devices
+              $ret .= "<td>$icon$devName</td>";                                             # keine Links zur Detailansicht des Devices
           } 
           else {
-              $ret .= FW_pH ("detail=$d", "$icon$devName", 1, "col1", 1);                    # FW_pH = add href (<link>, <Text>, <?>, <class>, <Wert zurückgeben>, <?>)
+              $ret .= FW_pH ("detail=$d", "$icon$devName", 1, "col1", 1);                   # FW_pH = add href (<link>, <Text>, <?>, <class>, <Wert zurückgeben>, <?>)
           } 
       }	     
 		
 	  $row++;		
-			
+
+      %extPage = ();                                                                        # reset per device: otherwise SVG_FwFn's isFirst-logic
+                                                                                            # (98_SVG.pm) suppresses zoom/nav-buttons for every SVG
+                                                                                            # device after the first one within this dashboard box
       $extPage{group}               = $groupname;
 	  my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf, \%extPage);
+      
+      delete $extPage{svgLoaded};   
+      
 	  $allSets                      = FW_widgetOverride($d, $allSets);
 		
 	  ##############   Customize Result for Special Types #####################
 	  my @txtarray = split(">", $txt);				
       if ($modules{$defs{$d}{TYPE}}{FW_atPageEnd}) {
 	      no strict "refs"; 
+		  local $FW_detail = $d;    # SVG_zoomLink() baut sonst "room=" (leer) -> leere Root-Seite;
+		                            # mit $FW_detail zeigt der Link auf die funktionierende Detailseite dieses Devices
 		  my $devret = &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, $FW_room, \%extPage);
  		  $ret      .= "<td class=\"dashboard_dev_container\"";
 		  
@@ -957,7 +973,7 @@ sub Dashboard_BuildGroup ($$$$$$) {
       
 	  $ret .= "</tr>";
       if(AttrVal($name, "dashboard_noLinks", 0)) {   
-          $ret   =~ s/(<a\s+href="\/fhem\?detail=$d">(.*)<\/a>)/$2/s;           # keine Links zur Detailansicht des Devices
+          $ret   =~ s/(<a\s+href="\/fhem\?detail=$d">(.*)<\/a>)/$2/s;               # keine Links zur Detailansicht des Devices
       }
   }
 	
@@ -975,6 +991,29 @@ sub Dashboard_BuildGroup ($$$$$$) {
   }
 
 return $ret;
+}
+
+#############################################################################################
+#  AJAX partial refresh of a single SVG-Plot (used by dashboard.js for the Zoom/Pan-Buttons)
+#############################################################################################
+sub Dashboard_BuildSvgDevice ($) {
+  my ($d) = @_;
+
+  return "" if (!defined($defs{$d}) || !$modules{$defs{$d}{TYPE}}{FW_atPageEnd});
+
+  my %extPage = ();                                                                 # frisch: sorgt in SVG_FwFn fuer isFirst=1 -> Buttons werden erzeugt
+  $extPage{group} = "";
+
+  no strict "refs";
+  local $FW_detail = $d;                                                            # Fallback-Link (falls JS mal nicht greift), zeigt auf Detailseite statt "room="
+  my $devret = &{$modules{$defs{$d}{TYPE}}{FW_summaryFn}}($FW_wname, $d, $FW_room, \%extPage);
+  use strict "refs";
+
+  my $ret = "<td class=\"dashboard_dev_container\"";
+  $ret .= " informId=\"$d\"" if ($devret !~ /informId/i);
+  $ret .= ">$devret</td>";
+
+  return $ret;
 }
 
 #############################################################################################
@@ -1204,7 +1243,7 @@ sub Dashboard_init ($) {
   my $hash = shift;
   my $name = $hash->{NAME};
   
-  RemoveInternalTimer($hash, "Dashboard_init");
+  RemoveInternalTimer ($hash, "Dashboard_init");
   
   if ($init_done) {                                                                             # die Argumente für das Attribut dashboard_webRefresh dynamisch ermitteln und setzen
       my $fwd             = join ",", devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized"); 
