@@ -279,7 +279,7 @@ MQTT2_SERVER_State()
       $hash->{retain}{$k} = \%h;
     }
 
-    my $rname = AttrVal($hash->{NAME}, "hideRetain", 0) ? "RETAIN" : ".RETAIN";
+    my $rname = AttrVal($hash->{NAME}, "hideRetain", 0) ? ".RETAIN" : "RETAIN";
     if($name ne $rname) {
       InternalTimer(0, sub {
         $hash->{READINGS}{$rname} = $hash->{READINGS}{$name};
