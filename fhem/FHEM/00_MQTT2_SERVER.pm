@@ -272,6 +272,7 @@ MQTT2_SERVER_State()
     {
       # do not convert retained MQTT-Payloads again, #145363
       local $unicodeEncoding = 1;
+      local $jsonSkipNameConversion = 1;
       $ret = json2nameValue($val);
     }
     for my $k (keys %{$ret}) {

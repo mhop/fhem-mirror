@@ -241,7 +241,6 @@ use vars qw($cmdFromAnalyze);   # used by the warnings-sub
 use vars qw($devcount);         # Maximum device number, used for storing. 
 use vars qw($devcountPrioSave); # Maximum prioSave device number
 use vars qw($devcountTemp);     # number for temp devices like client connect
-use vars qw($unicodeEncoding);  # internal encoding is unicode (wide character)
 use vars qw($featurelevel); 
 use vars qw($fhemForked);       # 1 in a fhemFork()'ed process, else undef
 use vars qw($fhemTestFile);     # file to include if -t is specified
@@ -249,6 +248,7 @@ use vars qw($fhem_started);     # used for uptime calculation
 use vars qw($haveInet6);        # Using INET6
 use vars qw($init_done);        #
 use vars qw($internal_data);    # FileLog/DbLog -> SVG data transport
+use vars qw($jsonSkipNameConversion); # Used by MQTT2_SERVER
 use vars qw($lastDefChange);    # number of last def/attr change
 use vars qw($lastWarningMsg);   # set by the warnings-sub
 use vars qw($nextat);           # Time when next timer will be triggered.
@@ -256,6 +256,7 @@ use vars qw($numCPUs);          # Number of CPUs on Linux, else 1
 use vars qw($reread_active);
 use vars qw($selectTimestamp);  # used to check last select exit timestamp
 use vars qw($tmpdevcount);      # Maximum device number, used for storing
+use vars qw($unicodeEncoding);  # internal encoding is unicode (wide character)
 use vars qw($winService);       # the Windows Service object
 
 use vars qw(%attr);             # Attributes
@@ -5481,7 +5482,7 @@ json2nameValue($;$$$$)
         my ($name,$val) = ($1,$2);
         ($err,$name) = lStr('"'.$name.'"'); #139807
         return ($err,undef) if($err);
-        $name = makeReadingName($name);
+        $name = makeReadingName($name) if(!$jsonSkipNameConversion);
         ($err,$in2) = eObj(\%r2, $name, $val, $in2, $prefix);
         return ($err,undef) if($err);
         $in2 =~ s/^\s*,\s*//;
