@@ -72,6 +72,9 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.2" => "29.08.2026  userExit bzgl. zirkulären Referenzen gehärtet, potenzielle Speicherleaks geschlossen ".
+                           "_aiFannAutoArchitecture: Warnung durch undefiniertes dataParamRatio beseitigt ".
+                           "_aiFannEpochDiagnostic: neuen hint29, very_early-Zweig: hint1 und hint26 zusaätzlich gated, early-Zweig: hint5 und hint23 zusätzlich gated ",
   "2.10.1" => "20.08.2026  writeCacheFile: singleUpdateState entfernt (Forum: https://forum.fhem.de/index.php?msg=1368075) ".
                            "weitere singleUpdateState in Getter entfernt ".
                            "isGhoValFormValid geändert: die Prüfung erfolgt nun zuverlässig bei Eingabe des graphicHeaderOwnspecValForm-Attributs ",
@@ -990,6 +993,8 @@ my %epoche_translations = (
                DE => "Validierungsverlauf bleibt trotz maximaler Shuffle-Periode (30) instabil (StdDev/Mean=%.2f): Momentum ist unauffällig, daher wahrscheinlich datenbedingtes Rauschen (z.B. stochastisches Verbrauchsprofil). Prüfe aiControl->aiConBitFailLimit und erwäge eine moderate Reduktion der Lernrate (aiControl->aiConLearnRate) statt weiterer Shuffle-Anpassungen." },
   hint28  => { EN => "Periodic shuffle is active (aiConShufflePeriod=%d), but validation curve is still unstable (StdDev/Mean=%.2f): increase the period step by step to %d to further improve stability (aiControl->aiConShufflePeriod).",
                DE => "Periodisches Shuffle ist aktiv (aiConShufflePeriod=%d), Validierungsverlauf aber weiterhin instabil (StdDev/Mean=%.2f): Periode schrittweise erhöhen auf %d, um die Stabilität weiter zu verbessern (aiControl->aiConShufflePeriod)." },
+  hint29  => { EN => "Early convergence with poor R² (%.2f, profile threshold %.2f) at a non-oversized architecture (DPR=%.1f): the network has likely already extracted what the current architecture/feature set can offer. Learning-rate or momentum tuning is unlikely to help here (community report: tightening the bit-fail limit increased epoch usage without any R²/MAE gain) - instead review/extend the feature set or, if DPR allows, try a larger architecture (aiControl->aiConHiddenLayers).",
+               DE => "Frühe Konvergenz bei schwachem R² (%.2f, Profilschwelle %.2f) und nicht überdimensionierter Architektur (DPR=%.1f): das Netz hat vermutlich bereits ausgeschöpft, was die aktuelle Architektur/das Feature-Set hergeben. Lernraten- oder Momentum-Anpassungen bringen hier erfahrungsgemäß keine Verbesserung (Community-Report: BitFail-Limit-Verschärfung erhöhte Epochenausnutzung ohne jeden R²/MAE-Gewinn) - stattdessen Feature-Set prüfen/erweitern oder, falls DPR es zulässt, eine größere Architektur versuchen (aiControl->aiConHiddenLayers)." },
 );
 
 my %hqtxt = (                                                                               # Hash (Setup) Texte
@@ -11579,8 +11584,42 @@ sub Undef {
  my $hash = shift;
  my $name = shift;
 
- RemoveInternalTimer($hash);
+ for my $blkkey (qw(AINNTRAIN_CON_BLOCKRUN AINNTRAIN_PV_BLOCKRUN AIBLOCKRUNNING GMFRUNNING)) {          # laufende BlockingCall Kindprozesse beenden, sonst Zombie-Prozess + Zugriff auf gelöschten $hash
+     BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
+ }
+
+ _removeAllTimers ($hash);                                                                              # entfernt auch Timer mit [$name,...]/{hash=>$hash,...} ARG, siehe oben
  delete $readyfnlist{$name};
+
+return;
+}
+
+################################################################
+#  Entfernt alle InternalTimer dieses Devices - auch solche,
+#  deren ARG kein $hash, sondern ein anonymer Array-Ref
+#  ([$name, ...]) oder Hash-Ref ({hash => $hash, ...}) ist.
+#  RemoveInternalTimer($hash) matcht nur exakte Referenzgleichheit
+#  und erfasst diese Timer daher NICHT (z.B. centralTask,
+#  singleUpdateState, writeCacheFile mit [$name,...]-Aufruf).
+################################################################
+sub _removeAllTimers {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+
+  for my $i (keys %main::intAt) {
+      my $entry = $main::intAt{$i};
+      my $fn    = $entry->{FN} // '';
+
+      next if($fn !~ /^FHEM::SolarForecast::/xs);                                                       # nur eigene Timer anfassen
+
+      my $arg   = $entry->{ARG};
+      my $match = 0;
+
+      $match = 1 if(ref $arg eq 'HASH'  && ( $arg == $hash || (defined $arg->{hash} && $arg->{hash} == $hash) ));
+      $match = 1 if(ref $arg eq 'ARRAY' && defined $arg->[0] && $arg->[0] eq $name);
+
+      delete $main::intAt{$i} if($match);
+  }
 
 return;
 }
@@ -13369,7 +13408,7 @@ sub _specialActivities {
           my $cutoff = $t - $ttl;
 
           for my $sh1 (keys %{ $data{$name}{log} }) {                                           # Logsperrhash bereinigen
-              delete $data{$name}{log}{$sh1} if($data{$name}{log}{$sh1}{ts} // 0 < $cutoff);
+              delete $data{$name}{log}{$sh1} if(($data{$name}{log}{$sh1}{ts} // 0) < $cutoff);
           }
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
@@ -28705,6 +28744,7 @@ sub aiFannConAbortTrain {
   Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{$blkkey}{fn} pid:$hash->{HELPER}{$blkkey}{pid} aborted: $cause");
 
   delete $hash->{HELPER}{$blkkey};
+  delete $data{$name}{$fanntyp.'temp'};                                                        # verwaiste Trainingsversuche (inkl. FannBlob) des abgebrochenen Laufs verwerfen
 
   $data{$name}{current}{$fanntyp.'NNTrainstate'} = $cause;
 
@@ -30242,7 +30282,7 @@ return $composite;
 # Die Parameterzahl einer Architektur ergibt sich schichtweise: Jede versteckte Schicht hat
 # (Neuronen_Vorgänger + 1) × Neuronen_aktuell Parameter (Gewichte + Bias). Die Ausgabeschicht
 # addiert Neuronen_letzte_Hidden + 1 Parameter.
-# Die Kandidatenliste wird von der kleinsten zur größten Architektur durchlaufen.
+# Die Kandidatenliste wird von der größten zur kleinsten Architektur durchlaufen.
 # Die erste Architektur, deren Data-Parameter-Ratio ≥ ratio_min ist, wird gewählt. Erfüllt kein
 # Kandidat das Kriterium, greift der Fallback auf die minimale Architektur '8'.
 # Entscheidend ist, dass neben der Datenmenge auch die Anzahl der Input-Features eingeht - eine
@@ -30256,8 +30296,8 @@ sub _aiFannAutoArchitecture {
   my $dataParamRatio;
 
   for my $arch (@candidates) {
-      my $num_params     = __aiFannEstimateParams ($num_inputs, $arch);
-      my $dataParamRatio = $num_train_datasets / $num_params;
+      my $num_params  = __aiFannEstimateParams ($num_inputs, $arch);
+      $dataParamRatio = $num_train_datasets / $num_params;
       return ($arch, $dataParamRatio) if $dataParamRatio >= $ratio_min;
   }
 
@@ -30413,15 +30453,25 @@ sub _aiFannEpochDiagnostic {
   # kleine Architekturen (hoher DPR) konvergieren strukturell früher – das ist kein Fehler
   my $thr_very_early = $dpr > 20 ? 0.015 : $dpr > 10 ? 0.02 : 0.03;
   my $thr_early      = $dpr > 20 ? 0.04  : $dpr > 6  ? 0.06 : 0.12;
+  
+  # Kapazitätsgrenze: frühe Konvergenz bei schwachem R² UND nicht überdimensionierter Architektur (DPR<=20)
+  # deutet auf eine durch Architektur/Feature-Set begrenzte Vorhersagequalität hin, nicht auf ein
+  # Lernraten-/Trainingsproblem. LR-/Momentum-Hints greifen hier typischerweise ins Leere
+  # (Community-Report: BitFail-Verschärfung 0.34->0.25 erhöhte Epochenausnutzung 357->1919 ohne jede R²/MAE-Verbesserung).
+  my $capacity_limited = !$is_dead_net
+                      && defined $r2
+                      && $r2 < $r2_threshold
+                      && $dpr > 0
+                      && $dpr <= 20;
 
   # --- 1. Relative Epochen-Position
   if ($rel < $thr_very_early) {
       $code  = 'very_early';
       $label = $epoche_translations{vearly}{$lang};
 
-      push @hints, $epoche_translations{hint1}{$lang} unless ($is_dead_net || $lr_at_floor);
+      push @hints, $epoche_translations{hint1}{$lang} unless ($is_dead_net || $lr_at_floor || $capacity_limited);
       push @hints, sprintf $epoche_translations{hint26}{$lang}, $learning_rate, $learning_momentum
-          if ($lr_at_floor && !$is_dead_net);
+          if ($lr_at_floor && !$is_dead_net && !$capacity_limited);
 
       my $ratio_ok = !$dpr || $dpr > 20;                                                # hint2 nur wenn DPR sehr hoch → Architektur ist gemessen an den Daten zu klein
 
@@ -30440,14 +30490,14 @@ sub _aiFannEpochDiagnostic {
       $label = $epoche_translations{early}{$lang};
 
       my $hint4_fires = $learning_momentum >= 0.65;
-      my $hint5_fires = $learning_rate     >= 0.01 && $slope < $slope_warn_min;         # nur wenn Slope auch tatsächlich problematisch
+      my $hint5_fires = $learning_rate     >= 0.01 && $slope < $slope_warn_min && !$capacity_limited;       # nur wenn Slope auch tatsächlich problematisch
 
       push @hints, $epoche_translations{hint4}{$lang} if $hint4_fires;
       push @hints, $epoche_translations{hint5}{$lang} if $hint5_fires;
 
       my $arch_too_small = $dpr > 20;                                                   # nur wenn Netz wirklich zu klein für die Datenmenge
       push @hints, $epoche_translations{hint23}{$lang}
-          unless ($hint4_fires || $hint5_fires || !$arch_too_small);
+          unless ($hint4_fires || $hint5_fires || !$arch_too_small || $capacity_limited);
   }
   elsif ($rel <= 0.72) {                                                                # 1800 – 10800 Epochen
       $code  = 'ok';
@@ -30470,8 +30520,11 @@ sub _aiFannEpochDiagnostic {
   }
 
   # --- 2. Kombinations-Checks
-  # Totes Netz: lernt überhaupt nichts (Slope≈0, Val MSE < Train MSE)
-  if ($is_dead_net) {
+  if (($code eq 'very_early' || $code eq 'early') && $capacity_limited) {
+      push @hints, sprintf $epoche_translations{hint29}{$lang}, $r2, $r2_threshold, $dpr;
+  }
+  
+  if ($is_dead_net) {                                                                   # Totes Netz: lernt überhaupt nichts (Slope≈0, Val MSE < Train MSE)
       if ($learning_rate < 0.001 && $learning_momentum < 0.6) {
           push @hints, sprintf $epoche_translations{deadlow}{$lang}, $learning_rate;
       }
@@ -38756,19 +38809,27 @@ sub userExit {
   my $uefn = AttrVal ($name, 'ctrlUserExitFn', '');
   return if(!$uefn);
 
-  $uefn =~ s/\s*#.*//g;                                             # Kommentare entfernen
-  $uefn =~ s/^\s+|\s+$//g;                                          # nur Anfang und Ende trimmen
+  $uefn =~ s/\s*#.*//g;                                                             # Kommentare entfernen
+  $uefn =~ s/^\s+|\s+$//g;                                                          # nur Anfang und Ende trimmen
   my $result;
 
-  if ($uefn =~ /^\{.*\}$/s) {                                       # unnamed Funktion direkt in ctrlUserExitFn mit {...}
-        my $coderef = eval "sub $uefn;";
+  if ($uefn =~ /^\{.*\}$/s) {
+        my $weak_hash = $hash;
+        weaken ($weak_hash);                                                        # Schwache Referenz für den Hash erstellen
+        
+        my $coderef = eval "sub { my \$hash = shift; $uefn }";                      # Code als Block kompilieren, der den Hash als Parameter erwartet
 
         if ($@) {
             Log3 ($name, 1, "$name - ERROR compiling userExitFn: $@");
         }
         elsif (ref $coderef eq 'CODE') {
-            eval { $result = $coderef->() };
+            eval { 
+                $result = $coderef->($weak_hash);
+            };
+            
             Log3 ($name, 1, "$name - ERROR executing userExitFn: $@") if($@);
+            
+            undef $coderef;                                                         # Coderef explizit freigeben
         }
         else {
             Log3 ($name, 1, "$name - no valid function block in ctrlUserExitFn");
