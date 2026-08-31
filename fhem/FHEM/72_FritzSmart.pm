@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.08.27";
+our $ModulVersion = "26.08.31";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -179,6 +179,7 @@ sub Fritz_Get_MobileInfo($);
 sub Fritz_Get_WLAN_globalFilters($);
 sub Fritz_Get_LED_Settings($);
 sub Fritz_Get_VPN_Shares_List($);
+sub Fritz_Get_VPN_Shares_List_old($);
 sub Fritz_Get_DOCSIS_Informations($);
 sub Fritz_Get_WLAN_Environment($);
 sub Fritz_Get_SmartHome_Devices_List($@);
@@ -209,8 +210,8 @@ sub Fritz_open_Web_Connection($);
 # Sub, die die Funktionen data.lua, query.lua, function.lua und javascript abbilden
 sub Fritz_call_Lua_Query($$@);
 sub Fritz_call_LuaData($$$@);
-sub Fritz_write_javaScript($$;@);
 sub Fritz_call_javaScript($$@);
+sub Fritz_write_javaScript($$;@);
 
 # Sub, die Helferfunktionen bereit stellen
 sub Fritz_Helper_make_TableRow($@);
@@ -833,7 +834,7 @@ our %LuaQueryCmd = (
 
         sip_info               => { cmd   => "sip:settings/sip/list(activated,displayname,connect)"},
 
-        vpn_info               => { cmd   => "vpn:settings/connection/list(remote_ip,activated,name,state,access_type,connected_since)"},
+        vpn_info               => { cmd   => "vpn:settings/connection/list(remote_ip,activated,name,state,access_type,connected_since,UID)"},
 
         GSM_RSSI               => { cmd   => "gsm:settings/RSSI"},
         GSM_NetworkState       => { cmd   => "gsm:settings/NetworkState"},
@@ -1088,7 +1089,7 @@ sub Fritz_Get_attrList($@) {
                                 ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_GuestWlan_OnOff,Fritz_Set_call_Phone,"
                                 ."Fritz_Set_dectRing_Phone,Fritz_Set_ring_Phone,Fritz_Set_rescan_Neighborhood,Fritz_Set_macFilter_OnOff,Fritz_Set_change_Profile,Fritz_Set_lock_filter_Profile,"
                                 ."Fritz_Set_lock_Landevice_OnOffRt,Fritz_Set_lock_Landevice_OnOffRt_8,Fritz_Set_enable_VPNshare_OnOff,Fritz_Set_wake_Up_Call,Fritz_Set_Wlan_Log_Ext_OnOff,"
-                                ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_DOCSIS_Informations,"
+                                ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_VPN_Shares_List_Old,Fritz_Get_DOCSIS_Informations,"
                                 ."Fritz_Get_WLAN_Environment,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
                                 ."Fritz_Get_Fritz_Log_Info_nonBlk,Fritz_Get_Kid_Profiles_List,Fritz_Get_Fritz_Log_Info_Std,Fritz_Get_Lan_Device_Info,Fritz_Get_supportData,Fritz_Get_TR064_ServiceList,Fritz_Get_meshInfrastructure,"
                                 ."Fritz_SOAP_Request,Fritz_SOAP_Para_Request,"
@@ -1184,7 +1185,7 @@ sub Fritz_Get_attrList($@) {
                                 ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_GuestWlan_OnOff,Fritz_Set_call_Phone,"
                                 ."Fritz_Set_dectRing_Phone,Fritz_Set_ring_Phone,Fritz_Set_rescan_Neighborhood,Fritz_Set_macFilter_OnOff,Fritz_Set_change_Profile,Fritz_Set_lock_filter_Profile,"
                                 ."Fritz_Set_lock_Landevice_OnOffRt,Fritz_Set_lock_Landevice_OnOffRt_8,Fritz_Set_enable_VPNshare_OnOff,Fritz_Set_wake_Up_Call,Fritz_Set_Wlan_Log_Ext_OnOff,"
-                                ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_DOCSIS_Informations,"
+                                ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_VPN_Shares_List_Old,Fritz_Get_DOCSIS_Informations,"
                                 ."Fritz_Get_WLAN_Environment,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
                                 ."Fritz_Get_Fritz_Log_Info_nonBlk,Fritz_Get_Kid_Profiles_List,Fritz_Get_Fritz_Log_Info_Std,Fritz_Get_Lan_Device_Info,Fritz_Get_supportData,Fritz_Get_TR064_ServiceList,Fritz_Get_meshInfrastructure,"
                                 ."Fritz_SOAP_Request,Fritz_SOAP_Para_Request,"
@@ -2492,7 +2493,7 @@ sub Fritz_Attr_Modul($@)
                             ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_GuestWlan_OnOff,Fritz_Set_call_Phone,"
                             ."Fritz_Set_dectRing_Phone,Fritz_Set_ring_Phone,Fritz_Set_rescan_Neighborhood,Fritz_Set_macFilter_OnOff,Fritz_Set_change_Profile,Fritz_Set_lock_filter_Profile,"
                             ."Fritz_Set_lock_Landevice_OnOffRt,Fritz_Set_lock_Landevice_OnOffRt_8,Fritz_Set_enable_VPNshare_OnOff,Fritz_Set_wake_Up_Call,Fritz_Set_Wlan_Log_Ext_OnOff,"
-                            ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_DOCSIS_Informations,"
+                            ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_VPN_Shares_List_Old,Fritz_Get_DOCSIS_Informations,"
                             ."Fritz_Get_WLAN_Environment,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
                             ."Fritz_Get_Fritz_Log_Info_nonBlk,Fritz_Get_Kid_Profiles_List,Fritz_Get_Fritz_Log_Info_Std,Fritz_Get_Lan_Device_Info,Fritz_Get_supportData,Fritz_Get_TR064_ServiceList,Fritz_Get_meshInfrastructure,"
                             ."Fritz_SOAP_Request,Fritz_SOAP_Para_Request,"
@@ -4808,7 +4809,7 @@ sub Fritz_Set_Modul($$@)
 
            $val[0] = "vpn".$val[0] unless ($val[0] =~ /vpn/);
 
-           unless (defined( $hash->{READINGS}{$val[0]})) {
+           unless (defined( $hash->{READINGS}{$val[0].'_name'})) {
              $retMsg = "ERROR: set $name $cmd " . join(" ", @val);
              return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
            }
@@ -5402,7 +5403,10 @@ sub Fritz_Get_Modul($@)
        } elsif ( $val[0] eq "lanDevices" && $hash->{LUADATA} == 1) {
          $returnStr = Fritz_Get_Lan_Devices_List($hash);
 
-       } elsif ( $val[0] eq "vpnShares" && $hash->{LUADATA} == 1) {
+       } elsif ( $val[0] eq "vpnShares" && $hash->{LUADATA} == 1 && $hash->{fhem}{fwVersion} < 840) {
+         $returnStr = Fritz_Get_VPN_Shares_List_old($hash);
+
+       } elsif ( $val[0] eq "vpnShares" && $hash->{LUADATA} == 1 && $hash->{fhem}{fwVersion} >= 840) {
          $returnStr = Fritz_Get_VPN_Shares_List($hash);
 
        } elsif ( $val[0] eq "wlanNeighborhood" && $hash->{LUADATA} == 1) {
@@ -6253,7 +6257,7 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
    }
 
    Fritz_Log $hash, 4, "ReadOut gestartet: $queryStr";
-   $result = Fritz_call_Lua_Query( $hash, $queryStr, "", "luaQuery") ;
+   $result = Fritz_call_Lua_Query( $hash, $queryStr, "", "luaQuery");
 
    # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
    return Fritz_Readout_Response($hash, $result, $roReadings) if ( defined $result->{Error} || defined $result->{AuthorizationRequired});
@@ -6634,35 +6638,56 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
      }
 
      # 09128734qwe
-     # vpn:settings/connection/list(remote_ip,activated,name,state,access_type,connected_since)
+     # vpn:settings/connection/list(remote_ip,activated,name,state,access_type,connected_since,UID)
+
+     my %accessType = (
+            '1' => "Corp VPN",
+            '2' => "User VPN",
+            '3' => "Lan2Lan VPN",
+            '4' => "Wireguard Simple",
+          );
+
+     my $vName = "";
 
      foreach ( @{ $result->{vpn_info} } ) {
        $_->{_node} =~ m/(\d+)/;
-       $rName = "vpn" . $1;
+       $rName = "vpn" . $1 . "_";
 
        Fritz_Log $hash, 4, "vpn->info: $rName " . $_->{_node} . ": " . $_->{activated} . ": " . $_->{state};
 
-       Fritz_Readout_Add_Reading $hash, $roReadings, $rName, $_->{name};
-       delete $oldVPNDevice{$rName} if exists $oldVPNDevice{$rName};
+       $vName = $rName . "name";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $vName, $_->{name};
+       delete $oldVPNDevice{$vName} if exists $oldVPNDevice{$vName};
 
-       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_access_type", "Corp VPN"    if $_->{access_type} == 1;
-       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_access_type", "User VPN"    if $_->{access_type} == 2;
-       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_access_type", "Lan2Lan VPN" if $_->{access_type} == 3;
-       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_access_type", "Wireguard Simple" if $_->{access_type} == 4;
-       delete $oldVPNDevice{$rName . "_access_type"} if exists $oldVPNDevice{$rName . "_access_type"};
+       $vName = $rName . "UID";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $vName, $_->{UID};
+       delete $oldVPNDevice{$vName} if exists $oldVPNDevice{$vName};
 
-       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_remote_ip", $_->{remote_ip} eq "" ? "....":$_->{remote_ip};
-       delete $oldVPNDevice{$rName . "_remote_ip"} if exists $oldVPNDevice{$rName . "_remote_ip"};
+#       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "access_type", "Corp VPN"         if $_->{access_type} == 1;
+#       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "access_type", "User VPN"         if $_->{access_type} == 2;
+#       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "access_type", "Lan2Lan VPN"      if $_->{access_type} == 3;
+#       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "access_type", "Wireguard Simple" if $_->{access_type} == 4;
 
-       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_activated", $_->{activated};
-       delete $oldVPNDevice{$rName . "_activated"} if exists $oldVPNDevice{$rName . "_activated"};
+       $vName = $rName . "access_type";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $vName, $accessType{"$_->{access_type}"};
+       delete $oldVPNDevice{$vName} if exists $oldVPNDevice{$vName};
 
-       Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_state", $_->{state} eq "" ? "none":$_->{state};
-       delete $oldVPNDevice{$rName . "_state"} if exists $oldVPNDevice{$rName . "_state"};
+       $vName = $rName . "remote_ip";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $vName, $_->{remote_ip} eq "" ? "....":$_->{remote_ip};
+       delete $oldVPNDevice{$vName} if exists $oldVPNDevice{$vName};
 
+       $vName = $rName . "activated";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $vName, $_->{activated};
+       delete $oldVPNDevice{$vName} if exists $oldVPNDevice{$vName};
+
+       $vName = $rName . "state";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $vName, $_->{state} eq "" ? "none":$_->{state};
+       delete $oldVPNDevice{$vName} if exists $oldVPNDevice{$vName};
+
+       $vName = $rName . "connected_since";
        if ($_->{access_type} <= 3) {
          if ($_->{connected_since} == 0) {
-           Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_connected_since", "none";
+           Fritz_Readout_Add_Reading $hash, $roReadings, $vName, "none";
          } else {
            $Sek = $_->{connected_since};
 
@@ -6674,17 +6699,18 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
            $Std = substr("0".$Std,-2);
            $Min = substr("0".$Min,-2);
            $Sek = substr("0".$Sek,-2);
-           Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_connected_since", $_->{connected_since} . " sec = " . $Tag . "T $Std:$Min:$Sek";
+           Fritz_Readout_Add_Reading $hash, $roReadings, $vName, $_->{connected_since} . " sec = " . $Tag . "T $Std:$Min:$Sek";
          }
-         delete $oldVPNDevice{$rName . "_connected_since"} if exists $oldVPNDevice{$rName . "_connected_since"};
+         delete $oldVPNDevice{$rName . $vName} if exists $oldVPNDevice{$vName};
        } else {
+         $vName = $rName . "last_negotiation";
          if ($_->{connected_since} == 0) {
-           Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_last_negotiation", "none";
+           Fritz_Readout_Add_Reading $hash, $roReadings, $vName, "none";
          } else {
            $Sek = (int(time) - $_->{connected_since});
-           Fritz_Readout_Add_Reading $hash, $roReadings, $rName . "_last_negotiation", (strftime "%d-%m-%Y %H:%M:%S", localtime($_->{connected_since}));
+           Fritz_Readout_Add_Reading $hash, $roReadings, $rName . $vName, (strftime "%d-%m-%Y %H:%M:%S", localtime($_->{connected_since}));
          }
-         delete $oldVPNDevice{$rName . "_last_negotiation"} if exists( $oldVPNDevice{$rName . "_last_negotiation"});
+         delete $oldVPNDevice{$vName} if exists( $oldVPNDevice{$vName});
        }
 
      }
@@ -11681,24 +11707,28 @@ sub Fritz_Readout_API_Check($)
            } else {
 
              my $errText = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error}, 1);
+             Fritz_Log $hash, 4, "GetCommonLinkProperties failed (expected for IP-Client without firewall): $errText";
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN?";
 
-             $apiError .= " TR064: $errText";
-
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
-
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $errText;
-
-             $hash->{fhem}{sidTime} = 0;
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
-
-             my $returnStr = join('|', @roReadings );
-
-             Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
-
-             return $name . "|" . encode_base64($returnStr,"");
+#             my $errText = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error}, 1);
+#
+#             $apiError .= " TR064: $errText";
+#
+#             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
+#             Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+#
+#             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
+#             Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $errText;
+#
+#             $hash->{fhem}{sidTime} = 0;
+#             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
+#             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+#
+#             my $returnStr = join('|', @roReadings );
+#
+#             Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
+#
+#             return $name . "|" . encode_base64($returnStr,"");
            }
 
          } else {
@@ -12877,7 +12907,7 @@ sub Fritz_Set_enable_VPNshare_OnOff($)
    # lang: de
    # page: shareVpn
 
-   my $queryStr = "&vpn_info=vpn:settings/connection/list(remote_ip,activated,name,state,access_type)";
+   my $queryStr = "&vpn_info=vpn:settings/connection/list(remote_ip,activated,name,state,access_type,UID)";
 
    $result = Fritz_call_Lua_Query( $hash, $queryStr) ;
 
@@ -12888,45 +12918,57 @@ sub Fritz_Set_enable_VPNshare_OnOff($)
      return Fritz_Readout_Response($hash, $result, \@roReadings, 2);
    }
 
-   my $vpnok = 0;
+   my $vpnok    = 0;
    my $vpnShare = substr($val[0],3);
+   my $vpnUID   = "";
 
    foreach ( @{ $result->{vpn_info} } ) {
      $_->{_node} =~ m/(\d+)/;
      if ( $1 == $vpnShare) {
+       $vpnUID = $_->{UID};
        $vpnok = 1;
        last;
      }
    }
 
    if ($vpnok == 0){
-     Fritz_Log $hash, 2, "vo valid " . $val[0] . " found";
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", $val[0] . "->ERROR: not found";
+     Fritz_Log $hash, 2, "vo valid vpn" . $val[0] . " found";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", "vpn" .$val[0]. "->ERROR: not found";
    } else {
-     Fritz_Log $hash, 4, "set $name $cmd " . join(" ", @val);
 
+     Fritz_Log $hash, 4, "set $name $cmd " . join(" ", @val);
      my $state = $val[1] eq "on"?"1":"0";
 
-     #xhr 1 connection0 on active_connection0 1 apply nop lang de page shareVpn
+     if($hash->{fhem}{fwVersion} >= 840) {
+       # {"activated":"1"}
 
-     push @webCmdArray, "xhr"                         => "1";
-     push @webCmdArray, "lang"                        => "de";
-     push @webCmdArray, "page"                        => "shareVpn";
-     push @webCmdArray, "apply"                       => "";
-     push @webCmdArray, "connection".$vpnShare        => $val[1];
-     push @webCmdArray, "active_connection".$vpnShare => $state;
+       my $vpnAddress = 'generic/vpn/connection/' . $vpnUID;
+       $result = Fritz_write_javaScript($hash,$vpnAddress, '{"activated":"' . $state . '"}', "put");
 
-     Fritz_Log $hash, 4, "data.lua: \n" . join(" ", @webCmdArray);
+     } else { # $hash->{fhem}{fwVersion} < 840
+       #xhr 1 connection0 on active_connection0 1 apply nop lang de page shareVpn
 
-     $result = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
+       push @webCmdArray, "xhr"                         => "1";
+       push @webCmdArray, "lang"                        => "de";
+       push @webCmdArray, "page"                        => "shareVpn";
+       push @webCmdArray, "apply"                       => "";
+       push @webCmdArray, "connection".$vpnShare        => $val[1];
+       push @webCmdArray, "active_connection".$vpnShare => $state;
+
+       Fritz_Log $hash, 4, "data.lua: \n" . join(" ", @webCmdArray);
+
+       $result = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
+
+     }
 
      # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
      if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
-       Fritz_Log $hash, 2, "enable_VPNshare: " . $result->{Error};
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", $val[0] . "->ERROR: " . $result->{Error};
+       Fritz_Log $hash, 2, "enable_VPNshare: vpn" .$val[0]. ":" .$result->{Error};
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", "vpn" .$val[0]. "->ERROR: " . $result->{Error};
        return Fritz_Readout_Response($hash, $result, \@roReadings, 2);
      }
 
+     # Testen, ob es funktioniert hat
      $queryStr = "&vpn_info=vpn:settings/connection$vpnShare/activated";
      my $vpnState = Fritz_call_Lua_Query( $hash, $queryStr) ;
 
@@ -12934,17 +12976,17 @@ sub Fritz_Set_enable_VPNshare_OnOff($)
 
      # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
      if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
-       Fritz_Log $hash, 2, "enable_VPNshare: " . $result->{Error};
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", $val[0] . "->ERROR: " . $result->{Error};
+       Fritz_Log $hash, 2, "enable_VPNshare: vpn" .$val[0]. ":" .$result->{Error};
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", "vpn" .$val[0]. "->ERROR: " . $result->{Error};
        return Fritz_Readout_Response($hash, $result, \@roReadings, 2);
      }
 
      if ($vpnState->{vpn_info} != $state) {
-       Fritz_Log $hash, 2, "VPNshare " . $val[0] . " not set to " . $val[1] . " <> " . $vpnState->{vpn_info};
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", $val[0] . "->ERROR: " . $vpnState->{vpn_info};
+       Fritz_Log $hash, 2, "VPNshare vpn" . $val[0] . " not set to " . $val[1] . " <> " . $vpnState->{vpn_info};
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", "vpn" .$val[0]. "->ERROR: " . $vpnState->{vpn_info};
      } else {
-       Fritz_Log $hash, 4, "VPNshare " . $val[0] . " set to " . $val[1];
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", $val[0] . "->" . $val[1];
+       Fritz_Log $hash, 4, "VPNshare vpn" . $val[0] . " set to " . $val[1];
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_enableVPNshare", "vpn" .$val[0]. "->" . $val[1];
        Fritz_Readout_Add_Reading $hash, \@roReadings, $val[0] . "_activated", $vpnState->{vpn_info};
      }
    }
@@ -14814,9 +14856,79 @@ sub Fritz_Get_LED_Settings($) {
 
 } # end Fritz_Get_LED_Settings
 
-# get list of VPN Shares
+# get list of VPN Shares, FritzOS >= 8.40
 ############################################
 sub Fritz_Get_VPN_Shares_List($) {
+
+   my ($hash) = @_;
+   my $name = $hash->{NAME};
+
+   my $returnStr;
+
+   my $result = Fritz_call_javaScript($hash, 'generic/vpn/connection' );
+
+   if(defined $result->{Error}) {
+     $returnStr .= "VPN Shares\n";
+     $returnStr .= "---------------------------------\n";
+     my $tmp = Fritz_ERR_Result($hash, $result);
+     return $returnStr . $tmp;
+   }
+
+   if (!defined($result->{Error}) && exists($result->{result}) && ref($result->{result}) eq "ARRAY") {
+
+     my %accessType = (
+          '1' => "Corp VPN",
+          '2' => "User VPN",
+          '3' => "Lan2Lan VPN",
+          '4' => "Wireguard Simple",
+        );
+
+     my $tableFormat = main::AttrVal($name, "disableTableFormat", "undef");
+
+     my $views = $result->{result};
+     my $nbViews = scalar @$views;
+
+     my $tableFormat = main::AttrVal($name, "disableTableFormat", "undef");
+
+     $returnStr .= '<table';
+     $returnStr .= ' border="8"'       if $tableFormat !~ "border";
+     $returnStr .= ' cellspacing="10"' if $tableFormat !~ "cellspacing";
+     $returnStr .= ' cellpadding="20"' if $tableFormat !~ "cellpadding";
+     $returnStr .= '>';
+     $returnStr .= "<tr>\n";
+     $returnStr .= '<td colspan="7">VPN Shares: Verbindungen</td>';
+     $returnStr .= "</tr>\n";
+     $returnStr .= "<tr>\n";
+     $returnStr .= "<td>Verbindung</td><td>Typ</td><td>Aktiv</td><td>Verbunden</td><td>UID</td><td>Name</td><td>Host</td><td>Adresse</td><td>Remote-IP</td>\n";
+     $returnStr .= "</tr>\n";
+
+
+     Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $result->{result}, 5);
+
+     for(my $i = 0; $i <= $nbViews - 1; $i++) {
+       $returnStr .= "<tr>\n";
+       $returnStr .= "<td>" . $i . "</td>";
+       $returnStr .= '<td>' . $accessType{"$views->[$i]->{access_type}"} . '</td>';
+       $returnStr .= "<td>" . $views->[$i]->{activated} . "</td>";
+       $returnStr .= "<td>" . $views->[$i]->{state} . "</td>";
+       $returnStr .= "<td>" . $views->[$i]->{UID} . "</td>";
+       $returnStr .= "<td>" . $views->[$i]->{name} . "</td>";
+       $returnStr .= "<td>" . $views->[$i]->{access_hostname} . "</td>";
+       $returnStr .= "<td>" . $views->[$i]->{wg_allowed_ips} . "</td>";
+       $returnStr .= "<td>" . $views->[$i]->{remote_ip} . "</td>";
+       $returnStr .= "</tr>\n";
+     }
+     $returnStr .= "</table>\n";
+
+   }
+
+   return $returnStr;
+
+} # end Fritz_Get_VPN_Shares_List
+
+# get list of VPN Shares, FritzOS < 8.40
+############################################
+sub Fritz_Get_VPN_Shares_List_Old($) {
 
    my ($hash) = @_;
    my $name = $hash->{NAME};
@@ -14982,7 +15094,7 @@ sub Fritz_Get_VPN_Shares_List($) {
 
    return $returnStr;
 
-} # end Fritz_Get_VPN_Shares_List
+} # end Fritz_Get_VPN_Shares_List_Old
 
 # get list of DOCSIS informations
 ############################################
@@ -22774,7 +22886,7 @@ sub Fritz_Helper_Dumper($$;@) {
     "Dect",
     "Consumer"
   ],
-  "version": "260817",
+  "version": "260831",
   "release_status": "stable",
   "author": [
     "Jörg Wiemann <jowiemann@debitel.net>"
