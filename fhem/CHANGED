@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix: 72_FritzSmart: Korrektur in checkAPIs
+ - feature: 72_FritzSmart: set <name> enableVPNshare - kommendes Fritz!OS
  - change:  76_SolarForecast: Version 2.10.2
  - feature: 95_Dashboard: v3.18.0 - SVG-Zoom-/Pan-Navigation implementiert
  - bugfix: 72_FritzSmart: Korrektur Attributen, kleinere Optimierungen
