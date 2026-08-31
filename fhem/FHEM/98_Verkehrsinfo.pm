@@ -25,6 +25,11 @@
 ############################################################################
 #
 # Changelog:
+#
+# 2026-08-28, 2.6
+# Leak-Fix: HTML::TreeBuilder erzeugt zirkulaere Referenzen und muss explizit freigegeben werden
+# Bugfix: radiosaw.de-Parsing an neues Vue/Nuxt-Frontend angepasst (block-system-main existiert nicht mehr)
+#
 # 2019-02-07, v2.5
 # Feature: Attribut timeout added
 # 
@@ -220,6 +225,7 @@ sub Verkehrsinfo_HttpNbDefineZone($) {
 			$zone = $arrzone[3];
 		}
 		readingsSingleUpdate( $hash, "zone", $zone, 1 );
+		$tree->delete;                                                              # Leak-Fix: HTML::TreeBuilder erzeugt zirkulaere Referenzen und muss explizit freigegeben werden
 	}
 	Log3 $hash, 4, "Verkehrsinfo: ($name) Verkehrsinfo_HttpNbDefineZone done";
 }
@@ -439,109 +445,87 @@ sub Verkehrsinfo_HttpNbUpdateData ($) {
 			
 			$message_zone = ' für SAW';
 			
-			# part one meldungen
+			# Die Website wurde auf ein Vue/Nuxt-Frontend umgestellt (Stand 08/2026).
+			# Die alte Struktur mit der ID "block-system-main" existiert nicht mehr.
+			# Meldungen liegen jetzt als Bloecke mit der Klasse "paragraph-title-text"
+			# innerhalb von "paragraph-block-reference" vor. Jeder Block besteht aus
+			# einer Ueberschrift (h4) und einem oder mehreren Absaetzen (p). Mehrere
+			# Straszen koennen innerhalb eines Absatzes durch eine Trennlinie
+			# ("------") gebuendelt sein (z.B. im Block "Baustellen").
 			$tree->parse_content($content);
-			@toc = $tree->findnodes('//div[contains(@id, "block-system-main")]/div/div[2]/div[2]/div/div/div');
-			# part two baustellen
-			@toc2 = $tree->findnodes('//div[contains(@id, "block-system-main")]/div/div[3]/div[1]/div/div[1]/div/div[2]/div/div/div/ul/li');
-			push (@toc, @toc2);
+			@toc = $tree->findnodes('//div[contains(concat(" ",normalize-space(@class)," ")," paragraph-block-reference ")]//div[contains(concat(" ",normalize-space(@class)," ")," paragraph-title-text ")]');
+
 			for my $el ( Verkehrsinfo_hf_orderby($orderby, @toc) ) {
-				if (grep(!/$filterexclude/i, $el->as_trimmed_text) && grep(/$filterinclude/i, $el->as_trimmed_text)){
-				
-					if ($el->as_trimmed_text =~ /^Aktuelle Baustelle/){
 
-						my $tmp = $el->as_HTML;
-						$tmp =~ s/<br \/>-+<br \/>/\|/g;
-						$tmp =~ s/<br \/>/###/g;
-						
-						my $subtree = HTML::TreeBuilder->new;
-						$subtree->parse_content($tmp);
+				my $headnode = $el->findnodes('h4')->[0];
+				my $head = $headnode ? $headnode->as_trimmed_text : '-';
 
-						my @tmp2 = split(/\|/, $subtree->as_trimmed_text);
-						shift @tmp2;
-						
-						for my $sel ( @tmp2 ){
-							
-							$dataarray->{"e_".$i."_road"} = ((split(/\s/, $sel))[0] =~ /^.[0-9]+/) ? (split(/\s/, $sel))[0] : '-';
-							$dataarray->{"e_".$i."_head"} = (split(/\###/, $sel))[0];
-							
-							$dataarray->{"e_".$i."_msg"}  = $sel;
-							$dataarray->{"e_".$i."_msg"}  =~ s/^.*?###//;
-							$dataarray->{"e_".$i."_msg"}  =~ s/###/ /g;
-							
-							$message .= (AttrVal($name,"msg_format","") =~ "road|both") ? $dataarray->{"e_".$i."_road"}  .', ' : '';
-							$message .= (AttrVal($name,"msg_format","") =~ "head|both") ? $dataarray->{"e_".$i."_head"} .', ' : '';
-							$message .= $dataarray->{"e_".$i."_msg"};
-							$message .= ($dataarray->{"e_".$i."_msg"} =~ /\.$/) ? ' ' : '. ' ;
-							
-							$i++;
+				for my $pnode ( $el->findnodes('div/p') ) {
+
+					# <br> durch Marker ersetzen, damit Zeilenumbrueche beim Text-Extrakt erhalten bleiben
+					my $tmp = $pnode->as_HTML;
+					$tmp =~ s/<br\s*\/?>/###/gi;
+
+					my $subtree = HTML::TreeBuilder->new;
+					$subtree->parse_content($tmp);
+					my $text = $subtree->as_trimmed_text;
+					$subtree->delete;                                                                       # Leak-Fix: HTML::TreeBuilder erzeugt zirkulaere Referenzen und muss explizit freigegeben werden
+
+					# Trennlinien ("------") spalten gebuendelte Meldungen (z.B. mehrere Baustellen) auf
+					for my $entrytext ( split(/#{0,3}-{5,}#{0,3}/, $text) ) {
+
+						$entrytext =~ s/^\s*#*\s*//;
+						$entrytext =~ s/\s*#*\s*$//;
+						next unless length($entrytext) > 0;
+
+						my $msg = $entrytext;
+						$msg =~ s/\s*###\s*/ /g;
+
+						# Straszennummer irgendwo in Kopfzeile oder Meldung suchen
+						my $road = '-';
+						if (($head . ' ' . $msg) =~ /\b([A-Z]{1,2}[0-9]{1,4})\b/) {
+							$road = $1;
 						}
-						$i--;
-					}
-					elsif ($el->findnodes('../li')->[0]){
-						if (exists $el->findnodes('strong')->[0]){
-							$dataarray->{"e_".$i."_road"} = ((split(/\s/, $el->findnodes('strong')->[0]->as_trimmed_text .' -'))[1] =~ /^[0-9]+/) ? (split(/\s/, $el->findnodes('strong')->[0]->as_trimmed_text))[0] . ' ' . (split(/\s/, $el->findnodes('strong')->[0]->as_trimmed_text))[1] : '-';
-							$dataarray->{"e_".$i."_head"} = $el->findnodes('strong')->[0]->as_trimmed_text;
-							$dataarray->{"e_".$i."_msg"}  = $el->as_trimmed_text;
-							$dataarray->{"e_".$i."_msg"} =~ s/\(/_ko_/g;
-							$dataarray->{"e_".$i."_msg"} =~ s/\)/_kc_/g;
-							my $tmp = $el->findnodes('strong')->[0]->as_trimmed_text;
-							$tmp =~ s/\(/_ko_/g;
-							$tmp =~ s/\)/_kc_/g;
-							$dataarray->{"e_".$i."_msg"}  =~ s/$tmp//;
-						}
-						else{
-							$dataarray->{"e_".$i."_road"} = '-';
-							$dataarray->{"e_".$i."_head"} = '-';
-							$dataarray->{"e_".$i."_msg"}  = $el->as_trimmed_text;
-						}
-						$dataarray->{"e_".$i."_msg"} =~ s/_ko_/\(/g;
-						$dataarray->{"e_".$i."_msg"} =~ s/_kc_/\)/g;
-						
+
+						# Testtext fuer den Filter: Straszencode zuerst, damit
+						# ^-verankerte filter_include/filter_exclude-Muster
+						# (z.B. "^A9") weiterhin funktionieren
+						my $testtext = ($road ne '-' ? "$road " : '') . "$head $msg";
+
+						# Bewusst KEIN grep(!/$filterexclude/i,...) wie im Rest des Moduls:
+						# bei leerem filter_exclude (Standard) haengt das Ergebnis von
+						# Perls "leeres Pattern nutzt letztes erfolgreiches Match"-Verhalten
+						# ab, das durch die vielen s///-Aufrufe oben hier nicht mehr
+						# verlaesslich vorhersagbar ist.
+						next if ($filterexclude ne '' && $testtext =~ /$filterexclude/i);
+						next unless ($testtext =~ /$filterinclude/i);
+
+						$dataarray->{"e_".$i."_road"} = $road;
+						$dataarray->{"e_".$i."_head"} = $head;
+						$dataarray->{"e_".$i."_msg"}  = $msg;
+
 						$message .= (AttrVal($name,"msg_format","") =~ "road|both") ? $dataarray->{"e_".$i."_road"}  .', ' : '';
 						$message .= (AttrVal($name,"msg_format","") =~ "head|both") ? $dataarray->{"e_".$i."_head"} .', ' : '';
 						$message .= $dataarray->{"e_".$i."_msg"};
 						$message .= ($dataarray->{"e_".$i."_msg"} =~ /\.$/) ? ' ' : '. ' ;
-						
+
 						$i++;
 					}
-					else {						
-						my $tmp = $el->as_HTML;
-						$tmp =~ s/<br \/>/###/g;
-						
-						my $subtree = HTML::TreeBuilder->new;
-						$subtree->parse_content($tmp);
-
-						my $anz = scalar(split(/\###/, $subtree->as_trimmed_text));
-						$dataarray->{"e_".$i."_road"} = ((split(/\s/, $subtree->as_trimmed_text))[0] =~ /^.[0-9]+/) ? (split(/\s/, $subtree->as_trimmed_text))[0] : '-';
-						$dataarray->{"e_".$i."_head"} = ($anz == 2) ? (split(/\###/, $subtree->as_trimmed_text))[0] : '-';
-						$dataarray->{"e_".$i."_msg"}  = ($anz == 2) ? (split(/\###/, $subtree->as_trimmed_text))[1] : $subtree->as_trimmed_text;
-						
-						$message .= (AttrVal($name,"msg_format","") =~ "road|both") ? $dataarray->{"e_".$i."_road"}  .', ' : '';
-						$message .= (AttrVal($name,"msg_format","") =~ "head|both") ? $dataarray->{"e_".$i."_head"} .', ' : '';
-						$message .= $dataarray->{"e_".$i."_msg"};
-						$message .= ($dataarray->{"e_".$i."_msg"} =~ /\.$/) ? ' ' : '. ' ;
-						
-						$i++;					
-					}
-
-					# else{
-						# Log3 $hash, 3, "Verkehrsinfo: ($name) Verkehrsinfo_HttpNbUpdateData DataNodeElements not found";
-					# }
 				}
 			}
 		}
 		
+		$tree->delete;                                                                                      # Leak-Fix: HTML::TreeBuilder erzeugt zirkulaere Referenzen und muss explizit freigegeben werden
 		 
 		if ($i - 1 == 0){
-			$message_head = "Es liegen um " . strftime('%H:%M', localtime) . $message_zone . " keine Staumeldungen vor.";
+			$message_head = "Es liegen um " . strftime('%H:%M', localtime) . $message_zone . " keine Meldungen vor.";
 		}
 		elsif ($i - 1 == 1){
-			$message_head  = "Es liegt um " . strftime('%H:%M', localtime) . $message_zone . " eine Staumeldung vor:\n";
+			$message_head  = "Es liegt um " . strftime('%H:%M', localtime) . $message_zone . " eine Meldung vor:\n";
 		}
 		else{
 			my $anz_msg = $i - 1;
-			$message_head = "Es liegen um " . strftime('%H:%M', localtime) . $message_zone . ', ' . $anz_msg ." Staumeldungen vor:\n";
+			$message_head = "Es liegen um " . strftime('%H:%M', localtime) . $message_zone . ', ' . $anz_msg ." Meldungen vor:\n";
 		}
 		
 		$dataarray->{'message'} = $message_head . ' ' . $message;
