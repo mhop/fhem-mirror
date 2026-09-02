@@ -1,5 +1,5 @@
 ##############################################################################################################################
-# $Id: 93_DbLog.pm 29036 2024-07-21 20:47:25Z DS_Starter $
+# $Id: 93_DbLog.pm 29401 2024-12-05 14:26:00Z DS_Starter $
 ##############################################################################################################################
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -56,8 +56,13 @@ use SubProcess;
 
 use vars qw($FW_ME $FW_subdir);                                      # predeclare global variable names
 
-# Version History intern by DS_Starter:
 my %DbLog_vNotesIntern = (
+  "5.12.0"  => "02.09.2026 Einbau SVG Cache (benötigt FHEMWEB plotfork=0) ".
+                           "neues Attribut sampleDataCacheLifetime: Zwischenspeicherung Leseliste (DbLog_sampleDataFn) ".
+                           "In der SQL-Abfrage mit den Beispieldaten für die aktuelle Tabelle überflüssiges 'GROUP BY' entfernt ".
+                           "SVG-Cache: Hintergrundaktualisierung veralteter Cache-Einträge über SubProcess (stale-while-revalidate) ".
+                           "keine Blockierung bei Cache-Treffer oder Aktualisierung ".
+                           "gezielte Cache-Invlidierung bei gesetzten longpollSVG im Kontext der geloggten und angezeigten Daten ",
   "5.11.0"  => "02.12.2024 sub _DbLog_SBP_onRun_LogArray revised: insertmode Array - not saved data are print out in Logfile ",
   "5.10.3"  => "01.12.2024 check valid Time limit 1970-01-01 00:00:00 of Event time, Forum: #139847 ", 
   "5.10.2"  => "21.07.2024 _DbLog_copyCache: Copy process changed to minimize memory usage after reopen ", 
@@ -148,14 +153,17 @@ my %DbLog_columns = ("DEVICE"  => 64,
 
 # Defaultwerte
 ###############
-my $dblog_cachedef = 500;                                                       # default Größe cacheLimit bei asynchronen Betrieb
-my $dblog_cmdef    = 'basic_ta:on';                                             # default commitMode
-my $dblog_todef    = 86400;                                                     # default timeout Sekunden
-my $dblog_lrpth    = 0.8;                                                       # Schwellenwert für LONGRUN_PID ab dem "Another operation is in progress...." im state ausgegeben wird
-my $dblog_pifl     = 40;                                                        # default Breite Eingabefelder im Plot Editor
-my $dblog_svgfnset = ',delta-d,delta-h,delta-ts,int,int1,int2,int3,int4,int5';  # Funktionen für SVG sampleDataFn
+my $dblog_cachedef  = 500;                                                       # default Größe cacheLimit bei asynchronen Betrieb
+my $dblog_cmdef     = 'basic_ta:on';                                             # default commitMode
+my $dblog_todef     = 86400;                                                     # default timeout Sekunden
+my $dblog_lrpth     = 0.8;                                                       # Schwellenwert für LONGRUN_PID ab dem "Another operation is in progress...." im state ausgegeben wird
+my $dblog_pifl      = 40;                                                        # default Breite Eingabefelder im Plot Editor
+my $dblog_svgfnset  = ',delta-d,delta-h,delta-ts,int,int1,int2,int3,int4,int5';  # Funktionen für SVG sampleDataFn
+my $dblog_pcldef    = 0;                                                         # default plotCacheLifetime (0 = deaktiviert)
+my $dblog_pcmaxage  = 3600;                                                      # max. Alter Cache-Einträge bis Purge unabhängig von TTL (Sek)
+my $dblog_sdcldef   = 0;                                                         # default sampleDataCacheLifetime (0 = deaktiviert)
 
-# $data{DbLog}{$name}{cache}                                                    # Log-Daten Arbeitscache
+# $data{DbLog}{$name}{cache}                                                     # Log-Daten Arbeitscache
 
 ################################################################
 sub DbLog_Initialize {
@@ -193,7 +201,9 @@ sub DbLog_Initialize {
                                "headerLinks:text,icon ".
                                "insertMode:1,0 ".
                                "noSupportPK:1,0 ".
+                               "plotCacheLifetime ".
                                "plotInputFieldLength ".
+                               "sampleDataCacheLifetime ".
                                "showproctime:1,0 ".
                                "suppressAddLogV3:1,0 ".
                                "suppressUndef:0,1 ".
@@ -415,13 +425,15 @@ sub DbLog_Attr {
   my $do   = 0;
 
   if ($cmd eq "set") {
-      if ($aName eq "syncInterval"           ||
-          $aName eq "cacheLimit"             ||
-          $aName eq "cacheOverflowThreshold" ||
-          $aName eq "SQLiteCacheSize"        ||
-          $aName eq "plotInputFieldLength"   ||
+      if ($aName eq "syncInterval"            ||
+          $aName eq "cacheLimit"              ||
+          $aName eq "cacheOverflowThreshold"  ||
+          $aName eq "plotCacheLifetime"       ||
+          $aName eq "sampleDataCacheLifetime" ||
+          $aName eq "SQLiteCacheSize"         ||
+          $aName eq "plotInputFieldLength"    ||
           $aName eq "timeout") {
-          if ($aVal !~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9 !";}
+          if ($aVal !~ /^[0-9]+$/) { return "The Value of $aName is not valid. Use only figures 0-9";}
       }
 
       if ($hash->{MODEL} !~ /MYSQL|MARIADB|POSTGRESQL/xs && $aName =~ /dbSchema/) {
@@ -1983,6 +1995,16 @@ sub DbLog_execMemCacheAsync {
       DbLog_logHashContent ( {name => $name, href => $data{DbLog}{$name}{cache}{memcache}, level => 5, logtxt => 'MemCache contains: '} );
 
       my $memc = _DbLog_copyCache      ($name);
+
+      __DbLog_plotCacheInvalidateForEvents ($hash, $memc->{cdata})
+          if(AttrVal ($name, 'plotCacheLifetime', $dblog_pcldef) && __DbLog_longpollSVGactive ());
+                                                                                            # bewusst VOR der DB-Bestaetigung: der Schreibzyklus laeuft
+                                                                                            # asynchron im SubProcess, ein durch longpollSVG ausgeloester
+                                                                                            # Plot-Reload soll ab sofort keinen (dann veralteten) Cache-Treffer
+                                                                                            # mehr finden. Schlaegt der Schreibvorgang doch fehl, landen die
+                                                                                            # Events per rowlback ohnehin zurueck im MemCache - Worst Case ist
+                                                                                            # ein einzelner unnoetiger Live-Fetch, kein Korrektheitsproblem.
+
       $err     = DbLog_SBP_sendLogData ($hash, 'log_asynch', $memc);                       # Subprocess Prozessdaten senden, Log-Daten sind in $memc->{cdata} gespeichert
   }
   else {
@@ -2034,6 +2056,9 @@ sub DbLog_execMemCacheSync {
   DbLog_logHashContent ( {name => $name, href => $data{DbLog}{$name}{cache}{memcache}, level => 5, logtxt => 'TempStore contains: '} );
 
   my $memc = _DbLog_copyCache ($name);
+
+  __DbLog_plotCacheInvalidateForEvents ($hash, $memc->{cdata})
+      if(AttrVal ($name, 'plotCacheLifetime', $dblog_pcldef) && __DbLog_longpollSVGactive ());
 
   readingsSingleUpdate($hash, 'CacheUsage', 0, 0);
 
@@ -2255,6 +2280,18 @@ sub DbLog_SBP_onRun {
                                          bst        => $bst
                                        }
                                      );
+          }
+
+          ##  Kommando: refreshplotdata (Hintergrund-Refresh Plotcache)
+          #########################################################
+          if ($operation =~ /refreshplotdata/xs) {
+              _DbLog_SBP_onRun_plotRefresh ( { subprocess => $subprocess,
+                                               name       => $name,
+                                               memc       => $memc,
+                                               store      => $store,
+                                               bst        => $bst
+                                             }
+                                           );
           }
 
           ##  Kommando: deleteOldDays
@@ -2915,7 +2952,7 @@ sub _DbLog_SBP_onRun_LogSequential {
 
       $error = __DbLog_SBP_beginTransaction ($name, $dbh, $useta, $subprocess);
 
-      if(!$useta) {                                                                  # keine Transaktion: generate errstr, keine Ausnahme
+      if (!$useta) {                                                                  # keine Transaktion: generate errstr, keine Ausnahme
           _DbLog_SBP_dbhPrintError ($dbh);
       }
 
@@ -3189,7 +3226,8 @@ sub _DbLog_SBP_onRun_LogArray {
           };
 
           __DbLog_SBP_sendToParent ($subprocess, $ret);
-          return;
+          
+          return $error;
       }
 
       if ($tl) {                                                                      # Tracelevel setzen
@@ -3216,7 +3254,7 @@ sub _DbLog_SBP_onRun_LogArray {
           _DbLog_SBP_dbhPrintError ($dbh);
       }
 
-      eval {  $tuples = $sth_ih->execute_array ( { ArrayTupleStatus => \@tuple_status } ) };
+      eval { $tuples = $sth_ih->execute_array ( { ArrayTupleStatus => \@tuple_status } ) };
            
       if (!$tuples) {
           no warnings 'uninitialized';
@@ -3325,7 +3363,7 @@ sub _DbLog_SBP_onRun_LogArray {
                                   }
                                 );
 
-          DbLog_logHashContent ( {name => $name, href => $rowhref, level => 2, subprocess => $subprocess} );
+          DbLog_logHashContent ( {name => $name, href => $rowhref, level => 3, subprocess => $subprocess} );
       }
   }
 
@@ -3704,8 +3742,94 @@ return;
 }
 
 #################################################################
-# SubProcess - deleteOldDays-Routine
+# SubProcess - Plotdaten-Hintergrund-Refresh-Routine
+# (stale-while-revalidate fuer plotCacheLifetime)
+#
+# Nutzt dieselben reinen SQL-Bau-Funktionen wie der synchrone
+# Pfad in _DbLog_plotData (DbLog_plotParseReadings,
+# DbLog_plotBuildSqlSpec, DbLog_plotBuildStm) - kein
+# Codeduplikat der eigentlichen Query-Logik. Die eigentliche
+# Row-Verarbeitung (delta-h/d, regexp, ...) findet NICHT hier
+# statt, sondern nach Rueckkehr im Hauptprozess (DbLog_SBP_Read),
+# der _DbLog_plotData im Replay-Modus mit den hier ermittelten
+# Rohzeilen aufruft.
 #################################################################
+sub _DbLog_SBP_onRun_plotRefresh {
+  my $paref      = shift;
+
+  my $subprocess = $paref->{subprocess};
+  my $name       = $paref->{name};
+  my $memc       = $paref->{memc};
+  my $store      = $paref->{store};                                          # Datenspeicher
+  my $bst        = $paref->{bst};
+
+  my $dbh        = $store->{dbh};
+  my $model      = $store->{dbparams}{model};
+
+  my $operation  = $memc->{operation} // 'unknown';
+  my $args       = $memc->{arguments};                                       # Hashref: sig/inf/outf/from/to/table/colspecs
+
+  my $sig        = $args->{sig};
+  my $inf        = $args->{inf};
+  my $outf       = $args->{outf};
+  my $from       = $args->{from};
+  my $to         = $args->{to};
+  my $table      = $args->{table};
+  my $colspecs   = $args->{colspecs};
+
+  my $error      = q{};
+  my $rows       = {};                                                       # {readingindex => [ [ts,dev,rd,val,type,event,unit], ... ]}
+
+  my $st         = [gettimeofday];
+
+  eval {
+      my @readings = DbLog_plotParseReadings ($colspecs);
+      my %sqlspec  = DbLog_plotBuildSqlSpec  ($model, $from, $to, $outf);
+
+      for (my $i = 0; $i < int(@readings); $i++) {
+          my $deltacalc = ($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) ? 1 : 0;
+
+          my $stm = DbLog_plotBuildStm ($table, \%sqlspec, $readings[$i], $deltacalc);
+
+          $rows->{$i} = $dbh->selectall_arrayref ($stm);
+      }
+
+      1;
+  } or do {
+      $error = $@;
+
+      _DbLog_SBP_Log3Parent ( { name       => $name,
+                                level      => 2,
+                                msg        => "ERROR in background plot refresh (sig: $sig): $error",
+                                oper       => 'log3parent',
+                                subprocess => $subprocess
+                              }
+                            );
+  };
+
+  my $rt  = tv_interval ($st);                                               # SQL-Laufzeit ermitteln
+  my $brt = tv_interval ($bst);                                              # Background-Laufzeit ermitteln
+  my $ot  = $rt.",".$brt;
+
+  my $ret = {
+      name  => $name,
+      msg   => $error,
+      ot    => $ot,
+      oper  => $operation,
+      sig   => $sig,
+      inf   => $inf,
+      outf  => $outf,
+      from  => $from,
+      to    => $to,
+      table => $table,
+      colspecs => $colspecs,
+      rows  => $rows
+  };
+
+  __DbLog_SBP_sendToParent ($subprocess, $ret);
+
+return;
+}
 sub _DbLog_SBP_onRun_deleteOldDays {
   my $paref      = shift;
 
@@ -5411,7 +5535,6 @@ return;
 ################################################################################
 sub DbLog_SBP_Read {
   my $hash = shift;
-  #my $name = $hash->{NAME};
 
   my $subprocess = $hash->{".fhem"}{subprocess};
   my $retserial  = $subprocess->readFromChild();                                              # hier lesen wir aus der globalen Select-Schleife, was in der onRun-Funktion geschrieben wurde
@@ -5490,6 +5613,34 @@ sub DbLog_SBP_Read {
           readingsBulkUpdate  ($hash, 'countHistory', $ch);
           readingsBulkUpdate  ($hash, 'countCurrent', $cc);
           readingsEndUpdate   ($hash, 1);
+      }
+
+      ## refreshplotdata - Read (Hintergrund-Refresh Plotcache, stale-while-revalidate)
+      #####################################################################################
+      if ($oper =~ /refreshplotdata/xs) {
+          my $sig = $ret->{sig};
+
+          if (!$sig) {                                                                        # z.B. DB-Verbindungsfehler im SubProcess - keine Signatur zurueckgekommen
+              Log3 ($name, 2, "$name - background plot refresh failed (no signature returned): ".($msg || 'unknown error'));
+          }
+          elsif ($msg) {
+              Log3 ($name, 2, "$name - background plot refresh failed (sig: $sig): $msg");
+
+              delete $hash->{HELPER}{PLOTCACHE_REFRESHING}{$sig};
+          }
+          else {
+              my $paref = { hash       => $hash,
+                            name       => $name,
+                            aref       => [ $ret->{inf}, $ret->{outf}, $ret->{from}, $ret->{to}, @{$ret->{colspecs}} ],
+                            prefetched => $ret->{rows}
+                          };
+
+              my $rerr = _DbLog_plotData ($paref);                                             # Replay-Modus: verarbeitet die vorab geholten Rohzeilen und cacht das Ergebnis
+
+              Log3 ($name, 2, "$name - error processing background plot refresh (sig: $sig): $rerr") if($rerr);
+
+              delete $hash->{HELPER}{PLOTCACHE_REFRESHING}{$sig};                              # Sicherheitsnetz, falls _DbLog_plotData es im Fehlerpfad nicht selbst getan hat
+          }
       }
 
       ## deleteOldDays - Read
@@ -6024,7 +6175,7 @@ sub _DbLog_chartQuery {
              if(int(@a) < 4);
   }
 
-  my ($sql, $countsql) = _DbLog_createQuerySql ($paref);
+  my ($sql, $countsql) = __DbLog_createChartQuerySql ($paref);
 
   if ($sql eq "error") {
      return DbLog_jsonError("Could not setup SQL String. Check your input data.");
@@ -6122,7 +6273,7 @@ return $jsonstring;
 ################################################################
 #                Prepare the SQL String
 ################################################################
-sub _DbLog_createQuerySql {
+sub __DbLog_createChartQuerySql {
     my $paref = shift;
 
     my $opt   = $paref->{opt};
@@ -6369,9 +6520,11 @@ return $sql;
 sub _DbLog_plotData {
   my $paref = shift;
 
-  my $hash  = $paref->{hash};
-  my $name  = $paref->{name};
-  my @a     = @{$paref->{aref}};
+  my $hash       = $paref->{hash};
+  my $name       = $paref->{name};
+  my @a          = @{$paref->{aref}};
+  my $prefetched = $paref->{prefetched};                # optional: Hashref {readingindex => [ [ts,dev,rd,val,type,event,unit], ... ]}
+                                                        # vom SubProcess vorab geholte Rohzeilen (Replay-Modus, kein DB-Zugriff)
 
   return "Usage: \n".
          "get $name &lt;in&gt; &lt;out&gt; &lt;from&gt; &lt;to&gt; &lt;column_spec&gt;...\n".
@@ -6418,10 +6571,18 @@ sub _DbLog_plotData {
 
   }
 
-  my (%sqlspec, %from_datetime, %to_datetime);
+  my (%from_datetime, %to_datetime);
 
   my @readings = ();
   my $verbose  = AttrVal ($name, 'verbose', $attr{global}{verbose});
+  
+  if ($verbose > 3) {
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - ###                  new get data for SVG                    ###");
+      Log3 ($name, 4, "$name - ################################################################");
+      Log3 ($name, 4, "$name - main PID: $hash->{PID}, secondary PID: $$");
+      Log3 ($name, 4, "$name - get Params: in=$inf out=$outf from=$from to=$to <more Params may follow....>");
+  }
 
   # uebergebenen Timestamp anpassen
   # moegliche Formate: YYYY | YYYY-MM | YYYY-MM-DD | YYYY-MM-DD_HH24
@@ -6452,6 +6613,72 @@ sub _DbLog_plotData {
      $to = strftime "%Y-%m-%d %H:%M:%S", localtime($tc);
   }
 
+  # Plotdaten-Cache: nur fuer den SVG/INT-Pfad relevant (samePID-unabhaengig,
+  # da rein lesend und ohne DB-Zugriff im Trefferfall).
+  #
+  # WICHTIG: Der Cache lebt in $hash->{HELPER} und ist damit an den
+  # FHEM-Hauptprozess gebunden. Laeuft dieser Aufruf in einem per
+  # 'plotfork=1' geforkten Kindprozess (erkennbar an $$ != $hash->{PID}),
+  # verpufft jeder Cache-Schreibzugriff beim Terminieren des Kindes -
+  # der Hauptprozess sieht ihn nie. Der Cache wird in diesem Fall daher
+  # komplett uebersprungen, damit kein nutzloser Schreibversuch samt
+  # irrefuehrendem Log erfolgt.
+  my $pcttl  = AttrVal ($name, 'plotCacheLifetime', $dblog_pcldef);
+  my $pcfork = ($$ != $hash->{PID}) ? 1 : 0;
+  my $pcsig;
+
+  if ($pcttl && $pcfork && !$hash->{HELPER}{PLOTCACHE_FORKWARNED}) {
+      Log3 ($name, 3, "$name - WARNING - attribute 'plotCacheLifetime' is set but this get runs in a forked ".
+                       "process (PID $$, main PID $hash->{PID}), likely because attribute 'plotfork=1' is set in ".
+                       "the calling FHEMWEB device. Both mechanisms are incompatible: cache entries written in a ".
+                       "forked child are lost when the child terminates. Please either set 'plotfork=0' in the ".
+                       "relevant FHEMWEB device(s) to make the cache effective, or unset 'plotCacheLifetime' and ".
+                       "rely on plotfork for non-blocking plot generation instead.");
+
+      $hash->{HELPER}{PLOTCACHE_FORKWARNED} = 1;
+  }
+
+  if ($internal && $pcttl && !$pcfork) {
+      $pcsig = __DbLog_plotCacheSig ($inf, $outf, $from, $to, $table, join("|", @a));
+  }
+
+  if ($internal && $pcttl && !$pcfork && !$prefetched) {                          # Replay-Aufrufe (prefetched) lesen nie aus dem Cache - sie befuellen ihn
+      my $ce = __DbLog_plotCacheGet ($hash, $pcsig, $pcttl);                       # frischer Treffer
+
+      if ($ce) {
+          for my $k (keys %{$ce->{dat}}) {
+              $data{$k} = $ce->{dat}{$k};
+          }
+
+          $internal_data = \$ce->{retval};
+
+          Log3 ($name, 4, "$name - plotdata delivered from cache (age: ".sprintf("%.1f", gettimeofday()-$ce->{ts})."s)");
+
+          return undef;
+      }
+
+      my $stale = __DbLog_plotCacheGetAny ($hash, $pcsig);                         # evtl. abgelaufener, aber noch vorhandener Eintrag
+
+      if ($stale) {
+          for my $k (keys %{$stale->{dat}}) {
+              $data{$k} = $stale->{dat}{$k};
+          }
+
+          $internal_data = \$stale->{retval};
+
+          Log3 ($name, 4, "$name - plotdata delivered from STALE cache sig=$pcsig (age: ".sprintf("%.1f", gettimeofday()-$stale->{ts}).
+                           "s), triggering background refresh");
+
+          __DbLog_plotCacheTriggerRefresh ({ hash => $hash, sig => $pcsig,
+                                             args => { inf => $inf, outf => 'int', from => $from, to => $to, table => $table, colspecs => \@a } });
+                                             # outf hart auf 'int' statt der bereits transformierten lokalen $outf-Variable (die hier schon "-" ist) -
+                                             # der Replay-Aufruf muss die outf->internal-Umwandlung in _DbLog_plotData selbst nochmal durchlaufen,
+                                             # sonst bleibt $internal dort false und die Funktion nimmt den falschen Rueckgabepfad.
+
+          return undef;
+      }
+  }
+
   my ($retval,$retvaldummy,$hour,$sql_timestamp, $sql_device, $sql_reading, $sql_value, $type, $event, $unit) = "";
   my @ReturnArray;
   my $writeout = 0;
@@ -6460,27 +6687,14 @@ sub _DbLog_plotData {
 
   # extract the Device:Reading arguments into @readings array
   # Ausgangspunkt ist z.B.: KS300:temperature KS300:rain::delta-h KS300:rain::delta-d
-  for (my $i = 0; $i < int(@a); $i++) {
-      @fld             = split ":", $a[$i], 5;
-      $readings[$i][0] = $fld[0];                                   # Device
-      $readings[$i][1] = $fld[1];                                   # Reading
-      $readings[$i][2] = $fld[2];                                   # Default
-      $readings[$i][3] = $fld[3];                                   # function
-      $readings[$i][4] = $fld[4];                                   # regexp
-
-      $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0);   # falls Reading nicht gefuellt setze Joker
-  }
-
-  if ($verbose > 3) {
-      Log3 ($name, 4, "$name - ################################################################");
-      Log3 ($name, 4, "$name - ###                  new get data for SVG                    ###");
-      Log3 ($name, 4, "$name - ################################################################");
-      Log3 ($name, 4, "$name - main PID: $hash->{PID}, secondary PID: $$");
-  }
+  @readings = DbLog_plotParseReadings (\@a);
 
   my $samePID = $hash->{PID} == $$ ? 1 : 0;
 
-  if ($samePID) {
+  if ($prefetched) {
+      Log3 ($name, 4, "$name - PID: $$, replay mode with prefetched rows - no DB connect needed");
+  }
+  elsif ($samePID) {
       $err = _DbLog_manageDBHU ($hash);
       return $err if($err);
 
@@ -6493,55 +6707,7 @@ sub _DbLog_plotData {
   }
 
   # vorbereiten der DB-Abfrage, DB-Modell-abhaengig
-  if ($hash->{MODEL} eq "POSTGRESQL") {
-      $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
-      $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
-      $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
-      $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
-      $sqlspec{max_value}      = "MAX(VALUE)";
-      $sqlspec{day_before}     = "($sqlspec{from_timestamp} - INTERVAL '1 DAY')";
-  }
-  elsif ($hash->{MODEL} eq "ORACLE") {
-      $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
-      $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
-      $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
-      $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
-      $sqlspec{max_value}      = "MAX(VALUE)";
-      $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
-  }
-  elsif ($hash->{MODEL} =~ /MYSQL|MARIADB/xs) {
-      $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
-      $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
-      $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
-      $sqlspec{order_by_hour}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H')";
-      $sqlspec{max_value}      = "MAX(VALUE)";                                           # 12.04.2019 Forum: https://forum.fhem.de/index.php/topic,99280.0.html
-      $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
-  }
-  elsif ($hash->{MODEL} eq "SQLITE") {
-      $sqlspec{get_timestamp}  = "TIMESTAMP";
-      $sqlspec{from_timestamp} = "'$from'";
-      $sqlspec{to_timestamp}   = "'$to'";
-      $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
-      $sqlspec{max_value}      = "MAX(VALUE)";
-      $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
-  }
-  else {
-      $sqlspec{get_timestamp}  = "TIMESTAMP";
-      $sqlspec{from_timestamp} = "'$from'";
-      $sqlspec{to_timestamp}   = "'$to'";
-      $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
-      $sqlspec{max_value}      = "MAX(VALUE)";
-      $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
-  }
-
-  if($outf =~ m/(all|array)/) {
-      $sqlspec{all}      = ",TYPE,EVENT,UNIT";
-      $sqlspec{all_max}  = ",MAX(TYPE) AS TYPE,MAX(EVENT) AS EVENT,MAX(UNIT) AS UNIT";
-  }
-  else {
-      $sqlspec{all}      = "";
-      $sqlspec{all_max}  = "";
-  }
+  my %sqlspec = DbLog_plotBuildSqlSpec ($hash->{MODEL}, $from, $to, $outf);
 
   for (my $i = 0; $i < int(@readings); $i++) {                # ueber alle Readings Variablen initialisieren
       $min[$i]    =  (~0 >> 1);
@@ -6567,91 +6733,27 @@ sub _DbLog_plotData {
           }
       }
 
-      my ($stm);
+      my $stm = DbLog_plotBuildStm ($table, \%sqlspec, $readings[$i], $deltacalc);
 
-      if($deltacalc) {
-          $stm  = "SELECT Z.TIMESTAMP, Z.DEVICE, Z.READING, Z.VALUE from ";
+      my ($sth, $prows);
 
-          $stm .= "(SELECT $sqlspec{get_timestamp} AS TIMESTAMP,
-                    DEVICE AS DEVICE,
-                    READING AS READING,
-                    VALUE AS VALUE ";
+      if ($prefetched) {                                                                    # Zeilen liegen bereits vor (SubProcess-Refresh) - keine DB-Ausfuehrung noetig
+          $prows = $prefetched->{$i} // [];
 
-          $stm .= "FROM $table ";
-
-          $stm .= "WHERE 1=1 ";
-
-          $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "   if ($readings[$i]->[0] !~ m(\%));
-          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' " if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
-
-          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
-
-          $stm .= "AND TIMESTAMP < $sqlspec{from_timestamp} ";
-          $stm .= "AND TIMESTAMP > $sqlspec{day_before} ";
-
-          $stm .= "ORDER BY TIMESTAMP DESC LIMIT 1 ) AS Z
-                   UNION ALL " if($readings[$i]->[3] eq "delta-h");
-
-          $stm .= "ORDER BY TIMESTAMP) AS Z
-                   UNION ALL " if($readings[$i]->[3] eq "delta-d");
-
-          $stm .= "SELECT
-                   MAX($sqlspec{get_timestamp}) AS TIMESTAMP,
-                   MAX(DEVICE) AS DEVICE,
-                   MAX(READING) AS READING,
-                   $sqlspec{max_value}
-                   $sqlspec{all_max} ";
-
-          $stm .= "FROM $table ";
-
-          $stm .= "WHERE 1=1 ";
-
-          $stm .= "AND DEVICE  = '".$readings[$i]->[0]."' "    if ($readings[$i]->[0] !~ m(\%));
-          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' "  if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
-
-          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
-
-          $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-          $stm .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
-
-          $stm .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
-          $stm .= "ORDER BY TIMESTAMP";
-      }
-      else {                                                            # kein deltacalc
-          $stm =  "SELECT
-                      $sqlspec{get_timestamp},
-                      DEVICE,
-                      READING,
-                      VALUE
-                      $sqlspec{all} ";
-
-          $stm .= "FROM $table ";
-
-          $stm .= "WHERE 1=1 ";
-
-          $stm .= "AND DEVICE = '".$readings[$i]->[0]."' "     if ($readings[$i]->[0] !~ m(\%));
-          $stm .= "AND DEVICE LIKE '".$readings[$i]->[0]."' "  if(($readings[$i]->[0] !~ m(^\%$)) && ($readings[$i]->[0] =~ m(\%)));
-
-          $stm .= "AND READING = '".$readings[$i]->[1]."' "    if ($readings[$i]->[1] !~ m(\%));
-          $stm .= "AND READING LIKE '".$readings[$i]->[1]."' " if(($readings[$i]->[1] !~ m(^%$)) && ($readings[$i]->[1] =~ m(\%)));
-
-          $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
-          $stm .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
-          $stm .= "ORDER BY TIMESTAMP";
-      }
-
-      Log3 ($name, 4, "$name - PID: $$, Processing Statement:\n$stm");
-
-      my $sth = $dbh->prepare($stm) || return "Cannot prepare statement $stm: $DBI::errstr";
-      my $rc  = $sth->execute()     || return "Cannot execute statement $stm: $DBI::errstr";
-
-      if($outf =~ m/(all|array)/) {
-          $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value, \$type, \$event, \$unit);
+          Log3 ($name, 4, "$name - PID: $$, using prefetched rows (".scalar(@{$prows}).") for reading index $i");
       }
       else {
-          $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value);
+          Log3 ($name, 4, "$name - PID: $$, Processing Statement:\n$stm");
+
+          $sth = $dbh->prepare($stm) || return "Cannot prepare statement $stm: $DBI::errstr";
+          my $rc  = $sth->execute()  || return "Cannot execute statement $stm: $DBI::errstr";
+
+          if($outf =~ m/(all|array)/) {
+              $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value, \$type, \$event, \$unit);
+          }
+          else {
+              $sth->bind_columns(undef, \$sql_timestamp, \$sql_device, \$sql_reading, \$sql_value);
+          }
       }
 
       if ($outf =~ m/(all)/) {
@@ -6662,9 +6764,20 @@ sub _DbLog_plotData {
       ####################################################################################
       #                              Select Auswertung
       ####################################################################################
-      my $rv = 0;
+      my $rv     = 0;
+      my $rowidx = 0;
 
-      while ($sth->fetch()) {
+      while (1) {
+          if ($prefetched) {
+              last if($rowidx > $#{$prows});
+
+              ($sql_timestamp, $sql_device, $sql_reading, $sql_value, $type, $event, $unit) = @{$prows->[$rowidx]};
+              $rowidx++;
+          }
+          else {
+              last if(!$sth->fetch());
+          }
+
           $rv++;
 
           no warnings 'uninitialized';                                                                     # geändert V4.8.0 / 14.10.2019
@@ -6998,12 +7111,30 @@ sub _DbLog_plotData {
       $data{"maxdate$k"}   = $maxd[$j];
   }
 
-  if (!$samePID) {
+  if (!$samePID && !$prefetched) {
       __DbLog_SBP_disconnectOnly ($name, $dbh);
       delete $hash->{DBHU};
   }
 
   if ($internal) {
+      if ($pcttl && $pcsig) {
+          my %dat;
+
+          for (my $j = 0; $j < int(@readings); $j++) {
+              my $k = $j+1;
+
+              for my $kn (qw(min max avg sum cnt firstval firstdate currval currdate mindate maxdate)) {
+                  $dat{"$kn$k"} = $data{"$kn$k"};
+              }
+          }
+
+          __DbLog_plotCacheStore ({ hash => $hash, sig => $pcsig, retval => $retval, dat => \%dat });
+
+          delete $hash->{HELPER}{PLOTCACHE_REFRESHING}{$pcsig};                     # Refresh-Guard freigeben (no-op falls nicht gesetzt)
+
+          Log3 ($name, 4, "$name - data cached".($prefetched ? ' by background refresh' : ''). " sig=$pcsig");
+      }
+      
       $internal_data = \$retval;
       return undef;
   }
@@ -7014,6 +7145,430 @@ sub _DbLog_plotData {
       $retval = Encode::encode_utf8($retval) if($utf8);
       return $retval;
   }
+}
+
+################################################################
+#     Cache für SVG-Plotdaten (TTL-Cache, synchroner Refresh
+#     bei Cache-Miss/-Ablauf - kein SubProcess-Eingriff, keine
+#     Änderung am SVG-Modul erforderlich)
+#
+#     Cache-Key besteht aus den kompletten Get-Parametern, die
+#     SVG für einen Plot übergibt (inf/outf/from/to/table/
+#     Spaltenspezifikationen). Ein Treffer ist somit exakt und
+#     erfordert keine Rundung von Zeitfenstern.
+################################################################
+sub __DbLog_plotCacheSig {
+  my ($inf,$outf,$from,$to,$table,$argstr) = @_;
+
+return join ("\x1e", $inf, $outf, $from, $to, $table, $argstr);
+}
+
+sub __DbLog_plotCacheGet {
+  my $hash = shift;
+  my $sig  = shift;
+  my $ttl  = shift;
+
+  return if(!$ttl);
+
+  my $ce = $hash->{HELPER}{PLOTCACHE}{$sig};
+  return if(!$ce);
+
+  return if((gettimeofday() - $ce->{ts}) > $ttl);                              # Cache-Eintrag abgelaufen
+
+return $ce;
+}
+
+sub __DbLog_plotCacheStore {
+  my $paref = shift;
+
+  my $hash   = $paref->{hash};
+  my $sig    = $paref->{sig};
+  my $retval = $paref->{retval};
+  my $dat    = $paref->{dat};                                                  # Hashref der zugehörigen min/max/avg/... Keys aus %data
+
+  $hash->{HELPER}{PLOTCACHE}{$sig} = { ts => scalar(gettimeofday()), retval => $retval, dat => $dat };  # scalar() zwingend! gettimeofday() liefert im Listenkontext ($sec,$usec)
+
+  __DbLog_plotCachePurge ($hash);
+
+return;
+}
+
+################################################################
+#  Prueft, ob longpollSVG auf mindestens einem FHEMWEB-Device
+#  tatsaechlich wirksam ist. Das erfordert 'longpollSVG=1' UND
+#  'plotEmbed=1' gleichzeitig (siehe DbLog_configcheck, gleiche
+#  Bedingung dort schon verwendet) - ohne diese Kombination
+#  reagiert svg.js gar nicht auf Live-Events (FW_svgUpdateDevs
+#  findet keine <embed>-Tags).
+#
+#  Nur wenn das zutrifft, lohnt sich der Zusatzaufwand der
+#  Plotcache-Invalidierung bei jedem Schreibzyklus: ohne
+#  longpollSVG bringt das sofortige Loeschen (statt sanftem
+#  "als veraltet markieren") keinen Vorteil, sondern erzwingt nur
+#  unnoetig oefter einen synchronen (blockierenden) Fetch beim
+#  naechsten Plot-Request fuer ein gerade geloggtes Reading.
+################################################################
+sub __DbLog_longpollSVGactive {
+  for my $web (devspec2array ("TYPE=FHEMWEB:FILTER=STATE=Initialized")) {
+      return 1 if(AttrVal ($web, 'longpollSVG', 0) && AttrVal ($web, 'plotEmbed', 0) == 1);
+  }
+
+return 0;
+}
+
+##############################################################################
+#  Entfernt (invalidiert) alle Plotdaten-Cache-Eintraege eines
+#  DbLog-Devices, deren Signatur eines der soeben geloggten
+#  Device:Reading-Paare enthaelt. Wird beim Anstossen eines
+#  Schreibzyklus aufgerufen (vor der eigentlichen DB-Bestaetigung -
+#  bewusst optimistisch, siehe Kommentar am Aufrufort).
+#
+#  Grund: ohne diese Invalidierung wuerde ein durch das FHEMWEB-
+#  Attribut "longpollSVG" ausgeloester Live-Reload eines SVG-Plots
+#  (siehe svg.js: FW_svgUpdateDevs) zwar korrekt einen neuen
+#  Request absetzen, dabei aber ggf. noch aus einem bis zu
+#  plotCacheLifetime Sekunden alten Cache-Eintrag bedient werden -
+#  der Plot wirkt dann so, als aktualisiere er sich nicht mehr live.
+#
+#  $cdata: Hashref index => "TIMESTAMP|DEVICE|TYPE|EVENT|READING|VALUE|UNIT"
+#          (identisches Format wie $memc->{cdata} beim Senden 
+#          an den SubProcess)
+##############################################################################
+sub __DbLog_plotCacheInvalidateForEvents {
+  my $hash  = shift;
+  my $cdata = shift;
+
+  my $pc = $hash->{HELPER}{PLOTCACHE};
+  return if(!$pc || !%{$pc});
+  return if(!$cdata || !%{$cdata});
+
+  my %dr;                                                                     # eindeutige "Device:Reading"-Paare dieses Schreibzyklus
+
+  for my $key (keys %{$cdata}) {
+      my @fld = split "\\|", $cdata->{$key}, -1;
+      next if(int(@fld) < 5);
+
+      $dr{"$fld[1]:$fld[4]"} = 1;                                             # DEVICE:READING
+  }
+
+  return if(!%dr);
+
+  my $name = $hash->{NAME};
+  my $cnt  = 0;
+
+  for my $sig (keys %{$pc}) {
+      for my $k (keys %dr) {
+          if (index ($sig, $k) >= 0) {
+              delete $pc->{$sig};
+              delete $hash->{HELPER}{PLOTCACHE_REFRESHING}{$sig};             # evtl. laufenden Refresh-Guard fuer diese Signatur ebenfalls loeschen
+
+              $cnt++;
+              last;
+          }
+      }
+  }
+
+  Log3 ($name, 4, "$name - plot cache invalidated for $cnt entr".($cnt == 1 ? 'y' : 'ies')." due to new data (longpollSVG)") if($cnt);
+
+return;
+}
+
+################################################################
+#     liefert einen Plotdaten-Cache-Eintrag unabhaengig von
+#     seinem Alter zurueck (fuer stale-while-revalidate), oder
+#     undef wenn es noch nie einen Eintrag fuer diese Signatur
+#     gab (bzw. er per Purge entfernt wurde)
+################################################################
+sub __DbLog_plotCacheGetAny {
+  my $hash = shift;
+  my $sig  = shift;
+
+return $hash->{HELPER}{PLOTCACHE}{$sig};
+}
+
+################################################################
+#     veraltete Cache-Einträge entfernen, damit der Hash bei
+#     wechselnden Zeitfenstern/Zoomstufen nicht unbegrenzt
+#     waechst (unabhängig von der eingestellten TTL)
+################################################################
+sub __DbLog_plotCachePurge {
+  my $hash = shift;
+
+  my $pc = $hash->{HELPER}{PLOTCACHE};
+  return if(!$pc);
+
+  for my $sig (keys %{$pc}) {
+      delete $pc->{$sig} if((gettimeofday() - $pc->{$sig}{ts}) > $dblog_pcmaxage);
+  }
+
+return;
+}
+
+################################################################
+#  stoesst einen Hintergrund-Refresh der Plotdaten fuer die
+#  angegebene Cache-Signatur ueber den SubProcess an
+#  (stale-while-revalidate). Macht nichts wenn:
+#   - fuer diese Signatur bereits ein Refresh laeuft
+#   - der SubProcess aktuell mit einer anderen Operation
+#     beschaeftigt ist (single-in-flight) - der naechste
+#     stale-Hit versucht es erneut
+################################################################
+sub __DbLog_plotCacheTriggerRefresh {
+  my $paref = shift;
+
+  my $hash = $paref->{hash};
+  my $sig  = $paref->{sig};
+  my $args = $paref->{args};                                        # Hashref: inf/outf/from/to/table/aref
+
+  my $name       = $hash->{NAME};
+  my $subprocess = $hash->{".fhem"}{subprocess};
+
+  my $rf = $hash->{HELPER}{PLOTCACHE_REFRESHING}{$sig};
+
+  return if($rf && (gettimeofday() - $rf) < 120);                   # Refresh laeuft noch (oder Antwort ging verloren, max. 120s) - kein Duplikat anstossen
+                                                                    # bewusst KEIN "return if(defined $hash->{HELPER}{LONGRUN_PID})": der eigene
+                                                                    # PLOTCACHE_REFRESHING-Guard oben reicht als Duplikat-Schutz aus. Zusaetzlich NICHT mehr
+                                                                    # DbLog_SBP_sendCommand() genutzt, da diese Funktion selbst $hash->{HELPER}{LONGRUN_PID} setzt (Seiteneffekt:
+                                                                    # haeufige Plot-Refreshes wuerden dann reguläre log_asynch-Schreibzyklen verzoegern, siehe
+                                                                    # DbLog_execMemCacheAsync: "if(defined $hash->{HELPER}{LONGRUN_PID}) { $dolog = 0; }"
+
+  return if(!defined $subprocess);
+
+  $args->{sig} = $sig;
+
+  my $memc = { verbose => AttrVal ($name, 'verbose', $attr{global}{verbose}), operation => 'refreshplotdata', arguments => $args };
+
+  my $err = _DbLog_SBP_sendToChild ($name, $subprocess, $memc);
+
+  if ($err) {
+      Log3 ($name, 2, "$name - could not trigger plot cache refresh: $err");
+      return;
+  }
+
+  $hash->{HELPER}{PLOTCACHE_REFRESHING}{$sig} = gettimeofday();
+
+  Log3 ($name, 4, "$name - background plot cache refresh triggered (sig: $sig)");
+
+return;
+}
+
+################################################################
+#  Cache fuer DbLog_sampleDataFn (Device:Reading-Liste im Plot
+#  Editor). Anders als der Plotdaten-Cache genuegt hier EIN
+#  einzelner Eintrag pro DbLog-Device (keine Signatur noetig) -
+#  das Ergebnis haengt nicht von Request-Parametern ab, sondern
+#  ausschliesslich vom Inhalt der current-Tabelle.
+#
+#  Rein synchron (TTL, kein SubProcess): der Plot Editor wird im
+#  Vergleich zu SVG-Plotaufrufen selten genug geoeffnet, dass ein
+#  Hintergrund-Refresh hier keinen relevanten Zusatznutzen bringt.
+#  Nachteil: neue Device:Reading-Kombinationen erscheinen im
+#  Editor erst nach Ablauf der TTL - akzeptabler Trade-off fuer
+#  ein Feature, das per Default (TTL=0) deaktiviert ist.
+################################################################
+sub __DbLog_sampleDataCacheGet {
+  my $hash = shift;
+  my $ttl  = shift;
+
+  return if(!$ttl);
+
+  my $sc = $hash->{HELPER}{SAMPLEDATACACHE};
+  return if(!$sc);
+
+  return if((gettimeofday() - $sc->{ts}) > $ttl);                       # Cache-Eintrag abgelaufen
+
+return $sc;
+}
+
+sub __DbLog_sampleDataCacheStore {
+  my $hash    = shift;
+  my $cols    = shift;
+  my $example = shift;                                                  # Arrayref
+
+  $hash->{HELPER}{SAMPLEDATACACHE} = { ts => scalar(gettimeofday()), cols => $cols, example => $example };
+                                                                        # scalar() zwingend! gettimeofday() liefert im Listenkontext ($sec,$usec)
+return;
+}
+
+################################################################
+# @a (Spaltenspezifikationen wie "Device:Reading:Default:
+# Funktion:Regexp") in ein @readings-Array parsen. Reine
+# Funktion - identisch zur bisherigen Inline-Logik,
+# ausgelagert damit sie auch vom SubProcess (Hintergrund-
+# Refresh) genutzt werden kann.
+################################################################
+sub DbLog_plotParseReadings {
+  my $aref = shift;
+
+  my @readings;
+
+  for (my $i = 0; $i < int(@{$aref}); $i++) {
+      my @fld          = split ":", $aref->[$i], 5;
+      $readings[$i][0] = $fld[0];                                   # Device
+      $readings[$i][1] = $fld[1];                                   # Reading
+      $readings[$i][2] = $fld[2];                                   # Default
+      $readings[$i][3] = $fld[3];                                   # function
+      $readings[$i][4] = $fld[4];                                   # regexp
+
+      $readings[$i][1] = "%" if(!$readings[$i][1] || length($readings[$i][1])==0);   # falls Reading nicht gefuellt setze Joker
+  }
+
+return @readings;
+}
+
+
+################################################################
+# SQL-Dialekt-spezifische Fragmente fuer Plot-Queries bauen.
+# Reine Funktion (kein State, keine DB) - identisch zur
+# bisherigen Inline-Logik, ausgelagert damit sie auch vom
+# SubProcess (Hintergrund-Refresh) genutzt werden kann.
+################################################################
+sub DbLog_plotBuildSqlSpec {
+  my ($model, $from, $to, $outf) = @_;
+
+  my %sqlspec;
+
+  if ($model eq "POSTGRESQL") {
+      $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
+      $sqlspec{max_value}      = "MAX(VALUE)";
+      $sqlspec{day_before}     = "($sqlspec{from_timestamp} - INTERVAL '1 DAY')";
+  }
+  elsif ($model eq "ORACLE") {
+      $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
+      $sqlspec{order_by_hour}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24')";
+      $sqlspec{max_value}      = "MAX(VALUE)";
+      $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
+  }
+  elsif ($model =~ /MYSQL|MARIADB/xs) {
+      $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
+      $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
+      $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
+      $sqlspec{order_by_hour}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H')";
+      $sqlspec{max_value}      = "MAX(VALUE)";                                           # 12.04.2019 Forum: https://forum.fhem.de/index.php/topic,99280.0.html
+      $sqlspec{day_before}     = "DATE_SUB($sqlspec{from_timestamp},INTERVAL 1 DAY)";
+  }
+  elsif ($model eq "SQLITE") {
+      $sqlspec{get_timestamp}  = "TIMESTAMP";
+      $sqlspec{from_timestamp} = "'$from'";
+      $sqlspec{to_timestamp}   = "'$to'";
+      $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
+      $sqlspec{max_value}      = "MAX(VALUE)";
+      $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
+  }
+  else {
+      $sqlspec{get_timestamp}  = "TIMESTAMP";
+      $sqlspec{from_timestamp} = "'$from'";
+      $sqlspec{to_timestamp}   = "'$to'";
+      $sqlspec{order_by_hour}  = "strftime('%Y-%m-%d %H', TIMESTAMP)";
+      $sqlspec{max_value}      = "MAX(VALUE)";
+      $sqlspec{day_before}     = "date($sqlspec{from_timestamp},'-1 day')";
+  }
+
+  if($outf =~ m/(all|array)/) {
+      $sqlspec{all}      = ",TYPE,EVENT,UNIT";
+      $sqlspec{all_max}  = ",MAX(TYPE) AS TYPE,MAX(EVENT) AS EVENT,MAX(UNIT) AS UNIT";
+  }
+  else {
+      $sqlspec{all}      = "";
+      $sqlspec{all_max}  = "";
+  }
+
+return %sqlspec;
+}
+
+################################################################
+# SQL-Statement fuer ein einzelnes Reading bauen. Reine
+# Funktion (kein State, keine DB) - identisch zur bisherigen
+# Inline-Logik, ausgelagert damit sie auch vom SubProcess
+# (Hintergrund-Refresh) genutzt werden kann.
+#
+# $reading: Arrayref [device, reading, default, function, regexp]
+################################################################
+sub DbLog_plotBuildStm {
+  my ($table, $sqlref, $reading, $deltacalc) = @_;
+
+  my %sqlspec = %{$sqlref};
+  my $stm;
+
+  if ($deltacalc) {
+      $stm  = "SELECT Z.TIMESTAMP, Z.DEVICE, Z.READING, Z.VALUE from ";
+
+      $stm .= "(SELECT $sqlspec{get_timestamp} AS TIMESTAMP,
+                DEVICE AS DEVICE,
+                READING AS READING,
+                VALUE AS VALUE ";
+
+      $stm .= "FROM $table ";
+
+      $stm .= "WHERE 1=1 ";
+
+      $stm .= "AND DEVICE  = '".$reading->[0]."' "   if ($reading->[0] !~ m(\%));
+      $stm .= "AND DEVICE LIKE '".$reading->[0]."' " if(($reading->[0] !~ m(^\%$)) && ($reading->[0] =~ m(\%)));
+
+      $stm .= "AND READING = '".$reading->[1]."' "    if ($reading->[1] !~ m(\%));
+      $stm .= "AND READING LIKE '".$reading->[1]."' " if(($reading->[1] !~ m(^%$)) && ($reading->[1] =~ m(\%)));
+
+      $stm .= "AND TIMESTAMP < $sqlspec{from_timestamp} ";
+      $stm .= "AND TIMESTAMP > $sqlspec{day_before} ";
+
+      $stm .= "ORDER BY TIMESTAMP DESC LIMIT 1 ) AS Z
+               UNION ALL " if($reading->[3] eq "delta-h");
+
+      $stm .= "ORDER BY TIMESTAMP) AS Z
+               UNION ALL " if($reading->[3] eq "delta-d");
+
+      $stm .= "SELECT
+               MAX($sqlspec{get_timestamp}) AS TIMESTAMP,
+               MAX(DEVICE) AS DEVICE,
+               MAX(READING) AS READING,
+               $sqlspec{max_value}
+               $sqlspec{all_max} ";
+
+      $stm .= "FROM $table ";
+
+      $stm .= "WHERE 1=1 ";
+
+      $stm .= "AND DEVICE  = '".$reading->[0]."' "    if ($reading->[0] !~ m(\%));
+      $stm .= "AND DEVICE LIKE '".$reading->[0]."' "  if(($reading->[0] !~ m(^\%$)) && ($reading->[0] =~ m(\%)));
+
+      $stm .= "AND READING = '".$reading->[1]."' "    if ($reading->[1] !~ m(\%));
+      $stm .= "AND READING LIKE '".$reading->[1]."' " if(($reading->[1] !~ m(^%$)) && ($reading->[1] =~ m(\%)));
+
+      $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
+      $stm .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
+
+      $stm .= "GROUP BY $sqlspec{order_by_hour} " if($deltacalc);
+      $stm .= "ORDER BY TIMESTAMP";
+  }
+  else {                                                            # kein deltacalc
+      $stm =  "SELECT
+                  $sqlspec{get_timestamp},
+                  DEVICE,
+                  READING,
+                  VALUE
+                  $sqlspec{all} ";
+
+      $stm .= "FROM $table ";
+
+      $stm .= "WHERE 1=1 ";
+
+      $stm .= "AND DEVICE = '".$reading->[0]."' "     if ($reading->[0] !~ m(\%));
+      $stm .= "AND DEVICE LIKE '".$reading->[0]."' "  if(($reading->[0] !~ m(^\%$)) && ($reading->[0] =~ m(\%)));
+
+      $stm .= "AND READING = '".$reading->[1]."' "    if ($reading->[1] !~ m(\%));
+      $stm .= "AND READING LIKE '".$reading->[1]."' " if(($reading->[1] !~ m(^%$)) && ($reading->[1] =~ m(\%)));
+
+      $stm .= "AND TIMESTAMP >= $sqlspec{from_timestamp} ";
+      $stm .= "AND TIMESTAMP <= $sqlspec{to_timestamp} ";           # 03.09.2018 : https://forum.fhem.de/index.php/topic,65860.msg815640.html#msg815640
+      $stm .= "ORDER BY TIMESTAMP";
+  }
+
+return $stm;
 }
 
 ###############################################################################################
@@ -8643,7 +9198,7 @@ sub DbLog_sampleDataFn {
   my $conf    = shift;
   my $wName   = shift;
 
-  my $desc    = "";                                                                         # Beschreibung über Eingabezeile
+  my $desc    = "";                                                                             # Beschreibung über Eingabezeile
   my $hash    = $defs{$dlName};
   my $current = $hash->{HELPER}{TC};
   my $history = $hash->{HELPER}{TH};
@@ -8653,67 +9208,107 @@ sub DbLog_sampleDataFn {
   my @colregs;
   my $counter;
 
-  my $err = _DbLog_manageDBHU ($defs{$dlName});
-  return if($err);
+  my $pifl  = AttrVal ($dlName, 'plotInputFieldLength',        $dblog_pifl);
+  my $sdttl = AttrVal ($dlName, 'sampleDataCacheLifetime',  $dblog_sdcldef);
+  my $sdsrc = AttrVal ($dlName, 'sampleDataSource',              'current');                    # Attr nicht implementiert ('current' (default) oder 'history')
 
-  my $dbh    = $hash->{DBHU};
-  my $ccount = 0;
-  my $dblt   = AttrVal ($dlName, 'DbLogType',              'History');
-  my $pifl   = AttrVal ($dlName, 'plotInputFieldLength', $dblog_pifl);
+  my $sdc = __DbLog_sampleDataCacheGet ($hash, $sdttl);
 
-  if ($dblt =~ m/Current|SampleFill/xs) {
-      $ccount = eval {$dbh->selectrow_array("select count(*) from $current");} || 0;
+  my ($cols, $havecurrent);
+
+  if ($sdc) {                                                                                   # frischer Cache-Treffer - kein DB-Zugriff noetig
+      $cols        = $sdc->{cols};
+      @example     = @{$sdc->{example}};
+      $havecurrent = 1;
+
+      Log3 ($dlName, 4, "$dlName - sample data delivered from cache (age: ".sprintf("%.1f", gettimeofday()-$sdc->{ts})."s)");
   }
+  else {
+      my $err = _DbLog_manageDBHU ($defs{$dlName});
+      return if($err);
 
-  if ($ccount) {                                                                           # Table Current present, use it for sample data
-      $desc = "Device:Reading [Function]".
-              "<br>[RegExp] &lt;unused&gt;";                                               # Beschreibung über Eingabezeile
+      my $dbh    = $hash->{DBHU};
+      my $ccount = 0;
+      my $dblt   = AttrVal ($dlName, 'DbLogType', 'History');
 
-      my $query = "select device,reading from $current where device <> '' group by device,reading";
-      my $sth   = $dbh->prepare( $query );
-      $sth->execute();
-
-      while (my @line = $sth->fetchrow_array()) {
-          $counter++;
-          push @example, (join ":", @line).' [Function]<br>[RegExp]' if($counter <= 4);    # show max 4 examples
-          push @colregs, "$line[0]:$line[1]";                                              # push all eventTypes to selection list
+      if ($sdsrc eq 'history') {                                                                # history statt current - nutzt vorhandenen Index auf history
+          if ($dblt =~ m/History/xs) {
+              $ccount = eval {$dbh->selectrow_array("select count(*) from $history")} || 0;
+          }
+      }
+      elsif ($dblt =~ m/Current|SampleFill/xs) {
+          $ccount = eval {$dbh->selectrow_array("select count(*) from $current")} || 0;
       }
 
-      my $cols = join ",", sort { "\L$a" cmp "\L$b" } @colregs;
+      if ($ccount) {                                                                            # Quelltabelle vorhanden und gefuellt, fuer Sample-Daten nutzen
+          my $query;
+
+          if ($sdsrc eq 'history') {
+              $query = "select device,reading from $history where device <> '' group by device,reading";
+                                                                                                # GROUP BY hier bewusst beibehalten (bzw. fuer diese Quelle
+                                                                                                # ueberhaupt erst noetig): history enthaelt viele Zeilen je
+                                                                                                # Device:Reading, der vorhandene Index ermoeglicht dafuer i.d.R.
+                                                                                                # einen Index-only- bzw. Loose-Index-Scan durch die DB
+          }
+          else {
+              $query = "select device,reading from $current where device <> ''";                # kein GROUP BY - current enthaelt konstruktionsbedingt
+                                                                                                # genau eine Zeile je Device:Reading, GROUP BY erzwingt
+                                                                                                # unnoetig Sort/Filesort bzw. verhindert einen Index-only-Scan
+          }
+
+          my $sth = $dbh->prepare ($query);
+          $sth->execute();
+
+          while (my @line = $sth->fetchrow_array()) {
+              $counter++;
+              push @example, (join ":", @line).' [Function]<br>[RegExp]' if($counter <= 4);     # show max 4 examples
+              push @colregs, "$line[0]:$line[1]";                                               # push all eventTypes to selection list
+          }
+
+          $cols        = join ",", sort { "\L$a" cmp "\L$b" } @colregs;
+          $havecurrent = 1;
+
+          __DbLog_sampleDataCacheStore ($hash, $cols, \@example);
+      }
+  }
+
+  if ($havecurrent) {
+      $desc = "Device:Reading [Function]".
+              "<br>[RegExp] &lt;unused&gt;";                                                    # Beschreibung über Eingabezeile
 
       for (my $r = 0; $r < $max; $r++) {
-          my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : "::::"), 5;                    # Beispiel Input Zeile > sysmon:ram::delta-h:$val=~s/^Total..([\d.]*).*/$1/eg          
-          my $ret = q{};                                                                   #                           0   1  2 3       4
+          my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : "::::"), 5;                         # Beispiel Input Zeile > sysmon:ram::delta-h:$val=~s/^Total..([\d.]*).*/$1/eg          
+          my $ret = q{};                                                                        #                           0   1  2 3       4
 
-          no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
-          $ret .= SVG_sel ("par_${r}_0", $cols, "$f[0]:$f[1]");                            # par_<Zeile>_<Spalte>, <Auswahl>, <Vorbelegung>
+          no warnings 'uninitialized';                                                          # Forum:74690, bug unitialized
+          $ret .= SVG_sel ("par_${r}_0", $cols, "$f[0]:$f[1]");                                 # par_<Zeile>_<Spalte>, <Auswahl>, <Vorbelegung>
 
-          $ret .= SVG_sel ("par_${r}_3", $dblog_svgfnset, $f[3]);                          # Funktionsauswahl
+          $ret .= SVG_sel ("par_${r}_3", $dblog_svgfnset, $f[3]);                               # Funktionsauswahl
 
           $f[4] =~ /^(:+)?(.*)/xs;
-          $ret .= SVG_txt ("par_${r}_4", "<br>", "$2", $pifl);                             # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
+          $ret .= SVG_txt ("par_${r}_4", "<br>", "$2", $pifl);                                  # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
 
-          $ret .= SVG_txt ("par_${r}_2", "", $f[2], 1);                                    # der Defaultwert (nicht ausgewertet)
+          $ret .= SVG_txt ("par_${r}_2", "", $f[2], 1);                                         # der Defaultwert (nicht ausgewertet)
           use warnings;
           
           push @htmlArr, $ret;
       }
   }
-  else {                                                                                   # Table Current not present, so create an empty input field
+  else {                                                                                        # Table Current not present, so create an empty input field
       push @example, '&lt;Device&gt;:&lt;Reading&gt;::[Function]<br>[RegExp]';
 
       $desc = "Device:Reading::[Function]".
-              "<br>RegExp";                                                                # Beschreibung über Eingabezeile
+              "<br>RegExp";                                                                     # Beschreibung über Eingabezeile
 
       for (my $r = 0; $r < $max; $r++) {
           my @f   = split ":", ($dlog->[$r] ? $dlog->[$r] : "::::"), 5;
           my $ret = q{};
 
-          no warnings 'uninitialized';                                                     # Forum:74690, bug unitialized
-          $ret .= SVG_txt ("par_${r}_0", "", "$f[0]:$f[1]::$f[3]", $pifl);                 # letzter Wert -> Breite der Eingabezeile
+          no warnings 'uninitialized';                                                          # Forum:74690, bug unitialized
+          $ret .= SVG_txt ("par_${r}_0", "", "$f[0]:$f[1]::$f[3]", $pifl);                      # letzter Wert -> Breite der Eingabezeile
 
           $f[4] =~ /^(:+)?(.*)/xs;
-          $ret .= SVG_txt ("par_${r}_3", "<br>", "$2", $pifl);                             # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
+          $ret .= SVG_txt ("par_${r}_3", "<br>", "$2", $pifl);                                  # RegExp (z.B. $val=~s/^Total..([\d.]*).*/$1/eg)
           use warnings;
           
           push @htmlArr, $ret;
@@ -8815,13 +9410,13 @@ sub DbLog_setVersionInfo {
 
   if($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {       # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                        # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{DbLog}{META}}
-      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 29036 2024-07-21 20:47:25Z DS_Starter $ im Kopf komplett! vorhanden )
+      if($modules{$type}{META}{x_version}) {                                          # {x_version} ( nur gesetzt wenn $Id: 93_DbLog.pm 29401 2024-12-05 14:26:00Z DS_Starter $ im Kopf komplett! vorhanden )
           $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/xsg;
       }
       else {
           $modules{$type}{META}{x_version} = $v;
       }
-      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 29036 2024-07-21 20:47:25Z DS_Starter $ im Kopf komplett! vorhanden )
+      return $@ unless (FHEM::Meta::SetInternals($hash));                             # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 93_DbLog.pm 29401 2024-12-05 14:26:00Z DS_Starter $ im Kopf komplett! vorhanden )
       if(__PACKAGE__ eq "FHEM::$type" || __PACKAGE__ eq $type) {
           # es wird mit Packages gearbeitet -> Perl übliche Modulversion setzen
           # mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
@@ -8895,7 +9490,7 @@ return;
   Accordingly, in this case the MySQL/MariaDB database would be created with the following statement: <br><br>
 
   <ul>
-   <code> CREATE DATABASE `fhem` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin; </code>
+   <code> CREATE DATABASE `fhem` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin; </code>
   </ul>
   <br>
 
@@ -10460,6 +11055,28 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
+     <a id="DbLog-attr-plotCacheLifetime"></a>
+     <li><b>plotCacheLifetime &lt;seconds&gt; </b> <br><br>
+     <ul>
+        Caches the data delivered to SVG plots. While a cache entry is younger
+        than plotCacheLifetime seconds, an identical plot request (same device/readings and time range) is answered
+        directly from cache without any database access. <br>
+        Once a cache entry is older than plotCacheLifetime, the next request for it is still answered
+        instantly from the (now outdated) cache entry, while a refresh is fetched asynchronously in the
+        background via the DbLog SubProcess (stale-while-revalidate). The following request is then answered
+        from the refreshed, current cache entry. <br>
+        This requires attribute <b>plotfork=0</b> in the relevant FHEMWEB device(s): the cache lives in
+        DbLog's device hash and is not visible to a process forked off by plotfork - any cache entries written
+        there are lost when the forked process terminates. If plotfork=1 is set nevertheless, a warning is
+        logged once and the cache is bypassed for that FHEMWEB device. <br>
+        (default: 0 - disabled, every plot request queries the database directly as before this attribute
+        was introduced)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
      <a id="DbLog-attr-plotInputFieldLength"></a>
      <li><b>plotInputFieldLength &lt;Ganzzahl&gt; </b> <br><br>
      <ul>
@@ -10467,6 +11084,21 @@ attr SMA_Energymeter DbLogValueFn
         If the drop-down list is used as input help for Device:Reading, the width of the field is
         set automatically. <br>
         (default: 40)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a id="DbLog-attr-sampleDataCacheLifetime"></a>
+     <li><b>sampleDataCacheLifetime &lt;seconds&gt; </b> <br><br>
+     <ul>
+        Caches the Device:Reading list offered as input help (drop-down) in the Plot Editor. While a cache
+        entry is younger than sampleDataCacheLifetime seconds, opening the Plot Editor doesn't query the
+        database at all. <br>
+        Newly appearing Device:Reading combinations only show up in the Plot Editor's drop-down list after
+        the cache entry has expired. <br>
+        (default: 0 - disabled, the Plot Editor always queries the database directly)
      </ul>
      </li>
   </ul>
@@ -10782,7 +11414,7 @@ attr SMA_Energymeter DbLogValueFn
   Dementsprechend wäre in diesem Fall die MySQL/MariaDB Datenbank mit folgendem Statement anzulegen: <br><br>
 
   <ul>
-   <code> CREATE DATABASE `fhem` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin; </code>
+   <code> CREATE DATABASE `fhem` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin; </code>
   </ul>
   <br>
 
@@ -12388,6 +13020,28 @@ attr SMA_Energymeter DbLogValueFn
   <br>
 
   <ul>
+     <a id="DbLog-attr-plotCacheLifetime"></a>
+     <li><b>plotCacheLifetime &lt;Sekunden&gt; </b> <br><br>
+
+     <ul>
+        Cacht die an SVG-Plots gelieferten Daten. Solange ein Cache-Eintrag
+        jünger als plotCacheLifetime Sekunden ist, wird eine identische Plot-Anfrage (gleiche Devices/Readings und
+        gleicher Zeitraum) direkt aus dem Cache beantwortet, ohne Datenbankzugriff. <br>
+        Ist ein Cache-Eintrag älter als plotCacheLifetime, wird die nächste Anfrage dafür trotzdem sofort aus
+        dem (dann veralteten) Cache-Eintrag beantwortet, während im Hintergrund über den DbLog-SubProzess
+        asynchron ein Refresh geholt wird (stale-while-revalidate). Die darauffolgende Anfrage wird dann aus
+        dem aktualisierten, frischen Cache-Eintrag beantwortet. <br>
+        Dies erfordert das Attribut <b>plotfork=0</b> im/den betreffenden FHEMWEB-Device(s): Der Cache lebt im
+        Geräte-Hash von DbLog und ist für einen von plotfork abgespaltenen Kindprozess nicht sichtbar -
+        dortige Cache-Schreibzugriffe gehen beim Beenden des Kindprozesses verloren. Ist dennoch plotfork=1
+        gesetzt, wird einmalig eine Warnung geloggt und der Cache für dieses FHEMWEB-Device umgangen. <br>
+        (default: 0 - deaktiviert, jede Plot-Anfrage fragt wie bisher direkt die Datenbank ab)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
      <a id="DbLog-attr-plotInputFieldLength"></a>
      <li><b>plotInputFieldLength &lt;Ganzzahl&gt; </b> <br><br>
 
@@ -12396,6 +13050,22 @@ attr SMA_Energymeter DbLogValueFn
         Wird die Drop-Down Liste als Eingabehilfe für Device:Reading verwendet, wird die Breite des Feldes
         automatisch eingestellt. <br>
         (default: 40)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a id="DbLog-attr-sampleDataCacheLifetime"></a>
+     <li><b>sampleDataCacheLifetime &lt;Sekunden&gt; </b> <br><br>
+
+     <ul>
+        Cacht die im Plot Editor als Eingabehilfe (Drop-Down) angebotene Device:Reading-Liste. Solange ein
+        Cache-Eintrag jünger als sampleDataCacheLifetime Sekunden ist, wird beim Öffnen des Plot Editors
+        keinerlei Datenbankzugriff durchgeführt. <br>
+        Neu hinzugekommene Device:Reading-Kombinationen erscheinen in der Drop-Down-Liste des Plot Editors
+        erst, nachdem der Cache-Eintrag abgelaufen ist. <br>
+        (default: 0 - deaktiviert, der Plot Editor fragt immer direkt die Datenbank ab)
      </ul>
      </li>
   </ul>
