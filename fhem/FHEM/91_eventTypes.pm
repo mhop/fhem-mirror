@@ -200,7 +200,7 @@ eventTypes_Set($@)
 {
   my ($hash, @a) = @_;
 
-  return %{$modules{eventTypes}{ldata}} = undef
+  return %{$modules{eventTypes}{ldata}} = ()
         if($a[1] eq "clear");
   return eventTypes_Shutdown($hash, $hash->{NAME})
         if($a[1] eq "flush");
