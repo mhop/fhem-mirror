@@ -79,7 +79,7 @@ $(document).ready(function(){
   if($(szc).length)
     $(szc).before("<div class='SVGplot'></div>");
 
-  $(".SVGlabel[data-name]").each(function(){ 
+  $(".SVGlabel[data-name],.label[data-name]").each(function(){ 
     $(this).attr("data-name", "Room_"+f18_room+"_"+$(this).attr("data-name"));
   });
   f18_menu();
@@ -741,6 +741,7 @@ f18_compEl(el)
 {
   return $(el).hasClass("fileList") ?  $(el).next("table") : 
          $(el).hasClass("SVGlabel") ?  $(el).prev(".SVGplot") :
+         $(el).hasClass("label")    ?  $(el).prev(".content4label") :
          $(el).closest("tr").next().find(">td>table").first();
 }
 
@@ -798,7 +799,9 @@ f18_addDragger(el)
   // Size
   var off = 20;
   var elPadding = ($(el).outerWidth()-$(el).width());
-  if(!$(el).hasClass("SVGlabel")) {
+  var isLabel = $(el).hasClass("SVGlabel") ||
+                $(el).hasClass("label");
+  if(!isLabel) {
     $("<div class='dragSize'></div>")
       .appendTo(el)
       .css({ cursor:"pointer", "background-image":"url('"+f18_icon.arrows+"')",
@@ -925,7 +928,9 @@ f18_doSetPos(el, comp, pos)
 {
   f18_applyGrid(pos);
   $(el).css({ position:"absolute", left:pos.left, top:pos.top });
-  if(!$(el).hasClass("SVGlabel")) {
+  var isLabel = $(el).hasClass("SVGlabel") ||
+                $(el).hasClass("label");
+  if(!isLabel) {
     var elPadding = ($(el).outerWidth()-$(el).width());
     $(el).css({ width:pos.width-elPadding });
   }

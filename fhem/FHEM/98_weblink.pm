@@ -80,16 +80,15 @@ FW_showWeblink($$$$)
 sub
 weblink_FwDetail($@)
 {
-  my ($d, $text, $nobr)= @_;
+  my ($d, $attr)= @_;
   return "" if(AttrVal($d, "group", "") || AttrVal($d, "nodetaillink", ""));
   my $alias = AttrVal($d, "alias", $d);
-
-  my $ret = ($nobr ? "" : "<br>");
-  $ret .= "$text " if($text);
-  $ret .= FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
-  $ret .= "<br>";
+  my $ret = "<div class='label' data-name='$d'>";
+  $ret .= FW_pHPlain("detail=$d", $alias, undef, $attr) if(!$FW_subdir);
+  $ret .= "</div>";
   return $ret;
 }
+
 
 sub
 weblink_FwFn($$$$)
@@ -111,11 +110,11 @@ weblink_FwFn($$$$)
     $ret = "<a href=\"$link\" $attr>$alias</a>"; # no FW_pH, open extra browser
 
   } elsif($wltype eq "image") {
-    $ret = "<img src=\"$link\" $attr><br>" . 
+    $ret = "<img class='content4label' src=\"$link\" $attr><br>" . 
            weblink_FwDetail($d);
 
   } elsif($wltype eq "iframe") {
-    $ret = "<iframe src=\"$link\" $attr>Iframes disabled</iframe>" .
+    $ret = "<iframe class='content4label' src='$link' $attr>Iframes disabled</iframe>" .
            weblink_FwDetail($d);
 
   } elsif($wltype eq "cmdList") {
