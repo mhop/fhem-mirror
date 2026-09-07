@@ -1,4 +1,4 @@
-REV 31621
+REV 31623
 DIR unused
 UPD 2026-09-02_07:45:05 460796 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -461,7 +461,7 @@ UPD 2019-05-27_07:45:02 53160 FHEM/89_VCLIENT.pm
 UPD 2016-07-11_07:45:14 62016 FHEM/89_VCONTROL.pm
 UPD 2026-07-06_07:45:03 15628 FHEM/90_SIGNALduino_un.pm
 UPD 2026-07-24_07:45:03 28410 FHEM/90_at.pm
-UPD 2026-08-15_07:45:04 7929 FHEM/91_eventTypes.pm
+UPD 2026-09-07_07:45:04 7926 FHEM/91_eventTypes.pm
 UPD 2025-09-04_07:45:03 30145 FHEM/91_notify.pm
 UPD 2023-07-15_07:45:03 11892 FHEM/91_sequence.pm
 UPD 2022-06-02_07:45:02 19537 FHEM/91_watchdog.pm
@@ -773,8 +773,8 @@ UPD 2026-08-28_07:45:11 5592078 docs/commandref.html
 UPD 2026-08-28_07:45:15 3568711 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-09-06_07:45:17 331813 docs/commandref_modular.html
-UPD 2026-09-06_07:45:19 343613 docs/commandref_modular_DE.html
+UPD 2026-09-07_07:45:17 331813 docs/commandref_modular.html
+UPD 2026-09-07_07:45:18 343613 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
