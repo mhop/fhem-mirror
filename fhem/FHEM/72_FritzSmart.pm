@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.09.01";
+our $ModulVersion = "26.09.07";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -525,6 +525,8 @@ our %JavaScript = (
                                    810 => "generic/dnsserver"},
         dect                  => { 800 => "generic?ui=dect",
                                    810 => "generic/dect"},
+        dhcpv6info            => { 800 => "generic?ui=dhcpv6info",
+                                   810 => "generic/dhcpv6info"},
         eventlog              => { 800 => "eventlog",
                                    810 => "dino/eventlog"},
         eventlog_groups       => { 800 => "eventlog/groups",
@@ -1062,8 +1064,8 @@ sub Fritz_Get_attrList($@) {
   my $name = $hash->{NAME};
 
   my $avmModel;
-  if( defined($hash->{FRITZ_MODEL}) && $hash->{FRITZ_MODEL} ne "") {
-    $avmModel = $hash->{FRITZ_MODEL};
+  if( defined($hash->{MODEL}) && $hash->{MODEL} ne "") {
+    $avmModel = $hash->{MODEL};
   } else {
     $avmModel = "Initial";
   }
@@ -1437,10 +1439,10 @@ sub Fritz_Log($$$)
    }
 
    my $avmModel = "Initial";
-   if ( exists($instHash->{FRITZ_MODEL}) && ref($instHash->{FRITZ_MODEL}) eq "SCALAR" ) {
-     $avmModel = $instHash->{FRITZ_MODEL};
+   if ( exists($instHash->{MODEL}) && ref($instHash->{MODEL}) eq "SCALAR" ) {
+     $avmModel = $instHash->{MODEL};
    } else {
-     $avmModel = main::InternalVal($instName, "FRITZ_MODEL", "Initial");
+     $avmModel = main::InternalVal($instName, "MODEL", "Initial");
    }
 
    my $fwV = main::ReadingsVal($instName, "box_fwVersion", "0.0.0.0");
@@ -1777,8 +1779,8 @@ sub Fritz_Define_Modul($$)
      $hash->{SID_RENEW_ERR_CNT}      = 0;
      $hash->{SID_RENEW_CNT}          = 0;
      $hash->{STATUS}                 = "active";
-     $hash->{FRITZ_MODEL}            = "";
-     $hash->{FRITZ_OS}               = "";
+     $hash->{MODEL}            = "";
+     $hash->{MODEL_OS}               = "";
      $hash->{XML_PARSER}             = main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default});
 
      $hash->{fhem}{readOutState}     = 0;
@@ -1950,7 +1952,7 @@ sub Fritz_Attr_Modul($@)
       # aName and aVal are Attribute name and value
 
    my $hash      = $defs{$name};
-   my $avmModel  = main::InternalVal($name, "FRITZ_MODEL", $hash->{FRITZ_MODEL});
+   my $avmModel  = main::InternalVal($name, "MODEL", $hash->{MODEL});
    my $URL_MATCH = Fritz_Helper_Url_Regex();
    my $attrList  = Fritz_Get_attrList($hash);
 
@@ -2938,7 +2940,7 @@ sub Fritz_Set_Modul($$@)
      if ($hash->{TR064} == 1 && $hash->{SECPORT}) {
        $list    .= " reboot";
 
-       if (defined ($hash->{FRITZ_MODEL}) && ($hash->{FRITZ_MODEL} =~ "Box")) {
+       if (defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box")) {
  
          $list .= " call"
                .  " dectRing"
@@ -2974,8 +2976,8 @@ sub Fritz_Set_Modul($$@)
      # set abhängig von data.lua
      if ($hash->{LUADATA} == 1) {
 
-       if (defined ($hash->{FRITZ_MODEL})) {
-         if ( $hash->{FRITZ_MODEL} =~ "Box" ) {
+       if (defined ($hash->{MODEL})) {
+         if ( $hash->{MODEL} =~ "Box" ) {
 
            $list .= " switchIPv4DNS:provider,other"
                  .  " dect:on,off"
@@ -2994,7 +2996,7 @@ sub Fritz_Set_Modul($$@)
            $list .= " dnsFilter:on,off,updNow,never,updEvery8h,updDayly,updWeeky,updMonthly" if ($hash->{fhem}{fwVersion} >= 840);
          }
       
-         if ( $hash->{FRITZ_MODEL} =~ "Box|Smart" ) {
+         if ( $hash->{MODEL} =~ "Box|Smart" ) {
            $list .= " smartHome" if ($hash->{fhem}{fwVersion} >= 721);
          }
 
@@ -3578,7 +3580,7 @@ sub Fritz_Set_Modul($$@)
        }         
      } # end call
 
-     elsif ( (lc $cmd eq 'blockincomingphonecall') && ($hash->{LUADATA} == 1) && defined ($hash->{FRITZ_MODEL}) && ($hash->{FRITZ_MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721) ) {
+     elsif ( (lc $cmd eq 'blockincomingphonecall') && ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721) ) {
 
        # set <name> blockIncomingPhoneCall <new> <name> <number> <home|work|mobile|fax_work>
        # set <name> blockIncomingPhoneCall <new> <name> <number> <home|work|mobile|fax_work> <yyyy-mm-ddThh:mm:ss>
@@ -4249,7 +4251,7 @@ sub Fritz_Set_Modul($$@)
        #         PhoneBookID VIP EntryName      NumberType:PhoneNumber
        # del     PhoneBookID     Mein_Test_Name
 
-       unless ( defined ($hash->{FRITZ_MODEL}) && ($hash->{FRITZ_MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT} ) { #tr064
+       unless ( defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && $hash->{TR064} == 1 && $hash->{SECPORT} ) { #tr064
          $retMsg = "ERROR: 'set ... PhonebookEntry' is not supported by the limited interfaces of your Fritz!OS firmware.";
          return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
        }
@@ -4846,7 +4848,7 @@ sub Fritz_Set_Modul($$@)
 
      } # end enablevpnshare
 
-     elsif ( (lc $cmd eq 'wakeupcall') && ($hash->{LUADATA} == 1) && defined ($hash->{FRITZ_MODEL}) && ($hash->{FRITZ_MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721) ) {
+     elsif ( (lc $cmd eq 'wakeupcall') && ($hash->{LUADATA} == 1) && defined ($hash->{MODEL}) && ($hash->{MODEL} =~ "Box") && ($hash->{fhem}{fwVersion} >= 721) ) {
        # xhr 1 lang de page alarm xhrId all / get Info
 
        # xhr: 1
@@ -5011,7 +5013,7 @@ sub Fritz_Get_Modul($@)
    my ($hash, $name, $cmd, @val) = @_;
    my $returnStr;
 
-   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
+   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
 
    my $retMsg = "";
@@ -5404,7 +5406,7 @@ sub Fritz_Get_Modul($@)
 
        return "Wrong number of arguments, usage: get $name argName1 argValue1" if int @val != 1;
 
-       my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
+       my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
 
        if ( $val[0] eq "mobileInfo" && $hash->{LUADATA} == 1) {
          $returnStr = Fritz_Get_MobileInfo($hash);
@@ -6180,7 +6182,7 @@ sub Fritz_Readout_Run_Web($)
    my $sid = "";
    my $sidNew = 0;
 
-   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
+   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
 
    my $startTime = time();
 
@@ -6247,7 +6249,7 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
    my $views;
    my $nbViews;
 
-   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
+   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
 
    my @webCmdArray;
@@ -7285,7 +7287,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
    my $views;
    my $nbViews;
 
-   my $avmModel          = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
+   my $avmModel          = main::InternalVal($name, "MODEL", "FRITZ!Box");
    my $mesh              = main::ReadingsVal($name, "box_meshRole", "master");
    my $logFilter         = main::AttrVal($name, "enableLogReadings", "");
    my $enableBoxReading  = main::AttrVal($name, "enableBoxReadings", "");
@@ -9652,7 +9654,7 @@ sub Fritz_Readout_Run_Web_TR064($$$$)
    my $views;
    my $nbViews;
 
-   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", "FRITZ!Box");
+   my $avmModel = main::InternalVal($name, "MODEL", "FRITZ!Box");
 
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
    my $enBoxReadings = main::AttrVal($name, "enableBoxReadings", "");
@@ -10372,13 +10374,13 @@ sub Fritz_Readout_Process($$@)
      }
  
      elsif ($rName eq "box_model") {
-       $hash->{FRITZ_MODEL} = $rValue;
+       $hash->{MODEL} = $rValue;
 
        $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
      }
 
      elsif ($rName eq "box_fwVersion") {
-       $hash->{FRITZ_OS} = $rValue;
+       $hash->{MODEL_OS} = $rValue;
      }
 
      if ($rName !~ /-\<|-\>|box_fwUpdate|readoutTime|Error/) {
@@ -11006,7 +11008,7 @@ sub Fritz_Readout_API_Check($)
 
    Fritz_Log $hash, 3, "boxUser for checkAPIs: " . ($boxUser ? $boxUser : "not set/necessary");
 
-   $hash->{FRITZ_MODEL} = $name;
+   $hash->{MODEL} = $name;
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
    Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", "";
@@ -11076,7 +11078,7 @@ sub Fritz_Readout_API_Check($)
          if ($content =~ /\<modelName\>/) {
            if ($content =~ /\<modelName\>(.*)\<\/modelName\>/) {
              Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-             $hash->{FRITZ_MODEL} = $1;
+             $hash->{MODEL} = $1;
            }
 
            if ($content =~ /\<modelNumber\>(.*)\<\/modelNumber\>/) {
@@ -11133,7 +11135,7 @@ sub Fritz_Readout_API_Check($)
 
          if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-           $hash->{FRITZ_MODEL} = $1;
+           $hash->{MODEL} = $1;
          }
          Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1) if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
 
@@ -11192,7 +11194,7 @@ sub Fritz_Readout_API_Check($)
          # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
 
          Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-         $hash->{FRITZ_MODEL} = $result[0];
+         $hash->{MODEL} = $result[0];
 
          my $FBOS = $result[7];
          $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
@@ -11211,7 +11213,7 @@ sub Fritz_Readout_API_Check($)
      # Check for defined user in Fritz!Device, only if $osVersion >= 725
      if ($osVersion && $osVersion >= 725 ) {
 
-       Fritz_Log $hash, 4, "boxUser for: $osVersion $hash->{FRITZ_MODEL}";
+       Fritz_Log $hash, 4, "boxUser for: $osVersion $hash->{MODEL}";
        $url       = "http://" . $host;
        $response  = $agent->get( $url );
        $apiError .= " boxUser:" . $response->status_line;
@@ -11380,7 +11382,7 @@ sub Fritz_Readout_API_Check($)
            Fritz_Log $hash, 2, $passErr;
            Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
 
-           if ($osVersion && $osVersion < 725 && $hash->{FRITZ_MODEL} !~ /Repeater/) {
+           if ($osVersion && $osVersion < 725 && $hash->{MODEL} !~ /Repeater/) {
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
            }
 
@@ -11413,7 +11415,7 @@ sub Fritz_Readout_API_Check($)
            # 9 Branding, z.B. 1und1 (Provider 1&1) oder avm (direkt von AVM)
 
            Fritz_Readout_Add_Reading $hash, \@roReadings, "box_model",  $result[0];
-           $hash->{FRITZ_MODEL} = $result[0];
+           $hash->{MODEL} = $result[0];
 
            my $FBOS = $result[7];
            $FBOS = substr($FBOS,0,3) . "." . substr($FBOS,3,2) . "." . substr($FBOS,5,2);
@@ -11480,7 +11482,7 @@ sub Fritz_Readout_API_Check($)
            Fritz_Log $hash, 2, $passErr;
            Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
 
-           if ($osVersion && $osVersion < 725 && $hash->{FRITZ_MODEL} !~ /Repeater/) {
+           if ($osVersion && $osVersion < 725 && $hash->{MODEL} !~ /Repeater/) {
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
            }
          } elsif( $statusLine =~ /\(No route to host\)/) {
@@ -11498,7 +11500,7 @@ sub Fritz_Readout_API_Check($)
 
          if ($content =~ /<j:Name>(.*)<\/j:Name>/) {
            Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_model", $1);
-           $hash->{FRITZ_MODEL} = $1;
+           $hash->{MODEL} = $1;
          }
 
          Fritz_Readout_Add_Reading ($hash, \@roReadings, "box_oem", $1)       if $content =~ /<j:OEM>(.*)<\/j:OEM>/;
@@ -11754,7 +11756,7 @@ sub Fritz_Readout_API_Check($)
          Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN?";
        }
 
-       my $avmModel = main::InternalVal($name, "FRITZ_MODEL", $hash->{FRITZ_MODEL});
+       my $avmModel = main::InternalVal($name, "MODEL", $hash->{MODEL});
        my $serviceList = Fritz_Get_TR064_ServiceList ($hash, undef, "tr64" . "desc.xml");
 
        Fritz_Log $hash, 4, "ApiCheck TR64 serviceList\n" . $serviceList;
@@ -17884,7 +17886,7 @@ sub Fritz_open_Web_Connection ($)
       Fritz_Log $hash, 4, "renewing SID while: " . $msg;
    }
 
-   my $avmModel = main::InternalVal($name, "FRITZ_MODEL", $hash->{FRITZ_MODEL});
+   my $avmModel = main::InternalVal($name, "MODEL", $hash->{MODEL});
    my $user = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
 
    Fritz_Log $hash, 4, "Fritz_Get_Lan_Device_Info (Fritz!OS: $hash->{fhem}{fwVersionStr}) ";
@@ -22865,7 +22867,7 @@ sub Fritz_Helper_Dumper($$;@) {
     "Dect",
     "Consumer"
   ],
-  "version": "260901",
+  "version": "260907",
   "release_status": "stable",
   "author": [
     "Jörg Wiemann <jowiemann@debitel.net>"
