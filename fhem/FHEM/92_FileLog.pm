@@ -1221,7 +1221,7 @@ FileLog_seekTo($$$$$)
 {
   my ($fname, $fh, $hash, $ts, $reformatFn) = @_;
 
-  # If its cached
+  # If its cached ($plotfork: only while the child is alive)
   if($hash->{pos} && $hash->{pos}{"$fname:$ts"}) {
     $fh->seek($hash->{pos}{"$fname:$ts"}, 0);
     return;
