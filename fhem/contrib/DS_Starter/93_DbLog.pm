@@ -1,5 +1,5 @@
 ##############################################################################################################################
-# $Id: 93_DbLog.pm 29401 2024-12-05 14:26:00Z DS_Starter $
+# $Id: 93_DbLog.pm 29401 2026-09-06 14:26:00Z DS_Starter $
 ##############################################################################################################################
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
@@ -57,12 +57,13 @@ use SubProcess;
 use vars qw($FW_ME $FW_subdir);                                      # predeclare global variable names
 
 my %DbLog_vNotesIntern = (
-  "5.12.0"  => "02.09.2026 Einbau SVG Cache (benötigt FHEMWEB plotfork=0) ".
+  "5.12.0"  => "06.09.2026 Einbau SVG Cache (benötigt FHEMWEB plotfork=0) ".
                            "neues Attribut sampleDataCacheLifetime: Zwischenspeicherung Leseliste (DbLog_sampleDataFn) ".
                            "In der SQL-Abfrage mit den Beispieldaten für die aktuelle Tabelle überflüssiges 'GROUP BY' entfernt ".
                            "SVG-Cache: Hintergrundaktualisierung veralteter Cache-Einträge über SubProcess (stale-while-revalidate) ".
                            "keine Blockierung bei Cache-Treffer oder Aktualisierung ".
-                           "gezielte Cache-Invlidierung bei gesetzten longpollSVG im Kontext der geloggten und angezeigten Daten ",
+                           "neues Attribut plotCacheKeepalive: proaktive Hintergrundaktualisierung des Plot-Caches ".
+                           "(vermeidet kurzzeitig veraltete Anzeige nach Ablauf von plotCacheLifetime) ",
   "5.11.0"  => "02.12.2024 sub _DbLog_SBP_onRun_LogArray revised: insertmode Array - not saved data are print out in Logfile ",
   "5.10.3"  => "01.12.2024 check valid Time limit 1970-01-01 00:00:00 of Event time, Forum: #139847 ", 
   "5.10.2"  => "21.07.2024 _DbLog_copyCache: Copy process changed to minimize memory usage after reopen ", 
@@ -161,6 +162,7 @@ my $dblog_pifl      = 40;                                                       
 my $dblog_svgfnset  = ',delta-d,delta-h,delta-ts,int,int1,int2,int3,int4,int5';  # Funktionen für SVG sampleDataFn
 my $dblog_pcldef    = 0;                                                         # default plotCacheLifetime (0 = deaktiviert)
 my $dblog_pcmaxage  = 3600;                                                      # max. Alter Cache-Einträge bis Purge unabhängig von TTL (Sek)
+my $dblog_pckeepdef = 0;                                                         # default plotCacheKeepalive (0 = deaktiviert, kein proaktives Hintergrund-Refresh)
 my $dblog_sdcldef   = 0;                                                         # default sampleDataCacheLifetime (0 = deaktiviert)
 
 # $data{DbLog}{$name}{cache}                                                     # Log-Daten Arbeitscache
@@ -201,6 +203,7 @@ sub DbLog_Initialize {
                                "headerLinks:text,icon ".
                                "insertMode:1,0 ".
                                "noSupportPK:1,0 ".
+                               "plotCacheKeepalive ".
                                "plotCacheLifetime ".
                                "plotInputFieldLength ".
                                "sampleDataCacheLifetime ".
@@ -429,6 +432,7 @@ sub DbLog_Attr {
           $aName eq "cacheLimit"              ||
           $aName eq "cacheOverflowThreshold"  ||
           $aName eq "plotCacheLifetime"       ||
+          $aName eq "plotCacheKeepalive"      ||
           $aName eq "sampleDataCacheLifetime" ||
           $aName eq "SQLiteCacheSize"         ||
           $aName eq "plotInputFieldLength"    ||
@@ -1571,7 +1575,7 @@ sub _DbLog_ParseEvent {
       $value = $tail;
       $unit  = q{};
     
-      if (scalar @parts <= 2 && looks_like_number($parts[0])) {
+      if (scalar @parts <= 2 && looks_like_number ($parts[0])) {
           $value = $parts[0];
           $unit  = $parts[1] // q{};            
       }
@@ -6642,8 +6646,8 @@ sub _DbLog_plotData {
       $pcsig = __DbLog_plotCacheSig ($inf, $outf, $from, $to, $table, join("|", @a));
   }
 
-  if ($internal && $pcttl && !$pcfork && !$prefetched) {                          # Replay-Aufrufe (prefetched) lesen nie aus dem Cache - sie befuellen ihn
-      my $ce = __DbLog_plotCacheGet ($hash, $pcsig, $pcttl);                       # frischer Treffer
+  if ($internal && $pcttl && !$pcfork && !$prefetched) {                            # Replay-Aufrufe (prefetched) lesen nie aus dem Cache - sie befuellen ihn
+      my $ce = __DbLog_plotCacheGet ($hash, $pcsig, $pcttl);                        # frischer Treffer
 
       if ($ce) {
           for my $k (keys %{$ce->{dat}}) {
@@ -6652,12 +6656,14 @@ sub _DbLog_plotData {
 
           $internal_data = \$ce->{retval};
 
+          __DbLog_plotCacheTouch ($hash, $pcsig);                                   # "zuletzt angefragt" aktualisieren (fuer plotCacheKeepalive)
+
           Log3 ($name, 4, "$name - plotdata delivered from cache (age: ".sprintf("%.1f", gettimeofday()-$ce->{ts})."s)");
 
-          return undef;
+          return;
       }
 
-      my $stale = __DbLog_plotCacheGetAny ($hash, $pcsig);                         # evtl. abgelaufener, aber noch vorhandener Eintrag
+      my $stale = __DbLog_plotCacheGetAny ($hash, $pcsig);                          # evtl. abgelaufener, aber noch vorhandener Eintrag
 
       if ($stale) {
           for my $k (keys %{$stale->{dat}}) {
@@ -6665,6 +6671,8 @@ sub _DbLog_plotData {
           }
 
           $internal_data = \$stale->{retval};
+
+          __DbLog_plotCacheTouch ($hash, $pcsig);                                   # "zuletzt angefragt" aktualisieren (fuer plotCacheKeepalive)
 
           Log3 ($name, 4, "$name - plotdata delivered from STALE cache sig=$pcsig (age: ".sprintf("%.1f", gettimeofday()-$stale->{ts}).
                            "s), triggering background refresh");
@@ -6675,7 +6683,7 @@ sub _DbLog_plotData {
                                              # der Replay-Aufruf muss die outf->internal-Umwandlung in _DbLog_plotData selbst nochmal durchlaufen,
                                              # sonst bleibt $internal dort false und die Funktion nimmt den falschen Rueckgabepfad.
 
-          return undef;
+          return;
       }
   }
 
@@ -6800,8 +6808,7 @@ sub _DbLog_plotData {
           # $readings[$i][3] = function
           # $readings[$i][4] = regexp
           ####################################################################
-          if($readings[$i]->[4]) {
-              #evaluate
+          if ($readings[$i]->[4]) {                                                                 # evaluate
               my $val = $sql_value;
               my $ts  = $sql_timestamp;
 
@@ -6815,9 +6822,9 @@ sub _DbLog_plotData {
           }
 
           if ($sql_timestamp lt $from && $deltacalc) {
-              if (Scalar::Util::looks_like_number($sql_value)) {                                 # nur setzen wenn numerisch
-                  $minval    = $sql_value if($sql_value < $minval || ($minval =  (~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019
-                  $maxval    = $sql_value if($sql_value > $maxval || ($maxval = -(~0 >> 1)) );   # geändert V4.8.0 / 14.10.2019
+              if (Scalar::Util::looks_like_number ($sql_value)) {                                   # nur setzen wenn numerisch
+                  $minval    = $sql_value if($sql_value < $minval || ($minval =  (~0 >> 1)) );      # geändert V4.8.0 / 14.10.2019
+                  $maxval    = $sql_value if($sql_value > $maxval || ($maxval = -(~0 >> 1)) );      # geändert V4.8.0 / 14.10.2019
                   $lastv[$i] = $sql_value;
               }
           }
@@ -7128,7 +7135,8 @@ sub _DbLog_plotData {
               }
           }
 
-          __DbLog_plotCacheStore ({ hash => $hash, sig => $pcsig, retval => $retval, dat => \%dat });
+          __DbLog_plotCacheStore ({ hash => $hash, sig => $pcsig, retval => $retval, dat => \%dat,
+                                     args => { inf => $inf, outf => 'int', from => $from, to => $to, table => $table, colspecs => [@a] } });
 
           delete $hash->{HELPER}{PLOTCACHE_REFRESHING}{$pcsig};                     # Refresh-Guard freigeben (no-op falls nicht gesetzt)
 
@@ -7173,7 +7181,7 @@ sub __DbLog_plotCacheGet {
   my $ce = $hash->{HELPER}{PLOTCACHE}{$sig};
   return if(!$ce);
 
-  return if((gettimeofday() - $ce->{ts}) > $ttl);                              # Cache-Eintrag abgelaufen
+  return if((gettimeofday() - $ce->{ts}) > $ttl);                               # Cache-Eintrag abgelaufen
 
 return $ce;
 }
@@ -7184,11 +7192,123 @@ sub __DbLog_plotCacheStore {
   my $hash   = $paref->{hash};
   my $sig    = $paref->{sig};
   my $retval = $paref->{retval};
-  my $dat    = $paref->{dat};                                                  # Hashref der zugehörigen min/max/avg/... Keys aus %data
+  my $dat    = $paref->{dat};                                                   # Hashref der zugehörigen min/max/avg/... Keys aus %data
+  my $args   = $paref->{args};                                                  # Hashref: inf/outf/from/to/table/colspecs - fuer autonomen Hintergrund-Refresh (plotCacheKeepalive)
 
-  $hash->{HELPER}{PLOTCACHE}{$sig} = { ts => scalar(gettimeofday()), retval => $retval, dat => $dat };  # scalar() zwingend! gettimeofday() liefert im Listenkontext ($sec,$usec)
+  my $old     = $hash->{HELPER}{PLOTCACHE}{$sig};
+  my $lastreq = $old ? $old->{lastreq} : scalar(gettimeofday());                # bei neuem Eintrag = jetzt, bei Refresh eines bestehenden Eintrags unveraendert
+                                                                                # (ein automatischer Hintergrund-Refresh ist keine echte Anfrage!)
+
+  $hash->{HELPER}{PLOTCACHE}{$sig} = { ts => scalar(gettimeofday()), retval => $retval, dat => $dat, args => $args, lastreq => $lastreq };
+                                                                                # scalar() zwingend! gettimeofday() liefert im Listenkontext ($sec,$usec)
 
   __DbLog_plotCachePurge ($hash);
+
+  __DbLog_plotCacheAutoRefreshStart ($hash);
+
+return;
+}
+
+################################################################
+#  Aktualisiert den "zuletzt tatsaechlich angefragt"-Zeitstempel
+#  eines Cache-Eintrags, OHNE dessen Daten/Alter (ts) anzufassen.
+#  Wird bei jedem echten Plot-Request (Fresh- oder Stale-Hit)
+#  aufgerufen - dient als Grundlage fuer plotCacheKeepalive
+#  (ein automatischer Hintergrund-Refresh zaehlt NICHT als Anfrage).
+################################################################
+sub __DbLog_plotCacheTouch {
+  my $hash = shift;
+  my $sig  = shift;
+
+  return if(!$hash->{HELPER}{PLOTCACHE}{$sig});
+
+  $hash->{HELPER}{PLOTCACHE}{$sig}{lastreq} = scalar(gettimeofday());
+
+return;
+}
+
+################################################################
+#  Startet den periodischen Hintergrund-Refresh-Timer fuer den
+#  Plotdaten-Cache (plotCacheKeepalive), falls er nicht schon
+#  laeuft. No-op wenn plotCacheKeepalive nicht gesetzt ist.
+#  Selbstregulierend: der Timer stoppt sich selbst, sobald keine
+#  "aktiven" (innerhalb plotCacheKeepalive tatsaechlich
+#  angefragten) Cache-Eintraege mehr vorhanden sind, und wird bei
+#  Bedarf durch den naechsten __DbLog_plotCacheStore automatisch
+#  neu gestartet.
+################################################################
+sub __DbLog_plotCacheAutoRefreshStart {
+  my $hash = shift;
+
+  return if($hash->{HELPER}{PLOTCACHE_AUTOTIMER});                            # Timer laeuft schon
+
+  my $name  = $hash->{NAME};
+  my $pcttl = AttrVal ($name, 'plotCacheLifetime',  $dblog_pcldef);
+  my $keep  = AttrVal ($name, 'plotCacheKeepalive', $dblog_pckeepdef);
+
+  return if(!$pcttl || !$keep);
+
+  $hash->{HELPER}{PLOTCACHE_AUTOTIMER} = 1;
+
+  InternalTimer (gettimeofday()+$pcttl, 'DbLog_plotCacheAutoRefresh', $hash, 0);
+
+return;
+}
+
+################################################################
+#  Periodischer, proaktiver Hintergrund-Refresh des Plotdaten-
+#  Caches - unabhaengig von eingehenden Plot-Requests. Fuer jede
+#  Signatur, die innerhalb von plotCacheKeepalive Sekunden
+#  tatsaechlich zuletzt angefragt wurde (lastreq), wird ein
+#  Refresh ueber den SubProcess angestossen (stale-while-
+#  revalidate-Mechanik wird dafuer wiederverwendet). Laenger
+#  nicht mehr angefragte Eintraege werden verworfen.
+#
+#  Der Timer plant sich selbst neu, solange plotCacheLifetime/
+#  plotCacheKeepalive weiterhin gesetzt sind UND noch mindestens
+#  ein aktiver Eintrag vorhanden ist - andernfalls stoppt er sich
+#  selbst.
+################################################################
+sub DbLog_plotCacheAutoRefresh {
+  my $hash = shift;
+
+  my $name  = $hash->{NAME};
+  my $pcttl = AttrVal ($name, 'plotCacheLifetime',  $dblog_pcldef);
+  my $keep  = AttrVal ($name, 'plotCacheKeepalive', $dblog_pckeepdef);
+
+  if (!$pcttl || !$keep) {
+      delete $hash->{HELPER}{PLOTCACHE_AUTOTIMER};                            # Attribut(e) entfernt/deaktiviert - Timer beenden
+
+      return;
+  }
+
+  my $pc     = $hash->{HELPER}{PLOTCACHE};
+  my $now    = gettimeofday();
+  my $active = 0;
+
+  for my $sig (keys %{$pc // {}}) {
+      my $entry = $pc->{$sig};
+
+      if (($now - $entry->{lastreq}) > $keep) {
+          delete $pc->{$sig};                                                 # zu lange nicht mehr angefragt - verwerfen, kein weiterer Refresh
+          delete $hash->{HELPER}{PLOTCACHE_REFRESHING}{$sig};
+
+          next;
+      }
+
+      $active = 1;
+
+      next if(!$entry->{args});                                               # Sicherheitsnetz, sollte nicht vorkommen
+
+      __DbLog_plotCacheTriggerRefresh ({ hash => $hash, sig => $sig, args => { %{$entry->{args}} } });
+  }
+
+  if ($active) {
+      InternalTimer (gettimeofday()+$pcttl, 'DbLog_plotCacheAutoRefresh', $hash, 0);
+  }
+  else {
+      delete $hash->{HELPER}{PLOTCACHE_AUTOTIMER};                            # keine aktiven Eintraege mehr - Timer stoppen (wird bei Bedarf neu gestartet)
+  }
 
 return;
 }
@@ -7216,7 +7336,7 @@ sub __DbLog_longpollSVGactive {
 return 0;
 }
 
-##############################################################################
+################################################################
 #  Entfernt (invalidiert) alle Plotdaten-Cache-Eintraege eines
 #  DbLog-Devices, deren Signatur eines der soeben geloggten
 #  Device:Reading-Paare enthaelt. Wird beim Anstossen eines
@@ -7231,9 +7351,8 @@ return 0;
 #  der Plot wirkt dann so, als aktualisiere er sich nicht mehr live.
 #
 #  $cdata: Hashref index => "TIMESTAMP|DEVICE|TYPE|EVENT|READING|VALUE|UNIT"
-#          (identisches Format wie $memc->{cdata} beim Senden 
-#          an den SubProcess)
-##############################################################################
+#          (identisches Format wie $memc->{cdata} beim Senden an den SubProcess)
+################################################################
 sub __DbLog_plotCacheInvalidateForEvents {
   my $hash  = shift;
   my $cdata = shift;
@@ -7289,7 +7408,19 @@ return $hash->{HELPER}{PLOTCACHE}{$sig};
 ################################################################
 #     veraltete Cache-Einträge entfernen, damit der Hash bei
 #     wechselnden Zeitfenstern/Zoomstufen nicht unbegrenzt
-#     waechst (unabhängig von der eingestellten TTL)
+#     waechst (unabhängig von plotCacheKeepalive, siehe
+#     __DbLog_plotCacheStore).
+#
+#     Schwelle = groesserer Wert aus $dblog_pcmaxage (fester
+#     Sockelwert, dient als Selbstheilung falls der Hintergrund-
+#     Refresh z.B. wegen haengendem SubProcess dauerhaft
+#     fehlschlaegt - lastreq wuerde in dem Fall trotzdem durch
+#     eingehende Anfragen aktuell gehalten, plotCacheKeepalive
+#     wuerde den Eintrag also NIE bereinigen) und dem 3-fachen
+#     von plotCacheLifetime (damit ein bewusst gross eingestelltes
+#     Lifetime nicht dazu fuehrt, dass ein gesunder, aktiv
+#     gepflegter Eintrag zwischen zwei planmaessigen Refresh-
+#     Zyklen geloescht wird).
 ################################################################
 sub __DbLog_plotCachePurge {
   my $hash = shift;
@@ -7297,8 +7428,12 @@ sub __DbLog_plotCachePurge {
   my $pc = $hash->{HELPER}{PLOTCACHE};
   return if(!$pc);
 
+  my $pcttl  = AttrVal ($hash->{NAME}, 'plotCacheLifetime', $dblog_pcldef);
+  my $maxage = $dblog_pcmaxage;
+  $maxage    = $pcttl * 3 if($pcttl && ($pcttl * 3) > $maxage);
+
   for my $sig (keys %{$pc}) {
-      delete $pc->{$sig} if((gettimeofday() - $pc->{$sig}{ts}) > $dblog_pcmaxage);
+      delete $pc->{$sig} if((gettimeofday() - $pc->{$sig}{ts}) > $maxage);
   }
 
 return;
@@ -7903,9 +8038,11 @@ sub DbLog_configcheck {
   #######################################################################
   $check      .= "<u><b>Result of plot generation method check</u></b><br><br>";
   my @webdvs   = devspec2array("TYPE=FHEMWEB:FILTER=STATE=Initialized");
-  my $forks    = 1;
-  my $lpseb    = 1;
-  my $noemb    = 1;
+  my $pcttl    = AttrVal ($name, 'plotCacheLifetime', $dblog_pcldef);                    # nutzt dieses DbLog-Device den Plotdaten-Cache?
+  my $forks    = 1;                                                                      # alle FHEMWEB-Devices haben plotfork=1 (klassischer Ansatz)
+  my $lpseb    = 1;                                                                      # longpollSVG ueberall korrekt konfiguriert (plotEmbed=1)
+  my $noemb    = 1;                                                                      # plotEmbed gesetzt, wo plotfork=1 verwendet wird
+  my $cconfl   = 0;                                                                      # Konflikt: plotCacheLifetime gesetzt, aber plotfork!=0 irgendwo
   my $wall     = "";
 
   for my $web (@webdvs) {
@@ -7916,8 +8053,9 @@ sub DbLog_configcheck {
       $forks  = 0 if(!$pf);
       $lpseb  = 0 if($lps && $pe != 1);
       $noemb  = 0 if($pf && !$pe);
+      $cconfl = 1 if($pcttl && $pf);
 
-      if (!$pf || ($lps && $pe != 1) || ($pf && !$pe)) {
+      if (!$pf || ($lps && $pe != 1) || ($pf && !$pe) || ($pcttl && $pf)) {
           $wall .= "<b>".$web.": plotfork=".$pf." / plotEmbed=".$pe." / longpollSVG=".$lps."</b><br>";
       }
       else {
@@ -7925,17 +8063,33 @@ sub DbLog_configcheck {
       }
   }
 
-  if (!$forks || !$lpseb || !$noemb) {
+  $check .= "Attribute 'plotCacheLifetime' on $name is ".($pcttl ? "set to $pcttl seconds." : "not set (disabled).")." <br><br>";
+
+  if ($cconfl) {                                                                         # hoechste Prioritaet: Cache aktiviert, aber durch plotfork wirkungslos
       $rec = q{};
 
-      if (!$forks) {
-          $check .= "WARNING - at least one of your FHEMWEB devices has attribute 'plotfork = 1' not set. <br>";
-      }
+      $check .= "WARNING - attribute 'plotCacheLifetime' is set on $name, but at least one of your FHEMWEB devices has 'plotfork = 1'. <br>";
+      $check .= "<br>";
+      $check .= $wall;
+      $check .= "<br>";
+      $check .= "Rating: ".$warn."<br>";
+
+      $rec .= "The plot data cache lives in the main process memory and is not visible to a process forked off by 'plotfork' - any cache entries ".
+              "written there are lost when the forked process terminates. For plots served by the affected FHEMWEB device(s) above the cache is ".
+              "therefore silently bypassed (a corresponding warning is logged once per device). <br>".
+              "Set attribute 'plotfork = 0' in the affected FHEMWEB device(s) to make the cache effective there, or unset 'plotCacheLifetime' on ".
+              "$name if you prefer to keep using 'plotfork' for non-blocking plot generation instead. <br>";
+  }
+  elsif (!$forks && !$pcttl) {                                                           # weder Cache noch plotfork aktiv - Blockierungsrisiko
+      $rec = q{};
+
+      $check .= "WARNING - at least one of your FHEMWEB devices doesn't have attribute 'plotfork = 1' set, and DbLog-device $name doesn't use ".
+                "'plotCacheLifetime' either. <br>";
 
       if (!$lpseb) {
           $check .= "WARNING - at least one of your FHEMWEB devices has attribute 'longpollSVG = 1' but not 'plotEmbed = 1' set. <br>";
       }
-      
+
       if (!$noemb) {
           $check .= "WARNING - at least one of your FHEMWEB devices has attribute 'plotEmbed' not set. <br>";
       }
@@ -7945,19 +8099,46 @@ sub DbLog_configcheck {
       $check .= "<br>";
       $check .= "Rating: ".$warn."<br>";
 
-      if (!$forks) {
-          $rec .= "You should set attribute 'plotfork = 1' in relevant devices. ".
-                 "If this attribute is not set, blocking situations may occure when creating plots. <br>".
-                 "(Note: Your system must have sufficient memory to handle parallel running Perl processes.) ".
-                 "See also global attribute <a href=\"http://fhem.de/commandref.html#blockingCallMax\">blockingCallMax</a>. <br>"
-      }
+      $rec .= "Without one of the following mechanisms, blocking situations may occur when creating plots. Choose one: <br><br>";
+      $rec .= "<b>a)</b> Set attribute 'plotCacheLifetime' (e.g. 60) on DbLog-device $name and attribute 'plotfork = 0' in the relevant FHEMWEB ".
+              "device(s). Plot requests are then served from a cache and refreshed asynchronously in the background via the DbLog SubProcess - no ".
+              "additional forked Perl processes needed. <br>";
+      $rec .= "<b>b)</b> Set attribute 'plotfork = 1' in the relevant FHEMWEB device(s) (classic approach). Each plot request is then rendered in ".
+              "a separate forked process. ".
+              "(Note: Your system must have sufficient memory to handle parallel running Perl processes.) ".
+              "See also global attribute <a href=\"http://fhem.de/commandref.html#blockingCallMax\">blockingCallMax</a>. <br><br>";
+      $rec .= "Independent of the chosen approach: if you want plots to update live as soon as new data is logged, also set attribute ".
+              "'longpollSVG = 1' together with 'plotEmbed = 1' in the relevant FHEMWEB device(s). ".
+              "Refer to <a href=\"http://fhem.de/commandref.html#FHEMWEB-attr-longpollSVG\">longpollSVG</a> for further information.<br>";
 
       if (!$noemb) {
           $rec .= "You should set attribute 'plotEmbed = (1 | 2)' in relevant devices. ".
                   "If this attribute is not set, blocking situations may occure when creating plots. <br>".
                   "Refer to <a href=\"http://fhem.de/commandref.html#FHEMWEB-attr-plotEmbed\">plotEmbed</a> for further information.<br>";
       }
-      
+  }
+  elsif (!$lpseb || !$noemb) {                                                           # ein Blockierungs-Mechanismus aktiv, aber longpollSVG/plotEmbed fehlerhaft
+      $rec = q{};
+
+      if (!$lpseb) {
+          $check .= "WARNING - at least one of your FHEMWEB devices has attribute 'longpollSVG = 1' but not 'plotEmbed = 1' set. <br>";
+      }
+
+      if (!$noemb) {
+          $check .= "WARNING - at least one of your FHEMWEB devices has attribute 'plotEmbed' not set. <br>";
+      }
+
+      $check .= "<br>";
+      $check .= $wall;
+      $check .= "<br>";
+      $check .= "Rating: ".$warn."<br>";
+
+      if (!$noemb) {
+          $rec .= "You should set attribute 'plotEmbed = (1 | 2)' in relevant devices. ".
+                  "If this attribute is not set, blocking situations may occure when creating plots. <br>".
+                  "Refer to <a href=\"http://fhem.de/commandref.html#FHEMWEB-attr-plotEmbed\">plotEmbed</a> for further information.<br>";
+      }
+
       if (!$lpseb) {
           $rec .= "You have to set the attribute 'plotEmbed = 1' in FHEMWEB devices where 'longpollSVG' should be used. ".
                   "Refer to <a href=\"http://fhem.de/commandref.html#FHEMWEB-attr-longpollSVG\">longpollSVG</a> for further information.<br>";
@@ -7967,10 +8148,19 @@ sub DbLog_configcheck {
       $check .= $wall;
       $check .= "<br>";
       $check .= "Rating: ".$ok."<br>";
-      $rec    = "settings o.k.";
+      $rec    = $pcttl ? "settings o.k. - using the plot data cache ('plotCacheLifetime') with 'plotfork = 0'." :
+                          "settings o.k. - using classic 'plotfork = 1' for non-blocking plot generation.";
   }
 
   $check .= "<b>Recommendation:</b> $rec <br><br>";
+
+  if ($pcttl && !$cconfl && !AttrVal ($name, 'plotCacheKeepalive', $dblog_pckeepdef)) {
+      $check .= "$info Attribute 'plotCacheLifetime' is set on $name, but 'plotCacheKeepalive' isn't. <br>";
+      $check .= "Without it, a cache entry is only refreshed once a new plot request happens to hit an already outdated entry - ".
+                "this can lead to a brief \"stale, then instantly current\" display when reopening a plot after some time. <br>";
+      $check .= "Consider setting attribute 'plotCacheKeepalive' (noticeably larger than plotCacheLifetime) to keep frequently viewed ".
+                "plots refreshed proactively in the background instead. <br><br>";
+  }
 
   ### Check Spaltenbreite history
   #######################################################################
@@ -11058,19 +11248,28 @@ attr SMA_Energymeter DbLogValueFn
      <a id="DbLog-attr-plotCacheLifetime"></a>
      <li><b>plotCacheLifetime &lt;seconds&gt; </b> <br><br>
      <ul>
-        Caches the data delivered to SVG plots. While a cache entry is younger
-        than plotCacheLifetime seconds, an identical plot request (same device/readings and time range) is answered
-        directly from cache without any database access. <br>
-        Once a cache entry is older than plotCacheLifetime, the next request for it is still answered
-        instantly from the (now outdated) cache entry, while a refresh is fetched asynchronously in the
-        background via the DbLog SubProcess (stale-while-revalidate). The following request is then answered
-        from the refreshed, current cache entry. <br>
-        This requires attribute <b>plotfork=0</b> in the relevant FHEMWEB device(s): the cache lives in
-        DbLog's device hash and is not visible to a process forked off by plotfork - any cache entries written
-        there are lost when the forked process terminates. If plotfork=1 is set nevertheless, a warning is
-        logged once and the cache is bypassed for that FHEMWEB device. <br>
-        (default: 0 - disabled, every plot request queries the database directly as before this attribute
-        was introduced)
+        Caches SVG plot data for the given time. An identical request within that time is answered directly
+        from cache. After expiry, the outdated value is still delivered once more while a refresh is fetched
+        in the background via the DbLog SubProcess (stale-while-revalidate). <br>
+        Requires attribute <b>plotfork=0</b> in the relevant FHEMWEB device(s) - the cache isn't visible to a
+        forked child process. <br>
+        See also <a href="#DbLog-attr-plotCacheKeepalive">plotCacheKeepalive</a>. <br>
+        (default: 0 - disabled)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a id="DbLog-attr-plotCacheKeepalive"></a>
+     <li><b>plotCacheKeepalive &lt;seconds&gt; </b> <br><br>
+     <ul>
+        Only effective together with <a href="#DbLog-attr-plotCacheLifetime">plotCacheLifetime</a>. Keeps a
+        once-requested cache entry refreshed proactively in the background every plotCacheLifetime seconds,
+        instead of only on the next request - avoids a momentary stale display. <br>
+        An entry is dropped once it hasn't actually been requested for longer than plotCacheKeepalive seconds. <br>
+        Choose it noticeably larger than plotCacheLifetime. <br>
+        (default: 0 - disabled)
      </ul>
      </li>
   </ul>
@@ -13024,18 +13223,29 @@ attr SMA_Energymeter DbLogValueFn
      <li><b>plotCacheLifetime &lt;Sekunden&gt; </b> <br><br>
 
      <ul>
-        Cacht die an SVG-Plots gelieferten Daten. Solange ein Cache-Eintrag
-        jünger als plotCacheLifetime Sekunden ist, wird eine identische Plot-Anfrage (gleiche Devices/Readings und
-        gleicher Zeitraum) direkt aus dem Cache beantwortet, ohne Datenbankzugriff. <br>
-        Ist ein Cache-Eintrag älter als plotCacheLifetime, wird die nächste Anfrage dafür trotzdem sofort aus
-        dem (dann veralteten) Cache-Eintrag beantwortet, während im Hintergrund über den DbLog-SubProzess
-        asynchron ein Refresh geholt wird (stale-while-revalidate). Die darauffolgende Anfrage wird dann aus
-        dem aktualisierten, frischen Cache-Eintrag beantwortet. <br>
-        Dies erfordert das Attribut <b>plotfork=0</b> im/den betreffenden FHEMWEB-Device(s): Der Cache lebt im
-        Geräte-Hash von DbLog und ist für einen von plotfork abgespaltenen Kindprozess nicht sichtbar -
-        dortige Cache-Schreibzugriffe gehen beim Beenden des Kindprozesses verloren. Ist dennoch plotfork=1
-        gesetzt, wird einmalig eine Warnung geloggt und der Cache für dieses FHEMWEB-Device umgangen. <br>
-        (default: 0 - deaktiviert, jede Plot-Anfrage fragt wie bisher direkt die Datenbank ab)
+        Cacht die an SVG-Plots gelieferten Daten für die angegebene Zeit. Eine identische Anfrage innerhalb
+        dieser Zeit wird direkt aus dem Cache beantwortet. Nach Ablauf wird der veraltete Wert noch einmal
+        ausgeliefert, während im Hintergrund über den DbLog-SubProzess aktualisiert wird (stale-while-revalidate). <br>
+        Erfordert das Attribut <b>plotfork=0</b> im/den betreffenden FHEMWEB-Device(s) - der Cache ist für
+        geforkte Kindprozesse nicht sichtbar. <br>
+        Siehe auch <a href="#DbLog-attr-plotCacheKeepalive">plotCacheKeepalive</a>. <br>
+        (default: 0 - deaktiviert)
+     </ul>
+     </li>
+  </ul>
+  <br>
+
+  <ul>
+     <a id="DbLog-attr-plotCacheKeepalive"></a>
+     <li><b>plotCacheKeepalive &lt;Sekunden&gt; </b> <br><br>
+
+     <ul>
+        Wirkt nur zusammen mit <a href="#DbLog-attr-plotCacheLifetime">plotCacheLifetime</a>. Hält einen einmal
+        angefragten Cache-Eintrag proaktiv im Hintergrund aktuell (alle plotCacheLifetime Sekunden), statt erst
+        bei der nächsten Anfrage zu aktualisieren - vermeidet eine kurzzeitig veraltete Anzeige. <br>
+        Wird ein Eintrag länger als plotCacheKeepalive Sekunden nicht mehr tatsächlich angefragt, wird er verworfen. <br>
+        Sollte deutlich größer als plotCacheLifetime gewählt werden. <br>
+        (default: 0 - deaktiviert)
      </ul>
      </li>
   </ul>
