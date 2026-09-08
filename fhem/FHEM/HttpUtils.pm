@@ -1095,8 +1095,10 @@ HttpUtils_ParseAnswer($)
   }
 
   # Debug
+  my $length = ( defined($ret) ? length($ret) : "no return value" );
   Log3 $hash, $hash->{loglevel}+1,
-    "HttpUtils $hash->{displayurl}: Got data, length: ". length($ret);
+    "HttpUtils $hash->{displayurl}: Got data, length: ". $length;
+
   Log3 $hash, $hash->{loglevel}+1,
     "HttpUtils response header:\n$hash->{httpheader}" if($hash->{httpheader});
   return ("", $ret);
