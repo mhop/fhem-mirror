@@ -607,6 +607,7 @@ FW_Read($$)
       } elsif(defined($pid)){                   # child
         delete $hash->{BUF};
         $hash->{isChild} = 1;
+        $FW_headerlines .= "Connection: close\r\n"; # 145413
 
       } # fork failed and continue in parent
     }
