@@ -57,52 +57,14 @@ use SubProcess;
 use vars qw($FW_ME $FW_subdir);                                      # predeclare global variable names
 
 my %DbLog_vNotesIntern = (
-  "5.12.0"  => "06.09.2026 Einbau SVG Cache (benötigt FHEMWEB plotfork=0) ".
+  "5.12.0"  => "08.09.2026 Einbau SVG Cache (benötigt FHEMWEB plotfork=0) ".
                            "neues Attribut sampleDataCacheLifetime: Zwischenspeicherung Leseliste (DbLog_sampleDataFn) ".
                            "In der SQL-Abfrage mit den Beispieldaten für die aktuelle Tabelle überflüssiges 'GROUP BY' entfernt ".
                            "SVG-Cache: Hintergrundaktualisierung veralteter Cache-Einträge über SubProcess (stale-while-revalidate) ".
                            "keine Blockierung bei Cache-Treffer oder Aktualisierung ".
                            "neues Attribut plotCacheKeepalive: proaktive Hintergrundaktualisierung des Plot-Caches ".
-                           "(vermeidet kurzzeitig veraltete Anzeige nach Ablauf von plotCacheLifetime) ",
-  "5.11.0"  => "02.12.2024 sub _DbLog_SBP_onRun_LogArray revised: insertmode Array - not saved data are print out in Logfile ",
-  "5.10.3"  => "01.12.2024 check valid Time limit 1970-01-01 00:00:00 of Event time, Forum: #139847 ", 
-  "5.10.2"  => "21.07.2024 _DbLog_copyCache: Copy process changed to minimize memory usage after reopen ", 
-  "5.10.1"  => "01.04.2024 _DbLog_plotData: avoid possible uninitialized value \$out_value (SVG: Argument '' isn't numeric) ".
-                           "replace Smartmatch Forum:#137776 ",
-  "5.10.0"  => "17.03.2024 support of MariaDB driver, optimize Timer execMemCacheAsync, optimize DbLog_configcheck,_DbLog_SBP_connectDB ".
-                           "remove countNbl, support compression between client and server, improved performance if attr excludeDevs is set ".
-                           "Fix _DbLog_plotData Forum: https://forum.fhem.de/index.php?topic=136930.0 ",
-  "5.9.6"   => "09.03.2024 change META.json ",
-  "5.9.5"   => "04.01.2024 change DbLog_configcheck to select only column width independent from column characteristic ",
-  "5.9.4"   => "03.01.2024 make EVENT writable ",
-  "5.9.3"   => "09.10.2023 new attribute colType ",
-  "5.9.2"   => "09.10.2023 edit commandref, Forum: https://forum.fhem.de/index.php?msg=1288840 ",
-  "5.9.1"   => "15.08.2023 possible use of alternative tables in _DbLog_plotData Forum:134547, fix warnings in ".
-                           "_DbLog_SBP_onRun_LogSequential Forum:https://forum.fhem.de/index.php?msg=1284228 ",
-  "5.9.0"   => "16.05.2023 Server shutdown -> write cachefile if database connect can't be done during delayed shutdown ". 
-                           "Forum: https://forum.fhem.de/index.php?topic=133599.0 ",
-  "5.8.8"   => "11.05.2023 _DbLog_ParseEvent changed default splitting, Forum: https://forum.fhem.de/index.php?topic=133537.0 ",
-  "5.8.7"   => "01.05.2023 new Events FRAME_INITIALIZED, SUBPROC_INITIALIZED, SUBPROC_DISCONNECTED, SUBPROC_STOPPED ".
-                           "Forum: https://forum.fhem.de/index.php?topic=133403.0, minor fixes ",
-  "5.8.6"   => "25.03.2023 change _DbLog_plotData (intx), Plot Editor: include functions delta-h, delta-h, ...".
-                           "remove setter deleteOldDaysNbl, reduceLogNbl ",
-  "5.8.5"   => "16.03.2023 fix using https in configCheck after SVN server change ",
-  "5.8.4"   => "20.02.2023 new attr plotInputFieldLength, improve Plot Editor, delete attr noNotifyDev ".
-                           "move notifyRegexpChanged from Define to initOnStart ",
-  "5.8.3"   => "19.02.2023 adapt DbLog_configcheck, new get ... configCheck, commandref edited ",
-  "5.8.2"   => "18.02.2023 adapt DbLog_configcheck, Forum: https://forum.fhem.de/index.php/topic,132163.msg1264320.html#msg1264320 ",
-  "5.8.1"   => "13.02.2023 change field type of DbLogInclude, DbLogExclude to textField-long, configCheck evaluate collation ".
-                           "_DbLog_SBP_connectDB: UTF8 -> evaluate DB character/collation set and use it for ".
-                           "setting names connection collation ",
-  "5.8.0"   => "30.01.2023 new Get menu for a selection of getters, fix creation of new subprocess during shutdown sequence ",
-  "5.7.0"   => "25.01.2023 send Log3() data back ro parent process, improve _DbLog_dbReadings function ",
-  "5.6.2"   => "22.01.2023 check Syntax of DbLogValueFn attribute with Log output, Forum:#131777 ",
-  "5.6.1"   => "16.01.2023 rewrite sub _DbLog_SBP_connectDB, rewrite sub DbLog_ExecSQL, _DbLog_SBP_onRun_deleteOldDays ",
-  "5.6.0"   => "11.01.2023 rename attribute 'bulkInsert' to 'insertMode' ",
-  "5.5.12"  => "10.01.2023 changed routine _DbLog_SBP_onRun_LogSequential, edit CommandRef ",
-  "5.5.11"  => "09.01.2023 more code rework / structured subroutines ",
-  "5.5.10"  => "07.01.2023 more code rework (_DbLog_SBP_checkDiscDelpars) and others, use dbh quote in _DbLog_SBP_onRun_LogSequential ".
-                           "configCheck changed to use only one db connect + measuring the connection time, universal DBHU ",
+                           "(vermeidet kurzzeitig veraltete Anzeige nach Ablauf von plotCacheLifetime) ".
+                           "Attribut noSupportPK als varaltet gekennzeichnet ",                           
   "1.7.1"   => "15.12.2016 initial rework "
 );
 
@@ -2824,7 +2786,7 @@ sub _DbLog_SBP_onRun_LogSequential {
   my $bst         = $paref->{bst};
 
   my $DbLogType   = $memc->{DbLogType};                                   # Log-Ziele
-  my $nsupk       = $memc->{nsupk};                                       # No Support PK 0|1
+  #my $nsupk       = $memc->{nsupk};                                       # No Support PK 0|1
   my $tl          = $memc->{tl};                                          # traceLevel
   my $tf          = $memc->{tf};                                          # traceFlag
   my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
@@ -2854,7 +2816,7 @@ sub _DbLog_SBP_onRun_LogSequential {
 
   my ($usepkh,$usepkc,$pkh,$pkc);
 
-  if (!$nsupk) {                                                                      # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK
+  #if (!$nsupk) {                                                                      # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK
       ($usepkh,$usepkc,$pkh,$pkc) = DbLog_checkUsePK ( { name     => $name,
                                                          dbh      => $dbh,
                                                          dbconn   => $dbconn,
@@ -2862,16 +2824,16 @@ sub _DbLog_SBP_onRun_LogSequential {
                                                          current  => $current
                                                        }
                                                      );
-  }
-  else {
-      _DbLog_SBP_Log3Parent ( { name       => $name,
-                                level      => 5,
-                                msg        => qq(Primary Key usage suppressed by attribute noSupportPK),
-                                oper       => 'log3parent',
-                                subprocess => $subprocess
-                              }
-                            );
-  }
+  #}
+  #else {
+  #    _DbLog_SBP_Log3Parent ( { name       => $name,
+  #                              level      => 5,
+  #                              msg        => qq(Primary Key usage suppressed by attribute noSupportPK),
+  #                              oper       => 'log3parent',
+  #                              subprocess => $subprocess
+  #                            }
+  #                          );
+  #}
 
   my $ln = scalar keys %{$logstore};
 
@@ -3110,7 +3072,7 @@ sub _DbLog_SBP_onRun_LogArray {
   my $bst         = $paref->{bst};
 
   my $DbLogType   = $memc->{DbLogType};                                   # Log-Ziele
-  my $nsupk       = $memc->{nsupk};                                       # No Support PK 0|1
+  #my $nsupk       = $memc->{nsupk};                                       # No Support PK 0|1
   my $tl          = $memc->{tl};                                          # traceLevel
   my $tf          = $memc->{tf};                                          # traceFlag
   my $operation   = $memc->{operation} // 'unknown';                      # aktuell angeforderte Operation (log, etc.)
@@ -3140,7 +3102,7 @@ sub _DbLog_SBP_onRun_LogArray {
 
   my ($usepkh,$usepkc,$pkh,$pkc);
 
-  if (!$nsupk) {                                                                      # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK
+  #if (!$nsupk) {                                                                      # check ob PK verwendet wird, @usepkx?Anzahl der Felder im PK:0 wenn kein PK, $pkx?Namen der Felder:none wenn kein PK
       ($usepkh,$usepkc,$pkh,$pkc) = DbLog_checkUsePK ( { name     => $name,
                                                          dbh      => $dbh,
                                                          dbconn   => $dbconn,
@@ -3148,16 +3110,16 @@ sub _DbLog_SBP_onRun_LogArray {
                                                          current  => $current
                                                        }
                                                      );
-  }
-  else {
-      _DbLog_SBP_Log3Parent ( { name       => $name,
-                                level      => 5,
-                                msg        => qq(Primary Key usage suppressed by attribute noSupportPK),
-                                oper       => 'log3parent',
-                                subprocess => $subprocess
-                              }
-                            );
-  }
+  #}
+  #else {
+  #    _DbLog_SBP_Log3Parent ( { name       => $name,
+  #                              level      => 5,
+  #                              msg        => qq(Primary Key usage suppressed by attribute noSupportPK),
+  #                              oper       => 'log3parent',
+  #                              subprocess => $subprocess
+  #                            }
+  #                          );
+  #}
 
   my $ln = scalar keys %{$logstore};
 
@@ -5359,7 +5321,7 @@ sub DbLog_SBP_sendLogData {
   }
 
   $memc->{DbLogType} = AttrVal ($name, 'DbLogType',   'History');
-  $memc->{nsupk}     = AttrVal ($name, 'noSupportPK',         0);
+  #$memc->{nsupk}     = AttrVal ($name, 'noSupportPK',         0);
   $memc->{tl}        = AttrVal ($name, 'traceLevel',          0);
   $memc->{tf}        = AttrVal ($name, 'traceFlag',       'SQL');
   $memc->{im}        = AttrVal ($name, 'insertMode',          0);
@@ -5398,7 +5360,7 @@ sub DbLog_SBP_sendCommand {
 
   my $memc;
 
-  $memc->{nsupk}     = AttrVal ($name, 'noSupportPK',    0);
+  #$memc->{nsupk}     = AttrVal ($name, 'noSupportPK',    0);
   $memc->{tl}        = AttrVal ($name, 'traceLevel',     0);
   $memc->{tf}        = AttrVal ($name, 'traceFlag',  'SQL');
   $memc->{im}        = AttrVal ($name, 'insertMode',     0);
@@ -10892,7 +10854,7 @@ return;
        (default: none) <br><br>
 
        <b>Note:</b> <br>
-       The Perl modules 'DateTime' and 'DateTime::Format::Strptime' must be installed!
+       The Perl modules 'DateTime' and 'DateTime::Format::Strptime' must be installed.
      </ul>
      </li>
   </ul>
@@ -11238,7 +11200,7 @@ attr SMA_Energymeter DbLogValueFn
      <a id="DbLog-attr-noSupportPK"></a>
      <li><b>noSupportPK [1|0] </b> <br><br>
      <ul>
-       Deactivates the support of a set primary key by the module.<br>
+       Deprecated, do not use it - Deactivates the support of a set primary key by the module.<br>
      </ul>
      </li>
   </ul>
@@ -12865,7 +12827,7 @@ attr SMA_Energymeter DbLogValueFn
        (default: none) <br><br>
 
        <b>Hinweis:</b> <br>
-       Die Perl-Module 'DateTime' und 'DateTime::Format::Strptime' müssen installiert sein !
+       Die Perl-Module 'DateTime' und 'DateTime::Format::Strptime' müssen installiert sein.
      </ul>
      </li>
   </ul>
@@ -13212,7 +13174,7 @@ attr SMA_Energymeter DbLogValueFn
      <li><b>noSupportPK [1|0] </b> <br><br>
 
      <ul>
-       Deaktiviert die programmtechnische Unterstützung eines gesetzten Primary Key durch das Modul.<br>
+       Veraltet, nicht mehr verwenden - Deaktiviert die programmtechnische Unterstützung eines gesetzten Primary Key durch das Modul.<br>
      </ul>
      </li>
   </ul>
