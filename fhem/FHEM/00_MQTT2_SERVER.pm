@@ -678,8 +678,11 @@ MQTT2_SERVER_sendto($$$$;$)
   my $ltopic = $topic;
   my $lval = $val;
   if($unicodeEncoding) {
-    $ltopic = Encode::encode('UTF-8', $topic);
-    $lval   = Encode::encode('UTF-8', $val);
+    if(!$shash->{binaryTopicRegexp} ||
+       $topic !~ m/^$shash->{binaryTopicRegexp}$/) {
+      $ltopic = Encode::encode('UTF-8', $topic);
+      $lval   = Encode::encode('UTF-8', $val);
+    }
   }
 
   # FIXME: respect the subscribe options NL/RAP/RETAIN for proto 5
