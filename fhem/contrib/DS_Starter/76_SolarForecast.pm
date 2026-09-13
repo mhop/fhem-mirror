@@ -72,7 +72,8 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.3" => "12.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ",
+  "2.10.3" => "13.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
+                           "Wertebereiche für stepSoC und careCycle überarbeitet ",
   "2.10.2" => "29.08.2026  userExit bzgl. zirkulären Referenzen gehärtet, potenzielle Speicherleaks geschlossen ".
                            "_aiFannAutoArchitecture: Warnung durch undefiniertes dataParamRatio beseitigt ".
                            "_aiFannEpochDiagnostic: neuen hint29, very_early-Zweig: hint1 und hint26 zusaätzlich gated, early-Zweig: hint5 und hint23 zusätzlich gated ",
@@ -10541,10 +10542,9 @@ sub _attrBatSocManagement {              ## no critic "not used"
       upSoC        => { comp => '(?:100|[1-9][0-9]?)',                                                                   must => 1, act => 0 },
       maxSoC       => { comp => '(?:100|[1-9][0-9]?)',                                                                   must => 0, act => 0 },
       barrierSoC   => { comp => '(?:0|[1-9]\d?|100):(?:max|set|inc|dec|prc):(?:-?\d+|[A-Za-z0-9_.\/-]+)(?::[+-]?\d+)?',  must => 0, act => 0 },
-      stepSoC      => { comp => '[0-5]',                                                                                 must => 0, act => 0 },
-      careCycle    => { comp => '\d+',                                                                                   must => 0, act => 0 },
+      stepSoC      => { comp => '(?:0|1|2|4|5|10|20|25|50|100)',                                                         must => 0, act => 1 },
+      careCycle    => { comp => '(?:1|2|4|5|10|20|25|50|100)',                                                           must => 0, act => 1 },
       lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)',                                 must => 0, act => 1 },
-      careCycle    => { comp => '\d+',                                                                                   must => 0, act => 0 },
       loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',                                      must => 0, act => 0 },
       loadStrategy => { comp => '(loadRelease|optPower|smartPower)',                                                     must => 0, act => 0 },
       loadTarget   => { comp => '(?:100|[1-9]?\d)(?::-?(?:[1-9]|1[0-9]|20))?',                                           must => 0, act => 0 },
@@ -10880,6 +10880,15 @@ sub __attrKeyAction {
 
       # --- Ende init_done Sektion
 
+      if ($akey eq 'stepSoC' || $akey eq 'careCycle') {                                             # Kreuzvalidierung stepSoC * careCycle
+          my $stepSoc   = $pphash->{stepSoC}   // BATSOCCHGDAY;
+          my $careCycle = $pphash->{careCycle} // CARECYCLEDEF;
+          
+          if ($stepSoc != 0 && ($stepSoc * $careCycle) != 100) {
+              my $product = $stepSoc * $careCycle;
+              return qq{Invalid combination: stepSoC=$stepSoc * careCycle=$careCycle = $product (must be 100 or stepSoC=0)};
+          }
+      }
 
       if ($akey eq 'capacity') {
           if (!isNumeric ($akeyval)) {
@@ -11928,6 +11937,8 @@ sub readCacheFile {
   my $hash = $defs{$name};
 
   if ($cachename eq 'aitrained') {
+      delete $data{$name}{aidectree}{aitrained} if(-s $file);                                                # Peak-Reduktion
+
       my ($err, $objref) = fileRetrieve ($file);
 
       if (!$err && $objref) {
@@ -11952,6 +11963,8 @@ sub readCacheFile {
       return;
   }
   elsif ($cachename eq 'airaw') {
+      delete $data{$name}{aidectree}{airaw} if -s $file;                                                    # Peak-Reduktion
+      
       my ($err, $dat) = fileRetrieve ($file);
 
       if (!$err && $dat) {
@@ -11964,6 +11977,14 @@ sub readCacheFile {
       return;
   }
   elsif ($cachename eq 'neuralnet') {
+      my @fanntypes = qw(con pv);                                                                           # --- Liste aller FANN-Typen, die geladen werden sollen ---
+      
+      if ($data{$name}{neuralnet} && -s $file) {                                                            # FannModel-Objekte (XS) vorab freigeben – sie sind nie im Cache-File und stellen den größten Teil des RAM-Peaks dar
+          for my $ft (@fanntypes) {
+              delete $data{$name}{neuralnet}{$ft}{FannModel};
+          }
+      }      
+      
       my ($err, $net) = fileRetrieve($file);
 
       if (!$err && $net) {
@@ -11973,8 +11994,6 @@ sub readCacheFile {
               $data{$name}{current}{conNNTrainstate} = "Perl Modul AI::FANN is missing. Install it first with e.g. 'cpan AI::FANN' or 'cpanm AI::FANN'";
               return;
           }
-
-          my @fanntypes = qw(con pv);                                                                       # --- Liste aller FANN-Typen, die geladen werden sollen ---
 
           # --- für jeden Typ das Modell aus dem Blob neu erzeugen ---
           for my $fanntyp (@fanntypes) {
@@ -15669,6 +15688,39 @@ return;
 }
 
 ################################################################
+#                Parse setupEnvironment
+################################################################
+sub __parseAttrEnvironment {
+  my $name = shift;
+
+  my $env = AttrVal ($name, 'setupEnvironment', '');
+  return if(!$env);
+
+  my ($pa, $ph) = parseParams ($env);
+
+  my ($oustmpdev, $oustmprdg)             = split (':', $ph->{outsideTemp}, 2) if(defined $ph->{outsideTemp});
+  my ($winddev,     $windrdg)             = split (':', $ph->{windSpeed},   2) if(defined $ph->{windSpeed});
+  my ($presendev, $presenrdg, $presenrgx) = split (':', $ph->{presence},    3) if(defined $ph->{presence});
+  my ($gridstdev, $gridstrdg, $gridstrgx) = split (':', $ph->{gridStatus},  3) if(defined $ph->{gridStatus});
+
+
+  my $parsed = {
+      outsideTempDev  => $oustmpdev,
+      outsideTempRdg  => $oustmprdg,
+      windDev         => $winddev,
+      windRdg         => $windrdg,
+      presenceDev     => $presendev,
+      presenceRdg     => $presenrdg,
+      presenceRgx     => $presenrgx,
+      gridstdev       => $gridstdev,
+      gridstrdg       => $gridstrdg,
+      gridstrgx       => $gridstrgx,
+  };
+
+return $parsed;
+}
+
+################################################################
 #   Wochentage, Feiertage und Urlaubstage übertragen
 ################################################################  starttime
 sub _transferHolidayValues {
@@ -15953,39 +16005,6 @@ sub __parseAttrBatSoc {
       otpMargin    => $otpMargin,
       barrierSoc   => $barrierSoC,                                                        # SoC Barriere ab der eine Ladeleistungssteuerung aktiv sein soll
       barrierPar   => $barrierPar,                                                        # Aktionsparameter für Barriere Bereich
-  };
-
-return $parsed;
-}
-
-################################################################
-#                Parse setupEnvironment
-################################################################
-sub __parseAttrEnvironment {
-  my $name = shift;
-
-  my $env = AttrVal ($name, 'setupEnvironment', '');
-  return if(!$env);
-
-  my ($pa, $ph) = parseParams ($env);
-
-  my ($oustmpdev, $oustmprdg)             = split (':', $ph->{outsideTemp}, 2) if(defined $ph->{outsideTemp});
-  my ($winddev,     $windrdg)             = split (':', $ph->{windSpeed},   2) if(defined $ph->{windSpeed});
-  my ($presendev, $presenrdg, $presenrgx) = split (':', $ph->{presence},    3) if(defined $ph->{presence});
-  my ($gridstdev, $gridstrdg, $gridstrgx) = split (':', $ph->{gridStatus},  3) if(defined $ph->{gridStatus});
-
-
-  my $parsed = {
-      outsideTempDev  => $oustmpdev,
-      outsideTempRdg  => $oustmprdg,
-      windDev         => $winddev,
-      windRdg         => $windrdg,
-      presenceDev     => $presendev,
-      presenceRdg     => $presenrdg,
-      presenceRgx     => $presenrgx,
-      gridstdev       => $gridstdev,
-      gridstrdg       => $gridstrdg,
-      gridstrgx       => $gridstrgx,
   };
 
 return $parsed;
@@ -41903,12 +41922,13 @@ to ensure that the system configuration is correct.
             <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
             <tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr>
-            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100' should be observed!                   </td></tr>
-            <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
+            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100 | 0' must be observed!                 </td></tr>
+            <tr><td>                     </td><td>Value range: <b>0, 1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 5                              </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>careCycle</b>    </td><td>Maximum interval in days between two charge states of at least 'maxSoC' that should not be      </td></tr>
-            <tr><td>                     </td><td>exceeded if possible. The specification is optional (default: 20)                               </td></tr>
-            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100' should be observed!                   </td></tr>
+            <tr><td>                     </td><td>exceeded if possible. The specification is optional.                                            </td></tr>
+            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100 | 0' must be observed!                 </td></tr>
+            <tr><td>                     </td><td>Value range: <b>1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 20                                </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>lcSlot</b>       </td><td>A daily time window is defined in which the charging control of the module should be active     </td></tr>
             <tr><td>                     </td><td>for this battery. Outside the time window, the battery charge is released                       </td></tr>
@@ -45089,12 +45109,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
             <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
             <tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr>
-            <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100' sollte eingehalten werden!            </td></tr>
-            <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
+            <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100 | 0' muß eingehalten werden!           </td></tr>
+            <tr><td>                     </td><td>Wertebereich: <b>0, 1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 5                             </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>careCycle</b>    </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'          </td></tr>
-            <tr><td>                     </td><td>möglichst nicht überschritten werden soll. Die Angabe ist optional (default: 20)                </td></tr>
-            <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100' sollte eingehalten werden!            </td></tr>
+            <tr><td>                     </td><td>möglichst nicht überschritten werden soll. Die Angabe ist optional.                             </td></tr>
+            <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100 | 0' muß eingehalten werden!           </td></tr>
+            <tr><td>                     </td><td>Wertebereich: <b>1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 20                               </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>lcSlot</b>       </td><td>Es wird ein tägliches Zeitfenster festgelegt, in dem die Ladesteuerung des Moduls für diese     </td></tr>
             <tr><td>                     </td><td>Batterie aktiv sein soll. Außerhalb des Zeitfensters wird die Batterieladung mit voller         </td></tr>
