@@ -29470,18 +29470,18 @@ sub _aiFannPercentileBasedLimits {
 
   my @outliers = grep { $_ > $p999 } @above;                                         # echte Ausreißer ermitteln (alles > Percentile)
 
-  my $raw_max    = max (@$tgref);                                                    # max. Targetwert
-  my $overshoot  = $p999 > 0 ? $raw_max / $p999 : 1.0;                               # z.B. 8902/8056 = 1.105
-  my $safety     = max (1.05, $overshoot * 1.05);                                    # V 2.6.10 5% Puffer über dem historischen Maximum
-  my $targminval = 0;                                                                # (De)Normalisierung -> Targetgrenze min
-  my $targmaxval = $p999 * $safety;
+  my $raw_max    = max (@$tgref);
+  my $n          = scalar @sorted;
+  my $targminval = 0;
+  my $targmaxval = $p999 * 1.05;                                                    # 5% Headroom über clip_max, nicht über raw_max
 
   if ($debug =~ /aiProcess/xs) {
       $p1 = 'p'.($p1 * 100);
       $p2 = 'p'.($p2 * 100);
 
-      Log3 ($name, 1, sprintf "%s DEBUG> AI FANN - Target-Norm: raw_max=%0.0f, $p1=%0.0f, $p2=%0.0f, targmaxval=%0.0f",
-                               $name, $raw_max, $p99, $p999, $targmaxval);
+      Log3 ($name, 1, sprintf "%s DEBUG> AI FANN - Target-Norm: n=%d raw_max=%0.0f, $p1=%0.0f, $p2=%0.0f, targmaxval=%0.0f (clipping=%s)",
+                              $name, $n, $raw_max, $p99, $p999, $targmaxval,
+                              $raw_max > $targmaxval ? 'YES' : 'none');
 
       if (@outliers) {
           my $olist = join (', ', @outliers);
@@ -32712,7 +32712,7 @@ sub _aiFannNormBevSocDeficit {
   my ($val, $range) = @_;
   return 0 if !defined $val;
 
-  $val = 0 if $val < 0;                                                             # Sicherheitsclamp (Restschutz, siehe Aggregat-Funktion)
+  $val = 0 if $val < 0;                                                                 # Sicherheitsclamp (Restschutz, siehe Aggregat-Funktion)
   $val = 1 if $val > 1;
 
 return $val;
@@ -32726,11 +32726,13 @@ return $val;
 ###############################################################
 sub _aiFannNormAsymFixRange {
   my ($aref, $min, $max) = @_;
+  
+  return [] unless $max > $min;
 
-  my $range    = $max - $min;
-  my $norm_ref = [ map { ($_ - $min) / $range } @$aref ];
-
-return ($norm_ref);
+  return [ map {
+      my $v = ($_ - $min) / ($max - $min);
+      $v < 0 ? 0 : $v > 1 ? 1 : $v;                                                     # Hard clamp [0,1]
+  } @$aref ];
 }
 
 ###############################################################
