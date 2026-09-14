@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.14";
+my $ModulVersion = "01.14a";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -2634,6 +2634,12 @@ sub CDCOpenData_myCalcColor {
          Number of days for which data *_day_rain is held as a reading. The standard is 5 readings.
       </li><br>
 
+      <li><a name="tmpRadolanData"></a>
+         <dt><code>attr &lt;name&gt; tmpRadolanData &lt;tempDirectory&gt;</code></dt>
+         <br>
+         This attribute allows you to set the directory for temporary data. The default directory is: temp_radolan_data_&lt;DeviceName&gt;
+      </li><br>
+
       <li><a name="updateOnStart"></a>
          <dt><code>attr &lt;name&gt; updateOnStart &lt;0 | 1gt;</code></dt>
          <br>
@@ -2822,6 +2828,12 @@ sub CDCOpenData_myCalcColor {
          <dt><code>attr &lt;name&gt; sFTP_TimeOut &lt;10 .. 50&gt;</code></dt>
          <br>
          Setzt den Timeout auf einen Wert zwischen 10 und 50 Sekunden. Standard sind 10 Sekunden.
+      </li><br>
+
+      <li><a name="tmpRadolanData"></a>
+         <dt><code>attr &lt;name&gt; tmpRadolanData &lt;tempDirectory&gt;</code></dt>
+         <br>
+         Mit dem Attribut kann das Verzeichnis für die temporären Daten gesetzt werden. Standardverzeichnis ist: temp_radolan_data_&lt;DeviceName&gt;
       </li><br>
 
       <li><a name="updateOnStart"></a>
