@@ -349,6 +349,7 @@ FW_Read($$)
     my $wt = AttrVal($name, "alarmTimeout", undef);
     $nhash->{ALARMTIMEOUT} = $wt if($wt);
     $nhash->{CD}->blocking(0);
+    $nhash->{devauth}={};
     return;
   }
 
@@ -3272,8 +3273,12 @@ FW_Notify($$)
   return undef if(!$h);
   my $isStatus = ($h->{type} =~ m/status/);
   my $events;
-
   my $dn = $dev->{NAME};
+
+  $ntfy->{devauth}{$dn} = Authorized($ntfy, "devicename", $dn, 1)
+    if(!defined($ntfy->{devauth}{$dn}));
+  return if(!$ntfy->{devauth}{$dn});
+
   if($dn eq "global" && $isStatus) {
     my $vs = int(@structChangeHist) ? 'visible' : 'hidden';
     my $data = FW_longpollInfo($h->{fmt},
