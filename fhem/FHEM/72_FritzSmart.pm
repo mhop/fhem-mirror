@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.09.07";
+our $ModulVersion = "26.09.15";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -110,6 +110,7 @@ eval "use IO::Socket;1"     or $missingModul .= "IO::Socket ";
 eval "use Net::Ping;1"      or $missingModul .= "Net::Ping ";
 
 eval "use JSON;1"           or $missingModul .= "JSON ";             # sudo apt-get install libjson-perl
+eval "use utf8;1"           or $missingModul .= "utf8 ";
 eval "use LWP::UserAgent;1" or $missingModul .= "LWP::UserAgent ";
 
 eval "use URI::Escape;1"    or $missingModul .= "URI::Escape ";
@@ -120,6 +121,8 @@ eval "use Data::Dumper;1"   or $missingModul .= "Data::Dumper ";
 # $Data::Dumper::Terse = 1;
 # $Data::Dumper::Purity = 1;
 # $Data::Dumper::Sortkeys = 1;
+
+#       use JSON::PP;
 
 ###############################################################################
 # defines
@@ -159,38 +162,39 @@ sub Fritz_Readout_SetGet_Aborted($);
 
 # Sub, die einen Set Befehl nonBlocking umsetzen
 sub Fritz_Set_block_Incoming_Phone_Call($);
-sub Fritz_Set_GuestWlan_OnOff($);
 sub Fritz_Set_call_Phone($);
-sub Fritz_Set_dectRing_Phone($);
-sub Fritz_Set_ring_Phone($);
-sub Fritz_Set_rescan_Neighborhood($);
-sub Fritz_Set_macFilter_OnOff($);
 sub Fritz_Set_change_Profile($);
+sub Fritz_Set_dectRing_Phone($);
+sub Fritz_Set_enable_VPNshare_OnOff($);
 sub Fritz_Set_lock_filter_Profile($);
 sub Fritz_Set_lock_Landevice_OnOffRt($);
 sub Fritz_Set_lock_Landevice_OnOffRt_8($);
-sub Fritz_Set_enable_VPNshare_OnOff($);
+sub Fritz_Set_macFilter_OnOff($);
+sub Fritz_Set_rescan_Neighborhood($);
+sub Fritz_Set_ring_Phone($);
 sub Fritz_Set_wake_Up_Call($);
+sub Fritz_Set_Wlan_Guest_OnOff($);
 sub Fritz_Set_Wlan_Log_Ext_OnOff($);
 sub Fritz_Set_Wlan_Guest_Params($);
 
 # Sub, die einen Get Befehl nonBlocking umsetzen
-sub Fritz_Get_MobileInfo($);
-sub Fritz_Get_WLAN_globalFilters($);
-sub Fritz_Get_LED_Settings($);
-sub Fritz_Get_VPN_Shares_List($);
-sub Fritz_Get_VPN_Shares_List_old($);
+sub Fritz_Get_attrList($@);
 sub Fritz_Get_DOCSIS_Informations($);
-sub Fritz_Get_WLAN_Environment($);
-sub Fritz_Get_SmartHome_Devices_List($@);
-sub Fritz_Get_SmartHome_Automation_List($@);
-sub Fritz_Get_Lan_Devices_List($);
-sub Fritz_Get_User_Info_List($);
 sub Fritz_Get_Fritz_Log_Info_nonBlk($);
 sub Fritz_Get_Kid_Profiles_List($);
-sub Fritz_Get_supportData($@);
+sub Fritz_Get_Lan_Devices_List($);
+sub Fritz_Get_LED_Settings($);
 sub Fritz_Get_meshInfrastructure($@);
-sub Fritz_Get_attrList($@);
+sub Fritz_Get_MobileInfo($);
+sub Fritz_Get_SmartHome_Devices_List($@);
+sub Fritz_Get_SmartHome_Automation_List($@);
+sub Fritz_Get_supportData($@);
+sub Fritz_Get_User_Info_List($);
+sub Fritz_Get_VPN_Shares_List($);
+sub Fritz_Get_VPN_Shares_List_old($);
+sub Fritz_Get_Wlan_Environment($);
+sub Fritz_Get_WLAN_globalFilters($);
+sub Fritz_Get_Wlan_Status($$$);
 
 # Sub, die einen Get Befehl blocking umsetzen
 sub Fritz_Get_Fritz_Log_Info_Std($$$);
@@ -486,19 +490,28 @@ our %TR064   = (
 #get Fritz tr064command X_AVM-DE_TAM:1               x_tam SetEnable  NewIndex 0              NewEnable 0
 #get Fritz tr064command InternetGatewayDevice:1      deviceinfo       GetInfo
 
+
+# generic/multi?ui=vpn,wlan_light,webdavclient,mobiled
+# generic/multi?ui=box,boxusers,connections,eth_ports,landevice,nexus,plc,power,providerlist,uimodlogic,updatecheck,dect
+# generic/multi?ui=sip,telcfg,umts
+# generic/multi?ui=budget,ddns,emailnotify,forwardrules,igdforwardrules,inetstat,ipv6,jasonii,myfritzdevice,remoteman,userglobal,aura
+# generic/multi?ui=trafficprio,user
+
 our %JavaScript = (
-        beta_dns_excepted_domains => { 840 => "generic/dns_excepted_domains"},
-        beta_dnsfilter            => { 840 => "beta/dnsfilter"},
-        beta_fritzmesh            => { 840 => "beta/fritzmesh"},
-        beta_trafficprio          => { 840 => "beta/trafficprioritization/automatic/networkDevices"},
-        beta_route                => { 840 => "generic/route"},
-        beta_ipv6route            => { 840 => "generic/ipv6route"},
+        beta_dns_excepted_domains  => { 840 => "generic/dns_excepted_domains"},
+        beta_dnsfilter             => { 840 => "beta/dnsfilter"},
+        beta_fritzmesh             => { 840 => "beta/fritzmesh"},
+        beta_trafficprio           => { 840 => "beta/trafficprioritization/automatic/networkDevices"},
+        beta_route                 => { 840 => "generic/route"},
+        beta_ipv6route             => { 840 => "generic/ipv6route"},
+        beta_friendlyname_device   => { 840 => "beta/friendlyname/device"},
+        beta_inet_connections      => { 840 => "beta/internet/connections"},
+        beta_traffPrio             => { 840 => "beta/trafficprioritization"}, #/automatic/networkDevices
+
         aura                  => { 800 => "generic?ui=aura",
                                    810 => "generic/aura"},
         apps                  => { 800 => "generic?ui=apps",
                                    810 => "generic/apps"},
-        phonebook             => { 800 => "phonebook/books",
-                                   810 => "dino/phonebook/books"},
         box                   => { 800 => "generic?ui=box",
                                    810 => "generic/box"},
         boxnotifications      => { 800 => "boxnotifications",
@@ -527,6 +540,10 @@ our %JavaScript = (
                                    810 => "generic/dect"},
         dhcpv6info            => { 800 => "generic?ui=dhcpv6info",
                                    810 => "generic/dhcpv6info"},
+        downgradecheck        => { 800 => "generic?ui=downgradecheck", # {"start":"1"} put
+                                   810 => "generic/downgradecheck"},
+        downgradecheckState   => { 800 => "generic?ui=downgradecheck/state",
+                                   810 => "generic/downgradecheck/state"},
         eventlog              => { 800 => "eventlog",
                                    810 => "dino/eventlog"},
         eventlog_groups       => { 800 => "eventlog/groups",
@@ -549,8 +566,12 @@ our %JavaScript = (
                                    810 => "generic/emailnotify"},
         errorreport           => { 800 => "generic?ui=errorreport",
                                    810 => "dino/errorreport"},
+        filter_profile        => { 800 => "generic?ui=filter_profile",
+                                   810 => "generic/filter_profile"},
         forwardrules          => { 800 => "generic?ui=forwardrules",
                                    810 => "generic/forwardrules"},
+        handsets              => { 800 => "misc/handsets",
+                                   810 => "dino/misc/handsets"},
         hybridcfg             => { 800 => "generic?ui=hybridcfg",
                                    810 => "generic/hybridcfg"},
         igdforwardrules       => { 800 => "generic?ui=igdforwardrules",
@@ -565,6 +586,14 @@ our %JavaScript = (
                                    810 => "generic/ipv6firewall"},
         jasonii               => { 800 => "generic?ui=jasonii",
                                    810 => "generic/jasonii"},
+        KidsTimer             => { 800 => "timermix/KidsTimer",
+                                   810 => "dino/timermix/KidsTimer"},
+        kisi                  => { 800 => "kisi",
+                                   810 => "dino/kisi"},
+        kisi_internetRuleset  => { 800 => "kisi/internetRuleset",
+                                   810 => "dino/kisi/internetRuleset"},
+        kisi_netapp           => { 800 => "kisi/netApp",
+                                   810 => "dino/kisi/netApp"},
         language              => { 800 => "generic?ui=language",
                                    810 => "generic/language"},
         landevice             => { 800 => "generic?ui=landevice",
@@ -607,8 +636,14 @@ our %JavaScript = (
                                    810 => "generic/time"},
         nexus                 => { 800 => "generic?ui=nexus",
                                    810 => "generic/nexus"},
+        nexusfon              => { 800 => "generic?ui=nexusfon",
+                                   810 => "generic/nexusfon"},
+        nqos                  => { 800 => "generic?ui=nqos",
+                                   810 => "generic/nqos"},
         pcp                   => { 800 => "generic?ui=pcp",
                                    810 => "generic/pcp"},
+        phonebook             => { 800 => "phonebook/books",
+                                   810 => "dino/phonebook/books"},
         phonecalls            => { 800 => "phonecalls",
                                    810 => "dino/phonecalls"},
         plc                   => { 800 => "generic?ui=plc",
@@ -639,6 +674,8 @@ our %JavaScript = (
                                    810 => "smarthome/overview/globals"},
         smarthome_globals     => { 800 => "smarthome/overview/globals",
                                    810 => "smarthome/overview/globals"},
+        sync_groups           => { 800 => "generic?ui=sync_groups",
+                                   810 => "generic/sync_groups"},
         storage               => { 800 => "storage",
                                    810 => "storage"},
         storagenasrights      => { 800 => "storagenasrights",
@@ -659,8 +696,10 @@ our %JavaScript = (
                                    810 => "generic/tr069"},
         uimodlogic            => { 800 => "generic?ui=uimodlogic",
                                    810 => "generic/uimodlogic"},
-        updatecheck           => { 800 => "generic?ui=updatecheck",
+        updatecheck           => { 800 => "generic?ui=updatecheck", # {"start":"Updateserver"} put
                                    810 => "generic/updatecheck"},
+        updateStatus          => { 800 => "misc/updateStatus",
+                                   810 => "dino/misc/updateStatus"},
         umts                  => { 800 => "generic?ui=umts",
                                    810 => "generic/umts"},
         usb                   => { 800 => "usb",
@@ -671,8 +710,12 @@ our %JavaScript = (
                                    810 => "generic/user"},
         userglobal            => { 800 => "generic?ui=userglobal",
                                    810 => "generic/userglobal"},
+        serticket             => { 800 => "generic?ui=serticket",
+                                   810 => "generic/serticket"},
         vpn                   => { 800 => "generic?ui=vpn",
                                    810 => "generic/vpn"},
+        wanStatus             => { 800 => "generic?ui=wanStatus",
+                                   810 => "misc/wanStatus"},
         webdavclient          => { 800 => "generic?ui=webdavclient",
                                    810 => "generic/webdavclient"},
         webui                 => { 800 => "generic?ui=webui",
@@ -683,79 +726,146 @@ our %JavaScript = (
                                    810 => "generic/wlan"},
         wlan_light            => { 800 => "generic?ui=wlan_light",
                                    810 => "generic/wlan_light"},
-        wlan_timer            => { 800 => "timermix/WLANTimer",
+        WLANTimer             => { 800 => "timermix/WLANTimer",
                                    810 => "dino/timermix/WLANTimer"}
 );
 
+# xhr 1 clicktodial on port 50 back_to_page /fon_num/dial_foncalls.lua btn_apply nop lang de page dial
+
+# Request URL
+# http://192.168.0.1/nas/api/data.lua
+# Request Method
+# POST
+#       nas/api/login.lua  POST cmd => sid 661635feec88ba28
+#       fritzNas             => { cmd => "path / limit 100 sorting +filename c files a browse"},
+#       fritzNasRights       => { cmd => "c user a check_nas_rights"},
+
+# Request URL
+# http://192.168.0.1/nas/cgi-bin/luacgi_notimeout
+# Request Method
+# POST
+# sid 320a38b7e3782dcb script /api/data.lua c files a get path /Videos/FRITZ! Clips.html
+
+# Request URL
+# http://192.168.0.1/myfritz/api/data.lua
+# Request Method
+# POST
+# c calls a getData
+# path / limit 100 sorting +filename c nas.files a browse
+# c comfort a getData
+# c smarthome a getDevicesAndGroups
+# c smarthome a getAutomations
+
+
 our %LuaData = (
-        alarm           => { cmd => "xhr 1 lang de page alarm xhrId all"},
-        boxname         => { cmd => "xhr 1 lang de page boxname xhrId all"},
-        callLock        => { cmd => "xhr 1 lang de page callLock xhrId all"},
-        callRedi        => { cmd => "xhr 1 lang de page callRedi xhrId all"},
-        dectMonitor     => { cmd => "xhr 1 lang de page dectMoni xhrId all"},
-        dectMonitorExp  => { cmd => "xhr 1 lang de page dectMoniEx xhrId refresh useajax 1"},
-        dectSet         => { cmd => "xhr 1 lang de page dectSet xhrId all"},
-        dnsSrv          => { cmd => "xhr 1 lang de page dnsSrv xhrId all"},
-        docInfo         => { cmd => "xhr 1 lang de page docInfo xhrId all"},
-        dslGraph2       => { cmd => "xhr 1 lang de page dslGraph2 xhrId all"},
-        dslOv           => { cmd => "xhr 1 lang de page dslOv xhrId all"},
-        dslSpectrum     => { cmd => "xhr 1 lang de page dslSpectrum xhrId all"},
-        dslStat         => { cmd => "xhr 1 lang de page dslStat xhrId all"},
-        energy          => { cmd => "xhr 1 lang de page energy xhrId all"},
-        environment     => { cmd => "xhr 1 lang de page chan xhrId all"},
-        fonDevices      => { cmd => "xhr 1 page telDev"},
-        funcCheck       => { cmd => "xhr 1 lang de page funcCheck xhrId all"},
-        initDPM         => { cmd => "xhr 1 lang de page dpm xhrId all"},
-        kidPro          => { cmd => "xhr 1 lang de page kidPro xhrId all"},
-        kidLis          => { cmd => "xhr 1 lang de page kidLis xhrId all"},
-        led             => { cmd => "xhr 1 lang de page led xhrId all"},
-        lisp            => { cmd => "xhr 1 lang de page lisp xhrId all"},
-        log_filter_all  => { cmd => "xhr 1 lang de page log xhrId log filter all"},
-        log_filter_sys  => { cmd => "xhr 1 lang de page log xhrId log filter sys"},
-        log_filter_fon  => { cmd => "xhr 1 lang de page log xhrId log filter fon"},
-        mfSet           => { cmd => "xhr 1 lang de page mfSet xhrId all"},
-        mobile          => { cmd => "xhr 1 lang de page mobile xhrId all"},
-        modem           => { cmd => "xhr 1 lang de page mobile xhrId all"},
-        mServSet        => { cmd => "xhr 1 lang de page mServSet xhrId all"},
-        netDev          => { cmd => "xhr 1 lang de page netDev xhrId all"},
-        netMoni         => { cmd => "xhr 1 lang de page netMoni xhrId all"},
-        netSet          => { cmd => "xhr 1 lang de page netSet xhrId all"},
-        overwiev        => { cmd => "xhr 1 lang de page overview xhrId all"},
-        podcast         => { cmd => "xhr 1 lang de page pod xhrId all"},
-        portoverview    => { cmd => "xhr 1 lang de page portoverview xhrId all"},
-        radio           => { cmd => "xhr 1 lang de page rdio xhrId all"},
-        ring_tones      => { cmd => "xhr 1 idx 0 page edit_dect_ring_tone"},
-        repMode         => { cmd => "xhr 1 lang de page repMode xhrId all"},
-        save_energy     => { cmd => "xhr 1 lang de page save_energy xhrId all"},
-        secCheck        => { cmd => "xhr 1 lang de page secCheck xhrId all"},
-        shareUsb        => { cmd => "xhr 1 lang de page shareUsb xhrId all"},
-        shareVpn        => { cmd => "xhr 1 lang de page shareVpn xhrId all"},
-        shareWireguard  => { cmd => "xhr 1 lang de page shareWireguard xhrId all"},
-        sh_control      => { cmd => "xhr 1 lang de page sh_control xhrId all"},
-        sh_dev          => { cmd => "xhr 1 lang de page sh_dev xhrid all"},
-        sh_matter       => { cmd => "xhr 1 lang de page sh_matter xhrId all"},
-        sh_organize     => { cmd => "xhr 1 lang de page sh_organize xhrId all"},
-        sysImport       => { cmd => "xhr 1 lang de page sysImp xhrId all"},
-        sysSave         => { cmd => "xhr 1 lang de page sysSave xhrId all"},
-        trafapp         => { cmd => "xhr 1 lang de page trafapp xhrId all"},
-        trafprio        => { cmd => "xhr 1 lang de page trafprio xhrId all"},
-        usbOv           => { cmd => "xhr 1 lang de page usbOv xhrId all"},
-        wGuest          => { cmd => "xhr 1 lang de page wGuest xhrId all"},
-        wKey            => { cmd => "xhr 1 lang de page wKey xhrId all"},
-        wps             => { cmd => "xhr 1 lang de page wps xhrId all"},
-        wSet            => { cmd => "xhr 1 lang de page wSet xhrId all"},
-        wTime           => { cmd => "xhr 1 lang de page wTime xhrId all"},
-        wlanChannels    => { cmd => "xhr 1 lang de page chan xhrId all"},
-        wlanEnvironment => { cmd => "xhr 1 lang de page chan xhrId environment"},
-        wlanAirTime     => { cmd => "xhr 1 lang de page chan xhrId airtime"},
-        wlanmesh        => { cmd => "xhr 1 lang de page wlanmesh xhrId all"}
+        alarm1               => { cmd => "xhr 1 lang de page alarm xhrId all"},
+        alarm2               => { cmd => "xhr 1 lang de page alarm2 xhrId all"},
+        alarm3               => { cmd => "xhr 1 lang de page alarm3 xhrId all"},
+        bookLi               => { cmd => "xhr 1 lang de page bookLi xhrId all"},
+        boxname              => { cmd => "xhr 1 lang de page boxname xhrId all"},
+        callBlock            => { cmd => "xhr 1 lang de page callBlock xhrId all"},
+        callLock             => { cmd => "xhr 1 lang de page callLock xhrId all"},
+        callRedi             => { cmd => "xhr 1 lang de page callRedi xhrId all"},
+        credentials          => { cmd => "xhr 1 lang de page cred xhrId all"},
+        dectMail             => { cmd => "xhr 1 lang de page dectMail xhrId all"},
+        dectMonitor          => { cmd => "xhr 1 lang de page dectMoni xhrId all"},
+        dectMonitorEx        => { cmd => "xhr 1 lang de page dectMoniEx xhrId refresh useajax 1"},
+        dectRdio             => { cmd => "xhr 1 lang de page dectRdio xhrId all"},
+        dectSet              => { cmd => "xhr 1 lang de page dectSet xhrId all"},
+        dial                 => { cmd => "xhr 1 lang de page dial xhrId all"},
+        dialLi               => { cmd => "xhr 1 lang de page dialLi xhrId all"},
+        dnsSrv               => { cmd => "xhr 1 lang de page dnsSrv xhrId all"},
+        docInfo              => { cmd => "xhr 1 lang de page docInfo xhrId all"},
+        dslFeed              => { cmd => "xhr 1 lang de page dslFeed xhrId all"},
+        dslGraph2            => { cmd => "xhr 1 lang de page dslGraph2 xhrId all"},
+        dslOv                => { cmd => "xhr 1 lang de page dslOv xhrId all"},
+        dslSpectrum          => { cmd => "xhr 1 lang de page dslSpectrum xhrId all"},
+        dslStat              => { cmd => "xhr 1 lang de page dslStat xhrId all"},
+        energy               => { cmd => "xhr 1 lang de page energy xhrId all"},
+        environment          => { cmd => "xhr 1 lang de page chan xhrId all"},
+        faxOverview          => { cmd => "xhr 1 lang de page faxOverview xhrId all"},
+        fcCheck              => { cmd => "xhr 1 lang de page funcCheck xhrId all"},
+        fcCheck_uiFritzOs    => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiFritzOs firstDiag true reqCnt 0 useajax 1"},
+        fcCheck_uiPwd        => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiPwd reqCnt 0 useajax 1"},
+        fcCheck_uiLan        => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiLan reqCnt 0 useajax 1"},
+        fcCheck_uiWlan       => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiWlan reqCnt 0 useajax 1"},
+        fcCheck_uiDect       => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiDect reqCnt 0 useajax 1"},
+        fcCheck_uiUsb        => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiUsb reqCnt 0 useajax 1"},
+        fcCheck_uiInternet_0 => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiInternet reqCnt 0 useajax 1"},
+        fcCheck_uiInternet_1 => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiInternet reqCnt 1 purpose ntpcheck useajax 1"},
+        fcCheck_uiMyFritz    => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiMyFritz reqCnt 0 useajax 1"},
+        fcCheck_uiNumbers    => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiNumbers reqCnt 0 useajax 1"},
+        fcCheck_uiHomeNet    => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiHomeNet reqCnt 0 useajax 1"},
+        fcCheck_uiSmartHome  => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiSmartHome reqCnt 0 useajax 1"},
+        fcCheck_uiWlanEnvNet => { cmd => "xhr 1 lang de page funcCheck xhrId diag diagID uiWlanEnvNet reqCnt 0 useajax 1"},
+        fonDevices           => { cmd => "xhr 1 page telDev"},
+        initDPM              => { cmd => "xhr 1 lang de page dpm xhrId all"},
+        kidPro               => { cmd => "xhr 1 lang de page kidPro xhrId all"},
+        kidLis               => { cmd => "xhr 1 lang de page kidLis xhrId all"},
+        led                  => { cmd => "xhr 1 lang de page led xhrId all"},
+        liveImg              => { cmd => "xhr 1 lang de page liveImg xhrId all"},
+        lisp                 => { cmd => "xhr 1 lang de page lisp xhrId all"},
+        log_filter_all       => { cmd => "xhr 1 lang de page log xhrId log filter all"},
+        log_filter_sys       => { cmd => "xhr 1 lang de page log xhrId log filter sys"},
+        log_filter_fon       => { cmd => "xhr 1 lang de page log xhrId log filter fon"},
+        mfSet                => { cmd => "xhr 1 lang de page mfSet xhrId all"},
+        mobile               => { cmd => "xhr 1 lang de page mobile xhrId all"},
+        modem                => { cmd => "xhr 1 lang de page mobile xhrId all"},
+        mServSet             => { cmd => "xhr 1 lang de page mServSet xhrId all"},
+        netDev               => { cmd => "xhr 1 lang de page netDev xhrId all"},
+        netMoni              => { cmd => "xhr 1 lang de page netMoni xhrId all"},
+        netSet               => { cmd => "xhr 1 lang de page netSet xhrId all"},
+        numLi                => { cmd => "xhr 1 lang de page numLi xhrId all"},
+        overwiev             => { cmd => "xhr 1 lang de page overview xhrId all"},
+        phoneline            => { cmd => "xhr 1 lang de page phoneline xhrId all"},
+        podcast              => { cmd => "xhr 1 lang de page pod xhrId all"},
+        portoverview         => { cmd => "xhr 1 lang de page portoverview xhrId all"},
+        providerService      => { cmd => "xhr 1 lang de page provServ xhrId all"},
+        radio                => { cmd => "xhr 1 lang de page rdio xhrId all"},
+        ring_tones           => { cmd => "xhr 1 idx 0 page edit_dect_ring_tone"},
+        repMode              => { cmd => "xhr 1 lang de page repMode xhrId all"},
+        rss                  => { cmd => "xhr 1 lang de page rss xhrId all"},
+        rootServices         => { cmd => "xhr 1 lang de page rootServices xhrId all"},
+        save_energy          => { cmd => "xhr 1 lang de page save_energy xhrId all"},
+        secCheck             => { cmd => "xhr 1 lang de page secCheck xhrId all"},
+        sipQual              => { cmd => "xhr 1 lang de page sipQual xhrId all"},
+        sitemap              => { cmd => "xhr 1 lang de page sitemap xhrId all"},
+        shareUsb             => { cmd => "xhr 1 lang de page shareUsb xhrId all"},
+        shareVpn             => { cmd => "xhr 1 lang de page shareVpn xhrId all"},
+        shareWireguard       => { cmd => "xhr 1 lang de page shareWireguard xhrId all"},
+        sh_control           => { cmd => "xhr 1 lang de page sh_control xhrId all"},
+        sh_dev               => { cmd => "xhr 1 lang de page sh_dev xhrid all"},
+        sh_matter            => { cmd => "xhr 1 lang de page sh_matter xhrId all"},
+        sh_organize          => { cmd => "xhr 1 lang de page sh_organize xhrId all"},
+        sysImport            => { cmd => "xhr 1 lang de page sysImp xhrId all"},
+        sysSave              => { cmd => "xhr 1 lang de page sysSave xhrId all"},
+        tam                  => { cmd => "xhr 1 lang de page tam xhrId all"},
+        telDev               => { cmd => "xhr 1 lang de page telDev xhrId all"},
+        trafapp              => { cmd => "xhr 1 lang de page trafapp xhrId all"},
+        trafprio             => { cmd => "xhr 1 lang de page trafprio xhrId all"},
+        usbOv                => { cmd => "xhr 1 lang de page usbOv xhrId all"},
+        wizOv                => { cmd => "xhr 1 lang de page wizOv xhrId all"},
+        wGuest               => { cmd => "xhr 1 lang de page wGuest xhrId all"},
+        wKey                 => { cmd => "xhr 1 lang de page wKey xhrId all"},
+        wKeyDevices          => { cmd => "xhr 1 lang de page wKey xhrId wlanDevices"},
+        wps                  => { cmd => "xhr 1 lang de page wps xhrId all"},
+        wpsActive            => { cmd => "xhr 1 wpsActive 1 wps nop lang de page wps"},
+        wpsTest              => { cmd => "xhr 1 lang de page wps_test xhrId all"},
+        wpsTestStaus         => { cmd => "xhr 1 lang de page wps_test xhrId wpsStatus"}, # xhr 1 backToPid wps next nop lang de page wps_test
+        wSet                 => { cmd => "xhr 1 lang de page wSet xhrId all"},
+        wTime                => { cmd => "xhr 1 lang de page wTime xhrId all"},
+        wlanChannels         => { cmd => "xhr 1 lang de page chan xhrId all"},
+        wlanDevices          => { cmd => "xhr 1 lang de page wset xhrId wlanDevices"},
+        wlanEnvironment      => { cmd => "xhr 1 lang de page chan xhrId environment"},
+        wlanAirTime          => { cmd => "xhr 1 lang de page chan xhrId airtime"},
+        wlanmesh             => { cmd => "xhr 1 lang de page wlanmesh xhrId all"}
 );
 
 our %LuaDataSG = (
-        overview        => { cmd => "xhr 1 lang de page overview xhrId first noMenuRef 1"},
-        repModeAll      => { cmd => "xhr 1 lang de page repMode xhrId all"},
-        repModeTable    => { cmd => "xhr 1 lang de page repMode xhrId requestTable useajax 1"},
-        repNetSet       => { cmd => "xhr 1 lang de page repNetSet xhrId all"},
+    overview             => { cmd => "xhr 1 lang de page overview xhrId first noMenuRef 1"},
+    repModeAll           => { cmd => "xhr 1 lang de page repMode xhrId all"},
+    repModeTable         => { cmd => "xhr 1 lang de page repMode xhrId requestTable useajax 1"},
+    repNetSet            => { cmd => "xhr 1 lang de page repNetSet xhrId all"},
 );
 
 our %LuaQueryCmd = (
@@ -872,126 +982,134 @@ our %LuaQueryCmd = (
 # Fritz!OS Versions
 # https://www.pcwelt.de/article/1196302/die-neuesten-updates-fuer-fritzbox-co.html
 our %FB_Model = (
-       '7690'        => { version => "8.22", date => "26.02.2026"},
-       '7682'        => { version => "8.25", date => "28.07.2026"},
-       '7632'        => { version => "8.25", date => "14.07.2026"},
-       '7630'        => { version => "8.25", date => "02.07.2026"},
-       '7620'        => { version => "8.25", date => "30.07.2026"},
-       '7590 AX'     => { version => "8.25", date => "26.03.2026"},
-       '7590'        => { version => "8.25", date => "26.03.2026"},
-       '7583 VDSL'   => { version => "8.26", date => "01.07.2026"},
-       '7583'        => { version => "8.26", date => "01.07.2026"},
-       '7582'        => { version => "7.18", date => "19.08.2024"},
-       '7581'        => { version => "7.18", date => "19.08.2024"},
-       '7580'        => { version => "7.30", date => "04.09.2023"},
-       '7560'        => { version => "7.30", date => "04.09.2023"},
-       '7530 AX'     => { version => "8.25", date => "16.04.2026"},
-       '7530'        => { version => "8.25", date => "21.04.2026"},
-       '7520 B'      => { version => "8.10", date => "14.08.2025"},
-       '7520'        => { version => "8.10", date => "14.08.2025"},
-       '7510'        => { version => "8.26", date => "21.07.2026"},
-       '7490'        => { version => "7.62", date => "08.01.2026"},
-       '7430'        => { version => "7.31", date => "04.09.2023"},
-       '7412'        => { version => "6.88", date => "04.09.2023"},
-       '7390'        => { version => "6.88", date => "04.09.2023"},
-       '7362 SL'     => { version => "7.14", date => "04.09.2023"},
-       '7360 v2'     => { version => "6.88", date => "04.09.2023"},
-       '7360 v1'     => { version => "6.36", date => "06.09.2023"},
-       '7360'        => { version => "6.85", date => "13.03.2017"},
-       '7360 SL'     => { version => "6.35", date => "07.09.2023"},
-       '7340'        => { version => "6.06", date => "24.04.2014"},
-       '7330'        => { version => "6.56", date => "07.09.2034"},
-       '7320'        => { version => "6.35", date => "07.09.2023"},
-       '7312'        => { version => "6.56", date => "07.09.2023"},
-       '7272'        => { version => "6.89", date => "04.09.2023"},
-       '7270_v3'     => { version => "6.06", date => "20.10.2015"},
-       '7270_v2'     => { version => "6.06", date => "20.10.2015"},
-       '7270_v1'     => { version => "6.06", date => "20.10.2015"},
-       '7270'        => { version => "6.06", date => "20.10.2015"},
-       '6890 LTE'    => { version => "7.57", date => "04.09.2023"},
-       '6860 5G V2'  => { version => "8.25", date => "04.08.2026"},
-       '6860 5G'     => { version => "8.25", date => "09.07.2026"},
-       '6850 5G V2'  => { version => "8.25", date => "23.07.2026"},
-       '6850 5G'     => { version => "8.25", date => "09.07.2026"},
-       '6850 4G'     => { version => "8.25", date => "02.07.2026"},
-       '6850 LTE'    => { version => "8.25", date => "02.07.2026"},
-       '6842 LTE'    => { version => "6.35", date => "07.09.2023"},
-       '6840 LTE'    => { version => "6.88", date => "07.09.2023"},
-       '6825 4G'     => { version => "8.25", date => "02.07.2026"},
-       '6820 LTE v4' => { version => "7.57", date => "04.09.2023"},
-       '6820 LTE v3' => { version => "7.57", date => "04.09.2023"},
-       '6820 LTE v2' => { version => "7.57", date => "04.09.2023"},
-       '6820 LTE'    => { version => "7.30", date => "04.09.2023"},
-       '6810 LTE'    => { version => "6.35", date => "07.09.2023"},
-       '6690 Cable'  => { version => "8.21", date => "01.12.2025"},
-       '6670 Cable'  => { version => "8.21", date => "29.01.2026"},
-       '6660 Cable'  => { version => "8.25", date => "19.03.2026"},
-       '6591 Cable'  => { version => "8.25", date => "19.03.2026"},
-       '6590 Cable'  => { version => "7.57", date => "04.09.2023"},
-       '6490 Cable'  => { version => "7.57", date => "04.09.2023"},
-       '6430 Cable'  => { version => "7.30", date => "04.09.2023"},
-       '5690 XGS'    => { version => "8.20", date => "05.02.2026"},
-       '5690 Pro'    => { version => "8.25", date => "21.07.2026"},
-       '5690'        => { version => "8.25", date => "30.06.2026"},
-       '5590 Fiber'  => { version => "8.20", date => "12.02.2026"},
-       '5530 Fiber'  => { version => "8.20", date => "03.09.2025"},
-       '5491'        => { version => "7.31", date => "04.09.2023"},
-       '5490'        => { version => "7.31", date => "04.09.2023"},
-       '4690'        => { version => "8.25", date => "02.07.2026"},
-       '4630'        => { version => "8.25", date => "25.06.2026"},
-       '4060'        => { version => "8.25", date => "02.07.2026"},
-       '4050'        => { version => "8.25", date => "01.07.2026"},
-       '4040'        => { version => "8.02", date => "30.01.2025"},
-       '4020'        => { version => "7.04", date => "19.08.2024"},
-       '3490'        => { version => "7.31", date => "04.09.2023"},
-       '3272'        => { version => "6.89", date => "07.09.2023"}
-   );
+    '7690'        => { version => "8.22", date => "26.02.2026"},
+    '7682'        => { version => "8.25", date => "28.07.2026"},
+    '7632'        => { version => "8.25", date => "14.07.2026"},
+    '7630'        => { version => "8.25", date => "02.07.2026"},
+    '7620'        => { version => "8.25", date => "30.07.2026"},
+    '7590 AX'     => { version => "8.25", date => "26.03.2026"},
+    '7590'        => { version => "8.25", date => "26.03.2026"},
+    '7583 VDSL'   => { version => "8.26", date => "01.07.2026"},
+    '7583'        => { version => "8.26", date => "01.07.2026"},
+    '7582'        => { version => "7.18", date => "19.08.2024"},
+    '7581'        => { version => "7.18", date => "19.08.2024"},
+    '7580'        => { version => "7.30", date => "04.09.2023"},
+    '7560'        => { version => "7.30", date => "04.09.2023"},
+    '7530 AX'     => { version => "8.25", date => "16.04.2026"},
+    '7530'        => { version => "8.25", date => "21.04.2026"},
+    '7520 B'      => { version => "8.10", date => "14.08.2025"},
+    '7520'        => { version => "8.10", date => "14.08.2025"},
+    '7510'        => { version => "8.26", date => "21.07.2026"},
+    '7490'        => { version => "7.62", date => "08.01.2026"},
+    '7430'        => { version => "7.31", date => "04.09.2023"},
+    '7412'        => { version => "6.88", date => "04.09.2023"},
+    '7390'        => { version => "6.88", date => "04.09.2023"},
+    '7362 SL'     => { version => "7.14", date => "04.09.2023"},
+    '7360 v2'     => { version => "6.88", date => "04.09.2023"},
+    '7360 v1'     => { version => "6.36", date => "06.09.2023"},
+    '7360'        => { version => "6.85", date => "13.03.2017"},
+    '7360 SL'     => { version => "6.35", date => "07.09.2023"},
+    '7340'        => { version => "6.06", date => "24.04.2014"},
+    '7330'        => { version => "6.56", date => "07.09.2034"},
+    '7320'        => { version => "6.35", date => "07.09.2023"},
+    '7312'        => { version => "6.56", date => "07.09.2023"},
+    '7272'        => { version => "6.89", date => "04.09.2023"},
+    '7270_v3'     => { version => "6.06", date => "20.10.2015"},
+    '7270_v2'     => { version => "6.06", date => "20.10.2015"},
+    '7270_v1'     => { version => "6.06", date => "20.10.2015"},
+    '7270'        => { version => "6.06", date => "20.10.2015"},
+    '6890 LTE'    => { version => "7.57", date => "04.09.2023"},
+    '6860 5G V2'  => { version => "8.25", date => "04.08.2026"},
+    '6860 5G'     => { version => "8.25", date => "09.07.2026"},
+    '6850 5G V2'  => { version => "8.25", date => "23.07.2026"},
+    '6850 5G'     => { version => "8.25", date => "09.07.2026"},
+    '6850 4G'     => { version => "8.25", date => "02.07.2026"},
+    '6850 LTE'    => { version => "8.25", date => "02.07.2026"},
+    '6842 LTE'    => { version => "6.35", date => "07.09.2023"},
+    '6840 LTE'    => { version => "6.88", date => "07.09.2023"},
+    '6825 4G'     => { version => "8.25", date => "02.07.2026"},
+    '6820 LTE v4' => { version => "7.57", date => "04.09.2023"},
+    '6820 LTE v3' => { version => "7.57", date => "04.09.2023"},
+    '6820 LTE v2' => { version => "7.57", date => "04.09.2023"},
+    '6820 LTE'    => { version => "7.30", date => "04.09.2023"},
+    '6810 LTE'    => { version => "6.35", date => "07.09.2023"},
+    '6690 Cable'  => { version => "8.21", date => "01.12.2025"},
+    '6670 Cable'  => { version => "8.21", date => "29.01.2026"},
+    '6660 Cable'  => { version => "8.25", date => "19.03.2026"},
+    '6591 Cable'  => { version => "8.25", date => "19.03.2026"},
+    '6590 Cable'  => { version => "7.57", date => "04.09.2023"},
+    '6490 Cable'  => { version => "7.57", date => "04.09.2023"},
+    '6430 Cable'  => { version => "7.30", date => "04.09.2023"},
+    '5690 XGS'    => { version => "8.20", date => "05.02.2026"},
+    '5690 Pro'    => { version => "8.25", date => "21.07.2026"},
+    '5690'        => { version => "8.25", date => "30.06.2026"},
+    '5590 Fiber'  => { version => "8.20", date => "12.02.2026"},
+    '5530 Fiber'  => { version => "8.20", date => "03.09.2025"},
+    '5491'        => { version => "7.31", date => "04.09.2023"},
+    '5490'        => { version => "7.31", date => "04.09.2023"},
+    '4690'        => { version => "8.25", date => "02.07.2026"},
+    '4630'        => { version => "8.25", date => "25.06.2026"},
+    '4060'        => { version => "8.25", date => "02.07.2026"},
+    '4050'        => { version => "8.25", date => "01.07.2026"},
+    '4040'        => { version => "8.02", date => "30.01.2025"},
+    '4020'        => { version => "7.04", date => "19.08.2024"},
+    '3490'        => { version => "7.31", date => "04.09.2023"},
+    '3272'        => { version => "6.89", date => "07.09.2023"}
+);
 
 our %RP_Model = (
-       'Stick'            => { version => "8.25", date => "17.06.2026"},
-       'Mesh Set 4200'    => { version => "8.25", date => "25.06.2026"},
-       'Mesh Set 1600'    => { version => "8.20", date => "20.01.2026"},
-       'Smart Gateway'    => { version => "8.26", date => "09.04.2026"},
-       'Smart Energy 250' => { version => "3.70", date => "06.08.2025"},
-       'PowerLine 1260'   => { version => "8.20", date => "12.12.2025"},
-       'PowerLine 1260E'  => { version => "8.20", date => "12.12.2025"},
-       'PowerLine 1240AX' => { version => "8.20", date => "17.12.2025"},
-       'PowerLine 1240E'  => { version => "7.16", date => "12.09.2023"},
-       'PowerLine 546E'   => { version => "7.15", date => "12.09.2023"},
-       'PowerLine 540'    => { version => "7.15", date => "17.09.2023"},
-       '1200'             => { version => "8.10", date => "04.09.2025"},
-       'DECT 302'         => { version => "5.29", date => "25.07.2025"},
-       'DECT 200'         => { version => "4.27", date => "10.12.2024"},
-       'DECT 301'         => { version => "5.23", date => "25.07.2025"},
-       'DVB-C'            => { version => "7.04", date => "06.08.2024"},
-       '6000'             => { version => "8.20", date => "16.12.2025"},
-       '3000 AX'          => { version => "8.25", date => "25.06.2026"},
-       '3000'             => { version => "8.10", date => "29.08.2025"},
-       '2700'             => { version => "8.06", date => "18.09.2025"},
-       '2600'             => { version => "8.06", date => "23.09.2025"},
-       '2400'             => { version => "8.20", date => "17.10.2025"},
-       '1750E'            => { version => "7.32", date => "19.03.2024"},
-       '1700'             => { version => "8.06", date => "18.09.2025"},
-       '1610 Oudoor'      => { version => "8.25", date => "08.07.2026"},
-       '1200 AX'          => { version => "8.20", date => "16.12.2025"},
-       '1200'             => { version => "8.20", date => "23.09.2025"},
-       '1160'             => { version => "7.15", date => "12.09.2023"},
-       '600 (V2)'         => { version => "8.20", date => "18.11.2025"},
-       '600'              => { version => "8.20", date => "18.11.2025"},
-       '450E'             => { version => "7.15", date => "12.09.2023"},
-       '310 a/b'          => { version => "7.16", date => "04.09.2023"},
-       '300E'             => { version => "6.34", date => "13.09.2023"}
-   );
+    'Stick'            => { version => "8.25", date => "25.06.2026"},
+    'Mesh Set 4200'    => { version => "8.26", date => "25.06.2026"},
+    'Mesh Set 1600'    => { version => "8.25", date => "25.06.2026"},
+    'Smart Gateway'    => { version => "8.50", date => "01.09.2026"},
+    'Smart Energy 250' => { version => "3.76", date => "06.08.2025"},
+    'PowerLine 1260'   => { version => "8.25", date => "26.06.2026"},
+    'PowerLine 1260E'  => { version => "8.25", date => "26.06.2026"},
+    'PowerLine 1240AX' => { version => "8.25", date => "26.06.2026"},
+    'PowerLine 1240E'  => { version => "7.16", date => "12.09.2023"},
+    'PowerLine 1220E'  => { version => "3.0.0.0-38", date => "tt.tt.yy"},
+    'PowerLine 1220'   => { version => "3.0.0.0-7", date => "tt.tt.yy"},
+    'PowerLine 1210'   => { version => "3.0.0.0-2", date => "tt.tt.yy"},
+    'PowerLine 1000'   => { version => "3.0.0.0-43", date => "tt.tt.yy"},
+    'PowerLine 546E'   => { version => "7.15", date => "12.09.2023"},
+    'PowerLine 540E'   => { version => "7.15", date => "12.09.2023"},
+    'PowerLine 530E'   => { version => "1.5.0.2-18", date => "tt.tt.yy"},
+    'PowerLine 510E'   => { version => "1.5.0.2-24", date => "tt.tt.yy"},
+    '1200'             => { version => "8.10", date => "04.09.2025"},
+    'DECT 302'         => { version => "5.29", date => "25.07.2025"},
+    'DECT 200'         => { version => "4.27", date => "10.12.2024"},
+    'DECT 301'         => { version => "5.23", date => "25.07.2025"},
+    'DVB-C'            => { version => "7.04", date => "06.08.2024"},
+    '6000'             => { version => "8.25", date => "26.06.2026"},
+    '3000 AX'          => { version => "8.25", date => "25.06.2026"},
+    '3000'             => { version => "8.25", date => "25.06.2026"},
+    '2700'             => { version => "8.07", date => "18.09.2025"},
+    '2600'             => { version => "8.06", date => "23.09.2025"},
+    '2400'             => { version => "8.25", date => "25.06.2026"},
+    '1750E'            => { version => "7.32", date => "19.03.2024"},
+    '1700'             => { version => "8.07", date => "18.09.2025"},
+    '1610 Oudoor'      => { version => "8.25", date => "08.07.2026"},
+    '1200 AX'          => { version => "8.25", date => "25.06.2026"},
+    '1200 AX V2'       => { version => "8.03", date => "25.06.2026"},
+    '1200'             => { version => "8.25", date => "25.06.2026"},
+    '1160'             => { version => "7.15", date => "12.09.2023"},
+    '600 (V2)'         => { version => "8.25", date => "25.06.2026"},
+    '600'              => { version => "8.25", date => "25.06.2026"},
+    '450E'             => { version => "7.15", date => "12.09.2023"},
+    '310 a/b'          => { version => "7.16", date => "04.09.2023"},
+    '300E'             => { version => "6.34", date => "13.09.2023"},
+    'N/G'              => { version => "4.88", date => "tt.mm.yyyy"}
+);
 
 ###############################################################################
 # our declarations
 our %fonModel = (
-        '0x01' => "MT-D"
-      , '0x03' => "MT-F"
-      , '0x04' => "C3"
-      , '0x05' => "M2"
-      , '0x08' => "C4"
-   );
+    '0x01' => "MT-D",
+    '0x03' => "MT-F",
+    '0x04' => "C3",
+    '0x05' => "M2",
+    '0x08' => "C4"
+);
 
 our %ringTone =  qw {
     0 HandsetDefault 1 HandsetInternalTone
@@ -1010,7 +1128,7 @@ our %ringTone =  qw {
     26 Musicbox 27 Blok2
     28 2Jazz
     33 InternetRadio 34 MusicList
-   };
+};
 
 our %dialPort = qw {
    1 fon1 2 fon2
@@ -1019,21 +1137,21 @@ our %dialPort = qw {
    60 dect1 61 dect2
    62 dect3 63 dect4
    64 dect5 65 dect6
-   };
+};
 
 our %gsmNetworkState = qw {
    0 disabled  1 registered_home
    2 searching 3 registration_denied
    4 unknown   5 registered_roaming
    6 limited_service
-   };
+};
 
 our %gsmTechnology = qw {
    0 GPRS 1 GPRS
    2 UMTS
    3 EDGE
    4 HSPA 5 HSPA 6 HSPA
-   };
+};
 
 our %ringToneNumber;
 while (our ($key, $value) = each %ringTone) {
@@ -1053,6 +1171,72 @@ our %LOG_Text = (
    4 => "EXPANDED:",
    5 => "DEBUG:"
 ); 
+
+#our %serverErrors = (
+#   '100' => "Continue",
+#   '101' => "Switching Protocols",
+#   '102' => "Processing (WebDAV; RFC 2518)",
+#   '103' => "Early Hints (RFC 8297)",
+#   '200' => "OK",
+#   '201' => "Created",
+#   '202' => "Accepted",
+#   '203' => "Non-Authoritative Information (since HTTP/1.1)",
+#   '204' => "No Content",
+#   '205' => "Reset Content",
+#   '206' => "Partial Content",
+#   '207' => "Multi-Status (WebDAV; RFC 4918)",
+#   '208' => "Already Reported (WebDAV; RFC 5842)",
+#   '226' => "IM Used (RFC 3229)",
+#   '300' => "Multiple Choices",
+#   '301' => "Moved Permanently",
+#   '302' => "Found",
+#   '303' => "See Other (since HTTP/1.1)",
+#   '304' => "Not Modified",
+#   '305' => "Use Proxy (since HTTP/1.1)",
+#   '306' => "Switch Proxy",
+#   '307' => "Temporary Redirect (since HTTP/1.1)",
+#   '308' => "Permanent Redirect",
+#   '400' => "Bad Request",
+#   '401' => "Unauthorized",
+#   '402' => "Payment Required",
+#   '403' => "Forbidden",
+#   '404' => "Not Found",
+#   '405' => "Method Not Allowed",
+#   '406' => "Not Acceptable",
+#   '407' => "Proxy Authentication Required",
+#   '408' => "Request Timeout",
+#   '409' => "Conflict",
+#   '410' => "Gone",
+#   '411' => "Length Required",
+#   '412' => "Precondition Failed",
+#   '413' => "Content Too Large",
+#   '414' => "URI Too Long",
+#   '415' => "Unsupported Media Type",
+#   '416' => "Range Not Satisfiable",
+#   '417' => "Expectation Failed",
+#   '418' => "I'm a teapot (RFC 2324, RFC 7168)",
+#   '421' => "Misdirected Request",
+#   '422' => "Unprocessable Content",
+#   '423' => "Locked (WebDAV; RFC 4918)",
+#   '424' => "Failed Dependency (WebDAV; RFC 4918)",
+#   '425' => "Too Early (RFC 8470)",
+#   '426' => "Upgrade Required",
+#   '428' => "Precondition Required (RFC 6585)",
+#   '429' => "Too Many Requests (RFC 6585)",
+#   '431' => "Request Header Fields Too Large (RFC 6585)",
+#   '451' => "Unavailable For Legal Reasons (RFC 7725)",
+#   '500' => "Internal Server Error",
+#   '501' => "Not Implemented",
+#   '502' => "Bad Gateway",
+#   '503' => "Service Unavailable",
+#   '504' => "Gateway Timeout",
+#   '505' => "HTTP Version Not Supported",
+#   '506' => "Variant Also Negotiates (RFC 2295)",
+#   '507' => "Insufficient Storage (WebDAV; RFC 4918)",
+#   '508' => "Loop Detected (WebDAV; RFC 5842)",
+#   '510' => "Not Extended (RFC 2774)",
+#   '511' => "Network Authentication Required (RFC 6585)"
+#);
 
 # FIFO Buffer for commands
 our @cmdBuffer = ();
@@ -1088,11 +1272,11 @@ sub Fritz_Get_attrList($@) {
                                 ."Fritz_Initialize_Modul,Fritz_Define_Modul,Fritz_Undefine_Modul,Fritz_Delete_Modul,Fritz_Rename_Modul,Fritz_Notify_Modul,Fritz_Set_Modul,Fritz_Get_Modul,Fritz_Attr_Modul,"
                                 ."Fritz_DebugLog,Fritz_dbgLogInit,Fritz_Readout_Start,Fritz_Readout_API_Check,Fritz_Readout_Run_Web,Fritz_Readout_Run_Web_LuaQuery,Fritz_Readout_Run_Web_LuaData,"
                                 ."Fritz_Readout_Run_Web_TR064,Fritz_Readout_Response,Fritz_Readout_Done,Fritz_Readout_Process,Fritz_Readout_Aborted,Fritz_Readout_Add_Reading,Fritz_Readout_Format,"
-                                ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_GuestWlan_OnOff,Fritz_Set_call_Phone,"
+                                ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_Wlan_Guest_OnOf,Fritz_Set_call_Phone,"
                                 ."Fritz_Set_dectRing_Phone,Fritz_Set_ring_Phone,Fritz_Set_rescan_Neighborhood,Fritz_Set_macFilter_OnOff,Fritz_Set_change_Profile,Fritz_Set_lock_filter_Profile,"
                                 ."Fritz_Set_lock_Landevice_OnOffRt,Fritz_Set_lock_Landevice_OnOffRt_8,Fritz_Set_enable_VPNshare_OnOff,Fritz_Set_wake_Up_Call,Fritz_Set_Wlan_Log_Ext_OnOff,"
                                 ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_VPN_Shares_List_Old,Fritz_Get_DOCSIS_Informations,"
-                                ."Fritz_Get_WLAN_Environment,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
+                                ."Fritz_Get_Wlan_Environment,Fritz_Get_Wlan_Status,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
                                 ."Fritz_Get_Fritz_Log_Info_nonBlk,Fritz_Get_Kid_Profiles_List,Fritz_Get_Fritz_Log_Info_Std,Fritz_Get_Lan_Device_Info,Fritz_Get_supportData,Fritz_Get_TR064_ServiceList,Fritz_Get_meshInfrastructure,"
                                 ."Fritz_SOAP_Request,Fritz_SOAP_Para_Request,"
                                 ."Fritz_init_TR064,Fritz_open_Web_Connection,Fritz_call_Lua_Query,Fritz_call_LuaData,Fritz_write_javaScript,Fritz_call_javaScript,"
@@ -1184,11 +1368,11 @@ sub Fritz_Get_attrList($@) {
                                 ."Fritz_Initialize_Modul,Fritz_Define_Modul,Fritz_Undefine_Modul,Fritz_Delete_Modul,Fritz_Rename_Modul,Fritz_Notify_Modul,Fritz_Set_Modul,Fritz_Get_Modul,Fritz_Attr_Modul,"
                                 ."Fritz_DebugLog,Fritz_dbgLogInit,Fritz_Readout_Start,Fritz_Readout_API_Check,Fritz_Readout_Run_Web,Fritz_Readout_Run_Web_LuaQuery,Fritz_Readout_Run_Web_LuaData,"
                                 ."Fritz_Readout_Run_Web_TR064,Fritz_Readout_Response,Fritz_Readout_Done,Fritz_Readout_Process,Fritz_Readout_Aborted,Fritz_Readout_Add_Reading,Fritz_Readout_Format,"
-                                ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_GuestWlan_OnOff,Fritz_Set_call_Phone,"
+                                ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_Wlan_Guest_OnOf,Fritz_Set_call_Phone,"
                                 ."Fritz_Set_dectRing_Phone,Fritz_Set_ring_Phone,Fritz_Set_rescan_Neighborhood,Fritz_Set_macFilter_OnOff,Fritz_Set_change_Profile,Fritz_Set_lock_filter_Profile,"
                                 ."Fritz_Set_lock_Landevice_OnOffRt,Fritz_Set_lock_Landevice_OnOffRt_8,Fritz_Set_enable_VPNshare_OnOff,Fritz_Set_wake_Up_Call,Fritz_Set_Wlan_Log_Ext_OnOff,"
                                 ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_VPN_Shares_List_Old,Fritz_Get_DOCSIS_Informations,"
-                                ."Fritz_Get_WLAN_Environment,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
+                                ."Fritz_Get_Wlan_Environment,Fritz_Get_Wlan_Status,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
                                 ."Fritz_Get_Fritz_Log_Info_nonBlk,Fritz_Get_Kid_Profiles_List,Fritz_Get_Fritz_Log_Info_Std,Fritz_Get_Lan_Device_Info,Fritz_Get_supportData,Fritz_Get_TR064_ServiceList,Fritz_Get_meshInfrastructure,"
                                 ."Fritz_SOAP_Request,Fritz_SOAP_Para_Request,"
                                 ."Fritz_init_TR064,Fritz_open_Web_Connection,Fritz_call_Lua_Query,Fritz_call_LuaData,Fritz_write_javaScript,Fritz_call_javaScript,"
@@ -1762,7 +1946,7 @@ sub Fritz_Define_Modul($$)
 
      my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.";
      Fritz_Log $hash, 2, $missingMsg;
-     $hash->{HINT_PERL}         = $missingMsg;
+     $hash->{WARNING_PERL}         = $missingMsg;
      $hash->{APICHECKED}        = (-1);
      $hash->{fhem}{sidTime}     = 0;
      $hash->{fhem}{sidErrCount} = (-1);
@@ -1940,7 +2124,7 @@ sub Fritz_Rename_Modul($$)
   Fritz_Readout_Start($hash->{helper}{TimerReadout});
   $hash->{fhem}{readOutState} = 0;
 
-+  main::AttrVal($hash, "SHInfoExtInterval", 3600);
+#  main::AttrVal($hash, "SHInfoExtInterval", 3600);
 }
 
 ###############################################################################
@@ -1971,7 +2155,7 @@ sub Fritz_Attr_Modul($@)
          # Fritz_Log $hash, 2, "attrVal boxUser: $tstUser - $hash->{fhem}{intBoxUsers}";
 
          if ($hash->{fhem}{intBoxUsers} =~ /$tstUser/) {
-           delete $hash->{HINT_BOXUSER} if(exists $hash->{HINT_BOXUSER});
+           delete $hash->{WARNING_BOXUSER} if(exists $hash->{WARNING_BOXUSER});
          } else {
            if($hash->{fhem}{intBoxUsers} eq '&lt;pWd&gt;') {
              return "boxUser not supported by $avmModel";
@@ -1980,13 +2164,13 @@ sub Fritz_Attr_Modul($@)
            }
          }
        } else {
-         delete $hash->{HINT_BOXUSER} if(exists $hash->{HINT_BOXUSER});
+         delete $hash->{WARNING_BOXUSER} if(exists $hash->{WARNING_BOXUSER});
        }       
        $aVal =~ s/\xC2\xA0/ /;
        $hash->{DEVICE_USER} = $aVal;
      }
      if ($cmd eq "del") {
-       $hash->{HINT_BOXUSER} = "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)";
+       $hash->{WARNING_BOXUSER} = "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)";
      }
    }
 
@@ -2492,11 +2676,11 @@ sub Fritz_Attr_Modul($@)
                             ."Fritz_Initialize_Modul,Fritz_Define_Modul,Fritz_Undefine_Modul,Fritz_Delete_Modul,Fritz_Rename_Modul,Fritz_Notify_Modul,Fritz_Set_Modul,Fritz_Get_Modul,Fritz_Attr_Modul,"
                             ."Fritz_DebugLog,Fritz_dbgLogInit,Fritz_Readout_Start,Fritz_Readout_API_Check,Fritz_Readout_Run_Web,Fritz_Readout_Run_Web_LuaQuery,Fritz_Readout_Run_Web_LuaData,"
                             ."Fritz_Readout_Run_Web_TR064,Fritz_Readout_Response,Fritz_Readout_Done,Fritz_Readout_Process,Fritz_Readout_Aborted,Fritz_Readout_Add_Reading,Fritz_Readout_Format,"
-                            ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_GuestWlan_OnOff,Fritz_Set_call_Phone,"
+                            ."Fritz_Readout_SetGet_Start,Fritz_Readout_SetGet_Done,Fritz_Readout_SetGet_Aborted,Fritz_Set_block_Incoming_Phone_Call,Fritz_Set_Wlan_Guest_OnOf,Fritz_Set_call_Phone,"
                             ."Fritz_Set_dectRing_Phone,Fritz_Set_ring_Phone,Fritz_Set_rescan_Neighborhood,Fritz_Set_macFilter_OnOff,Fritz_Set_change_Profile,Fritz_Set_lock_filter_Profile,"
                             ."Fritz_Set_lock_Landevice_OnOffRt,Fritz_Set_lock_Landevice_OnOffRt_8,Fritz_Set_enable_VPNshare_OnOff,Fritz_Set_wake_Up_Call,Fritz_Set_Wlan_Log_Ext_OnOff,"
                             ."Fritz_Set_Wlan_Guest_Params,Fritz_Get_MobileInfo,Fritz_Get_WLAN_globalFilters,Fritz_Get_LED_Settings,Fritz_Get_VPN_Shares_List,Fritz_Get_VPN_Shares_List_Old,Fritz_Get_DOCSIS_Informations,"
-                            ."Fritz_Get_WLAN_Environment,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
+                            ."Fritz_Get_Wlan_Environment,Fritz_Get_Wlan_Status,Fritz_Get_SmartHome_Devices_List,Fritz_Get_SmartHome_Automation_List,Fritz_Get_Lan_Devices_List,Fritz_Get_User_Info_List,"
                             ."Fritz_Get_Fritz_Log_Info_nonBlk,Fritz_Get_Kid_Profiles_List,Fritz_Get_Fritz_Log_Info_Std,Fritz_Get_Lan_Device_Info,Fritz_Get_supportData,Fritz_Get_TR064_ServiceList,Fritz_Get_meshInfrastructure,"
                             ."Fritz_SOAP_Request,Fritz_SOAP_Para_Request,"
                             ."Fritz_init_TR064,Fritz_open_Web_Connection,Fritz_call_Lua_Query,Fritz_call_LuaData,Fritz_write_javaScript,Fritz_call_javaScript,"
@@ -2797,7 +2981,7 @@ sub Fritz_Set_Modul($$@)
 
    my $list =  "";
 
-   if (!$hash->{HINT_PERL}) {
+   if (!$hash->{WARNING_PERL}) {
 
      $list =  " checkAPIs:" . (!defined($hash->{APICHECKED}) || $hash->{APICHECKED} <= 0 ? "full" : "basic,full");
      $list .=  " password"
@@ -2832,6 +3016,8 @@ sub Fritz_Set_Modul($$@)
            $hash->{CKECKAPI_TMOUT}   = $hash->{CKECKAPI_MAX_TMOUT};
          }
          $hash->{fhem}{readOutState} = 1; #!main::AttrVal($name, "disable", 0);
+
+         $hash->{helper}{TimerReadout} = $name . ".Readout";
          main::RemoveInternalTimer($hash->{helper}{TimerReadout});
          $retMsg = "set <name> checkAPIs: " . Fritz_Readout_Start($hash->{helper}{TimerReadout});
          $hash->{fhem}{readOutState} = 0;
@@ -2930,7 +3116,7 @@ sub Fritz_Set_Modul($$@)
    } #end missing modul
 
    # available, if password is set correctly
-   if ($hash->{WEBCONNECT} && !$hash->{HINT_PERL} && !$hash->{HINT_NETWORK}) {
+   if ($hash->{WEBCONNECT} && !$hash->{WARNING_PERL} && !$hash->{WARNING_NETWORK}) {
 
      my $wlanNames = "(" . $hash->{fhem}{multiple_wlan}{names} . ")";
      $wlanNames =~ s/ /\|/;
@@ -5019,7 +5205,7 @@ sub Fritz_Get_Modul($@)
    my $retMsg = "";
 
    # available, if password is set correctly
-   if ($hash->{WEBCONNECT} && !$hash->{HINT_PERL}&& !$hash->{HINT_NETWORK}) {
+   if ($hash->{WEBCONNECT} && !$hash->{WARNING_PERL}&& !$hash->{WARNING_NETWORK}) {
 
      if( lc $cmd eq "smarthomepredef" && $hash->{LUADATA} == 1) {
 
@@ -5189,6 +5375,9 @@ sub Fritz_Get_Modul($@)
        $queryStr =~ tr/\&/ /;
 
        Fritz_Log $hash, 4, "get $name $cmd " . $queryStr;
+
+       # my $result = Fritz_call_LuaData($hash, "myfritz/api/data", \@webCmdArray) ;
+       # my $result = Fritz_call_LuaData($hash, "nas/api/data", \@webCmdArray) ;
 
        my $result = Fritz_call_LuaData($hash, "fnget", \@webCmdArray) ;
 
@@ -5427,7 +5616,7 @@ sub Fritz_Get_Modul($@)
          $returnStr = Fritz_Get_VPN_Shares_List($hash);
 
        } elsif ( $val[0] eq "wlanNeighborhood" && $hash->{LUADATA} == 1) {
-         $returnStr = Fritz_Get_WLAN_Environment($hash);
+         $returnStr = Fritz_Get_Wlan_Environment($hash);
 
        } elsif ( $val[0] eq "globalFilters" && $hash->{LUADATA} == 1 && ($avmModel =~ "Box")) {
          $hash->{helper}{gFilters} = 0;
@@ -6042,20 +6231,20 @@ sub Fritz_Readout_Start($)
    if( defined $hash->{fhem}{sidErrCount} && $hash->{fhem}{sidErrCount} < 0 ) {
       main::RemoveInternalTimer($hash->{helper}{TimerReadout});
 
-      if(exists($hash->{HINT_PERL})) {
+      if(exists($hash->{WARNING_PERL})) {
         main::readingsSingleUpdate( $hash, "state", "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.", 1);
 
-      } elsif(exists($hash->{HINT_NETWORK}) ) {
-        main::readingsSingleUpdate( $hash, "state", $hash->{HINT_NETWORK}, 1 );
-        Fritz_Log $hash, 2, $hash->{HINT_NETWORK};
+      } elsif(exists($hash->{WARNING_NETWORK}) ) {
+        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_NETWORK}, 1 );
+        Fritz_Log $hash, 2, $hash->{WARNING_NETWORK};
 
-      } elsif(exists($hash->{HINT_BOXUSER}) && exists($hash->{HINT_PASSWORD})) {
-        main::readingsSingleUpdate( $hash, "state", $hash->{HINT_PASSWORD}. ". Attention: " . $hash->{HINT_BOXUSER}, 1 );
-        Fritz_Log $hash, 2, $hash->{HINT_PASSWORD};
+      } elsif(exists($hash->{WARNING_BOXUSER}) && exists($hash->{WARNING_PASSWORD})) {
+        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_PASSWORD}. ". Attention: " . $hash->{WARNING_BOXUSER}, 1 );
+        Fritz_Log $hash, 2, $hash->{WARNING_PASSWORD};
 
-      } elsif(!exists($hash->{HINT_BOXUSER}) && exists($hash->{HINT_PASSWORD})) {
-        main::readingsSingleUpdate( $hash, "state", $hash->{HINT_PASSWORD}, 1 );
-        Fritz_Log $hash, 2, $hash->{HINT_PASSWORD};
+      } elsif(!exists($hash->{WARNING_BOXUSER}) && exists($hash->{WARNING_PASSWORD})) {
+        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_PASSWORD}, 1 );
+        Fritz_Log $hash, 2, $hash->{WARNING_PASSWORD};
 
       } else {
         main::readingsSingleUpdate( $hash, "state", "Attention - no Password and/or no User set. Please set the credentials", 1 );
@@ -6071,11 +6260,11 @@ sub Fritz_Readout_Start($)
 
       if ($hash->{APICHECKED} == -1) {
         main::readingsSingleUpdate( $hash, "state", "stopped while to many network errors", 1 );
-        $hash->{HINT_PROCESS} = "stopped while to many network errors";
+        $hash->{WARNING_PROCESS} = "stopped while to many network errors";
         Fritz_Log $hash, 2, "stopped while to many network errors";
       } else {
         main::readingsSingleUpdate( $hash, "state", "stopped while to many authentication errors", 1 );
-        $hash->{HINT_PROCESS} = "stopped while to many API errors";
+        $hash->{WARNING_PROCESS} = "stopped while to many API errors";
         Fritz_Log $hash, 2, "stopped while to many API errors";
       }
 
@@ -6125,19 +6314,19 @@ sub Fritz_Readout_Start($)
       $timeout  = $hash->{CKECKAPI_TMOUT};
       main::readingsSingleUpdate( $hash, "state", "check APIs: " . ($hash->{APICHECKED} ? "basic" : "full"), 1 );
       $runFn = "Fritz::Fritz_Readout_API_Check";
-      $hash->{HINT_PROCESS} = "check APIs: " . ($hash->{APICHECKED} ? "basic" : "full");
+      $hash->{WARNING_PROCESS} = "check APIs: " . ($hash->{APICHECKED} ? "basic" : "full");
    } elsif ( $hash->{APICHECKED} < 0 ) {
       $interval = (main::AttrVal( $name, "reConnectInterval", 180 ) < $hash->{CKECKAPI_TMOUT} ? $hash->{CKECKAPI_TMOUT} + 10 : main::AttrVal( $name, "reConnectInterval", 180 ));
       $timeout  = $hash->{CKECKAPI_TMOUT};
       main::readingsSingleUpdate( $hash, "state", "check APIs: recheck every $interval sec. with timeout $timeout sec.", 1 );
       $runFn = "Fritz::Fritz_Readout_API_Check";
-      $hash->{HINT_PROCESS} = "check APIs: recheck every $interval sec. with timeout $timeout sec.";
+      $hash->{WARNING_PROCESS} = "check APIs: recheck every $interval sec. with timeout $timeout sec.";
    }
 # Run shell or web api, restrict interval
    else {
       $interval = $hash->{INTERVAL};
       $runFn = "Fritz::Fritz_Readout_Run_Web";
-      $hash->{HINT_PROCESS} = "normal";
+      $hash->{WARNING_PROCESS} = "no warnings";
    }
 
    $hash->{helper}{runFN} = $runFn;
@@ -6203,9 +6392,9 @@ sub Fritz_Readout_Run_Web($)
      Fritz_Log $hash, 4, "TR064: $hash->{TR064} or secure Port:" . ($hash->{SECPORT} ? $hash->{SECPORT} : "none") . " not available or wrong Fritz!OS: $hash->{fhem}{fwVersionStr}.";
    }
 
-   Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_BOXUSER", "");
-   Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_PASSWORD", "");
-   Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_NETWORK", "");
+   Fritz_Readout_Add_Reading ($hash, \@roReadings, "->WARNING_BOXUSER", "");
+   Fritz_Readout_Add_Reading ($hash, \@roReadings, "->WARNING_PASSWORD", "");
+   Fritz_Readout_Add_Reading ($hash, \@roReadings, "->WARNING_NETWORK", "");
 
    # Ende und Rückkehr zum Hauptprozess
 
@@ -7037,7 +7226,7 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
 #-------------------------------------------------------------------------------------
 # Box model, firmware and uptimes
 
-   if($result->{box_uptimeHours} && $result->{box_uptimeHours} ne "no-emu") {
+   if(exists($result->{box_uptimeHours}) && $result->{box_uptimeHours} ne "no-emu") {
       $Tag = int($result->{box_uptimeHours} / 24);
       $Std = int($result->{box_uptimeHours} - (24 * $Tag));
       $Sek = int($result->{box_uptimeHours} * 3600) + $result->{box_uptimeMinutes} * 60;
@@ -7327,12 +7516,15 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
    $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
 
    my $wlanmesh = 0;
+   my $meshRole = "slave";
 
    if (exists($resultData->{data}) && ref($resultData->{data}) eq "HASH") {
      $wlanmesh = 1;
      Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}->{vars}, 5) if $resultData->{data}->{vars};
      Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}->{rep_data}, 5) if $resultData->{data}->{rep_data};
    }
+
+   # Fritz_Log $hash, 3, "wlanMesh 1: $wlanmesh " . ref($resultData->{data});
 
    #-------------------------------------------------------------------------------------
    # getting error notify 
@@ -7380,6 +7572,8 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
        } else {
          $result = Fritz_call_javaScript($hash, "dino/boxnotifications");
        }
+       # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+       return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
 
        if (defined $result->{result}) {
 
@@ -7518,10 +7712,17 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
    #-------------------------------------------------------------------------------------
    # now, evaluating mesh role
-   if ($wlanmesh) {
 
-     if(exists($resultData->{data}->{vars}->{role}->{value}) && ref($resultData->{data}->{vars}->{role}->{value}) eq "SCALAR") {
+   if ($wlanmesh) {
+     # Fritz_Log $hash, 3, "wlanMesh 2b: $wlanmesh " . ref($resultData->{data}) ." ". ref($resultData->{data}->{vars}->{role}->{value}) . " ". $resultData->{data}->{vars}->{role}->{value};
+
+     if (exists($resultData->{data}->{vars}->{role}->{value}) ) {
+       # Fritz_Log $hash, 3, "wlanMesh 3: $wlanmesh " . ref($resultData->{data});
+
+       $meshRole = $resultData->{data}->{vars}->{role}->{value};
+
        Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshRole", $resultData->{data}->{vars}->{role}->{value};
+       Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshed", $resultData->{data}->{vars}->{role}->{meshed}, "yesno";
 
        if ($resultData->{data}->{vars}->{role}->{value} ne "slave") {
          Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
@@ -7539,9 +7740,10 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
      } elsif (exists($resultData->{data}->{rep_data}->{is_repeater}) && ref($resultData->{data}->{rep_data}->{is_repeater} eq "SCALAR") ) {
 
-       my $meshRole = $resultData->{data}->{rep_data}->{is_repeater} ? "slave" : "master";
+       $meshRole = $resultData->{data}->{rep_data}->{is_repeater} ? "repeater" : "master";
 
        Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshRole", $meshRole;
+       Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshed", "no";
 
        if ($meshRole ne "slave") {
          Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
@@ -7555,15 +7757,85 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
          $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 0;
          $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 0;
+
+       }
+     } else {
+       $wlanmesh = 0;
+     }
+   }
+   
+   if (!$wlanmesh && $hash->{fhem}{fwVersion} >= 840) {
+
+     my $result;
+     $result = Fritz_call_javaScript($hash, "beta/fritzmesh");
+
+     # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+     return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+     $wlanmesh = 1;
+
+     if (exists($result->{data}) ) {
+
+       $meshRole = ($result->{data}->{thisDevice}->{currentRole} eq "primary" ? "master" : "slave");
+
+       Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshRole" , $meshRole;
+       Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshed"   , "yes";
+       Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshTrust", $result->{data}->{thisDevice}->{autoTrustEnabled}, "yesno";
+
+       if ($meshRole ne "slave") {
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 1;
+
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 1;
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 1;
+
+       } else {
+
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 0;
+         Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 0;
+
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 0;
+         $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 0;
        }
      }
-   } else {
+   } 
+
+   if (!$wlanmesh) {
+     Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshRole", "none";
+     Fritz_Readout_Add_Reading $hash, $roReadings, "box_meshed", "no";
+
      Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalIn->AttrVal", 1;
      Fritz_Readout_Add_Reading $hash, $roReadings, "helper->LuaQueryCmd->dslStatGlobalOut->AttrVal", 1;
 
      $hash->{helper}{LuaQueryCmd}{dslStatGlobalIn}{AttrVal} = 1;
      $hash->{helper}{LuaQueryCmd}{dslStatGlobalOut}{AttrVal} = 1;
+   } else {
+     # if mesh master then get provider services
+     if($meshRole eq "master") {
+       #xhr 1 lang de page provServ xhrId all
+
+       @webCmdArray = ();
+       push @webCmdArray, "xhr"         => "1";
+       push @webCmdArray, "lang"        => "de";
+       push @webCmdArray, "page"        => "provServ";
+       push @webCmdArray, "xhrId"       => "all";
+
+       $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
+
+       # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+       return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
+
+       $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+
+       if (exists($resultData->{data}) && ref($resultData->{data}) eq "HASH") {
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_proService"          , $resultData->{data}->{providerService}->{service};
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_proServiceAutoUpdate", $resultData->{data}->{providerService}->{autoUpdate};
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_proServiceDHCP"      , $resultData->{data}->{providerService}->{dhcpSupport};
+         Fritz_Readout_Add_Reading $hash, $roReadings, "box_proServiceUSP_TR369" , $resultData->{data}->{providerService}->{uspTR369};
+       }
+     }
    }
+
    Fritz_Log $hash, 4, "mesh_role/error notify - end getting data";
 
  
@@ -7572,8 +7844,6 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
    # xhr 1 lang de page chan xhrId all
    # xhr 1 lang de page repMode xhrId all
-
-#   if ($hash->{fhem}{fwVersion} >= 750 && (($hash->{fhem}{fwVersion} < 840) || ($avmModel =~ /Gateway|1700/))) {
 
    if ($hash->{fhem}{fwVersion} >= 750) {
      Fritz_Log $hash, 4, "wlanChannels - start getting data";
@@ -7593,115 +7863,8 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 
      Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $resultData->{data}, 5);
 
-     my $wNames = "";
+     Fritz_Get_Wlan_Status($hash, $resultData, $roReadings);
 
-     if (exists($resultData->{data}->{bands}) && ref($resultData->{data}->{bands}) eq "ARRAY" ) {
-
-       $nbViews = 0;
-       $views = $resultData->{data}->{bands};
-       $nbViews = scalar @$views;
-
-       if ($nbViews > 0) {
-         $wNames = "";
-         eval {
-           for(my $i = 0; $i <= $nbViews - 1; $i++) {
-
-             my $bandOrg  = $resultData->{data}->{bands}->[$i];
-             my $bandName = $bandOrg;
-             $bandName    =~ s/24/2.4/;
-             $bandName    =~ s/ghz/GHz/;
-             $wNames .= "wlan" . $bandName . " ";
-             $bandName = "box_wlanBand_" . $bandName; 
-
-             Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{$bandOrg}->{active}, "onoff";
-             Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{$bandOrg}->{useable}, "yesno";
-           }
-         };
-
-         Fritz_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
-         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", $nbViews;
-
-         chop ($wNames);
-         $wNames =~ s/GHz//g;
-         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
-       }
-
-     } elsif(exists($resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) && ref( $resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) eq "ARRAY" ) {
-
-       $nbViews = 0;
-
-       $views = $resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo};
-       $nbViews = scalar @$views;
-
-       if ($nbViews > 0) {
-         $wNames = "";
-         eval {
-           for(my $i = 0; $i <= $nbViews - 1; $i++) {
-
-             my $bandOrg  = $resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}->[$i]->{desc};
-             my $bandName = $bandOrg;
-             $bandName    =~ s/24/2.4/;
-             $bandName    =~ s/2\,4/2.4/;
-             $bandName    =~ s/ghz/GHz/;
-             $bandName    =~ s/ GHz/GHz/;
-             $wNames .= "wlan" . $bandName . " ";
-             $bandName = "box_wlanBand_" . $bandName; 
-
-             Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}->[$i]->{radio}, "onoff";
-#             Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{$bandOrg}->{useable}, "yesno";
-           }
-         };
-
-         Fritz_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
-         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", $nbViews;
-
-         chop ($wNames);
-         $wNames =~ s/GHz//g;
-         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
-       }
-
-     } else {
-
-       $wNames = "";
-       $nbViews = 0;
-
-       if (defined($resultData->{data}->{'24ghz'}) && ref($resultData->{data}->{'24ghz'}) eq "HASH") {
-         my $bandName = "box_wlanBand_2.4GHz"; 
-         $wNames .= "wlan2.4 ";
-
-         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{'24ghz'}->{active}, "onoff";
-         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{'24ghz'}->{useable}, "yesno";
-
-         $nbViews += 1;
-       }
-
-       if (exists($resultData->{data}->{'5ghz'}) && ref($resultData->{data}->{'5ghz'}) eq "HASH") {
-         my $bandName = "box_wlanBand_5GHz"; 
-         $wNames .= "wlan5 ";
-
-         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{'5ghz'}->{active}, "onoff";
-         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{'5ghz'}->{useable}, "yesno";
-
-         $nbViews += 1;
-       }
-
-       if (exists($resultData->{data}->{'6ghz'}) && ref($resultData->{data}->{'6ghz'}) eq "HASH") {
-         my $bandName = "box_wlanBand_6GHz"; 
-         $wNames .= "wlan6 ";
-
-         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $resultData->{data}->{'6ghz'}->{active}, "onoff";
-         Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $resultData->{data}->{'6ghz'}->{useable}, "yesno";
-
-         $nbViews += 1;
-       }
-
-       Fritz_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
-       Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", $nbViews;
-
-       chop ($wNames);
-       Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
-
-     }
      Fritz_Log $hash, 4, "wlanChannels - end getting data";
    } 
 
@@ -10099,9 +10262,13 @@ sub Fritz_Readout_Response($$$@)
 
   my $xsubroutine = ( caller(1) )[3];
   my $sub         = ( split( ':', $xsubroutine ) )[2];
-  $sub =~ s/Fritz_//       if ( defined $sub );
-  $sub ||= 'no-subroutine-specified';
 
+  if ( defined $sub ) {
+    $sub = "Fritz_Get_supportData" if $sub eq "__ANON__";
+    $sub =~ s/Fritz_//;
+  } else {
+    $sub = $xsubroutine;
+  }
 
   if ( defined $result->{sid} && !defined $result->{AuthorizationRequired}) {
     push @{$roReadings}, "fhem->sid", $result->{sid} if $result->{sid};
@@ -10118,19 +10285,25 @@ sub Fritz_Readout_Response($$$@)
     }
   }
 
-  elsif ( defined $result->{Error} ) {
-    # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
-    push @{$roReadings}, "->APICHECKED", -1;
-    push @{$roReadings}, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+  elsif ( exists($result->{Error}) ) {
+    if( $result->{Error} =~ /500/) {
+      # Hinweis wenn Fehler beim Lesen der Fritz-Device-Antwort
+      push @{$roReadings}, "Hint", "network: $result->{Error} in " .$sub. ":" .$xline;
+      Fritz_Log $hash, 4, "Network: " . $result->{Error} . " - " . $sub . "(" . $xline . ")";
+    } else {
+      # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+      push @{$roReadings}, "->APICHECKED", -1;
+      push @{$roReadings}, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
 
-    push @{$roReadings}, "->APICHECK_RET_CODES", $result->{Error};
-    push @{$roReadings}, "Error", "network error 500 in " .$sub. ":" .$xline;
-    push @{$roReadings}, "->WEBCONNECT", 0;
-    push @{$roReadings}, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+      push @{$roReadings}, "->APICHECK_RET_CODES", $result->{Error};
+      push @{$roReadings}, "Error", "network: $result->{Error} in " .$sub. ":" .$xline;
+      push @{$roReadings}, "->WEBCONNECT", 0;
+      push @{$roReadings}, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
-    Fritz_Log $hash, 2, "" . $result->{Error} . " - " . $sub . "(" . $xline . ")";
-    $returnStr = "Error|" . $result->{Error};
-    $returnStr .= "|";
+      Fritz_Log $hash, 2, "Network: " . $result->{Error} . " - " . $sub . "(" . $xline . ")";
+      $returnStr = "Error|" . $result->{Error};
+      $returnStr .= "|";
+    }
   }
 
   elsif ( defined $result->{AuthorizationRequired} ) {
@@ -10244,11 +10417,17 @@ sub Fritz_Readout_Process($$@)
 
    main::readingsBeginUpdate($hash);
 
-   if ( defined $values{Error} ) {
-     main::readingsBulkUpdate( $hash, "retStat_lastReadoutError", $values{Error} );
-     main::readingsBulkUpdate( $hash, "state", $values{Error} );
-     $newState = $values{Error};
-   }
+#   if ( exists($values{Error}) ) {
+#     main::readingsBulkUpdate( $hash, "retStat_lastReadoutError", $values{Error} );
+#     main::readingsBulkUpdate( $hash, "state", $values{Error} );
+#     $newState = $values{Error};
+#   }
+#
+#   if ( exists($values{Hint}) ) {
+#     main::readingsBulkUpdate( $hash, "retStat_lastReadoutWarning", $values{Hint} );
+#     main::readingsBulkUpdate( $hash, "state", $values{Hint} );
+#     $newState = $values{Hint};
+#   }
 
    # Statistics
    if (defined $values{".calledFrom"} && $values{".calledFrom"} eq "runWeb") {
@@ -10342,18 +10521,18 @@ sub Fritz_Readout_Process($$@)
          }
        }
        
-       delete ($hash->{HINT_BOXUSER}) if $rName2 eq "HINT_BOXUSER" && $rValue eq "";
-       delete ($hash->{HINT_PASSWORD}) if $rName2 eq "HINT_PASSWORD" && $rValue eq "";
-       delete ($hash->{HINT_NETWORK}) if $rName2 eq "HINT_NETWORK" && $rValue eq "";
+       delete ($hash->{WARNING_BOXUSER})  if $rName2 eq "WARNING_BOXUSER"  && $rValue eq "";
+       delete ($hash->{WARNING_PASSWORD}) if $rName2 eq "WARNING_PASSWORD" && $rValue eq "";
+       delete ($hash->{WARNING_NETWORK})  if $rName2 eq "WARNING_NETWORK"  && $rValue eq "";
        if ($rName2 eq "APICHECKED") {
          if($rValue == -1) {
            main::readingsBulkUpdate( $hash, "state", ": waiting for recheck" ) ;
-           $hash->{HINT_PROCESS} = "disrupted -> waiting for API recheck" ;
+           $hash->{WARNING_PROCESS} = "disrupted -> waiting for API recheck" ;
            $newState = "check API: waiting for recheck";
          } else {
            main::readingsBulkUpdate( $hash, "state", "check API: done" ) ;
+           $hash->{WARNING_PROCESS} = "check API:no warning" ;
            $newState = "check API: done";
-           $hash->{HINT_PROCESS} = "API:normal" ;
          }
        }
      }
@@ -10364,7 +10543,15 @@ sub Fritz_Readout_Process($$@)
      }
 
      elsif ($rName eq "box_fwVersion" && defined $values{box_fwUpdate}) {
-       $rValue .= " (old)" if $values{box_fwUpdate} eq "1";
+       if (defined $values{box_fwUpdate}) {
+         $rValue .= " (old)" if $values{box_fwUpdate} eq "1";
+       }
+       $hash->{MODEL_OS} = $rValue;
+     }
+
+     elsif ($rName eq "box_model") {
+       $hash->{MODEL} = $rValue;
+       $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
      }
 
      elsif ( $rName eq "Error" ) {
@@ -10373,17 +10560,18 @@ sub Fritz_Readout_Process($$@)
        $newState = $rValue;
      }
  
-     elsif ($rName eq "box_model") {
-       $hash->{MODEL} = $rValue;
-
-       $rValue .= " [".$values{box_oem}."]" if $values{box_oem};
+     elsif ( $rName eq "Hint" ) {
+       main::readingsBulkUpdate( $hash, "retStat_lastReadoutWarning", $rValue );
+       main::readingsBulkUpdate( $hash, "state", $rValue );
+       $newState = $rValue;
+     }
+ 
+     elsif ( $rName eq "readoutTime" ) {
+       # only dummy elsif
      }
 
-     elsif ($rName eq "box_fwVersion") {
-       $hash->{MODEL_OS} = $rValue;
-     }
+     else {
 
-     if ($rName !~ /-\<|-\>|box_fwUpdate|readoutTime|Error/) {
        # writing all other readings, except the disabled
        my $rFilter = $rName;
        $rFilter =~ s/[1-9]//g;
@@ -10441,6 +10629,7 @@ sub Fritz_Readout_Process($$@)
 
      # adapt TR064-Mode
      if ( defined $values{box_tr064} ) {
+
        if ( $values{box_tr064} eq "off" && defined $hash->{SECPORT} ) {
          Fritz_Log $hash, 4, "TR-064 is switched off";
          delete $hash->{SECPORT};
@@ -10460,8 +10649,31 @@ sub Fritz_Readout_Process($$@)
            $hash->{TR064} = 0;
          }
        }
-     }
+
+       if ( $TR064_chg == 1) {
+
+         my $msg = "TR-064 changed -> start a new API check";
+         Fritz_Log $hash, 3, $msg;
+         $hash->{WARNING_PROCESS}    = $msg;
+
+         $hash->{WEBCONNECT}         = 0;
+         $hash->{APICHECK_RET_CODES} = "-";
+         $hash->{fhem}{sidTime}      = 0;
+         $hash->{fhem}{sidErrCount}  = 0;
+         $hash->{fhem}{sidNewCount}  = 0;
+         $hash->{SID_RENEW_ERR_CNT}  = 0;
+         $hash->{SID_RENEW_CNT}      = 0;
+
+         $hash->{CKECKAPI_TMOUT}     = $hash->{CKECKAPI_MAX_TMOUT};
+         $hash->{APICHECKED}         = 0; # full check
+
+       }
+     } # end adapt TR064-Mode
    }
+
+   # chance attrList depending on Fritz Model and Fritz!OS Version
+   my $attrList = Fritz_Get_attrList($hash);
+   main::setDevAttrList($hash->{NAME}, $attrList);
 
    my $msg;
    if (keys( %values ) && $values{readoutTime}) {
@@ -10474,38 +10686,16 @@ sub Fritz_Readout_Process($$@)
    Fritz_Log $hash, 4, "BulkUpdate lastReadout: " . $msg;
 
    main::readingsEndUpdate( $hash, 1 );
-
    main::readingsSingleUpdate( $hash, "retStat_processReadout", sprintf( "%.2f s", time()-$startTime), 1);
 
-   # chance attrList depending on Fritz Model and Fritz!OS Version
-   my $attrList = Fritz_Get_attrList($hash);
-   main::setDevAttrList($hash->{NAME}, $attrList);
-
-   if ( $TR064_chg == 1) {
-
-     Fritz_Log $hash, 3, "TR-064 is switched -> start a new API check";
-     $hash->{WEBCONNECT}         = 0;
-     $hash->{APICHECK_RET_CODES} = "-";
-     $hash->{fhem}{sidTime}      = 0;
-     $hash->{fhem}{sidErrCount}  = 0;
-     $hash->{fhem}{sidNewCount}  = 0;
-     $hash->{SID_RENEW_ERR_CNT}  = 0;
-     $hash->{SID_RENEW_CNT}      = 0;
-
-     $hash->{CKECKAPI_TMOUT}     = $hash->{CKECKAPI_MAX_TMOUT};
-     $hash->{APICHECKED}         = 0; # full check
-     $hash->{fhem}{readOutState} = !main::AttrVal($name, "disable", 0);
-     Fritz_Readout_Start($hash->{helper}{TimerReadout});
-     $hash->{fhem}{readOutState} = 0;
-
-   } elsif( $hash->{HINT_PROCESS} eq "API:normal" ) {
+   # starting new interval
+   if( ($TR064_chg == 1) || ($hash->{WARNING_PROCESS} eq "check API:no warning") ) {
 
      $hash->{fhem}{readOutState} = !main::AttrVal($name, "disable", 0);
      Fritz_Readout_Start($hash->{helper}{TimerReadout});
      $hash->{fhem}{readOutState} = 0;
 
    }
-
 
 } # end Fritz_Readout_Process
 
@@ -10669,42 +10859,52 @@ sub Fritz_Readout_Add_Reading ($$$$@)
 
 sub Fritz_Readout_SetGet_Start($)
 {
+   # @cmdBuffer is an our array
+   return "no command in buffer." unless int @cmdBuffer;
+
    my ($timerpara) = @_;
 
-   my $index = rindex( $timerpara, "." );    # rechter punkt
-   my $func = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
-   my $name = substr $timerpara, 0, $index;                         # name extrahieren
-   my $hash = $defs{$name};
+   my $index = rindex( $timerpara, "." );                            # rechter punkt
+   my $func  = substr $timerpara, $index + 1, length($timerpara);    # function extrahieren
+   my $name  = substr $timerpara, 0, $index;                         # name extrahieren
+   my $hash  = $defs{$name};                                         # hash holen
+
+   # $cmdBufferTimeout is an our variable
    my $cmdBufTimeoutOffSet = $cmdBufferTimeout + main::AttrVal($name, "setgetTimeout", 10);
 
    my $cmdFunction;
    my $timeout;
    my $handover;
 
-   return "no command in buffer." unless int @cmdBuffer;
-
  # kill old process if timeout + 10s is reached
-   if ( exists( $hash->{helper}{CMD_RUNNING_PID}) && time() > ($cmdBufTimeoutOffSet) ) {
-      Fritz_Log $hash, 1, "Old command still running. Killing old command: " . $cmdBuffer[0];
+   if ( exists( $hash->{helper}{CMD_RUNNING_PID}) && (time() > $cmdBufTimeoutOffSet) ) {
+
+      Fritz_Log $hash, 1, "Set/Get - Old command still running. Killing old command: " . $cmdBuffer[0];
       shift @cmdBuffer;
-      main::BlockingKill( $hash->{helper}{CMD_RUNNING_PID} );
+
       # stop FHEM, giving Fritz-Device some time to free the memory
+      main::BlockingKill( $hash->{helper}{CMD_RUNNING_PID} );
+
       delete $hash->{helper}{CMD_RUNNING_PID};
-      return "INFO: no more command in buffer." unless int @cmdBuffer;
+
+      return "INFO: no more commands in buffer." unless int @cmdBuffer;
    }
+
+   my @val     = split / /, $cmdBuffer[0];
+   my $process = $val[0];
 
  # (re)start timer if command buffer is still filled
    if (int @cmdBuffer > 1) {
-      my @val = split / /, $cmdBuffer[0];
-      Fritz_Log $hash, 3, "restarting internal Timer: next set/get: $val[0] will be processed";
+      Fritz_Log $hash, 3, "Set/Get - restarting internal Timer: " .int(@cmdBuffer). " processes are pendig";
       main::RemoveInternalTimer($hash->{helper}{TimerCmd});
       main::InternalTimer(gettimeofday() + 1, "Fritz::Fritz_Readout_SetGet_Start", $hash->{helper}{TimerCmd}, 1);
    }
 
-# do not continue until running command has finished or is aborted
-   return "INFO: Process " . $hash->{helper}{CMD_RUNNING_PID} . " is still running" if exists $hash->{helper}{CMD_RUNNING_PID};
-
-   my @val = split / /, $cmdBuffer[0];
+ # do not continue until running command has finished or is aborted
+   if ( exists($hash->{helper}{CMD_RUNNING_PID}) ) {
+     Fritz_Log $hash, 3, "Set/Get - process: " .$hash->{helper}{CMD_RUNNING_PID}. " is still running";
+     return "INFO: Process " .$hash->{helper}{CMD_RUNNING_PID}. " is still running";
+   }
 
    my $xline       = ( caller(0) )[2];
    my $xsubroutine = ( caller(1) )[3];
@@ -10712,17 +10912,17 @@ sub Fritz_Readout_SetGet_Start($)
    $sub =~ s/Fritz_//       if ( defined $sub );
    $sub ||= 'no-subroutine-specified';
 
-   Fritz_Log $hash, 4, "Set_CMD_Start -> $sub.$xline -> $val[0]";
+   Fritz_Log $hash, 3, "Set/Get - Start -> $sub.$xline -> $process";
 
 # Preparing SET blockIncomingPhoneCall -> result in retStat_blockIncomingPhoneCall
-   if ($val[0] eq "blockincomingphonecall") {
+   if ($process eq "blockincomingphonecall") {
       $timeout = 10;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_block_Incoming_Phone_Call";
    }
 # Preparing SET Call -> result in retStat_ring
-   elsif ($val[0] eq "call") {
+   elsif ($process eq "call") {
       shift @val;
       $timeout = 60;
       $timeout = $val[2] if defined $val[2] && $val[2] =~/^\d+$/;
@@ -10732,36 +10932,35 @@ sub Fritz_Readout_SetGet_Start($)
       $cmdFunction = "Fritz::Fritz_Set_call_Phone";
    }
 # Preparing SET chgProfile -> result in retStat_chgProfile
-   elsif ($val[0] eq "chgprofile") {
+   elsif ($process eq "chgprofile") {
       $timeout = 25;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_change_Profile";
    }
 # Preparing SET enableVPNshare -> result in retStat_enableVPNshare
-   elsif ($val[0] eq "enablevpnshare") {
+   elsif ($process eq "enablevpnshare") {
       $timeout = 10;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_enable_VPNshare_OnOff";
    } 
 # Preparing SET guestWLAN -> result in retStat_SetGet_nonBlocking
-   elsif ($val[0] eq "guestwlan") {
-      shift @val;
+   elsif ($process eq "guestwlan") {
       $timeout = 20;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
-      $cmdFunction = "Fritz::Fritz_Set_GuestWlan_OnOff";
+      $cmdFunction = "Fritz::Fritz_Set_Wlan_Guest_OnOf";
    }
 # Preparing SET lockFilterProfile -> result in retStat_lockFilterProfile 
-   elsif ($val[0] eq "lockfilterprofile") {
+   elsif ($process eq "lockfilterprofile") {
       $timeout = 25;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_lock_Filter_Profile";
    }
 # Preparing SET lockLandevice -> result in retStat_lockLandevice 
-   elsif ($val[0] eq "locklandevice") {
+   elsif ($process eq "locklandevice") {
       $timeout = 25;
       $cmdBufferTimeout = time() + $timeout;
       if ($hash->{fhem}{fwVersion} < 800 || ( int @val == 4 && $val[3] eq "OS7")) {
@@ -10774,23 +10973,21 @@ sub Fritz_Readout_SetGet_Start($)
       }
    }
 # Preparing SET macFilter -> result in retStat_macFilter 
-   elsif ($val[0] eq "macfilter") {
+   elsif ($process eq "macfilter") {
       $timeout = 25;
-      $cmdBufferTimeout = time
-() + $timeout;
+      $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_macFilter_OnOff";
    }
 # Preparing SET rescanWLANneighbors -> result in retStat_rescanWLANneighbors 
-   elsif ( $val[0] eq "rescanwlanneighbors" ) {
+   elsif ( $process eq "rescanwlanneighbors" ) {
       $timeout = 10;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_rescan_Neighborhood";
    }
 # Preparing SET DECTRING -> result in retStat_ring
-   elsif ($val[0] eq "dectring") {
-
+   elsif ($process eq "dectring") {
       shift @val;
       $timeout = 20 + $val[1];
       Fritz_Log $hash, 4, "timeout ring: $timeout";
@@ -10799,7 +10996,7 @@ sub Fritz_Readout_SetGet_Start($)
       $cmdFunction = "Fritz::Fritz_Set_dectRing_Phone";
    }
 # Preparing SET RING -> result in retStat_ring
-   elsif ($val[0] eq "ring") {
+   elsif ($process eq "ring") {
 
       shift @val;
       $timeout = 20;
@@ -10812,50 +11009,50 @@ sub Fritz_Readout_SetGet_Start($)
       $cmdFunction = "Fritz::Fritz_Set_ring_Phone";
    }
 # Preparing SET wakeUpCall -> result in retStat_wakeUpCall 
-   elsif ($val[0] eq "wakeupcall") {
+   elsif ($process eq "wakeupcall") {
       $timeout = 10;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_wake_Up_Call";
    }
 # Preparing SET WLAN -> result in retStat_SetGet_nonBlocking
-   elsif ($val[0] eq "wlan") {
+   elsif ($process eq "wlan") {
       $timeout = 10;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_Wlan_OnOff";
    }
 # Preparing SET WLAN2.4 -> result in retStat_SetGet_nonBlocking
-   elsif ( $val[0] =~ /^wlan(2\.4|5)$/ ) {
+   elsif ($process =~ /^wlan(2\.4|5)$/ ) {
       $timeout = 10;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_Wlan_OnOff";
    }
 # Preparing SET wlanlogextended -> result in retStat_wlanLogExtended 
-   elsif ($val[0] eq "wlanlogextended") {
+   elsif ($process eq "wlanlogextended") {
       $timeout = 20;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_Wlan_Log_Ext_OnOff";
    }
 # Preparing SET wlanguestparams -> result in retStat_wlanGuestParams
-   elsif ($val[0] eq "wlanguestparams") {
+   elsif ($process eq "wlanguestparams") {
       $timeout = 20;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Set_Wlan_Guest_Params";
    }
 # Preparing GET fritzlog information -> result in retStat_fritzLogInfo 
-   elsif ($val[0] eq "fritzloginfo") {
+   elsif ($process eq "fritzloginfo") {
       $timeout = 20;
       $cmdBufferTimeout = time() + $timeout;
       $handover = $name . "|" . join( "|", @val );
       $cmdFunction = "Fritz::Fritz_Get_Fritz_Log_Info_nonBlk";
    }
    else {
-      my $msg = "ERROR: Unknown command '".join( " ", @val )."'";
-      Fritz_Log $hash, 4, "" . $msg;
+      my $msg = "ERROR: Unknown command: $process";
+      Fritz_Log $hash, 4, $msg;
       return $msg;
    }
 
@@ -10865,6 +11062,9 @@ sub Fritz_Readout_SetGet_Start($)
                                        "Fritz::Fritz_Readout_SetGet_Done", $timeout,
                                        "Fritz::Fritz_Readout_SetGet_Aborted", $hash);
    $hash->{helper}{CMD_RUNNING_PID}->{loglevel} = main::GetVerbose($name);
+
+   Fritz_Log $hash, 3, "Processing Set/Get: " .$handover;
+   main::readingsSingleUpdate($hash, "retStat_Processing", $handover, 1);
 
    return "Fritz_Readout_SetGet_Start done";
 
@@ -10890,7 +11090,7 @@ sub Fritz_Readout_SetGet_Done($)
    delete($hash->{helper}{CMD_RUNNING_PID});
 
    # ungültiger Rückgabewerte. Darf nicht vorkommen
-   if ( $success !~ /1|2|3/ )
+   if ( $success !~ /1|2|3|4/ )
    {
       Fritz_Log $hash, 1, "" . $result;
       Fritz_Readout_Process ( $hash, "Error|" . $result, 1 );
@@ -10901,14 +11101,14 @@ sub Fritz_Readout_SetGet_Done($)
       Fritz_Log $hash, 4, "" . $result;
    }
    # alles ok und es müssen noch Readings verarbeitet werden
-   elsif  ($success == 2 )
+   elsif  ($success =~ /2|4/ )
    {
 
       $result = decode_base64($result);
 
       Fritz_Log $hash, 4, "Nachverarbeitung:\n" . $result;
 
-      Fritz_Readout_Process ( $hash, $result, 1 );
+      Fritz_Readout_Process ( $hash, $result, ($success == 2 ? 1 : 0) );
    }
    # internes Fritz-Device Log: alles ok und es findet noch eine Nachverarbeitung durch eine sub in einer 99_...pm statt.
    elsif  ($success == 3 )
@@ -11006,19 +11206,20 @@ sub Fritz_Readout_API_Check($)
 
    my $attrList   = "";
 
-   Fritz_Log $hash, 3, "boxUser for checkAPIs: " . ($boxUser ? $boxUser : "not set/necessary");
+   Fritz_Log $hash, 3, "checkAPIs: started";
+   Fritz_Log $hash, 4, "boxUser for checkAPIs: " . ($boxUser ? $boxUser : "not set/necessary");
 
    $hash->{MODEL} = $name;
-   Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
-   Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
-   Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", "";
+   Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", "";
+   Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_BOXUSER", "";
+   Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_NETWORK", "";
 
    # Check if perl modules for remote APIs exists
    if ($hash->{helper}{misPerlModul}) {
 
      my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.";
      Fritz_Log $hash, 2, $missingMsg;
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PERL", $missingMsg;
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PERL", $missingMsg;
 
      Fritz_Readout_Add_Reading $hash, \@roReadings, ".calledFrom", "checkApis";
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
@@ -11031,18 +11232,18 @@ sub Fritz_Readout_API_Check($)
      push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
 
      my $returnStr = join('|', @roReadings );
-
+     Fritz_Log $hash, 4-$myVerbose, "0 - Handover to main process: (" . length ($returnStr) . "): " . $returnStr;
      return $name . "|" . encode_base64($returnStr,"");
 
    } else {
-     Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_PERL", "");
+     Fritz_Readout_Add_Reading ($hash, \@roReadings, "->WARNING_PERL", "");
    }
    # End check if perl modules for remote APIs exists
 
    # Check for valid host definition
    if (!defined($host)) {
      Fritz_Log $hash, 2, "No valid Host defined.";
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_HOST", "No Host defined.";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_HOST", "No Host defined.";
      $crdOK = 0;
    }
    # End check for valid host definition
@@ -11066,7 +11267,7 @@ sub Fritz_Readout_API_Check($)
 
          if($response->code == 500) {
            $crdOK = 0 ;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_NETWORK", $netErr;
          }
 
        } elsif ($response->is_success) { #determine TR064-Port
@@ -11125,7 +11326,7 @@ sub Fritz_Readout_API_Check($)
 
          if($response->code == 500) {
            $crdOK = 0 ;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_NETWORK", $netErr;
          }
 
        } elsif ($response->is_success && $response->content =~ /<j:Name>/) {
@@ -11175,7 +11376,7 @@ sub Fritz_Readout_API_Check($)
 
          if($response->code == 500) {
            $crdOK = 0 ;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_NETWORK", $netErr;
          }
 
        } elsif ($response->is_success && $response->content =~ /\<body\>(.*)\<\/body\>/) {
@@ -11230,7 +11431,7 @@ sub Fritz_Readout_API_Check($)
 
          if($response->code == 500) {
            $crdOK = 0 ;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_NETWORK", $netErr;
          }
 
        } elsif( $response->is_success && $response->content =~ /\<body\>(.*?)\<\/body\>/isg) {
@@ -11254,7 +11455,7 @@ sub Fritz_Readout_API_Check($)
                for(my $j = 0; $j < $nbViews; $j++) {
                  if (ref(@$cData[$j]) eq 'HASH') { # $hash_ref is reference to hash
                    $bUsers .= $cData->[$j]->{value} . ",";
-                   if ($cData->[$j]->{value} =~ /(fritz\d+)/) {
+                   if ( $cData->[$j]->{value} =~ /^(fritz\d{4})$/ ) {
                      Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEFAULT_USER", $1;
                      $hash->{DEFAULT_USER} = $1;
                    }
@@ -11297,12 +11498,12 @@ sub Fritz_Readout_API_Check($)
    # Check for defined password
    if (!Fritz_Helper_read_Password($hash)) {
      Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
 
      if ($hash->{DEFAULT_USER}) {
-       Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_BOXUSER", "using default boxUser: $hash->{DEFAULT_USER} or set one with 'attr " .$name. " boxUser'.");
+       Fritz_Readout_Add_Reading ($hash, \@roReadings, "->WARNING_BOXUSER", "using default boxUser: $hash->{DEFAULT_USER} or set one with 'attr " .$name. " boxUser'.");
      } elsif ( $boxUser eq "" && $hash->{fhem}{intBoxUsers} ne "&lt;none&gt;") {
-       Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)");
+       Fritz_Readout_Add_Reading ($hash, \@roReadings, "->WARNING_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)");
      }
 
      $crdOK = -1;
@@ -11323,15 +11524,13 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", ($crdOK < 0 ? $crdOK : $hash->{fhem}{sidErrCount} + 1);
 
      my $returnStr = join('|', @roReadings );
-
-     Fritz_Log $hash, 4-$myVerbose, "1. Handover to main process - $crdOK (" . length ($returnStr) . "): " . $returnStr;
-
+     Fritz_Log $hash, 4-$myVerbose, "1 - Handover to main process: (" . length ($returnStr) . "): " . $returnStr;
      return $name . "|" . encode_base64($returnStr,"");
 
    } else {
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER" , "" if ( $boxUser ne "");
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_HOST" , "";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", "";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_BOXUSER" , "" if ( $boxUser ne "");
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_HOST" , "";
    }
    # end error handling if Password, boxUser or host not Ok
 
@@ -11351,7 +11550,7 @@ sub Fritz_Readout_API_Check($)
        $crdOK = 0;
 
        Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
 
      } else {
 
@@ -11365,8 +11564,8 @@ sub Fritz_Readout_API_Check($)
 
        $apiError .= " boxModelSystem (login):" . $response->status_line;
 
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", "";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_BOXUSER", "";
 
        unless ($response->is_success) {
 
@@ -11380,19 +11579,19 @@ sub Fritz_Readout_API_Check($)
 
          if(defined $response->{AuthorizationRequired}) {
            Fritz_Log $hash, 2, $passErr;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", $passErr;
 
            if ($osVersion && $osVersion < 725 && $hash->{MODEL} !~ /Repeater/) {
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_BOXUSER", "Attribut boxUser not set.";
            }
 
          } elsif( $statusLine =~ /\(No route to host\)/) {
            Fritz_Log $hash, 2, $netErr;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_NETWORK", $netErr;
 
          } else {
            Fritz_Log $hash, 2, $osErr;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $osErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", $osErr;
          }
 
        } else {
@@ -11449,7 +11648,7 @@ sub Fritz_Readout_API_Check($)
        $crdOK = 0;
 
        Fritz_Log $hash, 2, "No password set. Please define it (once) with 'set $name password YourPassword'";
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", "No password set. Please define it (once) with 'set $name password YourPassword'";
 
      } else {
 
@@ -11465,8 +11664,8 @@ sub Fritz_Readout_API_Check($)
 
        $apiError .= " boxModelJason(login):" . $response->status_line;
 
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", "";
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_BOXUSER", "";
 
        if (!$response->is_success) {
 
@@ -11480,17 +11679,17 @@ sub Fritz_Readout_API_Check($)
 
          if(defined $response->{AuthorizationRequired}) {
            Fritz_Log $hash, 2, $passErr;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $passErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", $passErr;
 
            if ($osVersion && $osVersion < 725 && $hash->{MODEL} !~ /Repeater/) {
-             Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.";
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_BOXUSER", "Attribut boxUser not set.";
            }
          } elsif( $statusLine =~ /\(No route to host\)/) {
            Fritz_Log $hash, 2, "No route to host. Please check your network";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK", $netErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_NETWORK", $netErr;
          } else {
            Fritz_Log $hash, 2, $osErr;
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", $osErr;
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", $osErr;
          }
 
        } elsif ($response->is_success && $response->content =~ /<j:Name>/) {
@@ -11539,16 +11738,14 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
      my $returnStr = join('|', @roReadings );
-
-     Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
-
+     Fritz_Log $hash, 4-$myVerbose, "3 - Handover to main process: (" . length ($returnStr) . "): " . $returnStr;
      return $name . "|" . encode_base64($returnStr,"");
 
    } else {
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_PASSWORD", "";
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_BOXUSER" , "" if ( $boxUser ne "");
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_NETWORK" , "";
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "->HINT_HOST" , "";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_PASSWORD", "";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_BOXUSER" , "" if ( $boxUser ne "");
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_NETWORK" , "";
+     Fritz_Readout_Add_Reading $hash, \@roReadings, "->WARNING_HOST" , "";
    }
    # end error handling if Password, boxUser or host not Ok
 
@@ -11640,9 +11837,9 @@ sub Fritz_Readout_API_Check($)
        Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
        if ($hash->{DEFAULT_USER}) {
-         Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_BOXUSER", "Error using default boxUser: $hash->{DEFAULT_USER}. Set the correct one with 'attr " .$name. " boxUser'.");
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "->WARNING_BOXUSER", "Error using default boxUser: $hash->{DEFAULT_USER}. Set the correct one with 'attr " .$name. " boxUser'.");
        } elsif ( $boxUser eq "" && $hash->{fhem}{intBoxUsers} ne "&lt;none&gt;") {
-         Fritz_Readout_Add_Reading ($hash, \@roReadings, "->HINT_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)");
+         Fritz_Readout_Add_Reading ($hash, \@roReadings, "->WARNING_BOXUSER", "Attribut boxUser not set.(not absolutely necessary for Fritz!Repeater, Fritz!Smart or Fritz!OS < 7.25)");
        }
 
      } else {
@@ -11682,9 +11879,7 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
      my $returnStr = join('|', @roReadings );
-
-     Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
-
+     Fritz_Log $hash, 4-$myVerbose, "4 - Handover to main process: (" . length ($returnStr) . "): " . $returnStr;
      return $name . "|" . encode_base64($returnStr,"");
 
    } else {
@@ -11722,25 +11917,6 @@ sub Fritz_Readout_API_Check($)
              Fritz_Log $hash, 4, "GetCommonLinkProperties failed (expected for IP-Client without firewall): $errText";
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->WAN_ACCESS_TYPE", "WLAN?";
 
-#             my $errText = Fritz_Helper_TR064_ErrMsg($hash, $tr064Result->{Error}, 1);
-#
-#             $apiError .= " TR064: $errText";
-#
-#             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
-#             Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
-#
-#             Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
-#             Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $errText;
-#
-#             $hash->{fhem}{sidTime} = 0;
-#             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
-#             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
-#
-#             my $returnStr = join('|', @roReadings );
-#
-#             Fritz_Log $hash, 4-$myVerbose, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
-#
-#             return $name . "|" . encode_base64($returnStr,"");
            }
 
          } else {
@@ -11945,8 +12121,9 @@ sub Fritz_Readout_API_Check($)
 
    Fritz_Log $hash, 4, "Response -> " . $apiError;
    Fritz_Log $hash, 4, "Captured " . @roReadings . " values";
-   Fritz_Log $hash, 5, "Handover to main process (" . length ($returnStr) . "): " . $returnStr;
+   Fritz_Log $hash, 5, "5 - Handover to main process: (" . length ($returnStr) . "): " . $returnStr;
 
+   Fritz_Log $hash, 3, "checkAPIs: ended";
    return $name . "|" . encode_base64($returnStr,"");
 
 } #end Fritz_Readout_API_Check
@@ -12475,7 +12652,7 @@ sub Fritz_Set_Wlan_Guest_Params($)
    push @roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
    return Fritz_Readout_Response($hash, $result, \@roReadings, 2, $sidNew);
 
-} # end Fritz_Set_Wlan_Guest_Name
+} # end Fritz_Set_Wlan_Guest_Params
 
 ###############################################################################
 sub Fritz_Set_macFilter_OnOff($)
@@ -13883,7 +14060,7 @@ sub Fritz_Set_ring_Phone($)
 } # end Fritz_Set_ring_Phone
 
 ###############################################################################
-sub Fritz_Set_GuestWlan_OnOff($)
+sub Fritz_Set_Wlan_Guest_OnOf($)
 {
    my ($string) = @_;
    my ($name, @val) = split "\\|", $string;
@@ -13894,7 +14071,7 @@ sub Fritz_Set_GuestWlan_OnOff($)
    my @roReadings;
    my $startTime = time();
 
-   my $state = $val[0];
+   my $state = $val[1];
    $state =~ s/on/1/;
    $state =~ s/off/0/;
 
@@ -13913,9 +14090,11 @@ sub Fritz_Set_GuestWlan_OnOff($)
      my $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
      if( exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
-       my $msg = "set guestWlan: TR064 error switching guestWlan: $val[0]";
+
+       my $msg = "set guestWlan: TR064 error switching guestWlan: $val[1]";
        Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
        Fritz_Log $hash, 2, $msg . " - " . Dumper($tr064NewResult->{Error});
+
      } else {
 
        Fritz_Log $hash, 5, "switch GuestWLAN: \n" . Fritz_Helper_Dumper($hash, \$tr064NewResult, 5);
@@ -13931,7 +14110,8 @@ sub Fritz_Set_GuestWlan_OnOff($)
 
        # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
        if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
-         my $msg = "set guestWlan: Lua_Query error verifying guestWlan: $val[0]";
+
+         my $msg = "set guestWlan: Lua_Query error verifying guestWlan: $val[1]";
          Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
          Fritz_Log $hash, 2, $msg . " - " . $result->{Error};
 
@@ -13947,7 +14127,7 @@ sub Fritz_Set_GuestWlan_OnOff($)
          Fritz_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain",  $result->{box_guestWlanRemain};
          Fritz_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff";
 
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", "set guestWlan: $val[0]";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", "set guestWlan: $val[1]";
 
          Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid} if $result->{sid};
          Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
@@ -13968,40 +14148,17 @@ sub Fritz_Set_GuestWlan_OnOff($)
 
        # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
        if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
-         my $msg = "set guestWlan: Lua_Data error verifying guestWlan: $val[0]";
+
+         my $msg = "set guestWlan: Lua_Data error verifying guestWlan: $val[1]";
          Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
          Fritz_Log $hash, 2, $msg . " - " . $result->{Error};
 
        } else {
 
-         Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $result->{data}, 5);
+         Fritz_Get_Wlan_Status($hash, $result, \@roReadings);
 
-         my $nbViews = 0;
-
-         if (defined $result->{data}->{bands}) {
-           my $views = $result->{data}->{bands};
-           $nbViews = scalar @$views;
-         }
-
-         if ($nbViews > 0) {
-
-           eval {
-             for(my $i = 0; $i <= $nbViews - 1; $i++) {
-
-               my $bandOrg  = $result->{data}->{bands}->[$i];
-               my $bandName = "box_wlanBand_" . $bandOrg;
-               $bandName    =~ s/24/2.4/;
-               $bandName    =~ s/ghz/GHz/;
-
-               Fritz_Readout_Add_Reading $hash, \@roReadings, $bandName . "_active",  $result->{data}->{$bandOrg}->{active}, "onoff";
-               Fritz_Readout_Add_Reading $hash, \@roReadings, $bandName . "_useable", $result->{data}->{$bandOrg}->{useable}, "yesno";
-
-             }
-           };
-         }
        }
      }
-
    } else { #no API
      my $msg = "set guestWlan: TR064 SECPORT not available to switch WLAN.";
      Fritz_Log $hash, 2, $msg;
@@ -14010,9 +14167,9 @@ sub Fritz_Set_GuestWlan_OnOff($)
 
    my $returnStr = join('|', @roReadings );
    Fritz_Log $hash, 5, "Handover to main process: " . $returnStr;
-   return $name."|2|".encode_base64($returnStr,"");
+   return $name."|4|".encode_base64($returnStr,"");
 
-} # end Fritz_Set_GuestWlan_OnOff
+} # end Fritz_Set_Wlan_Guest_OnOf
 
 ###############################################################################
 sub Fritz_Set_Wlan_OnOff($)
@@ -14020,7 +14177,8 @@ sub Fritz_Set_Wlan_OnOff($)
    my ($string) = @_;
    my ($name, $cmd, @val) = split "\\|", $string;
    my $hash = $defs{$name};
-   my $result;
+   my $resultLua;
+   my $resultData;
    my @webCmdArray;
    my @tr064CmdArray;
    my @roReadings;
@@ -14045,42 +14203,55 @@ sub Fritz_Set_Wlan_OnOff($)
      my $tr064NewResult = Fritz_SOAP_Request($hash, 0, \@tr064CmdArray);
 
      if( exists($tr064NewResult->{Error}) && ref($tr064NewResult->{Error}) eq "HASH" ) {
+
        my $msg = "set $cmd: TR064 error switching $cmd: $val[0]";
        Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
        Fritz_Log $hash, 2, $msg . " - " . Dumper ($tr064NewResult->{Error});
+
      } else {
 
        Fritz_Log $hash, 4, "switch WLAN: " . Dumper($tr064NewResult);
 
        # Read WLAN-Status
-       my $queryStr = "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
-       $queryStr   .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
-       $queryStr   .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # Gäste WLAN
-       $queryStr   .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
-       $queryStr   .= "&box_macFilter_active=wlan:settings/is_macfilter_active";
+       my $queryStr = "";
+       if ($hash->{fhem}{fwVersion} < 750) {
+         $queryStr .= "&box_wlan_24GHz=wlan:settings/ap_enabled"; # WLAN
+         $queryStr .= "&box_wlan_5GHz=wlan:settings/ap_enabled_scnd"; # 2nd WLAN
+         $queryStr .= "&box_is_double_wlan=wlan:settings/feature_flags/DBDC";
+       }
+       $queryStr .= "&box_guestWlan=wlan:settings/guest_ap_enabled"; # Gäste WLAN
+       $queryStr .= "&box_guestWlanRemain=wlan:settings/guest_time_remain";
+       $queryStr .= "&box_macFilter_active=wlan:settings/is_macfilter_active";
 
-       $result = Fritz_call_Lua_Query( $hash, $queryStr) ;
+       $resultLua = Fritz_call_Lua_Query( $hash, $queryStr) ;
 
-       if ( defined $result->{Error} ) {
+       if ( exists($resultLua->{Error}) ) {
          my $msg = "set $cmd: Lua_Query error verifiying $cmd: $val[0]";
          Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
-         Fritz_Log $hash, 2, $msg . " - " . $result->{Error};
+         Fritz_Log $hash, 2, $msg . " - " . $resultLua->{Error};
 
        } else {
 
          if ($hash->{fhem}{fwVersion} < 750) {
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_2.4GHz", $result->{box_wlan_24GHz}, "onoff";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_5GHz", $result->{box_wlan_5GHz}, "onoff";
-           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_cnt", ($result->{box_wlan_5GHz} ? 2 : 1);
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_2.4GHz", $resultLua->{box_wlan_24GHz}, "onoff";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_5GHz", $resultLua->{box_wlan_5GHz}, "onoff";
+           Fritz_Readout_Add_Reading $hash, \@roReadings, "box_wlanBand_cnt", ($resultLua->{box_wlan_5GHz} ? 2 : 1);
+           if ($resultLua->{box_is_double_wlan}) {
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->multiple_wlan->cnt", 2;
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->multiple_wlan->names", "wlan2.4 wlan5";
+           } else {
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->multiple_wlan->cnt", 1;
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->multiple_wlan->names", "wlan2.4";
+           }
          }
 
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $result->{box_guestWlan}, "onoff";
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $result->{box_guestWlanRemain};
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $result->{box_macFilter_active}, "onoff";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_guestWlan", $resultLua->{box_guestWlan}, "onoff";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_guestWlanRemain", $resultLua->{box_guestWlanRemain};
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "box_macFilter_active", $resultLua->{box_macFilter_active}, "onoff";
 
          Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", "set $cmd: $val[0]";
 
-         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid} if $result->{sid};
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $resultLua->{sid} if $resultLua->{sid};
          Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
          Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
          Fritz_Readout_Add_Reading $hash, \@roReadings, "readoutTime", sprintf( "%.2f", time()-$startTime);
@@ -14095,41 +14266,16 @@ sub Fritz_Set_Wlan_OnOff($)
        push @webCmdArray, "page"        => "chan";
        push @webCmdArray, "xhrId"       => "all";
 
-       $result = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
+       $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
 
        # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
-       if ( defined $result->{Error} || defined $result->{AuthorizationRequired}) {
+       if ( exists($resultData->{Error}) || exists($resultData->{AuthorizationRequired}) ) {
          my $msg = "set guestWlan: Lua_Data error verifying guestWlan: $val[0]";
          Fritz_Readout_Add_Reading $hash, \@roReadings, "retStat_SetGet_nonBlocking", $msg;
-         Fritz_Log $hash, 2, $msg . " - " . $result->{Error};
+         Fritz_Log $hash, 2, $msg . " - " . $resultData->{Error};
 
        } else {
-
-         Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $result->{data}, 5);
-
-         my $nbViews = 0;
-
-         if (defined $result->{data}->{bands}) {
-           my $views = $result->{data}->{bands};
-           $nbViews = scalar @$views;
-         }
-
-         if ($nbViews > 0) {
-
-           eval {
-             for(my $i = 0; $i <= $nbViews - 1; $i++) {
-
-               my $bandOrg  = $result->{data}->{bands}->[$i];
-               my $bandName = "box_wlanBand_" . $bandOrg;
-               $bandName    =~ s/24/2.4/;
-               $bandName    =~ s/ghz/GHz/;
-
-               Fritz_Readout_Add_Reading $hash, \@roReadings, $bandName . "_active", $result->{data}->{$bandOrg}->{active}, "onoff";
-               Fritz_Readout_Add_Reading $hash, \@roReadings, $bandName . "_useable", $result->{data}->{$bandOrg}->{useable}, "yesno";
-
-             }
-           };
-         }
+         Fritz_Get_Wlan_Status($hash, $resultData, \@roReadings);
        }
      }
 
@@ -14141,7 +14287,7 @@ sub Fritz_Set_Wlan_OnOff($)
 
    my $returnStr = join('|', @roReadings );
    Fritz_Log $hash, 5, "Handover to main process: " . $returnStr;
-   return $name . "|2|" . encode_base64($returnStr, "");
+   return $name . "|4|" . encode_base64($returnStr, "");
 
 } # end Fritz_Set_Wlan_OnOff
 
@@ -15311,7 +15457,7 @@ sub Fritz_Get_DOCSIS_Informations($) {
 
 # get list of WLAN in environment
 ############################################
-sub Fritz_Get_WLAN_Environment($) {
+sub Fritz_Get_Wlan_Environment($) {
 
    my ($hash) = @_;
    my $name = $hash->{NAME};
@@ -15376,7 +15522,119 @@ sub Fritz_Get_WLAN_Environment($) {
 
    return $returnStr;
 
-} # end sub Fritz_Get_WLAN_Environment
+} # end sub Fritz_Get_Wlan_Environment
+
+###############################################################################
+sub Fritz_Get_Wlan_Status($$$)
+{
+   my ($hash, $result, $roReadings) = @_;
+   my $name    = $hash->{NAME};
+   my $wNames  = "";
+   my $nbViews = 0;
+   my $bandOrg;
+   my $bandName;
+   my $views;
+
+   Fritz_Log $hash, 5, "\n" . Fritz_Helper_Dumper($hash, $result->{data}, 5);
+
+   if (exists($result->{data}->{bands}) && ref($result->{data}->{bands}) eq "ARRAY" ) {
+
+     $nbViews = 0;
+     my $views   = $result->{data}->{bands};
+     $nbViews    = scalar @$views;
+
+     if ($nbViews > 0) {
+
+       eval {
+         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+
+           $bandOrg  = $result->{data}->{bands}->[$i];
+           $bandName = $bandOrg;
+           $bandName    =~ s/24/2.4/;
+           $bandName    =~ s/ghz/GHz/;
+           $wNames      .= "wlan" . $bandName . " ";
+           $bandName    = "box_wlanBand_" . $bandName; 
+
+           Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active",  $result->{data}->{$bandOrg}->{active}, "onoff";
+           Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $result->{data}->{$bandOrg}->{useable}, "yesno";
+
+         }
+       };
+     }
+
+   } elsif(exists($result->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) && ref( $result->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) eq "ARRAY" ) {
+
+     $nbViews = 0;
+
+     $views = $result->{data}->{rep_data}->{wlan_conninfo}->{bandinfo};
+     $nbViews = scalar @$views;
+
+     if ($nbViews > 0) {
+
+       eval {
+         for(my $i = 0; $i <= $nbViews - 1; $i++) {
+
+           $bandOrg  = $result->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}->[$i]->{desc};
+           $bandName = $bandOrg;
+           $bandName    =~ s/24/2.4/;
+           $bandName    =~ s/2\,4/2.4/;
+           $bandName    =~ s/ghz/GHz/;
+           $bandName    =~ s/ GHz/GHz/;
+           $wNames  .= "wlan" . $bandName . " ";
+           $bandName = "box_wlanBand_" . $bandName; 
+
+           Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $result->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}->[$i]->{radio}, "onoff";
+#           Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $result->{data}->{$bandOrg}->{useable}, "yesno";
+         }
+       };
+
+     }
+
+   } else {
+
+     $wNames = "";
+     $nbViews = 0;
+
+     if (defined($result->{data}->{'24ghz'}) && ref($result->{data}->{'24ghz'}) eq "HASH") {
+       $bandName = "box_wlanBand_2.4GHz"; 
+       $wNames .= "wlan2.4 ";
+
+       Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $result->{data}->{'24ghz'}->{active}, "onoff";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $result->{data}->{'24ghz'}->{useable}, "yesno";
+
+       $nbViews += 1;
+     }
+
+     if (exists($result->{data}->{'5ghz'}) && ref($result->{data}->{'5ghz'}) eq "HASH") {
+       $bandName = "box_wlanBand_5GHz"; 
+       $wNames .= "wlan5 ";
+
+       Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $result->{data}->{'5ghz'}->{active}, "onoff";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $result->{data}->{'5ghz'}->{useable}, "yesno";
+
+       $nbViews += 1;
+     }
+
+     if (exists($result->{data}->{'6ghz'}) && ref($result->{data}->{'6ghz'}) eq "HASH") {
+       $bandName = "box_wlanBand_6GHz"; 
+       $wNames .= "wlan6 ";
+
+       Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_active", $result->{data}->{'6ghz'}->{active}, "onoff";
+       Fritz_Readout_Add_Reading $hash, $roReadings, $bandName . "_useable", $result->{data}->{'6ghz'}->{useable}, "yesno";
+
+       $nbViews += 1;
+     }
+
+   }
+
+   Fritz_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
+   Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->cnt", $nbViews;
+
+   chop ($wNames);
+   $wNames =~ s/GHz//g;
+   Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
+
+} # end Fritz_Get_Wlan_Status
 
 # get list of SmartHome Devices
 ############################################
@@ -17420,8 +17678,8 @@ sub Fritz_SOAP_Request($$$;@)
      return \%retHash;
    }
 
-# Get Password und User for TR064 access
-   $UserAgentParaU = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "") );
+   # Get Password and User (dslf-config < FritzOS 7.50) for TR064 access
+   $UserAgentParaU = main::AttrVal( $name, "boxUser", ($hash->{DEFAULT_USER} ? $hash->{DEFAULT_USER} : "dslf-config") );
    $UserAgentParaP  = Fritz_Helper_read_Password($hash) unless defined $UserAgentParaP;
 
    unless (defined $UserAgentParaP) {
@@ -17525,7 +17783,7 @@ sub Fritz_SOAP_Request($$$;@)
 
      my $respData = eval { $ua->post($init_url, Content_Type => 'text/xml; charset=utf-8', Content => $request) };
 
-     Fritz_Log $hash, 5, "respData:\n" . Dumper($respData);
+     Fritz_Log $hash, 4, "respData:\n" . Dumper($respData);
 
      if ($@) {
 
@@ -17955,16 +18213,13 @@ sub Fritz_call_Lua_Query($$@)
      $url .= '/query.lua?sid=' . $result->{sid} . $queryStr;
    } elsif ( $f_lua eq "luaCall") {
 
-     if ($queryStr =~ /\?/) {
-
-        $url .= '/' . $queryStr;
-        $url .= '&sid=' . $result->{sid} if $queryStr ne "login_sid.lua";
-
-     } else {
-
-       $url .= '/' . $queryStr;
-       $url .= '?sid=' . $result->{sid} if $queryStr ne "login_sid.lua";
-
+     $url .= '/' . $queryStr;
+     if ($queryStr ne "login_sid.lua") {
+       if ($queryStr =~ /\?/) {
+         $url .= '&sid=' . $result->{sid};
+       } else {
+         $url .= '?sid=' . $result->{sid};
+       }
      }
      Fritz_Log $hash, 4, "luaFunction call: " . $url;
 
@@ -18009,7 +18264,7 @@ sub Fritz_call_Lua_Query($$@)
    $luaContent .= ',"status_line":"' . $response->status_line .'"}';
 
 #################
-#   Fritz_Log $hash, 3, "Response: " . $response->content;
+#   Fritz_Log $hash, 4, "Response: " . $response->content;
 #################
    my $jsonResult ;
 
@@ -18091,6 +18346,54 @@ sub Fritz_call_LuaData($$$@)
    }
 
    my $data = $response->content;
+
+   # handling provider services informations
+   ###########  HTML #################################
+   # data: import login from "\/js\/login.js";.*?setConfig\((\{.*?\})\);
+   # xhr 1 lang de page overview xhrId all
+
+   if ( $data =~ m/\<form name="mainform" method="POST" action="\/internet\/providerservices.lua"\>.*?\<div class="formular"\>(.*?)\<div id="btn_form_foot"\>/igs ) {
+
+     Fritz_Log $hash, 4, "Response Data provider services: \n" . $1;
+     #Fritz_Log $hash, 3, "Response Content: \n" . $response->content;
+
+     my $provSrv = '{';
+     my $tmp = $1;
+     my $profile_content;
+
+     if ( $tmp =~ /\<input type="checkbox" checked id="uiEnabled" name="enabled"\>/igs ) {
+       $provSrv .= '"service":"enabled",'
+     } else {
+       $provSrv .= '"service":"disabled",'
+     }
+     if ( $tmp =~ /\<input id="uiFWdownload_enable" type="checkbox" name="FWdownload_enable" checked\>/igs ) {
+       $provSrv .= '"autoUpdate":"enabled",'
+     } else {
+       $provSrv .= '"autoUpdate":"disabled",'
+     }
+     if ( $tmp =~ /\<input id="uiDhcp43_support" type="checkbox" name="dhcp43_support" checked\>/igs ) {
+       $provSrv .= '"dhcpSupport":"enabled",'
+     } else {
+       $provSrv .= '"dhcpSupport":"disabled",'
+     }
+     if ( $tmp =~ /\<input id="uiAllowUsp" type="checkbox" name="allow_usp" checked\>/igs ) {
+       $provSrv .= '"uspTR369":"enabled",'
+     } else {
+       $provSrv .= '"uspTR369":"disabled",'
+     }
+
+     chop($provSrv) if ($provSrv ne "{");
+     $provSrv .= '}';
+
+     $profile_content  = '{"sid":"'.$result->{sid}.'",';
+     $profile_content .= '"status":"' . $response->status_line . '",' if ($response->status_line && $response->status_line ne "");
+     $profile_content .= '"pid":"provider_service","data":{"providerService":' . $provSrv;
+     $profile_content .= '}}';
+
+     Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
+
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+   }
 
    # handling fon_devices informations
    ###########  HTML #################################
@@ -18603,7 +18906,6 @@ sub Fritz_call_LuaData($$$@)
      }
    }
 
-
    # handling for getting disabled incomming numbers
    ###########  HTML #################################
    # data: [{"numberstring":"030499189721","uid":128,"name":"030499189721","typeSuffix":"_entry","numbers":[{"number":"030499189721","type":"privat"}]},{"numberstring":"02234983525","uid":137,"name":"Testsperre","typeSuffix":"_entry","numbers":[{"number":"02234983525","type":"privat"}]}]};
@@ -18714,12 +19016,29 @@ sub Fritz_call_LuaData($$$@)
 
    if (defined $resultJSON->{Error} && $resultJSON->{Error} =~ /no HASH\/ARRAY from JSON returned/ ) {
 
-     Fritz_Log $hash, 3, "Response Data: \n" . $data;
+     Fritz_Log $hash, 4, "Response Data: \n" . $data;
 
-     my $isHTML = ($data =~ m/\<\DOCTYPE html\>/igs);
+     my $isHTML = ($data =~ m/\<\DOCTYPE html\>|type="text\/css"/igs);
 
-     $data = "<textarea>" . $data . "</textarea>" if $isHTML;
-     $data = encode_base64($data, "");
+     if ($isHTML) {
+       $data = "<textarea>" . $data . "</textarea>" if $isHTML;
+
+       my $htmlJson = {
+         html => $data
+       };
+
+       my $json_coder  = JSON::PP->new->utf8->pretty;
+       my $json_string = $json_coder->encode($htmlJson);
+       $json_string =~ s/^\{\s*"html" : (.*?)\}$/$1/igs;
+       $data = $json_string;
+
+#       Fritz_Log $hash, 3, "Response JSON: \n" . $json_string;
+#       return Fritz_Helper_process_JSON($hash, $json_string, $result->{sid}, $charSet, $sidNew);
+
+     } else {
+
+       $data = encode_base64($data, "");
+     }
 
      my $profile_content;
 
@@ -18735,10 +19054,11 @@ sub Fritz_call_LuaData($$$@)
      $profile_content .= '"noJSONinfo":"no JSON-Data in data.lua request",';
      if( $isHTML) {
        $profile_content .= '"noJSONtype":"HTML",';
+       $profile_content .= '"noJSONdocument":' .$data;
      } else {
        $profile_content .= '"noJSONtype":"unknown",';
+       $profile_content .= '"noJSONdocument":"' .$data. '"';
      }
-     $profile_content .= '"noJSONdocument":"' .$data. '"';
      $profile_content .= '},';
      $profile_content .= '"status":"' . $response->status_line . '",' if ($response->status_line && $response->status_line ne "");
      $profile_content .= '"sid":"' . $result->{sid} . '"';
@@ -19970,8 +20290,17 @@ sub Fritz_Helper_Dumper($$;@) {
 
    my $xsubroutine = ( caller(1) )[3];
    my $sub         = ( split( ':', $xsubroutine ) )[2];
-   $sub =~ s/Fritz_//       if ( defined $sub );
-   $sub ||= 'no-subroutine-specified';
+
+   if ( defined $sub ) {
+     $sub = "Fritz_Get_supportData" if $sub eq "__ANON__";
+     my $setSubVerbose4 = main::AttrVal( $name, "setSubVerbose4", "" );
+     if ($sub =~ /^$setSubVerbose4$/) {
+       $logLevel = 2;
+     }
+     $sub =~ s/Fritz_//;
+   } else {
+     $sub = $xsubroutine;
+   }
 
    if (ref $reference) {
      if (ref($reference) eq '') {
@@ -21045,8 +21374,13 @@ sub Fritz_Helper_Dumper($$;@) {
                                                      readings to -solved by click-. If the information is withdrawn from the FritzBox, the readings receive the<br>
                                                      suffix -solved by FB-. The button is set to '-solved by FB- delete readings'. Using this button, the two readings box_notify_<notify_ID> and box_notify_<notify_ID>_info can now be deleted.<br>
                                                      The readings must be activated using the attribute: enableBoxReadings.</li>
-
       <br>
+      <li><b>box_proService</b>Allow automatic setup by the internet service provider</li>
+      <li><b>box_proServiceAutoUpdate</b>Allow automatic updates</li>
+      <li><b>box_proServiceDHCP</b>Use the auto-configuration server URL provided via DHCP and PPP</li>
+      <li><b>box_proServiceUSP_TR369</b>Allow connection to your internet service provider via USP (TR-369)</li>
+      <br>
+
       <li><b>box_pwr...</b>Readings Energy consumption. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_pwr_Rate_Act</b>Total system - Current energy consumption</li>
       <li><b>box_pwr_Rate_24avg</b>Total system - 24-hour average energy consumption</li>
@@ -22477,6 +22811,12 @@ sub Fritz_Helper_Dumper($$;@) {
                                                      Die Readings müssen über das Attribut: enableBoxReadings aktiviert werden.</li>
 
       <br>
+      <li><b>box_proService</b>Automatische Einrichtung durch den Internetanbieter zulassen</li>
+      <li><b>box_proServiceAutoUpdate</b>Automatische Updates zulassen</li>
+      <li><b>box_proServiceDHCP</b>URL des Auto Configuration Servers über DHCP und PPP beachten</li>
+      <li><b>box_proServiceUSP_TR369</b>Anbindung an Ihren Internetanbieter über USP (TR-369) erlauben</li>
+
+      <br>
       <li><b>box_pwr...</b>Readings Energieverbrauch. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_pwr_Rate_Act</b>Gesamtsystem - Energieverbrauch aktuell</li>
       <li><b>box_pwr_Rate_24avg</b>Gesamtsystem - Energieverbrauch 24-Stunden-Mittel</li>
@@ -22867,7 +23207,7 @@ sub Fritz_Helper_Dumper($$;@) {
     "Dect",
     "Consumer"
   ],
-  "version": "260907",
+  "version": "260915",
   "release_status": "stable",
   "author": [
     "Jörg Wiemann <jowiemann@debitel.net>"
