@@ -1,5 +1,10 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix: 72_FritzSmart: TR064 Fehler bei FritzOS < 7.50
+ - feature: 72_FritzSmart: weitere Vorbereitungen für neues FritzOS
+                           Aktualisierung Readings bei guestWlan on|off
+                           kleinere Optimierungen
+                           neue Readings box_proService...
  - bugfix: 98_CDCOpenData.pm: commandRef - tmpRadolanData
  - change: 93_Log2Syslog: Bugfixes und Verbesserungen für Sender und Collector
  - bugfix: 72_FritzSmart: Internal MODEL
