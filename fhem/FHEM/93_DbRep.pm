@@ -58,17 +58,7 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.54.21" => "25.08.2026  Fix: DbRep_nextMultiCmd - \%data{DbRep}{\$name}{multicmd} wird nicht vollständig bereinigt ".
-                            "DbRep_fetchrows: undef \@row_array ".
-                            "DbRep_Undef gepatcht ",
-  "8.54.20" => "25.03.2026  consider attr limit lines for output in all relevant *_Done Subs ",
-  "8.54.19" => "27.07.2025  DbReadingsVal: Code change Forum:https://forum.fhem.de/index.php?msg=1345204, remove obsolete att allowDeletion ".
-                            "new sub DbRep_convert2oneLine: attr device/reading can now be entered in multiple lines ",
-  "8.54.18" => "21.06.2025  DbRep_reduceLog: fix bug in INCLUDE Regex, forum:#141912.0 ",
-  "8.54.17" => "03.05.2025  DbRep_optimizeTables: fix resolution of symbolic links in Optimize Tables for SQLite ".
-                            "DbRep_sqlCmd / DbRep_sqlCmdBlocking: add commands analyze, check ",
-  "8.53.16" => "01.12.2024  fix check changeValue Forum: #139950.0, Role Agent can use executeBeforeProc, executeAfterProc ",
-  "8.53.15" => "18.08.2024  DbRep_diffvalDone: change loglevel to 2, Forum:#138986 ",
+  "8.54.22" => "16.09.2026  toten Code \$hash->{DBH} entfernt, DbRep_Index: Korrekturen für alle unterstützten Datenbankmodelle ",
   "1.0.0"   => "19.05.2016  Initial"
 );
 
@@ -1232,7 +1222,6 @@ sub DbRep_Get {
   my $name        = $a[0];
   my $opt         = $a[1];
   my $prop        = $a[2];
-  my $dbh         = $hash->{DBH};
   my $dblogdevice = $hash->{HELPER}{DBLOGDEVICE};
   my $dbloghash   = $defs{$hash->{HELPER}{DBLOGDEVICE}};
   my $dbmodel     = $dbloghash->{MODEL};
@@ -1498,14 +1487,13 @@ sub DbRep_Attr {
           $do = ($aVal) ? 1 : 0;
       }
 
-      $do     = 0 if($cmd eq "del");
-      my $val = ($do == 1 ?  "disabled" : "initialized");
+      $do     = 0 if($cmd eq 'del');
+      my $val = ($do == 1 ?  'disabled' : 'initialized');
 
-      ReadingsSingleUpdateValue ($hash, "state", $val, 1);
+      ReadingsSingleUpdateValue ($hash, 'state', $val, 1);
 
       if ($do == 1) {
-          my $dbh = $hash->{DBH};
-          DbRep_clearConn ($dbh);
+
       }
   }
 
@@ -1897,9 +1885,6 @@ sub DbRep_Undef {
 
  RemoveInternalTimer($hash);
 
- my $dbh = $hash->{DBH};
- DbRep_clearConn ($dbh);
-
  if (exists($hash->{HELPER}{RUNNING_PID})) {
      BlockingKill($hash->{HELPER}{RUNNING_PID});
      delete $hash->{HELPER}{RUNNING_PID};
@@ -1961,9 +1946,6 @@ return;
 ###################################################################################
 sub DbRep_Shutdown {
   my $hash = shift;
-
-  my $dbh = $hash->{DBH};
-  DbRep_clearConn ($dbh);
 
   DbRep_delread          ($hash,1);
   RemoveInternalTimer    ($hash);
@@ -7868,29 +7850,29 @@ sub DbRep_Index {
   my $database   = $hash->{DATABASE};
   my $dbuser     = $dbloghash->{dbuser};
 
-  my ($sqldel,$sqlcre,$sqlava,$sqlallidx,$ret) = ("","","","","");
+  my ($sqldel,$sqlcre,$sqlava,$sqlallidx,$sqlanlz,$ret) = ("","","","","","");
   my $p = 0;
 
   my ($sth,$rows,@six);
 
-  my $bst = [gettimeofday];                                         # Background-Startzeit
+  my $bst = [gettimeofday];                                                 # Background-Startzeit
 
   my ($err,$dbh,$dbmodel) = DbRep_dbConnect($name, $p);
   return "$name|$err" if ($err);
 
   # Userrechte ermitteln
-  #######################
+  # ----------------------
   $paref->{dbmodel}  = $dbmodel;
   $paref->{dbh}      = $dbh;
   $paref->{database} = $database;
   my $grants         = _DbRep_getInitData_grants ($paref);
 
-  if($cmdidx ne "list_all" && $dbmodel =~ /MYSQL|MARIADB/xs) {      # Rechte Check MYSQL
-      if($grants && $grants ne "ALL PRIVILEGES") {                  # Rechte INDEX und ALTER benötigt
-          my $i = index($grants, "INDEX");
-          my $a = index($grants, "ALTER");
+  if ($cmdidx ne "list_all" && $dbmodel =~ /MYSQL|MARIADB/xs) {             # Rechte Check MYSQL
+      if ($grants && $grants ne "ALL PRIVILEGES") {                         # Rechte INDEX und ALTER benötigt
+          my $i = ($grants =~ /\bINDEX\b/) ? 1 : 0;
+          my $a = ($grants =~ /\bALTER\b/) ? 1 : 0;
 
-          if($i == -1 || $a == -1) {
+          if (!$i || !$a) {
               $p = 1;
           }
       }
@@ -7908,53 +7890,36 @@ sub DbRep_Index {
       return "$name|$err" if ($err);
   }
 
-  my ($cmd,$idx) = split "_", $cmdidx, 2;
+  my ($cmd,$idx) = split '_', $cmdidx, 2;
+  $idx //= '';                                                              # undef vermeiden
 
-  my $st = [gettimeofday];                                             # SQL-Startzeit
+  # ------------------------------------------------------------------------------------------------
+  # Zentrale Index-Definitionen
+  #   - Search_Idx : DEVICE + READING, sortiert nach TIMESTAMP
+  #   - Report_Idx : READING + TIMESTAMP (alle Devices)
+  #
+  #   MySQL/MariaDB  : online DDL via ALGORITHM=INPLACE, LOCK=NONE
+  #   SQLite         : kein Online-DDL, aber unkritisch bei kleinen DBs
+  #   PostgreSQL     : KEIN CONCURRENTLY, da DbRep in Transaktionen arbeitet
+  # ------------------------------------------------------------------------------------------------
+  my %index_def = (
+      Search_Idx => {
+          mysql   => "ADD INDEX `Search_Idx` (DEVICE, READING, TIMESTAMP) USING BTREE, ALGORITHM=INPLACE, LOCK=NONE",
+          sqlite  => "CREATE INDEX IF NOT EXISTS \"Search_Idx\" ON \"history\" (DEVICE, READING, TIMESTAMP)",
+          pg      => "CREATE INDEX IF NOT EXISTS \"Search_Idx\" ON history USING btree (device, reading, \"timestamp\")",
+      },
+      Report_Idx => {
+          mysql   => "ADD INDEX `Report_Idx` (READING, TIMESTAMP) USING BTREE, ALGORITHM=INPLACE, LOCK=NONE",
+          sqlite  => "CREATE INDEX IF NOT EXISTS \"Report_Idx\" ON \"history\" (READING, TIMESTAMP)",
+          pg      => "CREATE INDEX IF NOT EXISTS \"Report_Idx\" ON history USING btree (reading, \"timestamp\")",
+      },
+  );
 
-  if($dbmodel =~ /MYSQL|MARIADB/xs) {
-      $sqlallidx = "SELECT TABLE_NAME,INDEX_NAME,COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = '$database';";
-      $sqlava    = "SHOW INDEX FROM history where Key_name='$idx';";
-
-      if($cmd =~ /recreate/) {
-          $sqldel = "ALTER TABLE `history` DROP INDEX `$idx`;";
-          $sqlcre = "ALTER TABLE `history` ADD INDEX `Search_Idx` (DEVICE, READING, TIMESTAMP) USING BTREE;" if($idx eq "Search_Idx");
-          $sqlcre = "ALTER TABLE `history` ADD INDEX `Report_Idx` (TIMESTAMP, READING) USING BTREE;"         if($idx eq "Report_Idx");
-      }
-
-      if($cmd =~ /drop/) {
-          $sqldel = "ALTER TABLE `history` DROP INDEX `$idx`;";
-      }
-  }
-  elsif($dbmodel =~ /SQLITE/) {
-      $sqlallidx = "SELECT tbl_name,name,sql FROM sqlite_master WHERE type='index' ORDER BY tbl_name,name DESC;";
-      $sqlava    = "SELECT tbl_name,name FROM sqlite_master WHERE type='index' AND name='$idx';";
-
-      if($cmd =~ /recreate/) {
-          $sqldel = "DROP INDEX '$idx';";
-          $sqlcre = "CREATE INDEX Search_Idx ON `history` (DEVICE, READING, TIMESTAMP);" if($idx eq "Search_Idx");
-          $sqlcre = "CREATE INDEX Report_Idx ON `history` (TIMESTAMP,READING);"          if($idx eq "Report_Idx");
-      }
-
-      if($cmd =~ /drop/) {
-          $sqldel = "DROP INDEX '$idx';";
-      }
-  }
-  elsif($dbmodel =~ /POSTGRESQL/) {
-      $sqlallidx = "SELECT tablename,indexname,indexdef FROM pg_indexes WHERE tablename NOT LIKE 'pg%' ORDER BY tablename,indexname DESC;";
-      $sqlava    = "SELECT * FROM pg_indexes WHERE tablename='history' and indexname ='$idx';";
-
-      if($cmd =~ /recreate/) {
-          $sqldel = "DROP INDEX \"$idx\";";
-          $sqlcre = "CREATE INDEX \"Search_Idx\" ON history USING btree (device, reading, \"timestamp\");" if($idx eq "Search_Idx");
-          $sqlcre = "CREATE INDEX \"Report_Idx\" ON history USING btree (\"timestamp\", reading);" if($idx eq "Report_Idx");
-      }
-
-      if($cmd =~ /drop/) {
-          $sqldel = "DROP INDEX \"$idx\";";
-      }
-  }
-  else {
+  my $dbm_key;
+  if    ($dbmodel =~ /MYSQL|MARIADB/xs) { $dbm_key = "mysql";  }
+  elsif ($dbmodel =~ /SQLITE/xs)        { $dbm_key = "sqlite"; }
+  elsif ($dbmodel =~ /POSTGRESQL/xs)    { $dbm_key = "pg";     }
+  else  {
       $err = "database model unknown";
       Log3 ($name, 2, "DbRep $name - DbRep_Index - $err");
       $err = encode_base64($err,"");
@@ -7962,26 +7927,84 @@ sub DbRep_Index {
       return "$name|$err";
   }
 
+  # ------------------------------------------------------------------------------------------------
+  # DBM-spezifische Statements vorbereiten
+  # ------------------------------------------------------------------------------------------------
+  my $st = [gettimeofday];                                          # SQL-Startzeit
+
+  if ($dbm_key eq "mysql") {
+      $sqlallidx = "SELECT TABLE_NAME,INDEX_NAME,COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = '$database';";
+      $sqlava    = "SHOW INDEX FROM history WHERE Key_name='$idx';";
+      $sqlanlz   = "ANALYZE TABLE `history`;";
+
+      if ($cmd =~ /recreate|drop/) {
+          $sqldel = "ALTER TABLE `history` DROP INDEX `$idx`;";
+      }
+      
+      if ($cmd =~ /recreate/ && $index_def{$idx}{$dbm_key}) {
+          $sqlcre = "ALTER TABLE `history` " . $index_def{$idx}{$dbm_key} . ";";
+      }
+  }
+  elsif ($dbm_key eq "sqlite") {
+      $sqlallidx = "SELECT tbl_name,name,sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY tbl_name,name DESC;";
+      $sqlava    = "SELECT tbl_name,name FROM sqlite_master WHERE type='index' AND name='$idx';";
+      $sqlanlz   = "ANALYZE;";
+
+      if ($cmd =~ /recreate|drop/) {
+          $sqldel = "DROP INDEX IF EXISTS \"$idx\";";
+      }
+      
+      if ($cmd =~ /recreate/ && $index_def{$idx}{$dbm_key}) {
+          $sqlcre = $index_def{$idx}{$dbm_key} . ";";
+      }
+  }
+  elsif ($dbm_key eq "pg") {
+      $sqlallidx = "SELECT tablename,indexname,indexdef FROM pg_indexes WHERE tablename NOT LIKE 'pg%' ORDER BY tablename,indexname DESC;";
+      $sqlava    = "SELECT * FROM pg_indexes WHERE tablename='history' AND indexname='$idx';";
+      $sqlanlz   = "ANALYZE history;";
+
+      if ($cmd =~ /recreate|drop/) {
+          $sqldel = "DROP INDEX IF EXISTS \"$idx\";";
+      }
+      
+      if ($cmd =~ /recreate/ && $index_def{$idx}{$dbm_key}) {
+          $sqlcre = $index_def{$idx}{$dbm_key} . ";";
+      }
+  }
+
+  # ------------------------------------------------------------------------------------------------
   # alle Indizes auflisten
-  Log3($name, 4, "DbRep $name - List all indexes: $sqlallidx");
+  # ------------------------------------------------------------------------------------------------
+  Log3 ($name, 4, "DbRep $name - List all indexes: $sqlallidx");
 
   my ($sql_table,$sql_idx,$sql_column);
+  
   eval {$sth = $dbh->prepare($sqlallidx);
         $sth->execute();
         $sth->bind_columns(\$sql_table, \$sql_idx, \$sql_column);
        };
+       
+  if ($@) {
+      my $emsg = encode_base64($@,"");
+      Log3 ($name, 2, "DbRep $name - DbRep_Index list - $@");
+      DbRep_clearConn ($dbh, $sth);
+      return "$name|$emsg";
+  }
 
   $ret = "";
 
   my ($lt,$li) = ("",""); my $i = 0;
+  
   while ($sth->fetch()) {
-      if($lt ne $sql_table || $li ne $sql_idx) {
+      if ($lt ne $sql_table || $li ne $sql_idx) {
           $ret .= "\n" if($i>0);
-          if($dbmodel =~ /SQLITE/ or $dbmodel =~ /POSTGRESQL/) {
+          
+          if ($dbm_key eq "sqlite" or $dbm_key eq "pg") {
               $sql_column =~ /.*\((.*)\).*/;
               $sql_column = uc($1);
               $sql_column =~ s/"//g;
           }
+          
           $ret .= "Table: $sql_table, Idx: $sql_idx, Col: $sql_column";
       }
       else {
@@ -7992,26 +8015,51 @@ sub DbRep_Index {
       $li = $sql_idx;
       $i++;
   }
+  
+  $sth->finish() if($sth);
 
-  Log3($name, 3, "DbRep $name - Index found in database:\n$ret");
+  Log3 ($name, 3, "DbRep $name - Index found in database:\n$ret");
 
   $ret = "Index found in database:\n========================\n".$ret;
 
-  if($cmd !~ /list/) {
-      Log3($name, 4, "DbRep $name - SQL execute: $sqlava $sqldel $sqlcre");
+  # ------------------------------------------------------------------------------------------------
+  # Index-Operationen ausführen
+  # ------------------------------------------------------------------------------------------------
+  if ($cmd !~ /list/) {                                                                         # Hinweis: unbekannter Indexname
+      if ($cmd =~ /recreate/ && !$index_def{$idx}) {
+          my $emsg = "Index '$idx' unknown - allowed: " . join(", ", sort keys %index_def);
+          Log3 ($name, 2, "DbRep $name - DbRep_Index - $emsg");
+          DbRep_clearConn ($dbh);
+          $emsg = encode_base64($emsg,"");
+          return "$name|$emsg";
+      }
 
-      if($sqldel) {
+      Log3 ($name, 4, "DbRep $name - SQL execute: $sqlava | $sqldel | $sqlcre | $sqlanlz");
+
+      # --- DROP ---
+      if ($sqldel) {
           eval {@six = $dbh->selectrow_array($sqlava);};
-          if (@six) {
+          
+          if ($@) {
+              Log3 ($name, 2, "DbRep $name - DbRep_Index check index existence - $@");
+          }
+          
+          my $exists = (@six) ? 1 : 0;
+
+          if ($exists) {
               Log3 ($name, 3, "DbRep $name - dropping index $idx ... ");
 
               eval {$rows = $dbh->do($sqldel);};
-              if ($@) {
-                  if($cmd !~ /recreate/) {
-                      $err = encode_base64($@,"");
+              
+              if ($@) {                                                                         # Bei recreate: Fehler tolerieren (Index sollte danach weg sein)
+                  if ($cmd !~ /recreate/) {
+                      my $emsg = encode_base64($@,"");
                       Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
                       DbRep_clearConn ($dbh);
-                      return "$name|$err";
+                      return "$name|$emsg";
+                  }
+                  else {
+                      Log3 ($name, 3, "DbRep $name - drop index returned: $@ (ignored for recreate)");
                   }
               }
               else {
@@ -8025,31 +8073,47 @@ sub DbRep_Index {
           }
       }
 
-      if($sqlcre) {
+      # --- CREATE ---
+      if ($sqlcre) {
           Log3 ($name, 3, "DbRep $name - creating index $idx ... ");
 
           eval {$rows = $dbh->do($sqlcre);};
+          
           if ($@) {
-              $err = encode_base64($@,"");
+              my $emsg = encode_base64($@,"");
               Log3 ($name, 2, "DbRep $name - DbRep_Index - $@");
               DbRep_clearConn ($dbh);
-              return "$name|$err";
+              return "$name|$emsg";
           }
           else {
               $ret = "Index $idx created";
               Log3 ($name, 3, "DbRep $name - $ret");
+
+              # --- ANALYZE nach erfolgreichem CREATE ---
+              if ($sqlanlz) {
+                  Log3 ($name, 3, "DbRep $name - analyzing table history ... ");
+                  
+                  eval {$dbh->do($sqlanlz);};
+                  
+                  if ($@) {
+                      Log3 ($name, 2, "DbRep $name - ANALYZE failed (ignored): $@");
+                  }
+                  else {
+                      Log3 ($name, 3, "DbRep $name - table history analyzed");
+                  }
+              }
           }
       }
 
-      $rows = $rows eq "0E0" ? 0 : $rows if(defined $rows);                        # always return true if no error
+      $rows = $rows eq "0E0" ? 0 : $rows if(defined $rows);         # always return true if no error
   }
 
-  my $rt = tv_interval($st);                                                       # SQL-Laufzeit ermitteln
+  my $rt = tv_interval($st);                                        # SQL-Laufzeit ermitteln
 
   DbRep_clearConn ($dbh, $sth);
 
   $ret    = encode_base64($ret,"");
-  my $brt = tv_interval($bst);                                                     # Background-Laufzeit ermitteln
+  my $brt = tv_interval($bst);                                      # Background-Laufzeit ermitteln
   $rt     = $rt.",".$brt;
   $err    = q{};
 
@@ -8104,7 +8168,6 @@ sub DbRep_IndexAborted {
   my $cause  = shift // "Timeout: process terminated";
 
   my $name   = $hash->{NAME};
-  my $dbh    = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_INDEX}{fn} pid:$hash->{HELPER}{RUNNING_INDEX}{pid} $cause");
 
@@ -8113,8 +8176,6 @@ sub DbRep_IndexAborted {
   my $erread = DbRep_afterproc ($hash, "index");                                # Befehl nach Procedure ausführen
   $erread    = ", ".(split("but", $erread))[1] if($erread);
   my $state  = $cause.$erread;
-
-  DbRep_clearConn ($dbh);
 
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
@@ -10934,7 +10995,6 @@ sub DbRep_ParseAborted {
   my $cause  = shift // "Timeout: process terminated";
 
   my $name   = $hash->{NAME};
-  my $dbh    = $hash->{DBH};
 
   Log3 ($name, 5, qq{DbRep $name - BlockingCall PID "$hash->{HELPER}{RUNNING_PID}{pid}" finished});
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_PID}{fn} pid:$hash->{HELPER}{RUNNING_PID}{pid} $cause");
@@ -10948,7 +11008,6 @@ sub DbRep_ParseAborted {
 
   my $state  = $cause.$erread;
 
-  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database command aborted: \"$cause\" ");
@@ -10966,7 +11025,6 @@ sub DbRep_reduceLogAborted {
   my $cause = shift // "Timeout: process terminated";
 
   my $name  = $hash->{NAME};
-  my $dbh   = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_REDUCELOG}{fn} pid:$hash->{HELPER}{RUNNING_REDUCELOG}{pid} $cause") if($hash->{HELPER}{RUNNING_REDUCELOG});
 
@@ -10976,7 +11034,6 @@ sub DbRep_reduceLogAborted {
   $erread    = ", ".(split("but", $erread))[1] if($erread);
 
   my $state = $cause.$erread;
-  DbRep_clearConn ($dbh);
 
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
@@ -10997,7 +11054,6 @@ sub DbRep_restoreAborted {
   my $cause = shift // "Timeout: process terminated";
 
   my $name  = $hash->{NAME};
-  my $dbh   = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_RESTORE}{fn} pid:$hash->{HELPER}{RUNNING_RESTORE}{pid} $cause") if($hash->{HELPER}{RUNNING_RESTORE});
 
@@ -11008,7 +11064,6 @@ sub DbRep_restoreAborted {
 
   my $state = $cause.$erread;
 
-  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database restore aborted: \"$cause\" ");
@@ -11028,7 +11083,6 @@ sub DbRep_DumpAborted {
   my $cause = shift // "Timeout: process terminated";
 
   my $name  = $hash->{NAME};
-  my $dbh   = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BACKUP_CLIENT}{fn} pid:$hash->{HELPER}{RUNNING_BACKUP_CLIENT}{pid} $cause") if($hash->{HELPER}{RUNNING_BACKUP_CLIENT});
   Log3 ($name, 1, "DbRep $name - BlockingCall $hash->{HELPER}{RUNNING_BCKPREST_SERVER}{fn} pid:$hash->{HELPER}{RUNNING_BCKPREST_SERVER}{pid} $cause") if($hash->{HELPER}{RUNNING_BCKPREST_SERVER});
@@ -11040,7 +11094,6 @@ sub DbRep_DumpAborted {
 
   my $state = $cause.$erread;
 
-  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database dump aborted: \"$cause\" ");
@@ -11061,7 +11114,6 @@ sub DbRep_OptimizeAborted {
   my $cause = shift // "Timeout: process terminated";
 
   my $name  = $hash->{NAME};
-  my $dbh   = $hash->{DBH};
 
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_OPTIMIZE}}{fn} pid:$hash->{HELPER}{RUNNING_OPTIMIZE}{pid} $cause");
 
@@ -11072,7 +11124,6 @@ sub DbRep_OptimizeAborted {
 
   my $state = $cause.$erread;
 
-  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash, "state", $state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database optimize aborted: \"$cause\" ");
@@ -11092,7 +11143,6 @@ sub DbRep_RepairAborted {
   my $cause     = shift // "Timeout: process terminated";
 
   my $name      = $hash->{NAME};
-  my $dbh       = $hash->{DBH};
   my $dbloghash = $defs{$hash->{HELPER}{DBLOGDEVICE}};
 
   Log3 ($name, 1, "DbRep $name -> BlockingCall $hash->{HELPER}{RUNNING_REPAIR}{fn} pid:$hash->{HELPER}{RUNNING_REPAIR}{pid} $cause");
@@ -11108,7 +11158,6 @@ sub DbRep_RepairAborted {
 
   my $state = $cause.$erread;
 
-  DbRep_clearConn ($dbh);
   ReadingsSingleUpdateValue ($hash,"state",$state, 1);
 
   Log3 ($name, 2, "DbRep $name - Database repair aborted: \"$cause\" ");

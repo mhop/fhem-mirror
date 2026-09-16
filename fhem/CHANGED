@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change: 93_DbRep: Korrekturen für alle unterstützten Datenbankmodelle
  - bugfix: 72_FritzSmart: TR064 Fehler bei FritzOS < 7.50
  - feature: 72_FritzSmart: weitere Vorbereitungen für neues FritzOS
                            Aktualisierung Readings bei guestWlan on|off
