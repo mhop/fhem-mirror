@@ -3,7 +3,7 @@
 #########################################################################################################################
 #       60_Watches.pm
 #
-#       (c) 2018-2021 by Heiko Maaz
+#       (c) 2018-2026 by Heiko Maaz
 #       e-mail: Heiko dot Maaz at t-online dot de
 # 
 #       This script is part of fhem.
@@ -75,6 +75,7 @@ BEGIN {
 
 # Versions History intern 
 my %vNotesIntern = (
+  "1.0.0"  => "16.09.2026  ca. 10 Bugfixes im JavaScript Code (z.B. Akkumulation paralleler Animationsschleifen bei FHEMWEB-Longpoll-Updates) ",
   "0.27.1" => "09.01.2021  remove usage of sscam_tooltip.js in sub controlPanel ,Forum: https:/topic,93454.msg1119567.html#msg1119567",
   "0.27.0" => "12.08.2020  control buttons, new attr hideButtons, controlButtonSize, some more changes according PBP".
                            "fix Random triggering of alarm or random time display at start / resume ",
@@ -745,6 +746,20 @@ sub digitalWatch {
     var asydone1_$d        = 0;                       // Statusbit dass asynchrone Datenkommunikation stattgefunden hat
     var asydone2_$d        = 0;                       // Statusbit dass asynchrone Datenkommunikation stattgefunden hat
     var allowSetStopTime;                             // erlaube / verbiete Setzen Reading stoptime 
+    var command;                                      // FHEM-Kommando-String
+    var modulo2_$d      = 0;                          // Hilfszähler
+    var lastalmtime_$d;                               // zuletzt ausgelöste Alarmzeit (localStorage)
+    var elapsesec_$d;                                 // vergangene Sekunden (Stopwatch/Countdown)
+    var currDate_$d;                                  // aktueller Timestamp
+    var countcurr_$d;                                 // verbleibende Countdown-Sekunden
+    var countInitVal_$d;                              // Countdown-Startwert
+    var sumsecs_$d;                                   // Gesamtsekunden (Stopwatch stopped)
+    var pastsumsec_$d;                                // Gesamtsekunden (Countdown stopped)
+    var tlength_$d;                                   // Textlänge (Text-Modus)
+    var forerun_$d;                                   // Vorlauf Textticker
+    var value_$d;                                     // Anzeigewert Display
+    var acttime_$d;                                   // aktuelle Zeitanzeige als String
+    var animTimerId_$d;                               // Timer-ID für clearTimeout bei Neustart
 
     function SegmentDisplay_$d(displayId_$d) {
         this.displayId_$d    = displayId_$d;
@@ -1342,6 +1357,16 @@ sub digitalWatch {
         localStorage.setItem('lastalmtime_'+dev, lastalmtime);
     }
     
+    // localStorage alle device-spezifischen Keys löschen (bei initialized/reset)
+    function localStoreClear_$d () {
+        localStorage.removeItem('h_$d');
+        localStorage.removeItem('m_$d');
+        localStorage.removeItem('s_$d');
+        localStorage.removeItem('ss_$d');
+        localStorage.removeItem('ast_$d');
+        localStorage.removeItem('lastalmtime_$d');
+    }
+
     // Reading currtime setzen
     function setrcurrtime (h_$d, m_$d, s_$d) {
         var time_$d = buildtime (h_$d, m_$d, s_$d);
@@ -1375,9 +1400,11 @@ sub digitalWatch {
         }
     }
     
+    if (typeof animTimerId_$d !== 'undefined') { clearTimeout(animTimerId_$d); }
     animate_$d();
     
     function animate_$d() {
+        if (!document.getElementById('display_$d')) { return; }
         var watchkind_$d = '$addp';
         var cycletime    = new Date();
         var cycleseconds = cycletime.getSeconds();
@@ -1538,6 +1565,7 @@ sub digitalWatch {
             }
 
             if (state_$d == 'initialized') {
+                localStoreClear_$d ();                                                    // localStorage bereinigen
                 hours_$d   = 0;
                 minutes_$d = 0;
                 seconds_$d = 0;
@@ -1661,6 +1689,7 @@ sub digitalWatch {
             }
 
             if (state_$d == 'initialized') {
+                localStoreClear_$d ();                                                   // localStorage bereinigen
                 hours_$d   = 0;
                 minutes_$d = 0;
                 seconds_$d = 0;
@@ -1735,7 +1764,7 @@ sub digitalWatch {
         }
         
         display_$d.setValue(value_$d);
-        window.setTimeout('animate_$d()', 200);
+        animTimerId_$d = window.setTimeout(animate_$d, 200);
     }
 
     </script>
@@ -1781,7 +1810,14 @@ sub stationWatch {
       var almtime0_$d     = '$alarm';
       var time_$d;       
       var zmodulo_$d      = 0;                       // Hilfszähler 
-      var showCurrTime_$d = '$showct';               // Reading currtime schreiben oder nicht      
+      var showCurrTime_$d = '$showct';               // Reading currtime schreiben oder nicht
+      var csrf;                                      // CSRF-Token
+      var command;                                   // FHEM-Kommando-String
+      var url_$d;                                    // FHEM-Request-URL
+      var modulo2_$d      = 0;                       // Hilfszähler
+      var lastalmtime_$d;                            // zuletzt ausgelöste Alarmzeit
+      var acttime_$d;                                // aktuelle Zeitanzeige als String
+      var animTimerId_$d;                            // Timer-ID für clearTimeout bei Neustart
       
       // clock body (Uhrgehäuse)
       StationClock_$d.NoBody         = 0;
@@ -2368,11 +2404,13 @@ sub stationWatch {
       clock_$d.secondHandBehavoir = StationClock_$d.$shb;
 
       function animate(clock_$d) {
+          if (!document.getElementById('clock_$d')) { return; }
           clock_$d.draw();
           // window.setTimeout(function(){animate(clock_$d)}, 50);     // alte Variante
-          window.setTimeout(function(){animate(clock_$d)}, 100);
+          animTimerId_$d = window.setTimeout(function(){animate(clock_$d)}, 100);
       }
 
+      if (typeof animTimerId_$d !== 'undefined') { clearTimeout(animTimerId_$d); }
       animate(clock_$d);   
       </script>
       
@@ -2418,6 +2456,13 @@ sub modernWatch {
       var zmodulo_$d      = 0;                       // Hilfszähler 
       var modulo2_$d      = 0;                       // Hilfszähler
       var showCurrTime_$d = '$showct';               // Reading currtime schreiben oder nicht
+      var csrf;                                      // CSRF-Token
+      var command;                                   // FHEM-Kommando-String
+      var url_$d;                                    // FHEM-Request-URL
+      var time_$d;                                   // Zeitobjekt
+      var lastalmtime_$d;                            // zuletzt ausgelöste Alarmzeit
+      var acttime_$d;                                // aktuelle Zeitanzeige als String
+      var intervalId_$d;                             // Interval-ID für clearInterval bei Neustart
       
       // CSRF-Token auslesen
       var body = document.querySelector("body");
@@ -2494,9 +2539,11 @@ sub modernWatch {
       ctx_$d.translate(radius_$d, radius_$d);
       radius_$d = radius_$d * 0.90
       // setInterval(drawClock_$d, 1000);                // alte Variante
-      setInterval(drawClock_$d, 100);
+      if (typeof intervalId_$d !== 'undefined') { clearInterval(intervalId_$d); }
+      intervalId_$d = setInterval(drawClock_$d, 100);
 
       function drawClock_$d() {
+          if (!document.getElementById('canvas_$d')) { clearInterval(intervalId_$d); return; }
           drawFace_$d    (ctx_$d, radius_$d);
           drawnumbers_$d (ctx_$d, radius_$d);
           drawTime_$d    (ctx_$d, radius_$d);
