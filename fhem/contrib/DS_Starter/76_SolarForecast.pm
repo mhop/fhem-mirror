@@ -17513,9 +17513,9 @@ sub __calcVectorConsumption {
   ##############################################################################
   my $home2bat = 0;
 
-  if ($node2home < 0 && $batin > 0) {
+  if ($node2home < 0 && $batin > 0 && !$dc2inv2node && !$node2inv2dc) {
       $home2bat  = abs ($node2home);
-      $node2bat += $node2home;                                                              # PV-Anteil am Knoten isolieren (z.B. 1999 + (-1931) = 68)
+      $node2bat += $node2home;                                                              # PV-Anteil am Knoten isolieren (node2bat - |home2bat|)
       $node2bat  = 0 if ($node2bat < 0);                                                    # Clamp gegen Messartefakte
       $node2home = 0;
       
