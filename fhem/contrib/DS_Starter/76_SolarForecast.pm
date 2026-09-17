@@ -72,8 +72,9 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.3" => "13.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
-                           "Wertebereiche für stepSoC und careCycle überarbeitet ",
+  "2.10.3" => "17.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
+                           "Wertebereiche für stepSoC und careCycle überarbeitet ".
+                           "Korrektur der Darstellung bei Netzladung der Batterie über den Hausknoten ",
   "2.10.2" => "29.08.2026  userExit bzgl. zirkulären Referenzen gehärtet, potenzielle Speicherleaks geschlossen ".
                            "_aiFannAutoArchitecture: Warnung durch undefiniertes dataParamRatio beseitigt ".
                            "_aiFannEpochDiagnostic: neuen hint29, very_early-Zweig: hint1 und hint26 zusaätzlich gated, early-Zweig: hint5 und hint23 zusätzlich gated ",
@@ -89,125 +90,6 @@ my %vNotesIntern = (
                            "neuer Get-Befehl 'stepTimes' zur detailliierten Anzeige von Phasenzeiten ".
                            "Sun Position Caching integriert ".
                            "kleinere Patches ",
-  "2.9.4"  => "02.08.2026  Resync Consumer Schaltstatus an der Flanke Automatik AUS→EIN beim Umlegen des Automatik-Schalters ".
-                           "Post-Icon für Schweregrad '2' geändert, Bugfix in _addDynAttr: Regexfilter für statische Platzhalter korrigiert ".
-                           "Mitteilungssystem: es wird immer das Icon für die Severity der letzten Message und nicht die höchste Severity aller Messages angezeigt ".
-                           "Debug consumerSwitchingXX erweitert ",
-  "2.9.3"  => "31.07.2026  Die reset-Funktion 'set ... reset ..' kann Daten in pvCircular suchen, löschen und bearbeiten ".
-                           "Einbau hint27 und hint28 sowie Überprüfung hint12 abhängig von aiConShuffleMode und aiConShufflePeriod ".
-                           "_calcConsForecast_legacy: eigener consForecastBase-Durchlauf auf conraw, konsistent zu confc/confcex ".
-                           "neuer Wert 'pvfcfeedlim' in Datenpool pvHistory und NextHours ".
-                           "neue Auswahl pvForecastLimited im Attr 'graphicBeamXContent' zur Anzeige der Einspeise-limitierten PV-Prognose ",
-  "2.9.2"  => "26.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
-                           "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
-                           "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
-                           "Ergänzung Datensammlung und Training für consumerXX->type heatpump->opmode 'eco' ".
-                           "vermeide zu wenig Datensätze im Drift-Retrain Prüfungskontext ".
-                           "Änderung plantControl->writeForceType: 'file' ist Standardspeicher, 'auto' ist deprecated, verwende 'db' anstatt (incl. BugFix FileRead) ".
-                           "Integration initialen Cache-Load 'initfirst' um vor dem Laden weiterer Daten Voreinstellungen festzulegen ".
-                           "Setter 'reset consumptionHistory' in 'reset consumptionShort' umbenannt ".
-                           "Intern: writeCacheToFile nach writeCacheFile umbenannt ",
-  "2.9.1"  => "16.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ".
-                           "neuer Befehl set .. reset aiData setValue ... ".
-                           "das Gemini Model kann im Schlüssel aiControl->geminiAPIkey nach dem API-Key angegeben werden ".
-                           "die Victron API ((Model VictronKiAPI) kann nun den neuen Token-Auth verwenden ",
-  "2.9.0"  => "10.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
-                           "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
-                           "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
-                           "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
-                           "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz, Speicherung zeitgewichtete Empfehlung Verbrauchernutzung ".
-                           "Bereinigung Verbrauchsinput um PV-getriebenen Anteil im CON-KI-Training für Non-PV-Profile ".
-                           "Consumer type noSchedule (deprecated) setzt immer mode=mustNot, Änderung von type=noSchedule nach type=X ist ohne Löschrequest möglich ".
-                           "Trainingsergebnisse können per Copy&Paste über ein generiertes Output manuell an LLM übergeben werden ".
-                           "Consumer 'power' darf nicht mehr 0 sein, dafür 'power=<Nominalleistung>' und 'pvshare=0' nutzen ".
-                           "neuer Consumer Typ 'fridge' ",
-  "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
-                           "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
-                           "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
-                           "Erweiterung _aiFannBevConsumerAggregate um energy_remaining, charge_intensity ".
-                           "Auto-Konfiguration: aiConHiddenLayers, aiConLearnRate, aiConSteepness, aiConShufflePeriod - falls nicht gesetzt ".
-                           "Trainingsdefaults angepasst, _aiFannEpochDiagnostic: Anpassung (very) early Konvergenzgrenzen ".
-                           "Getter aiNeuralNetConState in aiConTrainState umbenannt, Online KI-Bewertung durch Gemini ",
-  "2.7.0"  => "20.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
-                           "verbesserter Snap-Guard und Retrainidicator, Hint-Korrektur, Div0-Fix ".
-                           "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ".
-                           "Reading Tomorrow_ConsumptionForecast entfernt, neuer _aiFannFeatureBuilder ersetzt FEATURE-REGISTRY ".
-                           "Umstellung aiControl->aiConProfile auf Flags (bisherige Profile behalten Gültigkeit) ".
-                           "neue lag2_spike Features aus sandbox in BLOCKS->lags aktiviert, _aiFannEpochDiagnostic: Hints erweitert ".
-                           "delConsumerFromMem: Aufnahme neuer Schlüssel, _attrconsumer: Integration des Fingerprint-Guard ".
-                           "neue WP-Werte csmXX_(off|heating|defrost|hotwater|cooling|pool|poolheating)_minutes ".
-                           "neuer Schlüssel aiControl->opmode für Consumer 'heatpump', Definition mehrere WP-Consumer nun möglich ".
-                           "verbesserte Prüfung des Objektes 'Weather Properties' im Anlagencheck ",
-  "2.6.11" => "26.05.2026  _saveEnergyConsumption: nutze Logsequenzmanagement für Verbrauchslimitüberschreitung ".
-                           "_aiFannApplyBiasCorrection: Anpassung OSL-Gewicht ",
-  "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
-                           "aiFannConInfer: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
-                           "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
-                           "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ".
-                           "Fix Bat Prognose < 100% wenn Bat voll und PVü > Con, safetyMargin default: 20:20 gesetzt ".
-                           "v1_common_active_pv in FEATURE-REGISTRY ergänzt, Online-Hilfe für v1_common_pv und v1_common_active_pv geändert ".
-                           "Diagnose Lernverhalten eingebaut, aiConHiddenLayers kann nun auch Netze wie 80-3-5 ".
-                           "_aiFannApplyBiasCorrection: Einbau OSL-Korrektur, neuer Schlüssel aiCaontrol->aiConTrainLimit ".
-                           "AI mehr Neuronenlayer X-X-X-X... möglich, aiConLearnRate: kleinste Lernrate nun 0.0001 ".
-                           "Messagesystem: gelesene Mitteilungen werden auch nach Systemneustart nicht als neu signalisiert ",
-  "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
-                           "_aiFannDriftSafetyBlocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
-                           "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
-                           "AI Status Popup Inhalt aufklappbar ",
-  "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
-                           "___csmSpecificEpieces: stündliche AVG-Aktualisierung auch im laufenden Betrieb, ausgelöst durch einen Stundenwechsel ".
-                           "neuer Consumer-Schlüssel exclgroup zur Formung einer Exclude-Gruppe ",
-  "2.6.7"  => "09.05.2026  __calcVectorConsumption: fix Doppelbatteriebug mit einem Batterieinverter Forum: https://forum.fhem.de/index.php?msg=1363211 ",
-  "2.6.6"  => "07.05.2026  nicht mehr benötigten Code entfernt, writeToHistory, _saveHistP1 und _saveHistP2 refactored, ___doPlanning refactored ".
-                           "Einbau consumerCacheDirty, ___setConsumerSwitchingState: lastOwnSwitchCmd eingebaut, ".
-                           "BLINDTIME, REAPLANINTVL einegbaut, Anti-Toggling / Cycle-Budget: Verhindert dass mehrere starke Consumer im selben ".
-                           "Zyklus starten und den PV-Überschuss überzeichnen. Implementiert durch surplusCycleCommitted als Zyklus-Budget ".
-                           "neuer Verbraucher Schlüssel swprio ",
-  "2.6.5"  => "03.05.2026  _batChargeMgmt Refactored: Äußere Stundenschleife -> Innere Batterieschleife, Fix 100%-Bug ".
-                           "wichtiger Bugfix weekday in LOCALE_DAYNAMES, Debug consumerPlanning angepasst ".
-                           "Speicherung von bevcsmBatCapXX und bevcsmPwrXX in pvHistory und aiRawData ",
-  "2.6.4"  => "01.05.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
-                           "exponentielles Glätten EWMA -> verhindert Sprünge durch einen gleitenden Mittelwert über die letzten ".
-                           "Berechnungen, Routine ___areaFactorTrack entfernt ",
-  "2.6.3"  => "27.04.2026  Debug apiProcess: Anzeige ob ein Cached Wert verwendet wird bei 'DWD API Tilted' ".
-                           "__calcSunPosition: Korrektur für Randstunden, __getDWDSolarData: Korrektur DWD rad1h-Reading ",
-  "2.6.2"  => "23.04.2026  aiFannDetectDrift: Änderung der Driftanalyse ",
-  "2.6.1"  => "22.04.2026  neues Debug: miniCache, replace separate Mini Caches by one Multi_Cache, LRU Cache for timestringToTimestamp ".
-                           "Mini Caches FmtWeatherCache / cloud2bin / sunalt2bin / temp2bin / isHoliday ",
-  "2.6.0"  => "16.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
-                           "rename debug id saveData2Cache -> saveData2Storage, new Debug Id tiltedIrrCache ".
-                           "new Mini Caches: Solar2Astro_Cache, DayHourMove_Cache, move __createAdditionalEvents to Task 8 ".
-                           "complete universal LRU-Cache implementation for DWD Tilted Irradiance Cache, TimestringsFromOffset Cache ".
-                           "rework: timestringsFromOffset, _beamGraphicFirstHour -> fix graphic error hour -1 if graphicHistoryHour > day change ".
-                           "prepare replacing of Reading Tomorrow_ConsumptionForecast by Tomorrow_CONforecast, reqork _createSummaries to slots ",
-  "2.5.3"  => "09.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ".
-                           "correct ___areaFactorTrack: offset_hours ",
-  "2.5.2"  => "07.04.2026  func ___openMeteoErrorExit, ___solCastErrorExit -> 5 minutes Log message lock ".
-                           "get solardata API response code refactored ___forecastSolarErrorExit ",
-  "2.5.1"  => "06.04.2026  bugfixes _calcConsForecast_legacy Forum: https://forum.fhem.de/index.php?msg=1361272 ".
-                           "new func ___openMeteoErrorExit, ___solCastErrorExit, edit CommandRef ",
-  "2.5.0"  => "05.04.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
-                           "edit ComRef, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
-                           "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
-                           "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ".
-                           "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ".
-                           "new key aiControl->aiConAbsOversample, new key hpcsm in pvHistory & aiRawData ".
-                           "integrate new consumer type=bev as a device with no control, rework of _listDataPoolPvHist ",
-  "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
-                           "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
-                           "aiFannConDataLoad: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
-                           "extended/refactored: writeCacheFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
-                           "new key graphicControl->headerShowEnv, _saveEnergyConsumption: implemntation of MAXCONLIMIT ".
-                           "new key plantControl->conEnergyHourLimit ",
-  "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",
-  "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
-                           "_transferAPIRadiationValues: fix round0 ",
-  "2.2.2"  => "03.03.2026  _transferInverterValues: change etotal init of new hour, new keys consumerControl->globalMode ".
-                           "add windspeed to aiRawData ",
-  "2.2.1"  => "28.02.2026  _listDataPoolPvHist: clear non-numerical hours from history, new sub round0 ",
-  "2.2.0"  => "15.02.2026  new Consumer mode 'mustNot', _aiFannCreateAddOnSignals: fix problem devision by zero in special case 40 degrees ".
-                           "edit comref, _attrconsumer refactored ",
-  "2.1.1"  => "10.02.2026  sub _createSummaries refactored ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -17617,20 +17499,6 @@ sub __calcVectorConsumption {
       $node2bat = 0 if($dc2inv2node && $node2bat > 0);                                      # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
   }
 
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ########################################################################################################################
-  #if ($node2bat > 0) {
-      # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
-      # - dc2inv2node: Hybrid-Wechselrichter entlädt (Zeitversatz AC/DC-Messung)
-      # - node2inv2dc: Wechselrichter lädt (Zeitversatz AC/DC-Messung)
-      # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
-      # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
-      # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
-      #if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {
-      #    $node2bat = 0;
-      #}
-  #}
-
   my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                          # Erzeugung Summe im Inverter-Knoten
   $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                        # z.B. Batterie ist voll und SolarLader liefert an Knoten
   $pnodesum     = __normDecPlaces ($pnodesum);
@@ -17639,11 +17507,26 @@ sub __calcVectorConsumption {
   $node2home    = __normDecPlaces ($node2home);
 
   $vector->{vectorconsumption} = round0 ($gcon + $node2home + $bat2home);                   # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
+  
+  ## Netzladung Batterie via Hausknoten: negativer node2home bei aktivem Laden
+  ## -> Fluß grafisch auf Home->Bat umleiten, node->Home auf 0 setzen (v2.10.3)
+  ##############################################################################
+  my $home2bat = 0;
+
+  if ($node2home < 0 && $batin > 0) {
+      $home2bat  = abs ($node2home);
+      $node2bat += $node2home;                                                              # PV-Anteil am Knoten isolieren (z.B. 1999 + (-1931) = 68)
+      $node2bat  = 0 if ($node2bat < 0);                                                    # Clamp gegen Messartefakte
+      $node2home = 0;
+      
+      $vector->{gridChargeBat} = 1;                                                         # Flag für Grafikrichtung
+  }
 
   ## Linearverbrauch
   ####################
   $vector->{linearconsumption} = round0 ($pv2node + $pv2bat + $ppall - $gfeedin + $gcon - $batin + $batout);
 
+  $vector->{home2bat}  = $home2bat;
   $vector->{bat2home}  = $bat2home;
   $vector->{pnodesum}  = $pnodesum;
   $vector->{node2home} = $node2home;
@@ -25268,9 +25151,9 @@ sub _flowGraphic {
                   "$stna bat75";
 
   my $grid2home_style       = $gconMetered ? "$stna active_sig"    : "$stna inactive";    # GridConsumption
-  my $bat2home_style        = "$stna inactive";
   my $dc2inv2node_style     = $dc2inv2node ? "$stna active_normal" : "$stna inactive";    # Batterie zu Inverter mit source=bat
   my $gconMetered_direction = "M250,515 L670,590";
+  my $bat2home_style        = "$stna inactive";
   my $bat2home_direction    = "M1200,515 L730,590";
 
   ## Knotensummen Erzeuger - Batterie - Home ermitteln -> Hausverbrauch ermitteln
@@ -25290,6 +25173,7 @@ sub _flowGraphic {
 
   my $consptn   = $vector->{vectorconsumption};                                           # Hausverbrauch auf Grundlage der Leistungsflüsse
   my $bat2home  = $vector->{bat2home};                                                    # Batterie -> Hausknoten
+  my $home2bat  = $vector->{home2bat} // 0;                                               # Hausknoten -> Batterie (v2.10.3)
   my $pnodesum  = $vector->{pnodesum};                                                    # Summe Inverterknoten
   my $node2home = $vector->{node2home};                                                   # Inverterknoten -> Haus
   my $node2bat  = $vector->{node2bat};                                                    # Inverterknoten -> Batterie
@@ -25298,7 +25182,10 @@ sub _flowGraphic {
       $bat2home_style     = "$stna active_normal";
       $bat2home_direction = "M1200,515 L730,590";
   }
-
+  elsif ($home2bat > 0) {                                                                 # v2.10.3: Netzladung Bat via Hausknoten
+      $bat2home_style     = "$stna active_sig";                                           # Signalfarbe -> Netzstrom
+      $bat2home_direction = "M730,590 L1200,515";                                         # Richtung umkehren: Home -> Bat
+  }
 
   ## definierte Verbraucher ermitteln
   #####################################
@@ -25702,16 +25589,22 @@ END3
   ###################################
   $cons_dmy    = round0 ($cons_dmy);                                                                # Verbrauch Dummy-Consumer
   $bat2home    = __normDecPlaces ($bat2home);
+  $home2bat    = __normDecPlaces ($home2bat);                                                       # v2.10.3
   $dc2inv2node = __normDecPlaces ($dc2inv2node);
   $node2bat    = __normDecPlaces ($node2bat);
   $consptn     = __normDecPlaces ($consptn);
+  
+  my $bat_conn_val = $home2bat || $bat2home;
 
   $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}        if ($pnodesum > 0);
   $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1380" y="520" style="text-anchor: start;">$soc %</text>}           if ($hasbat);                         # Lage Text Batterieladungszustand
   $ret .= qq{<text class="$stna text" id="node2hometxt_$stna" x="730"  y="520" style="text-anchor: start;">$node2home</text>}       if ($node2home);
   $ret .= qq{<text class="$stna text" id="node2gridtxt_$stna" x="420"  y="420" style="text-anchor: end;">$node2gridMetered</text>}  if ($node2gridMetered);
   $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$gconMetered</text>}       if ($gconMetered);
-  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}        if ($bat2home && $hasbat);
+  
+  #$ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}        if ($bat2home && $hasbat);
+  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat_conn_val</text>}    if ($bat_conn_val && $hasbat);        # v2.10.3
+  
   $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="1000" y="420" style="text-anchor: start;">$node2bat</text>}        if ($node2bat && $hasbat);
   $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$consptn</text>};                                                # Current_Consumption Anlage
   $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cons_dmy</text>}        if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
@@ -42623,9 +42516,14 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                                        </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                                   </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
-            <tr><td> <b>consForecastBase</b>          </td><td>The consumption forecast will be increased to at least the specified base value. Higher consumption forecasts remain unaffected.                                         </td></tr>
+            <tr><td> <b>consForecastBase</b>          </td><td>This parameter sets a fixed minimum threshold for the consumption forecast.                                                                                              </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+			<tr><td>                                  </td><td><ul>-> calculated forecasts below consForecastBase are raised to this value (Basement).   </ul>                                                                          </td></tr>
+			<tr><td>                                  </td><td><ul>-> calculated forecasts above consForecastBase are not modified.                      </ul>                                                                          </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1–24) or as a group of hours (e.g., 5–9).                                                             </td></tr>
-			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;value&gt;,&lt;hod&gt;->&lt;value&gt;,...</b> The &lt;value&gt; can be specified as:                                                          </td></tr>
+			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;Value&gt;,&lt;hod&gt;->&lt;Value&gt;,...</b>                                                                                                 </td></tr>
+            <tr><td>                                  </td><td>&lt;Value&gt; can be defined in various ways:                                                                                                                            </td></tr>
             <tr><td>                                  </td><td><b>&lt;Integer&gt;</b> - a fixed base value, e.g. '2–500' or '3-9->650'                                                                                                  </td></tr>
             <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. '11->Dev:Rdg:200' or '6-11->Dev:Rdg:200', returns the base as an integer. '200' is the default value.       </td></tr>
             <tr><td>                                  </td><td><b>Note:</b> The base is only effective within the context of the consumption forecast component without AI.                                                             </td></tr>
@@ -45808,9 +45706,14 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                                    </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                               </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
-            <tr><td> <b>consForecastBase</b>          </td><td>Die Verbrauchsprognose wird mindestens auf den angegebenen Basiswert erhöht. Höhere Verbrauchsprognosen bleiben unberührt.                                           </td></tr>
-            <tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat oder als Stundengruppe (z.B. 5-9) definierbar.                                                           </td></tr>
-			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...</b>  Der &lt;Wert&gt; kann angegeben werden mit:                                                  </td></tr>
+            <tr><td> <b>consForecastBase</b>          </td><td>Dieser Parameter legt eine feste Mindestschwelle für die Verbrauchsprognose fest.                                                                                    </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+			<tr><td>                                  </td><td><ul>-> berechnete Prognosen unterhalb von consForecastBase werden auf diesen Wert (Basement) angehoben.   </ul>                                                      </td></tr>
+			<tr><td>                                  </td><td><ul>-> berechnete Prognosen oberhalb von consForecastBase werden nicht verändert.                         </ul>                                                      </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+			<tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat oder als Stundengruppe (z.B. 5-9) definierbar.                                                           </td></tr>
+			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...</b>                                                                                               </td></tr>
+            <tr><td>                                  </td><td>&lt;Wert&gt; kann durch verschiedene Varianten definiert werden:                                                                                                     </td></tr>
             <tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Base-Wert, z.B. '2->500' oder '3-9->650'                                                                                        </td></tr>
             <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. '11->Dev:Rdg:200' oder '6-11->Dev:Rdg:200', liefert die Base als Ganzzahl. '200' ist der Ersatzwert.    </td></tr>
             <tr><td>                                  </td><td><b>Hinweis:</b> Die Base ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                            </td></tr>
