@@ -72,9 +72,10 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.3" => "17.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
+  "2.10.3" => "18.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
                            "Wertebereiche für stepSoC und careCycle überarbeitet ".
-                           "Korrektur der Darstellung bei Netzladung der Batterie über den Hausknoten ",
+                           "Korrektur der Darstellung bei Netzladung der Batterie über den Hausknoten ".
+                           "Schlüssel plantControl->plantCoordinates hinzugefügt, um mehrere SF-Geräte an verschiedenen Standorten innerhalb eines FHEM-Systems zu unterstützen ",
   "2.10.2" => "29.08.2026  userExit bzgl. zirkulären Referenzen gehärtet, potenzielle Speicherleaks geschlossen ".
                            "_aiFannAutoArchitecture: Warnung durch undefiniertes dataParamRatio beseitigt ".
                            "_aiFannEpochDiagnostic: neuen hint29, very_early-Zweig: hint1 und hint26 zusaätzlich gated, early-Zweig: hint5 und hint23 zusätzlich gated ",
@@ -159,8 +160,7 @@ BEGIN {
           ReplaceEventMap
           readingFnAttributes
           setKeyValue
-          sunrise_abs_dat
-          sunset_abs_dat
+          sr_alt
           FW_cmd
           FW_directNotify
           FW_pH
@@ -4705,12 +4705,11 @@ sub __forecastSolar_ApiRequest {
   my $string;
   ($string, $allstrings) = split ",", $allstrings, 2;
 
-  my ($set, $lat, $lon) = locCoordinates();
+  my ($set, $lat, $lon) = locCoordinates ($name);
 
   if (!$set) {
       my $err = qq{ERROR - the attribute 'latitude' and/or 'longitude' in global device is not set};
       Log3 ($name, 1, "$name - $err");
-      #singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
       return $err;
   }
 
@@ -6355,7 +6354,7 @@ sub ___createOpenMeteoURL {
   my $string      = $paref->{string};
 
   my $err;
-  my ($set, $lat, $lon, $elev) = locCoordinates();
+  my ($set, $lat, $lon, $elev) = locCoordinates ($name);
 
   if (!$set) {
       $err = qq{ERROR - the attribute 'latitude' and/or 'longitude' in global device is not set};
@@ -9621,6 +9620,7 @@ sub _attrplantControl {                  ## no critic "not used"
       consForecastBase          => { comp => $cforegex,                                           act => 1 },
       showLink                  => { comp => '(0|1)',                                             act => 0 },
       comforttemp               => { comp => '.*',                                                act => 1 },
+      plantCoordinates          => { comp => '.*',                                                act => 1 },
       writeForceType            => { comp => '(auto|db|file)',                                    act => 0 },
   };
 
@@ -10580,8 +10580,8 @@ sub _attrRadiationAPI {                  ## no critic "not used"
       return if(_checkSetupNotComplete ($hash));                                                   # keine Stringkonfiguration wenn Setup noch nicht komplett
 
       if ($aVal =~ /(ForecastSolar|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
-          my ($set, $lat, $lon, $elev) = locCoordinates();
-          return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
+          my ($set, $lat, $lon, $elev) = locCoordinates ($name);
+          return qq{set value for latitude, longitude in $name or the global device first} if(!$set);
 
           my $tilt = AttrVal ($name, 'setupStringDeclination', '');                                # Modul Neigungswinkel für jeden Stringbezeichner
           return qq{Please complete command "attr $name setupStringDeclination".} if(!$tilt);
@@ -10761,6 +10761,11 @@ sub __attrKeyAction {
       }
 
       # --- Ende init_done Sektion
+      
+      if ($akey eq 'plantCoordinates') {
+          my $err = __validatePlantCoordinates ($akeyval);
+          return $err if($err);
+      }
 
       if ($akey eq 'stepSoC' || $akey eq 'careCycle') {                                             # Kreuzvalidierung stepSoC * careCycle
           my $stepSoc   = $pphash->{stepSoC}   // BATSOCCHGDAY;
@@ -11132,6 +11137,57 @@ sub __attrKeyAction {
   }
 
 return $err;
+}
+
+################################################################
+#  Eingabevalidierung für Attribut plantCoordinates
+#
+#  Format:  latitude->52.4350,longitude->9.8790,altitude->90
+#           alle Felder optional – Fallback auf global
+#           wenn gesetzt, muss der Wert valide sein
+#
+#  Rückgabe: Fehlerstring -> Attribut-Set wird von FHEM geblockt
+#            undef        -> OK
+################################################################
+sub __validatePlantCoordinates {
+  my ($val) = @_;
+
+  my (undef, $h) = parseParams ($val, ',', '', '->');
+
+  for my $k (keys %{$h}) {                                                  # Keys von führenden und trailing Leerzeichen befreien
+      my $clean = $k;
+      $clean =~ s/^\s+|\s+$//g;
+      
+      if ($clean ne $k) {
+          $h->{$clean} = delete $h->{$k};
+      }
+  }
+
+  if (defined $h->{latitude}) {                                             # --- latitude: optional, wenn gesetzt Bereich -90..90 ---
+      my $lat = $h->{latitude};
+      return "plantCoordinates: invalid latitude '$lat' (expected: decimal number -90..90)"
+          unless ($lat ne '' && $lat =~ /^-?\d+(?:\.\d+)?$/ && $lat >= -90 && $lat <= 90);
+  }
+
+  if (defined $h->{longitude}) {                                            # --- longitude: optional, wenn gesetzt Bereich -180..180 ---
+      my $lon = $h->{longitude};
+      return "plantCoordinates: invalid longitude '$lon' (expected: decimal number -180..180)"
+          unless ($lon ne '' && $lon =~ /^-?\d+(?:\.\d+)?$/ && $lon >= -180 && $lon <= 180);
+  }
+
+  #if (defined $h->{altitude}) {                                             # --- altitude: optional, wenn gesetzt beliebige Dezimalzahl ---
+  #    my $alt = $h->{altitude};                                             # altitude muß für [ASTRO] im global device gesetzt werden!!
+  #    return "plantCoordinates: invalid altitude '$alt' (expected: decimal number)"
+  #        unless ($alt ne '' && $alt =~ /^-?\d+(?:\.\d+)?$/);
+  #}
+
+  my %known = map { $_ => 1 } qw(latitude longitude);                       # --- unbekannte Schlüssel abweisen ---
+  for my $k (keys %{$h}) {
+      return "plantCoordinates: unknown key '$k'"
+          unless $known{$k};
+  }
+
+return;                                                                     # undef = OK
 }
 
 ################################################################
@@ -14152,32 +14208,42 @@ sub __sunRS {
   my $type   = $paref->{type};
   my $date   = $paref->{date};                                                    # aktuelles Datum
   my $apiu   = $paref->{apiu};
+  my $debug  = $paref->{debug};
 
   my $hash   = $defs{$name};
 
   my ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss);
 
-  my ($cset, undef, undef, undef) = locCoordinates();
-
-  debugLog ($paref, 'collectData_long', "collect sunrise/sunset times - device: $fcname =>");
+  my ($cset, $lat, $lon, $alt) = locCoordinates ($name);
+  
+  if ($debug =~ /collectData_long/x) {
+      Log3 ($name, 1, "$name DEBUG> plant coordinates used: latitude=$lat, longitude=$lon, altitude=$alt");
+      Log3 ($name, 1, "$name DEBUG> collect sunrise/sunset times - device: $fcname =>");
+  }
 
   my ($rapi, $wapi) = getStatusApiName ($hash);
 
   if ($cset) {
-      my $alt = 'HORIZON=-0.833';                                                 # default from https://metacpan.org/release/JFORGET/DateTime-Event-Sunrise-0.0505/view/lib/DateTime/Event/Sunrise.pm
-      $fc0_sr = substr (sunrise_abs_dat ($t, $alt),         0, 5);                # SunRise heute
-      $fc0_ss = substr (sunset_abs_dat  ($t, $alt),         0, 5);                # SunSet heute
-      $fc1_sr = substr (sunrise_abs_dat ($t + 86400, $alt), 0, 5);                # SunRise morgen
-      $fc1_ss = substr (sunset_abs_dat  ($t + 86400, $alt), 0, 5);                # SunSet morgen
+      my $altit = 'HORIZON=-0.833';                                                                     # default from https://metacpan.org/release/JFORGET/DateTime-Event-Sunrise-0.0505/view/lib/DateTime/Event/Sunrise.pm
+
+      # sr_alt direkt mit device-eigenen Koordinaten aufrufen.
+      # Parameter: $nt, $rise, $isrel, $daycheck, $nextDay,
+      #            $altit, $seconds, $min, $max, $lat, $lon
+      # Rückgabe:  "HH:MM:SS" via h2hms_fmt → substr 0..4 = "HH:MM"
+
+      $fc0_sr = substr (sr_alt ($t,         1, 0, 0, 0, $altit, 0, undef, undef, $lat, $lon), 0, 5);    # SunRise heute
+      $fc0_ss = substr (sr_alt ($t,         0, 0, 0, 0, $altit, 0, undef, undef, $lat, $lon), 0, 5);    # SunSet heute
+      $fc1_sr = substr (sr_alt ($t + 86400, 1, 0, 0, 0, $altit, 0, undef, undef, $lat, $lon), 0, 5);    # SunRise morgen
+      $fc1_ss = substr (sr_alt ($t + 86400, 0, 0, 0, 0, $altit, 0, undef, undef, $lat, $lon), 0, 5);    # SunSet morgen
   }
   else {
-      if (!$apiu) {                                                               # Daten aus DWD Device holen
+      if (!$apiu) {                                                                                     # Daten aus DWD Device holen
           $fc0_sr = ReadingsVal ($fcname, 'fc0_SunRise', '23:59');
           $fc0_ss = ReadingsVal ($fcname, 'fc0_SunSet',  '00:00');
           $fc1_sr = ReadingsVal ($fcname, 'fc1_SunRise', '23:59');
           $fc1_ss = ReadingsVal ($fcname, 'fc1_SunSet',  '00:00');
       }
-      else {                                                                                          # Daten aus solcastapi (API) holen
+      else {                                                                                            # Daten aus solcastapi (API) holen
           $fc0_sr = substr (WeatherAPIVal ($hash, $wapi, 'sunrise', 'today',    '23:59:59'), 0, 5);
           $fc0_ss = substr (WeatherAPIVal ($hash, $wapi, 'sunset',  'today',    '00:00:00'), 0, 5);
           $fc1_sr = substr (WeatherAPIVal ($hash, $wapi, 'sunrise', 'tomorrow', '23:59:59'), 0, 5);
@@ -21757,7 +21823,7 @@ sub _readSystemMessages {
 
   my $midx = 0;
 
-  my ($cset, $lat, $lon, $alt) = locCoordinates();
+  my ($cset, $lat, $lon, $alt) = locCoordinates ($name);
   my $noloc = '';
   my @nlc;
 
@@ -22168,7 +22234,7 @@ sub _checkSetupNotComplete {
 
   my $vrmcr   = StatusAPIVal ($hash, '?VRM', '?API', 'credentials', '');                    # Victron VRM Credentials gesetzt
 
-  my ($coset, $lat, $lon) = locCoordinates();                                               # Koordinaten im global device
+  my ($coset, $lat, $lon) = locCoordinates ($name);                                         # Koordinaten im global oder lokalen device
   my $rip;
   $rip    = 1 if(exists $data{$name}{statusapi}{'?IdPair'});                                # es existiert mindestens ein Paar RoofTop-ID / API-Key
   my $pv0 = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                              # der erste PV ForeCast Wert
@@ -35151,13 +35217,12 @@ sub checkPlantConfig {
 
   ## Allgemeine Settings (auch API spezifisch)
   ##############################################
-  my $eocr                     = AttrVal       ($name, 'event-on-change-reading', '');
-  my $eour                     = AttrVal       ($name, 'event-on-update-reading', '');
-  
-  my $gdn                      = AttrVal       ('global', 'dnsServer', '');
-  my $aiprep                   = isPrepared4AI ($hash, 'full');
-  my $aiusemsg                 = CurrentVal    ($hash, 'aicanuse', '');
-  my ($cset, $lat, $lon, $alt) = locCoordinates();
+  my $eocr                     = AttrVal        ($name, 'event-on-change-reading', '');
+  my $eour                     = AttrVal        ($name, 'event-on-update-reading', '');
+  my $gdn                      = AttrVal        ('global', 'dnsServer', '');
+  my $aiprep                   = isPrepared4AI  ($hash, 'full');
+  my $aiusemsg                 = CurrentVal     ($hash, 'aicanuse', '');
+  my ($cset, $lat, $lon, $alt) = locCoordinates ($name);
   
   my @eocrar = split ',', $eocr; 
   my @eourar = split ',', $eour; 
@@ -35190,29 +35255,29 @@ sub checkPlantConfig {
 
   if (!$lat) {
       $result->{'Common Settings'}{state}   = $warn;
-      $result->{'Common Settings'}{result} .= qq{Attribute latitude in global device is not set. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the latitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{result} .= qq{The latitude value is unknown. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in $name plantControl->plantCoordinates or the latitude attribute of the global device.<br>};
       $result->{'Common Settings'}{warn}    = 1;
   }
 
   if (!$lon) {
       $result->{'Common Settings'}{state}   = $warn;
-      $result->{'Common Settings'}{result} .= qq{Attribute longitude in global device is not set. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the longitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{result} .= qq{The longitude value is unknown. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in $name plantControl->plantCoordinates or the longitude attribute of the global device.<br>};
       $result->{'Common Settings'}{warn}    = 1;
+  }
+  
+  if (!$alt) {
+      $result->{'Common Settings'}{state}   = $nok;
+      $result->{'Common Settings'}{result} .= qq{The altitude value is not set. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the altitude in meters above sea level in the altitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{fault}   = 1;
   }
 
   if (!$gdn) {
       $result->{'Common Settings'}{state}   = $nok;
       $result->{'Common Settings'}{result} .= qq{Attribute dnsServer in global device is not set. <br>};
       $result->{'Common Settings'}{note}   .= qq{Set global attribute dnsServer to the IP Adresse of your DNS Server.<br>};
-      $result->{'Common Settings'}{fault}   = 1;
-  }
-
-  if (!$alt) {
-      $result->{'Common Settings'}{state}   = $nok;
-      $result->{'Common Settings'}{result} .= qq{Attribute altitude in global device is not set. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Set the altitude in meters above sea level in the altitude attribute of the global device.<br>};
       $result->{'Common Settings'}{fault}   = 1;
   }
 
@@ -35245,6 +35310,7 @@ sub checkPlantConfig {
   if (isForecastSolarUsed ($hash)) {                                                         # allg. Settings bei Nutzung Forecast.Solar API
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
       }
@@ -35266,6 +35332,7 @@ sub checkPlantConfig {
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
       }
@@ -35282,6 +35349,7 @@ sub checkPlantConfig {
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on_complex" is recommended if the SolCast efficiency factor is already adjusted.<br>};
       }
@@ -35318,6 +35386,7 @@ sub checkPlantConfig {
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" or "on_complex_ai" is recommended.<br>};
       }
@@ -35345,6 +35414,7 @@ sub checkPlantConfig {
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $warn;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
@@ -35365,6 +35435,7 @@ sub checkPlantConfig {
   }
 
   if (!$result->{'Common Settings'}{fault}) {
+      $result->{'Common Settings'}{note}   .= qq{plantControl->plantCoordinates keys latitude, longitude, altitude <br>};
       $result->{'Common Settings'}{note}   .= qq{global->latitude, global->longitude, global->altitude <br>};
       $result->{'Common Settings'}{note}   .= qq{global->language, global->dnsServer <br>};
       $result->{'Common Settings'}{note}   .= qq{event-on-change-reading, ctrlLanguage <br>};
@@ -37763,13 +37834,33 @@ return ($riseshift, $setshift);
 #  gibt latitude, longitude und altitude zurück
 ################################################################
 sub locCoordinates {
-
+  my ($name) = @_;
+  
   my $set = 0;
   my $lat = AttrVal ('global', 'latitude',  '');
   my $lon = AttrVal ('global', 'longitude', '');
   my $alt = AttrVal ('global', 'altitude',   0);
+  
+  my $plantCoordinates = CurrentVal ($name, 'plantCoordinates', '');
+  
+  if ($plantCoordinates) {
+      my (undef, $h) = parseParams ($plantCoordinates, ',', '', '->');
+      
+      for my $k (keys %{$h}) {                                                  # Keys von führenden und trailing Leerzeichen befreien
+          my $clean = $k;
+          $clean =~ s/^\s+|\s+$//g;
+          
+          if ($clean ne $k) {
+              $h->{$clean} = delete $h->{$k};
+          }
+      }
+    
+      $lat = $h->{latitude}  if(defined $h->{latitude});
+      $lon = $h->{longitude} if(defined $h->{longitude});
+      $alt = $h->{altitude}  if(defined $h->{altitude});
+  }
 
-  if ($lat && $lon) {
+  if ($lat ne '' && $lon ne '') {
       $set = 1;
   }
 
@@ -42572,6 +42663,11 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG plot type 'steps'                                                                                              </td></tr>
             <tr><td>                                  </td><td><b>adapt4fSteps</b> - the events are optimized for the SVG plot type 'fsteps'                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+            <tr><td> <b>plantCoordinates</b>          </td><td>Specifies the geographic coordinates (latitude and longitude) of the installed PV system. The values set here take precedence over those stored in the global device.    </td></tr>
+            <tr><td>                                  </td><td>latitude - latitude in decimal degrees (-90 .. 90)                                                                                                                       </td></tr>
+            <tr><td>                                  </td><td>longitude - geographic longitude in decimal degrees (−180 .. 180)                                                                                                        </td></tr>
+            <tr><td>                                  </td><td>Syntax: <b>latitude->&lt;Value&gt;,longitude->&lt;Value&gt;</b> (predefined by the setting in the global device)                                                         </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>reductionState</b>            </td><td>SolarForecast uses this parameter to determine the current curtailment status of the PV system (optional).                                                               </td></tr>
             <tr><td>                                  </td><td>The syntax is a <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Function&gt;</b>  combination. Possible values for &lt;Function&gt; are:                                           </td></tr>
 			<tr><td>                                  </td><td><b>&lt;Regex&gt;</b> - The regular expression is applied to the value of &lt;Device&gt;:&lt;Reading&gt;. Boolean result: 'true' -> throttled, 'false' -> not throttled   </td></tr>
@@ -42590,7 +42686,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650 plantCoordinates=latitude->41.235272,longitude->15.437722
        </ul>
 
        </li>
@@ -45762,6 +45858,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td><b>adapt4Steps</b> - die Events werden für den SVG Plot-Type 'steps' optimiert                                                                                       </td></tr>
             <tr><td>                                  </td><td><b>adapt4fSteps</b> - die Events werden für den SVG Plot-Type 'fsteps' optimiert                                                                                     </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+            <tr><td> <b>plantCoordinates</b>          </td><td>Legt die geografischen Daten latitude und longitude der installierten PV-Anlage fest. Gesetzte Werte haben Priorität vor den im global Device hinterlegten Werten.   </td></tr>
+            <tr><td>                                  </td><td>latitude - geographische Breite in Dezimalgrad (-90 .. 90)                                                                                                           </td></tr>
+            <tr><td>                                  </td><td>longitude - geographische Länge in Dezimalgrad (−180 .. 180)                                                                                                         </td></tr>
+            <tr><td>                                  </td><td>Syntax: <b>latitude->&lt;Wert&gt;,longitude->&lt;Wert&gt;</b> (vorbelegt durch die Einstellung im global Device)                                                     </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>reductionState</b>            </td><td>SolarForecast nutzt diesen Parameter, um den aktuellen Abregelungsstatus der PV-Anlage auszulesen (optional).                                                        </td></tr>
             <tr><td>                                  </td><td>Die Syntax ist eine <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Funktion&gt;</b>-Kombination. Möglich als &lt;Funktion&gt; sind:                                           </td></tr>
 			<tr><td>                                  </td><td><b>&lt;Regex&gt;</b> - Der Regex wird auf den Wert von &lt;Device&gt;:&lt;Reading&gt; angewendet. Boolesches Ergebnis: true'->abgeregelt, 'false'->nicht abgeregelt  </td></tr>
@@ -45780,7 +45881,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650 plantCoordinates=latitude->41.235272,longitude->15.437722
        </ul>
 
        </li>
