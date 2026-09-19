@@ -10710,6 +10710,15 @@ sub __attrKeyAction {
                     
                       next;
                   }
+                  
+                  if ($hnum =~ /^(\d+)-(\d+)$/) {                                                              # Stundenbereich: Start <= End prüfen
+                      my ($start, $end) = ($1, $2);
+ 
+                      if ($start >= $end) {
+                          delete $data{$name}{current}{$akey};
+                          return "consForecastBase: invalid hour range '$hnum' - start must be less than end (e.g. '6-11', not '11-6' or '7-7')";
+                      }
+                  }
 
                   my ($cfodev, $cford, $def) = split ":", $h->{$hnum};                                          # Stunden-Token: Device/Reading Kombi prüfen
 
@@ -45839,7 +45848,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 			<tr><td>                                  </td><td>&lt;Wert&gt; kann durch verschiedene Varianten definiert werden:                                                                                                     </td></tr>
 			<tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Wert, z.B. '2->500' oder '3-9->650'                                                                                             </td></tr>
 			<tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. '11->Dev:Rdg:200' oder '6-11->Dev:Rdg:200', liefert den Wert als Ganzzahl. '200' ist der Ersatzwert.    </td></tr>
-			<tr><td>                                  </td><td><b>Hinweis:</b> consForecastBase ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                    </td></tr>
+			<tr><td>                                  </td><td><b>Hinweise:</b> consForecastBase ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                   </td></tr>
+            <tr><td>                                  </td><td>Die Stunden müssen den Tag sequentiell abdecken, Bereichsangaben mit Start &gt; End (z.B. '22-7') sind ungültig.                                                     </td></tr>
+            <tr><td>                                  </td><td><ul>-> <b>gültig:</b>   Mode->AddOn,1-7->250,8-22->300,23-24->250                </ul>                                                                               </td></tr>
+            <tr><td>                                  </td><td><ul>-> <b>ungültig:</b> 22-7->250                                                </ul>                                                                               </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen.                                                               </td></tr>
             <tr><td>                                  </td><td>Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet.                                                                                      </td></tr>
