@@ -70,7 +70,7 @@ SetExtensions($$@)
     if(!$mt->{SetExtensionsFn}) {
       my @ml = ( $as );
       $mt->{SetExtensionsFn} = \@ml;
-    } elsif(!grep($as, @{$mt->{SetExtensionsFn}})) {
+    } elsif(!grep(/$as/, @{$mt->{SetExtensionsFn}})) {
       push(@{$mt->{SetExtensionsFn}}, $as);
     }
   }
