@@ -72,6 +72,11 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.3" => "19.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
+                           "Wertebereiche für stepSoC und careCycle überarbeitet ".
+                           "Korrektur der Darstellung bei Netzladung der Batterie über den Hausknoten ".
+                           "Schlüssel plantControl->plantCoordinates hinzugefügt, um mehrere SF-Geräte an verschiedenen Standorten innerhalb eines FHEM-Systems zu unterstützen ".
+                           "consForecastBase: Das Verfahren zur Anwendung des Basiswerts ist jetzt über den optionalen Token 'Mode->Base|AddOn' steuerbar. ",
   "2.10.2" => "29.08.2026  userExit bzgl. zirkulären Referenzen gehärtet, potenzielle Speicherleaks geschlossen ".
                            "_aiFannAutoArchitecture: Warnung durch undefiniertes dataParamRatio beseitigt ".
                            "_aiFannEpochDiagnostic: neuen hint29, very_early-Zweig: hint1 und hint26 zusaätzlich gated, early-Zweig: hint5 und hint23 zusätzlich gated ",
@@ -87,125 +92,6 @@ my %vNotesIntern = (
                            "neuer Get-Befehl 'stepTimes' zur detailliierten Anzeige von Phasenzeiten ".
                            "Sun Position Caching integriert ".
                            "kleinere Patches ",
-  "2.9.4"  => "02.08.2026  Resync Consumer Schaltstatus an der Flanke Automatik AUS→EIN beim Umlegen des Automatik-Schalters ".
-                           "Post-Icon für Schweregrad '2' geändert, Bugfix in _addDynAttr: Regexfilter für statische Platzhalter korrigiert ".
-                           "Mitteilungssystem: es wird immer das Icon für die Severity der letzten Message und nicht die höchste Severity aller Messages angezeigt ".
-                           "Debug consumerSwitchingXX erweitert ",
-  "2.9.3"  => "31.07.2026  Die reset-Funktion 'set ... reset ..' kann Daten in pvCircular suchen, löschen und bearbeiten ".
-                           "Einbau hint27 und hint28 sowie Überprüfung hint12 abhängig von aiConShuffleMode und aiConShufflePeriod ".
-                           "_calcConsForecast_legacy: eigener consForecastBase-Durchlauf auf conraw, konsistent zu confc/confcex ".
-                           "neuer Wert 'pvfcfeedlim' in Datenpool pvHistory und NextHours ".
-                           "neue Auswahl pvForecastLimited im Attr 'graphicBeamXContent' zur Anzeige der Einspeise-limitierten PV-Prognose ",
-  "2.9.2"  => "26.07.2026  Einbau hint26 mit Erkennung unterer Grenze von aiControl->aiConLearnRate ".
-                           "consumerControl->iconFix zur statischen Darstellung der Verbraucher-Icons ".
-                           "der Ready-Status der Fann-KI wird sprachensensitiv ausgegeben ".
-                           "Ergänzung Datensammlung und Training für consumerXX->type heatpump->opmode 'eco' ".
-                           "vermeide zu wenig Datensätze im Drift-Retrain Prüfungskontext ".
-                           "Änderung plantControl->writeForceType: 'file' ist Standardspeicher, 'auto' ist deprecated, verwende 'db' anstatt (incl. BugFix FileRead) ".
-                           "Integration initialen Cache-Load 'initfirst' um vor dem Laden weiterer Daten Voreinstellungen festzulegen ".
-                           "Setter 'reset consumptionHistory' in 'reset consumptionShort' umbenannt ".
-                           "Intern: writeCacheToFile nach writeCacheFile umbenannt ",
-  "2.9.1"  => "16.07.2026  neuer FEATURE BLOCKS semantics_heatpump_nopv, Gemini model auf gemini-3.5-flash geändert ".
-                           "neuer Befehl set .. reset aiData setValue ... ".
-                           "das Gemini Model kann im Schlüssel aiControl->geminiAPIkey nach dem API-Key angegeben werden ".
-                           "die Victron API ((Model VictronKiAPI) kann nun den neuen Token-Auth verwenden ",
-  "2.9.0"  => "10.07.2026  speichere Gründe für Retrainstatus in RetrainReason, Persistenztyp mit plantControl->writeForceType ".
-                           "_aiFannRetrainIndicator: berücksichtige neuen bias_abs_min, Gemini Prompt Erweiterung ".
-                           "Consumer Typ 'heatpump' für Planung & automatisches Schalten freigegeben, hef angepasst für: dishwasher, dryer, dehydrator ".
-                           "Consumer heatpump kann mit opmodeIcons jedem Betriebsmodus ein eigenes Icon zugewiesen werden ".
-                           "Aktivierung WP-Modusanteile (Punktesystem) im Training und Inferenz, Speicherung zeitgewichtete Empfehlung Verbrauchernutzung ".
-                           "Bereinigung Verbrauchsinput um PV-getriebenen Anteil im CON-KI-Training für Non-PV-Profile ".
-                           "Consumer type noSchedule (deprecated) setzt immer mode=mustNot, Änderung von type=noSchedule nach type=X ist ohne Löschrequest möglich ".
-                           "Trainingsergebnisse können per Copy&Paste über ein generiertes Output manuell an LLM übergeben werden ".
-                           "Consumer 'power' darf nicht mehr 0 sein, dafür 'power=<Nominalleistung>' und 'pvshare=0' nutzen ".
-                           "neuer Consumer Typ 'fridge' ",
-  "2.8.0"  => "30.06.2026  BEV Implementierung, Data Leakage beseitigt, neuer Consumer type dehydrator, Weiterentwicklung Berater ".
-                           "__hpConsumerOpmode: Umstellung modus-minutes nach points, ConsumerXX->modulation kann fest auf 100 eingestellt werden ".
-                           "neue Blöcke semantics_temp_basic, semantics_stochastic, hod_mean7_norm, hod_cv7_norm ".
-                           "Erweiterung _aiFannBevConsumerAggregate um energy_remaining, charge_intensity ".
-                           "Auto-Konfiguration: aiConHiddenLayers, aiConLearnRate, aiConSteepness, aiConShufflePeriod - falls nicht gesetzt ".
-                           "Trainingsdefaults angepasst, _aiFannEpochDiagnostic: Anpassung (very) early Konvergenzgrenzen ".
-                           "Getter aiNeuralNetConState in aiConTrainState umbenannt, Online KI-Bewertung durch Gemini ",
-  "2.7.0"  => "20.06.2026  _aiFannBuildLagFeatures: erweiterte Lag-Erstellung, nicht kompatibel mit Vorgänger Version ".
-                           "verbesserter Snap-Guard und Retrainidicator, Hint-Korrektur, Div0-Fix ".
-                           "Refakturierung _listDataPoolPvHist: Möglichkeit der Eingrenzung anzuzeigender / zu exportierender Werte ".
-                           "Reading Tomorrow_ConsumptionForecast entfernt, neuer _aiFannFeatureBuilder ersetzt FEATURE-REGISTRY ".
-                           "Umstellung aiControl->aiConProfile auf Flags (bisherige Profile behalten Gültigkeit) ".
-                           "neue lag2_spike Features aus sandbox in BLOCKS->lags aktiviert, _aiFannEpochDiagnostic: Hints erweitert ".
-                           "delConsumerFromMem: Aufnahme neuer Schlüssel, _attrconsumer: Integration des Fingerprint-Guard ".
-                           "neue WP-Werte csmXX_(off|heating|defrost|hotwater|cooling|pool|poolheating)_minutes ".
-                           "neuer Schlüssel aiControl->opmode für Consumer 'heatpump', Definition mehrere WP-Consumer nun möglich ".
-                           "verbesserte Prüfung des Objektes 'Weather Properties' im Anlagencheck ",
-  "2.6.11" => "26.05.2026  _saveEnergyConsumption: nutze Logsequenzmanagement für Verbrauchslimitüberschreitung ".
-                           "_aiFannApplyBiasCorrection: Anpassung OSL-Gewicht ",
-  "2.6.10" => "25.05.2026  Bewertungsübersicht im AI-Status Popup, pv_mittag_peak_boost_special geändert ".
-                           "aiFannConInfer: Fortschreibung der Arrays! mit Horizont-Dämpfung, geändert aiConShuffleMode default=1 ".
-                           "__getCyclesAndRuntime: Fix für Race Condition beim Übergang OFF->ON genau an einem Stundenwechsel ".
-                           "_aiFannPercentileBasedLimits: Safety Berechnung angepasst, aiFannDetectNoiseLevel: Bugfix n ".
-                           "Fix Bat Prognose < 100% wenn Bat voll und PVü > Con, safetyMargin default: 20:20 gesetzt ".
-                           "v1_common_active_pv in FEATURE-REGISTRY ergänzt, Online-Hilfe für v1_common_pv und v1_common_active_pv geändert ".
-                           "Diagnose Lernverhalten eingebaut, aiConHiddenLayers kann nun auch Netze wie 80-3-5 ".
-                           "_aiFannApplyBiasCorrection: Einbau OSL-Korrektur, neuer Schlüssel aiCaontrol->aiConTrainLimit ".
-                           "AI mehr Neuronenlayer X-X-X-X... möglich, aiConLearnRate: kleinste Lernrate nun 0.0001 ".
-                           "Messagesystem: gelesene Mitteilungen werden auch nach Systemneustart nicht als neu signalisiert ",
-  "2.6.9"  => "15.05.2026  Umbenennungen im CON Fann Statusdashboeard, dynamisches Drift Detect Fenster, Retrain Empfehlung ".
-                           "_aiFannDriftSafetyBlocked: Ausbau und zusätzliches Debug, aiConHiddenLayers: letzte Zahl kann einstellig sein ".
-                           "Flowgrafik Batteriefluß erneut nachgebessert, Adaptives Fenster _aiFannSelectWindow invertiert ".
-                           "AI Status Popup Inhalt aufklappbar ",
-  "2.6.8"  => "10.05.2026  ___doPlanning: Berücksichtigung des PV-Überschuß Budgets im Planungsprozesses von can-Consumern ".
-                           "___csmSpecificEpieces: stündliche AVG-Aktualisierung auch im laufenden Betrieb, ausgelöst durch einen Stundenwechsel ".
-                           "neuer Consumer-Schlüssel exclgroup zur Formung einer Exclude-Gruppe ",
-  "2.6.7"  => "09.05.2026  __calcVectorConsumption: fix Doppelbatteriebug mit einem Batterieinverter Forum: https://forum.fhem.de/index.php?msg=1363211 ",
-  "2.6.6"  => "07.05.2026  nicht mehr benötigten Code entfernt, writeToHistory, _saveHistP1 und _saveHistP2 refactored, ___doPlanning refactored ".
-                           "Einbau consumerCacheDirty, ___setConsumerSwitchingState: lastOwnSwitchCmd eingebaut, ".
-                           "BLINDTIME, REAPLANINTVL einegbaut, Anti-Toggling / Cycle-Budget: Verhindert dass mehrere starke Consumer im selben ".
-                           "Zyklus starten und den PV-Überschuss überzeichnen. Implementiert durch surplusCycleCommitted als Zyklus-Budget ".
-                           "neuer Verbraucher Schlüssel swprio ",
-  "2.6.5"  => "03.05.2026  _batChargeMgmt Refactored: Äußere Stundenschleife -> Innere Batterieschleife, Fix 100%-Bug ".
-                           "wichtiger Bugfix weekday in LOCALE_DAYNAMES, Debug consumerPlanning angepasst ".
-                           "Speicherung von bevcsmBatCapXX und bevcsmPwrXX in pvHistory und aiRawData ",
-  "2.6.4"  => "01.05.2026  _calcTodayDeviation: prozentuale Abweichung von Tageswerten mit Konfidenz-Gewichtung, Clipping & ".
-                           "exponentielles Glätten EWMA -> verhindert Sprünge durch einen gleitenden Mittelwert über die letzten ".
-                           "Berechnungen, Routine ___areaFactorTrack entfernt ",
-  "2.6.3"  => "27.04.2026  Debug apiProcess: Anzeige ob ein Cached Wert verwendet wird bei 'DWD API Tilted' ".
-                           "__calcSunPosition: Korrektur für Randstunden, __getDWDSolarData: Korrektur DWD rad1h-Reading ",
-  "2.6.2"  => "23.04.2026  aiFannDetectDrift: Änderung der Driftanalyse ",
-  "2.6.1"  => "22.04.2026  neues Debug: miniCache, replace separate Mini Caches by one Multi_Cache, LRU Cache for timestringToTimestamp ".
-                           "Mini Caches FmtWeatherCache / cloud2bin / sunalt2bin / temp2bin / isHoliday ",
-  "2.6.0"  => "16.04.2026  new ___computeTiltedIrradianceCached: implement new tilted irradiance calc for DWD ".
-                           "rename debug id saveData2Cache -> saveData2Storage, new Debug Id tiltedIrrCache ".
-                           "new Mini Caches: Solar2Astro_Cache, DayHourMove_Cache, move __createAdditionalEvents to Task 8 ".
-                           "complete universal LRU-Cache implementation for DWD Tilted Irradiance Cache, TimestringsFromOffset Cache ".
-                           "rework: timestringsFromOffset, _beamGraphicFirstHour -> fix graphic error hour -1 if graphicHistoryHour > day change ".
-                           "prepare replacing of Reading Tomorrow_ConsumptionForecast by Tomorrow_CONforecast, reqork _createSummaries to slots ",
-  "2.5.3"  => "09.04.2026  _attrMeterDev: complete refactored to avoid problems like https://forum.fhem.de/index.php?msg=1361507 ".
-                           "correct ___areaFactorTrack: offset_hours ",
-  "2.5.2"  => "07.04.2026  func ___openMeteoErrorExit, ___solCastErrorExit -> 5 minutes Log message lock ".
-                           "get solardata API response code refactored ___forecastSolarErrorExit ",
-  "2.5.1"  => "06.04.2026  bugfixes _calcConsForecast_legacy Forum: https://forum.fhem.de/index.php?msg=1361272 ".
-                           "new func ___openMeteoErrorExit, ___solCastErrorExit, edit CommandRef ",
-  "2.5.0"  => "05.04.2026  new key plantControl->consForecastBase, checkPlantConfig: add String Inverter Mapping check ".
-                           "edit ComRef, expand consForecastBase for groups e.g. 3-9, header: CO -> CON, use current environment variables for display in header ".
-                           "checkPlantConfig: check con in aiRawData, HPCOMFTEMP => 21 °C, __getaiFannState: more Drift parameter ".
-                           "aiFannDetectDrift: new drift weighting, move comforttemp to plantControl ".
-                           "_setattrKeyVal: change code, isReductionState: fix code call Forum https://forum.fhem.de/index.php?msg=1360810 ".
-                           "new key aiControl->aiConAbsOversample, new key hpcsm in pvHistory & aiRawData ".
-                           "integrate new consumer type=bev as a device with no control, rework of _listDataPoolPvHist ",
-  "2.4.0"  => "20.03.2026  change of __normBeamHeight -> Forum: https://forum.fhem.de/index.php?msg=1359069 ".
-                           "change last_presence_check to central 'last_transfer', edit comref, Drift complete rework & lock ".
-                           "aiFannConDataLoad: use new value pvInverterCapSum, _attrconsumer: fix locktime=0:0 ".
-                           "extended/refactored: writeCacheFile, readCacheFile, timestampToTimestring, timestringToTimestamp ".
-                           "new key graphicControl->headerShowEnv, _saveEnergyConsumption: implemntation of MAXCONLIMIT ".
-                           "new key plantControl->conEnergyHourLimit ",
-  "2.3.0"  => "07.03.2026  new environment windSpeed, new Debug option aiProcess_long ",
-  "2.2.3"  => "05.03.2026  _saveEnergyConsumption: improvement of deny save negative con values, _transferInverterValues: fix rounding of difference carryforward ".
-                           "_transferAPIRadiationValues: fix round0 ",
-  "2.2.2"  => "03.03.2026  _transferInverterValues: change etotal init of new hour, new keys consumerControl->globalMode ".
-                           "add windspeed to aiRawData ",
-  "2.2.1"  => "28.02.2026  _listDataPoolPvHist: clear non-numerical hours from history, new sub round0 ",
-  "2.2.0"  => "15.02.2026  new Consumer mode 'mustNot', _aiFannCreateAddOnSignals: fix problem devision by zero in special case 40 degrees ".
-                           "edit comref, _attrconsumer refactored ",
-  "2.1.1"  => "10.02.2026  sub _createSummaries refactored ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -275,8 +161,7 @@ BEGIN {
           ReplaceEventMap
           readingFnAttributes
           setKeyValue
-          sunrise_abs_dat
-          sunset_abs_dat
+          sr_alt
           FW_cmd
           FW_directNotify
           FW_pH
@@ -4821,12 +4706,11 @@ sub __forecastSolar_ApiRequest {
   my $string;
   ($string, $allstrings) = split ",", $allstrings, 2;
 
-  my ($set, $lat, $lon) = locCoordinates();
+  my ($set, $lat, $lon) = locCoordinates ($name);
 
   if (!$set) {
       my $err = qq{ERROR - the attribute 'latitude' and/or 'longitude' in global device is not set};
       Log3 ($name, 1, "$name - $err");
-      #singleUpdateState ( {hash => $hash, state => $err, evt => 1} );
       return $err;
   }
 
@@ -6471,7 +6355,7 @@ sub ___createOpenMeteoURL {
   my $string      = $paref->{string};
 
   my $err;
-  my ($set, $lat, $lon, $elev) = locCoordinates();
+  my ($set, $lat, $lon, $elev) = locCoordinates ($name);
 
   if (!$set) {
       $err = qq{ERROR - the attribute 'latitude' and/or 'longitude' in global device is not set};
@@ -9720,8 +9604,10 @@ sub _attrplantControl {                  ## no critic "not used"
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
 
-  my $cforegex = '((?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))(?:,\s*(?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))*';
-
+  my $cforegex = '(?:Mode->(?:Base|AddOn),\s*)?'
+               . '((?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))'
+               . '(?:,\s*(?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))*';
+             
   my $valid = {
       backupFilesKeep           => { comp => '\d+',                                               act => 0 },
       batteryPreferredCharge    => { comp => '([0-9]|[1-9][0-9]|100)',                            act => 0 },
@@ -9737,6 +9623,7 @@ sub _attrplantControl {                  ## no critic "not used"
       consForecastBase          => { comp => $cforegex,                                           act => 1 },
       showLink                  => { comp => '(0|1)',                                             act => 0 },
       comforttemp               => { comp => '.*',                                                act => 1 },
+      plantCoordinates          => { comp => '.*',                                                act => 1 },
       writeForceType            => { comp => '(auto|db|file)',                                    act => 0 },
   };
 
@@ -10540,10 +10427,9 @@ sub _attrBatSocManagement {              ## no critic "not used"
       upSoC        => { comp => '(?:100|[1-9][0-9]?)',                                                                   must => 1, act => 0 },
       maxSoC       => { comp => '(?:100|[1-9][0-9]?)',                                                                   must => 0, act => 0 },
       barrierSoC   => { comp => '(?:0|[1-9]\d?|100):(?:max|set|inc|dec|prc):(?:-?\d+|[A-Za-z0-9_.\/-]+)(?::[+-]?\d+)?',  must => 0, act => 0 },
-      stepSoC      => { comp => '[0-5]',                                                                                 must => 0, act => 0 },
-      careCycle    => { comp => '\d+',                                                                                   must => 0, act => 0 },
+      stepSoC      => { comp => '(?:0|1|2|4|5|10|20|25|50|100)',                                                         must => 0, act => 1 },
+      careCycle    => { comp => '(?:1|2|4|5|10|20|25|50|100)',                                                           must => 0, act => 1 },
       lcSlot       => { comp => '((?:[01]\d|2[0-3]):[0-5]\d-(?:[01]\d|2[0-3]):[0-5]\d)',                                 must => 0, act => 1 },
-      careCycle    => { comp => '\d+',                                                                                   must => 0, act => 0 },
       loadAbort    => { comp => '(?:100|[1-9]?[0-9]):\d+(?::(?:100|[1-9]?[0-9]))?',                                      must => 0, act => 0 },
       loadStrategy => { comp => '(loadRelease|optPower|smartPower)',                                                     must => 0, act => 0 },
       loadTarget   => { comp => '(?:100|[1-9]?\d)(?::-?(?:[1-9]|1[0-9]|20))?',                                           must => 0, act => 0 },
@@ -10697,8 +10583,8 @@ sub _attrRadiationAPI {                  ## no critic "not used"
       return if(_checkSetupNotComplete ($hash));                                                   # keine Stringkonfiguration wenn Setup noch nicht komplett
 
       if ($aVal =~ /(ForecastSolar|OpenMeteoDWD|OpenMeteoDWDEnsemble|OpenMeteoWorld)-API/xs) {
-          my ($set, $lat, $lon, $elev) = locCoordinates();
-          return qq{set attributes 'latitude' and 'longitude' in global device first} if(!$set);
+          my ($set, $lat, $lon, $elev) = locCoordinates ($name);
+          return qq{set value for latitude, longitude in $name or the global device first} if(!$set);
 
           my $tilt = AttrVal ($name, 'setupStringDeclination', '');                                # Modul Neigungswinkel für jeden Stringbezeichner
           return qq{Please complete command "attr $name setupStringDeclination".} if(!$tilt);
@@ -10808,15 +10694,35 @@ sub __attrKeyAction {
                   if (!defined $ev) { return qq{No Consumer type 'bev' is defined. Please define it with the consumerXX attribute first.} }
               }
           }
-
+          
           if ($akey eq 'consForecastBase') {
               my $cfbase  = CurrentVal  ($name, 'consForecastBase', '');
-              my ($a, $h) = parseParams ($cfbase, ',', '', '->');
+              my (undef, $h) = parseParams ($cfbase, ',', '', '->');
 
               for my $hnum (keys %{$h}) {
-                  my ($cfodev, $cford, $def) = split ":", $h->{$hnum};
+                  if ($hnum =~ /^Mode$/i) {                                                                     # Mode-Token validieren
+                      my $proc = trim ($h->{$hnum});
+                    
+                      if ($proc !~ /^(?:Base|AddOn)$/i) {
+                          delete $data{$name}{current}{$akey};
+                          return "consForecastBase: invalid Mode value '$proc' - use 'Base' or 'AddOn'";
+                      }
+                    
+                      next;
+                  }
+                  
+                  if ($hnum =~ /^(\d+)-(\d+)$/) {                                                              # Stundenbereich: Start <= End prüfen
+                      my ($start, $end) = ($1, $2);
+ 
+                      if ($start >= $end) {
+                          delete $data{$name}{current}{$akey};
+                          return "consForecastBase: invalid hour range '$hnum' - start must be less than end (e.g. '6-11', not '11-6' or '7-7')";
+                      }
+                  }
 
-                  if ($cfodev && $cford) {                                                          # Auswertung Device/Reading Kombi
+                  my ($cfodev, $cford, $def) = split ":", $h->{$hnum};                                          # Stunden-Token: Device/Reading Kombi prüfen
+
+                  if ($cfodev && $cford) {
                       ($err) = isDeviceValid ( { name   => $name,
                                                  obj    => $cfodev,
                                                  method => 'string',
@@ -10878,7 +10784,21 @@ sub __attrKeyAction {
       }
 
       # --- Ende init_done Sektion
+      
+      if ($akey eq 'plantCoordinates') {
+          my $err = __validatePlantCoordinates ($akeyval);
+          return $err if($err);
+      }
 
+      if ($akey eq 'stepSoC' || $akey eq 'careCycle') {                                             # Kreuzvalidierung stepSoC * careCycle
+          my $stepSoc   = $pphash->{stepSoC}   // BATSOCCHGDAY;
+          my $careCycle = $pphash->{careCycle} // CARECYCLEDEF;
+          
+          if ($stepSoc != 0 && ($stepSoc * $careCycle) != 100) {
+              my $product = $stepSoc * $careCycle;
+              return qq{Invalid combination: stepSoC=$stepSoc * careCycle=$careCycle = $product (must be 100 or stepSoC=0)};
+          }
+      }
 
       if ($akey eq 'capacity') {
           if (!isNumeric ($akeyval)) {
@@ -11240,6 +11160,57 @@ sub __attrKeyAction {
   }
 
 return $err;
+}
+
+################################################################
+#  Eingabevalidierung für Attribut plantCoordinates
+#
+#  Format:  latitude->52.4350,longitude->9.8790,altitude->90
+#           alle Felder optional – Fallback auf global
+#           wenn gesetzt, muss der Wert valide sein
+#
+#  Rückgabe: Fehlerstring -> Attribut-Set wird von FHEM geblockt
+#            undef        -> OK
+################################################################
+sub __validatePlantCoordinates {
+  my ($val) = @_;
+
+  my (undef, $h) = parseParams ($val, ',', '', '->');
+
+  for my $k (keys %{$h}) {                                                  # Keys von führenden und trailing Leerzeichen befreien
+      my $clean = $k;
+      $clean =~ s/^\s+|\s+$//g;
+      
+      if ($clean ne $k) {
+          $h->{$clean} = delete $h->{$k};
+      }
+  }
+
+  if (defined $h->{latitude}) {                                             # --- latitude: optional, wenn gesetzt Bereich -90..90 ---
+      my $lat = $h->{latitude};
+      return "plantCoordinates: invalid latitude '$lat' (expected: decimal number -90..90)"
+          unless ($lat ne '' && $lat =~ /^-?\d+(?:\.\d+)?$/ && $lat >= -90 && $lat <= 90);
+  }
+
+  if (defined $h->{longitude}) {                                            # --- longitude: optional, wenn gesetzt Bereich -180..180 ---
+      my $lon = $h->{longitude};
+      return "plantCoordinates: invalid longitude '$lon' (expected: decimal number -180..180)"
+          unless ($lon ne '' && $lon =~ /^-?\d+(?:\.\d+)?$/ && $lon >= -180 && $lon <= 180);
+  }
+
+  #if (defined $h->{altitude}) {                                             # --- altitude: optional, wenn gesetzt beliebige Dezimalzahl ---
+  #    my $alt = $h->{altitude};                                             # altitude muß für [ASTRO] im global device gesetzt werden!!
+  #    return "plantCoordinates: invalid altitude '$alt' (expected: decimal number)"
+  #        unless ($alt ne '' && $alt =~ /^-?\d+(?:\.\d+)?$/);
+  #}
+
+  my %known = map { $_ => 1 } qw(latitude longitude);                       # --- unbekannte Schlüssel abweisen ---
+  for my $k (keys %{$h}) {
+      return "plantCoordinates: unknown key '$k'"
+          unless $known{$k};
+  }
+
+return;                                                                     # undef = OK
 }
 
 ################################################################
@@ -11927,6 +11898,8 @@ sub readCacheFile {
   my $hash = $defs{$name};
 
   if ($cachename eq 'aitrained') {
+      delete $data{$name}{aidectree}{aitrained} if(-s $file);                                                # Peak-Reduktion
+
       my ($err, $objref) = fileRetrieve ($file);
 
       if (!$err && $objref) {
@@ -11951,6 +11924,8 @@ sub readCacheFile {
       return;
   }
   elsif ($cachename eq 'airaw') {
+      delete $data{$name}{aidectree}{airaw} if -s $file;                                                    # Peak-Reduktion
+      
       my ($err, $dat) = fileRetrieve ($file);
 
       if (!$err && $dat) {
@@ -11963,6 +11938,14 @@ sub readCacheFile {
       return;
   }
   elsif ($cachename eq 'neuralnet') {
+      my @fanntypes = qw(con pv);                                                                           # --- Liste aller FANN-Typen, die geladen werden sollen ---
+      
+      if ($data{$name}{neuralnet} && -s $file) {                                                            # FannModel-Objekte (XS) vorab freigeben – sie sind nie im Cache-File und stellen den größten Teil des RAM-Peaks dar
+          for my $ft (@fanntypes) {
+              delete $data{$name}{neuralnet}{$ft}{FannModel};
+          }
+      }      
+      
       my ($err, $net) = fileRetrieve($file);
 
       if (!$err && $net) {
@@ -11972,8 +11955,6 @@ sub readCacheFile {
               $data{$name}{current}{conNNTrainstate} = "Perl Modul AI::FANN is missing. Install it first with e.g. 'cpan AI::FANN' or 'cpanm AI::FANN'";
               return;
           }
-
-          my @fanntypes = qw(con pv);                                                                       # --- Liste aller FANN-Typen, die geladen werden sollen ---
 
           # --- für jeden Typ das Modell aus dem Blob neu erzeugen ---
           for my $fanntyp (@fanntypes) {
@@ -14250,32 +14231,42 @@ sub __sunRS {
   my $type   = $paref->{type};
   my $date   = $paref->{date};                                                    # aktuelles Datum
   my $apiu   = $paref->{apiu};
+  my $debug  = $paref->{debug};
 
   my $hash   = $defs{$name};
 
   my ($fc0_sr, $fc0_ss, $fc1_sr, $fc1_ss);
 
-  my ($cset, undef, undef, undef) = locCoordinates();
-
-  debugLog ($paref, 'collectData_long', "collect sunrise/sunset times - device: $fcname =>");
+  my ($cset, $lat, $lon, $alt) = locCoordinates ($name);
+  
+  if ($debug =~ /collectData_long/x) {
+      Log3 ($name, 1, "$name DEBUG> plant coordinates used: latitude=$lat, longitude=$lon, altitude=$alt");
+      Log3 ($name, 1, "$name DEBUG> collect sunrise/sunset times - device: $fcname =>");
+  }
 
   my ($rapi, $wapi) = getStatusApiName ($hash);
 
   if ($cset) {
-      my $alt = 'HORIZON=-0.833';                                                 # default from https://metacpan.org/release/JFORGET/DateTime-Event-Sunrise-0.0505/view/lib/DateTime/Event/Sunrise.pm
-      $fc0_sr = substr (sunrise_abs_dat ($t, $alt),         0, 5);                # SunRise heute
-      $fc0_ss = substr (sunset_abs_dat  ($t, $alt),         0, 5);                # SunSet heute
-      $fc1_sr = substr (sunrise_abs_dat ($t + 86400, $alt), 0, 5);                # SunRise morgen
-      $fc1_ss = substr (sunset_abs_dat  ($t + 86400, $alt), 0, 5);                # SunSet morgen
+      my $altit = 'HORIZON=-0.833';                                                                     # default from https://metacpan.org/release/JFORGET/DateTime-Event-Sunrise-0.0505/view/lib/DateTime/Event/Sunrise.pm
+
+      # sr_alt direkt mit device-eigenen Koordinaten aufrufen.
+      # Parameter: $nt, $rise, $isrel, $daycheck, $nextDay,
+      #            $altit, $seconds, $min, $max, $lat, $lon
+      # Rückgabe:  "HH:MM:SS" via h2hms_fmt → substr 0..4 = "HH:MM"
+
+      $fc0_sr = substr (sr_alt ($t,         1, 0, 0, 0, $altit, 0, undef, undef, $lat, $lon), 0, 5);    # SunRise heute
+      $fc0_ss = substr (sr_alt ($t,         0, 0, 0, 0, $altit, 0, undef, undef, $lat, $lon), 0, 5);    # SunSet heute
+      $fc1_sr = substr (sr_alt ($t + 86400, 1, 0, 0, 0, $altit, 0, undef, undef, $lat, $lon), 0, 5);    # SunRise morgen
+      $fc1_ss = substr (sr_alt ($t + 86400, 0, 0, 0, 0, $altit, 0, undef, undef, $lat, $lon), 0, 5);    # SunSet morgen
   }
   else {
-      if (!$apiu) {                                                               # Daten aus DWD Device holen
+      if (!$apiu) {                                                                                     # Daten aus DWD Device holen
           $fc0_sr = ReadingsVal ($fcname, 'fc0_SunRise', '23:59');
           $fc0_ss = ReadingsVal ($fcname, 'fc0_SunSet',  '00:00');
           $fc1_sr = ReadingsVal ($fcname, 'fc1_SunRise', '23:59');
           $fc1_ss = ReadingsVal ($fcname, 'fc1_SunSet',  '00:00');
       }
-      else {                                                                                          # Daten aus solcastapi (API) holen
+      else {                                                                                            # Daten aus solcastapi (API) holen
           $fc0_sr = substr (WeatherAPIVal ($hash, $wapi, 'sunrise', 'today',    '23:59:59'), 0, 5);
           $fc0_ss = substr (WeatherAPIVal ($hash, $wapi, 'sunset',  'today',    '00:00:00'), 0, 5);
           $fc1_sr = substr (WeatherAPIVal ($hash, $wapi, 'sunrise', 'tomorrow', '23:59:59'), 0, 5);
@@ -15668,6 +15659,39 @@ return;
 }
 
 ################################################################
+#                Parse setupEnvironment
+################################################################
+sub __parseAttrEnvironment {
+  my $name = shift;
+
+  my $env = AttrVal ($name, 'setupEnvironment', '');
+  return if(!$env);
+
+  my ($pa, $ph) = parseParams ($env);
+
+  my ($oustmpdev, $oustmprdg)             = split (':', $ph->{outsideTemp}, 2) if(defined $ph->{outsideTemp});
+  my ($winddev,     $windrdg)             = split (':', $ph->{windSpeed},   2) if(defined $ph->{windSpeed});
+  my ($presendev, $presenrdg, $presenrgx) = split (':', $ph->{presence},    3) if(defined $ph->{presence});
+  my ($gridstdev, $gridstrdg, $gridstrgx) = split (':', $ph->{gridStatus},  3) if(defined $ph->{gridStatus});
+
+
+  my $parsed = {
+      outsideTempDev  => $oustmpdev,
+      outsideTempRdg  => $oustmprdg,
+      windDev         => $winddev,
+      windRdg         => $windrdg,
+      presenceDev     => $presendev,
+      presenceRdg     => $presenrdg,
+      presenceRgx     => $presenrgx,
+      gridstdev       => $gridstdev,
+      gridstrdg       => $gridstrdg,
+      gridstrgx       => $gridstrgx,
+  };
+
+return $parsed;
+}
+
+################################################################
 #   Wochentage, Feiertage und Urlaubstage übertragen
 ################################################################  starttime
 sub _transferHolidayValues {
@@ -15952,39 +15976,6 @@ sub __parseAttrBatSoc {
       otpMargin    => $otpMargin,
       barrierSoc   => $barrierSoC,                                                        # SoC Barriere ab der eine Ladeleistungssteuerung aktiv sein soll
       barrierPar   => $barrierPar,                                                        # Aktionsparameter für Barriere Bereich
-  };
-
-return $parsed;
-}
-
-################################################################
-#                Parse setupEnvironment
-################################################################
-sub __parseAttrEnvironment {
-  my $name = shift;
-
-  my $env = AttrVal ($name, 'setupEnvironment', '');
-  return if(!$env);
-
-  my ($pa, $ph) = parseParams ($env);
-
-  my ($oustmpdev, $oustmprdg)             = split (':', $ph->{outsideTemp}, 2) if(defined $ph->{outsideTemp});
-  my ($winddev,     $windrdg)             = split (':', $ph->{windSpeed},   2) if(defined $ph->{windSpeed});
-  my ($presendev, $presenrdg, $presenrgx) = split (':', $ph->{presence},    3) if(defined $ph->{presence});
-  my ($gridstdev, $gridstrdg, $gridstrgx) = split (':', $ph->{gridStatus},  3) if(defined $ph->{gridStatus});
-
-
-  my $parsed = {
-      outsideTempDev  => $oustmpdev,
-      outsideTempRdg  => $oustmprdg,
-      windDev         => $winddev,
-      windRdg         => $windrdg,
-      presenceDev     => $presendev,
-      presenceRdg     => $presenrdg,
-      presenceRgx     => $presenrgx,
-      gridstdev       => $gridstdev,
-      gridstrdg       => $gridstrdg,
-      gridstrgx       => $gridstrgx,
   };
 
 return $parsed;
@@ -16443,7 +16434,16 @@ sub _batChargeMgmt {
           }
 
           my $socwh = $bs->{socwh} + $delta;
-          $socwh    = ___batClampValue ($socwh, $bs->{lowSocwh}, $bs->{batoptsocwh}, $bs->{batinstcap});
+
+          if ($delta >= 0) {                                                                    # Laden: kein Snap-up auf batoptsocwh, nur physikalische Grenzen
+              $socwh = $socwh < $bs->{lowSocwh}   ? $bs->{lowSocwh}   :
+                       $socwh > $bs->{batinstcap} ? $bs->{batinstcap} :
+                       $socwh;
+          }
+          else {                                                                                # Entladen: Snap-up auf batoptsocwh bleibt korrekt
+              $socwh = ___batClampValue ($socwh, $bs->{lowSocwh}, $bs->{batoptsocwh}, $bs->{batinstcap});
+          }    
+          
           $socwh    = round0($socwh);
           $progsoc  = round1(___batSocWhToPercent($bs->{batinstcap}, $socwh));
 
@@ -17588,20 +17588,6 @@ sub __calcVectorConsumption {
       $node2bat = 0 if($dc2inv2node && $node2bat > 0);                                      # muß negativ (0) sein: Richtung Bat -> Inv.Knoten,  wichtig zur Festlegung Richtung und Inv. Knoten Summierung
   }
 
-  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-  ########################################################################################################################
-  #if ($node2bat > 0) {
-      # Messversatz nur wenn mindestens eine Batterie-Pfad-Variable aktiv:
-      # - dc2inv2node: Hybrid-Wechselrichter entlädt (Zeitversatz AC/DC-Messung)
-      # - node2inv2dc: Wechselrichter lädt (Zeitversatz AC/DC-Messung)
-      # - pv2bat:      Solarladegerät (separater DC-Pfad, nicht über Knoten)
-      # Wenn alle null: direktes Bat-Setup (z.B. Enphase, Zendure) →
-      # node2bat ist echter Ladefluss aus dem Knoten → kein Clamp!
-      #if ($dc2inv2node || ($node2inv2dc && $node2bat - $node2inv2dc <= 0)) {
-      #    $node2bat = 0;
-      #}
-  #}
-
   my $pnodesum  = $ppall + $pv2node + $dc2inv2node - $node2inv2dc;                          # Erzeugung Summe im Inverter-Knoten
   $pnodesum    += $node2bat < 0 ? abs $node2bat : 0;                                        # z.B. Batterie ist voll und SolarLader liefert an Knoten
   $pnodesum     = __normDecPlaces ($pnodesum);
@@ -17610,11 +17596,26 @@ sub __calcVectorConsumption {
   $node2home    = __normDecPlaces ($node2home);
 
   $vector->{vectorconsumption} = round0 ($gcon + $node2home + $bat2home);                   # V 1.52.0 Anpassung Consumption wegen Verlustleistungsdifferenzen
+  
+  ## Netzladung Batterie via Hausknoten: negativer node2home bei aktivem Laden
+  ## -> Fluß grafisch auf Home->Bat umleiten, node->Home auf 0 setzen (v2.10.3)
+  ##############################################################################
+  my $home2bat = 0;
+
+  if ($node2home < 0 && $batin > 0 && !$dc2inv2node && !$node2inv2dc) {
+      $home2bat  = abs ($node2home);
+      $node2bat += $node2home;                                                              # PV-Anteil am Knoten isolieren (node2bat - |home2bat|)
+      $node2bat  = 0 if ($node2bat < 0);                                                    # Clamp gegen Messartefakte
+      $node2home = 0;
+      
+      $vector->{gridChargeBat} = 1;                                                         # Flag für Grafikrichtung
+  }
 
   ## Linearverbrauch
   ####################
   $vector->{linearconsumption} = round0 ($pv2node + $pv2bat + $ppall - $gfeedin + $gcon - $batin + $batout);
 
+  $vector->{home2bat}  = $home2bat;
   $vector->{bat2home}  = $bat2home;
   $vector->{pnodesum}  = $pnodesum;
   $vector->{node2home} = $node2home;
@@ -20506,7 +20507,8 @@ sub __considerConsBase {
   my $cfbase = CurrentVal ($name, 'consForecastBase', undef);
   return $confc_raw if(!defined $cfbase);
 
-  my ($a, $h) = parseParams ($cfbase, ',', '', '->');
+  my ($a, $h)   = parseParams ($cfbase, ',', '', '->');
+  my $procedure = exists $h->{Mode} ? trim($h->{Mode}) : 'Base';                # Mode auslesen (Default: Base = bisheriges Verhalten)
 
   my ($base_val, $def);
   my ($cfodev, $cford) = ('','');
@@ -20515,6 +20517,8 @@ sub __considerConsBase {
   $hod      = int($hod);
 
   for my $hnum (keys %{$h}) {
+      next if $hnum =~ /^Mode$/i;                                               # Mode-Token überspringen
+      
       my $basehod = trim ($hnum);
 
       $basehod =~ /(\d+(?:-\d+)?)/;                                             # auflösen einfache Ziffer (7) oder Bereich (2-5)
@@ -20553,17 +20557,21 @@ sub __considerConsBase {
       }
 
       if ($debug =~ /consumption/) {
-          if ($cfodev && $cford) {
-              Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - use device:reading combination $cfodev:$cford -> got value=$base_val Wh");
-          }
-          else {
-              Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - use given value=$base_val Wh");
-          }
+          my $src = ($cfodev && $cford) ? "device:reading $cfodev:$cford -> value=$base_val Wh"
+                                        : "given value=$base_val Wh";
+          Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod procedure=$procedure - $src");
       }
 
-      $confc = defined $base_val && $base_val > $confc_raw ? $base_val : $confc_raw;
+      # --- Kernlogik: Base (Boden) oder AddOn (Aufschlag)
+      if ($procedure eq 'AddOn') {
+          $confc = $confc_raw + $base_val;                                      # Aufschlag auf berechneten Wert
+      }
+      else {                                                                    # 'Base' = default Verhalten
+          $confc = defined $base_val && $base_val > $confc_raw ? $base_val : $confc_raw;
+      }
 
-      Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - original confc=$confc_raw recalculated to value=$confc Wh") if ($debug =~ /consumption/);
+      Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod procedure=$procedure - original confc=$confc_raw recalculated to value=$confc Wh")
+          if ($debug =~ /consumption/);
   }
 
 return $confc;
@@ -21845,7 +21853,7 @@ sub _readSystemMessages {
 
   my $midx = 0;
 
-  my ($cset, $lat, $lon, $alt) = locCoordinates();
+  my ($cset, $lat, $lon, $alt) = locCoordinates ($name);
   my $noloc = '';
   my @nlc;
 
@@ -22256,7 +22264,7 @@ sub _checkSetupNotComplete {
 
   my $vrmcr   = StatusAPIVal ($hash, '?VRM', '?API', 'credentials', '');                    # Victron VRM Credentials gesetzt
 
-  my ($coset, $lat, $lon) = locCoordinates();                                               # Koordinaten im global device
+  my ($coset, $lat, $lon) = locCoordinates ($name);                                         # Koordinaten im global oder lokalen device
   my $rip;
   $rip    = 1 if(exists $data{$name}{statusapi}{'?IdPair'});                                # es existiert mindestens ein Paar RoofTop-ID / API-Key
   my $pv0 = NexthoursVal ($hash, 'NextHour00', 'pvfc', undef);                              # der erste PV ForeCast Wert
@@ -25239,9 +25247,9 @@ sub _flowGraphic {
                   "$stna bat75";
 
   my $grid2home_style       = $gconMetered ? "$stna active_sig"    : "$stna inactive";    # GridConsumption
-  my $bat2home_style        = "$stna inactive";
   my $dc2inv2node_style     = $dc2inv2node ? "$stna active_normal" : "$stna inactive";    # Batterie zu Inverter mit source=bat
   my $gconMetered_direction = "M250,515 L670,590";
+  my $bat2home_style        = "$stna inactive";
   my $bat2home_direction    = "M1200,515 L730,590";
 
   ## Knotensummen Erzeuger - Batterie - Home ermitteln -> Hausverbrauch ermitteln
@@ -25261,6 +25269,7 @@ sub _flowGraphic {
 
   my $consptn   = $vector->{vectorconsumption};                                           # Hausverbrauch auf Grundlage der Leistungsflüsse
   my $bat2home  = $vector->{bat2home};                                                    # Batterie -> Hausknoten
+  my $home2bat  = $vector->{home2bat} // 0;                                               # Hausknoten -> Batterie (v2.10.3)
   my $pnodesum  = $vector->{pnodesum};                                                    # Summe Inverterknoten
   my $node2home = $vector->{node2home};                                                   # Inverterknoten -> Haus
   my $node2bat  = $vector->{node2bat};                                                    # Inverterknoten -> Batterie
@@ -25269,7 +25278,10 @@ sub _flowGraphic {
       $bat2home_style     = "$stna active_normal";
       $bat2home_direction = "M1200,515 L730,590";
   }
-
+  elsif ($home2bat > 0) {                                                                 # v2.10.3: Netzladung Bat via Hausknoten
+      $bat2home_style     = "$stna active_sig";                                           # Signalfarbe -> Netzstrom
+      $bat2home_direction = "M730,590 L1200,515";                                         # Richtung umkehren: Home -> Bat
+  }
 
   ## definierte Verbraucher ermitteln
   #####################################
@@ -25673,16 +25685,22 @@ END3
   ###################################
   $cons_dmy    = round0 ($cons_dmy);                                                                # Verbrauch Dummy-Consumer
   $bat2home    = __normDecPlaces ($bat2home);
+  $home2bat    = __normDecPlaces ($home2bat);                                                       # v2.10.3
   $dc2inv2node = __normDecPlaces ($dc2inv2node);
   $node2bat    = __normDecPlaces ($node2bat);
   $consptn     = __normDecPlaces ($consptn);
+  
+  my $bat_conn_val = $home2bat || $bat2home;
 
   $ret .= qq{<text class="$stna text" id="nodetxt_$stna"      x="800"  y="320" style="text-anchor: start;">$pnodesum</text>}        if ($pnodesum > 0);
   $ret .= qq{<text class="$stna text" id="batsoctxt_$stna"    x="1380" y="520" style="text-anchor: start;">$soc %</text>}           if ($hasbat);                         # Lage Text Batterieladungszustand
   $ret .= qq{<text class="$stna text" id="node2hometxt_$stna" x="730"  y="520" style="text-anchor: start;">$node2home</text>}       if ($node2home);
   $ret .= qq{<text class="$stna text" id="node2gridtxt_$stna" x="420"  y="420" style="text-anchor: end;">$node2gridMetered</text>}  if ($node2gridMetered);
   $ret .= qq{<text class="$stna text" id="grid2hometxt_$stna" x="420"  y="610" style="text-anchor: end;">$gconMetered</text>}       if ($gconMetered);
-  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}        if ($bat2home && $hasbat);
+  
+  #$ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat2home</text>}        if ($bat2home && $hasbat);
+  $ret .= qq{<text class="$stna text" id="batouttxt_$stna"    x="1000" y="610" style="text-anchor: start;">$bat_conn_val</text>}    if ($bat_conn_val && $hasbat);        # v2.10.3
+  
   $ret .= qq{<text class="$stna text" id="node2battxt_$stna"  x="1000" y="420" style="text-anchor: start;">$node2bat</text>}        if ($node2bat && $hasbat);
   $ret .= qq{<text class="$stna text" id="hometxt_$stna"      x="600"  y="710" style="text-anchor: end;">$consptn</text>};                                                # Current_Consumption Anlage
   $ret .= qq{<text class="$stna text" id="dummytxt_$stna"     x="1380" y="710" style="text-anchor: start;">$cons_dmy</text>}        if ($flowgconX && $flowgconsPower);   # Current_Consumption Dummy
@@ -29441,18 +29459,18 @@ sub _aiFannPercentileBasedLimits {
 
   my @outliers = grep { $_ > $p999 } @above;                                         # echte Ausreißer ermitteln (alles > Percentile)
 
-  my $raw_max    = max (@$tgref);                                                    # max. Targetwert
-  my $overshoot  = $p999 > 0 ? $raw_max / $p999 : 1.0;                               # z.B. 8902/8056 = 1.105
-  my $safety     = max (1.05, $overshoot * 1.05);                                    # V 2.6.10 5% Puffer über dem historischen Maximum
-  my $targminval = 0;                                                                # (De)Normalisierung -> Targetgrenze min
-  my $targmaxval = $p999 * $safety;
+  my $raw_max    = max (@$tgref);
+  my $n          = scalar @sorted;
+  my $targminval = 0;
+  my $targmaxval = $p999 * 1.05;                                                    # 5% Headroom über clip_max, nicht über raw_max
 
   if ($debug =~ /aiProcess/xs) {
       $p1 = 'p'.($p1 * 100);
       $p2 = 'p'.($p2 * 100);
 
-      Log3 ($name, 1, sprintf "%s DEBUG> AI FANN - Target-Norm: raw_max=%0.0f, $p1=%0.0f, $p2=%0.0f, targmaxval=%0.0f",
-                               $name, $raw_max, $p99, $p999, $targmaxval);
+      Log3 ($name, 1, sprintf "%s DEBUG> AI FANN - Target-Norm: n=%d raw_max=%0.0f, $p1=%0.0f, $p2=%0.0f, targmaxval=%0.0f (clipping=%s)",
+                              $name, $n, $raw_max, $p99, $p999, $targmaxval,
+                              $raw_max > $targmaxval ? 'YES' : 'none');
 
       if (@outliers) {
           my $olist = join (', ', @outliers);
@@ -32683,7 +32701,7 @@ sub _aiFannNormBevSocDeficit {
   my ($val, $range) = @_;
   return 0 if !defined $val;
 
-  $val = 0 if $val < 0;                                                             # Sicherheitsclamp (Restschutz, siehe Aggregat-Funktion)
+  $val = 0 if $val < 0;                                                                 # Sicherheitsclamp (Restschutz, siehe Aggregat-Funktion)
   $val = 1 if $val > 1;
 
 return $val;
@@ -32697,11 +32715,13 @@ return $val;
 ###############################################################
 sub _aiFannNormAsymFixRange {
   my ($aref, $min, $max) = @_;
+  
+  return [] unless $max > $min;
 
-  my $range    = $max - $min;
-  my $norm_ref = [ map { ($_ - $min) / $range } @$aref ];
-
-return ($norm_ref);
+  return [ map {
+      my $v = ($_ - $min) / ($max - $min);
+      $v < 0 ? 0 : $v > 1 ? 1 : $v;                                                     # Hard clamp [0,1]
+  } @$aref ];
 }
 
 ###############################################################
@@ -35227,13 +35247,12 @@ sub checkPlantConfig {
 
   ## Allgemeine Settings (auch API spezifisch)
   ##############################################
-  my $eocr                     = AttrVal       ($name, 'event-on-change-reading', '');
-  my $eour                     = AttrVal       ($name, 'event-on-update-reading', '');
-  
-  my $gdn                      = AttrVal       ('global', 'dnsServer', '');
-  my $aiprep                   = isPrepared4AI ($hash, 'full');
-  my $aiusemsg                 = CurrentVal    ($hash, 'aicanuse', '');
-  my ($cset, $lat, $lon, $alt) = locCoordinates();
+  my $eocr                     = AttrVal        ($name, 'event-on-change-reading', '');
+  my $eour                     = AttrVal        ($name, 'event-on-update-reading', '');
+  my $gdn                      = AttrVal        ('global', 'dnsServer', '');
+  my $aiprep                   = isPrepared4AI  ($hash, 'full');
+  my $aiusemsg                 = CurrentVal     ($hash, 'aicanuse', '');
+  my ($cset, $lat, $lon, $alt) = locCoordinates ($name);
   
   my @eocrar = split ',', $eocr; 
   my @eourar = split ',', $eour; 
@@ -35266,29 +35285,29 @@ sub checkPlantConfig {
 
   if (!$lat) {
       $result->{'Common Settings'}{state}   = $warn;
-      $result->{'Common Settings'}{result} .= qq{Attribute latitude in global device is not set. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the latitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{result} .= qq{The latitude value is unknown. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in $name plantControl->plantCoordinates or the latitude attribute of the global device.<br>};
       $result->{'Common Settings'}{warn}    = 1;
   }
 
   if (!$lon) {
       $result->{'Common Settings'}{state}   = $warn;
-      $result->{'Common Settings'}{result} .= qq{Attribute longitude in global device is not set. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in the longitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{result} .= qq{The longitude value is unknown. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the coordinates of your installation in $name plantControl->plantCoordinates or the longitude attribute of the global device.<br>};
       $result->{'Common Settings'}{warn}    = 1;
+  }
+  
+  if (!$alt) {
+      $result->{'Common Settings'}{state}   = $nok;
+      $result->{'Common Settings'}{result} .= qq{The altitude value is not set. <br>};
+      $result->{'Common Settings'}{note}   .= qq{Set the altitude in meters above sea level in the altitude attribute of the global device.<br>};
+      $result->{'Common Settings'}{fault}   = 1;
   }
 
   if (!$gdn) {
       $result->{'Common Settings'}{state}   = $nok;
       $result->{'Common Settings'}{result} .= qq{Attribute dnsServer in global device is not set. <br>};
       $result->{'Common Settings'}{note}   .= qq{Set global attribute dnsServer to the IP Adresse of your DNS Server.<br>};
-      $result->{'Common Settings'}{fault}   = 1;
-  }
-
-  if (!$alt) {
-      $result->{'Common Settings'}{state}   = $nok;
-      $result->{'Common Settings'}{result} .= qq{Attribute altitude in global device is not set. <br>};
-      $result->{'Common Settings'}{note}   .= qq{Set the altitude in meters above sea level in the altitude attribute of the global device.<br>};
       $result->{'Common Settings'}{fault}   = 1;
   }
 
@@ -35321,6 +35340,7 @@ sub checkPlantConfig {
   if (isForecastSolarUsed ($hash)) {                                                         # allg. Settings bei Nutzung Forecast.Solar API
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
       }
@@ -35342,6 +35362,7 @@ sub checkPlantConfig {
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
       }
@@ -35358,6 +35379,7 @@ sub checkPlantConfig {
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on_complex" is recommended if the SolCast efficiency factor is already adjusted.<br>};
       }
@@ -35394,6 +35416,7 @@ sub checkPlantConfig {
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $info;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{Set pvCorrectionFactor_Auto to "on_complex" or "on_complex_ai" is recommended.<br>};
       }
@@ -35421,6 +35444,7 @@ sub checkPlantConfig {
 
       if ($pcf !~ /on/xs) {
           $result->{'Common Settings'}{state}   = $warn;
+          $result->{'Common Settings'}{result} .= qq{plant coordinates are set: longitude=$lon, latitude=$lat, altitude=$alt <br>};
           $result->{'Common Settings'}{result} .= qq{pvCorrectionFactor_Auto is set to "$pcf" <br>};
           $result->{'Common Settings'}{note}   .= qq{set pvCorrectionFactor_Auto to "on_complex" is recommended.<br>};
           $result->{'Common Settings'}{warn}    = 1;
@@ -35441,6 +35465,7 @@ sub checkPlantConfig {
   }
 
   if (!$result->{'Common Settings'}{fault}) {
+      $result->{'Common Settings'}{note}   .= qq{plantControl->plantCoordinates keys latitude, longitude, altitude <br>};
       $result->{'Common Settings'}{note}   .= qq{global->latitude, global->longitude, global->altitude <br>};
       $result->{'Common Settings'}{note}   .= qq{global->language, global->dnsServer <br>};
       $result->{'Common Settings'}{note}   .= qq{event-on-change-reading, ctrlLanguage <br>};
@@ -37839,13 +37864,33 @@ return ($riseshift, $setshift);
 #  gibt latitude, longitude und altitude zurück
 ################################################################
 sub locCoordinates {
-
+  my ($name) = @_;
+  
   my $set = 0;
   my $lat = AttrVal ('global', 'latitude',  '');
   my $lon = AttrVal ('global', 'longitude', '');
   my $alt = AttrVal ('global', 'altitude',   0);
+  
+  my $plantCoordinates = CurrentVal ($name, 'plantCoordinates', '');
+  
+  if ($plantCoordinates) {
+      my (undef, $h) = parseParams ($plantCoordinates, ',', '', '->');
+      
+      for my $k (keys %{$h}) {                                                  # Keys von führenden und trailing Leerzeichen befreien
+          my $clean = $k;
+          $clean =~ s/^\s+|\s+$//g;
+          
+          if ($clean ne $k) {
+              $h->{$clean} = delete $h->{$k};
+          }
+      }
+    
+      $lat = $h->{latitude}  if(defined $h->{latitude});
+      $lon = $h->{longitude} if(defined $h->{longitude});
+      $alt = $h->{altitude}  if(defined $h->{altitude});
+  }
 
-  if ($lat && $lon) {
+  if ($lat ne '' && $lon ne '') {
       $set = 1;
   }
 
@@ -41893,12 +41938,13 @@ to ensure that the system configuration is correct.
             <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
             <tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr>
-            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100' should be observed!                   </td></tr>
-            <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
+            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100 | 0' must be observed!                 </td></tr>
+            <tr><td>                     </td><td>Value range: <b>0, 1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 5                              </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>careCycle</b>    </td><td>Maximum interval in days between two charge states of at least 'maxSoC' that should not be      </td></tr>
-            <tr><td>                     </td><td>exceeded if possible. The specification is optional (default: 20)                               </td></tr>
-            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100' should be observed!                   </td></tr>
+            <tr><td>                     </td><td>exceeded if possible. The specification is optional.                                            </td></tr>
+            <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100 | 0' must be observed!                 </td></tr>
+            <tr><td>                     </td><td>Value range: <b>1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 20                                </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>lcSlot</b>       </td><td>A daily time window is defined in which the charging control of the module should be active     </td></tr>
             <tr><td>                     </td><td>for this battery. Outside the time window, the battery charge is released                       </td></tr>
@@ -42591,13 +42637,21 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                                        </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                                   </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
-            <tr><td> <b>consForecastBase</b>          </td><td>The consumption forecast will be increased to at least the specified base value. Higher consumption forecasts remain unaffected.                                         </td></tr>
-            <tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1–24) or as a group of hours (e.g., 5–9).                                                             </td></tr>
-			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;value&gt;,&lt;hod&gt;->&lt;value&gt;,...</b> The &lt;value&gt; can be specified as:                                                          </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Integer&gt;</b> - a fixed base value, e.g. '2–500' or '3-9->650'                                                                                                  </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. '11->Dev:Rdg:200' or '6-11->Dev:Rdg:200', returns the base as an integer. '200' is the default value.       </td></tr>
-            <tr><td>                                  </td><td><b>Note:</b> The base is only effective within the context of the consumption forecast component without AI.                                                             </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+			<tr><td> <b>consForecastBase</b>          </td><td>This parameter controls a base value for the consumption forecast. The application method can be selected via the optional token <b>Mode</b>.                            </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+			<tr><td>                                  </td><td><b>Mode->Base</b>: The base value acts as a minimum threshold (default).                                                                                                 </td></tr>
+			<tr><td>                                  </td><td><ul>-> calculated forecasts below consForecastBase are raised to this value (basement).                     </ul>                                                        </td></tr>
+			<tr><td>                                  </td><td><ul>-> calculated forecasts above consForecastBase remain unchanged.                                        </ul>                                                        </td></tr>
+			<tr><td>                                  </td><td><b>Mode->AddOn</b>: The base value is added as a fixed surcharge to the calculated forecast — regardless of its magnitude.                                               </td></tr>
+			<tr><td>                                  </td><td><ul>-> e.g. 'Mode->AddOn,6-11->200' adds a surcharge of 200 Wh to every forecast for hours 6–11.            </ul>                                                        </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+			<tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1..24) or as a group of hours (e.g. 5-9).                                                             </td></tr>
+			<tr><td>                                  </td><td>Syntax: <b>[Mode->&lt;Base|AddOn&gt;,]&lt;hod&gt;->&lt;value&gt;,&lt;hod&gt;->&lt;value&gt;,...</b>                                                                      </td></tr>
+			<tr><td>                                  </td><td>&lt;value&gt; can be defined in different ways:                                                                                                                          </td></tr>
+			<tr><td>                                  </td><td><b>&lt;integer&gt;</b> - a fixed value, e.g. '2->500' or '3-9->650'                                                                                                      </td></tr>
+			<tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. '11->Dev:Rdg:200' or '6-11->Dev:Rdg:200', returns the value as an integer. '200' is the fallback value.     </td></tr>
+			<tr><td>                                  </td><td><b>Note:</b> consForecastBase is only effective within the non-AI consumption forecast component.                                                                        </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast.                                                                   </td></tr>
             <tr><td>                                  </td><td>Otherwise, all weekdays are used equally for the calculation.                                                                                                            </td></tr>
             <tr><td>                                  </td><td>Value: <b>0|1</b>, default: 0                                                                                                                                            </td></tr>
@@ -42642,6 +42696,11 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td><b>adapt4Steps</b> - the events are optimized for the SVG plot type 'steps'                                                                                              </td></tr>
             <tr><td>                                  </td><td><b>adapt4fSteps</b> - the events are optimized for the SVG plot type 'fsteps'                                                                                            </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+            <tr><td> <b>plantCoordinates</b>          </td><td>Specifies the geographic coordinates (latitude and longitude) of the installed PV system. The values set here take precedence over those stored in the global device.    </td></tr>
+            <tr><td>                                  </td><td>latitude - latitude in decimal degrees (-90 .. 90)                                                                                                                       </td></tr>
+            <tr><td>                                  </td><td>longitude - geographic longitude in decimal degrees (−180 .. 180)                                                                                                        </td></tr>
+            <tr><td>                                  </td><td>Syntax: <b>latitude->&lt;Value&gt;,longitude->&lt;Value&gt;</b> (predefined by the setting in the global device)                                                         </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>reductionState</b>            </td><td>SolarForecast uses this parameter to determine the current curtailment status of the PV system (optional).                                                               </td></tr>
             <tr><td>                                  </td><td>The syntax is a <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Function&gt;</b>  combination. Possible values for &lt;Function&gt; are:                                           </td></tr>
 			<tr><td>                                  </td><td><b>&lt;Regex&gt;</b> - The regular expression is applied to the value of &lt;Device&gt;:&lt;Reading&gt;. Boolean result: 'true' -> throttled, 'false' -> not throttled   </td></tr>
@@ -42660,7 +42719,7 @@ to ensure that the system configuration is correct.
 
        <ul>
          <b>Example: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650 plantCoordinates=latitude->41.235272,longitude->15.437722
        </ul>
 
        </li>
@@ -45079,12 +45138,13 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
             <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
             <tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr>
-            <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100' sollte eingehalten werden!            </td></tr>
-            <tr><td>                     </td><td>Wert: <b>0..5</b>, default: 5                                                                   </td></tr>
+            <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100 | 0' muß eingehalten werden!           </td></tr>
+            <tr><td>                     </td><td>Wertebereich: <b>0, 1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 5                             </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>careCycle</b>    </td><td>maximaler Abstand in Tagen, der zwischen zwei Ladungszuständen von mindestens 'maxSoC'          </td></tr>
-            <tr><td>                     </td><td>möglichst nicht überschritten werden soll. Die Angabe ist optional (default: 20)                </td></tr>
-            <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100' sollte eingehalten werden!            </td></tr>
+            <tr><td>                     </td><td>möglichst nicht überschritten werden soll. Die Angabe ist optional.                             </td></tr>
+            <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100 | 0' muß eingehalten werden!           </td></tr>
+            <tr><td>                     </td><td>Wertebereich: <b>1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 20                               </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>lcSlot</b>       </td><td>Es wird ein tägliches Zeitfenster festgelegt, in dem die Ladesteuerung des Moduls für diese     </td></tr>
             <tr><td>                     </td><td>Batterie aktiv sein soll. Außerhalb des Zeitfensters wird die Batterieladung mit voller         </td></tr>
@@ -45775,13 +45835,24 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                                    </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                               </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
-            <tr><td> <b>consForecastBase</b>          </td><td>Die Verbrauchsprognose wird mindestens auf den angegebenen Basiswert erhöht. Höhere Verbrauchsprognosen bleiben unberührt.                                           </td></tr>
-            <tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat oder als Stundengruppe (z.B. 5-9) definierbar.                                                           </td></tr>
-			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...</b>  Der &lt;Wert&gt; kann angegeben werden mit:                                                  </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Base-Wert, z.B. '2->500' oder '3-9->650'                                                                                        </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. '11->Dev:Rdg:200' oder '6-11->Dev:Rdg:200', liefert die Base als Ganzzahl. '200' ist der Ersatzwert.    </td></tr>
-            <tr><td>                                  </td><td><b>Hinweis:</b> Die Base ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                            </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+			<tr><td> <b>consForecastBase</b>          </td><td>Dieser Parameter steuert einen Basiswert für die Verbrauchsprognose. Das Verfahren zur Anwendung ist über den optionalen Token <b>Mode</b> wählbar.                  </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+			<tr><td>                                  </td><td><b>Mode->Base</b>: Der Basiswert wirkt als Mindestschwelle (default).                                                                                                </td></tr>
+			<tr><td>                                  </td><td><ul>-> berechnete Prognosen unterhalb von consForecastBase werden auf diesen Wert (Basement) angehoben.   </ul>                                                      </td></tr>
+			<tr><td>                                  </td><td><ul>-> berechnete Prognosen oberhalb von consForecastBase werden nicht verändert.                         </ul>                                                      </td></tr>
+			<tr><td>                                  </td><td><b>Mode->AddOn</b>: Der Basiswert wird als fester Aufschlag auf die berechnete Prognose addiert — unabhängig von deren Höhe.                                         </td></tr>
+			<tr><td>                                  </td><td><ul>-> z.B. 'Mode->AddOn,6-11->200' addiert auf jede Prognose der Stunden 6–11 einen Aufschlag von 200 Wh. </ul>                                                     </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+			<tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat oder als Stundengruppe (z.B. 5-9) definierbar.                                                           </td></tr>
+			<tr><td>                                  </td><td>Syntax: <b>[Mode->&lt;Base|AddOn&gt;,]&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...</b>                                                                    </td></tr>
+			<tr><td>                                  </td><td>&lt;Wert&gt; kann durch verschiedene Varianten definiert werden:                                                                                                     </td></tr>
+			<tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Wert, z.B. '2->500' oder '3-9->650'                                                                                             </td></tr>
+			<tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. '11->Dev:Rdg:200' oder '6-11->Dev:Rdg:200', liefert den Wert als Ganzzahl. '200' ist der Ersatzwert.    </td></tr>
+			<tr><td>                                  </td><td><b>Hinweise:</b> consForecastBase ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                   </td></tr>
+            <tr><td>                                  </td><td>Die Stunden müssen den Tag sequentiell abdecken, Bereichsangaben mit Start &gt; End (z.B. '22-7') sind ungültig.                                                     </td></tr>
+            <tr><td>                                  </td><td><ul>-> <b>gültig:</b>   Mode->AddOn,1-7->250,8-22->300,23-24->250                </ul>                                                                               </td></tr>
+            <tr><td>                                  </td><td><ul>-> <b>ungültig:</b> 22-7->250                                                </ul>                                                                               </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen.                                                               </td></tr>
             <tr><td>                                  </td><td>Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet.                                                                                      </td></tr>
             <tr><td>                                  </td><td>Wert: <b>0|1</b>, default: 0                                                                                                                                         </td></tr>
@@ -45826,6 +45897,11 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td><b>adapt4Steps</b> - die Events werden für den SVG Plot-Type 'steps' optimiert                                                                                       </td></tr>
             <tr><td>                                  </td><td><b>adapt4fSteps</b> - die Events werden für den SVG Plot-Type 'fsteps' optimiert                                                                                     </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+            <tr><td> <b>plantCoordinates</b>          </td><td>Legt die geografischen Daten latitude und longitude der installierten PV-Anlage fest. Gesetzte Werte haben Priorität vor den im global Device hinterlegten Werten.   </td></tr>
+            <tr><td>                                  </td><td>latitude - geographische Breite in Dezimalgrad (-90 .. 90)                                                                                                           </td></tr>
+            <tr><td>                                  </td><td>longitude - geographische Länge in Dezimalgrad (−180 .. 180)                                                                                                         </td></tr>
+            <tr><td>                                  </td><td>Syntax: <b>latitude->&lt;Wert&gt;,longitude->&lt;Wert&gt;</b> (vorbelegt durch die Einstellung im global Device)                                                     </td></tr>
+            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>reductionState</b>            </td><td>SolarForecast nutzt diesen Parameter, um den aktuellen Abregelungsstatus der PV-Anlage auszulesen (optional).                                                        </td></tr>
             <tr><td>                                  </td><td>Die Syntax ist eine <b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Funktion&gt;</b>-Kombination. Möglich als &lt;Funktion&gt; sind:                                           </td></tr>
 			<tr><td>                                  </td><td><b>&lt;Regex&gt;</b> - Der Regex wird auf den Wert von &lt;Device&gt;:&lt;Reading&gt; angewendet. Boolesches Ergebnis: true'->abgeregelt, 'false'->nicht abgeregelt  </td></tr>
@@ -45844,7 +45920,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
 
        <ul>
          <b>Beispiel: </b> <br>
-         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650
+         attr &lt;name&gt; plantControl feedinPowerLimit=4800 consForecastInPlanning=1 showLink=1 backupFilesKeep=2 consForecastIdentWeekdays=1 consForecastLastDays=8 genPVdeviation=continuously genPVforecastsToEvent=adapt4Steps consForecastBase=1->400,12->Dev:Rdg:650 plantCoordinates=latitude->41.235272,longitude->15.437722
        </ul>
 
        </li>
