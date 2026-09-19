@@ -72,10 +72,11 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.3" => "18.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
+  "2.10.3" => "19.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
                            "Wertebereiche für stepSoC und careCycle überarbeitet ".
                            "Korrektur der Darstellung bei Netzladung der Batterie über den Hausknoten ".
-                           "Schlüssel plantControl->plantCoordinates hinzugefügt, um mehrere SF-Geräte an verschiedenen Standorten innerhalb eines FHEM-Systems zu unterstützen ",
+                           "Schlüssel plantControl->plantCoordinates hinzugefügt, um mehrere SF-Geräte an verschiedenen Standorten innerhalb eines FHEM-Systems zu unterstützen ".
+                           "consForecastBase: Das Verfahren zur Anwendung des Basiswerts ist jetzt über den optionalen Token 'Mode->Base|AddOn' steuerbar. ",
   "2.10.2" => "29.08.2026  userExit bzgl. zirkulären Referenzen gehärtet, potenzielle Speicherleaks geschlossen ".
                            "_aiFannAutoArchitecture: Warnung durch undefiniertes dataParamRatio beseitigt ".
                            "_aiFannEpochDiagnostic: neuen hint29, very_early-Zweig: hint1 und hint26 zusaätzlich gated, early-Zweig: hint5 und hint23 zusätzlich gated ",
@@ -9603,8 +9604,10 @@ sub _attrplantControl {                  ## no critic "not used"
   my $aVal  = $paref->{aVal};
   my $cmd   = $paref->{cmd};
 
-  my $cforegex = '((?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))(?:,\s*(?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))*';
-
+  my $cforegex = '(?:Mode->(?:Base|AddOn),\s*)?'
+               . '((?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))'
+               . '(?:,\s*(?:[1-9]|1\d|2[0-4])(?:-(?:[1-9]|1\d|2[0-4]))?->(?:[^\s]+:[^\s]+:\d+|\d+))*';
+             
   my $valid = {
       backupFilesKeep           => { comp => '\d+',                                               act => 0 },
       batteryPreferredCharge    => { comp => '([0-9]|[1-9][0-9]|100)',                            act => 0 },
@@ -10691,15 +10694,26 @@ sub __attrKeyAction {
                   if (!defined $ev) { return qq{No Consumer type 'bev' is defined. Please define it with the consumerXX attribute first.} }
               }
           }
-
+          
           if ($akey eq 'consForecastBase') {
               my $cfbase  = CurrentVal  ($name, 'consForecastBase', '');
-              my ($a, $h) = parseParams ($cfbase, ',', '', '->');
+              my (undef, $h) = parseParams ($cfbase, ',', '', '->');
 
               for my $hnum (keys %{$h}) {
-                  my ($cfodev, $cford, $def) = split ":", $h->{$hnum};
+                  if ($hnum =~ /^Mode$/i) {                                                                     # Mode-Token validieren
+                      my $proc = trim ($h->{$hnum});
+                    
+                      if ($proc !~ /^(?:Base|AddOn)$/i) {
+                          delete $data{$name}{current}{$akey};
+                          return "consForecastBase: invalid Mode value '$proc' - use 'Base' or 'AddOn'";
+                      }
+                    
+                      next;
+                  }
 
-                  if ($cfodev && $cford) {                                                          # Auswertung Device/Reading Kombi
+                  my ($cfodev, $cford, $def) = split ":", $h->{$hnum};                                          # Stunden-Token: Device/Reading Kombi prüfen
+
+                  if ($cfodev && $cford) {
                       ($err) = isDeviceValid ( { name   => $name,
                                                  obj    => $cfodev,
                                                  method => 'string',
@@ -20484,7 +20498,8 @@ sub __considerConsBase {
   my $cfbase = CurrentVal ($name, 'consForecastBase', undef);
   return $confc_raw if(!defined $cfbase);
 
-  my ($a, $h) = parseParams ($cfbase, ',', '', '->');
+  my ($a, $h)   = parseParams ($cfbase, ',', '', '->');
+  my $procedure = exists $h->{Mode} ? trim($h->{Mode}) : 'Base';                # Mode auslesen (Default: Base = bisheriges Verhalten)
 
   my ($base_val, $def);
   my ($cfodev, $cford) = ('','');
@@ -20493,6 +20508,8 @@ sub __considerConsBase {
   $hod      = int($hod);
 
   for my $hnum (keys %{$h}) {
+      next if $hnum =~ /^Mode$/i;                                               # Mode-Token überspringen
+      
       my $basehod = trim ($hnum);
 
       $basehod =~ /(\d+(?:-\d+)?)/;                                             # auflösen einfache Ziffer (7) oder Bereich (2-5)
@@ -20531,17 +20548,21 @@ sub __considerConsBase {
       }
 
       if ($debug =~ /consumption/) {
-          if ($cfodev && $cford) {
-              Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - use device:reading combination $cfodev:$cford -> got value=$base_val Wh");
-          }
-          else {
-              Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - use given value=$base_val Wh");
-          }
+          my $src = ($cfodev && $cford) ? "device:reading $cfodev:$cford -> value=$base_val Wh"
+                                        : "given value=$base_val Wh";
+          Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod procedure=$procedure - $src");
       }
 
-      $confc = defined $base_val && $base_val > $confc_raw ? $base_val : $confc_raw;
+      # --- Kernlogik: Base (Boden) oder AddOn (Aufschlag)
+      if ($procedure eq 'AddOn') {
+          $confc = $confc_raw + $base_val;                                      # Aufschlag auf berechneten Wert
+      }
+      else {                                                                    # 'Base' = default Verhalten
+          $confc = defined $base_val && $base_val > $confc_raw ? $base_val : $confc_raw;
+      }
 
-      Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod - original confc=$confc_raw recalculated to value=$confc Wh") if ($debug =~ /consumption/);
+      Log3 ($name, 1, "$name DEBUG> consider consForecastBase hod=$hod procedure=$procedure - original confc=$confc_raw recalculated to value=$confc Wh")
+          if ($debug =~ /consumption/);
   }
 
 return $confc;
@@ -42607,18 +42628,21 @@ to ensure that the system configuration is correct.
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                                        </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                                   </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
-            <tr><td> <b>consForecastBase</b>          </td><td>This parameter sets a fixed minimum threshold for the consumption forecast.                                                                                              </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
-			<tr><td>                                  </td><td><ul>-> calculated forecasts below consForecastBase are raised to this value (Basement).   </ul>                                                                          </td></tr>
-			<tr><td>                                  </td><td><ul>-> calculated forecasts above consForecastBase are not modified.                      </ul>                                                                          </td></tr>
+			<tr><td> <b>consForecastBase</b>          </td><td>This parameter controls a base value for the consumption forecast. The application method can be selected via the optional token <b>Mode</b>.                            </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
-            <tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1–24) or as a group of hours (e.g., 5–9).                                                             </td></tr>
-			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;Value&gt;,&lt;hod&gt;->&lt;Value&gt;,...</b>                                                                                                 </td></tr>
-            <tr><td>                                  </td><td>&lt;Value&gt; can be defined in various ways:                                                                                                                            </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Integer&gt;</b> - a fixed base value, e.g. '2–500' or '3-9->650'                                                                                                  </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. '11->Dev:Rdg:200' or '6-11->Dev:Rdg:200', returns the base as an integer. '200' is the default value.       </td></tr>
-            <tr><td>                                  </td><td><b>Note:</b> The base is only effective within the context of the consumption forecast component without AI.                                                             </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+			<tr><td>                                  </td><td><b>Mode->Base</b>: The base value acts as a minimum threshold (default).                                                                                                 </td></tr>
+			<tr><td>                                  </td><td><ul>-> calculated forecasts below consForecastBase are raised to this value (basement).                     </ul>                                                        </td></tr>
+			<tr><td>                                  </td><td><ul>-> calculated forecasts above consForecastBase remain unchanged.                                        </ul>                                                        </td></tr>
+			<tr><td>                                  </td><td><b>Mode->AddOn</b>: The base value is added as a fixed surcharge to the calculated forecast — regardless of its magnitude.                                               </td></tr>
+			<tr><td>                                  </td><td><ul>-> e.g. 'Mode->AddOn,6-11->200' adds a surcharge of 200 Wh to every forecast for hours 6–11.            </ul>                                                        </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
+			<tr><td>                                  </td><td>The base value can be defined separately for each hour of the day (1..24) or as a group of hours (e.g. 5-9).                                                             </td></tr>
+			<tr><td>                                  </td><td>Syntax: <b>[Mode->&lt;Base|AddOn&gt;,]&lt;hod&gt;->&lt;value&gt;,&lt;hod&gt;->&lt;value&gt;,...</b>                                                                      </td></tr>
+			<tr><td>                                  </td><td>&lt;value&gt; can be defined in different ways:                                                                                                                          </td></tr>
+			<tr><td>                                  </td><td><b>&lt;integer&gt;</b> - a fixed value, e.g. '2->500' or '3-9->650'                                                                                                      </td></tr>
+			<tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - e.g. '11->Dev:Rdg:200' or '6-11->Dev:Rdg:200', returns the value as an integer. '200' is the fallback value.     </td></tr>
+			<tr><td>                                  </td><td><b>Note:</b> consForecastBase is only effective within the non-AI consumption forecast component.                                                                        </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                         </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>If set, only the same weekdays (Mon..Sun) are included in the calculation of the consumption forecast.                                                                   </td></tr>
             <tr><td>                                  </td><td>Otherwise, all weekdays are used equally for the calculation.                                                                                                            </td></tr>
             <tr><td>                                  </td><td>Value: <b>0|1</b>, default: 0                                                                                                                                            </td></tr>
@@ -45802,18 +45826,21 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                                  </td><td>Werte oberhalb des Limits werden durch SolarForecast als ungültig bewertet und nicht gespeichert.                                                                    </td></tr>
             <tr><td>                                  </td><td>Wert: <b>Ganzzahl</b>, default: 100000                                                                                                                               </td></tr>
             <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
-            <tr><td> <b>consForecastBase</b>          </td><td>Dieser Parameter legt eine feste Mindestschwelle für die Verbrauchsprognose fest.                                                                                    </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+			<tr><td> <b>consForecastBase</b>          </td><td>Dieser Parameter steuert einen Basiswert für die Verbrauchsprognose. Das Verfahren zur Anwendung ist über den optionalen Token <b>Mode</b> wählbar.                  </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+			<tr><td>                                  </td><td><b>Mode->Base</b>: Der Basiswert wirkt als Mindestschwelle (default).                                                                                                </td></tr>
 			<tr><td>                                  </td><td><ul>-> berechnete Prognosen unterhalb von consForecastBase werden auf diesen Wert (Basement) angehoben.   </ul>                                                      </td></tr>
 			<tr><td>                                  </td><td><ul>-> berechnete Prognosen oberhalb von consForecastBase werden nicht verändert.                         </ul>                                                      </td></tr>
+			<tr><td>                                  </td><td><b>Mode->AddOn</b>: Der Basiswert wird als fester Aufschlag auf die berechnete Prognose addiert — unabhängig von deren Höhe.                                         </td></tr>
+			<tr><td>                                  </td><td><ul>-> z.B. 'Mode->AddOn,6-11->200' addiert auf jede Prognose der Stunden 6–11 einen Aufschlag von 200 Wh. </ul>                                                     </td></tr>
 			<tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
 			<tr><td>                                  </td><td>Der Basiswert ist für jede Stunde des Tages (1..24) separat oder als Stundengruppe (z.B. 5-9) definierbar.                                                           </td></tr>
-			<tr><td>                                  </td><td>Syntax: <b>&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...</b>                                                                                               </td></tr>
-            <tr><td>                                  </td><td>&lt;Wert&gt; kann durch verschiedene Varianten definiert werden:                                                                                                     </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Base-Wert, z.B. '2->500' oder '3-9->650'                                                                                        </td></tr>
-            <tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. '11->Dev:Rdg:200' oder '6-11->Dev:Rdg:200', liefert die Base als Ganzzahl. '200' ist der Ersatzwert.    </td></tr>
-            <tr><td>                                  </td><td><b>Hinweis:</b> Die Base ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                            </td></tr>
-            <tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
+			<tr><td>                                  </td><td>Syntax: <b>[Mode->&lt;Base|AddOn&gt;,]&lt;hod&gt;->&lt;Wert&gt;,&lt;hod&gt;->&lt;Wert&gt;,...</b>                                                                    </td></tr>
+			<tr><td>                                  </td><td>&lt;Wert&gt; kann durch verschiedene Varianten definiert werden:                                                                                                     </td></tr>
+			<tr><td>                                  </td><td><b>&lt;Ganzzahl&gt;</b> - ein fester Wert, z.B. '2->500' oder '3-9->650'                                                                                             </td></tr>
+			<tr><td>                                  </td><td><b>&lt;Device&gt;:&lt;Reading&gt;:&lt;Default&gt;</b> - z.B. '11->Dev:Rdg:200' oder '6-11->Dev:Rdg:200', liefert den Wert als Ganzzahl. '200' ist der Ersatzwert.    </td></tr>
+			<tr><td>                                  </td><td><b>Hinweis:</b> consForecastBase ist nur im Rahmen des Verbrauchsprognoseanteils ohne KI wirksam.                                                                    </td></tr>
+			<tr><td>                                  </td><td>                                                                                                                                                                     </td></tr>
             <tr><td> <b>consForecastIdentWeekdays</b> </td><td>Wenn gesetzt, werden zur Berechnung der Verbrauchsprognose nur gleiche Wochentage (Mo..So) einbezogen.                                                               </td></tr>
             <tr><td>                                  </td><td>Anderenfalls werden alle Wochentage gleichberechtigt zur Kalkulation verwendet.                                                                                      </td></tr>
             <tr><td>                                  </td><td>Wert: <b>0|1</b>, default: 0                                                                                                                                         </td></tr>
