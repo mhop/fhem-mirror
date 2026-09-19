@@ -303,6 +303,8 @@ sub _ReturnWithError {
 
     ::readingsBeginUpdate($hash);
     ::readingsBulkUpdate( $hash, 'lastError', $responseRef->{status} );
+    $hash->{fhem}->{consecutiveErrorCount}++;
+    ::Log3( $hash, 1, "Weather $hash->{NAME}: error " . $responseRef->{status} );
 
     foreach my $r ( keys %{$responseRef} ) {
         ::readingsBulkUpdate( $hash, $r, $responseRef->{$r} )
@@ -315,7 +317,8 @@ sub _ReturnWithError {
           . $responseRef->{status} );
     ::readingsEndUpdate( $hash, 1 );
 
-    my $next = 60;    # $next= $hash->{INTERVAL};
+    my $next = 2 ** $hash->{fhem}->{consecutiveErrorCount} * 60;   
+    if($next > $hash->{INTERVAL}) { $next= $hash->{INTERVAL}; }
     _RearmTimer( $hash, gettimeofday() + $next );
 
     return;
@@ -370,6 +373,7 @@ sub RetrieveCallbackFn {
     my $responseRef = $hash->{fhem}->{api}->getWeather;
 
     if ( $responseRef->{status} eq 'ok' ) {
+        $hash->{fhem}->{consecutiveErrorCount}  = 0;
         _Writereadings( $hash, $responseRef );
     }
     else {
@@ -714,6 +718,8 @@ sub _RearmTimer {
 
     ::Log3( $hash, 4, "Weather $hash->{NAME}: Rearm new Timer" );
     ::InternalTimer( $t, \&FHEM::Core::Weather::GetUpdate, $hash, 0 );
+    $hash->{nextUpdateTime} = $t;
+    $hash->{nextUpdate} = ::FmtDateTime($t);
 
     return;
 }
@@ -724,6 +730,8 @@ sub _DisarmTimer {
     my $hash = shift;
 
     ::RemoveInternalTimer($hash);
+    $hash->{nextUpdateTime} = undef;
+    $hash->{nextUpdate} = "";
 
     return;
 }
@@ -822,6 +830,7 @@ sub Define {
     $hash->{APIOPTIONS}         = $apioptions;
     $hash->{VERSION}            = version->parse($VERSION)->normal;
     $hash->{fhem}->{allowCache} = 1;
+    $hash->{fhem}->{consecutiveErrorCount} = 0;
 
     ::readingsSingleUpdate( $hash, 'current_date_time', ::TimeNow(), 0 );
     ::readingsSingleUpdate( $hash, 'current_date_time', 'none',      0 );

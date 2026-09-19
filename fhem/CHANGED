@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: lib/FHEM/Core/Weather.pm: exponentielle Verzögerung bei
+            fehlerbedingtem Neuladen, Fehlermeldung im Log, Anzeige
+            nextUpdate
  - change:  76_SolarForecast: Version 2.10.3
  - bugfix:  60_Watches: Fixes im JS Code
  - feature: 93_DbLog: SVG Datenlieferung über SubProzess 
