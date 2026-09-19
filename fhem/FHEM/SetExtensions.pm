@@ -42,11 +42,40 @@ SE_DoSet(@)
 }
 
 sub
+SE_Next(@)
+{
+  my ($hash, $list, $name, $cmd, @a) = @_;
+  my $mt = $modules{$hash->{TYPE}};
+  if($mt->{SetExtensionsFn}){
+    foreach my $fn (@{$mt->{SetExtensionsFn}}) {
+      no strict "refs";
+      my $ret = &{$fn}($hash, $list, $name, $cmd, @a);
+      use strict "refs";
+      return $ret if(!$ret ||
+                      $ret !~ m/^Unknown argument $cmd, choose one of (.*)/);
+      $list = $1;
+    }
+  }
+  return "Unknown argument $cmd, choose one of $list";
+}
+
+sub
 SetExtensions($$@)
 {
   my ($hash, $list, $name, $cmd, @a) = @_;
 
-  return AttrTemplate_Set($hash, $list, $name, $cmd, @a) if(!$list);
+  if(AttrVal("global", "disableFeatures", "") !~ m/\battrTemplate\b/) {
+    my $as = "AttrTemplate_Set";
+    my $mt = $modules{$hash->{TYPE}};
+    if(!$mt->{SetExtensionsFn}) {
+      my @ml = ( $as );
+      $mt->{SetExtensionsFn} = \@ml;
+    } elsif(!grep($as, @{$mt->{SetExtensionsFn}})) {
+      push(@{$mt->{SetExtensionsFn}}, $as);
+    }
+  }
+
+  return SE_Next($hash, $list, $name, $cmd, @a) if(!$list);
 
   my %se_list = (
     "on-for-timer"      => 1,
@@ -98,7 +127,7 @@ SetExtensions($$@)
   $list =~ s/:\{([^ ]+)\}/$cmdFromAnalyze=$1; ":".(eval $1)/ge if($cmd eq "?");
 
   if(!$onCmd || !$offCmd) { # No extension
-    return AttrTemplate_Set($hash, $list, $name, $cmd, @a);
+    return SE_Next($hash, $list, $name, $cmd, @a);
   }
 
   $cmd = ReplaceEventMap($name, $cmd, 1) if($fixedIt);
@@ -106,7 +135,7 @@ SetExtensions($$@)
   if(!defined($se_list{$cmd})) {
     # Add only "new" commands
     my @mylist = grep { $list !~ m/\b$_\b/ } keys %se_list;
-    return AttrTemplate_Set($hash, "$list ".join(" ", @mylist), $name, $cmd,@a);
+    return SE_Next($hash, "$list ".join(" ", @mylist), $name, $cmd,@a);
   }
   if($se_list{$cmd} && $se_list{$cmd} != int(@a)) {
     return "$cmd requires $se_list{$cmd} parameter";
