@@ -5,9 +5,10 @@
 # SIGNALduino RSL Modul. Modified version of FHEMduino Modul by Wzut
 #
 # 2019 - Ralf9 & Sidey79
+# 2020..2021 Sidey79
 #
 # Supports following devices:
-# - Conrad RSL  
+# - Conrad RSL 
 #####################################################################
 
 package main;
@@ -15,6 +16,7 @@ package main;
 use strict;
 use warnings;
 use SetExtensions;
+use FHEM::Meta;
 
 my %sets = ( 
 		"on"	=> sub { return $_[0]->{OnCode};  }, 
@@ -59,19 +61,20 @@ my @RSLCodes;
     $RSLCodes[4][4][0] = 0xA3;  # IV   4 / off All
     $RSLCodes[4][4][1] = 0x93;  # IV   4 / on  All
 
-sub SD_RSL_Initialize($) { 
+sub SD_RSL_Initialize { 
   my ($hash) = @_;
 
-  $hash->{Match}     = "^P1#[A-Fa-f0-9]+";
-  $hash->{SetFn}     = "SD_RSL_Set";
-  $hash->{DefFn}     = "SD_RSL_Define";
-  $hash->{UndefFn}   = "SD_RSL_Undef";
-  $hash->{AttrFn}    = "SD_RSL_Attr";
-  $hash->{ParseFn}   = "SD_RSL_Parse";
+  $hash->{Match}     = qr/^P1#[A-Fa-f0-9]+/;
+  $hash->{SetFn}     = \&SD_RSL_Set;
+  $hash->{DefFn}     = \&SD_RSL_Define;
+  $hash->{UndefFn}   = \&SD_RSL_Undef;
+  $hash->{AttrFn}    = \&SD_RSL_Attr;
+  $hash->{ParseFn}   = \&SD_RSL_Parse;
   $hash->{AttrList}  = "IODev RSLrepetition ignore:0,1 ".$readingFnAttributes;
   
   $hash->{AutoCreate}=
         { "RSL.*" => { GPLOT => "", FILTER => "%NAME",  autocreateThreshold => "2:30"} };
+  return FHEM::Meta::InitMod( __FILE__, $hash );                    
 }
 
 #####################################
@@ -112,7 +115,7 @@ sub SD_RSL_Define($$) {
 	
   AssignIoPort($hash, $iodevice);
 
-  return undef;
+  return ;
 }
 
 ##########################################################
@@ -135,7 +138,7 @@ sub SD_RSL_Set($@) {
 		return SetExtensions($hash, $cmdList, $name, @a)
 	}
 	
-	return undef;
+	return ;
 }
 
 ###################################################################
@@ -201,7 +204,7 @@ sub SD_RSL_Parse($$) {
 
     Log3 $hash, 4, "$name: SD_RSL_Parse - Device: $deviceCode  Action: $action";
 		
-	$modules{SD_RSL}{defptr}{ioname} = $name;
+	  $modules{SD_RSL}{defptr}{ioname} = $name;
     my $def = $modules{SD_RSL}{defptr}{$hash->{NAME} . "." . $deviceCode};
     $def = $modules{SD_RSL}{defptr}{$deviceCode} if(!$def);
 
@@ -239,7 +242,7 @@ sub SD_RSL_Undef($$) {
   my ($hash, $name) = @_;
   SetExtensionsCancel($hash);
   delete($modules{SD_RSL}{defptr}{$hash->{DEF}}) if($hash && $hash->{DEF});
-  return undef;
+  return ;
 }
 
 ########################################################
@@ -254,7 +257,7 @@ sub SD_RSL_Attr(@) {
   my $cde = $hash->{DEF};
   delete($modules{SD_RSL}{defptr}{$cde});
   $modules{SD_RSL}{defptr}{$iohash->{NAME} . "." . $cde} = $hash;
-  return undef;
+  return ;
 }
 
 1;
@@ -274,7 +277,7 @@ If autocreate is used, a device &quot;&lt;code&gt;_ALL&quot; like RSL_74A400_ALL
 <a name="SD_RSL_Define"></a>
 <b>Define</b>
 <ul>
-	<p><code>define &lt;name&gt; SD_RSL &lt;code&gt;_&lt;channel&gt;[_&lt;button&gt;] &lt;optional IODEV&gt;</code>
+	<p><code>define &lt;name&gt; SD_RSL &lt;code&gt;_&lt;channel&gt;[_&lt;button&gt;] &lt;optional IODEV&gt;</code></p>
 	<br>
 	<br>
 	<code>&lt;name&gt;</code> is any name assigned to the device.
@@ -327,7 +330,7 @@ Beim Verwendung von Autocreate wird bei der Taste All anstatt channel und button
 <a name="SD_RSL_Define"></a>
 <b>Define</b>
 <ul>
-	<p><code>define &lt;name&gt; SD_RSL &lt;code&gt;_&lt;channel&gt;[_&lt;button&gt;] &lt;optional IODEV&gt;</code>
+	<p><code>define &lt;name&gt; SD_RSL &lt;code&gt;_&lt;channel&gt;[_&lt;button&gt;] &lt;optional IODEV&gt;</code></p>
 	<br>
 	<br>
 	<code>&lt;name&gt;</code> ist ein Name, der dem Ger&auml;t zugewiesen ist.
@@ -343,7 +346,7 @@ Beim Verwendung von Autocreate wird bei der Taste All anstatt channel und button
 <a name="SD_RSL_Set"></a>
 <b>Set</b>
 <ul>
-  <code>set <name> &lt;[on|off|toggle]&gt;</code><br
+  <code>set <name> &lt;[on|off|toggle]&gt;</code><br>
   Schaltet das Ger&auml;t ein oder aus.<br><br>
   <code>set <name> &lt;[on-for-timer|off-for-timer|on-till|off-till|blink|intervals]&gt;</code><br>
   Schaltet das Ger&auml;t f&uuml;r einen bestimmten Zeitraum. Weitere Infos hierzu unter <a href="#setExtensions">set extensions</a>.<br><br>
@@ -369,4 +372,81 @@ Beim Verwendung von Autocreate wird bei der Taste All anstatt channel und button
 </ul>
 =end html_DE
 
+=for :application/json;q=META.json 14_SD_RSL.pm
+{
+  "abstract": "devices communicating using the Conrad RSL protocol",
+  "author": [
+    "Sidey <>",
+    "ralf9 <>"
+  ],  
+  "x_fhem_maintainer": [
+    "Sidey"
+  ],
+  "x_fhem_maintainer_github": [
+    "Sidey79"
+  ],
+  "description": "The SD_RSL module decrypts and creates Conrad RSL messages sent / received by a SIGNALduino device.",
+  "dynamic_config": 1,
+  "keywords": [
+    "fhem-sonstige-systeme",
+    "fhem-hausautomations-systeme",
+    "fhem-mod",
+    "signalduino",
+    "RSL"
+  ],
+  "license": [
+    "GPL_2"
+  ],
+  "meta-spec": {
+    "url": "https://metacpan.org/pod/CPAN::Meta::Spec",
+    "version": 2
+  },
+  "name": "FHEM::SD_RSL",
+  "prereqs": {
+    "runtime": {
+      "requires": {
+      }
+    },
+    "develop": {
+      "requires": {
+	    }
+    }
+  },
+  "release_status": "stable",
+  "resources": {
+    "bugtracker": {
+      "web": "https://github.com/fhem/mod_RSL/issues/"
+    },
+    "x_testData": [
+      {
+        "url": "https://raw.githubusercontent.com/fhem/mod_RSL/master/t/FHEM/14_SD_RSL/testData.json",
+        "testname": "Testdata with RSL sensors / actors"
+      }
+    ],
+    "repository": {
+      "x_master": {
+        "type": "git",
+        "url": "https://github.com/fhem/mod_RSL.git",
+        "web": "https://github.com/fhem/mod_RSL/tree/master"
+      },
+      "type": "svn",
+      "url": "https://svn.fhem.de/fhem",
+      "web": "https://svn.fhem.de/trac/browser/trunk/fhem/FHEM/14_SD_RSL.pm",
+      "x_branch": "trunk",
+      "x_filepath": "fhem/FHEM/",
+      "x_raw": "https://svn.fhem.de/trac/export/latest/trunk/fhem/FHEM/14_SD_RSL.pm"
+    },
+    "x_support_community": {
+      "board": "Sonstige Systeme",
+      "boardId": "29",
+      "cat": "FHEM - Hausautomations-Systeme",
+      "description": "Sonstige Hausautomations-Systeme",
+      "forum": "FHEM Forum",
+      "rss": "https://forum.fhem.de/index.php?action=.xml;type=rss;board=29",
+      "title": "FHEM Forum: Sonstige Systeme",
+      "web": "https://forum.fhem.de/index.php/board,29.0.html"
+    }
+  }
+}
+=end :application/json;q=META.json
 =cut
