@@ -72,6 +72,8 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.4" => "20.09.2026  _batSocTarget: Debuglog für Step6 korrigiert ".
+                           "AI::FANN Speicherleck durch globales DESTROY-Patching behoben. ",
   "2.10.3" => "19.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
                            "Wertebereiche für stepSoC und careCycle überarbeitet ".
                            "Korrektur der Darstellung bei Netzladung der Batterie über den Hausknoten ".
@@ -11974,12 +11976,13 @@ sub readCacheFile {
                   next;
               }
 
-              my $model = AI::FANN->new_from_file ($tmpfile);                                               # Modell neu laden
+              my $raw = AI::FANN->new_from_file ($tmpfile);                                                 # Modell neu laden
               unlink $tmpfile if -e $tmpfile;
 
-              if ($model && eval { $model->MSE(); 1 }) {                                                    # Modell testen
-                  $data{$name}{neuralnet}{$fanntyp}{FannModel} = $model;                                    # gültiges Modell → in Struktur einfügen
-
+               if ($raw && eval { $raw->MSE(); 1 }) {                                                       # Modell testen
+                  $data{$name}{neuralnet}{$fanntyp}{FannModel} =                                            # gültiges Modell → in Wrapper kapseln → in Struktur einfügen
+                      FHEM::SolarForecast::AiFannModelWrapper->aiFannModelCreate ($raw);
+                      
                   $data{$name}{current}{$fanntyp.'NNTrainstate'} = 'ok';
                   Log3 ($name, 3, qq{$name - cached data "$title" restored for FANN type '$fanntyp'});
               }
@@ -12157,13 +12160,6 @@ sub writeCacheFile {
               my $obj = $nnref->{$fanntyp}{FannModel};
               $saved_models{$fanntyp} = $obj;
 
-              if (defined $obj && ref($obj)) {                                            # XS-Destructor entschärfen
-                  my $class = ref($obj);
-                  no strict 'refs';
-                  no warnings 'redefine';
-                  *{$class . '::DESTROY'} = sub { };
-              }
-
               delete $nnref->{$fanntyp}{FannModel};
           }
 
@@ -12183,10 +12179,13 @@ sub writeCacheFile {
                       my $tmpfile = $file . "_reload_fannmodel_$fanntyp";
                       write_blob ($tmpfile, $blob);
 
-                      my $new = AI::FANN->new_from_file ($tmpfile);
+                      my $new_raw = AI::FANN->new_from_file ($tmpfile);
                       unlink $tmpfile;
 
-                      $nnref->{$fanntyp}{FannModel} = $new if($new);
+                      if ($new_raw) {
+                          $nnref->{$fanntyp}{FannModel} =
+                              FHEM::SolarForecast::AiFannModelWrapper->aiFannModelCreate ($new_raw);
+                      }
                   }
               }
           }
@@ -15932,7 +15931,9 @@ sub _batSocTarget {
       }
 
       debugLog ($paref, 'batteryManagement', "SoC Step6 Bat $bn - force charging request: ".
-                        ($chargereq ? 'yes (battery charge is below minimum SoC)' : 'no (Battery is sufficiently charged)'));
+                        ($chargereq ? "yes (battery charge $soc % is below target SoC $target %)" 
+                                    : "no (battery charge $soc % has reached target SoC $target %)")
+                        );
 
       ## pvHistory/Readings schreiben
       #################################
@@ -31347,7 +31348,7 @@ sub _aiFannPredict {
   my $fannModel = $data{$name}{neuralnet}{$fanntyp}{FannModel};
 
   my $out;
-  eval { $out = $fannModel->run ($input) };                                                         # Netz laufen lassen
+  eval { $out = $fannModel->aiFannModelRun ($input) };                                              # Netz im Wrapper laufen lassen                                                         # Netz laufen lassen
 
   my $zone = 3;
   my $bc   = 0;
@@ -40172,6 +40173,46 @@ sub SM_getValue    { $_[0]->{value} }                         # gibt den aktuell
 sub SM_setValue    { $_[0]->{value}    = $_[1] }              # setzt einen neuen Vergleichswert im Objekt
 sub SM_setDeadband { $_[0]->{deadband} = $_[1] }              # setzt den Deadband-Parameter des Objekts
 sub SM_setAlpha    { $_[0]->{alpha}    = $_[1] }              # setzt den Alpha-Parameter des Objekts
+
+
+###############################################
+# AI::FANN MODEL WRAPPER (Memory-Safe)
+# Kapselt das rohe XS-Objekt.
+# Zweck: writeCacheFile braucht kein globales
+#        Patching von AI::FANN::DESTROY mehr.
+###############################################
+package FHEM::SolarForecast::AiFannModelWrapper;
+
+sub aiFannModelCreate {                                       # Konstruktor
+  my ($class, $model) = @_;
+  return bless { model => $model }, $class;
+}
+
+sub aiFannModelRun {                                          # Dedizierter Run-Wrapper (kein AUTOLOAD-Overhead im Inferenzpfad)
+  my ($self, $input) = @_;
+  return unless $self->{model};
+  return $self->{model}->run ($input);
+}
+
+sub aiFannModelDestroy {                                      # Explizite Freigabe: setzt inneres XS-Objekt auf undef
+  my ($self) = @_;
+  $self->{model} = undef;
+}
+
+our $AUTOLOAD;
+sub AUTOLOAD {                                                # Delegiert alle unbekannten Methoden (MSE, save …) an echtes FANN-Objekt
+  my $self = shift;
+  my $method = $AUTOLOAD;
+  $method =~ s/.*:://;
+  return if $method eq 'DESTROY';
+  return unless $self->{model};
+  return $self->{model}->$method (@_);
+}
+
+sub DESTROY {                                                 # Automatische Freigabe via Perl-GC
+  my ($self) = @_;
+  $self->aiFannModelDestroy();
+}
 
 1;
 
