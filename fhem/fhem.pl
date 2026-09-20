@@ -409,7 +409,7 @@ map { $attrSource{$_} = {m=>"framework"} } qw(
 
 my %ra = (
   "suppressReading"            => { s=>"\n" },
-  "event-aggregator"           => { s=>",", c=>".attraggr" },
+  "event-aggregator"           => { s=>",", c=>".attraggr", r=>":.*" },
   "event-on-update-reading"    => { s=>",", c=>".attreour" },
   "event-on-change-reading"    => { s=>",", c=>".attreocr",   r=>":.*" },
   "timestamp-on-change-reading"=> { s=>",", c=>".attrtocr" },
@@ -2397,6 +2397,7 @@ CommandDelete($$)
     addStructChange("delete", $sdev, $sdev) if(!$temporary);
     delete($attr{$sdev});
     delete($defs{$sdev});
+    delete($oldvalue{$sdev});
     DoTrigger("global", "DELETED $sdev", 1) if(!$temporary);
 
   }
@@ -2431,7 +2432,10 @@ CommandDeleteAttr($$)
         delete($defs{$sdev}{'.userReadings'});
       } elsif($ra{$a[1]}) {
         my $cache = $ra{$a[1]}{c};
-        delete $defs{$sdev}{$cache} if( $cache );
+        if($cache) {
+          delete($defs{$sdev}{$cache});
+          delete($defs{$sdev}{"$cache.re"});
+        }
       }
     }
 
@@ -3194,6 +3198,7 @@ CommandAttr($$)
         delete $hash->{$cache} if( $cache );
 
         my @a = split($ra{$attrName}{s}, $lval) ;
+        my @re;
         for my $v (@a) {
           my $v = $v; # resolve the reference to avoid changing @a itself
           if($ra{$attrName}{isNum}) {
@@ -3206,8 +3211,12 @@ CommandAttr($$)
           return "$err: use .* instead of *" if($v =~ /^\*/); # no err in eval!?
           eval { "Hallo" =~ m/^$v$/ };
           return "$err: $@" if($@);
+          push(@re, qr/^$v$/);
         }
-        $hash->{$cache} = \@a if( $cache );
+        if($cache) {
+          $hash->{$cache} = \@a;
+          $hash->{"$cache.re"} = \@re;
+        }
       }
     }
 
@@ -4192,7 +4201,7 @@ Dispatch($$;$$)
 
   foreach my $m (@{$clientArray}) {
     # The message is not for this module
-    next if($dmsg !~ m/$modules{$m}{Match}/s);
+    next if($dmsg !~ m/$modules{$m}{MatchRe}/s);
 
     if( my $ffn = $modules{$m}{FingerprintFn} ) {
       ($isdup, $idx) = CheckDuplicate($name, $dmsg, $ffn);
@@ -4826,8 +4835,8 @@ setReadingsVal($$$$)
 
   return if($rname eq "IODev" && !fhem_devSupportsAttr($hash->{NAME}, "IODev"));
 
-  my $or = $hash->{".or"};
-  if($or && grep($rname =~ m/^$_$/, @{$or}) ) {
+  my ($or, $orRe) = ($hash->{".or"}, $hash->{".or.re"});
+  if($orRe && grep($rname =~ m/$_/, @{$orRe}) ) {
     my $rd = $hash->{READINGS};
     if(defined($rd->{$rname}) && 
        defined($rd->{$rname}{VAL}) &&
@@ -5093,12 +5102,13 @@ readingsBulkUpdate($$$@)
     # these flags determine if any of the "event-on" attributes are set
     my $attreocr = $hash->{".attreocr"};
     my $attreour = $hash->{".attreour"};
-
-    # determine whether the reading is listed in any of the attributes
+    my ($eocrRe, $eocrIdx) = ($hash->{".attreocr.re"}, 0);
+    my ($eourRe, $eourIdx) = ($hash->{".attreour.re"}, 0);
     my $eocr = $attreocr &&
-               ( my @eocrv = grep { my $l = $_; $l =~ s/:.*//;
-                   ($reading=~ m/^$l$/) ? $_ : undef} @{$attreocr});
-    my $eour = $attreour && grep($reading =~ m/^$_$/, @{$attreour});
+               (my @eocrv = grep { $reading=~$eocrRe->[$eocrIdx++] ? $_ : undef}
+                                 @{$attreocr});
+    my $eour = $attreour && grep { $reading=~$eourRe->[$eourIdx++] }
+                                 @{$attreour};
 
     # check if threshold is given
     my $eocrExists = $eocr;
@@ -5130,9 +5140,9 @@ readingsBulkUpdate($$$@)
               || ($eocr && ($value ne $readings->{VAL}));
     #Log 1, "EOCR:$eocr EOUR:$eour CHANGED:$changed";
 
-    my @v = grep { my $l = $_;
-                   $l =~ s/:.*//;
-                   ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attrminint"}};
+    my ($miRe, $miIdx) = ($hash->{".attrminint.re"}, 0);
+    my @v = grep { $reading =~ $miRe->[$miIdx++] ? $_ : undef }
+                 @{$hash->{".attrminint"}};
     if(@v) {
       my (undef, $minInt) = split(":", $v[0]);
       my $now = $hash->{".updateTime"};
@@ -5149,20 +5159,18 @@ readingsBulkUpdate($$$@)
       }
     }
 
-    if( $attreocr ) {
-      if( my $attrtocr = $hash->{".attrtocr"} ) {
-        $update_timestamp = $changed
-                if( $attrtocr && grep($reading =~ m/^$_$/, @{$attrtocr}) );
-      }
+    if($attreocr) {
+       $update_timestamp = $changed
+          if(grep {$reading =~ $_} @{$hash->{".attrtocr.re"}})
     }
 
   }
 
   if($changed) {
     #Debug "Processing $reading: $value";
-    my @v = grep { my $l = $_;
-                  $l =~ s/:.*//;
-                  ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attraggr"}};
+    my ($aggrRe, $aggrIdx) = ($hash->{".attraggr.re"}, 0);
+    my @v = grep { $reading =~ $aggrRe->[$aggrIdx++] ? $_ : undef }
+                 @{$hash->{".attraggr"}};
     if(@v) {
       # e.g. power:20:linear:avg
       my (undef,$duration,$method,$function,$holdTime) = split(":", $v[0], 5);
@@ -5309,6 +5317,9 @@ computeClientArray($$)
       }
     }
   }
+
+  map { $modules{$_}{MatchRe} = qr/$modules{$_}{Match}/ } @a; # 145484
+
 
   $hash->{".clientArray"} = \@a;
   return \@a;
