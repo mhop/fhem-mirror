@@ -8,7 +8,7 @@
 # FHEM module to communicate with BOSE SoundTouch system
 #  $Id$
 #
-# Version: 3.0
+# Version: 3.1
 #
 #############################################################
 #
@@ -243,7 +243,8 @@ sub BOSEST_Set($@) {
                 "saveChannel:07,08,09,10,11,12,13,14,15,16,17,18,19,20 ".
                 "origin saveState:noArg restoreState restoreVolAndOff ".
                 "addDLNAServer:".$hash->{helper}{dlnaServers}." ".
-                "removeDLNAServer:".ReadingsVal($hash->{NAME}, "connectedDLNAServers", "noArg");
+                "removeDLNAServer:".ReadingsVal($hash->{NAME}, "connectedDLNAServers", "noArg")." ".
+                "reboot:noArg";
  
     #--check parameters for set function
     #DEVELOPNEWFUNCTION-1
@@ -417,6 +418,8 @@ sub BOSEST_Set($@) {
     } elsif($workType eq "restoreVolAndOff") {
         my $wait = (defined($params[0]) && looks_like_number($params[0]))?$params[0]:0;
         InternalTimer(gettimeofday()+$wait, "BOSEST_restoreVolumeAndOff", $hash, 0);
+    } elsif($workType eq "reboot") {
++        return BOSEST_reboot($hash);
     #-- end NEW
     } else {
         return SetExtensions($hash, $list, $name, $workType, @params);
@@ -2965,6 +2968,28 @@ sub BOSEST_readingsSingleUpdateIfChanged {
   }
 }
 
+#############################################################################
+
+sub BOSEST_reboot{
+    my ($hash) = @_;
+    my $host   = $hash->{helper}{IP};
+    my $port   = 17000;
+
+    my $socket = IO::Socket::INET->new(
+        PeerAddr => $host,
+        PeerPort => $port,
+        Proto    => 'tcp',
+        Timeout  => 5
+    );
+    return "cannot connect" unless($socket);
+
+    print $socket "sys reboot\r\n";
+    close($socket);
+
+    readingsSingleUpdate($hash, "state", "rebooting", 1);
+    return undef;
+}
+
 1;
 
 =pod
@@ -3036,6 +3061,7 @@ sub BOSEST_readingsSingleUpdateIfChanged {
         <li><code><b>source</b> bluetooth,bt-discover,aux mode, airplay,tv,hdmi1</code> &nbsp;&nbsp;-&nbsp;&nbsp; select a local source</li><br>
         <li><code><b>addDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; add DLNA servers Name1 (and Name2 to Namex) to the BOSE library</li>
         <li><code><b>removeDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; remove DLNA servers Name1 (and Name2 to Namex) to the BOSE library</li>
+        <li><code><b>reboot</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; reboot of device</li>
       </ul><br>
       Example: <code>set BOSE_1234567890AB volume 25</code>&nbsp;&nbsp;Set volume on device with the name BOSE_1234567890AB <br><br><br>
        	
@@ -3171,6 +3197,7 @@ sub BOSEST_readingsSingleUpdateIfChanged {
         <li><code><b>source</b> bluetooth,bt-discover,aux mode, airplay</code> &nbsp;&nbsp;-&nbsp;&nbsp; lokale Quelle ausw&auml;hlen</li><br>
         <li><code><b>addDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; DLNA server Name1 (und Name2 bis Namex) zur BOSE Bibliothek hinzuf&uuml;gen</li>
         <li><code><b>removeDLNAServer</b> Name1 [Name2] [Namex]</code> &nbsp;&nbsp;-&nbsp;&nbsp; DLNA server Name1 (und Name2 bis Namex) aus der BOSE Bibliothek entfernen</li>
+         <li><code><b>reboot</b></code> &nbsp;&nbsp;-&nbsp;&nbsp; Neustart des Geräts</li>
        </ul><br>
        Beispiel: <code>set BOSE_1234567890AB volume 25</code>&nbsp;&nbsp;Setzt die Lautst&auml;rke des Lautsprechers BOSE_1234567890AB auf 25.<br><br><br>
        	
