@@ -196,7 +196,7 @@ SVG_getplotsize($)
   my ($d) = @_;
   return $FW_webArgs{plotsize} ?
                 $FW_webArgs{plotsize} :
-                AttrVal($d,"plotsize", $FW_plotsize ? $FW_plotsize : "800,400");
+                AttrVal($d,"plotsize", $FW_plotsize ? $FW_plotsize : "800,160");
 }
 
 sub
@@ -2026,45 +2026,45 @@ SVG_render($$$$$$$$$$)
 
         } elsif ($pShape eq "square") {
           my $d = $pSize * 2;
-          SVG_pO sprintf("<rect x='%d'' y='%d' width='%d' height='%d' $attr/>",
-                        $x1-$pSize, $y1-$pSize, $d, $d);
+          SVG_pO sprintf("<rect x='%d' y='%d' width='%d' height='%d' %s/>",
+                        $x1-$pSize, $y1-$pSize, $d, $d, $attr);
 
         } elsif ($pShape eq "triangleup") {
-          SVG_pO sprintf("<polygon points='%d,%d %d,%d %d,%d' $attr/>",
+          SVG_pO sprintf("<polygon points='%d,%d %d,%d %d,%d' %s/>",
                 $x1,           $y1-$pSize,
                 $x1-$pSize,    $y1+$pSize,
-                $x1+$pSize,    $y1+$pSize);
+                $x1+$pSize,    $y1+$pSize, $attr);
 
         } elsif ($pShape eq "triangledown") {
-          SVG_pO sprintf("<polygon points='%d,%d %d,%d %d,%d' $attr/>",
+          SVG_pO sprintf("<polygon points='%d,%d %d,%d %d,%d' %s/>",
                 $x1-$pSize,    $y1-$pSize,
                 $x1+$pSize,    $y1-$pSize,
-                $x1,           $y1+$pSize);
+                $x1,           $y1+$pSize, $attr);
 
         } elsif ($pShape eq "plus") {
-          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
-                        $x1-$pSize, $y1, $x1+$pSize, $y1);
-          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
-                        $x1, $y1-$pSize, $x1, $y1+$pSize);
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' %s/>",
+                        $x1-$pSize, $y1, $x1+$pSize, $y1, $attr);
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' %s/>",
+                        $x1, $y1-$pSize, $x1, $y1+$pSize, $attr);
 
         } elsif ($pShape eq "cross") {
-          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
-                        $x1-$pSize, $y1-$pSize, $x1+$pSize, $y1+$pSize);
-          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
-                        $x1+$pSize, $y1-$pSize, $x1-$pSize, $y1+$pSize);
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' %s/>",
+                        $x1-$pSize, $y1-$pSize, $x1+$pSize, $y1+$pSize, $attr);
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' %s/>",
+                        $x1+$pSize, $y1-$pSize, $x1-$pSize, $y1+$pSize, $attr);
 
         } elsif ($pShape eq "minus") {
-          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' $attr/>",
-                        $x1-$pSize, $y1, $x1+$pSize, $y1);
+          SVG_pO sprintf("<line x1='%d' y1='%d' x2='%d' y2='%d' %s/>",
+                        $x1-$pSize, $y1, $x1+$pSize, $y1, $attr);
 
         } else { # diamond
           SVG_pO
-              sprintf("<polygon points='%d,%d %d,%d %d,%d %d,%d %d,%d' $attr/>",
+              sprintf("<polygon points='%d,%d %d,%d %d,%d %d,%d %d,%d' %s/>",
                 $x1-$pSize,$y1,
                 $x1,$y1-$pSize,
                 $x1+$pSize,$y1,
                 $x1,$y1+$pSize,
-                $x1-$pSize,$y1);
+                $x1-$pSize,$y1, $attr);
         }
 
       }
@@ -2613,12 +2613,20 @@ plotAsPng(@)
 
   ($mimetype, $svgdata)   = SVG_showLog("unused");
 
-  my ($w, $h) = split(",", AttrVal($svgName,"plotsize","800,160"));
+  my ($w, $h) = split(",", SVG_getplotsize($svgName));
   $svgdata =~ s/<\/svg>/<polyline opacity="0" points="0,0 $w,$h"\/><\/svg>/;
 
   # Forum #32791,#116138: some lib versions cannot parse complex CSS selectors
   $svgdata =~ s/\.SVGplot\./\./g if(AttrVal($svgName, "plotAsPngFix", 0));
   $svgdata = Encode::decode("UTF-8", $svgdata) if(!$unicodeEncoding); #129693
+
+  $svgdata = SVG_resolveCssVars($svgdata);
+  $svgdata = SVG_fixLibRSVGFonts($svgdata);
+  my $targetWidth         = $plotName[3];
+  if($targetWidth) {
+    my $targetHeight = int($h * $targetWidth / $w + 0.5);
+    $svgdata = SVG_scaleForLibRSVG( $svgdata, $targetWidth, $targetHeight);
+  }
 
   eval {
     require Image::LibRSVG;
@@ -2635,6 +2643,85 @@ plotAsPng(@)
   return;
 }
 
+##################
+# Helper functions: Forum #145492
+sub
+SVG_resolveCssVars($)
+{
+  my ($svg) = @_;
+  my %vars;
+
+  if($svg =~ /:root\s*\{(.*?)\}/s) {
+    my $root = $1;
+    while($root =~ /--([\w-]+)\s*:\s*([^;]+)\s*;/g) {
+      $vars{$1} = $2;
+    }
+  }
+
+  $svg =~ s{
+    var\(--([\w-]+)\)
+  }{
+    exists($vars{$1}) ? $vars{$1} : "var(--$1)"
+  }gex;
+
+  return $svg;
+}
+
+sub
+SVG_fixLibRSVGFonts($)
+{
+  my ($svg) = @_;
+  my $fontFamily;
+
+  if($svg =~ /(?:^|\})\s*text\s*\{([^}]*)\}/s) {
+    my $css = $1;
+
+    if($css =~ /font-family\s*:\s*([^;!]+)(?:\s*!important)?\s*;/i) {
+      $fontFamily = $1;
+      $fontFamily =~ s/^\s+|\s+$//g;
+    }
+  }
+
+  return $svg if(!defined($fontFamily) || $fontFamily eq "");
+
+  $fontFamily =~ s/&/&amp;/g;
+  $fontFamily =~ s/"/&quot;/g;
+
+  $svg =~ s{
+      <text\b
+  }{
+      qq{<text font-family="$fontFamily"}
+  }gex;
+
+  return $svg;
+}
+
+sub
+SVG_scaleForLibRSVG($$$)
+{
+  my ($svg, $newWidth, $newHeight) = @_;
+
+  return $svg
+      if($svg !~ /<svg\b[^>]*\bwidth=['"]([\d.]+)(?:px)?['"][^>]*\bheight=['"]([\d.]+)(?:px)?['"]/s);
+
+  my ($oldWidth, $oldHeight) = ($1, $2);
+
+  $svg =~ s{<svg\b([^>]*)>}{
+      my $attr = $1;
+
+      $attr =~ s/\bwidth=['"][^'"]+['"]/width="${newWidth}px"/;
+      $attr =~ s/\bheight=['"][^'"]+['"]/height="${newHeight}px"/;
+
+      $attr =~ s/\s+viewBox=['"][^'"]*['"]//;
+
+      $attr =~ s/width\s*:\s*[\d.]+px/width:${newWidth}px/;
+      $attr =~ s/height\s*:\s*[\d.]+px/height:${newHeight}px/;
+
+      qq{<svg$attr viewBox="0 0 $oldWidth $oldHeight">};
+  }ex;
+
+  return $svg;
+}
 ##################
 
 1;

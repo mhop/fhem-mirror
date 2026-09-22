@@ -303,6 +303,7 @@ WriteFile($$)
     Log 1, "ERROR WriteFile $filename: $!";
     return;
   }
+  binmode(FH);
   print FH $data;
   close(FH);
 }
