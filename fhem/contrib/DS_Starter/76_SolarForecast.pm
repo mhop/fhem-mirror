@@ -73,7 +73,9 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.5" => "21.09.2026  _createReadingsFromArrayFast: exists Prüfung zur Verhinderung Auto-Vivification (Forum:https://forum.fhem.de/index.php?msg=1369271) ",
+  "2.10.5" => "23.09.2026  _createReadingsFromArrayFast: exists Prüfung zur Verhinderung Auto-Vivification (Forum:https://forum.fhem.de/index.php?msg=1369271) ".
+                           "removeMinMaxArray: Fix: Rekursionsbedingung > 20 -> > \$limit, Fix: grep entfernt alle Duplikate von Min und Max -> Umstellung auf splice ".
+                           "AIF_isModelValid: neue Validierungsmethode, die das FANN-Modell leak-frei prüft ",
   "2.10.4" => "20.09.2026  _batSocTarget: Debuglog für Step6 korrigiert ".
                            "AI::FANN Speicherleck durch globales DESTROY-Patching behoben. ",
   "2.10.3" => "19.09.2026  Fix: SOC-Prognose LR überschätzt erreichbaren Ladestand wenn aktueller SoC < batoptsocwh ".
@@ -11981,12 +11983,13 @@ sub readCacheFile {
               my $raw = AI::FANN->new_from_file ($tmpfile);                                                 # Modell neu laden
               unlink $tmpfile if -e $tmpfile;
 
-               if ($raw && eval { $raw->MSE(); 1 }) {                                                       # Modell testen
-                  $data{$name}{neuralnet}{$fanntyp}{FannModel} =                                            # gültiges Modell → in Wrapper kapseln → in Struktur einfügen
-                      FHEM::SolarForecast::AiFannModelWrapper->aiFannModelCreate ($raw);
-                      
+              if ($raw && FHEM::SolarForecast::AiFannModelWrapper->AIF_isModelValid($raw)) {
+                  $data{$name}{neuralnet}{$fanntyp}{FannModel} =
+                      FHEM::SolarForecast::AiFannModelWrapper->AIF_modelCreate($raw);
+
                   $data{$name}{current}{$fanntyp.'NNTrainstate'} = 'ok';
-                  Log3 ($name, 3, qq{$name - cached data "$title" restored for FANN type '$fanntyp'});
+                  
+                  Log3($name, 3, qq{$name - cached data "$title" restored for FANN type '$fanntyp'});
               }
               else {                                                                                        # Modell kaputt → Status setzen
                   my $msg = $@ || "AI::FANN object for '$fanntyp' is empty or faulty";
@@ -12169,7 +12172,7 @@ sub writeCacheFile {
 
           for my $fanntyp (keys %saved_models) {
               my $obj = $saved_models{$fanntyp};
-              my $ok  = eval { $obj->MSE(); 1 };                                          # Objekt testen
+              my $ok  = $obj->AIF_isModelValid();                                         # Objekt testen
 
               if ($ok) {                                                                  # gültig → zurück in Struktur
                   $nnref->{$fanntyp}{FannModel} = $obj;
@@ -12186,7 +12189,7 @@ sub writeCacheFile {
 
                       if ($new_raw) {
                           $nnref->{$fanntyp}{FannModel} =
-                              FHEM::SolarForecast::AiFannModelWrapper->aiFannModelCreate ($new_raw);
+                              FHEM::SolarForecast::AiFannModelWrapper->AIF_modelCreate ($new_raw);
                       }
                   }
               }
@@ -12698,6 +12701,9 @@ sub centralTask {
   #Log3 ($name, 1, "$name - pvhist  size: "  . total_size($data{$name}{pvhist}));
   #Log3 ($name, 1, "$name - current size: "  . total_size($data{$name}{current}));
   #Log3 ($name, 1, "$name - airaw   size: "  . total_size($data{$name}{aidectree}{airaw}));
+  #Log3 ($name, 1, "$name - weatherapi size: "  . total_size($data{$name}{weatherapi}));
+  #Log3 ($name, 1, "$name - statusapi  size: "  . total_size($data{$name}{statusapi}));
+  #Log3 ($name, 1, "$name - readings size: "    . total_size($defs{$name}{READINGS}));
 
 ##########################################################################################################################
 
@@ -31354,9 +31360,10 @@ sub _aiFannPredict {
   my $maxval    = $data{$name}{neuralnet}{$fanntyp}{MaxVal};                                        # Target Denormalisierungsparameter
   my $fannModel = $data{$name}{neuralnet}{$fanntyp}{FannModel};
 
-  my $out;
-  eval { $out = $fannModel->aiFannModelRun ($input) };                                              # Netz im Wrapper laufen lassen                                                         # Netz laufen lassen
-
+  #my $out;
+  #eval { $out = $fannModel->AIF_modelRun ($input) };                                                # Netz im Wrapper laufen lassen                                                         # Netz laufen lassen
+  my $out = $fannModel->AIF_modelRun($input);                                                       # Wrapper liefert undef, wenn Modell kaputt ist
+  
   my $zone = 3;
   my $bc   = 0;
 
@@ -35843,12 +35850,27 @@ sub removeMinMaxArray {
   my $aref  = shift;
   my $limit = shift // SPLSLIDEMAX;
 
-  return if(ref $aref ne 'ARRAY' || scalar @$aref <= $limit);          # Abbruchbedingung
+  return if(ref $aref ne 'ARRAY' || scalar @$aref <= $limit);           # Abbruchbedingung
 
-  my ($min, $max) = (sort { $a <=> $b } @$aref)[0, -1];                # finde Min- und Max-Werte
-  @$aref          = grep { $_ != $min && $_ != $max } @$aref;          # Entferne die Werte
+  my ($min_idx, $max_idx) = (0, 0);                                     # Indizes von Minimum und Maximum bestimmen
+  for my $i (1 .. $#$aref) {
+      $min_idx = $i if $aref->[$i] < $aref->[$min_idx];
+      $max_idx = $i if $aref->[$i] > $aref->[$max_idx];
+  }
 
-  removeMinMaxArray ($aref, $limit) if(@$aref > 20);                   # Rekursiver Aufruf, wenn nötig
+  if ($min_idx == $max_idx) {                                           # Sonderfall: alle Elemente gleich
+      splice @$aref, $min_idx, 1;
+  }
+  elsif ($min_idx > $max_idx) {                                         # höheren Index zuerst entfernen
+      splice @$aref, $min_idx, 1;
+      splice @$aref, $max_idx,  1;
+  }
+  else {
+      splice @$aref, $max_idx,  1;
+      splice @$aref, $min_idx, 1;
+  }
+
+  removeMinMaxArray ($aref, $limit) if(@$aref > $limit);               
 
 return;
 }
@@ -40192,24 +40214,35 @@ sub SM_setAlpha    { $_[0]->{alpha}    = $_[1] }              # setzt den Alpha-
 ###############################################
 package FHEM::SolarForecast::AiFannModelWrapper;
 
-sub aiFannModelCreate {                                       # Konstruktor
+sub AIF_modelCreate {                                           # Konstruktor
   my ($class, $model) = @_;
   return bless { model => $model }, $class;
 }
 
-sub aiFannModelRun {                                          # Dedizierter Run-Wrapper (kein AUTOLOAD-Overhead im Inferenzpfad)
+sub AIF_modelRun {                                              # Dedizierter Run-Wrapper (kein AUTOLOAD-Overhead im Inferenzpfad)
   my ($self, $input) = @_;
   return unless $self->{model};
   return $self->{model}->run ($input);
 }
 
-sub aiFannModelDestroy {                                      # Explizite Freigabe: setzt inneres XS-Objekt auf undef
+sub AIF_modelDestroy {                                          # explizite Freigabe: setzt inneres XS-Objekt auf undef
   my ($self) = @_;
   $self->{model} = undef;
 }
 
+sub AIF_isModelValid {
+  my ($invocant, $model) = @_;
+
+  if (ref($invocant)) {                                         # Objektaufruf: Wrapper-Objekt
+      $model = $invocant->{model};
+  }
+
+  return 0 unless $model && ref($model);                        # Muss ein Objekt sein
+  return 1;
+}
+
 our $AUTOLOAD;
-sub AUTOLOAD {                                                # Delegiert alle unbekannten Methoden (MSE, save …) an echtes FANN-Objekt
+sub AUTOLOAD {                                                  # Delegiert alle unbekannten Methoden (MSE, save …) an echtes FANN-Objekt
   my $self = shift;
   my $method = $AUTOLOAD;
   $method =~ s/.*:://;
@@ -40220,7 +40253,7 @@ sub AUTOLOAD {                                                # Delegiert alle u
 
 sub DESTROY {                                                 # Automatische Freigabe via Perl-GC
   my ($self) = @_;
-  $self->aiFannModelDestroy();
+  $self->AIF_modelDestroy();
 }
 
 1;
