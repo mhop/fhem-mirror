@@ -234,7 +234,7 @@ MQTT2_CLIENT_doinit($)
       }
     }
     if($hash->{sendHash}) {
-      map { MQTT2_CLIENT_doPublish($hash,$_->[1],$_->[2],$_->[3]) }
+      map { MQTT2_CLIENT_doPublish($hash,$_->[0],$_->[1],$_->[2]) }
                 @{$hash->{sendHash}};
       delete($hash->{sendHash});
     } 
@@ -289,6 +289,7 @@ MQTT2_CLIENT_Disco($;$$)
   }
   $isUndef ? DevIo_CloseDev($hash) : DevIo_Disconnected($hash);
   delete($hash->{BUF});
+  delete($hash->{sendHash}) if($isUndef);
 
   if($hash->{disconnectTimerHash}) {
     RemoveInternalTimer($hash->{disconnectTimerHash});
@@ -297,6 +298,7 @@ MQTT2_CLIENT_Disco($;$$)
 
   delete $hash->{waitingForConnack};
   delete $hash->{waitingForPingRespSince};
+  delete $hash->{inConnectFn};
 
   readingsSingleUpdate($hash, "state", "disconnected", 1);
 }
@@ -633,7 +635,7 @@ MQTT2_CLIENT_doPublish($@)
   if((!$hash->{FD} || $hash->{connecting}) &&
         AttrVal($name, "disconnectAfter", undef)) {
     $hash->{sendHash} = [] if(!defined($hash->{sendHash}));
-    push(@{$hash->{sendHash}}, \@_);
+    push(@{$hash->{sendHash}}, [$topic, $val, $retain]);
     MQTT2_CLIENT_connect($hash) if(!$hash->{connecting});
     return;
   }
