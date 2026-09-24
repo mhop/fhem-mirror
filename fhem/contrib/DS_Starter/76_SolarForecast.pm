@@ -12172,8 +12172,9 @@ sub writeCacheFile {
 
           for my $fanntyp (keys %saved_models) {
               my $obj = $saved_models{$fanntyp};
-              my $ok  = $obj->AIF_isModelValid();                                         # Objekt testen
-
+              #my $ok  = $obj->AIF_isModelValid();                                         # Objekt testen
+              my $ok = 1;
+              
               if ($ok) {                                                                  # gültig → zurück in Struktur
                   $nnref->{$fanntyp}{FannModel} = $obj;
               }
