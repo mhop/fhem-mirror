@@ -498,12 +498,14 @@ FW_Read($$)
   my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3)
         if($FW_httpheader[0]);
   $method = "" if(!$method);
+  $hash->{HTTPVERSION} = ($httpvers && $httpvers =~ m/^HTTP\/(\d\.\d)$/) ? $1 : "1.0";
   my $ahm = AttrVal($FW_wname, "allowedHttpMethods", "GET|POST");
   if($method !~ m/^($ahm)$/i){
     my $retCode = ($method eq "OPTIONS") ? "200 OK" : "405 Method Not Allowed";
     TcpServer_WriteBlocking($FW_chash,
       "HTTP/1.1 $retCode\r\n" .
       $FW_headerlines.
+      FW_connectionHeader($hash).
       "Content-Length: 0\r\n\r\n");
     delete $hash->{CONTENT_LENGTH};
     FW_Read($hash, 1) if($hash->{BUF});
@@ -661,6 +663,7 @@ FW_finishRead($$$)
            "HTTP/1.1 $FW_httpRetCode\r\n" .
            "Content-Length: $length\r\n" .
            $expires . $compressed . $FW_headerlines .
+           FW_connectionHeader($hash) .
            "Content-Type: $FW_RETTYPE\r\n\r\n" .
            $FW_RET, "FW_closeConn", "nolimit", "encoded") ){
     Log3 $name, 4, "Closing connection $name due to full buffer in FW_Read"
@@ -800,15 +803,45 @@ FW_AsyncOutput($$;$)
   return undef;
 }
 
+###########################
+# HTTP/1.1 persists, HTTP/1.0 doesn't (RFC 7230 6.3), unless overridden by
+# an explicit Connection header, closeConn or the iOS UA workaround
+sub
+FW_shouldClose($)
+{
+  my ($hash) = @_;
+  return 1 if($hash->{isChild}); # forked child serves a single request, 145413
+
+  my $cc = AttrVal($hash->{SNAME}, "closeConn",
+                   $FW_userAgent =~ m/(iPhone|iPad|iPod)/);
+  return 1 if($cc);
+
+  my $conn = $FW_httpheader{Connection};
+  return 1 if($conn && $conn =~ m/close/i);
+  return 0 if($conn && $conn =~ m/keep-alive/i);
+
+  return (($hash->{HTTPVERSION}||"1.0") eq "1.1") ? 0 : 1;
+}
+
+###########################
+# Connection/Keep-Alive response header, unless the caller already set one
+# (e.g. the forked-child Connection: close, Forum #145413)
+sub
+FW_connectionHeader($)
+{
+  my ($hash) = @_;
+  return "" if($FW_headerlines =~ m/^Connection:/mi);
+  return "Connection: close\r\n" if(FW_shouldClose($hash));
+  return "Connection: keep-alive\r\nKeep-Alive: timeout=60\r\n";
+}
+
 sub
 FW_closeConn($)
 {
   my ($hash) = @_;
   # Forum #41125, 88470
   if(!$hash->{inform} && !$hash->{BUF} && !defined($hash->{".WRITEBUFFER"})) {
-    my $cc = AttrVal($hash->{SNAME}, "closeConn",
-                     $FW_userAgent =~ m/(iPhone|iPad|iPod)/);
-    if(!$FW_httpheader{Connection} || $cc) {
+    if(FW_shouldClose($hash)) {
       TcpServer_Close($hash, 1, !$hash->{inform});
       delete $FW_svgData{$hash->{NAME}};
     }
@@ -2360,6 +2393,7 @@ FW_returnFileAsStream($$$$$)
                 "Content-Encoding: gzip\r\n" : "";
   TcpServer_WriteBlocking($FW_chash, "HTTP/1.1 200 OK\r\n".
                   $compr . $expires . $FW_headerlines . $etag .
+                  FW_connectionHeader($FW_chash) .
                   "Transfer-Encoding: chunked\r\n" .
                   "Content-Type: $type; charset=$FW_encoding\r\n\r\n");
 
@@ -3926,7 +3960,10 @@ FW_log($$)
     <a id="FHEMWEB-attr-closeConn"></a>
     <li>closeConn<br>
       If set, a TCP Connection will only serve one HTTP request. Seems to
-      solve problems on iOS9 for WebApp startup.
+      solve problems on iOS9 for WebApp startup. Takes precedence over the
+      normal HTTP/1.1 Connection: keep-alive/close handling, which is based
+      on the HTTP version and the Connection request header sent by the
+      client.
       </li><br>
 
     <a id="FHEMWEB-attr-column"></a>
@@ -4780,6 +4817,9 @@ FW_log($$)
      <li>closeConn<br>
         Falls gesetzt, wird pro TCP Verbindung nur ein HTTP Request
         durchgef&uuml;hrt. F&uuml;r iOS9 WebApp startups scheint es zu helfen.
+        Hat Vorrang vor der normalen HTTP/1.1 Connection: keep-alive/close
+        Behandlung, die sich nach der HTTP-Version und dem vom Client
+        gesendeten Connection-Header richtet.
         </li><br>
 
     <a id="FHEMWEB-attr-cmdIcon"></a>
