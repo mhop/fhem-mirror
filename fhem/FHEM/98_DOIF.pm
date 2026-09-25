@@ -726,7 +726,8 @@ sub DOIF_RegisterEvalAll
             $lastWarningMsg="";
             my $value= eval($hash->{$table}{table}{$i}{$k}{$l}{$m});
             if ($lastWarningMsg) {
-              Log3 ($hash->{NAME},3,"$hash->{NAME}:Warning in DOIF_RegisterEvalAll:$hash->{$table}{table}{$i}{$k}{$l}{$m}");
+              ## $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
+              Log3 ($hash->{NAME},3,"$hash->{NAME}:Warning in DOIF_RegisterEvalAll:$hash->{$table}{table}{$i}{$k}{$l}{$m}: $::lastWarningMsg");
               $lastWarningMsg="";
             }
             if (defined ($value)) {
@@ -4950,11 +4951,39 @@ sub AttrNum {
 
 package ui_Table;
 
-
 sub get_uiTable {
   my ($device)=@_;
   return ::DOIF_RegisterEvalAll($::defs{$device},$device,"uiTable");
 }
+
+sub get_cell {
+  
+  my ($device,$table,$i,$k)=@_;
+  my $hash=$::defs{$device};
+  my $reg=1;
+  my $ret="";
+  my $lastcc =scalar keys %{$hash->{$table}{table}{$i}{$k}};
+  for (my $l=0;$l < $lastcc;$l++){
+    for (my $m=0;$m < scalar keys %{$hash->{$table}{table}{$i}{$k}{$l}};$m++) {
+      if (defined $hash->{$table}{table}{$i}{$k}{$l}{$m}){
+        $::lastWarningMsg="";
+        my $value= eval($hash->{$table}{table}{$i}{$k}{$l}{$m});
+        if ($::lastWarningMsg) {
+          ## $lastWarningMsg =~ s/^(.*) at \(eval.*$/$1/;
+          Log3 ($hash->{NAME},3,"$hash->{NAME}:Warning in DOIF_RegisterEvalAll:$hash->{$table}{table}{$i}{$k}{$l}{$m}: $::lastWarningMsg");
+          $::lastWarningMsg="";
+        }
+        if (defined ($value)) {
+           $ret.=$value;
+        }
+      }
+    }
+    $ret.="<br>" if ($l+1 != $lastcc);
+  }
+  return $ret;
+}
+
+
 
 sub get_uiState {
   my ($device)=@_;
@@ -5282,7 +5311,6 @@ sub plot {
   }
   my ($format,$value);
   ($format,$value,$val)=format_value($val,$min,$dec);
-  
   my $decform='%1.'.$dec.'f';
 
   $minVal=$value if (!defined $minVal);
@@ -5565,6 +5593,125 @@ sub plot {
   return($outDescript,$out,$footer);
 }
 
+sub hcard
+{
+  my ($p) = @_;
+  
+  if (defined $p->{model}) {
+    if ($p->{model} eq "co2") {
+      $p->{left}={min=>400,max=>1200,decimal=>0,unit=>"ppm",colorRef=>[(600,120,1000,60,1200,0)],desc=>"co2",styleDesc=>"fill:silver",%{$p->{left}}};
+      $p = {icon=>"air\@silver",yScaling=>"fixedscaling",rInnerRing=>"innerring",%$p};
+    } elsif ($p->{model} eq "tempIn") {
+      $p->{left}={min=>10,max=>30,colorRef=>\&temp_hue,unit=>"°C",%{$p->{left}}};
+      $p = {icon=>"temp_inside\@silver",%$p};
+    } elsif ($p->{model} eq "tempOut") {
+      $p->{left}={min=>-10,max=>50,colorRef=>\&temp_hue,unit=>"°C",%{$p->{left}}};
+      $p = {icon=>"temp_outside\@silver",%$p};
+    } elsif ($p->{model} eq "humOut") {
+      $p->{left}={min=>0,max=>100,colorRef=>\&hum_hue,unit=>" %",%{$p->{left}}};
+      $p = {icon=>"temperature_humidity\@silver",%$p};
+    } elsif ($p->{model} eq "wind") {
+      $p->{left}={min=>0,max=>30,minColor=>90,maxColor=>30,unit=>" km/h",%{$p->{left}}};
+      $p = {icon=>"weather_wind\@silver",%$p};
+    } elsif ($p->{model} eq "rain") {
+      $p->{left}={min=>0,max=>30,minColor=>180,maxColor=>270,unit=>" mm/h",%{$p->{left}}};
+      $p = {icon=>"weather_rain_gauge\@silver",steps=>1,%$p};
+    } elsif ($p->{model} eq "rainSum") {
+      $p->{left}={min=>0,max=>50,minColor=>180,maxColor=>270,unit=>" mm",%{$p->{left}}};
+      $p = {icon=>"weather_rain_gauge\@silver",%$p};
+    } elsif ($p->{model} eq "solar") {
+      $p->{left}={min=>0,max=>1000,minColor=>30,maxColor=>90,unit=>" W/m²",decimal=>0,%{$p->{left}}};
+      $p = {icon=>"sani_solar\@silver",%$p}
+    } elsif ($p->{model} eq "barometer") {
+      $p->{left}={min=>980,max=>1050,minColor=>30,maxColor=>90,unit=>" hPa",decimal=>0,%{$p->{left}}};
+      $p = {icon=>"sani_solar\@silver",steps=>1,%$p}
+    } elsif ($p->{model} eq "tempHumOut") {
+      $p->{left}={min=>-10,max=>50,colorRef=>\&temp_hue,unit=>"°C",%{$p->{left}}};
+      $p->{right}={min=>0,max=>100,decimal=>0,colorRef=>\&hum_hue,unit=>" %",%{$p->{right}}};
+    }
+  }   
+
+  my @values = map {
+  [
+    $_->{value},
+    $_->{min},
+    $_->{max},
+    $_->{minColor},
+    $_->{maxColor},
+    $_->{desc},
+    defined($_->{minColor}) ? "" : $_->{colorRef},
+    join(",",
+      $_->{decimal} // "",
+      $_->{styleValue} // "",
+      !defined($_->{styleDesc})
+        ? "fill:silver"
+        : $_->{styleDesc},
+      $_->{unit} // ""
+    )
+  ]
+} @{$p->{top}};
+
+return card(
+  ref($p->{left}{collect}) eq "ARRAY"
+    ? [@{$p->{left}{collect}}, @values]
+    : [$p->{left}{collect}, @values],
+
+  $p->{header},
+  $p->{icon},
+  $p->{left}{min},
+  $p->{left}{max},
+  $p->{left}{minColor},
+  $p->{left}{maxColor},
+  $p->{left}{desc},
+  $p->{left}{colorRef},
+
+  join(",",
+    $p->{left}{decimal} // "",
+    $p->{left}{styleValue} // "",
+    !defined($p->{left}{styleDesc})
+      ? "fill:silver"
+      : $p->{left}{styleDesc},
+    $p->{left}{unit} // ""
+  ),
+
+  join(",",
+    $p->{size} // "",
+    $p->{yScaling} // "",
+    $p->{steps} // "",
+    $p->{footer} // "",
+    $p->{colorYScaling} // "",
+    $p->{ring} // "",
+    $p->{width} // ""
+  ),
+
+  join(",",
+    $p->{rColorGradient} // "",
+    $p->{rMinMaxValues} // "",
+    $p->{rInnerRing} // "",
+    $p->{rPointer} // "",
+    $p->{rMode} // ""
+  ),
+
+  $p->{lightness},
+
+  $p->{right}{collect},
+  $p->{right}{min},
+  $p->{right}{max},
+  $p->{right}{minColor},
+  $p->{right}{maxColor},
+  $p->{right}{desc},
+  $p->{right}{colorRef},
+
+  join(",",
+    $p->{right}{decimal} // "",
+    $p->{right}{styleValue} // "",
+    !defined($p->{right}{styleDesc})
+      ? "fill:silver"
+      : $p->{right}{styleDesc},
+    $p->{right}{unit} // ""
+  )
+)
+}
 
 sub card
 {
@@ -5778,11 +5925,13 @@ sub card
   
   my ($dec,$fontformat,$unitformat);
   ($dec,$fontformat,$unitformat)=split (/,/,$decfont) if (defined $decfont);
+  $dec=1 if (!defined $dec or $dec eq "");
   $fontformat="" if (!defined $fontformat);
   $unitformat="" if (!defined $unitformat);
   
   my ($dec2,$fontformat2,$unitformat2);
   ($dec2,$fontformat2,$unitformat2)=split (/,/,$decfont2) if (defined $decfont2);
+  $dec2=1 if (!defined $dec2 or $dec2 eq "");
   $fontformat2="" if (!defined $fontformat2);
   $unitformat2="" if (!defined $unitformat2);
   
