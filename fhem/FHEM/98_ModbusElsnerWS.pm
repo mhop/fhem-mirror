@@ -74,7 +74,7 @@ sub ModbusElsnerWS_Initialize {
   $hash->{SetFn} = "ModbusElsnerWS_Set";
   $hash->{GetFn} = "ModbusElsnerWS_Get";
   $hash->{NotifyFn} = "ModbusElsnerWS_Notify";
-  $hash->{ModbusReadingsFn} = "ModbusElsnerWS_Eval";
+  $hash->{ModbusReadingsFn} = \&ModbusElsnerWS_Eval;
   $hash->{AttrFn} = "ModbusElsnerWS_Attr";
   $hash->{AttrList} .= ' ' .
                        #$hash->{ObjAttrList} . ' ' . $hash->{DevAttrList}.
@@ -91,7 +91,7 @@ sub ModbusElsnerWS_Initialize {
                        ' poll-.* polldelay-.* timeEvent:select,no,yes updateGlobalAttr:select,no,yes' .
                        ' windSpeedWindy windSpeedStormy windSpeedWindyDelay windSpeedStormyDelay ' .
                        $readingFnAttributes;
-  $hash->{parseParams}      = 1;
+  $hash->{parseParams} = 1;
   $hash->{NotifyOrderPrefix} = "55-";
   return;
 }
