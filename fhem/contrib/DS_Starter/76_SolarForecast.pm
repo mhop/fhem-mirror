@@ -3970,7 +3970,7 @@ sub _setaiDecTree {                   ## no critic "not used"
       BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
 
       $paref->{fanntyp} = $fanntyp;
-      my $err = aiEnterTrain ($paref);
+      my $err = aiFannEnterTrain ($paref);
       delete $paref->{fanntyp};
 
       return $err;
@@ -4139,7 +4139,7 @@ sub _getRoofTopData {
 
   delete $paref->{reqm};
 
-return $ret;
+return $ret || 'A data retrieval request for the selected radiation and/or weather API has been triggered';
 }
 
 ################################################################
@@ -11544,12 +11544,16 @@ return;
 # internen Timern.
 ################################################################
 sub Undef {
- my $hash = shift;
- my $name = shift;
+  my $hash = shift;
+  my $name = shift;
 
- for my $blkkey (qw(AINNTRAIN_CON_BLOCKRUN AINNTRAIN_PV_BLOCKRUN AIBLOCKRUNNING GMFRUNNING)) {          # laufende BlockingCall Kindprozesse beenden, sonst Zombie-Prozess + Zugriff auf gelöschten $hash
-     BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
- }
+  for my $blkkey (qw(AINNTRAIN_CON_BLOCKRUN AINNTRAIN_PV_BLOCKRUN AIBLOCKRUNNING GMFRUNNING)) {         # laufende BlockingCall Kindprozesse beenden, sonst Zombie-Prozess + Zugriff auf gelöschten $hash
+      BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
+  }
+ 
+  for my $k (grep { /^WCFBLOCK_/xs } keys %{$hash->{HELPER}}) {                                         # alle laufenden WCFBLOCK_*-Keys bereinigen
+      BlockingKill ($hash->{HELPER}{$k}) if(defined $hash->{HELPER}{$k});
+  }
 
  _removeAllTimers ($hash);                                                                              # entfernt auch Timer mit [$name,...]/{hash=>$hash,...} ARG, siehe oben
  delete $readyfnlist{$name};
@@ -12084,6 +12088,100 @@ return;
 }
 
 ################################################################
+#  writeCacheFile asynchron im BlockingCall ausführen
+#  $paref: { name, cachename, file }
+#  Rückgabe: undef (Ergebnis kommt asynchron via Finish-CB)
+################################################################
+sub writeCacheFileBlocking {
+  my $paref     = shift;
+  my $name      = $paref->{name};
+  my $cachename = $paref->{cachename};
+  my $blkkey    = 'WCFBLOCK_' . uc($cachename);
+  my $hash      = $defs{$name};
+
+  if (defined $hash->{HELPER}{$blkkey}{pid}) {
+      if ($hash->{HELPER}{$blkkey}{pid} =~ /DEAD/xs) {
+          delete $hash->{HELPER}{$blkkey};
+      }
+      else {
+          Log3 ($name, 4, "$name - writeCacheFileBlocking: $cachename write already running, skipped");
+          return;
+      }
+  }
+
+  $hash->{HELPER}{$blkkey} = BlockingCall ("FHEM::SolarForecast::_wcfBlockWorker",
+                                           $paref,
+                                           "FHEM::SolarForecast::_wcfBlockFinish",
+                                           60,
+                                           "FHEM::SolarForecast::_wcfBlockAbort",
+                                           $hash
+                                          );
+
+  if (defined $hash->{HELPER}{$blkkey}) {
+      $hash->{HELPER}{$blkkey}{loglevel} = 3;
+      Log3 ($name, 4, "$name - writeCacheFileBlocking: $cachename BlockingCall PID "
+                     ."$hash->{HELPER}{$blkkey}{pid} started");
+  }
+
+return;
+}
+
+# --- Work
+sub _wcfBlockWorker {
+  my $paref     = shift;
+  my $name      = $paref->{name};
+  my $cachename = $paref->{cachename};
+  my $file      = $paref->{file};
+
+  my $hash = $defs{$name};
+  my $err  = writeCacheFile ($hash, $cachename, $file, 'nolog');
+
+return join '|', $name, $cachename, ($err // '');                           # Rückgabe: Pipe-getrennte Werte an Finish-CB
+}
+
+# --- Finish 
+sub _wcfBlockFinish {
+  my $string = shift;
+  my ($name, $cachename, $err) = split /\|/, $string, 3;
+
+  my $hash   = $defs{$name};
+  my $debug  = getDebug ($hash); 
+  my $blkkey = 'WCFBLOCK_' . uc($cachename);
+
+  delete $hash->{HELPER}{$blkkey};
+
+  if ($err) {
+      Log3 ($name, 1, "$name - writeCacheFileBlocking ERROR $cachename: $err");
+      return;
+  }
+
+  $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." File (async)";
+  Log3 ($name, 4, "$name - writeCacheFileBlocking: $cachename successfully written");
+
+  if ($cachename eq 'airaw') {
+      $data{$name}{current}{aitrawstate} = 'ok';
+      Log3 ($name, 1, "$name DEBUG> AI raw data saved into file: " . $airaw.$name) if($debug =~ /aiProcess/xs);
+  }
+
+return;
+}
+
+# --- Abort
+sub _wcfBlockAbort {
+  my $hash  = shift;
+  my $cause = shift // "Timeout: process terminated";
+  my $name  = $hash->{NAME};
+
+  for my $k (grep { /^WCFBLOCK_/xs } keys %{$hash->{HELPER}}) {             # alle laufenden WCFBLOCK_*-Keys bereinigen
+      Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{$k}{fn} pid:$hash->{HELPER}{$k}{pid} aborted: $cause");
+
+      delete $hash->{HELPER}{$k};
+  }
+
+return;
+}
+
+################################################################
 #             Daten in File wegschreiben
 ################################################################
 sub writeCacheFile {
@@ -12103,7 +12201,7 @@ sub writeCacheFile {
       $hash      = $defs{$name};
   }
 
-  my ($error, $err, $lw);
+  my ($error, $err);
 
   if ($cachename eq 'aitrained') {
       my $objref = AiDetreeVal ($hash, 'aitrained', '');
@@ -12117,12 +12215,11 @@ sub writeCacheFile {
 
       if ($error) {
           $err = qq{ERROR while writing AI data to file "$file": $error};
-          Log3 ($name, 1, "$name - $err");
+          Log3 ($name, 1, "$name - $err") if(!$nolog);
           return $err;
       }
 
-      $lw                 = gettimeofday();
-      $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
+      $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." File: $file";
 
       return;
   }
@@ -12134,13 +12231,12 @@ sub writeCacheFile {
 
           if ($error) {
               $err = qq{ERROR while writing AI data to file "$file": $error};
-              Log3 ($name, 1, "$name - $err");
+              Log3 ($name, 1, "$name - $err") if(!$nolog);
               return $err;
           }
       }
 
-      $lw                 = gettimeofday();
-      $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
+      $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." File: $file";
 
       return;
   }
@@ -12166,7 +12262,7 @@ sub writeCacheFile {
 
           if ($error) {                                                                     # Fehlerbehandlung
               my $msg = qq{ERROR while writing AI FANN data to file "$file": $error};
-              Log3($name, 1, "$name - $msg");
+              Log3 ($name, 1, "$name - $msg") if(!$nolog);
               return $msg;
           }
 
@@ -12182,7 +12278,7 @@ sub writeCacheFile {
 
           if ($error) {
               $err = qq{ERROR while writing DWD Station Catalog to file "$file": $error};
-              Log3 ($name, 1, "$name - $err");
+              Log3 ($name, 1, "$name - $err") if(!$nolog);
               return $err;
           }
       }
@@ -12198,7 +12294,7 @@ sub writeCacheFile {
 
           if ($error) {
               $err = qq{ERROR while writing API Status to file "$file": $error};
-              Log3 ($name, 1, "$name - $err");
+              Log3 ($name, 1, "$name - $err") if(!$nolog);
               return $err;
           }
       }
@@ -12214,7 +12310,7 @@ sub writeCacheFile {
 
           if ($error) {
               $err = qq{ERROR while writing API Status to file "$file": $error};
-              Log3 ($name, 1, "$name - $err");
+              Log3 ($name, 1, "$name - $err") if(!$nolog);
               return $err;
           }
       }
@@ -12232,13 +12328,12 @@ sub writeCacheFile {
 
           if ($error) {
               $err = qq{ERROR writing cache file "$file": $error};
-              Log3 ($name, 1, "$name - $err");
+              Log3 ($name, 1, "$name - $err") if(!$nolog);
               return $err;
           }
       }
 
-      $lw                 = gettimeofday();
-      $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
+      $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." File: $file";
 
       return ('', $nr, $na);
   }
@@ -12256,7 +12351,7 @@ sub writeCacheFile {
 
       if ($error) {
           $err = qq{ERROR writing cache file "$file": $error};
-          Log3 ($name, 1, "$name - $err");
+          Log3 ($name, 1, "$name - $err") if(!$nolog);
           return $err;
       }
 
@@ -12285,12 +12380,11 @@ sub writeCacheFile {
 
   if ($error) {
       $err = qq{ERROR writing cache file "$file": $error};
-      Log3 ($name, 1, "$name - $err");
+      Log3 ($name, 1, "$name - $err") if(!$nolog);
       return $err;
   }
 
-  $lw                 = gettimeofday();
-  $hash->{LCACHEFILE} = "last write time: ".FmtTime($lw)." File: $file";
+  $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." File: $file";
 
 return;
 }
@@ -13439,7 +13533,7 @@ sub _specialActivities {
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 started");
 
           $paref->{fanntyp} = $fanntyp;
-          aiEnterTrain ($paref) if($prepared && $t >= $newctrstts);                                             # NN Consumption Forecast Training starten
+          aiFannEnterTrain ($paref) if($prepared && $t >= $newctrstts);                                         # NN Consumption Forecast Training starten
           delete $paref->{fanntyp};
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 7 finished");
@@ -27040,12 +27134,10 @@ sub __aiAddRawData {
   debugLog ($paref, 'aiProcess', "AI raw add - $dosave entities added to raw data pool ".(AttrVal ($name, 'verbose', 3) != 4 ? '(set verbose 4 for output more detail)' : ''));
 
   if ($dosave) {
-      $err = writeCacheFile ($hash, 'airaw', $airaw.$name);
-
-      if (!$err) {
-          $data{$name}{current}{aitrawstate} = 'ok';
-          debugLog ($paref, 'aiProcess', "AI raw data saved into file: ".$airaw.$name);
-      }
+      writeCacheFileBlocking ( { name      => $name,
+                                 cachename => 'airaw',
+                                 file      => $airaw.$name,
+                               } );                                     # aitrawstate und debugLog kommen jetzt aus _wcfBlockFinish
   }
 
 return;
@@ -27090,7 +27182,7 @@ sub aiDelRawData {
 
       if (!$err) {
           $data{$name}{current}{aitrawstate} = 'ok';
-          debugLog ($paref, 'aiProcess', qq{AI raw data saved into file: }.$airaw.$name);
+          debugLog ($paref, 'aiProcess', qq{AI raw data saved into file: } . $airaw.$name);
       }
   }
 
@@ -27115,7 +27207,7 @@ return $ridx;
 #  Trainingsdaten & Train Prozess non-Blocking
 #  $paref->{fanntyp} = 'con' | 'pv'
 #####################################################################
-sub aiEnterTrain {
+sub aiFannEnterTrain {
   my $paref   = shift;
   my $name    = $paref->{name};
   my $fanntyp = $paref->{fanntyp} // 'con';                                                         # 'con' | 'pv'
@@ -32892,7 +32984,7 @@ sub aiAddInstance {
       my $cbin   = cloud2bin  ($wcc)     if(defined $wcc);
       my $sabin  = sunalt2bin ($sunalt);
 
-      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, wid => $wid, rr1c => $rr1c, sunalt => $sunalt, sunaz => $sunaz, hod => $hod, pvrl => $pvrl };
+      push @pvhdata, { rad1h => $rad1h, temp => $tbin, wcc => $cbin, wid => $wid, rr1c => $rr1c, sunalt => $sabin, sunaz => $sunaz, hod => $hod, pvrl => $pvrl };
   }
 
   if (!scalar @pvhdata) {
