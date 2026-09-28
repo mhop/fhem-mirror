@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  93_Log2Syslog: v5.12.7 kleinere Optimierungen
  - change:  76_SolarForecast: Version 2.10.5
  - bugfix:  76_SolarForecast: potentielles Speicherleck mit AI::FANN beseitigt
  - feature: lib/FHEM/Core/Weather.pm: exponentielle Verzögerung bei
