@@ -495,9 +495,8 @@ FW_Read($$)
 
   #########################
   # Return 200 for OPTIONS or 405 for unsupported method
-  my ($method, $arg, $httpvers) = split(" ", $FW_httpheader[0], 3)
-        if($FW_httpheader[0]);
-  $method = "" if(!$method);
+  my ($method, $arg, $httpvers) = $FW_httpheader[0] ?
+                          split(" ", $FW_httpheader[0], 3) : ('', undef, undef);
   $hash->{HTTPVERSION} = ($httpvers && $httpvers =~ m/^HTTP\/(\d\.\d)$/) ? $1 : "1.0";
   my $ahm = AttrVal($FW_wname, "allowedHttpMethods", "GET|POST");
   if($method !~ m/^($ahm)$/i){
