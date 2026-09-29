@@ -108,9 +108,10 @@ BEGIN {
 
 # Versions History intern:
 my %vNotesIntern = (
+  "5.12.8" => "29.09.2026  Fix Notes ".
   "5.12.7" => "28.09.2026  setPayload: \$otp nur kodieren wenn tatsächlich non-ASCII vorhanden sind ".
                            "Define Funktion refaktoriert, set ... reopen mit neuer Sub _setReopen refaktoriert ".
-                           "openSocket: Fehlendes Leeren von $hash->{CLIENTSOCKET} bei Verbindungsabbrüchen korrigiert ",
+                           "openSocket: Fehlendes Leeren von \$hash->{CLIENTSOCKET} bei Verbindungsabbrüchen korrigiert ",
   "5.12.6" => "10.09.2026  Verbesserungen und Bugfixes in Funktionen charFilter, parseFilter, setPayload, parsePayload, _buildPayload (neu) ".
                            "parsePayload: parseProfile für Unify Console Log verbessert ",
   "5.12.5" => "23.01.2023  Adaptation to change \%logInform in fhem.pl, Forum:#131790 ",
