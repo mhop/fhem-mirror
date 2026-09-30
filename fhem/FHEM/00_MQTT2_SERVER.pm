@@ -625,7 +625,7 @@ MQTT2_SERVER_doPublish($$$$;$$)
   }
 
   foreach my $clName (keys %{$server->{clients}}) {
-    MQTT2_SERVER_sendto($server, $defs{$clName}, $tp, $val, $props);
+    MQTT2_SERVER_sendto($server, $defs{$clName}, $tp, $val, $retain, $props);
   }
 
   my $ir = AttrVal($serverName, "ignoreRegexp", undef);
@@ -668,9 +668,9 @@ MQTT2_SERVER_doPublish($$$$;$$)
 ######################################
 # send topic to client if its subscription matches the topic
 sub
-MQTT2_SERVER_sendto($$$$;$)
+MQTT2_SERVER_sendto($$$$;$$)
 {
-  my ($shash, $hash, $topic, $val, $props) = @_;
+  my ($shash, $hash, $topic, $val, $retain, $props) = @_;
   return if(IsDisabled($hash->{NAME}));
   $val = "" if(!defined($val));
   my $dump = (AttrVal($shash->{NAME},"verbose",1)>=5) ? $shash->{NAME} :undef;
@@ -704,7 +704,8 @@ MQTT2_SERVER_sendto($$$$;$)
       my $rl = MQTT2_SERVER_makeLength(2+length($props)+
                                          length($ltopic)+length($lval));
       MQTT2_SERVER_out($hash,
-        pack("C",0x30).$rl.MQTT2_SERVER_makeStr($topic).$props.$lval,$dump);
+        pack("C",(0x30+($retain?1:0))).
+                 $rl.MQTT2_SERVER_makeStr($topic).$props.$lval,$dump);
       last;       # send a message only once
     }
   }
@@ -970,7 +971,6 @@ MQTT2_SERVER_ReadDebug($$)
     <ul>
     <li>to set user/password use an allowed instance and its basicAuth
       feature (set/attr)</li>
-    <li>the retain flag is not propagated by publish</li>
     <li>only QOS 0 and 1 is implemented</li>
     </ul>
   </ul>
