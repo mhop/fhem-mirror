@@ -128,6 +128,8 @@
 #           add: readings 'relay' and 'source' for ShellyPro3EM prooutput addon
 # 6.05.20   add: commands 'on', 'off' etc for ShellyPro3EM prooutput addon
 # 6.05.21   basically(!) added gen3 bulbs, blu gateway and gen4 flood
+# 6.05.22   bugfix: csrf-handling as by chrisse111179
+#           fix: set number of buttons of pstrip to 0
 
 package main;
 
@@ -148,7 +150,7 @@ sub Shelly_Set ($@);
 sub Shelly_status(@);
 
 #-- globals on start
-my $version = "6.05.21 18.08.2026";
+my $version = "6.05.22 30.09.2026";
 
 my $defaultINTERVAL = 60;
 my $multiplyIntervalOnError = 1.0;   # mechanism disabled if value=1
@@ -465,7 +467,7 @@ my %shelly_models = (
     #-- 4nd generation devices (Gen4)
     "shellyemG4"    => [1,0,0, 0,4,0,  2,0,0],    # similar to 'shellyemG3'
     "shellyplugus"  => [1,0,0, 1,4,-1, 0,0,0],    # illuminance sensor not support yet
-    "shellypstrip4" => [4,0,0, 4,4,-4, 0,0,0],    # buttons?
+    "shellypstrip4" => [4,0,0, 4,4,0,  0,0,0],    # set buttons from -4 to 0  -  9/2026
     "shellydimmerg4"=> [0,0,1, 1,4,2,  0,0,0],
     "shellyemmini"  => [0,0,0, 1,4,0,  1,0,0],    # similar to 'shellypmmini'    changed 11.1.26
     "shellyfloodG4" => [0,0,0, 0,4,0,  0,0,0],
@@ -2915,7 +2917,7 @@ my $cmd_orig=$cmd;
         $comp="Switch";
     }
     Log3 $name,4,"[Shelly_Set] switching channel $channel for device $name with command $cmd";#4
-   # Log3 $name,0,"[Shelly_Set] $name ".$hash->{props}{namespace}."  ".($hash->{props}{gen}?1:0);
+   
     if( $hash->{GEN}>1 ){ #Gen2+
         # translate Gen1-commands to Gen2
         $cmd =~ s/\?/\&/g;
@@ -4836,7 +4838,7 @@ sub Shelly_status2G {
             $id -=100;
             Shelly_readingsBulkUpdate($hash,"temperature\_$id",$temperature,"tempC" );
         }
-        my $voltmeter=$jhash->{"voltmeter:100"}{voltage}; #qqq
+        my $voltmeter=$jhash->{"voltmeter:100"}{xvoltage} // $jhash->{"voltmeter:100"}{voltage}; #read first corrected value
         Shelly_readingsBulkUpdate($hash,"voltmeter",$voltmeter,"voltage" )  if( defined($voltmeter) );
     }
     # set state of 'input-only' devices to OK  (may have state 'error')
@@ -4846,13 +4848,13 @@ sub Shelly_status2G {
   $channels = $chnls[0]; # number of relays
   if( $channels>0 ){
     $comp="switch";
-    Log3 $name,5,"[Shelly_status2G:switch] Processing $channels relay states for device $name ($model as $mode)";
+    Log3 $name,5,"[Shelly_status2G:switch] Processing $channels relay states for device $name ($model as $mode)";#5
 
     for($channel=0; $channel<$channels; $channel++){
-        $id = $jhash->{"switch:$channel"}{id};
+        $id = $jhash->{"switch:$channel"}{id}//"undefined";
         $subs = ($channels == 1) ? "" : "_".$channel;
-        $ison = $jhash->{"switch:$channel"}{output};
-        $ison =~ s/0|(false)/off/;
+        $ison = $jhash->{"switch:$channel"}{output} // "undefined" ;
+        $ison =~ s/0|(false)/off/; 
         $ison =~ s/1|(true)/on/;
         Log3 $name,4,"[Shelly_status2G:switch] Setting state of relay $channel for device $name to \'$ison\'";
         readingsBulkUpdateMonitored($hash,"relay".$subs,$ison);
@@ -5066,7 +5068,7 @@ sub Shelly_status2G {
          readingsBulkUpdateMonitored($hash,$reading,'-');
          $hash->{helper}{timer}=0;
       }
-      Log3 $name,4,"[Shelly_status2G:timer] $name $msg";
+      Log3 $name,4,"[Shelly_status2G:timer] $name $msg"; #4
     }
   }
 
@@ -5585,7 +5587,7 @@ sub Shelly_settings2G {
            Shelly_HttpRequest($hash,"/rpc/Wifi.ListAPClients","","Shelly_settings2G","clients" );
        }elsif( $model =~ /display/ ){ # do nothing
        }elsif( $jhash->{gen} == 4 && !defined($jhash->{matter}) ){ # it's zigbee mode, do nothing
-       }else{  #Log3 $name,0,"calling for BLE List";
+       }else{ 
            Shelly_HttpRequest($hash,"/rpc/BLE.CloudRelay.List","","Shelly_settings2G","BLEclients" );
        }
 
@@ -7120,8 +7122,8 @@ sub Shelly_webhook_update {
               }else{
                   $sh_port = 0;
                   $sh_webname = "";
-              }
-              if( $sh_url =~ m/fwcsrf=(csrf_[a-z0-9]+)/ ){
+              }     my $sh_tokenCount = () = ( $sh_url =~ m/fwcsrf=/g );
+              if( $sh_url =~ m/fwcsrf=([^&\s]+)/ ){
                   $sh_token = $1;
               }else{
                   $sh_token = "";
@@ -7157,7 +7159,7 @@ sub Shelly_webhook_update {
                       $sh_url .= "&fwcsrf=$curr_token";
                       Log3 $name,4,"[Shelly_webhook_update:1a] token added to url: $sh_url";
                   }elsif( $curr_token eq "" && $sh_token ne "" ){
-                      $sh_url =~ s/fwcsrf=csrf_[a-z0-9]+//;
+                      $sh_url =~ s/fwcsrf=[^&\s]*//g;
                       $sh_url =~ s/&$//;      # has been at end of the query string
                       $sh_url =~ s/&&/&/;     # has been in the middle of the query string
                       $sh_url =~ s/\?&/\?/;   # has been first parameter in the query string
@@ -7227,8 +7229,8 @@ sub Shelly_webhook_update {
               }else{
                   $sh_port = 0;
                   $sh_webname = "";
-              }
-              if( $sh_url =~ m/fwcsrf=(csrf_[a-z0-9]+)/ ){
+              }      my $sh_tokenCount = () = ( $sh_url =~ m/fwcsrf=/g );
+              if( $sh_url =~ m/fwcsrf=([^&\s]+)/ ){
                   $sh_token = $1;
               }else{
                   $sh_token = "";
@@ -7264,7 +7266,7 @@ sub Shelly_webhook_update {
                       $sh_url .= "&fwcsrf=$curr_token";
                       Log3 $name,4,"[Shelly_webhook_update:2a] token added to url: $sh_url";
                   }elsif( $curr_token eq "" && $sh_token ne "" ){
-                      $sh_url =~ s/fwcsrf=csrf_[a-z0-9]+//;
+                      $sh_url =~ s/fwcsrf=[^&\s]*//g;
                       $sh_url =~ s/&$//;      # has been at end of the query string
                       $sh_url =~ s/&&/&/;     # has been in the middle of the query string
                       $sh_url =~ s/\?&/\?/;   # has been first parameter in the query string
@@ -9363,4 +9365,4 @@ sub Shelly_HttpResponse($){
         </ul>
         </ul>
 =end html_DE
-=cut ($@)
+=cut ($@)$
