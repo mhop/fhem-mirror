@@ -73,16 +73,8 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.5" => "26.09.2026  _createReadingsFromArrayFast: exists Prüfung zur Verhinderung Auto-Vivification (Forum:https://forum.fhem.de/index.php?msg=1369271) ".
-                           "removeMinMaxArray: Fix: Rekursionsbedingung > 20 -> > \$limit, Fix: grep entfernt alle Duplikate von Min und Max -> Umstellung auf splice ".
-                           "AIF_isModelValid: neue Validierungsmethode, die das FANN-Modell leak-frei prüft ".
-                           "Implementierung von STORABLE_freeze und STORABLE_thaw Hooks ".
-                           "fileStore / fileRetrieve: Fehlerbehandlung und Evaluierung geglättet ".
-                           "readCacheFile: Ressourcenverwaltung für AI::FANN-Modelle verbessert ".
-                           "Deserialize um Guard-Clauses gegen leere/unverarbeitbare Eingaben ergänzt sowie Fehler-Logging robuster gestaltet ".
-                           "Anpassung bezüglich OpenMeteo API Änderung für OpenMeteoDWDEnsembleAPI ",
-  "2.10.4" => "20.09.2026  _batSocTarget: Debuglog für Step6 korrigiert ".
-                           "AI::FANN Speicherleck durch globales DESTROY-Patching behoben. ",
+  "2.10.6" => "30.09.2026  siehe Changelog ".
+                           "Reading Battery_OptimumBaseSoC_XX parallel zum bestehenden Reading Battery_ChargeOptTargetPower_XX welches abgelöst werden soll (Forum: https://forum.fhem.de/index.php?msg=1369429) ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -4104,6 +4096,7 @@ return $getlist;
 sub _getRoofTopData {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $lang  = $paref->{lang} // 'EN';
   my $hash  = $defs{$name};
 
   delete $data{$name}{current}{dwdRad1hAge};
@@ -4139,7 +4132,8 @@ sub _getRoofTopData {
 
   delete $paref->{reqm};
 
-return $ret || 'A data retrieval request for the selected radiation and/or weather API has been triggered';
+return $ret || ($lang eq 'DE' ? 'Es wurde eine Datenabfrage an die eingestellte Strahlungs- und/oder Wetter-API gestartet' 
+                              : 'A data retrieval request for the selected radiation and/or weather API has been started');
 }
 
 ################################################################
@@ -6534,11 +6528,12 @@ return;
 sub _getdata {
   my $paref = shift;
   my $name  = $paref->{name};
+  my $lang  = $paref->{lang} // 'EN';
   my $hash  = $defs{$name};
 
   centralTask ($hash);
 
-return 'Data cycle triggered, watch readings';
+return $lang eq 'DE' ? 'Datenzyklus gestartet, Readings beachten' : 'Data cycle started, watch readings';
 }
 
 ###############################################################
@@ -11547,7 +11542,10 @@ sub Undef {
   my $hash = shift;
   my $name = shift;
 
-  for my $blkkey (qw(AINNTRAIN_CON_BLOCKRUN AINNTRAIN_PV_BLOCKRUN AIBLOCKRUNNING GMFRUNNING)) {         # laufende BlockingCall Kindprozesse beenden, sonst Zombie-Prozess + Zugriff auf gelöschten $hash
+  for my $blkkey (qw(AINNTRAIN_CON_BLOCKRUN 
+                     AINNTRAIN_PV_BLOCKRUN 
+                     AIBLOCKRUNNING GMFRUNNING
+                    ) ) {                                                                               # laufende BlockingCall Kindprozesse beenden, sonst Zombie-Prozess + Zugriff auf gelöschten $hash
       BlockingKill ($hash->{HELPER}{$blkkey}) if(defined $hash->{HELPER}{$blkkey});
   }
  
@@ -12155,12 +12153,12 @@ sub _wcfBlockFinish {
       return;
   }
 
-  $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." File (async)";
+  $hash->{LCACHEFILE} = "last write time: ".FmtTime(gettimeofday())." File (async): $cachename";
   Log3 ($name, 4, "$name - writeCacheFileBlocking: $cachename successfully written");
 
   if ($cachename eq 'airaw') {
       $data{$name}{current}{aitrawstate} = 'ok';
-      Log3 ($name, 1, "$name DEBUG> AI raw data saved into file: " . $airaw.$name) if($debug =~ /aiProcess/xs);
+      Log3 ($name, 1, "$name DEBUG> AI raw data saved (async) into File: " . $airaw.$name) if($debug =~ /aiProcess/xs);
   }
 
 return;
@@ -12173,7 +12171,7 @@ sub _wcfBlockAbort {
   my $name  = $hash->{NAME};
 
   for my $k (grep { /^WCFBLOCK_/xs } keys %{$hash->{HELPER}}) {             # alle laufenden WCFBLOCK_*-Keys bereinigen
-      Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{$k}{fn} pid:$hash->{HELPER}{$k}{pid} aborted: $cause");
+      Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{$k}{fn} pid=$hash->{HELPER}{$k}{pid} aborted. cause=$cause");
 
       delete $hash->{HELPER}{$k};
   }
@@ -12720,10 +12718,6 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ########################################################################################################################
-  #for my $hodc (1..9) {
-  #    delete $data{$name}{circular}{$hodc};
-  #}
-
   #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
   #my $gco = AttrVal ($name, 'graphicControl', '');
 
@@ -12759,14 +12753,6 @@ sub centralTask {
     }
     $data{$name}{current}{airaw_hp_cleanup_done} = 1;               # läuft nur einmal pro Session
   }
-  
-  #Log3 ($name, 1, "$name - circular size: " . total_size($data{$name}{circular}));
-  #Log3 ($name, 1, "$name - pvhist  size: "  . total_size($data{$name}{pvhist}));
-  #Log3 ($name, 1, "$name - current size: "  . total_size($data{$name}{current}));
-  #Log3 ($name, 1, "$name - airaw   size: "  . total_size($data{$name}{aidectree}{airaw}));
-  #Log3 ($name, 1, "$name - weatherapi size: "  . total_size($data{$name}{weatherapi}));
-  #Log3 ($name, 1, "$name - statusapi  size: "  . total_size($data{$name}{statusapi}));
-  #Log3 ($name, 1, "$name - readings size: "    . total_size($defs{$name}{READINGS}));
 
 ##########################################################################################################################
 
@@ -17259,12 +17245,16 @@ sub ___batChargeSaveResults {
           my $needmin = $otp->{$bn}{target} // 0;
           my ($smoothed, $changed) = smoothValue ( { name     => $name,
                                                      chan     => 'OTP',
-                                                     rdg      => 'Battery_ChargeOptTargetPower_'.$bn,
+                                                     rdg      => 'Battery_OptimumBaseSoC_'.$bn,
                                                      newval   => $needmin,
                                                      deadband => OTPDEADBAND,
                                                      alpha    => OTPALPHA
                                                    }
                                                  );
+                
+          storeReading ($name, 'Battery_OptimumBaseSoC_'.$bn, $smoothed.' W');
+          
+          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
           storeReading ($name, 'Battery_ChargeOptTargetPower_'.$bn, $smoothed.' W');
       }
   }
@@ -21115,11 +21105,58 @@ sub _calcDataEveryFullHour {
       }
 
       storeReading ($name, '.signaldone_'.$hh, 'done');                                             # Sperrsignal (erledigt) setzen
+      
+      # --- Größenausgabe einmal pro Stunde (nur letzte Loop-Iteration) ---
+      #_logDataStructSizes ($paref) if(int $h == int $chour);
 
       delete @{$paref}{qw(h cpcf aihit yday ydayname yt pvrlvd)};
   }
 
   delete $paref->{acu};
+
+return;
+}
+
+################################################################
+#  Einmalige Größenausgabe der internen Datenstrukturen
+#  Aufruf: einmal pro Stunde nach _calcDataEveryFullHour
+################################################################
+sub _logDataStructSizes {
+  my $paref = shift;
+  my $name  = $paref->{name};
+
+  return unless eval { require Devel::Size; Devel::Size->import('total_size'); 1 };
+
+  my @structs = (
+      [ 'pvhist',    \$data{$name}{pvhist}              ],
+      [ 'circular',  \$data{$name}{circular}             ],
+      [ 'airaw',     \$data{$name}{aidectree}{airaw}     ],
+      [ 'neuralnet', \$data{$name}{neuralnet}            ],
+      [ 'weatherapi',\$data{$name}{weatherapi}           ],
+      [ 'solcastapi',\$data{$name}{solcastapi}           ],
+      [ 'statusapi', \$data{$name}{statusapi}            ],
+      [ 'consumers', \$data{$name}{consumers}            ],
+      [ 'current',   \$data{$name}{current}              ],
+      [ 'nexthours', \$data{$name}{nexthours}            ],
+      [ 'messages',  \$data{$name}{messages}             ],
+      [ 'log',       \$data{$name}{log}                  ],
+      [ 'readings',  \$defs{$name}{READINGS}             ],
+  );
+
+  my $total = 0;
+  my @lines;
+
+  for my $s (@structs) {
+      next unless defined ${$s->[1]};
+      my $sz = total_size(${$s->[1]});
+      $total += $sz;
+      push @lines, sprintf "%-12s %8.2f KB", $s->[0], $sz / 1024;
+  }
+
+  push @lines, sprintf "%-12s %8.2f KB", 'TOTAL', $total / 1024;
+
+  Log3 ($name, 1, "$name - DataStructSizes (hourly):\n"
+                . join("\n", map { "  $_" } @lines));
 
 return;
 }
@@ -26804,7 +26841,7 @@ sub _abortGetMessageFile {
   my $cause = shift // "Timeout: process terminated";
   my $name  = $hash->{NAME};
 
-  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{GMFRUNNING}{fn} pid:$hash->{HELPER}{AIBLOCKRUNNING}{pid} aborted: $cause");
+  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{GMFRUNNING}{fn} pid=$hash->{HELPER}{AIBLOCKRUNNING}{pid} aborted. cause=$cause");
 
   delete $hash->{HELPER}{GMFRUNNING};
 
@@ -28843,7 +28880,7 @@ sub aiFannConAbortTrain {
   my $fanntyp = 'con';
   my $blkkey  = 'AINNTRAIN_' . uc($fanntyp) . '_BLOCKRUN';
 
-  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{$blkkey}{fn} pid:$hash->{HELPER}{$blkkey}{pid} aborted: $cause");
+  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{$blkkey}{fn} pid=$hash->{HELPER}{$blkkey}{pid} aborted. cause=$cause");
 
   delete $hash->{HELPER}{$blkkey};
   delete $data{$name}{$fanntyp.'temp'};                                                        # verwaiste Trainingsversuche (inkl. FannBlob) des abgebrochenen Laufs verwerfen
@@ -33219,7 +33256,7 @@ sub aiAbortTrain {
   my $cause = shift // "Timeout: process terminated";
   my $name  = $hash->{NAME};
 
-  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{AIBLOCKRUNNING}{fn} pid:$hash->{HELPER}{AIBLOCKRUNNING}{pid} aborted: $cause");
+  Log3 ($name, 1, "$name -> BlockingCall $hash->{HELPER}{AIBLOCKRUNNING}{fn} pid=$hash->{HELPER}{AIBLOCKRUNNING}{pid} aborted. cause=$cause");
 
   delete $hash->{HELPER}{AIBLOCKRUNNING};
 
@@ -42083,7 +42120,7 @@ to ensure that the system configuration is correct.
          full power without restriction (1), or not at all, or only when the <br>
          feed-in limit (see <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>) is exceeded (0).
          If you want to charge the battery continuously throughout the day, Reading
-         <b>Battery_ChargeOptTargetPower_XX</b> provides optimized charging power for battery control. <br>
+         <b>Battery_OptimumBaseSoC_XX</b> provides optimized charging power for battery control. <br>
          The readings can be used to control the SoC (State of Charge) and to control the charging power used for the
          battery. <br>
          Detailed information on battery SoC and charging management is described in the
@@ -42940,7 +42977,7 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>pinmax</b>    </td><td>the maximum possible charging power in watts (optional)                                                       </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
-           <tr><td> <b>pinreduced</b></td><td>The reduced charging power in watts (optional). The value is set in Reading Battery_ChargeOptTargetPower_XX   </td></tr>
+           <tr><td> <b>pinreduced</b></td><td>The reduced charging power in watts (optional). The value is set in Reading Battery_OptimumBaseSoC_XX         </td></tr>
            <tr><td>                  </td><td>if the calculated charging power falls below this value or the SoC <= lowSoC.                                 </td></tr>
            <tr><td>                  </td><td>This means that the value can also be applied in the case of demand charging from the public grid.            </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
@@ -45276,7 +45313,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Leistung (1), oder nicht bzw. nur bei Überschreitung des <br>
          Einspeiselimits (siehe <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>)
          geladen werden sollte (0). Möchte man die Batterie kontinuierlich über den gesamten Tag aufladen, wird im Reading
-         <b>Battery_ChargeOptTargetPower_XX</b> eine optimierte Ladeleistung zur Batteriesteuerung bereitgestellt.  <br>
+         <b>Battery_OptimumBaseSoC_XX</b> eine optimierte Ladeleistung zur Batteriesteuerung bereitgestellt.  <br>
          Die Readings können zur Steuerung des SoC (State of Charge) sowie zur Steuerung des verwendeten Ladeleistung
          der Batterie verwendet werden. <br>
          Detaillierte Informationen zum Batterie SoC- und Lade-Management sind im
@@ -46134,7 +46171,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>pinmax</b>    </td><td>die maximal mögliche Ladeleistung in Watt (optional)                                                     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
-           <tr><td> <b>pinreduced</b></td><td>Die reduzierte Ladeleistung in Watt (optional). Der Wert wird im Reading Battery_ChargeOptTargetPower_XX </td></tr>
+           <tr><td> <b>pinreduced</b></td><td>Die reduzierte Ladeleistung in Watt (optional). Der Wert wird im Reading Battery_OptimumBaseSoC_XX       </td></tr>
            <tr><td>                  </td><td>gesetzt wenn die kalkulierte Ladeleistung unter diesen Wert fällt oder der SoC <= lowSoC beträgt.        </td></tr>
            <tr><td>                  </td><td>Somit kann der Wert auch im Fall der Anforderungsladung aus dem öffentlichen Netz zur Anwendung kommen.  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
