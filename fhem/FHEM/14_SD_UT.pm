@@ -1166,7 +1166,7 @@ my %models = (
 #############################
 sub SD_UT_Initialize {
   my ($hash) = @_;
-  $hash->{Match}      = '^P(?:14|20|20.1|22|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91.1|92|93|95|97|99|104|105|114|118|121|127|128|130|132)#.*';
+  $hash->{Match}      = qr/^P(?:14|20|20.1|22|24|26|29|30|34|46|56|68|69|76|78|81|83|86|90|91|91.1|92|93|95|97|99|104|105|114|118|121|127|128|130|132)#.*/s;
   $hash->{DefFn}      = \&SD_UT_Define;
   $hash->{UndefFn}    = \&SD_UT_Undef;
   $hash->{ParseFn}    = \&SD_UT_Parse;
@@ -3400,7 +3400,7 @@ sub SD_UT_tristate2bin {
     "runtime": {
       "requires": {
         "FHEM": 5.00918623,
-        "lib::SD_Protocols": "0",
+        "FHEM::Devices::SIGNALduino::SD_Protocols": "0",
         "perl": 5.018,
         "strict": "0",
         "warnings": "0"
@@ -3408,7 +3408,7 @@ sub SD_UT_tristate2bin {
     },
     "develop": {
       "requires": {
-        "lib::SD_Protocols": "0",
+        "FHEM::Devices::SIGNALduino::SD_Protocols": "0",
         "strict": "0",
         "warnings": "0"
       }
