@@ -538,7 +538,7 @@ MQTT2_SERVER_Read($@)
         delete($hash->{answerScheduled});
         my $r = $shash->{retain};
         foreach my $tp (sort { $r->{$a}{ts} <=> $r->{$b}{ts} } keys %{$r}) {
-          MQTT2_SERVER_sendto($shash, $hash, $tp,
+          MQTT2_SERVER_sendto($shash, undef, $hash, $tp,
                               $r->{$tp}{val}, 1, $r->{$tp}{props});
         }
       }, undef, 0);
@@ -625,7 +625,7 @@ MQTT2_SERVER_doPublish($$$$;$$)
   }
 
   foreach my $clName (keys %{$server->{clients}}) {
-    MQTT2_SERVER_sendto($server, $defs{$clName}, $tp, $val, $retain, $props);
+    MQTT2_SERVER_sendto($server, $src, $defs{$clName}, $tp, $val, $retain, $props);
   }
 
   my $ir = AttrVal($serverName, "ignoreRegexp", undef);
@@ -668,25 +668,25 @@ MQTT2_SERVER_doPublish($$$$;$$)
 ######################################
 # send topic to client if its subscription matches the topic
 sub
-MQTT2_SERVER_sendto($$$$;$$)
+MQTT2_SERVER_sendto($$$$$;$$)
 {
-  my ($shash, $hash, $topic, $val, $retain, $props) = @_;
-  return if(IsDisabled($hash->{NAME}));
+  my ($server, $src, $dest, $topic, $val, $retain, $props) = @_;
+  return if(IsDisabled($server->{NAME}));
   $val = "" if(!defined($val));
-  my $dump = (AttrVal($shash->{NAME},"verbose",1)>=5) ? $shash->{NAME} :undef;
+  my $dump = (AttrVal($server->{NAME},"verbose",1)>=5) ? $server->{NAME} :undef;
 
   my $ltopic = $topic;
   my $lval = $val;
   if($unicodeEncoding) {
-    if(!$shash->{binaryTopicRegexp} ||
-       $topic !~ m/^$shash->{binaryTopicRegexp}$/) {
+    if(!$server->{binaryTopicRegexp} ||
+       $topic !~ m/^$server->{binaryTopicRegexp}$/) {
       $ltopic = Encode::encode('UTF-8', $topic);
       $lval   = Encode::encode('UTF-8', $val);
     }
   }
 
-  # FIXME: respect the subscribe options NL/RAP/RETAIN for proto 5
-  foreach my $s (keys %{$hash->{subscriptions}}) {
+  my $srcCid = $src && $src->{cid} ? $src->{cid} : "";
+  foreach my $s (keys %{$dest->{subscriptions}}) {
 
     my $re = $s;
     $re =~ s,^#$,.*,g;
@@ -694,18 +694,22 @@ MQTT2_SERVER_sendto($$$$;$$)
     $re =~ s,\+,\\b[^/]+\\b,g;
     if($topic =~ m/^$re$/) {
 
-      Log3 $shash, 5, "  $hash->{NAME} $hash->{cid} => $topic:$val";
+      Log3 $server, 5, "  $dest->{NAME} $dest->{cid} => $topic:$val";
 
-      if($hash->{protoNum} == 5) {
+      my $lr = $retain ? 1 : 0;
+      if($dest->{protoNum} == 5) {
         $props = pack("C",0) if(!$props);
+        my $sopt = $dest->{subscriptions}{$s};
+        next if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
+        next if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
+        $lr = 0 if(!($sopt & 0x08)); # RetainAsPublished
       } else {
         $props = "";
       }
       my $rl = MQTT2_SERVER_makeLength(2+length($props)+
                                          length($ltopic)+length($lval));
-      MQTT2_SERVER_out($hash,
-        pack("C",(0x30+($retain?1:0))).
-                 $rl.MQTT2_SERVER_makeStr($topic).$props.$lval,$dump);
+      MQTT2_SERVER_out($dest,
+        pack("C",0x30+$lr).$rl.MQTT2_SERVER_makeStr($topic).$props.$lval,$dump);
       last;       # send a message only once
     }
   }
