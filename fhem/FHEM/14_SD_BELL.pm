@@ -45,7 +45,7 @@ package main;
 
 use strict;
 use warnings;
-use lib::SD_Protocols;
+use FHEM::Devices::SIGNALduino::SD_Protocols;
 use FHEM::Meta;         # https://wiki.fhem.de/wiki/Meta for SVN Revision
 
 ### HASH for all modul models ###
@@ -100,7 +100,7 @@ my %models = (
 
 sub SD_BELL_Initialize {
   my ($hash) = @_;
-  $hash->{Match}      = '^P(?:15|32|41|42|57|79|96|98|112)#.*';
+  $hash->{Match}      = qr/^P(?:15|32|41|42|57|79|96|98|112)#.*/s;
   $hash->{DefFn}      = \&SD_BELL::Define;
   $hash->{UndefFn}    = \&SD_BELL::Undef;
   $hash->{ParseFn}    = \&SD_BELL::Parse;
@@ -166,8 +166,6 @@ sub Define {
   $doubleCode = $models{$hash_name}{doubleCode};                              # read note doubleCode
 
   $hash->{doubleCode} =  'Code alternates between two RAWMSG' if($protocol == 41);
-  $hash->{bitMSG} =  '';
-  $hash->{lastMSG} =  '';
 
   $iodevice = $a[4] if($a[4]);
 
@@ -603,7 +601,7 @@ sub Attr {
         "FHEM": 5.00918623,
         "FHEM::Meta": 0.001006,
         "GPUtils": 0,
-        "lib::SD_Protocols": "0",
+        "FHEM::Devices::SIGNALduino::SD_Protocols": "0",
         "perl": 5.018,
         "strict": "0",
         "warnings": "0"
@@ -611,7 +609,7 @@ sub Attr {
     },
     "develop": {
       "requires": {
-        "lib::SD_Protocols": "0",
+        "FHEM::Devices::SIGNALduino::SD_Protocols": "0",
         "strict": "0",
         "warnings": "0"
       }
