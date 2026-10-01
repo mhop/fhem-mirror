@@ -420,7 +420,7 @@ MQTT2_SERVER_Read($@)
       return MQTT2_SERVER_out($hash, pack("C*", 0x20, 2, 0, 1), $dump,
                                 sub{ CommandDelete(undef, $hash->{NAME}); });
     }
-    $off = MQTT2_SERVER_parseProps("conn_", $shash, $hash, $pl, $off, $dump)
+    $off = MQTT2_SERVER_parseProps("conn_", $hash, $pl, $off, $dump)
              if($hash->{protoNum} == 5);
 
     my $cid;
@@ -428,7 +428,7 @@ MQTT2_SERVER_Read($@)
     my $desc = "keepAlive:$hash->{keepalive}";
     if($hash->{cflags} & 0x04) { # Last Will & Testament
       my ($wt, $wm);
-      $off = MQTT2_SERVER_parseProps("lwt_", $shash, $hash, $pl, $off, $dump)
+      $off = MQTT2_SERVER_parseProps("lwt_", $hash, $pl, $off, $dump)
                if($hash->{protoNum} == 5);
       ($wt, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       ($wm, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
@@ -479,7 +479,7 @@ MQTT2_SERVER_Read($@)
 
     my $props="";
     if($hash->{protoNum} == 5) {
-      my $n = MQTT2_SERVER_parseProps("pub_", $shash, $hash, $pl, $off, $dump);
+      my $n = MQTT2_SERVER_parseProps("pub_", $hash, $pl, $off, $dump);
       $props = substr($pl, $off, $n-$off);
       $off = $n;
     }
@@ -512,13 +512,14 @@ MQTT2_SERVER_Read($@)
     my ($subscr, @ret);
     $off = 2;
 
-    $off = MQTT2_SERVER_parseProps("sub_",$shash,$hash,$pl,$off,$dump)
+    my %sprops;
+    $off = MQTT2_SERVER_parseProps("",\%sprops,$pl,$off,$dump)
              if($hash->{protoNum} == 5);
 
     while($off < $tlen) {
       ($subscr, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       my $sopt = unpack("C", substr($pl, $off++, 1));
-      $hash->{subscriptions}{$subscr} = $sopt;
+      $hash->{subscriptions}{$subscr} = { opt=>$sopt, prop=>\%sprops };
       Log3 $sname, 4, "    topic:$subscr options:$sopt";
       push @ret, (($sopt & 3) > 1 ? 1 : 0);    # max qos supported is 1
     }
@@ -551,7 +552,7 @@ MQTT2_SERVER_Read($@)
     my ($subscr, @ret);
     $off = 2;
 
-    $off = MQTT2_SERVER_parseProps("unsub_",$shash,$hash,$pl,$off,$dump)
+    $off = MQTT2_SERVER_parseProps("unsub_",$hash,$pl,$off,$dump)
              if($hash->{protoNum} == 5);
 
     while($off < $tlen) {
@@ -576,7 +577,7 @@ MQTT2_SERVER_Read($@)
   } elsif($cpt eq "DISCONNECT") {
     my $reason = length($pl) ? unpack('C', substr($pl, 0, 1)) : "N/A";
     Log3 $sname, 4, "  $cname $hash->{cid} $cpt, reason:$reason";
-    $off = MQTT2_SERVER_parseProps("disco_",$shash,$hash,$pl,1,$dump)
+    $off = MQTT2_SERVER_parseProps("disco_",$hash,$pl,1,$dump)
              if($hash->{protoNum} == 5);
 
     delete($hash->{lwt}); # no LWT on disconnect, see doc, chapter 3.14
@@ -693,18 +694,28 @@ MQTT2_SERVER_sendto($$$$$;$$)
     $re =~ s,/?#,\\b.*,g;
     $re =~ s,\+,\\b[^/]+\\b,g;
     if($topic =~ m/^$re$/) {
-
       Log3 $server, 5, "  $dest->{NAME} $dest->{cid} => $topic:$val";
 
       my $lr = $retain ? 1 : 0;
       if($dest->{protoNum} == 5) {
-        $props = pack("C",0) if(!$props);
-        my $sopt = $dest->{subscriptions}{$s};
+        my $sopt = $dest->{subscriptions}{$s}{opt};
         next if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
         next if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
         $lr = 0 if(!($sopt & 0x08)); # RetainAsPublished
+
+        if($props) {
+          my ($tlen,$noff) = MQTT2_SERVER_getLength($props,0); #strip the len
+          $props = substr($props, $noff);
+        } else {
+          $props = "";
+        }
+        my $si = $dest->{subscriptions}{$s}{prop}{subscription_identifier};
+        $props .= pack("C",11).MQTT2_SERVER_makeLength($si) if(defined($si));
+        $props = MQTT2_SERVER_makeLength(length($props)).$props;
+
       } else {
         $props = "";
+
       }
       my $rl = MQTT2_SERVER_makeLength(2+length($props)+
                                          length($ltopic)+length($lval));
@@ -742,6 +753,7 @@ sub
 MQTT2_SERVER_makeLength($)
 {
   my ($l) = @_;
+  return pack("C", 0) if($l == 0);
   my @r;
   while($l > 0) {
     my $eb = $l % 128;
@@ -831,9 +843,9 @@ MQTT2_SERVER_addToFeedList($$)
 }
 
 sub
-MQTT2_SERVER_parseProps($$$$$$)
+MQTT2_SERVER_parseProps($$$$$)
 {
-  my ($prefix, $shash, $hash, $pl, $off, $dump) = @_;
+  my ($prefix, $hash, $pl, $off, $dump) = @_;
 
   return if(length($pl) <= $off);
 
@@ -920,7 +932,7 @@ MQTT2_SERVER_connack($$$$)
   $props .= pack("CC", 37, 0) if(!AttrVal($shash->{NAME}, "respectRetain", 0));
   $props .= pack("C",  18).MQTT2_SERVER_makeStr($hash->{cid})
                                 if($hash->{cidByServer});
-  $props .= pack("CC", 41, 0); # no subscription identifier
+  $props .= pack("CC", 41, 1); # subscription identifier
   $props .= pack("CC", 42, 0); # no shared subscriptions
 
   $props = MQTT2_SERVER_makeLength(length($props)).$props;
