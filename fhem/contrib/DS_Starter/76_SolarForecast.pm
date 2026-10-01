@@ -74,7 +74,7 @@ use MIME::Base64;
 # Versions History intern
 my %vNotesIntern = (
   "2.10.6" => "30.09.2026  siehe Changelog ".
-                           "Reading Battery_OptimumBaseSoC_XX parallel zum bestehenden Reading Battery_ChargeOptTargetPower_XX welches abgelöst werden soll (Forum: https://forum.fhem.de/index.php?msg=1369429) ",
+                           "Reading Battery_OptimumBaseSoC_XX parallel zum bestehenden Reading Battery_OptimumTargetSoC_XX welches abgelöst werden soll (Forum: https://forum.fhem.de/index.php?msg=1369429) ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -15832,12 +15832,18 @@ sub _batSocTarget {
       }
 
       if (!$stepSoc) {
-          debugLog ($paref, 'batteryManagement', "SoC Step1 Bat $bn - The SoC-Management is switched off. Battery_OptimumTargetSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
+          debugLog ($paref, 'batteryManagement', "SoC Step1 Bat $bn - The SoC-Management is switched off. Battery_OptimumBaseSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
 
           ## pvHistory/Readings schreiben
           #################################
           writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, day => $day, hour => 99 } );
+          
+          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+          ########################################################################################################################          
           storeReading   ($name, 'Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
+          ########################################################################################################################
+          
+          storeReading   ($name, 'Battery_OptimumBaseSoC_'.$bn, $lowSoc.' %');
           storeReading   ($name, 'Battery_ChargeRequest_'.$bn, 0);
 
           next;
@@ -15937,7 +15943,7 @@ sub _batSocTarget {
 
       ## Aufladewahrscheinlichkeit beachten
       #######################################
-      my $csopt     = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, $lowSoc);            # aktuelles SoC Optimum
+      my $csopt     = ReadingsNum ($name, 'Battery_OptimumBaseSoC_'.$bn, $lowSoc);              # aktuelles SoC Optimum
       my $cantarget = round0 (100 - $pvexpect * (100 / $batinstcap));                           # maximale SOC-Höhe damit prognostizierte Energie komplett gespeichert werden kann
       my $newtarget = round0 ($cantarget < $target ? $cantarget : $target);                     # Abgleich möglicher Minimum-SOC gg. berechneten Minimum-SOC
 
@@ -16000,8 +16006,14 @@ sub _batSocTarget {
       ## pvHistory/Readings schreiben
       #################################
       writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $target, day => $day, hour => 99 } );
+      
+      ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+      ########################################################################################################################                
       storeReading   ($name, 'Battery_OptimumTargetSoC_'.$bn, $target.' %');
-      storeReading   ($name, 'Battery_ChargeRequest_'.$bn,      $chargereq);
+      ########################################################################################################################
+      
+      storeReading   ($name, 'Battery_OptimumBaseSoC_'.$bn, $lowSoc.' %');
+      storeReading   ($name, 'Battery_ChargeRequest_'.$bn,    $chargereq);
   }
 
 return;
@@ -16156,7 +16168,7 @@ sub _batChargeMgmt {
 
       $batinitval->{$bn}{sf}             = $sf;
       $batinitval->{$bn}{batinstcap}     = $batinstcap;
-      $batinitval->{$bn}{batoptsoc}      = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);         # aktueller optimierter SoC in %
+      $batinitval->{$bn}{batoptsoc}      = ReadingsNum ($name, 'Battery_OptimumBaseSoC_'.$bn,   0);         # aktueller optimierter SoC in %
       $batinitval->{$bn}{bcharge}        = BatteryVal  ($name, $bn, 'bcharge',                  0);         # aktuelle Ladung in %
       $batinitval->{$bn}{bchargewh}      = BatteryVal  ($name, $bn, 'bchargewh',                0);         # aktuelle Ladung in Wh
       $batinitval->{$bn}{bpinmax}        = BatteryVal  ($name, $bn, 'bpinmax',           INFINITE);         # max. mögliche Ladeleistung W
@@ -17245,16 +17257,12 @@ sub ___batChargeSaveResults {
           my $needmin = $otp->{$bn}{target} // 0;
           my ($smoothed, $changed) = smoothValue ( { name     => $name,
                                                      chan     => 'OTP',
-                                                     rdg      => 'Battery_OptimumBaseSoC_'.$bn,
+                                                     rdg      => 'Battery_ChargeOptTargetPower_'.$bn,
                                                      newval   => $needmin,
                                                      deadband => OTPDEADBAND,
                                                      alpha    => OTPALPHA
                                                    }
                                                  );
-                
-          storeReading ($name, 'Battery_OptimumBaseSoC_'.$bn, $smoothed.' W');
-          
-          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
           storeReading ($name, 'Battery_ChargeOptTargetPower_'.$bn, $smoothed.' W');
       }
   }
@@ -42113,14 +42121,14 @@ to ensure that the system configuration is correct.
          If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management
          for this battery device. <br>
          A set of control readings is generated; the module itself does not interfere with battery control. <br>
-         The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
+         The <b>Battery_OptimumBaseSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest_XX</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be reloaded, possibly with mains power. <br>
          The reading <b>Battery_ChargeUnrestricted_XX</b> contains the charging release, i.e. whether the battery should be charged at
          full power without restriction (1), or not at all, or only when the <br>
          feed-in limit (see <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>) is exceeded (0).
          If you want to charge the battery continuously throughout the day, Reading
-         <b>Battery_OptimumBaseSoC_XX</b> provides optimized charging power for battery control. <br>
+         <b>Battery_ChargeOptTargetPower_XX</b> provides optimized charging power for battery control. <br>
          The readings can be used to control the SoC (State of Charge) and to control the charging power used for the
          battery. <br>
          Detailed information on battery SoC and charging management is described in the
@@ -42167,9 +42175,9 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Change limit around &lt;Reading&gt; percent (+ increase, - decrease) </td></tr>
             <tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Change limit by 50% (+ increase, - decrease)                         </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
-            <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
+            <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumBaseSoC_XX) in %.                </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
-            <tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr>
+            <tr><td>                     </td><td>Battery_OptimumBaseSoC_XX to the value 'lowSoC'.                                                </td></tr>
             <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100 | 0' must be observed!                 </td></tr>
             <tr><td>                     </td><td>Value range: <b>0, 1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 5                              </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
@@ -42196,7 +42204,7 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>loadTarget</b>   </td><td>Optional target SoC (%), target time for calculating charge release, and optimal charging power.</td></tr>
             <tr><td>                     </td><td>The specified target SoC must be greater than the value of 'lowSoC'. A higher value in the      </td></tr>
-            <tr><td>                     </td><td>reading <b>Battery_OptimumTargetSoC_XX</b> takes precedence over the parameter setting.         </td></tr>
+            <tr><td>                     </td><td>reading <b>Battery_OptimumBaseSoC_XX</b> takes precedence over the parameter setting.         </td></tr>
             <tr><td>                     </td><td>A specified target time is the full hour (1..20) or, as a negative value (-20..-1), the         </td></tr>
             <tr><td>                     </td><td>last full hour before sunset minus this value.                                                  </td></tr>
             <tr><td>                     </td><td>Syntax: <b>&lt;Target SoC&gt;[:&lt;Target time&gt;]</b>                                         </td></tr>
@@ -42977,7 +42985,7 @@ to ensure that the system configuration is correct.
            <tr><td>                  </td><td>                                                                                                              </td></tr>
            <tr><td> <b>pinmax</b>    </td><td>the maximum possible charging power in watts (optional)                                                       </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
-           <tr><td> <b>pinreduced</b></td><td>The reduced charging power in watts (optional). The value is set in Reading Battery_OptimumBaseSoC_XX         </td></tr>
+           <tr><td> <b>pinreduced</b></td><td>The reduced charging power in watts (optional). The value is set in Reading Battery_ChargeOptTargetPower_XX   </td></tr>
            <tr><td>                  </td><td>if the calculated charging power falls below this value or the SoC <= lowSoC.                                 </td></tr>
            <tr><td>                  </td><td>This means that the value can also be applied in the case of demand charging from the public grid.            </td></tr>
            <tr><td>                  </td><td>                                                                                                              </td></tr>
@@ -45305,7 +45313,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC- und Lade-Management für dieses Batteriegerät. <br>
          Es wird ein Satz Steuerreadings erstellt; das Modul greift selbst <b>nicht</b> in die Batteriesteuerung ein. <br>
-         Das Reading <b>Battery_OptimumTargetSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
+         Das Reading <b>Battery_OptimumBaseSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
          Das Reading <b>Battery_ChargeRequest_XX</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
          ist. <br>
          In diesem Fall sollte die Batterie, unter Umständen mit Netzstrom, nachgeladen werden. <br>
@@ -45313,7 +45321,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Leistung (1), oder nicht bzw. nur bei Überschreitung des <br>
          Einspeiselimits (siehe <a href="#SolarForecast-attr-plantControl">plantControl->feedinPowerLimit</a>)
          geladen werden sollte (0). Möchte man die Batterie kontinuierlich über den gesamten Tag aufladen, wird im Reading
-         <b>Battery_OptimumBaseSoC_XX</b> eine optimierte Ladeleistung zur Batteriesteuerung bereitgestellt.  <br>
+         <b>Battery_ChargeOptTargetPower_XX</b> eine optimierte Ladeleistung zur Batteriesteuerung bereitgestellt.  <br>
          Die Readings können zur Steuerung des SoC (State of Charge) sowie zur Steuerung des verwendeten Ladeleistung
          der Batterie verwendet werden. <br>
          Detaillierte Informationen zum Batterie SoC- und Lade-Management sind im
@@ -45360,8 +45368,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um &lt;Reading&gt; Prozent ändern (+ erhöhen, - verringern) </td></tr>
             <tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Limit um 50% ändern (+ erhöhen, - verringern)                     </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
-            <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
-            <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
+            <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumBaseSoC_XX) in %.           </td></tr>
+            <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumBaseSoC_XX    </td></tr>
             <tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr>
             <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100 | 0' muß eingehalten werden!           </td></tr>
             <tr><td>                     </td><td>Wertebereich: <b>0, 1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 5                             </td></tr>
@@ -45389,7 +45397,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>loadTarget</b>   </td><td>Optionaler Ziel-SoC (%), Zielzeit zur Berechnung der Ladefreigabe und optimalen Ladeleistung.   </td></tr>
             <tr><td>                     </td><td>Der angegebene Ziel-SoC muß größer als der Wert von 'lowSoC' sein. Ein höherer Wert im Reading  </td></tr>
-            <tr><td>                     </td><td><b>Battery_OptimumTargetSoC_XX</b> gegenüber der Parametervorgabe hat Vorrang.                  </td></tr>
+            <tr><td>                     </td><td><b>Battery_OptimumBaseSoC_XX</b> gegenüber der Parametervorgabe hat Vorrang.                    </td></tr>
             <tr><td>                     </td><td>Eine angegebene Zielzeit ist die volle Stunde (1..20) oder als negativer Wert (-20..-1) die     </td></tr>
             <tr><td>                     </td><td>letzte volle Stunde vor dem Sonnenuntergang abzüglich diesem Wert.                              </td></tr>
             <tr><td>                     </td><td>Syntax: <b>&lt;Ziel-SoC&gt;[:&lt;Zielzeit&gt;]</b>                                              </td></tr>
@@ -46171,7 +46179,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
            <tr><td>                  </td><td>                                                                                                         </td></tr>
            <tr><td> <b>pinmax</b>    </td><td>die maximal mögliche Ladeleistung in Watt (optional)                                                     </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
-           <tr><td> <b>pinreduced</b></td><td>Die reduzierte Ladeleistung in Watt (optional). Der Wert wird im Reading Battery_OptimumBaseSoC_XX       </td></tr>
+           <tr><td> <b>pinreduced</b></td><td>Die reduzierte Ladeleistung in Watt (optional). Der Wert wird im Reading Battery_ChargeOptTargetPower_XX </td></tr>
            <tr><td>                  </td><td>gesetzt wenn die kalkulierte Ladeleistung unter diesen Wert fällt oder der SoC <= lowSoC beträgt.        </td></tr>
            <tr><td>                  </td><td>Somit kann der Wert auch im Fall der Anforderungsladung aus dem öffentlichen Netz zur Anwendung kommen.  </td></tr>
            <tr><td>                  </td><td>                                                                                                         </td></tr>
