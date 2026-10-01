@@ -16012,7 +16012,7 @@ sub _batSocTarget {
       storeReading   ($name, 'Battery_OptimumTargetSoC_'.$bn, $target.' %');
       ########################################################################################################################
       
-      storeReading   ($name, 'Battery_OptimumBaseSoC_'.$bn, $lowSoc.' %');
+      storeReading   ($name, 'Battery_OptimumBaseSoC_'.$bn, $target.' %');
       storeReading   ($name, 'Battery_ChargeRequest_'.$bn,    $chargereq);
   }
 
