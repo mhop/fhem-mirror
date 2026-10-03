@@ -100,10 +100,14 @@ sub Define {
   return "Interval must be a positive integer (seconds)"
       unless $interval =~ m/^\d+$/x && $interval > 0;
       
-  # Prüfung auf FFI::Platypus
-  eval { require FFI::Platypus; 1; } 
-       or return "MemSaver: Required Perl module FFI::Platypus is missing. Please install it via 'apt install libffi-platypus-perl' or cpan.";
+  # 1. OS-Prüfung: MemSaver läuft ausschließlich unter Linux
+  return "MemSaver: Unsupported operating system ($^O). This module requires Linux."
+      unless $^O eq 'linux';
 
+  # 2. Modul-Prüfung: FFI::Platypus vorhanden?
+  eval { require FFI::Platypus; 1; } 
+      or return "MemSaver: Required Perl module FFI::Platypus is missing. Please install it via 'apt install libffi-platypus-perl' or cpan.";
+      
   $hash->{INTERVAL}              = $interval;
   $hash->{VERSION}               = '1.1.0';
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
@@ -433,6 +437,7 @@ return @sorted;
 <a id="MemSaver"></a>
 <h3>MemSaver</h3>
 <ul>
+  <b>Note: This module operates exclusively on Linux operating systems.</b><br><br>
   Regularly returns unused glibc memory blocks to the operating system and collects memory & CPU usage data from <code>/proc</code>.
   Requires <code>FFI::Platypus</code> (<code>apt install libffi-platypus-perl</code>).
   <br><br>
@@ -484,7 +489,8 @@ return @sorted;
 <a id="MemSaver"></a>
 <h3>MemSaver</h3>
 <ul>
-  Gibt ungenutzte glibc-Speicherbl&auml;cke (Arenen) regelm&auml;&szlig;ig an das Betriebssystem zur&uuml;ck und erfasst detaillierte Speicher- sowie CPU-Messwerte aus <code>/proc</code>.
+  <b>Hinweis: Dieses Modul funktioniert ausschließllich unter Linux-Betriebssystemen.</b><br><br>
+  Gibt ungenutzte glibc-Speicherblöcke (Arenen) regelmäßig an das Betriebssystem zurück und erfasst detaillierte Speicher- sowie CPU-Messwerte aus <code>/proc</code>.
   Erfordert das Perl-Modul <code>FFI::Platypus</code> (<code>apt install libffi-platypus-perl</code>).
   <br><br>
 
@@ -492,7 +498,7 @@ return @sorted;
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; MemSaver [intervall]</code><br><br>
-    <code>intervall</code> — Ausf&uuml;hrungsintervall in Sekunden (Standard: 900).<br>
+    <code>intervall</code> — Ausführungsintervall in Sekunden (Standard: 900).<br>
     Beispiel: <code>define Saver MemSaver 900</code>
   </ul>
   <br>
@@ -517,14 +523,14 @@ return @sorted;
     <li>mem_pss_mb - Proportional Set Size (anteilig berechneter Shared-Memory)</li>
     <li>mem_private_mb - Privater Speicher (nicht mit anderen Prozessen geteilt)</li>
     <li>mem_shared_mb - Geteilter Speicher (Copy-on-Write Pages, Shared Libraries)</li>
-    <li>mem_vsize_mb - Gr&ouml;&szlig;e des virtuellen Adressraums</li>
+    <li>mem_vsize_mb - Größe des virtuellen Adressraums</li>
     <li>swap_process_total_mb - Aktuell ausgelagerter Speicher des FHEM-Prozesses</li>
-    <li>swap_process_delta_mb - &Auml;nderung des Prozess-Swaps seit dem letzten Zyklus</li>
+    <li>swap_process_delta_mb - Änderung des Prozess-Swaps seit dem letzten Zyklus</li>
     <li>swap_sys_in_mb - Systemweit wiedereingelagerter Swap seit dem letzten Zyklus</li>
     <li>swap_sys_out_mb - Systemweit ausgelagerter Swap seit dem letzten Zyklus</li>
-    <li>trim_last_freed_mb - Ungef&auml;hre Speichermenge in MB, die beim letzten malloc_trim an das OS zur&uuml;ckgegeben wurde</li>
-    <li>trim_last_run - Zeitstempel der letzten Ausf&uuml;hrung von malloc_trim</li>
-    <li>trim_next_run - Zeitstempel der n&auml;chsten geplanten Ausführung</li>
+    <li>trim_last_freed_mb - Ungefähre Speichermenge in MB, die beim letzten malloc_trim an das OS zurückgegeben wurde</li>
+    <li>trim_last_run - Zeitstempel der letzten Ausführung von malloc_trim</li>
+    <li>trim_next_run - Zeitstempel der nächsten geplanten Ausführung</li>
   </ul>
 </ul>
 
