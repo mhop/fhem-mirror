@@ -53,7 +53,7 @@ sub OREGON_Initialize
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^(3[8-9A-F]|[4-6][0-9A-F]|7[0-8]).*", #38-78
+  $hash->{Match}     = qr/^(3[8-9A-F]|[4-6][0-9A-F]|7[0-8]).*/s, #38-78
   $hash->{DefFn}     = \&OREGON_Define;
   $hash->{UndefFn}   = \&OREGON_Undef;
   $hash->{ParseFn}   = \&OREGON_Parse;
