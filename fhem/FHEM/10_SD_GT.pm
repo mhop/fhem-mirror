@@ -47,7 +47,7 @@ sub Initialize {
   $hash->{UndefFn}    = \&Undef;
   $hash->{SetFn}      = \&Set;
   $hash->{ParseFn}    = \&Parse;
-  $hash->{Match}      = '^P49#[A-Fa-f0-9]+';
+  $hash->{Match}      = qr/^P49#[A-Fa-f0-9]+/s;
   $hash->{AttrList}   = "IODev repeats:1,2,3,4,5,6,7,8,9,12,15 showtime:0,1 disableSetAllFunction:0,1 do_not_notify:0,1 ignore:0,1 showtime:0,1 $main::readingFnAttributes";
   $hash->{AutoCreate} = {'SD_GT_LEARN' => {FILTER => '%NAME', autocreateThreshold => '5:180', GPLOT => q{}}};
   return FHEM::Meta::InitMod( __FILE__, $hash );
