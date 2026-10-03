@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  14_SD_WS09: Match-Regex vorkompiliert, lastMSG, bitMSG und STATE
+            werden in Define nicht mehr gesetzt
  - change:  14_SD_WS07: Match-Regex vorkompiliert, lastMSG, bitMSG und STATE
             werden in Define nicht mehr gesetzt
  - change:  90_SIGNALduino_un: Match-Regex vorkompiliert
