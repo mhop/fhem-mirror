@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  14_SD_WS: Dekodiertabelle wird einmal je Modulladung erzeugt und
+            im Modulhash gehalten, Match-Regex vorkompiliert, Protokolle 37,
+            44/44x (Bresser Temeo) und 64 (WH2) tabellengetrieben
+ - bugfix:  14_SD_WS: Protokoll 27 (EuroChron EFS-3110A) prematch korrigiert
  - bugfix:  lib/FHEM/Devices/SIGNALduino/SD_Protocols/Data.pm: Protokoll 126
             (Ecowitt WH40): Nachrichtenlaenge korrigiert
  - feature: 00_SIGNALduino: Flash-Funktionen nach SD_Firmware ausgelagert,
