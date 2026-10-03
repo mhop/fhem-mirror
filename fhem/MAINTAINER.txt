@@ -652,6 +652,7 @@ lib/FHEM/AlexaCookieService/State.pm sidey             FHEM Development
 
 lib/FHEM/Core/Timer/Helper.pm    sidey            FHEM Development
 lib/FHEM/Core/Timer/Register.pm  Beta-User        FHEM Development
+lib/FHEM/Devices/SIGNALduino/*   Sidey            FHEM Development
 lib/FHEM/SynoModules/*           DS_Starter       Sonstiges
 lib/FHEM/Text/Unicode.pm         Adimarantis      FHEM Development
 lib/FHEM/Utility/CTZ.pm          DS_Starter       Sonstiges
