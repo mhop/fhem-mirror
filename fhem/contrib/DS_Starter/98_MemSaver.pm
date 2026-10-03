@@ -99,9 +99,13 @@ sub Define {
 
   return "Interval must be a positive integer (seconds)"
       unless $interval =~ m/^\d+$/x && $interval > 0;
+      
+  # Prüfung auf FFI::Platypus
+  eval { require FFI::Platypus; 1; } 
+       or return "MemSaver: Required Perl module FFI::Platypus is missing. Please install it via 'apt install libffi-platypus-perl' or cpan.";
 
-  $hash->{INTERVAL} = $interval;
-  $hash->{VERSION}  = '1.1.0';
+  $hash->{INTERVAL}              = $interval;
+  $hash->{VERSION}               = '1.1.0';
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
 
   use version 0.77; our $VERSION = moduleVersion ($hash, \%vNotesIntern);       # Versionsinformationen setzen
