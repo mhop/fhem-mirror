@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  14_Hideki: Match-Regex vorkompiliert, lastMSG wird in Define nicht
+            mehr gesetzt
  - change:  14_SD_WS: Dekodiertabelle wird einmal je Modulladung erzeugt und
             im Modulhash gehalten, Match-Regex vorkompiliert, Protokolle 37,
             44/44x (Bresser Temeo) und 64 (WH2) tabellengetrieben

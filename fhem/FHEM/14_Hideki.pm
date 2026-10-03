@@ -36,7 +36,7 @@ sub Hideki_Initialize {
   my ($hash) = @_;
   carp "Hideki_Initialize, hash failed" if (!$hash);
 
-  $hash->{Match}     = qr/^P12#75[A-F0-9]{14,30}/;   # Laenge (Anhahl nibbles nach 0x75 )noch genauer spezifizieren
+  $hash->{Match}     = qr/^P12#75[A-F0-9]{14,30}/s;   # Laenge (Anhahl nibbles nach 0x75 )noch genauer spezifizieren
   $hash->{DefFn}     = \&Hideki_Define;
   $hash->{UndefFn}   = \&Hideki_Undef;
   $hash->{ParseFn}   = \&Hideki_Parse;
@@ -135,10 +135,8 @@ sub Hideki_Define {
   return "wrong syntax: define <name> Hideki <code>".int(@a)
     if(int(@a) < 3);
 
-  $hash->{CODE}    = $a[2];
-  $hash->{lastMSG} =  '';
+  $hash->{CODE} = $a[2];
 
-  my $name= $hash->{NAME};
   $modules{Hideki}{defptr}{$a[2]} = $hash;
 
   return;
