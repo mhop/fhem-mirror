@@ -79,7 +79,7 @@ sub Initialize {
 	for my $k (keys %codes) {
 		$fs10_c2b{$codes{$k}} = $k; # reverse codes
 	}
-	$hash->{Match}      = '^P61#[a-fA-F0-9]{8,12}';
+	$hash->{Match}      = qr/^P61#[a-fA-F0-9]{8,12}/s;
 	$hash->{SetFn}      = \&Set;
 	$hash->{DefFn}      = \&Define;
 	$hash->{UndefFn}    = \&Undef;
