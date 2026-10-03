@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  lib/FHEM/Devices/SIGNALduino/SD_Protocols/Data.pm: Protokoll 126
+            (Ecowitt WH40): Nachrichtenlaenge korrigiert
  - feature: 00_SIGNALduino: Flash-Funktionen nach SD_Firmware ausgelagert,
             Flashen von Arduinos (avrdude) ueber das Netzwerk (TCP/ser2net),
             ESP8266 und ESP32 ueber HTTP, neues Attribut flashDevice,
