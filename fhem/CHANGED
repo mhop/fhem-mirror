@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  90_SIGNALduino_un: Match-Regex vorkompiliert
  - change:  10_SD_Rojaflex: Match-Regex vorkompiliert
  - change:  10_SD_GT: Match-Regex vorkompiliert
  - change:  10_FS10: Match-Regex vorkompiliert

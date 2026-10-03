@@ -22,7 +22,7 @@ my @bitcountlength = (0,0,0);   # array min|default|max
 sub SIGNALduino_un_Initialize {
   my ($hash) = @_;
 
-  $hash->{Match}     = '^[u]\d+(?:.\d)?#.*';
+  $hash->{Match}     = qr/^[u]\d+(?:.\d)?#.*/s;
   $hash->{DefFn}     = \&SIGNALduino_un_Define;
   $hash->{UndefFn}   = \&SIGNALduino_un_Undef;
   $hash->{AttrFn}    = \&SIGNALduino_un_Attr;
