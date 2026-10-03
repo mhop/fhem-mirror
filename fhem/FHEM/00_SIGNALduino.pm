@@ -15,7 +15,7 @@ use strict;
 use warnings;
 use Storable qw(dclone); 
 use FHEM::Core::Utils::Math;
-#use version 0.77; our $VERSION = version->declare('v4.0.0');
+#use version 0.77; our $VERSION = version->declare('v4.0.1');
 
 my $missingModulSIGNALduino = ' ';
 
@@ -25,9 +25,8 @@ use Carp;
 no warnings 'portable';
 
 eval {use Data::Dumper qw(Dumper);1};
-
 use constant {
-  SDUINO_VERSION                  => '4.0.1+20260306',  # Datum wird automatisch bei jedem pull request aktualisiert
+  SDUINO_VERSION                  => '4.0.1+20260917',  # Datum wird automatisch bei jedem pull request aktualisiert
   SDUINO_INIT_WAIT_XQ             => 1.5,     # wait disable device
   SDUINO_INIT_WAIT                => 2,
   SDUINO_INIT_MAXRETRY            => 3,
@@ -54,6 +53,7 @@ use FHEM::Devices::SIGNALduino::SD_Clients;
 use FHEM::Devices::SIGNALduino::SD_Message;
 use FHEM::Devices::SIGNALduino::SD_Matchlist;
 use FHEM::Devices::SIGNALduino::SD_CC1101;
+use FHEM::Devices::SIGNALduino::SD_Firmware qw( :all );
 use FHEM::Devices::SIGNALduino::SD_Utils qw( :all );
 use FHEM::Devices::SIGNALduino::SD_IO qw( :all );
 use List::Util qw(first);
@@ -162,6 +162,7 @@ sub SIGNALduino_Initialize {
             .' doubleMsgCheck_IDs'
             .' eventlogging:0,1'
             .' flashCommand'
+            .' flashDevice'
             .' hardware:esp32s,esp32cc1101,esp8266s,esp8266cc1101,MAPLEMINI_F103CBs,MAPLEMINI_F103CBcc1101,nano328,nanoCC1101,miniculCC1101,promini8cc1101,promini16cc1101,promini8s,promini16s,radinoCC1101'
             .' hexFile'
             .' initCommands'
@@ -305,146 +306,7 @@ sub SIGNALduino_Undef {
   return ;
 }
 
-############################# package main
-sub SIGNALduino_avrdude {
-  my $name = shift;
-  my $hash = $defs{$name};
 
-  if (defined($hash->{helper}{stty_pid}))
-  {
-    waitpid( $hash->{helper}{stty_pid}, 0 );
-    delete ( $hash->{helper}{stty_pid});
-  }
-
-  readingsSingleUpdate($hash,'state','FIRMWARE UPDATE running',1);
-  $hash->{helper}{avrdudelogs} .= "$name closed\n";
-  my $logFile = AttrVal('global', 'logdir', './log/') . "$hash->{TYPE}-Flash.log";
-
-  if (-e $logFile) {
-    unlink $logFile;
-  }
-
-  $hash->{helper}{avrdudecmd} =~ s/\Q[LOGFILE]\E/$logFile/g;
-  local $SIG{CHLD} = 'DEFAULT';
-  delete($hash->{FLASH_RESULT}) if (exists($hash->{FLASH_RESULT}));
-
-  qx($hash->{helper}{avrdudecmd});
-
-  if ($? != 0 )
-  {
-    readingsSingleUpdate($hash,'state','FIRMWARE UPDATE with error',1);    # processed in tests
-    $hash->{logMethod}->($name ,3, "$name: avrdude, ERROR: avrdude exited with error $?");
-    if (defined $FW_wname)
-    {
-      FW_directNotify("FILTER=$name", "FHEMWEB:$FW_wname", "FW_okDialog('ERROR: avrdude exited with error, for details see last flashlog.')", '');
-    }
-    $hash->{FLASH_RESULT}='ERROR: avrdude exited with error';              # processed in tests
-  } else {
-    $hash->{logMethod}->($name ,3, "$name: avrdude, Firmware update was successfull");
-    readingsSingleUpdate($hash,'state','FIRMWARE UPDATE successfull',1);   # processed in tests
-  }
-
-  local $/=undef;
-  if (-e $logFile) {
-    open FILE, $logFile;
-    $hash->{helper}{avrdudelogs} .= "--- AVRDUDE ---------------------------------------------------------------------------------\n";
-    $hash->{helper}{avrdudelogs} .= <FILE>;
-    $hash->{helper}{avrdudelogs} .= "--- AVRDUDE ---------------------------------------------------------------------------------\n\n";
-    close FILE;
-  } else {
-    $hash->{helper}{avrdudelogs} .= "WARNING: avrdude created no log file\n\n";
-    readingsSingleUpdate($hash,'state','FIRMWARE UPDATE with error',1);
-    $hash->{FLASH_RESULT}= 'WARNING: avrdude created no log file';         # processed in tests
-  }
-
-  DevIo_OpenDev($hash, 0, \&SIGNALduino_DoInit, \&SIGNALduino_Connect);
-  $hash->{helper}{avrdudelogs} .= "$name reopen started\n";
-  return $hash->{FLASH_RESULT};
-}
-
-############################# package main
-sub SIGNALduino_PrepareFlash {
-  my ($hash,$hexFile) = @_;
-
-  my $name=$hash->{NAME};
-  my $hardware=AttrVal($name,'hardware','');
-  my ($port,undef) = split('@', $hash->{DeviceName});
-  my $baudrate= 57600;
-  my $log = '';
-  my $avrdudefound=0;
-  my $tool_name = 'avrdude';
-  my $path_separator = ':';
-  if ($^O eq 'MSWin32') {
-    $tool_name .= '.exe';
-    $path_separator = ';';
-  }
-  for my $path ( split /$path_separator/, $ENV{PATH} ) {
-    if ( -f "$path/$tool_name" && -x _ ) {
-      $avrdudefound=1;
-      last;
-    }
-  }
-  $hash->{logMethod}->($name, 5, "$name: PrepareFlash, avrdude found = $avrdudefound");
-  return 'avrdude is not installed. Please provide avrdude tool example: sudo apt-get install avrdude' if($avrdudefound == 0);
-
-  $log .= "flashing Arduino $name\n";
-  $log .= "hex file: $hexFile\n";
-  $log .= "port: $port\n";
-
-  # prepare default Flashcommand
-  my $defaultflashCommand = ($hardware eq 'radinoCC1101' 
-    ? 'avrdude -c avr109 -b [BAUDRATE] -P [PORT] -p atmega32u4 -vv -D -U flash:w:[HEXFILE] 2>[LOGFILE]' 
-    : 'avrdude -c arduino -b [BAUDRATE] -P [PORT] -p atmega328p -vv -U flash:w:[HEXFILE] 2>[LOGFILE]');
-
-  # get User defined Flashcommand
-  my $flashCommand = AttrVal($name,'flashCommand',$defaultflashCommand);
-
-  if ($defaultflashCommand eq $flashCommand)  {
-    $hash->{logMethod}->($name, 5, "$name: PrepareFlash, standard flashCommand is used to flash.");
-  } else {
-    $hash->{logMethod}->($name, 3, "$name: PrepareFlash, custom flashCommand is manual defined! $flashCommand");
-  }
-
-  DevIo_CloseDev($hash);
-  if ($hardware eq 'radinoCC1101' && $^O eq 'linux') {
-    $hash->{logMethod}->($name, 3, "$name: PrepareFlash, forcing special reset for $hardware on $port");
-    # Mit dem Linux-Kommando 'stty' die Port-Einstellungen setzen
-    use IPC::Open3;
-
-    my($chld_out, $chld_in, $chld_err);
-    use Symbol 'gensym';
-    $chld_err = gensym;
-    my $pid;
-    eval {
-      $pid = open3($chld_in,$chld_out, $chld_err,  "stty -F $port ospeed 1200 ispeed 1200");
-      close($chld_in);  # give end of file to kid, or feed him
-    };
-    if ($@) {
-      $hash->{helper}{stty_output}=$@;
-    } else {
-      my @outlines = <$chld_out>;              # read till EOF
-      my @errlines = <$chld_err>;              # XXX: block potential if massive
-      $hash->{helper}{stty_pid}=$pid;
-      $hash->{helper}{stty_output} = join(' ',@outlines).join(' ',@errlines);
-    }
-    $port =~ s/usb-Unknown_radino/usb-In-Circuit_radino/g;
-    $hash->{logMethod}->($name ,3, "$name: PrepareFlash, changed usb port to \"$port\" for avrdude flashcommand compatible with radino");
-  }
-  $hash->{helper}{avrdudecmd} = $flashCommand;
-  $hash->{helper}{avrdudecmd}=~ s/\Q[PORT]\E/$port/g;
-  $hash->{helper}{avrdudecmd} =~ s/\Q[HEXFILE]\E/$hexFile/g;
-  if ($hardware =~ '^nano' && $^O eq 'linux') {
-    $hash->{logMethod}->($name ,5, "$name: PrepareFlash, try additional flash with baudrate 115200 for optiboot");
-    $hash->{helper}{avrdudecmd} = $hash->{helper}{avrdudecmd}." || ". $hash->{helper}{avrdudecmd};
-    $hash->{helper}{avrdudecmd} =~ s/\Q[BAUDRATE]\E/$baudrate/;
-    $baudrate=115200;
-  }
-  $hash->{helper}{avrdudecmd} =~ s/\Q[BAUDRATE]\E/$baudrate/;
-  $log .= "command: $hash->{helper}{avrdudecmd}\n\n";
-  FHEM::Core::Timer::Helper::addTimer($name,gettimeofday() + 1,\&SIGNALduino_avrdude,$name);
-  $hash->{helper}{avrdudelogs} = $log;
-  return ;
-}
 
 #$hash,$name,'sendmsg','P17;R6#'.substr($arg,2)
 ############################# package main, test exists
@@ -509,59 +371,6 @@ sub SIGNALduino_Set_raw {
     SIGNALduino_Get_Command($hash,'config');
   }
   return ;
-}
-
-############################# package main
- sub SIGNALduino_Set_flash {
-  my ($hash, @a) = @_;
-  my $name = $hash->{NAME};
-  return "Please define your hardware! (attr $name hardware <model of your receiver>) " if (AttrVal($name,'hardware','') eq '');
-
-  my @args = @a[1..$#a];
-  return 'ERROR: argument failed! flash [hexFile|url]' if (!$args[0]);
-
-  my %http_param = (
-    timeout    => 5,
-    hash       => $hash,                                                     # Muss gesetzt werden, damit die Callback funktion wieder $hash hat
-    method     => 'GET',                                                     # Lesen von Inhalten
-    header     => "User-Agent: perl_fhem\r\nAccept: application/json",       # Den Header gemaess abzufragender Daten aendern
-  );
-
-  my $hexFile = '';
-  if( ( exists $hash->{additionalSets}{flash} ) && ( grep $args[0] eq $_ , split(',',$hash->{additionalSets}{flash}) ) )
-  {
-    $hash->{logMethod}->($hash, 3, "$name: Set_flash, $args[0] try to fetch github assets for tag $args[0]");
-    my $ghurl = "https://api.github.com/repos/RFD-FHEM/SIGNALDuino/releases/tags/$args[0]";
-    $hash->{logMethod}->($hash, 3, "$name: Set_flash, $args[0] try to fetch release $ghurl");
-
-    $http_param{url}        = $ghurl;
-    $http_param{callback}   = \&SIGNALduino_githubParseHttpResponse;  # Diese Funktion soll das Ergebnis dieser HTTP Anfrage bearbeiten
-    $http_param{command}    = 'getReleaseByTag';
-    HttpUtils_NonblockingGet(\%http_param);                         # Starten der HTTP Abfrage. Es gibt keinen Return-Code.
-    return;
-  } elsif ($args[0] =~ m/^https?:\/\// ) {
-    $http_param{url}        = $args[0];
-    $http_param{callback}   = \&SIGNALduino_ParseHttpResponse;        # Diese Funktion soll das Ergebnis dieser HTTP Anfrage bearbeiten
-    $http_param{command}    = 'flash';
-    HttpUtils_NonblockingGet(\%http_param);
-    return;
-  } else {
-    $hexFile = $args[0];
-  }
-  $hash->{logMethod}->($name, 3, "$name: Set_flash, filename $hexFile provided, trying to flash");
-
-  # Only for Arduino , not for ESP
-  my $hardware = AttrVal($name,'hardware','');
-  if ($hardware =~ m/(?:nano|mini|radino)/)
-  {
-    return SIGNALduino_PrepareFlash($hash,$hexFile);
-  } else {
-    if (defined $FW_wname)
-    {
-      FW_directNotify("FILTER=$name", "#FHEMWEB:$FW_wname", "FW_okDialog('<u>ERROR:</u><br>Sorry, flashing your $hardware is currently not supported.<br>The file is only downloaded in /opt/fhem/FHEM/firmware.')", '');
-    }
-    return "Sorry, Flashing your $hardware via Module is currently not supported.";    # processed in tests
-  }
 }
 
 ############################# package main
@@ -894,30 +703,6 @@ sub SIGNALduino_Get_FhemWebList {
   return "Unknown argument $a[0], choose one of " . join(' ', @cList);
 }
 
-############################# package main
-sub SIGNALduino_Get_availableFirmware {
-  my ($hash, @a) = @_;
-
-  if ( !HAS_JSON )
-  {
-    $hash->{logMethod}->($hash->{NAME}, 1, "$hash->{NAME}: get $a[0] failed. Please install Perl module JSON. Example: sudo apt-get install libjson-perl");
-    return "$a[0]: \n\nFetching from github is not possible. Please install JSON. Example:<br><code>sudo apt-get install libjson-perl</code>";
-  }
-
-  my $channel=AttrVal($hash->{NAME},'updateChannelFW','stable');
-  my $hardware=AttrVal($hash->{NAME},'hardware',undef);
-
-  my ($validHw) = $modules{$hash->{TYPE}}{AttrList} =~ /.*hardware:(.*?)\s/;
-  $hash->{logMethod}->($hash->{NAME}, 1, "$hash->{NAME}: found availableFirmware for $validHw");
-
-  if (!defined($hardware) || $validHw !~ /$hardware(?:,|$)/ )
-  {
-    $hash->{logMethod}->($hash->{NAME}, 1, "$hash->{NAME}: get $a[0] failed. Please set attribute hardware first");
-    return "$a[0]: \n\n$hash->{NAME}: get $a[0] failed. Please choose one of $validHw attribute hardware";
-  }
-  SIGNALduino_querygithubreleases($hash);
-  return "$a[0]: \n\nFetching $channel firmware versions for $hardware from github\n";
-}
 
 ############################# package main
 sub SIGNALduino_Get_Command {
@@ -1506,53 +1291,6 @@ sub SIGNALduino_Read {
 
 ### Helper Subs >>>
 
-############################# package main
-## Parses a HTTP Response for example for flash via http download
-sub SIGNALduino_ParseHttpResponse {
-  my ($param, $err, $data) = @_;
-  my $hash = $param->{hash};
-  my $name = $hash->{NAME};
-
-  if($err ne '')                                              # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-  {
-    $hash->{logMethod}->($name, 3, "$name: ParseHttpResponse, error while requesting ".$param->{url}." - $err");                  # Eintrag fuers Log
-  }
-  elsif($param->{code} eq '200' && $data ne '')               # wenn die Abfrage erfolgreich war ($data enthaelt die Ergebnisdaten des HTTP Aufrufes)
-    {
-      $hash->{logMethod}->($name, 3, "$name: ParseHttpResponse, url ".$param->{url}.' returned: '.length($data).' bytes Data');   # Eintrag fuers Log
-
-      if ($param->{command} eq 'flash')
-      {
-        my $filename;
-
-        if ($param->{httpheader} =~ /Content-Disposition: attachment;.?filename=\"?([-+.\w]+)?\"?/)
-        {
-          $filename = $1;
-        } else {  # Filename via path if not specifyied via Content-Disposition
-          $param->{path} =~ /\/([-+.\w]+)$/;    #(?:[^\/][\d\w\.]+)+$   \/([-+.\w]+)$         
-          $filename = $1;
-        }
-        $hash->{logMethod}->($name, 3, "$name: ParseHttpResponse, Downloaded $filename firmware from ".$param->{host});
-        $hash->{logMethod}->($name, 5, "$name: ParseHttpResponse, Header = ".$param->{httpheader});
-
-        $filename = 'FHEM/firmware/' . $filename;
-        open(my $file, '>', $filename) or die $!;
-        print $file $data;
-        close $file;
-
-        # Den Flash Befehl mit der soebene heruntergeladenen Datei ausfuehren
-        #SIGNALduino_Log3 $name, 3, "$name: ParseHttpResponse, calling set ".$param->{command}." $filename";        # Eintrag fuers Log
-
-        my $set_return = SIGNALduino_Set($hash,$name,$param->{command},$filename); # $hash->{SetFn}
-        if (defined($set_return))
-        {
-          $hash->{logMethod}->($name ,3, "$name: ParseHttpResponse, Error while flashing: $set_return");
-        }
-      }
-    } else {
-      $hash->{logMethod}->($name, 3, "$name: ParseHttpResponse, undefined error while requesting ".$param->{url}." - $err - code=".$param->{code});   # Eintrag fuers Log
-    }
-}
 
 ############################# package main
 sub SIGNALduino_splitMsg {
@@ -2738,7 +2476,7 @@ sub SIGNALduino_FW_Detail {
     my $d = (devspec2array('TYPE=FileLog'))[0]; 
     IsDevice($d) ? $d : undef 
   };
-  my $fn=$defs{$name}->{TYPE}."-Flash.log";
+  my $fn=SIGNALduino_flashLogName($hash);
   my $fw_me = defined($FW_ME) ? $FW_ME : q{};
   my $fw_detail = defined($FW_detail) ? $FW_detail : q{};
 
@@ -2748,7 +2486,7 @@ sub SIGNALduino_FW_Detail {
 
   if (!defined($lfn)) {
     $ret .= "<td>No device of TYPE=FileLog found</td>" 
-  } elsif (! -s AttrVal('global', 'logdir', './log/'). $fn) {
+  } elsif (! -s SIGNALduino_flashLogFile($hash)) {
     $ret .= "<td></td>";
   } else {
     my $flashlogurl="$fw_me/FileLog_logWrapper?dev=$lfn&type=text&file=$fn";
@@ -3369,100 +3107,6 @@ sub SIGNALduino_FW_getProtocolList {
   return $ret;
 }
 
-############################# package main
-sub SIGNALduino_querygithubreleases {
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $param = {
-                url        => 'https://api.github.com/repos/RFD-FHEM/SIGNALDuino/releases',
-                timeout    => 5,
-                hash       => $hash,                                                    # Muss gesetzt werden, damit die Callback funktion wieder $hash hat
-                method     => 'GET',                                                    # Lesen von Inhalten
-                header     => "User-Agent: perl_fhem\r\nAccept: application/json",      # Den Header gemaess abzufragender Daten aendern
-                callback   =>  \&SIGNALduino_githubParseHttpResponse,                   # Diese Funktion soll das Ergebnis dieser HTTP Anfrage bearbeiten
-                command    => "queryReleases"
-              };
-
-  HttpUtils_NonblockingGet($param);                                                     # Starten der HTTP Abfrage. Es gibt keinen Return-Code.
-}
-
-############################# package main
-#return -10 = hardeware attribute is not set
-sub SIGNALduino_githubParseHttpResponse {
-  my ($param, $err, $data) = @_;
-  my $hash = $param->{hash};
-  my $name = $hash->{NAME};
-  my $hardware=AttrVal($name,'hardware',undef);
-
-  if($err ne '')                                                                                                        # wenn ein Fehler bei der HTTP Abfrage aufgetreten ist
-  {
-    Log3 $name, 3, "$name: githubParseHttpResponse, error while requesting ".$param->{url}." - $err (command: $param->{command}";   # Eintrag fuers Log
-    #readingsSingleUpdate($hash, 'fullResponse', 'ERROR');                                                              # Readings erzeugen
-  }
-  elsif($data ne '' && defined($hardware))                                                                              # wenn die Abfrage erfolgreich war ($data enthaelt die Ergebnisdaten des HTTP Aufrufes)
-  {
-
-    my $json_array = decode_json($data);
-    #print  Dumper($json_array);
-    if ($param->{command} eq 'queryReleases') {
-      #Log3 $name, 3, "$name: githubParseHttpResponse, url ".$param->{url}." returned: $data";                          # Eintrag fuers Log
-
-      my $releaselist='';
-      if (ref($json_array) eq "ARRAY") {
-        foreach my $item( @$json_array ) {
-          next if (AttrVal($name,'updateChannelFW','stable') eq 'stable' && $item->{prerelease});
-
-          #Debug ' item = '.Dumper($item);
-
-          foreach my $asset (@{$item->{assets}})
-          {
-            next if ($asset->{name} !~ m/$hardware/i);
-            $releaselist.=$item->{tag_name}.',' ;
-            last;
-          }
-        }
-      }
-
-      $releaselist =~ s/,$//;
-      $hash->{additionalSets}{flash} = $releaselist;
-    } elsif ($param->{command} eq 'getReleaseByTag' && defined($hardware)) {
-      #Debug ' json response = '.Dumper($json_array);
-
-      my @fwfiles;
-      foreach my $asset (@{$json_array->{assets}})
-      {
-        my %fileinfo;
-        if ( $asset->{name} =~ m/$hardware/i)
-        {
-          $fileinfo{filename} = $asset->{name};
-          $fileinfo{dlurl} = $asset->{browser_download_url};
-          $fileinfo{create_date} = $asset->{created_at};
-          #Debug ' firmwarefiles = '.Dumper(@fwfiles);
-          push @fwfiles, \%fileinfo;
-
-          my $set_return = SIGNALduino_Set($hash,$name,'flash',$asset->{browser_download_url}); # $hash->{SetFn
-          if(defined($set_return))
-          {
-            $hash->{logMethod}->($name, 3, "$name: githubParseHttpResponse, Error while trying to download firmware: $set_return");
-          }
-          last;
-        }
-      }
-
-    }
-  } elsif (!defined($hardware))  {
-    $hash->{logMethod}->($name, 5, "$name: githubParseHttpResponse, hardware is not defined");
-  }
-  # wenn
-  # Damit ist die Abfrage zuende.
-  # Evtl. einen InternalTimer neu schedulen
-  if (defined $FW_wname)
-  {
-     FW_directNotify("FILTER=$name", "#FHEMWEB:$FW_wname", "location.reload('true')", '');
-  }
-  return 0;
-}
-
 ################################################################################################
 1;
 
@@ -3614,7 +3258,8 @@ USB-connected devices (SIGNALduino):<br>
     The SIGNALduino needs the right firmware to be able to receive and deliver the sensor data to fhem. In addition to the way using the arduino IDE to flash the firmware into the SIGNALduino this provides a way to flash it directly from FHEM. You can specify a file on your fhem server or specify a url from which the firmware is downloaded.<br><br>
     There are some requirements:
     <ul>
-      <li>avrdude must be installed on the host<br> On a Raspberry PI this can be done with: sudo apt-get install avrdude</li>
+      <li>avrdude must be installed on the host<br> On a Raspberry PI this can be done with: sudo apt-get install avrdude.
+          Only needed for Arduino based hardware; ESP8266 and ESP32 are flashed over the network without it.</li>
       <li>the hardware attribute must be set if using any other hardware as an Arduino nano<br> This attribute defines the command, that gets sent to avrdude to flash the uC.</li>
       <li>If you encounter a problem, look into the logfile</li>
     </ul><br>
@@ -3854,7 +3499,9 @@ USB-connected devices (SIGNALduino):<br>
         is the speed (e.g. 57600)
       </li>
       <li>[PORT]<br>
-        is the port the Signalduino is connectd to (e.g. /dev/ttyUSB0) and will be used from the defenition
+        is the port the Signalduino is connectd to (e.g. /dev/ttyUSB0) and will be used from the defenition.<br>
+        A device connected over the network (e.g. via ser2net) is passed on to avrdude automatically, no configuration
+        needed. Only if flashing requires a different address, see <a href="#SIGNALDuino_flashDevice">flashDevice</a>.
       </li>
       <li>[HEXFILE]<br>
         is the .hex file that shall get flashed. There are three options (applied in this order):<br>
@@ -3868,13 +3515,30 @@ USB-connected devices (SIGNALduino):<br>
     </ul><br>
     <u><i>note:</u></i> ! Sometimes there can be problems flashing radino on Linux. <a href="https://wiki.in-circuit.de/index.php5?title=radino_common_problems">Here in the wiki under the point "radino & Linux" is a patch!</a>
   </li><br>
+  <a name="SIGNALDuino_flashDevice"></a>
+  <li>flashDevice<br>
+    Normally not needed. Only set this if the SIGNALduino is reachable under a different address for flashing than
+    during normal operation - through a ser2net port of its own, for example.<br>
+    <ul>
+      <li><code>attr sduino flashDevice raspi:45022</code></li>
+    </ul>
+    With ser2net such a port has to be a plain TCP connection: <code>accepter: tcp,45022</code>. Using
+    <code>telnet(rfc2217)</code> instead makes flashing fail - avrdude then reports <code>not in sync</code> or hangs.<br>
+    For ESP8266 and ESP32 the firmware is uploaded over http instead, and the address from the definition is used
+    automatically. Set this attribute only if the web interface of the device answers somewhere else, as a complete
+    address including the path:<br>
+    <ul>
+      <li><code>attr signalesp flashDevice http://192.168.1.40:8080/u</code></li>
+    </ul>
+  </li><br>
   <a name="SIGNALDuino_hardware"></a>
   <li>hardware<br>
     Currently, there are serval hardware options with different receiver options available.
     The simple single wire option,  consists of a single wire connected receiver and a single wire connected transmitter which are connected over a single digital port with the microcontroller.
     The receiver only sends data and the transmitter receives only from the microcontroller.
     The other option consists of the cc1101 (sub 1 GHZ) chip, which can transmit and receiver. It's a transceiver which is connected via spi.
-    ESP8266 hardware type, currently doesn't support flashing out of the module and needs at leat 1 MB of flash.
+    ESP8266 and ESP32 need at least 1 MB of flash. They are flashed over the network rather than with avrdude - the
+    firmware is uploaded to the device itself, so no additional tool is required on the FHEM host.
     <ul>
       <li>esp32s: ESP32 with simple single wire receiver</li>
       <li>esp32cc1101: ESP32 with CC1101 (spi connected) receiver</li>
@@ -4227,7 +3891,8 @@ USB-connected devices (SIGNALduino):<br>
     Der SIGNALduino ben&ouml;tigt die richtige Firmware, um die Sensordaten zu empfangen und zu liefern. Unter Verwendung der Arduino IDE zum Flashen der Firmware in den SIGNALduino bietet dies eine M&ouml;glichkeit, ihn direkt von FHEM aus zu flashen. Sie k&ouml;nnen eine Datei auf Ihrem fhem-Server angeben oder eine URL angeben, von der die Firmware heruntergeladen wird.<br><br>
     Es gibt einige Anforderungen:
     <ul>
-      <li><code>avrdude</code> muss auf dem Host installiert sein. Auf einem Raspberry PI kann dies getan werden mit: <code>sudo apt-get install avrdude</code>
+      <li><code>avrdude</code> muss auf dem Host installiert sein. Auf einem Raspberry PI kann dies getan werden mit: <code>sudo apt-get install avrdude</code>.
+          Nur f&uuml;r Arduino-basierte Hardware n&ouml;tig &mdash; ESP8266 und ESP32 werden ohne avrdude &uuml;ber das Netzwerk geflasht.
       </li>
       <li>Das Hardware-Attribut muss festgelegt werden, wenn eine andere Hardware als Arduino Nano verwendet wird. Dieses Attribut definiert den Befehl, der an avrdude gesendet wird, um den uC zu flashen.
       </li>
@@ -4462,7 +4127,10 @@ USB-connected devices (SIGNALduino):<br>
         Ist die Schrittgeschwindigkeit. (z.Bsp: 57600)
       </li>
       <li>[PORT]<br>
-        Ist der Port, an dem der SIGNALduino angeschlossen ist (z.Bsp: /dev/ttyUSB0) und wird von der Definition verwendet.
+        Ist der Port, an dem der SIGNALduino angeschlossen ist (z.Bsp: /dev/ttyUSB0) und wird von der Definition verwendet.<br>
+        Ein &uuml;ber das Netzwerk angebundenes Ger&auml;t (z.Bsp: via ser2net) wird automatisch an avrdude
+        weitergereicht, daf&uuml;r ist nichts einzurichten. Nur wenn zum Flashen eine andere Adresse n&ouml;tig ist,
+        siehe <a href="#SIGNALDuino_flashDevice">flashDevice</a>.
       </li>
       <li>[HEXFILE]<br>
         Ist die .hex-Datei, die geflasht werden soll. Es gibt drei Optionen (angewendet in dieser Reihenfolge):<br>
@@ -4478,13 +4146,32 @@ USB-connected devices (SIGNALduino):<br>
     </ul><br>
     <u><i>Hinweis:</u></i> ! Teilweise kann es beim Flashen vom radino unter Linux Probleme geben. <a href="https://wiki.in-circuit.de/index.php5?title=radino_common_problems">Hier im Wiki unter dem Punkt "radino & Linux" gibt es einen Patch!</a>
   </li><br>
+  <a name="SIGNALDuino_flashDevice"></a>
+  <li>flashDevice<br>
+    Wird normalerweise nicht ben&ouml;tigt. Nur setzen, wenn der SIGNALduino zum Flashen &uuml;ber eine andere Adresse
+    erreichbar ist als im normalen Betrieb &mdash; zum Beispiel &uuml;ber einen eigenen ser2net-Port.<br>
+    <ul>
+      <li><code>attr sduino flashDevice raspi:45022</code></li>
+    </ul>
+    Bei ser2net muss dieser Port eine einfache TCP-Verbindung sein: <code>accepter: tcp,45022</code>. Mit
+    <code>telnet(rfc2217)</code> schl&auml;gt das Flashen fehl &mdash; avrdude meldet dann <code>not in sync</code>
+    oder bleibt h&auml;ngen.<br>
+    Bei ESP8266 und ESP32 wird die Firmware stattdessen per http &uuml;bertragen, wobei die Adresse aus der Definition
+    automatisch verwendet wird. Das Attribut ist hier nur zu setzen, wenn die Weboberfl&auml;che des Ger&auml;ts unter
+    einer anderen Adresse antwortet &mdash; dann als vollst&auml;ndige Adresse einschlie&szlig;lich Pfad:<br>
+    <ul>
+      <li><code>attr signalesp flashDevice http://192.168.1.40:8080/u</code></li>
+    </ul>
+  </li><br>
   <a name="SIGNALDuino_hardware"></a>
   <li>hardware<br>
     Derzeit m&ouml;gliche Hardware Varianten mit verschiedenen Empfänger Optionen.
     Die einfache Variante besteht aus einem Empf&auml;nger und einen Sender, die über je eine einzige digitale Signalleitung Datem mit dem Microcontroller austauschen.
     Der Empf&auml;nger sendet dabei und der Sender empf&auml;ngt dabei ausschließlich.
     Weiterhin existiert der sogenannte cc1101 (sub 1 GHZ) Chip, welcher empfangen und senden kann. Dieser wird über die SPI Verbindung angebunden.
-    ESP8266/ESP32 Hardware Typen unterstützen derzeit kein flashen aus dem Modul und ben&ouml;tigen mindestens 1 MB Flash Speicher.
+    ESP8266 und ESP32 ben&ouml;tigen mindestens 1 MB Flash Speicher. Sie werden nicht mit avrdude, sondern &uuml;ber das
+    Netzwerk geflasht &mdash; die Firmware wird direkt auf das Ger&auml;t geladen, auf dem FHEM-Rechner ist daf&uuml;r
+    kein zus&auml;tzliches Werkzeug n&ouml;tig.
     <ul>
       <li>ESP32s: ESP32 f&uuml;r einfachen eindraht Empf&auml;nger</li>
       <li>ESP32cc1101: ESP32 mit einem CC110x-Empf&auml;nger (SPI Verbindung)</li>

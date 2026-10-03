@@ -1,5 +1,9 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 00_SIGNALduino: Flash-Funktionen nach SD_Firmware ausgelagert,
+            Flashen von Arduinos (avrdude) ueber das Netzwerk (TCP/ser2net),
+            ESP8266 und ESP32 ueber HTTP, neues Attribut flashDevice,
+            Pfad des Flashlogs korrigiert, Match-Regex vorkompiliert
  - feature: lib/FHEM/Devices/SIGNALduino/SD_Firmware.pm: neues Package fuer
             die Flash-Funktionen des SIGNALduino
  - change:  93_Log2Syslog: v5.12.7 kleinere Optimierungen
