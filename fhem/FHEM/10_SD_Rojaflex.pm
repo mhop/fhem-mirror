@@ -58,7 +58,7 @@ sub Initialize {
 	for my $k (keys %codes) {
 		$rev_codes{$codes{$k}} = $k; # reverse codes
 	}
-	$hash->{Match}      = '^P109#[a-fA-F0-9]{18}';
+	$hash->{Match}      = qr/^P109#[a-fA-F0-9]{18}/s;
 	$hash->{SetFn}      = \&Set;
 	$hash->{DefFn}      = \&Define;
 	$hash->{UndefFn}    = \&Undef;
