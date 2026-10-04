@@ -46,6 +46,7 @@ use GPUtils qw(GP_Import GP_Export);
 
 # Versions History
 my %vNotesIntern = (
+  "1.2.0"  => "04.10.2026  Einbau _leakAssessment zur Bewertung Leak vs. Fragmentierung ",
   "1.1.0"  => "04.10.2026  cpu_load, cpu_usage_pct und trim_next_run integriert ".
                            "fhem_uptime, fhem_start_time und fhem_uptime_sec als Readings eingebaut ".
                            "Perl Verion als Internal eingebaut ",
@@ -359,19 +360,31 @@ sub collectMemReadings {
   my $fhem_start = $main::fhem_started // gettimeofday();
   my $uptime_sec = int(gettimeofday() - $fhem_start);
   my $uptime_str = _formatUptime ($uptime_sec);
-  my $start_time = FmtDateTime ($fhem_start);                                   # Formatiert z.B. zu "2026-10-02 14:30:00"
+  my $start_time = FmtDateTime ($fhem_start);                                           # Formatiert z.B. zu "2026-10-02 14:30:00"
 
-  # --- Readings schreiben ---
-  # Safe conversion: stellt sicher, dass undef, "" oder Nicht-Zahlen zu 0 werden
-  my $fmt = sub {
+  # --- Priv + Shared RAM konsolidiert ---
+  my $priv_kb   = ($m{Private_Clean} // 0) + ($m{Private_Dirty} // 0);
+  my $shared_kb = ($m{Shared_Clean}  // 0) + ($m{Shared_Dirty}  // 0);
+  
+  # --- Umrechnungsroutine ---
+  my $fmt = sub {                                                                       # Safe conversion: stellt sicher, dass undef, "" oder Nicht-Zahlen zu 0 werden
       my $val = $_[0];
       $val = 0 if !defined $val || $val eq '' || $val !~ /^-?\d+(?:\.\d+)?$/;
       return sprintf '%.2f', $val / 1024;
   };
+  
+  # --- Leak-Analyse-Logik (Dynamischer Zeitpuffer) ---
+  my $now     = gettimeofday();
+  my $priv_mb = $priv_kb / 1024;
+  my $max_age = 1800;                                                                   # Betrachtungsfenster: 30 Minuten (1800 s)
 
-  my $priv_kb   = ($m{Private_Clean} // 0) + ($m{Private_Dirty} // 0);
-  my $shared_kb = ($m{Shared_Clean}  // 0) + ($m{Shared_Dirty}  // 0);
-
+  $hash->{HELPER}{PRIV_HISTORY} //= [];
+  push @{$hash->{HELPER}{PRIV_HISTORY}}, { time => $now, val => $priv_mb };                                         # Aktuellen Messwert mit Zeitstempel anfügen
+  @{$hash->{HELPER}{PRIV_HISTORY}} = grep { $_->{time} >= ($now - $max_age) } @{$hash->{HELPER}{PRIV_HISTORY}};     # Einträge entfernen, die älter als $max_age Sekunden sind
+  
+  
+  # --- Readings schreiben ---
+  
   readingsBeginUpdate ($hash);
   readingsBulkUpdate  ($hash, 'mem_private_mb',        $fmt->($priv_kb));
   readingsBulkUpdate  ($hash, 'mem_shared_mb',         $fmt->($shared_kb));
@@ -428,25 +441,64 @@ sub mallocTrim {
       };
 
       if (!$has_platypus) {
-          Log3 ($name, 2, "$name - MemSaver: FFI::Platypus not available — malloc_trim disabled. Install with: 'apt install libffi-platypus-perl' ");
+          Log3 ($name, 2, "$name - MemSaver: FFI::Platypus not available — malloc_trim disabled. Install with: 'apt install libffi-platypus-perl'");
       }
   }
 
   return unless $has_platypus && $malloc_trim_fn;
 
   my $rss_before = _currentRssMb();
-  $malloc_trim_fn->(0);
-  my $rss_after  = _currentRssMb();
-  my $freed      = sprintf '%.2f', $rss_before - $rss_after;
+    
+  $malloc_trim_fn->(0);                                                 # Freigabekern
+    
+  my $rss_after              = _currentRssMb();
+  my $freed                  = sprintf '%.2f', $rss_before - $rss_after;
+  my ($leak_status, $drift)  = _leakAssessment ($hash, $freed);
 
+  # --- Readings schreiben ---
   readingsBeginUpdate ($hash);
-  readingsBulkUpdate  ($hash, 'trim_last_freed_mb', $freed);
-  readingsBulkUpdate  ($hash, 'trim_last_run', FmtDateTime(gettimeofday()));
+  readingsBulkUpdate  ($hash, 'trim_last_freed_mb',    $freed);
+  readingsBulkUpdate  ($hash, 'trim_last_run',         FmtDateTime(gettimeofday()));
+  readingsBulkUpdate  ($hash, 'leak_status',           $leak_status);
+  readingsBulkUpdate  ($hash, 'mem_drift_per_hour_mb', sprintf('%.2f', $drift)) if defined $drift;
   readingsEndUpdate   ($hash, 1);
 
   Log3 ($name, 5, "$name - MemSaver: malloc_trim(0) executed, freed ~${freed} MB");
-
+    
 return;
+}
+
+##############################################################################
+#                   Leak vs. Fragmentierung bewerten 
+##############################################################################
+sub _leakAssessment {
+  my ($hash, $freed) = @_;
+
+  my $hist = $hash->{HELPER}{PRIV_HISTORY} // [];
+    
+  return ("initializing", 0) if scalar(@$hist) < 3;
+
+  my $first = $hist->[0];
+  my $last  = $hist->[-1];
+    
+  my $timespan_min = ($last->{time} - $first->{time}) / 60;
+  return ('collecting_data', 0) if $timespan_min < 5;
+
+  my $mem_trend      = $last->{val} - $first->{val};
+  my $drift_per_hour = ($mem_trend / $timespan_min) * 60;
+  my $mem_status     = "ok";
+
+  if ($freed > 5) {                                             # malloc_trim konnte signifikant Speicher freigeben -> Fragmentierung aufgeräumt
+      $mem_status = "fragmentation_cleared";
+  }
+  elsif ($drift_per_hour > 20 && $freed < 1.0) {                # Speicher wächst kontinuierlich (>20 MB/h Trend) und trim bringt fast nichts
+      $mem_status = "potential_leak_warning";
+  }
+  elsif ($drift_per_hour > 50) {                                # sehr starker Drift (>50 MB/h Trend)
+      $mem_status = "leak_suspected";
+  }
+
+return ($mem_status, $drift_per_hour);
 }
 
 ##############################################################################
@@ -593,6 +645,20 @@ return $sseq eq 'desc' ? reverse(@sorted) : @sorted;
     <li>trim_last_freed_mb - approximate MB returned to OS by last malloc_trim call</li>
     <li>trim_last_run - Timestamp of last malloc_trim execution</li>
     <li>trim_next_run - Timestamp of next scheduled malloc_trim execution</li>
+    
+    <li>mem_drift_per_hour_mb - Indicates the projected memory growth (trend) of the FHEM process in
+                                megabytes per hour (MB/h). The value is based on the trend in
+                                private memory (Private Clean + Private Dirty) over the last 30 minutes.
+                                Negative values indicate an actual reduction in memory. </li>
+                                
+    <li>leak_status - Displays the current assessment of memory leaks and fragmentation.           
+           <ul>initializing: There are still fewer than 3 data points.  </ul>
+           <ul>collecting_data: The measurement period is still shorter than 5 minutes (no reliable trend analysis possible yet). </ul>
+           <ul>ok: Normal memory behavior; no alarming increase detected. </ul>
+           <ul>fragmentation_cleared: malloc_trim was able to successfully return a significant amount of RAM (> 5 MB) to the operating system. The increase was therefore solely due to heap fragmentation. </ul>
+           <ul>potential_leak_warning: Memory is growing continuously (> 20 MB/h trend) and malloc_trim was barely able to free any memory (< 1 MB). There may be a slow memory leak. </ul>
+           <ul>leak_suspected: Very strong memory growth trend (> 50 MB/h). Strong suspicion of a memory leak in a loaded module. </ul>
+    </li>
   </ul>
 </ul>
 
@@ -648,6 +714,20 @@ return $sseq eq 'desc' ? reverse(@sorted) : @sorted;
     <li>trim_last_freed_mb - ungefähre Speichermenge in MB, die beim letzten malloc_trim an das OS zurückgegeben wurde</li>
     <li>trim_last_run - Zeitstempel der letzten Ausführung von malloc_trim</li>
     <li>trim_next_run - Zeitstempel der nächsten geplanten Ausführung</li>
+    
+    <li>mem_drift_per_hour_mb - Gibt den hochgerechneten Speicherzuwachs (Trend) des FHEM-Prozesses in 
+                                Megabyte pro Stunde (MB/h) an. Der Wert basiert auf der Entwicklung des 
+                                privaten Arbeitsspeichers (Private Clean + Private Dirty) innerhalb der letzten 30 Minuten. 
+                                Negativwerte bedeuten eine echte Speicherreduzierung.</li>
+                                
+    <li>leak_status - Zeigt die aktuelle Bewertung bezüglich Speicher-Leaks und Fragmentierung an.           
+           <ul>initializing: Es sind noch weniger als 3 Messwerte vorhanden.  </ul>
+           <ul>collecting_data: Der Messzeitraum ist noch kürzer als 5 Minuten (noch keine zuverlässige Trendanalyse möglich). </ul> 
+           <ul>ok: Normales Speicherverhalten, kein bedrohlicher Anstieg erkennbar. </ul>
+           <ul>fragmentation_cleared: malloc_trim konnte erfolgreich signifikant RAM (> 5 MB) an das Betriebssystem zurückgeben. Der Anstieg lag also nur an Heap-Fragmentierung. </ul>
+           <ul>potential_leak_warning: Der Speicher wächst kontinuierlich (> 20 MB/h Trend) und malloc_trim konnte kaum Speicher freigeben (< 1 MB). Es könnte ein langsames Memory-Leak vorliegen. </ul>
+           <ul>leak_suspected: Sehr starker Speicherspreizungs-Trend (> 50 MB/h). Dringender Verdacht auf ein Speicherleck in einem geladenen Modul. </ul>           
+    </li>
   </ul>
 </ul>
 
