@@ -46,7 +46,9 @@ use GPUtils qw(GP_Import GP_Export);
 
 # Versions History
 my %vNotesIntern = (
-  "1.1.0"  => "03.10.2026  cpu_load, cpu_usage_pct und trim_next_run integriert ",
+  "1.1.0"  => "04.10.2026  cpu_load, cpu_usage_pct und trim_next_run integriert ".
+                           "fhem_uptime, fhem_start_time und fhem_uptime_sec als Readings eingebaut ".
+                           "Perl Verion als Internal eingebaut ",
   "1.0.0"  => "03.10.2026  initiale Version "
 );
 
@@ -109,7 +111,7 @@ sub Define {
       or return "MemSaver: Required Perl module FFI::Platypus is missing. Please install it via 'apt install libffi-platypus-perl' or cpan.";
       
   $hash->{INTERVAL}              = $interval;
-  $hash->{VERSION}               = '1.1.0';
+  $hash->{PERLVERSION}           = sprintf "%vd", $^V;                          # Perl Version z.B. "5.36.0"
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
 
   use version 0.77; our $VERSION = moduleVersion ($hash, \%vNotesIntern);       # Versionsinformationen setzen
@@ -244,14 +246,18 @@ sub collectMemReadings {
   $hash->{HELPER}{PREV_PROC_SWAP} = ($m{Swap} // 0);
 
   # --- 3. CPU Load & Usage ---
-  my $load1 = 0;
+  my ($cpu_idle, $cpu_total);
+  my $load1   = 0;
+  my $cpu_pct = 0;
+  
   if (open my $fh_load, '<', '/proc/loadavg') {
       my $line = <$fh_load>;
       close $fh_load;
       ($load1) = $line =~ /^([\d\.]+)/;
   }
+  
+  $load1 //= 0;                                                     # Fallback falls Match fehlschlägt
 
-  my ($cpu_idle, $cpu_total);
   if (open my $fh_stat, '<', '/proc/stat') {
       my $line = <$fh_stat>;
       close $fh_stat;
@@ -260,50 +266,67 @@ sub collectMemReadings {
       $cpu_total = 0;
       $cpu_total += $_ for @v[1..8];
   }
-
-  my $cpu_pct = 0;
+  
   if (defined $hash->{HELPER}{LAST_CPU_IDLE} && defined $hash->{HELPER}{LAST_CPU_TOTAL}) {
       my $diff_total = $cpu_total - $hash->{HELPER}{LAST_CPU_TOTAL};
       my $diff_idle  = $cpu_idle  - $hash->{HELPER}{LAST_CPU_IDLE};
+      
       if ($diff_total > 0) {
           $cpu_pct = sprintf '%.2f', (1 - ($diff_idle / $diff_total)) * 100;
       }
   }
   $hash->{HELPER}{LAST_CPU_IDLE}  = $cpu_idle;
   $hash->{HELPER}{LAST_CPU_TOTAL} = $cpu_total;
+  
+  # --- 4. FHEM Uptime ---
+  my $fhem_start = $main::fhem_started // gettimeofday();
+  my $uptime_sec = int(gettimeofday() - $fhem_start);
+  my $uptime_str = _formatUptime ($uptime_sec);
+  my $start_time = FmtDateTime ($fhem_start);                                   # Formatiert z.B. zu "2026-10-02 14:30:00"
 
   # --- Readings schreiben ---
-  my $fmt = sub { sprintf '%.2f', ($_[0] // 0) / 1024 };
+  # Safe conversion: stellt sicher, dass undef, "" oder Nicht-Zahlen zu 0 werden
+  my $fmt = sub { 
+      my $val = $_[0];
+      $val = 0 if !defined $val || $val eq '' || $val !~ /^-?\d+(?:\.\d+)?$/;
+      return sprintf '%.2f', $val / 1024;
+  };
+
+  my $priv_kb   = ($m{Private_Clean} // 0) + ($m{Private_Dirty} // 0);
+  my $shared_kb = ($m{Shared_Clean}  // 0) + ($m{Shared_Dirty}  // 0);
 
   readingsBeginUpdate ($hash);
-  readingsBulkUpdate  ($hash, 'mem_private_mb',       $fmt->( ($m{Private_Clean} // 0) + ($m{Private_Dirty} // 0) ));  
-  readingsBulkUpdate  ($hash, 'mem_shared_mb',        $fmt->( ($m{Shared_Clean}  // 0) + ($m{Shared_Dirty}  // 0) ));
-  readingsBulkUpdate  ($hash, 'mem_rss_mb',           $fmt->($m{VmRSS}));                                      # Resident Set Size
-  readingsBulkUpdate  ($hash, 'mem_hwm_mb',           $fmt->($m{VmHWM}));                                      # High Water Mark (Peak seit Start)
-  readingsBulkUpdate  ($hash, 'mem_pss_mb',           $fmt->($m{Pss}));                                        # Proportional Set Size
-  readingsBulkUpdate  ($hash, 'mem_vsize_mb',         $fmt->($m{VmSize}));                                     # Virtueller Adressraum
-  readingsBulkUpdate  ($hash, 'swap_process_total_mb',$fmt->($m{Swap}));                                       # Ausgelagerter Prozess-Swap gesamt
-  readingsBulkUpdate  ($hash, 'swap_process_delta_mb',$fmt->($proc_swap_delta));                               # Swap-Delta seit letztem Zyklus
-  readingsBulkUpdate  ($hash, 'swap_sys_in_mb',       $swapin);                                                # Systemweiter Swap-In seit letztem Zyklus
-  readingsBulkUpdate  ($hash, 'swap_sys_out_mb',      $swapout);                                               # Systemweiter Swap-Out seit letztem Zyklus
-  readingsBulkUpdate  ($hash, 'cpu_load1',            sprintf('%.2f', $load1));                                # Load Average (1 Min)
-  readingsBulkUpdate  ($hash, 'cpu_usage_pct',        $cpu_pct);                                               # CPU-Auslastung über das Intervall
-  readingsBulkUpdate  ($hash, 'state',                'active');
+  readingsBulkUpdate  ($hash, 'mem_private_mb',        $fmt->($priv_kb));  
+  readingsBulkUpdate  ($hash, 'mem_shared_mb',         $fmt->($shared_kb));
+  readingsBulkUpdate  ($hash, 'mem_rss_mb',            $fmt->($m{VmRSS} // 0));                         # Resident Set Size
+  readingsBulkUpdate  ($hash, 'mem_hwm_mb',            $fmt->($m{VmHWM} // 0));                         # High Water Mark (Peak seit Start)
+  readingsBulkUpdate  ($hash, 'mem_pss_mb',            $fmt->($m{Pss} // 0));                           # Proportional Set Size
+  readingsBulkUpdate  ($hash, 'mem_vsize_mb',          $fmt->($m{VmSize} // 0));                        # Virtueller Adressraum
+  readingsBulkUpdate  ($hash, 'swap_process_total_mb', $fmt->($m{Swap} // 0));                          # Ausgelagerter Prozess-Swap gesamt
+  readingsBulkUpdate  ($hash, 'swap_process_delta_mb', $fmt->($proc_swap_delta // 0));                  # Swap-Delta seit letztem Zyklus
+  readingsBulkUpdate  ($hash, 'swap_sys_in_mb',        $swapin // '0.00');                              # Systemweiter Swap-In seit letztem Zyklus
+  readingsBulkUpdate  ($hash, 'swap_sys_out_mb',       $swapout // '0.00');                             # Systemweiter Swap-Out seit letztem Zyklus
+  readingsBulkUpdate  ($hash, 'cpu_load1',             sprintf('%.2f', $load1 // 0));                   # Load Average (1 Min)
+  readingsBulkUpdate  ($hash, 'cpu_usage_pct',         $cpu_pct // 0);                                  # CPU-Auslastung über das Intervall
+  readingsBulkUpdate  ($hash, 'fhem_start_time',       $start_time);                                    # Lesbare Startzeit
+  readingsBulkUpdate  ($hash, 'fhem_uptime',           $uptime_str);                                    # z. B. "12d 4h 15m 30s"
+  readingsBulkUpdate  ($hash, 'fhem_uptime_sec',       $uptime_sec);                                    # z. B. 1052130  
+  readingsBulkUpdate  ($hash, 'state',                 'active');
   readingsEndUpdate   ($hash, 1);
   
   my $ram = join ", ",
-      "RSS="         . $fmt->($m{VmRSS}),
-      "HWM="         . $fmt->($m{VmHWM}),
-      "PSS="         . $fmt->($m{Pss}),
-      "Priv="        . $fmt->($m{Private_Clean} + $m{Private_Dirty}),
-      "Shared="      . $fmt->($m{Shared_Clean}  + $m{Shared_Dirty}),
-      "ProcSwapTot=" . $fmt->($m{Swap}),                        		# Prozess-Swap MB
-      "ProcSwapDta=" . $fmt->($proc_swap_delta),						# Prozess-Swap-Delta MB
-      "SysSwapIn="   . $swapin,    									    # MB systemweit seit letztem Messzyklus eingelagert
-      "SysSwapOut="  . $swapout,   									    # MB systemweit seit letztem Messzyklus ausgelagert
-      "VSize="       . $fmt->($m{VmSize});
+      "RSS="         . $fmt->($m{VmRSS} // 0),
+      "HWM="         . $fmt->($m{VmHWM} // 0),
+      "PSS="         . $fmt->($m{Pss} // 0),
+      "Priv="        . $fmt->($priv_kb),
+      "Shared="      . $fmt->($shared_kb),
+      "ProcSwapTot=" . $fmt->($m{Swap} // 0),
+      "ProcSwapDta=" . $fmt->($proc_swap_delta // 0),
+      "SysSwapIn="   . ($swapin // '0.00'),
+      "SysSwapOut="  . ($swapout // '0.00'),
+      "VSize="       . $fmt->($m{VmSize} // 0);
 
-  Log3 ($name, 4, "$name - RAM/CPU: " . $ram . sprintf(", Load1=%.2f, CPU_Usage=%.2f%%", $load1, $cpu_pct));
+  Log3 ($name, 4, "$name - RAM/CPU: " . $ram . sprintf(", Load1=%.2f, CPU_Usage=%.2f%%", $load1 // 0, $cpu_pct // 0));
 
 return;
 }
@@ -341,13 +364,34 @@ sub mallocTrim {
 
   readingsBeginUpdate ($hash);
   readingsBulkUpdate  ($hash, 'trim_last_freed_mb', $freed);
-  readingsBulkUpdate  ($hash, 'trim_last_run',       FmtDateTime(gettimeofday()));
+  readingsBulkUpdate  ($hash, 'trim_last_run', FmtDateTime(gettimeofday()));
   readingsEndUpdate   ($hash, 1);
 
-  Log3 ($name, 4,
-      "$name - MemSaver: malloc_trim(0) executed, freed ~${freed} MB");
+  Log3 ($name, 5, "$name - MemSaver: malloc_trim(0) executed, freed ~${freed} MB");
 
 return;
+}
+
+##############################################################################
+#  Formatiert eine Sekunden-Anzahl in ein lesbares Format (d, h, m, s)
+##############################################################################
+sub _formatUptime {
+  my ($sec) = @_;
+    
+  my $days = int($sec / 86400);
+  $sec %= 86400;
+  my $hours = int($sec / 3600);
+  $sec %= 3600;
+  my $mins = int($sec / 60);
+  my $secs = $sec % 60;
+
+  my @parts;
+  push @parts, "${days}d"   if $days  > 0;
+  push @parts, "${hours}h"  if $hours > 0  || $days  > 0;
+  push @parts, "${mins}m"   if $mins  > 0  || $hours > 0 || $days > 0;
+  push @parts, "${secs}s";
+
+return join(' ', @parts);
 }
 
 ##############################################################################
@@ -438,7 +482,7 @@ return @sorted;
 <h3>MemSaver</h3>
 <ul>
   <b>Note: This module operates exclusively on Linux operating systems.</b><br><br>
-  Regularly returns unused glibc memory blocks to the operating system and collects memory & CPU usage data from <code>/proc</code>.
+  Regularly returns unused glibc memory blocks to the operating system and collects memory & CPU usage data from <code>/proc</code>. <br>
   Requires <code>FFI::Platypus</code> (<code>apt install libffi-platypus-perl</code>).
   <br><br>
 
@@ -473,7 +517,7 @@ return @sorted;
     <li>mem_shared_mb - Shared memory (CoW pages, shared libraries)</li>
     <li>mem_vsize_mb - Virtual address space size</li>
     <li>swap_process_total_mb - Process pages currently swapped out</li>
-    <li>swap_process_delta_mb - Change in process swap since last cycle</li>
+    <li>swap_process_delta_mb - Change in the process swap since the last cycle (negative values = "retrieval from swap")</li>
     <li>swap_sys_in_mb - Systemwide swap-in since last cycle (pages recalled)</li>
     <li>swap_sys_out_mb - Systemwide swap-out since last cycle (pages evicted)</li>
     <li>trim_last_freed_mb - Approximate MB returned to OS by last malloc_trim call</li>
@@ -490,7 +534,7 @@ return @sorted;
 <h3>MemSaver</h3>
 <ul>
   <b>Hinweis: Dieses Modul funktioniert ausschließllich unter Linux-Betriebssystemen.</b><br><br>
-  Gibt ungenutzte glibc-Speicherblöcke (Arenen) regelmäßig an das Betriebssystem zurück und erfasst detaillierte Speicher- sowie CPU-Messwerte aus <code>/proc</code>.
+  Gibt ungenutzte glibc-Speicherblöcke (Arenen) regelmäßig an das Betriebssystem zurück und erfasst detaillierte Speicher- sowie CPU-Messwerte aus <code>/proc</code>. <br>
   Erfordert das Perl-Modul <code>FFI::Platypus</code> (<code>apt install libffi-platypus-perl</code>).
   <br><br>
 
@@ -525,7 +569,7 @@ return @sorted;
     <li>mem_shared_mb - Geteilter Speicher (Copy-on-Write Pages, Shared Libraries)</li>
     <li>mem_vsize_mb - Größe des virtuellen Adressraums</li>
     <li>swap_process_total_mb - Aktuell ausgelagerter Speicher des FHEM-Prozesses</li>
-    <li>swap_process_delta_mb - Änderung des Prozess-Swaps seit dem letzten Zyklus</li>
+    <li>swap_process_delta_mb - Änderung des Prozess-Swaps seit dem letzten Zyklus (negative Werte="Rückholung aus Swap") </li>
     <li>swap_sys_in_mb - Systemweit wiedereingelagerter Swap seit dem letzten Zyklus</li>
     <li>swap_sys_out_mb - Systemweit ausgelagerter Swap seit dem letzten Zyklus</li>
     <li>trim_last_freed_mb - Ungefähre Speichermenge in MB, die beim letzten malloc_trim an das OS zurückgegeben wurde</li>
