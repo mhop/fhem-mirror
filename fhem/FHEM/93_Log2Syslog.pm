@@ -108,7 +108,8 @@ BEGIN {
 
 # Versions History intern:
 my %vNotesIntern = (
-  "5.12.8" => "29.09.2026  Fix Notes ".
+  "5.12.9" => "04.10.2026  Fix Syntax Fehler in vNotesIntern ",
+  "5.12.8" => "29.09.2026  Fix Notes ",
   "5.12.7" => "28.09.2026  setPayload: \$otp nur kodieren wenn tatsächlich non-ASCII vorhanden sind ".
                            "Define Funktion refaktoriert, set ... reopen mit neuer Sub _setReopen refaktoriert ".
                            "openSocket: Fehlendes Leeren von \$hash->{CLIENTSOCKET} bei Verbindungsabbrüchen korrigiert ",
