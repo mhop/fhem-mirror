@@ -2400,6 +2400,13 @@ CommandDelete($$)
     delete($oldvalue{$sdev});
     DoTrigger("global", "DELETED $sdev", 1) if(!$temporary);
 
+
+    if(defined($attr{$sdev}) || defined($defs{$sdev})) {
+      Log 1, "'CommandDelete $sdev' resulted in ghost attributes/devices ".
+             "due to the DELETED trigger!";
+      delete($attr{$sdev});
+      delete($defs{$sdev});
+    }
   }
   return join("\n", @rets);
 }
