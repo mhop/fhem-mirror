@@ -551,6 +551,7 @@ FHEM/98_logProxy.pm          justme1968           Frontends/SVG Plots logProxy
 FHEM/98_search.pm            rudolfkoenig/orphan  Unterstützende Dienste
 FHEM/98_MAX_Temperature.pm   Wzut/Bismosa         MAX
 FHEM/98_MaxScanner.pm        rudolfkoenig/orphan  MAX
+FHEM/98_MemSaver.pm          DS_Starter           Sonstiges
 FHEM/98_MediaList.pm         Tobias               Multimedia
 FHEM/98_Modbus.pm            StefanStrobel        Sonstiges
 FHEM/98_ModbusAttr.pm        StefanStrobel        Sonstiges
