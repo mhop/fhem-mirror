@@ -73,9 +73,10 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.6" => "01.10.2026  siehe Changelog ".
+  "2.10.6" => "05.10.2026  siehe Changelog ".
                            "Reading Battery_OptimumBaseSoC_XX parallel zum bestehenden Reading Battery_OptimumTargetSoC_XX welches abgelöst werden soll (Forum: https://forum.fhem.de/index.php?msg=1369429) ".
-                           "Nachtverarbeitung: aiDelRawData aus Task 6 nach Task 4 verschoben ",
+                           "Nachtverarbeitung: aiDelRawData aus Task 6 nach Task 4 verschoben ".
+                           "Wrapper AIF_modelRun gehärtet und Fehlerausgabe in _aiFannPredict verbessert ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -31498,15 +31499,14 @@ sub _aiFannPredict {
   my $maxval    = $data{$name}{neuralnet}{$fanntyp}{MaxVal};                                        # Target Denormalisierungsparameter
   my $fannModel = $data{$name}{neuralnet}{$fanntyp}{FannModel};
 
-  #my $out;
-  #eval { $out = $fannModel->AIF_modelRun ($input) };                                                # Netz im Wrapper laufen lassen                                                         # Netz laufen lassen
   my $out = $fannModel->AIF_modelRun($input);                                                       # Wrapper liefert undef, wenn Modell kaputt ist
   
   my $zone = 3;
   my $bc   = 0;
 
   unless (defined $out && ref($out) eq 'ARRAY' && @$out) {                                          # Härten: prüfen ob $out gültig ist
-      my $msg = "FANN Model '$fanntyp' did not return a valid result. New training is required.";
+      my $reason = $fannModel->{lastError} // 'unknown';
+      my $msg    = "FANN Model '$fanntyp' did not return a valid result ($reason). New training is required.";
       $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
 
       Log3 ($name, 1, "$name - WARNING - $msg") if(askLogtime ($name, $msg, 300));                  # Log mit Mehrfachverhinderung
@@ -40406,8 +40406,25 @@ sub AIF_modelCreate {                                           # Konstruktor
 
 sub AIF_modelRun {                                              # Dedizierter Run-Wrapper (kein AUTOLOAD-Overhead im Inferenzpfad)
   my ($self, $input) = @_;
+
   return unless $self->{model};
-  return $self->{model}->run ($input);
+  return unless ref($input) eq 'ARRAY';
+
+  my $need = eval { $self->{model}->num_inputs };               # erwartete Eingangsgröße des Netzes
+  my $got  = scalar @$input;
+
+  if (defined $need && $need != $got) {
+      $self->{lastError} = "input size mismatch: got $got, model requires $need";
+      return;
+  }
+
+  my $out = eval { $self->{model}->run ($input) };
+  if ($@) {
+      ($self->{lastError} = $@) =~ s/\s+at\s+\S+\s+line\s+\d+.*//s;
+      return;
+  }
+
+  return $out;
 }
 
 sub AIF_modelDestroy {                                          # explizite Freigabe: setzt inneres XS-Objekt auf undef
