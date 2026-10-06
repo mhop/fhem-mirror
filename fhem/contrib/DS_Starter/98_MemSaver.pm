@@ -1,5 +1,5 @@
 ########################################################################################################################
-# $Id: 98_MemSaver.pm $
+# $Id: 98_MemSaver.pm 31732 2026-10-04 21:05:05Z DS_Starter $
 #########################################################################################################################
 #       98_MemSaver.pm
 #
@@ -46,6 +46,16 @@ use GPUtils qw(GP_Import GP_Export);
 
 # Versions History
 my %vNotesIntern = (
+  "1.4.0"  => "05.10.2026  Drift-Berechnung in _leakAssessment mittels linearer Regression statt Endpunktdifferenz, ".
+                           "fragmentation_cleared basiert auf der Summe der freigegebenen MB im Zeitfenster FREEDWINDOW statt auf einem Einzelwert, ".
+                           "Filter fuer leak_status_weighted (Attribut leakFilterWindow), neues Reading leak_status_raw ".
+                           "Mindest-Zeitspanne MINSPAN in _leakAssessment, Mindestanzahl Messpunkte MINPOINTS, ".
+                           "Plausibilitätsprüfung gegen Einmalsprünge (beide Fensterhälften müssen mindestens STEADYFACTOR der Gesamtsteigung zeigen), ".
+                           "Messgröße der Drift-Berechnung ist RSS statt Private (Clean + Dirty) ".
+                           "Reading leak_status in leak_status_weighted umbenannt ",
+  "1.3.0"  => "05.10.2026  siehe Changelog, fhem_warming_up Status für Uptime < WARMUP in _leakAssessment integriert ".
+                           "Set-Kommando 'trimNow' eingebaut ",
+  "1.2.0"  => "04.10.2026  Einbau _leakAssessment zur Bewertung Leak vs. Fragmentierung ",
   "1.1.0"  => "04.10.2026  cpu_load, cpu_usage_pct und trim_next_run integriert ".
                            "fhem_uptime, fhem_start_time und fhem_uptime_sec als Readings eingebaut ".
                            "Perl Verion als Internal eingebaut ",
@@ -65,7 +75,9 @@ BEGIN {
         readingsBeginUpdate
         readingsBulkUpdate
         readingsEndUpdate
+        readingsDelete
         readingFnAttributes
+        ReadingsVal
         RemoveInternalTimer
     ));
 }
@@ -74,16 +86,33 @@ GP_Export( qw(
     Initialize
 ));
 
+
+## Konstanten
+######################
+use constant {
+  FREEDWINDOW  => 1800,                 # Zeitfenster (Sekunden) zur Aufsummierung der von malloc_trim freigegebenen MB
+  FILTERWINDOW => 1800,                 # Default Zeitfenster (Sekunden) des leak_status_weighted-Filters (Attribut leakFilterWindow)
+  MAXAGE       => 7200,                 # Historie-Zeitfenster (Sekunden) für stabile Regressions- bzw. Trendlinie der Leak-Analyse
+  MINPOINTS    => 8,                    # Mindestanzahl Messpunkte der Historie, bevor die Trendanalyse startet (wird bei großem Intervall begrenzt)
+  MINSPAN      => 2700,                 # Mindest-Zeitspanne (Sekunden) der Historie, bevor die Trendanalyse startet (45 Minuten)
+  MINVOTES     => 5,                    # Mindestanzahl Bewertungen im Filterfenster, sonst wird der Rohwert veroeffentlicht
+  STEADYFACTOR => 0.5,                  # beide Fensterhälften müssen mindestens diesen Anteil der Gesamtsteigung zeigen (Schutz vor Einmalsprüngen)
+  WARMUP       => 7200,                 # Warm-up-Phase (Sekunden)
+};
+
+
 ##############################################################################
 sub Initialize {
   my ($hash) = @_;
 
   $hash->{DefFn}      = \&Define;
+  $hash->{SetFn}      = \&Set;
   $hash->{UndefFn}    = \&Undef;
   $hash->{AttrFn}     = \&Attr;
   $hash->{AttrList}   = "disable:0,1 ".
+                        "leakFilterWindow ".
                         $readingFnAttributes;
-                          
+
   eval { FHEM::Meta::InitMod( __FILE__, $hash ) };     ## no critic 'eval'
 
 return;
@@ -100,17 +129,18 @@ sub Define {
   my $interval = $a[2] // 900;
 
   return "Interval must be a positive integer (seconds)"
-      unless $interval =~ m/^\d+$/x && $interval > 0;
-      
+      unless $interval =~ m/^[0-9]+$/x && $interval > 0;
+
   # 1. OS-Prüfung: MemSaver läuft ausschließlich unter Linux
   return "MemSaver: Unsupported operating system ($^O). This module requires Linux."
       unless $^O eq 'linux';
 
   # 2. Modul-Prüfung: FFI::Platypus vorhanden?
-  eval { require FFI::Platypus; 1; } 
+  eval { require FFI::Platypus; 1; }
       or return "MemSaver: Required Perl module FFI::Platypus is missing. Please install it via 'apt install libffi-platypus-perl' or cpan.";
-      
+
   $hash->{INTERVAL}              = $interval;
+  $hash->{DEF}                   = $interval;                                   # DEF immer setzen, damit das Intervall in FHEMWEB per modify änderbar ist
   $hash->{PERLVERSION}           = sprintf "%vd", $^V;                          # Perl Version z.B. "5.36.0"
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                        # Modul Meta.pm nicht vorhanden
 
@@ -121,6 +151,31 @@ sub Define {
   scheduleRun ($hash, 5);                                                       # Erster Lauf nach 5 Sekunden
 
 return;
+}
+
+##############################################################################
+sub Set {
+  my ($hash, @a) = @_;
+  
+  return qq{"Set ..." needs at least an argument} if @a < 2;
+  
+  my $name = shift @a;
+  my $cmd  = shift @a;
+
+  return if IsDisabled($name);
+
+  my $list = "trimNow:noArg ";
+  
+  my $setlist = "Unknown argument $cmd, choose one of ".
+                "trimNow:noArg ";
+
+  if ($cmd eq 'trimNow') {                                                      # Messwerte erneuern und malloc_trim ausführen
+      collectMemReadings ($hash);
+      mallocTrim         ($hash);
+      return;
+  }
+
+return $setlist;
 }
 
 ##############################################################################
@@ -146,6 +201,15 @@ sub Attr {
           readingsSingleUpdate ($hash, 'state', 'active', 1);
           scheduleRun          ($hash, 1);
       }
+  }
+
+  if ($attr eq 'leakFilterWindow') {
+      if ($cmd eq 'set' && ($val // '') !~ /^[0-9]+$/x) {
+          return qq{leakFilterWindow must be a non-negative integer (seconds, 0 = filter off)};
+      }
+
+      delete $hash->{HELPER}{STATUS_HISTORY};                                   # Filter neu aufsetzen
+      delete $hash->{HELPER}{LEAK_STATUS_PUB};
   }
 
 return;
@@ -189,25 +253,44 @@ return;
 sub collectMemReadings {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
+  my $v5     = AttrVal ($name, 'verbose', 3) >= 5;
   my %m;
 
   # --- 1. RAM / Proc Status ---
-  if (open my $fh, '<', "/proc/$$/status") {
+  my $status_file = "/proc/$$/status";
+
+  if (open my $fh, '<', $status_file) {
+      my @lines;
       while (<$fh>) {
+          push @lines, $_ if $v5;
           $m{VmRSS}  = $1 if /^VmRSS:\s+(\d+)/x;
           $m{VmHWM}  = $1 if /^VmHWM:\s+(\d+)/x;
           $m{VmSize} = $1 if /^VmSize:\s+(\d+)/x;
       }
       close $fh;
+
+      if ($v5) {
+          Log3 ($name, 5, "$name - MemSaver [diag] $status_file readable: YES");
+          Log3 ($name, 5, "$name - MemSaver [diag] $status_file content:\n" . join('', @lines));
+          Log3 ($name, 5, "$name - MemSaver [diag] parsed:"
+                                 . " VmRSS="  . ($m{VmRSS}  // 'undef')
+                                 . " VmHWM="  . ($m{VmHWM}  // 'undef')
+                                 . " VmSize=" . ($m{VmSize} // 'undef'));
+      }
   }
   else {
-      Log3 ($name, 2, "$name - MemSaver: cannot open /proc/$$/status: $!");
+      Log3 ($name, 2, "$name - MemSaver: cannot open $status_file: $!");
+      Log3 ($name, 5, "$name - MemSaver [diag] $status_file readable: NO ($!)") if $v5;
       return;
   }
 
-  # /proc/$$/smaps_rollup
-  if (open my $fh, '<', "/proc/$$/smaps_rollup") {
+  # --- /proc/$$/smaps_rollup ---
+  my $smaps_file = "/proc/$$/smaps_rollup";
+
+  if (open my $fh, '<', $smaps_file) {
+      my @lines;
       while (<$fh>) {
+          push @lines, $_ if $v5;
           $m{Pss}           = $1 if /^Pss:\s+(\d+)/x;
           $m{Shared_Clean}  = $1 if /^Shared_Clean:\s+(\d+)/x;
           $m{Shared_Dirty}  = $1 if /^Shared_Dirty:\s+(\d+)/x;
@@ -216,87 +299,156 @@ sub collectMemReadings {
           $m{Swap}          = $1 if /^Swap:\s+(\d+)/x;
       }
       close $fh;
+
+      if ($v5) {
+          Log3 ($name, 5, "$name - MemSaver [diag] $smaps_file readable: YES");
+          Log3 ($name, 5, "$name - MemSaver [diag] $smaps_file content:\n" . join('', @lines));
+          Log3 ($name, 5, "$name - MemSaver [diag] parsed:"
+                                 . " Pss="           . ($m{Pss}           // 'undef')
+                                 . " Shared_Clean="  . ($m{Shared_Clean}  // 'undef')
+                                 . " Shared_Dirty="  . ($m{Shared_Dirty}  // 'undef')
+                                 . " Private_Clean=" . ($m{Private_Clean} // 'undef')
+                                 . " Private_Dirty=" . ($m{Private_Dirty} // 'undef')
+                                 . " Swap="          . ($m{Swap}          // 'undef'));
+      }
+  }
+  else {
+      Log3 ($name, 4, "$name - MemSaver: $smaps_file not available — PSS/Shared/Private/Swap readings skipped") if !$v5;    # Herabgestuft auf Log-Level 4, da das Fehlen auf vielen Kerneln/Containern normal ist
+      Log3 ($name, 5, "$name - MemSaver [diag] $smaps_file readable: NO ($!)") if $v5;
   }
 
   # --- 2. Systemweite Swap-Aktivität ---
+  my $vmstat_file = '/proc/vmstat';
   my %vmstat_cur;
-  if (open my $fh, '<', '/proc/vmstat') {
+
+  if (open my $fh, '<', $vmstat_file) {
+      my @lines;
       while (<$fh>) {
+          push @lines, $_ if $v5 && /^pswp/x;    # nur relevante Zeilen
           $vmstat_cur{pswpin}  = $1 if /^pswpin\s+(\d+)/x;
           $vmstat_cur{pswpout} = $1 if /^pswpout\s+(\d+)/x;
       }
       close $fh;
-  }
 
+      if ($v5) {
+          Log3 ($name, 5, "$name - MemSaver [diag] $vmstat_file readable: YES");
+          Log3 ($name, 5, "$name - MemSaver [diag] $vmstat_file relevant lines:\n" . join('', @lines));
+          Log3 ($name, 5, "$name - MemSaver [diag] parsed:"
+                                 . " pswpin="  . ($vmstat_cur{pswpin}  // 'undef')
+                                 . " pswpout=" . ($vmstat_cur{pswpout} // 'undef'));
+      }
+  }
+  else {
+      Log3 ($name, 3, "$name - MemSaver: $vmstat_file not available — swap activity readings skipped") if !$v5;
+      Log3 ($name, 5, "$name - MemSaver [diag] $vmstat_file readable: NO ($!)") if $v5;
+  }
+  
   my $swapin = do {
       my $prev  = $hash->{HELPER}{VMSTAT_PREV}{pswpin} // $vmstat_cur{pswpin} // 0;
       my $delta = ($vmstat_cur{pswpin} // 0) - $prev;
       sprintf '%.2f', ($delta * 4) / 1024;
   };
+  
   my $swapout = do {
       my $prev  = $hash->{HELPER}{VMSTAT_PREV}{pswpout} // $vmstat_cur{pswpout} // 0;
       my $delta = ($vmstat_cur{pswpout} // 0) - $prev;
       sprintf '%.2f', ($delta * 4) / 1024;
   };
+  
   $hash->{HELPER}{VMSTAT_PREV} = \%vmstat_cur;
 
   # Prozess-Swap-Delta
-  my $prev_proc_swap  = $hash->{HELPER}{PREV_PROC_SWAP} // ($m{Swap} // 0);
-  my $proc_swap_delta = ($m{Swap} // 0) - $prev_proc_swap;
+  my $prev_proc_swap              = $hash->{HELPER}{PREV_PROC_SWAP} // ($m{Swap} // 0);
+  my $proc_swap_delta             = ($m{Swap} // 0) - $prev_proc_swap;
   $hash->{HELPER}{PREV_PROC_SWAP} = ($m{Swap} // 0);
 
-  # --- 3. CPU Load & Usage ---
-  my ($cpu_idle, $cpu_total);
-  my $load1   = 0;
-  my $cpu_pct = 0;
-  
-  if (open my $fh_load, '<', '/proc/loadavg') {
-      my $line = <$fh_load>;
-      close $fh_load;
-      ($load1) = $line =~ /^([\d\.]+)/;
-  }
-  
-  $load1 //= 0;                                                     # Fallback falls Match fehlschlägt
+  # --- 3. CPU Load ---
+  my $loadavg_file = '/proc/loadavg';
+  my $load1        = 0;
 
-  if (open my $fh_stat, '<', '/proc/stat') {
-      my $line = <$fh_stat>;
-      close $fh_stat;
-      my @v = split /\s+/, $line;
+  if (open my $fh, '<', $loadavg_file) {
+      my $line = <$fh>;
+      close $fh;
+      ($load1) = $line =~ /^([\d\.]+)/;
+      $load1 //= 0;
+
+      if ($v5) {
+          Log3 ($name, 5, "$name - MemSaver [diag] $loadavg_file readable: YES");
+          Log3 ($name, 5, "$name - MemSaver [diag] $loadavg_file content: $line");
+          Log3 ($name, 5, "$name - MemSaver [diag] parsed: load1=$load1");
+      }
+  }
+  else {
+      Log3 ($name, 3, "$name - MemSaver: $loadavg_file not available — cpu_load1 reading skipped") if !$v5;
+      Log3 ($name, 5, "$name - MemSaver [diag] $loadavg_file readable: NO ($!)") if $v5;
+  }
+
+  # --- /proc/stat (CPU times) ---
+  my $stat_file              = '/proc/stat';
+  my ($cpu_idle, $cpu_total) = (0, 0);
+  my $cpu_pct                = 0;
+
+  if (open my $fh, '<', $stat_file) {
+      my $line = <$fh>;
+      close $fh;
+      my @v  = split /\s+/, $line;
       $cpu_idle  = ($v[4] || 0) + ($v[5] || 0);
       $cpu_total = 0;
       $cpu_total += $_ for @v[1..8];
+
+      if ($v5) {
+          Log3 ($name, 5, "$name - MemSaver [diag] $stat_file readable: YES");
+          Log3 ($name, 5, "$name - MemSaver [diag] $stat_file cpu line: $line");
+          Log3 ($name, 5, "$name - MemSaver [diag] parsed: cpu_idle=$cpu_idle cpu_total=$cpu_total");
+      }
+  }
+  else {
+      Log3 ($name, 3, "$name - MemSaver: $stat_file not available — cpu_usage_pct reading skipped") if !$v5;
+      Log3 ($name, 5, "$name - MemSaver [diag] $stat_file readable: NO ($!)") if $v5;
   }
   
   if (defined $hash->{HELPER}{LAST_CPU_IDLE} && defined $hash->{HELPER}{LAST_CPU_TOTAL}) {
       my $diff_total = $cpu_total - $hash->{HELPER}{LAST_CPU_TOTAL};
       my $diff_idle  = $cpu_idle  - $hash->{HELPER}{LAST_CPU_IDLE};
-      
+
       if ($diff_total > 0) {
           $cpu_pct = sprintf '%.2f', (1 - ($diff_idle / $diff_total)) * 100;
       }
   }
+  
   $hash->{HELPER}{LAST_CPU_IDLE}  = $cpu_idle;
   $hash->{HELPER}{LAST_CPU_TOTAL} = $cpu_total;
-  
+
   # --- 4. FHEM Uptime ---
   my $fhem_start = $main::fhem_started // gettimeofday();
   my $uptime_sec = int(gettimeofday() - $fhem_start);
   my $uptime_str = _formatUptime ($uptime_sec);
-  my $start_time = FmtDateTime ($fhem_start);                                   # Formatiert z.B. zu "2026-10-02 14:30:00"
+  my $start_time = FmtDateTime ($fhem_start);                                           # Formatiert z.B. zu "2026-10-02 14:30:00"
 
-  # --- Readings schreiben ---
-  # Safe conversion: stellt sicher, dass undef, "" oder Nicht-Zahlen zu 0 werden
-  my $fmt = sub { 
+  # --- Priv + Shared RAM konsolidiert ---
+  my $priv_kb   = ($m{Private_Clean} // 0) + ($m{Private_Dirty} // 0);
+  my $shared_kb = ($m{Shared_Clean}  // 0) + ($m{Shared_Dirty}  // 0);
+  
+  # --- Umrechnungsroutine ---
+  my $fmt = sub {                                                                       # Safe conversion: stellt sicher, dass undef, "" oder Nicht-Zahlen zu 0 werden
       my $val = $_[0];
       $val = 0 if !defined $val || $val eq '' || $val !~ /^-?\d+(?:\.\d+)?$/;
       return sprintf '%.2f', $val / 1024;
   };
+  
+  # --- Leak-Analyse-Logik (Dynamischer Zeitpuffer) ---
+  my $now    = gettimeofday();
+  my $rss_mb = ($m{VmRSS} // 0) / 1024;                                                                             # Messgröße der Drift-Berechnung: Resident Set Size
 
-  my $priv_kb   = ($m{Private_Clean} // 0) + ($m{Private_Dirty} // 0);
-  my $shared_kb = ($m{Shared_Clean}  // 0) + ($m{Shared_Dirty}  // 0);
-
+  $hash->{HELPER}{RSS_HISTORY} //= [];
+  push @{$hash->{HELPER}{RSS_HISTORY}}, { time => $now, val => $rss_mb } if $rss_mb > 0;                            # Aktuellen Messwert mit Zeitstempel anfügen
+  @{$hash->{HELPER}{RSS_HISTORY}} = grep { $_->{time} >= ($now - MAXAGE) } @{$hash->{HELPER}{RSS_HISTORY}};         # Einträge entfernen, die älter als MAXAGE Sekunden sind
+  
+  
+  # --- Readings schreiben ---
+  
   readingsBeginUpdate ($hash);
-  readingsBulkUpdate  ($hash, 'mem_private_mb',        $fmt->($priv_kb));  
+  readingsBulkUpdate  ($hash, 'mem_private_mb',        $fmt->($priv_kb));
   readingsBulkUpdate  ($hash, 'mem_shared_mb',         $fmt->($shared_kb));
   readingsBulkUpdate  ($hash, 'mem_rss_mb',            $fmt->($m{VmRSS} // 0));                         # Resident Set Size
   readingsBulkUpdate  ($hash, 'mem_hwm_mb',            $fmt->($m{VmHWM} // 0));                         # High Water Mark (Peak seit Start)
@@ -310,10 +462,10 @@ sub collectMemReadings {
   readingsBulkUpdate  ($hash, 'cpu_usage_pct',         $cpu_pct // 0);                                  # CPU-Auslastung über das Intervall
   readingsBulkUpdate  ($hash, 'fhem_start_time',       $start_time);                                    # Lesbare Startzeit
   readingsBulkUpdate  ($hash, 'fhem_uptime',           $uptime_str);                                    # z. B. "12d 4h 15m 30s"
-  readingsBulkUpdate  ($hash, 'fhem_uptime_sec',       $uptime_sec);                                    # z. B. 1052130  
+  readingsBulkUpdate  ($hash, 'fhem_uptime_sec',       $uptime_sec);                                    # z. B. 1052130
   readingsBulkUpdate  ($hash, 'state',                 'active');
   readingsEndUpdate   ($hash, 1);
-  
+
   my $ram = join ", ",
       "RSS="         . $fmt->($m{VmRSS} // 0),
       "HWM="         . $fmt->($m{VmHWM} // 0),
@@ -326,7 +478,14 @@ sub collectMemReadings {
       "SysSwapOut="  . ($swapout // '0.00'),
       "VSize="       . $fmt->($m{VmSize} // 0);
 
-  Log3 ($name, 4, "$name - RAM/CPU: " . $ram . sprintf(", Load1=%.2f, CPU_Usage=%.2f%%", $load1 // 0, $cpu_pct // 0));
+  Log3 ($name, 4, "$name - RAM/CPU: " . $ram . sprintf(", CPU_Load1=%.2f, CPU_Usage=%.2f%%", $load1 // 0, $cpu_pct // 0));
+  
+  ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+  ########################################################################################################################
+  if (!$hash->{HELPER}{LS_deleted}) {                       # läuft nur einmal pro Session
+      readingsDelete ($hash, 'leak_status');
+      $hash->{HELPER}{LS_deleted} = 1;                          
+  }
 
 return;
 }
@@ -351,25 +510,209 @@ sub mallocTrim {
       };
 
       if (!$has_platypus) {
-          Log3 ($name, 2, "$name - MemSaver: FFI::Platypus not available — malloc_trim disabled. Install with: 'apt install libffi-platypus-perl' ");
+          Log3 ($name, 2, "$name - MemSaver: FFI::Platypus not available — malloc_trim disabled. Install with: 'apt install libffi-platypus-perl'");
       }
   }
 
   return unless $has_platypus && $malloc_trim_fn;
 
   my $rss_before = _currentRssMb();
-  $malloc_trim_fn->(0);
-  my $rss_after  = _currentRssMb();
-  my $freed      = sprintf '%.2f', $rss_before - $rss_after;
+    
+  $malloc_trim_fn->(0);                                                 # Freigabekern
+    
+  my $rss_after          = _currentRssMb();
+  my $freed              = sprintf '%.2f', $rss_before - $rss_after;
+  my ($leak_raw, $drift) = _leakAssessment ($hash, $freed);
+  my $leak_weighted      = _filterStatus   ($hash, $leak_raw);
 
+  # --- Readings schreiben ---
   readingsBeginUpdate ($hash);
-  readingsBulkUpdate  ($hash, 'trim_last_freed_mb', $freed);
-  readingsBulkUpdate  ($hash, 'trim_last_run', FmtDateTime(gettimeofday()));
+  readingsBulkUpdate  ($hash, 'trim_last_freed_mb',    $freed);
+  readingsBulkUpdate  ($hash, 'trim_last_run',         FmtDateTime(gettimeofday()));
+  readingsBulkUpdate  ($hash, 'leak_status_weighted',  $leak_weighted);
+  readingsBulkUpdate  ($hash, 'leak_status_raw',       $leak_raw);
+  readingsBulkUpdate  ($hash, 'mem_drift_per_hour_mb', sprintf('%.2f', $drift)) if defined $drift;
   readingsEndUpdate   ($hash, 1);
 
-  Log3 ($name, 5, "$name - MemSaver: malloc_trim(0) executed, freed ~${freed} MB");
-
+  Log3 ($name, 5, "$name - malloc_trim executed: freed ~${freed} MB");
+  Log3 ($name, 4, "$name - Leak Assessment: raw=$leak_raw, weighted=$leak_weighted, drift=" . sprintf('%.2f', $drift // 0) . " MB/h");
+    
 return;
+}
+
+##############################################################################
+#        Leak vs. Fragmentierung mittels Regression bewerten 
+##############################################################################
+sub _leakAssessment {
+  my ($hash, $freed) = @_;
+
+  my $now = gettimeofday();
+
+  # von malloc_trim freigegebene MB der letzten FREEDWINDOW Sekunden aufsummieren
+  # (Einzelwerte sind bei kurzen Zyklen zu klein um Fragmentierung zu erkennen)
+  $hash->{HELPER}{FREED_HISTORY} //= [];
+  push @{$hash->{HELPER}{FREED_HISTORY}}, { time => $now, val => ($freed > 0 ? $freed : 0) };
+  @{$hash->{HELPER}{FREED_HISTORY}} = grep { $_->{time} >= ($now - FREEDWINDOW) } @{$hash->{HELPER}{FREED_HISTORY}};
+
+  my $freed_sum = 0;
+  $freed_sum   += $_->{val} for @{$hash->{HELPER}{FREED_HISTORY}};
+
+  my $hist = $hash->{HELPER}{RSS_HISTORY} // [];
+  return ('initializing', 0) if scalar(@$hist) < 3;
+
+  my $fhem_start = $main::fhem_started // $now;
+  my $uptime_sec = int($now - $fhem_start);
+  return ('warming_up', 0) if $uptime_sec < WARMUP;                  # Warm-up-Phase berücksichtigen (z.B. erste 2 Stunden nach FHEM-Start)
+
+  my $first = $hist->[0];
+  my $last  = $hist->[-1];
+
+  my $timespan_min = ($last->{time} - $first->{time}) / 60;
+  my $iv     = $hash->{INTERVAL} || 1;
+  my $maxpts = int(MAXAGE / $iv) - 1;                                   # mehr Punkte kann die Historie bei diesem Intervall nicht dauerhaft halten
+  my $minpts = MINPOINTS;
+  $minpts    = $maxpts if $maxpts < $minpts;
+  $minpts    = 3       if $minpts < 3;
+
+  # Mindest-Zeitspanne und Mindestanzahl Messpunkte der Historie, bevor die Trendanalyse startet
+  return ('collecting_data', 0) if $timespan_min < MINSPAN / 60 || scalar(@$hist) < $minpts;
+
+  # Drift per linearer Regression (Least Squares) über alle Punkte der Historie, Einheit MB pro Stunde
+  my $n = scalar @$hist;
+  my ($sx, $sy, $sxx, $sxy) = (0, 0, 0, 0);
+
+  for my $pt (@$hist) {
+      my $x  = ($pt->{time} - $first->{time}) / 3600;                   # Zeit in Stunden relativ zum ersten Punkt
+      my $y  = $pt->{val};
+      $sx   += $x;
+      $sy   += $y;
+      $sxx  += $x * $x;
+      $sxy  += $x * $y;
+  }
+
+  my $den            = $n * $sxx - $sx * $sx;
+  my $drift_per_hour = $den > 0 ? ($n * $sxy - $sx * $sy) / $den : 0;
+
+  # Einmalsprung vs. stetiger Anstieg: beide Fensterhälften müssen mindestens STEADYFACTOR der Gesamtsteigung zeigen
+  my $steady = 1;
+
+  if ($drift_per_hour > 0) {
+      my $mid = $first->{time} + ($last->{time} - $first->{time}) / 2;
+      my @h1  = grep { $_->{time} <= $mid } @$hist;
+      my @h2  = grep { $_->{time} >  $mid } @$hist;
+      my $s1  = _halfSlope (\@h1);
+      my $s2  = _halfSlope (\@h2);
+
+      $steady = 0 if (defined $s1 && defined $s2 && ($s1 < STEADYFACTOR * $drift_per_hour || $s2 < STEADYFACTOR * $drift_per_hour));
+  }
+
+  # Bewertung: ein Leak wird nur vermutet, wenn der Anstieg stetig ist (kein Einmalsprung)
+  my $leak_rating = 'ok';
+
+  if ($drift_per_hour > 5.0 && $steady) {                                       # sehr starker und stetiger Drift
+      $leak_rating = 'leak_suspected';
+  }
+  elsif ($drift_per_hour > 1.5 && $steady) {                                    # kontinuierlicher Anstieg
+      $leak_rating = 'potential_leak_warning';
+  }
+  elsif ($freed_sum > 5.0 && $drift_per_hour <= 1.5) {                          # malloc_trim konnte im Zeitfenster signifikant Speicher freigeben -> Fragmentierung aufgeräumt
+      $leak_rating = 'fragmentation_cleared';
+  }
+
+return ($leak_rating, $drift_per_hour);
+}
+
+##############################################################################
+# Steigung (MB/h) einer Teilmenge der Historie, undef bei weniger als 3 Punkten
+##############################################################################
+sub _halfSlope {
+  my ($pts) = @_;
+
+  my $n = scalar @$pts;
+  return if $n < 3;
+
+  my $t0 = $pts->[0]{time};
+  my ($sx, $sy, $sxx, $sxy) = (0, 0, 0, 0);
+
+  for my $pt (@$pts) {
+      my $x  = ($pt->{time} - $t0) / 3600;
+      $sx   += $x;
+      $sy   += $pt->{val};
+      $sxx  += $x * $x;
+      $sxy  += $x * $pt->{val};
+  }
+
+  my $den = $n * $sxx - $sx * $sx;
+
+return $den > 0 ? ($n * $sxy - $sx * $sy) / $den : undef;
+}
+
+##############################################################################
+#  Rohbewertung glätten: im Zeitfenster (Attribut leakFilterWindow) überwiegend
+#  aufgetretene Bewertung veröffentlichen
+#  - technische Zustände (initializing, collecting_data, warming_up) werden nicht
+#    gefiltert und setzen den Filter zurück
+#  - Gewichtung nach Dauer (Zeitabstand zum vorherigen Eintrag)
+#  - Gleichstand: zuletzt veröffentlichter Status bleibt, sonst der schwerwiegendere
+##############################################################################
+sub _filterStatus {
+  my ($hash, $raw) = @_;
+  my $name = $hash->{NAME};
+
+  my $win = AttrVal ($name, 'leakFilterWindow', FILTERWINDOW);
+
+  if (!$win || $raw eq 'initializing' || $raw eq 'collecting_data' || $raw eq 'warming_up') {
+      delete $hash->{HELPER}{STATUS_HISTORY};
+      delete $hash->{HELPER}{LEAK_STATUS_PUB};
+      return $raw;
+  }
+
+  my $iv  = $hash->{INTERVAL};
+  my $min = MINVOTES * $iv;
+  $win    = $min if $win < $min;                                    # Fenster mindestens MINVOTES Zyklen lang
+
+  my $now  = gettimeofday();
+  my $hist = $hash->{HELPER}{STATUS_HISTORY} //= [];
+  push @$hist, { time => $now, status => $raw };
+  @$hist = grep { $_->{time} >= ($now - $win) } @$hist;
+
+  my $pub = $hash->{HELPER}{LEAK_STATUS_PUB};                       # zuletzt veröffentlichter Status
+
+  if (scalar(@$hist) < MINVOTES) {                                  # noch zu wenige Bewertungen -> Rohwert
+      $hash->{HELPER}{LEAK_STATUS_PUB} = $raw;
+      return $raw;
+  }
+
+  my (%w, $prev);
+  my $max_gap = 2 * $iv;                                            # große Lücken (z.B. nach disable) begrenzen
+
+  for my $e (@$hist) {
+      my $dt = defined $prev ? $e->{time} - $prev : $iv;
+      $dt    = $max_gap if $dt > $max_gap;
+      $w{$e->{status}} += $dt;
+      $prev  = $e->{time};
+  }
+
+  my $max = 0;
+  for my $v (values %w) { $max = $v if $v > $max }
+
+  my @top = grep { $w{$_} >= $max - 1 } keys %w;                    # Gleichstand mit 1 s Toleranz
+  my $res;
+
+  if (scalar(@top) == 1) {
+      $res = $top[0];
+  }
+  elsif (defined $pub && grep { $_ eq $pub } @top) {
+      $res = $pub;
+  }
+  else {
+      my %sev = (ok => 0, fragmentation_cleared => 1, potential_leak_warning => 2, leak_suspected => 3);
+      ($res)  = sort { ($sev{$b} // 0) <=> ($sev{$a} // 0) } @top;
+  }
+
+  $hash->{HELPER}{LEAK_STATUS_PUB} = $res;
+
+return $res;
 }
 
 ##############################################################################
@@ -377,7 +720,7 @@ return;
 ##############################################################################
 sub _formatUptime {
   my ($sec) = @_;
-    
+
   my $days = int($sec / 86400);
   $sec %= 86400;
   my $hours = int($sec / 3600);
@@ -402,7 +745,7 @@ sub _currentRssMb {
       while (<$fh>) { $rss = $1 if /^VmRSS:\s+(\d+)/x }
       close $fh;
   }
-    
+
 return $rss / 1024;
 }
 
@@ -410,71 +753,61 @@ return $rss / 1024;
 #  liefert die Versionierung des Moduls zurück
 #  Verwendung mit Packages:  use version 0.77; our $VERSION = moduleVersion ($hash, $notes)
 #  Verwendung ohne Packages: moduleVersion ($params)
-#  
+#
 #  Die Verwendung von Meta.pm und Packages wird berücksichtigt
 #############################################################################################
 sub moduleVersion {
   my ($hash, $notes) = @_;
-  
+
   my $type    = $hash->{TYPE};
-  my $package = (caller)[0];                                                                # das PACKAGE des aufrufenden Moduls          
+  my $package = (caller)[0];                                                                # das PACKAGE des aufrufenden Moduls
 
   my $v                    = (sortVersion ("desc", keys %{$notes}))[0];                     # die Modulversion aus Versionshash selektieren
   $hash->{HELPER}{VERSION} = $v;
   $hash->{HELPER}{PACKAGE} = $package;
-  
+
   if ($modules{$type}{META}{x_prereqs_src} && !$hash->{HELPER}{MODMETAABSENT}) {            # META-Daten sind vorhanden
       $modules{$type}{META}{version} = "v".$v;                                              # Version aus META.json überschreiben, Anzeige mit {Dumper $modules{<TYPE>}{META}}
-      
-      if ($modules{$type}{META}{x_version}) {                                               # {x_version} nur gesetzt wenn $Id: xxxxx.pm 29571 2025-01-25 13:45:02Z xxxxxx $ im Kopf komplett! vorhanden
-          $modules{$type}{META}{x_version} =~ s/1\.1\.0/$v/gx;
-      } 
-      else {
-          $modules{$type}{META}{x_version} = $v; 
+
+      if ($modules{$type}{META}{x_version}) {                                               # {x_version} nur gesetzt wenn $Id: 98_MemSaver.pm 31732 2026-10-04 21:05:05Z DS_Starter $ im Kopf komplett! vorhanden
+          $modules{$type}{META}{x_version} =~ s/1\.1\.1/$v/gx;
       }
-      
-      FHEM::Meta::SetInternals ($hash);                                                     # FVERSION wird gesetzt ( nur gesetzt wenn $Id: xxxxx.pm 29571 2025-01-25 13:45:02Z xxxxxx $ im Kopf komplett! vorhanden )
-  } 
+      else {
+          $modules{$type}{META}{x_version} = $v;
+      }
+
+      FHEM::Meta::SetInternals ($hash);                                                     # FVERSION wird gesetzt ( nur gesetzt wenn $Id: 98_MemSaver.pm 31732 2026-10-04 21:05:05Z DS_Starter $ im Kopf komplett! vorhanden )
+  }
   else {                                                                                    # herkömmliche Modulstruktur
       $hash->{VERSION} = $v;                                                                # Internal VERSION setzen
   }
-  
+
   if ($package =~ /FHEM::$type/x || $package eq $type) {                                    # es wird mit Packages gearbeitet -> mit {<Modul>->VERSION()} im FHEMWEB kann Modulversion abgefragt werden
-      return $v;         
+      return $v;
   }
-  
+
 return;
 }
 
 ################################################################
 # sortiert eine Liste von Versionsnummern x.x.x
-# Schwartzian Transform and the GRT transform
 # Übergabe: "asc | desc",<Liste von Versionsnummern>
 ################################################################
 sub sortVersion {
   my ($sseq, @versions) = @_;
+  
+  my @sorted = sort { version->parse($a) <=> version->parse($b) } @versions;
 
-  my @sorted = map {$_->[0]}
-               sort {$a->[1] cmp $b->[1]}
-               map {[$_, pack "C*", split /\./x]} @versions;
-             
-  @sorted = map {join ".", unpack "C*", $_}
-            sort
-            map {pack "C*", split /\./x} @versions;
-  
-  if ($sseq eq "desc") {
-      @sorted = reverse @sorted;
-  }
-  
-return @sorted;
+return $sseq eq 'desc' ? reverse(@sorted) : @sorted;
 }
 
 1;
 
 =pod
 =item helper
-=item summary    Periodically releases unused glibc memory arenas to the OS and tracks CPU/RAM usage
-=item summary_DE Gibt ungenutzte glibc-Speicherarenen periodisch an das OS zur&uuml;ck und erfasst CPU/RAM-Werte
+=item summary    Frees unused glibc memory blocks and monitors CPU and RAM usage
+=item summary_DE Gibt ungenutzte glibc-Speicherbl&ouml;cke frei + Readings CPU/RAM-Auslastung
+
 
 =begin html
 
@@ -494,13 +827,35 @@ return @sorted;
     Example: <code>define Saver MemSaver 900</code>
   </ul>
   <br>
+  
+  <a id="MemSaver-set"></a>
+  <b>Set</b>
+  <ul>
+    <li><b>trimNow</b><br>
+        Triggers an immediate execution of <code>malloc_trim</code> to release unused memory back to the OS and updates memory readings.
+    </li>
+  </ul>
+  <br>
 
   <a id="MemSaver-attr"></a>
   <b>Attributes</b>
   <ul>
     <a id="MemSaver-attr-disable"></a>
-    <li>disable <br>
-    Enables and disables the module.    
+    <li><b>disable</b> <br>
+    Enables and disables the module.
+    </li>
+    <br>
+
+    <a id="MemSaver-attr-leakFilterWindow"></a>
+    <li><b>leakFilterWindow &lt;seconds&gt;</b> <br>
+    Time window for filtering <b>leak_status_weighted</b>. The rating that occurred most frequently within the window
+    (weighted by duration) is published; the unfiltered value is available in
+    <b>leak_status_raw</b>. <br>
+    In the event of a tie, the last status is retained; otherwise, the more severe status applies.
+    The window covers at least 5 cycles of the interval; until then, the raw value is published. <br>
+    Technical states (initializing, collecting_data, warming_up) are never filtered. <br>
+    <b>0</b> disables the filter. <br>
+    (default: 1800)
     </li>
   </ul>
   <br>
@@ -508,22 +863,44 @@ return @sorted;
   <a id="MemSaver-Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>cpu_load1 - System load average (1 minute)</li>
-    <li>cpu_usage_pct - System CPU usage in % calculated over the interval</li>
-    <li>mem_rss_mb - Resident Set Size (physical RAM used by process)</li>
-    <li>mem_hwm_mb - High Water Mark (peak RSS since start)</li>
-    <li>mem_pss_mb - Proportional Set Size (shared memory counted proportionally)</li>
-    <li>mem_private_mb - Private memory (not shared with other processes)</li>
-    <li>mem_shared_mb - Shared memory (CoW pages, shared libraries)</li>
-    <li>mem_vsize_mb - Virtual address space size</li>
-    <li>swap_process_total_mb - Process pages currently swapped out</li>
-    <li>swap_process_delta_mb - Change in the process swap since the last cycle (negative values = "retrieval from swap")</li>
-    <li>swap_sys_in_mb - Systemwide swap-in since last cycle (pages recalled)</li>
-    <li>swap_sys_out_mb - Systemwide swap-out since last cycle (pages evicted)</li>
-    <li>trim_last_freed_mb - Approximate MB returned to OS by last malloc_trim call</li>
-    <li>trim_last_run - Timestamp of last malloc_trim execution</li>
-    <li>trim_next_run - Timestamp of next scheduled malloc_trim execution</li>
+    <table>
+      <colgroup><col width="15%"><col width="85%"></colgroup>
+      <tr><td> <b>cpu_load1</b>              </td><td>System load average (1 minute)                                                                                                    </td></tr>
+      <tr><td> <b>cpu_usage_pct</b>          </td><td>System CPU usage in % calculated over the interval                                                                                </td></tr>
+      <tr><td> <b>fhem_start_time</b>        </td><td>Timestamp when FHEM finished initializing (YYYY-MM-DD HH:MM:SS)                                                                   </td></tr>
+      <tr><td> <b>fhem_uptime</b>            </td><td>Human-readable uptime of the FHEM process since start (e.g. "12d 4h 15m 30s")                                                     </td></tr>
+      <tr><td> <b>fhem_uptime_sec</b>        </td><td>FHEM process uptime in total seconds                                                                                              </td></tr>
+      <tr><td> <b>mem_rss_mb</b>             </td><td>Resident Set Size (physical RAM used by process)                                                                                  </td></tr>
+      <tr><td> <b>mem_hwm_mb</b>             </td><td>High Water Mark (peak RSS since start)                                                                                            </td></tr>
+      <tr><td> <b>mem_pss_mb</b>             </td><td>Proportional Set Size (shared memory counted proportionally)                                                                      </td></tr>
+      <tr><td> <b>mem_private_mb</b>         </td><td>Private memory (not shared with other processes)                                                                                  </td></tr>
+      <tr><td> <b>mem_shared_mb</b>          </td><td>Shared memory (CoW pages, shared libraries)                                                                                       </td></tr>
+      <tr><td> <b>mem_vsize_mb</b>           </td><td>Virtual address space size                                                                                                        </td></tr>
+      <tr><td> <b>swap_process_total_mb</b>  </td><td>Process pages currently swapped out                                                                                               </td></tr>
+      <tr><td> <b>swap_process_delta_mb</b>  </td><td>Change in the process swap since the last cycle (negative values = "retrieval from swap")                                         </td></tr>
+      <tr><td> <b>swap_sys_in_mb</b>         </td><td>Systemwide swap-in since last cycle (pages recalled)                                                                              </td></tr>
+      <tr><td> <b>swap_sys_out_mb</b>        </td><td>Systemwide swap-out since last cycle (pages evicted)                                                                              </td></tr>
+      <tr><td> <b>trim_last_freed_mb</b>     </td><td>Approximate MB returned to OS by last malloc_trim call                                                                            </td></tr>
+      <tr><td> <b>trim_last_run</b>          </td><td>Timestamp of last malloc_trim execution                                                                                           </td></tr>
+      <tr><td> <b>trim_next_run</b>          </td><td>Timestamp of next scheduled malloc_trim execution                                                                                 </td></tr>
+      <tr><td> <b>mem_drift_per_hour_mb</b>  </td><td>Indicates the projected memory growth (trend) of the FHEM process in megabytes per hour (MB/h). The value is the slope            </td></tr>
+      <tr><td>                               </td><td>of a linear regression (least squares) over the resident set size (RSS) of the last two hours.                                    </td></tr>
+      <tr><td>                               </td><td>Negative values indicate an actual reduction in memory. A leak is only assessed if the rise is visible in both halves             </td></tr>
+      <tr><td>                               </td><td>of the history; one-time jumps are not rated as a leak.                                                                           </td></tr>
+      <tr><td> <b>leak_status_raw</b>        </td><td>Unfiltered assessment of the current cycle (same values as leak_status_weighted)                                                  </td></tr>
+      <tr><td> <b>leak_status_weighted</b>   </td><td>Displays the current assessment of memory leaks and fragmentation. The value is filtered: the assessment that prevailed           </td></tr>
+      <tr><td>                               </td><td>within the time window defined by attribute <a href="#MemSaver-attr-leakFilterWindow">leakFilterWindow</a> is published.          </td></tr>
+      <tr><td>                               </td><td>Possible values:                                                                                                                  </td></tr>
+      <tr><td>                               </td><td><ul><b>initializing</b> - fewer than 3 data points are available  </ul>                                                           </td></tr>
+      <tr><td>                               </td><td><ul><b>collecting_data</b> - data is being collected (no reliable trend analysis possible yet)  </ul>                             </td></tr>
+      <tr><td>                               </td><td><ul><b>warming_up</b> - FHEM has been running for less than the required minimum uptime before trend analysis can start. </ul>    </td></tr>
+      <tr><td>                               </td><td><ul><b>ok</b> - normal memory behavior; no alarming increase detected  </ul>                                                      </td></tr>
+      <tr><td>                               </td><td><ul><b>fragmentation_cleared</b> - malloc_trim was able to successfully return a significant amount of RAM to the operating system. The increase was solely due to heap fragmentation. </ul>      </td></tr>
+      <tr><td>                               </td><td><ul><b>potential_leak_warning</b> - memory is growing continuously and malloc_trim was barely able to free any memory. There may be a slow memory leak. </ul>                                     </td></tr>
+      <tr><td>                               </td><td><ul><b>leak_suspected</b> - very strong memory growth trend. Strong suspicion of a memory leak in a loaded module. </ul>                                                                          </td></tr>
+    </table>
   </ul>
+  
 </ul>
 
 =end html
@@ -546,13 +923,35 @@ return @sorted;
     Beispiel: <code>define Saver MemSaver 900</code>
   </ul>
   <br>
+  
+  <a id="MemSaver-set"></a>
+  <b>Set</b>
+  <ul>
+    <li><b>trimNow</b><br>
+        Löst sofort eine manuelle Ausführung von <code>malloc_trim</code> aus, um ungenutzten Speicher an das OS zurückzugeben, und aktualisiert die Messwerte.
+    </li>
+  </ul>
+  <br>
 
   <a id="MemSaver-attr"></a>
   <b>Attribute</b>
   <ul>
     <a id="MemSaver-attr-disable"></a>
-    <li>disable <br>
+    <li><b>disable</b> <br>
     Aktiviert oder deaktiviert das Modul.
+    </li>
+    <br>
+
+    <a id="MemSaver-attr-leakFilterWindow"></a>
+    <li><b>leakFilterWindow &lt;Sekunden&gt;</b> <br>
+    Zeitfenster zur Filterung von <b>leak_status_weighted</b>. Veröffentlicht wird die im Fenster
+    überwiegend aufgetretene Bewertung (nach Dauer gewichtet), der ungefilterte Wert steht in
+    <b>leak_status_raw</b>. <br>
+    Bei Gleichstand bleibt der letzte Status erhalten, sonst gilt der schwerwiegendere.
+    Das Fenster umfasst mindestens 5 Zyklen des Intervalls, bis dahin wird der Rohwert veröffentlicht. <br>
+    Technische Zustände (initializing, collecting_data, warming_up) werden nie gefiltert. <br>
+    <b>0</b> schaltet den Filter ab. <br>
+    (default: 1800)
     </li>
   </ul>
   <br>
@@ -560,22 +959,44 @@ return @sorted;
   <a id="MemSaver-Readings"></a>
   <b>Readings</b>
   <ul>
-    <li>cpu_load1 - Systemauslastung (Load Average der letzten 1 Minute)</li>
-    <li>cpu_usage_pct - Prozentuale CPU-Auslastung des Systems über das Intervall berechnet</li>
-    <li>mem_rss_mb - Resident Set Size (physisch vom Prozess belegter Arbeitsspeicher)</li>
-    <li>mem_hwm_mb - High Water Mark (Maximalwert des RSS seit Prozessstart)</li>
-    <li>mem_pss_mb - Proportional Set Size (anteilig berechneter Shared-Memory)</li>
-    <li>mem_private_mb - Privater Speicher (nicht mit anderen Prozessen geteilt)</li>
-    <li>mem_shared_mb - Geteilter Speicher (Copy-on-Write Pages, Shared Libraries)</li>
-    <li>mem_vsize_mb - Größe des virtuellen Adressraums</li>
-    <li>swap_process_total_mb - Aktuell ausgelagerter Speicher des FHEM-Prozesses</li>
-    <li>swap_process_delta_mb - Änderung des Prozess-Swaps seit dem letzten Zyklus (negative Werte="Rückholung aus Swap") </li>
-    <li>swap_sys_in_mb - Systemweit wiedereingelagerter Swap seit dem letzten Zyklus</li>
-    <li>swap_sys_out_mb - Systemweit ausgelagerter Swap seit dem letzten Zyklus</li>
-    <li>trim_last_freed_mb - Ungefähre Speichermenge in MB, die beim letzten malloc_trim an das OS zurückgegeben wurde</li>
-    <li>trim_last_run - Zeitstempel der letzten Ausführung von malloc_trim</li>
-    <li>trim_next_run - Zeitstempel der nächsten geplanten Ausführung</li>
+    <table>
+      <colgroup><col width="15%"><col width="85%"></colgroup>
+      <tr><td> <b>cpu_load1</b>             </td><td>Systemauslastung (Load Average der letzten 1 Minute)                                                                                           </td></tr>
+      <tr><td> <b>cpu_usage_pct</b>         </td><td>Prozentuale CPU-Auslastung des Systems über das Intervall berechnet                                                                            </td></tr>
+      <tr><td> <b>fhem_start_time</b>       </td><td>Zeitstempel des FHEM-Initialisierungsendes (YYYY-MM-DD HH:MM:SS)                                                                               </td></tr>
+      <tr><td> <b>fhem_uptime</b>           </td><td>Lesbare Laufzeit des FHEM-Prozesses seit dem Start (z. B. "12d 4h 15m 30s")                                                                    </td></tr>
+      <tr><td> <b>fhem_uptime_sec</b>       </td><td>Laufzeit des FHEM-Prozesses in absoluten Sekunden                                                                                              </td></tr>
+      <tr><td> <b>mem_rss_mb</b>            </td><td>Resident Set Size (physisch vom Prozess belegter Arbeitsspeicher)                                                                              </td></tr>
+      <tr><td> <b>mem_hwm_mb</b>            </td><td>High Water Mark (Maximalwert des RSS seit Prozessstart)                                                                                        </td></tr>
+      <tr><td> <b>mem_pss_mb</b>            </td><td>Proportional Set Size (anteilig berechneter Shared-Memory)                                                                                     </td></tr>
+      <tr><td> <b>mem_private_mb</b>        </td><td>Privater Speicher (nicht mit anderen Prozessen geteilt)                                                                                        </td></tr>
+      <tr><td> <b>mem_shared_mb</b>         </td><td>Geteilter Speicher (Copy-on-Write Pages, Shared Libraries)                                                                                     </td></tr>
+      <tr><td> <b>mem_vsize_mb</b>          </td><td>Größe des virtuellen Adressraums                                                                                                               </td></tr>
+      <tr><td> <b>swap_process_total_mb</b> </td><td>Aktuell ausgelagerter Speicher des FHEM-Prozesses                                                                                              </td></tr>
+      <tr><td> <b>swap_process_delta_mb</b> </td><td>Änderung des Prozess-Swaps seit dem letzten Zyklus (negative Werte = "Rückholung aus Swap")                                                    </td></tr>
+      <tr><td> <b>swap_sys_in_mb</b>        </td><td>Systemweit wiedereingelagerter Swap seit dem letzten Zyklus                                                                                    </td></tr>
+      <tr><td> <b>swap_sys_out_mb</b>       </td><td>Systemweit ausgelagerter Swap seit dem letzten Zyklus                                                                                          </td></tr>
+      <tr><td> <b>trim_last_freed_mb</b>    </td><td>Ungefähre Speichermenge in MB, die beim letzten malloc_trim an das OS zurückgegeben wurde                                                      </td></tr>
+      <tr><td> <b>trim_last_run</b>         </td><td>Zeitstempel der letzten Ausführung von malloc_trim                                                                                             </td></tr>
+      <tr><td> <b>trim_next_run</b>         </td><td>Zeitstempel der nächsten geplanten Ausführung                                                                                                  </td></tr>
+      <tr><td> <b>mem_drift_per_hour_mb</b> </td><td>Gibt den hochgerechneten Speicherzuwachs (Trend) des FHEM-Prozesses in Megabyte pro Stunde (MB/h) an. Der Wert ist die Steigung                </td></tr>
+      <tr><td>                              </td><td>einer linearen Regression (Methode der kleinsten Quadrate) über den Resident Set Size (RSS) der letzten zwei Stunden.                          </td></tr>
+      <tr><td>                              </td><td>Negativwerte bedeuten eine echte Speicherreduzierung. Ein Leak wird nur bewertet, wenn der Anstieg in beiden Hälften                           </td></tr>
+      <tr><td>                              </td><td>der Historie erkennbar ist; Einmalsprünge werden nicht als Leak bewertet.                                                                      </td></tr>
+      <tr><td> <b>leak_status_raw</b>       </td><td>Ungefilterte Bewertung des aktuellen Zyklus (gleiche Werte wie leak_status_weighted)                                                           </td></tr>
+      <tr><td> <b>leak_status_weighted</b>  </td><td>Zeigt die aktuelle Bewertung bezüglich Speicher-Leaks und Fragmentierung an. Der Wert ist gefiltert: Veröffentlicht wird                       </td></tr>
+      <tr><td>                              </td><td>die Bewertung, die im Zeitfenster des Attributs <a href="#MemSaver-attr-leakFilterWindow">leakFilterWindow</a> überwiegend aufgetreten ist.    </td></tr>
+      <tr><td>                              </td><td>Mögliche Werte:                                                                                                                                </td></tr>
+      <tr><td>                              </td><td><ul><b>initializing</b> - es sind noch weniger als 3 Messwerte vorhanden   </ul>                                                               </td></tr>
+      <tr><td>                              </td><td><ul><b>collecting_data</b> - Daten werden gesammelt (noch keine zuverlässige Trendanalyse möglich)  </ul>                                      </td></tr>
+      <tr><td>                              </td><td><ul><b>warming_up</b> - FHEM läuft seit weniger als der vorgegebenen Mindestlaufzeit, bevor die Trendanalyse starten kann. </ul>               </td></tr>
+      <tr><td>                              </td><td><ul><b>ok</b> - normales Speicherverhalten, kein bedrohlicher Anstieg erkennbar  </ul>                                                         </td></tr>
+      <tr><td>                              </td><td><ul><b>fragmentation_cleared</b> - malloc_trim konnte erfolgreich signifikant RAM an das Betriebssystem zurückgeben. Der Anstieg lag nur an Heap-Fragmentierung. </ul>      </td></tr>
+      <tr><td>                              </td><td><ul><b>potential_leak_warning</b> - Der Speicher wächst kontinuierlich und malloc_trim konnte kaum Speicher freigeben. Es könnte ein langsames Memory-Leak vorliegen. </ul> </td></tr>
+      <tr><td>                              </td><td><ul><b>leak_suspected</b> - Sehr starker Speicherspreizungs-Trend. Dringender Verdacht auf ein Speicherleck in einem geladenen Modul. </ul>                                 </td></tr>
+    </table>
   </ul>
+  
 </ul>
 
 =end html_DE
@@ -600,7 +1021,7 @@ return @sorted;
     "cpu",
     "load"
   ],
-  "version": "v1.1.0",
+  "version": "v1.1.1",
   "release_status": "stable",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>"
