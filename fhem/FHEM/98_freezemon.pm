@@ -1383,8 +1383,8 @@ sub freezemon_wrap_Log3($) {
 sub freezemon_install_AnalyzeCommand_wrapper($;$) {
     my ( $hash, $nolog ) = @_;
     my $name = $hash->{NAME};
-    return IsDisabled($name);
     $name = "FreezeMon" unless defined($name);
+    return IsDisabled($name);
     my $status = AnalyzeCommand( "freezemon", "" );
     if ( !defined($status) || $status ne "already wrapped" ) {
         $hash->{helper}{AnalyzeCommand} = \&AnalyzeCommand;
@@ -1420,8 +1420,8 @@ sub freezemon_http_wrapper_Callback($) {
 sub freezemon_install_http_wrapper($;$) {
     my ( $hash, $nolog ) = @_;
     my $name = $hash->{NAME};
-    return IsDisabled($name);
     $name = "FreezeMon" unless defined($name);
+    return IsDisabled($name);
     my $param = {
         url      => "file://freezemon_wrap.txt",
         hash     => $hash,
@@ -1434,8 +1434,8 @@ sub freezemon_install_http_wrapper($;$) {
 sub freezemon_install_callFn_wrapper($;$) {
     my ( $hash, $nolog ) = @_;
     my $name = $hash->{NAME};
-    return IsDisabled($name);
     $name = "FreezeMon" unless defined($name);
+    return IsDisabled($name);
     my $status = CallFn( $name, "freezemon_checkCallFnWrap" );
     if ( !defined($status) || $status ne "already wrapped" ) {
         $hash->{helper}{mycallFn} = \&CallFn;
@@ -1454,8 +1454,8 @@ sub freezemon_install_callFn_wrapper($;$) {
 sub freezemon_install_log_wrapper($) {
     my ($hash) = @_;
     my $name = $hash->{NAME};
-    return IsDisabled($name);
     $name = "FreezeMon" unless defined($name);
+    return IsDisabled($name);
     my $status = Log3( "", 99, "" );
     if ( !defined($status) || $status ne "already wrapped" ) {
         Log3( "", 3, "[Freezemon] $name: Wrapping Log3" );
