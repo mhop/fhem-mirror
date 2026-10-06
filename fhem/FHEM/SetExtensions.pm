@@ -72,7 +72,7 @@ DoSetExtensions($$@)
 {
   my ($hash, $list, $name, $cmd, @a) = @_;
 
-  return SE_Next($hash, $list, $name, $cmd, @a) if(!$list);
+  return "Unknown argument $cmd, choose one of " if(!$list);
 
   my %se_list = (
     "on-for-timer"      => 1,
