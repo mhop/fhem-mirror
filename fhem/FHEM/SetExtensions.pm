@@ -8,6 +8,7 @@ use AttrTemplate;
 
 sub SetExtensions($$@);
 sub SetExtensionsFn($);
+sub DoSetExtensions($$@);
 
 sub
 SetExtensionsCancel($)
@@ -42,38 +43,34 @@ SE_DoSet(@)
 }
 
 sub
-SE_Next(@)
+SetExtensions($$@)
 {
   my ($hash, $list, $name, $cmd, @a) = @_;
+
   my $mt = $modules{$hash->{TYPE}};
-  if($mt->{SetExtensionsFn}){
-    foreach my $fn (@{$mt->{SetExtensionsFn}}) {
-      no strict "refs";
-      my $ret = &{$fn}($hash, $list, $name, $cmd, @a);
-      use strict "refs";
-      return $ret if(!$ret ||
-                      $ret !~ m/^Unknown argument $cmd, choose one of (.*)/);
-      $list = $1;
-    }
+  if(!$mt->{seInitDone}) {
+    $mt->{seInitDone} = 1;
+    my @ml = ();
+    $mt->{SetExtensionsFn} = \@ml if(!$mt->{SetExtensionsFn});
+    push(@{$mt->{SetExtensionsFn}}, "AttrTemplate_Set")
+      if(AttrVal("global", "disableFeatures", "") !~ m/\battrTemplate\b/);
+    push(@{$mt->{SetExtensionsFn}}, "DoSetExtensions");
+  }
+
+  foreach my $fn (@{$mt->{SetExtensionsFn}}) {
+    no strict "refs";
+    my $ret = &{$fn}($hash, $list, $name, $cmd, @a);
+    use strict "refs";
+    return $ret if(!$ret || $ret !~ m/^Unknown argument.*, choose one of (.*)/);
+    $list=$1;
   }
   return "Unknown argument $cmd, choose one of $list";
 }
 
 sub
-SetExtensions($$@)
+DoSetExtensions($$@)
 {
   my ($hash, $list, $name, $cmd, @a) = @_;
-
-  if(AttrVal("global", "disableFeatures", "") !~ m/\battrTemplate\b/) {
-    my $as = "AttrTemplate_Set";
-    my $mt = $modules{$hash->{TYPE}};
-    if(!$mt->{SetExtensionsFn}) {
-      my @ml = ( $as );
-      $mt->{SetExtensionsFn} = \@ml;
-    } elsif(!grep(/$as/, @{$mt->{SetExtensionsFn}})) {
-      push(@{$mt->{SetExtensionsFn}}, $as);
-    }
-  }
 
   return SE_Next($hash, $list, $name, $cmd, @a) if(!$list);
 
@@ -126,16 +123,15 @@ SetExtensions($$@)
   # Forum #124505
   $list =~ s/:\{([^ ]+)\}/$cmdFromAnalyze=$1; ":".(eval $1)/ge if($cmd eq "?");
 
-  if(!$onCmd || !$offCmd) { # No extension
-    return SE_Next($hash, $list, $name, $cmd, @a);
-  }
+  return "Unknown argument $cmd, choose one of $list"
+    if(!$onCmd || !$offCmd);  # No extension
 
   $cmd = ReplaceEventMap($name, $cmd, 1) if($fixedIt);
 
   if(!defined($se_list{$cmd})) {
     # Add only "new" commands
     my @mylist = grep { $list !~ m/\b$_\b/ } keys %se_list;
-    return SE_Next($hash, "$list ".join(" ", @mylist), $name, $cmd,@a);
+    return "Unknown argument $cmd, choose one of $list ".join(" ", @mylist);
   }
   if($se_list{$cmd} && $se_list{$cmd} != int(@a)) {
     return "$cmd requires $se_list{$cmd} parameter";
@@ -219,7 +215,7 @@ SetExtensions($$@)
       delete($hash->{SetExtensionsCommand});  # Will be set by on-till
 
       if($hms_from le $hms_now) { # By slight delays at will schedule tomorrow.
-        SetExtensions($hash, $list, $name, "on-till", $till);
+        DoSetExtensions($hash, $list, $name, "on-till", $till);
 
       } else {
         CommandDefine(undef,
