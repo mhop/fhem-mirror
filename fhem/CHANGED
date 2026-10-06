@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 98_MemSaver: DEF auch ohne Intervallangabe editierbar uva.
  - new:     98_MemSaver: Rückgabe ungenutzter Speicherblöcke (Linux) an OS
  - bugfix:  93_Log2Syslog: Fix Syntaxfehler in v5.12.8
  - change:  14_SD_WS_Maverick: Match-Regex vorkompiliert, lastMSG und STATE
