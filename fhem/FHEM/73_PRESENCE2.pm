@@ -43,7 +43,7 @@ eval "use Net::Async::Ping;1"       or $missingModul .= "Net::Async::Ping ";
 eval "use List::Util qw(pairmap);1" or $missingModul .= "List::Util ";
 
 my $ModuleName = "PRESENCE2";
-my $ModuleVersion = "01.06";
+my $ModuleVersion = "01.06a";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -1933,7 +1933,7 @@ sub PRESENCE2_combined_check($$$) {
    my ($dn, $raw_ip, $raw_mac) = @_;
    my $result = "unknown";
 
-   PRESENCE2_Log $dn, 3, "ip: $raw_ip, mac: $raw_mac";
+   PRESENCE2_Log $dn, 4, "ip: $raw_ip, mac: $raw_mac";
 
    # Konstanten für die Schleifen
    my $PREMAXRETRIES = AttrVal($dn, "preMaxRetries", 8);
@@ -1956,7 +1956,7 @@ sub PRESENCE2_combined_check($$$) {
 
      if ($@) {
        $result = "subError:" . $@;
-       PRESENCE2_Log $dn, 3, "host: $@";
+       PRESENCE2_Log $dn, 2, "host: $@";
        return $result;
      } 
    }
@@ -1987,7 +1987,7 @@ sub PRESENCE2_combined_check($$$) {
 
    if ($@) {
      $result = "subError:" . $@;
-     PRESENCE2_Log $dn, 3, "arp-scan: $@";
+     PRESENCE2_Log $dn, 2, "arp-scan: $@";
      return $result;
    } else {
      return $result if ($result eq "present");
@@ -2022,7 +2022,7 @@ sub PRESENCE2_combined_check($$$) {
 
    if ($@) {
      $result = "subError:" . $@;
-     PRESENCE2_Log $dn, 3, "hping3 or arp: $@";
+     PRESENCE2_Log $dn, 2, "hping3 or arp: $@";
      return $result;
    } else {
      return $result if ($result eq "present");
