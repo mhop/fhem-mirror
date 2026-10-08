@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 73_PRESENCE2.pm: Modus: combined-check - Parameter angepasst
  - bugfix:  73_PRESENCE2.pm: Log verbose Modus: combined-check
  - bugfix:  73_PRESENCE2.pm: kleinere Sachen, commandRef
  - feature: 73_PRESENCE2.pm:
