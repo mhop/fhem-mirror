@@ -73,9 +73,10 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.5" => "27.09.2026  siehe Changelog ",
-  "2.10.4" => "20.09.2026  _batSocTarget: Debuglog für Step6 korrigiert ".
-                           "AI::FANN Speicherleck durch globales DESTROY-Patching behoben. ",
+  "2.10.6" => "05.10.2026  siehe Changelog ".
+                           "Reading Battery_OptimumBaseSoC_XX parallel zum bestehenden Reading Battery_OptimumTargetSoC_XX welches abgelöst werden soll (Forum: https://forum.fhem.de/index.php?msg=1369429) ".
+                           "Nachtverarbeitung: aiDelRawData aus Task 6 nach Task 4 verschoben ".
+                           "Wrapper AIF_modelRun gehärtet und Fehlerausgabe in _aiFannPredict verbessert ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -4286,7 +4287,7 @@ sub __solCast_ApiRequest {
       timeout    => APITIMEOUT,
       name       => $name,
       debug      => $debug,
-      caller     => \&$caller,
+      caller     => $caller,
       stc        => [gettimeofday],
       allstrings => $allstrings,
       string     => $string,
@@ -4466,6 +4467,8 @@ sub __solCast_ApiResponse {
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -4485,7 +4488,6 @@ sub ___solCastErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{SolCast}{'?All'}{response_message} = $msg;
-  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -4498,6 +4500,8 @@ sub ___solCastErrorExit {
       lang           => $paref->{lang}
   };
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -4722,7 +4726,7 @@ sub __forecastSolar_ApiRequest {
       type       => $type,
       debug      => $debug,
       header     => 'Accept: application/json',
-      caller     => \&$caller,
+      caller     => $caller,
       stc        => [gettimeofday],
       allstrings => $allstrings,
       string     => $string,
@@ -4866,6 +4870,8 @@ sub __forecastSolar_ApiResponse {
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                           # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
+  no strict 'refs'; 
+  
 return &$caller($param);
 }
 
@@ -4888,7 +4894,6 @@ sub ___forecastSolarErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{ForecastSolar}{'?All'}{response_message} = $msg;
-  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -4900,6 +4905,8 @@ sub ___forecastSolarErrorExit {
       lang           => $paref->{lang}
   };
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -5347,7 +5354,6 @@ sub __VictronVRM_ApiRequestLogin {
   else {
       my $msg = "ERROR - Victron VRM API credentials are not set or couldn't be decrypted. Use 'set $name vrmCredentials' to set it.";
       Log3 ($name, 1, "$name - $msg");
-      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $msg;
       return;
   }
@@ -5376,7 +5382,7 @@ sub __VictronVRM_ApiRequestLogin {
       name     => $name,
       stc      => [gettimeofday],
       debug    => $debug,
-      caller   => \&$caller,
+      caller   => $caller,
       lang     => $paref->{lang},
       chour    => $paref->{chour},
       date     => $paref->{date},
@@ -5418,7 +5424,6 @@ sub __VictronVRM_ApiResponseLogin {
   if ($err ne "") {
       $msg = 'ERROR - Victron VRM API error response: '.$err;
       Log3 ($name, 1, "$name - $msg");
-      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
       $data{$name}{current}{runTimeLastAPIProc}                    = round4 (tv_interval($sta));                            # Verarbeitungszeit ermitteln
@@ -5432,7 +5437,6 @@ sub __VictronVRM_ApiResponseLogin {
       if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
           Log3 ($name, 1, "$name - $msg");
-          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                     # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                 # API Laufzeit ermitteln
@@ -5445,7 +5449,6 @@ sub __VictronVRM_ApiResponseLogin {
       if (defined $jdata->{'error_code'}) {
           $msg = 'ERROR - Victron VRM API error_code response: '.$jdata->{'error_code'};
           Log3 ($name, 3, "$name - $msg");
-          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
@@ -5523,7 +5526,7 @@ sub __VictronVRM_ApiRequestForecast {
       debug    => $debug,
       token    => $token,
       authtype => $authtype,                                       # für Response-Handler durchreichen
-      caller   => \&$caller,
+      caller   => $caller,
       lang     => $paref->{lang},
       header   => { "Content-Type" => "application/json", "x-authorization" => $authheader },
       method   => 'GET',
@@ -5562,7 +5565,6 @@ sub __VictronVRM_ApiResponseForecast {
   if ($err ne "") {
       $msg = 'ERROR - Victron VRM API Forecast response: '.$err;
       Log3 ($name, 1, "$name - $msg");
-      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
       $data{$name}{current}{runTimeLastAPIProc}                    = round4 (tv_interval($sta));                            # Verarbeitungszeit ermitteln
@@ -5576,7 +5578,6 @@ sub __VictronVRM_ApiResponseForecast {
       if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API Forecast response';
           Log3 ($name, 1, "$name - $msg");
-          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                         # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                     # API Laufzeit ermitteln
@@ -5589,7 +5590,6 @@ sub __VictronVRM_ApiResponseForecast {
       if (defined $jdata->{'error_code'}) {
           $msg = 'ERROR - Victron VRM API Forecast response: '.$jdata->{'error_code'};
           Log3 ($name, 3, "$name - $msg");
-          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                         # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                     # API Laufzeit ermitteln
@@ -5622,7 +5622,6 @@ sub __VictronVRM_ApiResponseForecast {
           if (ref $syforecast ne 'ARRAY') {
               $msg = 'ERROR - invalid Victron VRM API Forecast response';
               Log3 ($name, 1, "$name - $msg");
-              #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
               $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
               $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
@@ -5719,7 +5718,7 @@ sub __VictronVRM_ApiRequestLogout {
       timeout    => APITIMEOUT,
       name       => $name,
       debug      => $debug,
-      caller     => \&$caller,
+      caller     => $caller,
       lang       => $paref->{lang},
       header     => { "Content-Type" => "application/json", "x-authorization" => "Bearer $token" },
       method     => 'GET',
@@ -5954,7 +5953,7 @@ sub __openMeteo_ApiRequest {
       begin          => $paref->{begin},
       callequivalent => $paref->{callequivalent},
       requestmode    => $requestmode,
-      caller         => \&$caller,
+      caller         => $caller,
       stc            => [gettimeofday],
       allstrings     => $allstrings,
       string         => $string,
@@ -6292,6 +6291,8 @@ sub __openMeteo_ApiResponse {
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                             # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));         # API Laufzeit ermitteln
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -6314,7 +6315,6 @@ sub ___openMeteoErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $msg;
-  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -6327,6 +6327,8 @@ sub ___openMeteoErrorExit {
       lang           => $paref->{lang}
   };
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -12719,10 +12721,6 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ########################################################################################################################
-  #for my $hodc (1..9) {
-  #    delete $data{$name}{circular}{$hodc};
-  #}
-
   #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
   #my $gco = AttrVal ($name, 'graphicControl', '');
 
@@ -12758,14 +12756,6 @@ sub centralTask {
     }
     $data{$name}{current}{airaw_hp_cleanup_done} = 1;               # läuft nur einmal pro Session
   }
-  
-  #Log3 ($name, 1, "$name - circular size: " . total_size($data{$name}{circular}));
-  #Log3 ($name, 1, "$name - pvhist  size: "  . total_size($data{$name}{pvhist}));
-  #Log3 ($name, 1, "$name - current size: "  . total_size($data{$name}{current}));
-  #Log3 ($name, 1, "$name - airaw   size: "  . total_size($data{$name}{aidectree}{airaw}));
-  #Log3 ($name, 1, "$name - weatherapi size: "  . total_size($data{$name}{weatherapi}));
-  #Log3 ($name, 1, "$name - statusapi  size: "  . total_size($data{$name}{statusapi}));
-  #Log3 ($name, 1, "$name - readings size: "    . total_size($defs{$name}{READINGS}));
 
 ##########################################################################################################################
 
@@ -12886,6 +12876,9 @@ sub centralTask {
   }
 
   undef %{$centpars};
+  
+  # --- Speicherbereinigung nach dem Zyklus ---
+  #mallocTrim ($name);
 
 return;
 }
@@ -13458,6 +13451,7 @@ sub _specialActivities {
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
 
           __delObsoleteAPIData ($paref);                                                        # Bereinigung obsoleter Daten im solcastapi Hash
+          aiDelRawData         ($paref);                                                        # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
 
           my $ttl    = 24 * 3600;                                                               # Logsperrhash: Lebenszeit eines Eintrags bevor er entfernt wird
           my $cutoff = $t - $ttl;
@@ -13465,6 +13459,8 @@ sub _specialActivities {
           for my $sh1 (keys %{ $data{$name}{log} }) {                                           # Logsperrhash bereinigen
               delete $data{$name}{log}{$sh1} if(($data{$name}{log}{$sh1}{ts} // 0) < $cutoff);
           }
+          
+          mallocTrim ($name);                                                                   # Rückgabe aller freigegebenen Arenen
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
       }
@@ -13503,7 +13499,6 @@ sub _specialActivities {
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 6 started");
 
-          aiDelRawData     ($paref);                                                            # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
           aiManageInstance ($paref);                                                            # AI PV-Forecast füllen, trainieren und sichern
 
           Log3 ($name, 4, "$name - Daily special tasks - Task 6 finished");
@@ -13667,17 +13662,31 @@ sub __delObsoleteAPIData {
   ## Solar-API Daten löschen
   #############################
   if (keys %{$data{$name}{solcastapi}}) {
-      my $refts = timestringToTimestamp ($hash, $date.' 00:00:00');                        # Referenztimestring
+      my $refts = timestringToTimestamp ($hash, $date.' 00:00:00');                         # Referenztimestring
 
-      for my $idx (sort keys %{$data{$name}{solcastapi}}) {                                # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
-          if (!keys %{$data{$name}{solcastapi}{$idx}}) {                                   # leeren Schlüssel löschen
-              delete $data{$name}{solcastapi}{$idx};
-              next;
+      #for my $idx (sort keys %{$data{$name}{solcastapi}}) {                                # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
+      #    if (!keys %{$data{$name}{solcastapi}{$idx}}) {                                   # leeren Schlüssel löschen
+      #        delete $data{$name}{solcastapi}{$idx};
+      #        next;
+      #    }
+
+      #    for my $scd (sort keys %{$data{$name}{solcastapi}{$idx}}) {
+      #        my $ds = timestringToTimestamp ($hash, $scd);
+      #        delete $data{$name}{solcastapi}{$idx}{$scd} if($ds && $ds < $refts);
+      #    }
+      #}
+      
+      for my $idx (keys %{$data{$name}{solcastapi}}) {                                 # alle Datumschlüssel kleiner aktueller Tag 00:00:00 selektieren
+          my $sub_hash = $data{$name}{solcastapi}{$idx};
+          next unless ref($sub_hash) eq 'HASH';
+
+          for my $scd (keys %$sub_hash) {
+              my $ds = timestringToTimestamp ($hash, $scd);
+              delete $sub_hash->{$scd} if ($ds && $ds < $refts);
           }
 
-          for my $scd (sort keys %{$data{$name}{solcastapi}{$idx}}) {
-              my $ds = timestringToTimestamp ($hash, $scd);
-              delete $data{$name}{solcastapi}{$idx}{$scd} if($ds && $ds < $refts);
+          if (!keys %$sub_hash) {                                                           # Wenn der innere Hash jetzt leer ist, direkt löschen
+              delete $data{$name}{solcastapi}{$idx};
           }
       }
   }
@@ -15845,12 +15854,18 @@ sub _batSocTarget {
       }
 
       if (!$stepSoc) {
-          debugLog ($paref, 'batteryManagement', "SoC Step1 Bat $bn - The SoC-Management is switched off. Battery_OptimumTargetSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
+          debugLog ($paref, 'batteryManagement', "SoC Step1 Bat $bn - The SoC-Management is switched off. Battery_OptimumBaseSoC_$bn is set to lowSoC and Battery_ChargeRequest_$bn to '0'.");
 
           ## pvHistory/Readings schreiben
           #################################
           writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, day => $day, hour => 99 } );
+          
+          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+          ########################################################################################################################          
           storeReading   ($name, 'Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
+          ########################################################################################################################
+          
+          storeReading   ($name, 'Battery_OptimumBaseSoC_'.$bn, $lowSoc.' %');
           storeReading   ($name, 'Battery_ChargeRequest_'.$bn, 0);
 
           next;
@@ -15950,7 +15965,7 @@ sub _batSocTarget {
 
       ## Aufladewahrscheinlichkeit beachten
       #######################################
-      my $csopt     = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, $lowSoc);            # aktuelles SoC Optimum
+      my $csopt     = ReadingsNum ($name, 'Battery_OptimumBaseSoC_'.$bn, $lowSoc);              # aktuelles SoC Optimum
       my $cantarget = round0 (100 - $pvexpect * (100 / $batinstcap));                           # maximale SOC-Höhe damit prognostizierte Energie komplett gespeichert werden kann
       my $newtarget = round0 ($cantarget < $target ? $cantarget : $target);                     # Abgleich möglicher Minimum-SOC gg. berechneten Minimum-SOC
 
@@ -16013,8 +16028,14 @@ sub _batSocTarget {
       ## pvHistory/Readings schreiben
       #################################
       writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $target, day => $day, hour => 99 } );
+      
+      ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
+      ########################################################################################################################                
       storeReading   ($name, 'Battery_OptimumTargetSoC_'.$bn, $target.' %');
-      storeReading   ($name, 'Battery_ChargeRequest_'.$bn,      $chargereq);
+      ########################################################################################################################
+      
+      storeReading   ($name, 'Battery_OptimumBaseSoC_'.$bn, $target.' %');
+      storeReading   ($name, 'Battery_ChargeRequest_'.$bn,    $chargereq);
   }
 
 return;
@@ -16169,7 +16190,7 @@ sub _batChargeMgmt {
 
       $batinitval->{$bn}{sf}             = $sf;
       $batinitval->{$bn}{batinstcap}     = $batinstcap;
-      $batinitval->{$bn}{batoptsoc}      = ReadingsNum ($name, 'Battery_OptimumTargetSoC_'.$bn, 0);         # aktueller optimierter SoC in %
+      $batinitval->{$bn}{batoptsoc}      = ReadingsNum ($name, 'Battery_OptimumBaseSoC_'.$bn,   0);         # aktueller optimierter SoC in %
       $batinitval->{$bn}{bcharge}        = BatteryVal  ($name, $bn, 'bcharge',                  0);         # aktuelle Ladung in %
       $batinitval->{$bn}{bchargewh}      = BatteryVal  ($name, $bn, 'bchargewh',                0);         # aktuelle Ladung in Wh
       $batinitval->{$bn}{bpinmax}        = BatteryVal  ($name, $bn, 'bpinmax',           INFINITE);         # max. mögliche Ladeleistung W
@@ -21114,11 +21135,61 @@ sub _calcDataEveryFullHour {
       }
 
       storeReading ($name, '.signaldone_'.$hh, 'done');                                             # Sperrsignal (erledigt) setzen
+      
+      # --- Größenausgabe einmal pro Stunde (nur letzte Loop-Iteration) ---
+      #_logDataStructSizes ($paref) if(int $h == int $chour);
 
       delete @{$paref}{qw(h cpcf aihit yday ydayname yt pvrlvd)};
   }
 
   delete $paref->{acu};
+
+return;
+}
+
+################################################################
+#  Einmalige Größenausgabe der internen Datenstrukturen
+#  Aufruf: einmal pro Stunde nach _calcDataEveryFullHour
+################################################################
+sub _logDataStructSizes {
+  my $paref = shift;
+  my $name  = $paref->{name};
+  
+  unless ( eval { require Devel::Size; Devel::Size->import('total_size'); 1 } ) {
+      Log3 ($name, 1, "$name - Devel::Size is not available. Install it on Debian/Ubuntu using 'sudo apt install libdevel-size-perl'.");
+      return;
+  }
+
+  my @structs = (
+      [ 'pvhist',    \$data{$name}{pvhist}              ],
+      [ 'circular',  \$data{$name}{circular}             ],
+      [ 'airaw',     \$data{$name}{aidectree}{airaw}     ],
+      [ 'neuralnet', \$data{$name}{neuralnet}            ],
+      [ 'weatherapi',\$data{$name}{weatherapi}           ],
+      [ 'solcastapi',\$data{$name}{solcastapi}           ],
+      [ 'statusapi', \$data{$name}{statusapi}            ],
+      [ 'consumers', \$data{$name}{consumers}            ],
+      [ 'current',   \$data{$name}{current}              ],
+      [ 'nexthours', \$data{$name}{nexthours}            ],
+      [ 'messages',  \$data{$name}{messages}             ],
+      [ 'log',       \$data{$name}{log}                  ],
+      [ 'readings',  \$defs{$name}{READINGS}             ],
+  );
+
+  my $total = 0;
+  my @lines;
+
+  for my $s (@structs) {
+      next unless defined ${$s->[1]};
+      my $sz = total_size(${$s->[1]});
+      $total += $sz;
+      push @lines, sprintf "%-12s %8.2f KB", $s->[0], $sz / 1024;
+  }
+
+  push @lines, sprintf "%-12s %8.2f KB", 'TOTAL', $total / 1024;
+
+  Log3 ($name, 1, "$name - DataStructSizes (hourly):\n"
+                . join("\n", map { "  $_" } @lines));
 
 return;
 }
@@ -26950,7 +27021,7 @@ sub outputMessages {
 
   my $hc = 0;
 
-  for my $key (sort keys %{$data{$name}{messages}}) {
+  for my $key (reverse sort keys %{$data{$name}{messages}}) {
       next if($key >= IDXLIMIT);
 
       $hc++;
@@ -31429,15 +31500,14 @@ sub _aiFannPredict {
   my $maxval    = $data{$name}{neuralnet}{$fanntyp}{MaxVal};                                        # Target Denormalisierungsparameter
   my $fannModel = $data{$name}{neuralnet}{$fanntyp}{FannModel};
 
-  #my $out;
-  #eval { $out = $fannModel->AIF_modelRun ($input) };                                                # Netz im Wrapper laufen lassen                                                         # Netz laufen lassen
   my $out = $fannModel->AIF_modelRun($input);                                                       # Wrapper liefert undef, wenn Modell kaputt ist
   
   my $zone = 3;
   my $bc   = 0;
 
   unless (defined $out && ref($out) eq 'ARRAY' && @$out) {                                          # Härten: prüfen ob $out gültig ist
-      my $msg = "FANN Model '$fanntyp' did not return a valid result. New training is required.";
+      my $reason = $fannModel->{lastError} // 'unknown';
+      my $msg    = "FANN Model '$fanntyp' did not return a valid result ($reason). New training is required.";
       $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
 
       Log3 ($name, 1, "$name - WARNING - $msg") if(askLogtime ($name, $msg, 300));                  # Log mit Mehrfachverhinderung
@@ -36043,10 +36113,9 @@ sub formatWeatherTimestrg {
   # --- Cache-Key generieren ---
   my $key = join '::', 'FMTWTSTR',                                                      # Cache Key ID
                        $date;
-
-  if (my $val = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
-      return $val;
-  }
+  
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                                   # Cache-Hit?
+  return $hit if defined $hit;
 
   my $dt    = timestringsFromOffset ($name, time, 0);
   my $cdate = $dt->{date};
@@ -36503,10 +36572,9 @@ sub azSolar2Astro {
   # --- Cache-Key generieren ---
   my $key = join '::', 'AZSOL',                                                   # Cache Key ID
                        $azsolar;
-
-  if (my $val = MCache_get (\%Multi_Cache, $stats, $key)) {                       # Cache-Hit?
-      return $val;
-  }
+  
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                             # Cache-Hit?
+  return $hit if defined $hit;
 
   my $astro = ($azsolar + 180) % 360;                                             # Berechnung
 
@@ -37494,16 +37562,9 @@ sub isHoliday {
 
   my $t = time();
 
-  if (my $entry = MCache_get (\%Multi_Cache, $stats, $key)) {                           # Cache-Hit?
-      if ($t - $entry->{ts} < 12 * 3600) {                                              # TTL = 12 Stunden
-          return $entry->{val};
-      }
-
-      delete $Multi_Cache{$key};
-      $stats->{evicts}++;                                                               # TTL abgelaufen → Cache-Eintrag verwerfen
+  if (my $entry = MCache_get (\%Multi_Cache, $stats, $key)) {
+      return $entry->{val} if $t - $entry->{ts} < 12 * 3600;                            # TTL = 12 Stunden
   }
-
-  $stats->{misses}++;
 
   my $holiday = 0;
 
@@ -38516,9 +38577,8 @@ sub temp2bin {
   my $key = join '::', 'TEMPBIN',                                                       # Cache Key ID
                        $val;
 
-  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
-      return $hit;
-  }
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                                   # Cache-Hit?
+  return $hit if defined $hit;
 
   my $bin = $val >=  35  ?  35 :
             $val >   32  ?  35 :
@@ -38564,10 +38624,9 @@ sub cloud2bin {
   # --- Cache-Key generieren ---
   my $key = join '::', 'CLOUDBIN',                                                      # Cache Key ID
                        $val;
-
-  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
-      return $hit;
-  }
+  
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                                   # Cache-Hit?
+  return $hit if defined $hit;
 
   my $bin = $val == 100 ? '100' :
             $val >  97  ? '100' :
@@ -38632,9 +38691,8 @@ sub sunalt2bin {
   my $key = join '::', 'SUNALTBIN',                                                     # Cache Key ID
                        $val;
 
-  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
-      return $hit;
-  }
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                                   # Cache-Hit?
+  return $hit if defined $hit;
 
   my $bin = $val == 90  ? 90  :
             $val >  87  ? 90  :
@@ -38948,6 +39006,35 @@ sub lineFromSpaces {
   $ret   .= "&nbsp;" x ($mlen + $an);
 
 return $ret;
+}
+
+################################################################
+#  glibc explizit auffordern, alle freigegebenen Arenen 
+#  an das OS zurückzugeben.
+################################################################
+sub mallocTrim {
+  my ($name) = @_;
+    
+  return unless $^O eq 'linux';
+
+  state $malloc_trim_fn;                                        # Einmalige Initialisierung beim allerersten Aufruf
+  state $has_platypus;
+
+  if (!defined $has_platypus) {
+      $has_platypus = eval {
+          require FFI::Platypus;
+          $malloc_trim_fn = FFI::Platypus->new(lib => undef)->function(malloc_trim => ['size_t'] => 'int');
+          1;
+      };
+        
+      if (!$has_platypus) {
+          Log3 ($name, 2, "$name - INFO - To ensure that unused memory areas are regularly released, please install FFI::Platypus (e.g., 'apt install libffi-platypus-perl')");
+      }
+  }
+
+  $malloc_trim_fn->(0) if $has_platypus && $malloc_trim_fn;     # Nur ausführen, wenn Platypus erfolgreich geladen wurde
+
+return;
 }
 
 ################################################################
@@ -40115,7 +40202,7 @@ sub LRU_debug {
 return;
 }
 
-# --- Mini-Cache Wert lesen
+# --- Mini-Cache Wert lesen (undef = Miss; gespeicherte Werte sind nie undef)
 sub MCache_get {
   my ($cache, $stats, $key) = @_;
 
@@ -40129,17 +40216,23 @@ sub MCache_get {
 return;
 }
 
-# --- Mini-Cache Wert schreiben
+# --- Mini-Cache Wert schreiben (echtes FIFO über Key-Queue)
 sub MCache_set {
   my ($cache, $stats, $key, $value) = @_;
-  $cache->{$key} = $value;
 
-  my $max = $stats->{max};
+  my $order = $stats->{order} //= [];
+  push @$order, $key if !exists $cache->{$key};         # Falls der Schlüssel neu ist, in die Queue einreihen
 
-  if (keys %$cache > $max) {                            # auf X Einträge begrenzen
-      delete $cache->{(keys %$cache)[0]};               # FIFO, reicht völlig
-      $stats->{evicts}++;
- }
+  $cache->{$key} = $value;                              # Wert im Cache speichern/aktualisieren
+
+  while (keys(%$cache) > $stats->{max} && @$order) {    # Bereinigen: So lange Elemente aus der Queue entfernen, bis die tatsächliche Cache-Größe <= max ist
+      my $old = shift @$order;
+        
+      if (exists $cache->{$old}) {                      # Nur mitzählen und löschen, wenn der Key wirklich noch im Hash existiert
+          delete $cache->{$old};
+          $stats->{evicts}++;
+      }
+  }
 
 return;
 }
@@ -40308,8 +40401,25 @@ sub AIF_modelCreate {                                           # Konstruktor
 
 sub AIF_modelRun {                                              # Dedizierter Run-Wrapper (kein AUTOLOAD-Overhead im Inferenzpfad)
   my ($self, $input) = @_;
+
   return unless $self->{model};
-  return $self->{model}->run ($input);
+  return unless ref($input) eq 'ARRAY';
+
+  my $need = eval { $self->{model}->num_inputs };               # erwartete Eingangsgröße des Netzes
+  my $got  = scalar @$input;
+
+  if (defined $need && $need != $got) {
+      $self->{lastError} = "input size mismatch: got $got, model requires $need";
+      return;
+  }
+
+  my $out = eval { $self->{model}->run ($input) };
+  if ($@) {
+      ($self->{lastError} = $@) =~ s/\s+at\s+\S+\s+line\s+\d+.*//s;
+      return;
+  }
+
+  return $out;
 }
 
 sub AIF_modelDestroy {                                          # explizite Freigabe: setzt inneres XS-Objekt auf undef
@@ -42075,7 +42185,7 @@ to ensure that the system configuration is correct.
          If a battery device (setupBatteryDevXX) is installed, this attribute activates the battery SoC and charge management
          for this battery device. <br>
          A set of control readings is generated; the module itself does not interfere with battery control. <br>
-         The <b>Battery_OptimumTargetSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
+         The <b>Battery_OptimumBaseSoC_XX</b> reading contains the optimum minimum SoC calculated by the module. <br>
          The <b>Battery_ChargeRequest_XX</b> reading is set to '1' if the current SoC has fallen below the minimum SoC. <br>
          In this case, the battery should be reloaded, possibly with mains power. <br>
          The reading <b>Battery_ChargeUnrestricted_XX</b> contains the charging release, i.e. whether the battery should be charged at
@@ -42129,9 +42239,9 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Change limit around &lt;Reading&gt; percent (+ increase, - decrease) </td></tr>
             <tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Change limit by 50% (+ increase, - decrease)                         </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
-            <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumTargetSoC_XX) in %.              </td></tr>
+            <tr><td> <b>stepSoC</b>      </td><td>Optional step size for optimal SoC calculation (Battery_OptimumBaseSoC_XX) in %.                </td></tr>
             <tr><td>                     </td><td>The specification 'stepSoC=0' deactivates the SoC management and sets                           </td></tr>
-            <tr><td>                     </td><td>Battery_OptimumTargetSoC_XX to the value 'lowSoC'.                                              </td></tr>
+            <tr><td>                     </td><td>Battery_OptimumBaseSoC_XX to the value 'lowSoC'.                                                </td></tr>
             <tr><td>                     </td><td><b>Note:</b> The relationship 'careCycle * stepSoC = 100 | 0' must be observed!                 </td></tr>
             <tr><td>                     </td><td>Value range: <b>0, 1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 5                              </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
@@ -42158,7 +42268,7 @@ to ensure that the system configuration is correct.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>loadTarget</b>   </td><td>Optional target SoC (%), target time for calculating charge release, and optimal charging power.</td></tr>
             <tr><td>                     </td><td>The specified target SoC must be greater than the value of 'lowSoC'. A higher value in the      </td></tr>
-            <tr><td>                     </td><td>reading <b>Battery_OptimumTargetSoC_XX</b> takes precedence over the parameter setting.         </td></tr>
+            <tr><td>                     </td><td>reading <b>Battery_OptimumBaseSoC_XX</b> takes precedence over the parameter setting.         </td></tr>
             <tr><td>                     </td><td>A specified target time is the full hour (1..20) or, as a negative value (-20..-1), the         </td></tr>
             <tr><td>                     </td><td>last full hour before sunset minus this value.                                                  </td></tr>
             <tr><td>                     </td><td>Syntax: <b>&lt;Target SoC&gt;[:&lt;Target time&gt;]</b>                                         </td></tr>
@@ -45267,7 +45377,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
          Sofern ein Batterie Device (setupBatteryDevXX) installiert ist, aktiviert dieses Attribut das Batterie
          SoC- und Lade-Management für dieses Batteriegerät. <br>
          Es wird ein Satz Steuerreadings erstellt; das Modul greift selbst <b>nicht</b> in die Batteriesteuerung ein. <br>
-         Das Reading <b>Battery_OptimumTargetSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
+         Das Reading <b>Battery_OptimumBaseSoC_XX</b> enthält den vom Modul berechneten optimalen Mindest-SoC. <br>
          Das Reading <b>Battery_ChargeRequest_XX</b> wird auf '1' gesetzt, wenn der aktuelle SoC unter den Mindest-SoC gefallen
          ist. <br>
          In diesem Fall sollte die Batterie, unter Umständen mit Netzstrom, nachgeladen werden. <br>
@@ -45322,8 +45432,8 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>barrierSoC=40:prc:&lt;Reading&gt;:&lt;default&gt <b>-></b> Limit um &lt;Reading&gt; Prozent ändern (+ erhöhen, - verringern) </td></tr>
             <tr><td>                     </td><td>barrierSoC=40:prc:50                             <b>-></b> Limit um 50% ändern (+ erhöhen, - verringern)                     </td></tr>
             <tr><td>                     </td><td>                                                                                                </td></tr>
-            <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumTargetSoC_XX) in %.         </td></tr>
-            <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumTargetSoC_XX  </td></tr>
+            <tr><td> <b>stepSoC</b>      </td><td>Optionale Schrittweite zur optimalen SoC-Berechnung (Battery_OptimumBaseSoC_XX) in %.           </td></tr>
+            <tr><td>                     </td><td>Mit der Angabe 'stepSoC=0' wird das SoC-Management deaktiviert und Battery_OptimumBaseSoC_XX    </td></tr>
             <tr><td>                     </td><td>auf den Wert 'lowSoC' gesetzt.                                                                  </td></tr>
             <tr><td>                     </td><td><b>Hinweis:</b> Die Beziehung 'careCycle * stepSoC = 100 | 0' muß eingehalten werden!           </td></tr>
             <tr><td>                     </td><td>Wertebereich: <b>0, 1, 2, 4, 5, 10, 20, 25, 50, 100</b>, default: 5                             </td></tr>
@@ -45351,7 +45461,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                     </td><td>                                                                                                </td></tr>
             <tr><td> <b>loadTarget</b>   </td><td>Optionaler Ziel-SoC (%), Zielzeit zur Berechnung der Ladefreigabe und optimalen Ladeleistung.   </td></tr>
             <tr><td>                     </td><td>Der angegebene Ziel-SoC muß größer als der Wert von 'lowSoC' sein. Ein höherer Wert im Reading  </td></tr>
-            <tr><td>                     </td><td><b>Battery_OptimumTargetSoC_XX</b> gegenüber der Parametervorgabe hat Vorrang.                  </td></tr>
+            <tr><td>                     </td><td><b>Battery_OptimumBaseSoC_XX</b> gegenüber der Parametervorgabe hat Vorrang.                    </td></tr>
             <tr><td>                     </td><td>Eine angegebene Zielzeit ist die volle Stunde (1..20) oder als negativer Wert (-20..-1) die     </td></tr>
             <tr><td>                     </td><td>letzte volle Stunde vor dem Sonnenuntergang abzüglich diesem Wert.                              </td></tr>
             <tr><td>                     </td><td>Syntax: <b>&lt;Ziel-SoC&gt;[:&lt;Zielzeit&gt;]</b>                                              </td></tr>
@@ -46811,6 +46921,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
         "DateTime::Format::Strptime": 0,
         "AI::DecisionTree": 0,
         "AI::FANN": 0,
+        "FFI::Platypus": 0,
         "Data::Dumper": 0
       },
       "suggests": {
