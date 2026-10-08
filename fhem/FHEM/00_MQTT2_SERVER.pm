@@ -689,18 +689,24 @@ MQTT2_SERVER_sendto($$$$$;$$)
   }
 
   my $srcCid = $src && $src->{cid} ? $src->{cid} : "";
-  foreach my $s (keys %{$dest->{subscriptions}}) {
+  my $ds = $dest->{subscriptions};
+  foreach my $s (keys %{$ds}) {
 
-    my $re = $s;
-    $re =~ s,^#$,.*,g;
-    $re =~ s,/?#,\\b.*,g;
-    $re =~ s,\+,\\b[^/]+\\b,g;
-    if($topic =~ m/^$re$/) {
+    my $re = $ds->{$s}{re};
+    if(!defined($re)) {
+      $re = $s;
+      $re =~ s,^#$,.*,g;
+      $re =~ s,/?#,\\b.*,g;
+      $re =~ s,\+,\\b[^/]+\\b,g;
+      $re = qr/^$re$/;
+      $ds->{$s}{re} = $re;
+    }
+    if($topic =~ m/$re/) {
       Log3 $server, 5, "  $dest->{NAME} $dest->{cid} => $topic:$val";
 
       my $lr = $retain ? 1 : 0;
       if($dest->{protoNum} == 5) {
-        my $sopt = $dest->{subscriptions}{$s}{opt};
+        my $sopt = $ds->{$s}{opt};
         next if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
         next if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
         $lr = 0 if(!($sopt & 0x08)); # RetainAsPublished
@@ -711,7 +717,7 @@ MQTT2_SERVER_sendto($$$$$;$$)
         } else {
           $props = "";
         }
-        my $si = $dest->{subscriptions}{$s}{prop}{subscription_identifier};
+        my $si = $ds->{$s}{prop}{subscription_identifier};
         $props .= pack("C",11).MQTT2_SERVER_makeLength($si) if(defined($si));
         $props = MQTT2_SERVER_makeLength(length($props)).$props;
 
