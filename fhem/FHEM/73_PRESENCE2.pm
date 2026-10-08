@@ -43,7 +43,7 @@ eval "use Net::Async::Ping;1"       or $missingModul .= "Net::Async::Ping ";
 eval "use List::Util qw(pairmap);1" or $missingModul .= "List::Util ";
 
 my $ModuleName = "PRESENCE2";
-my $ModuleVersion = "01.06a";
+my $ModuleVersion = "01.06b";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -296,9 +296,13 @@ sub PRESENCE2_Define($$) {
    # end initialize DEBUG LOG function
 
    if(defined($a[2]) && defined($a[3])) {
-     $attr{$name}{intervalNormal}       = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
-     $attr{$name}{intervalPresent}      = (defined($a[5]) and $a[5] =~ /^\d+$/ and $a[5] > 0) ? $a[5] : 1;
-     $hash->{INTERVAL}                  = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
+
+     if ($a[2] ne "combined-check") {
+       $attr{$name}{intervalNormal}       = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
+       $attr{$name}{intervalPresent}      = (defined($a[5]) and $a[5] =~ /^\d+$/ and $a[5] > 0) ? $a[5] : 1;
+       $hash->{INTERVAL}                  = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
+     }
+
      $hash->{TIMEOUT}                   = AttrVal($name, "nonblockingTimeOut", 60);
      $hash->{MODE}                      = $a[2];
      $hash->{ADDRESS}                   = $a[3];
@@ -336,23 +340,17 @@ sub PRESENCE2_Define($$) {
          return $msg;
        }
 
-       if ($a[3] =~ /((?:\d{1,3}\.){3}\d{1,3})/ ) {
-         $hash->{ADDRESS} = $1;
+       if ($a[4] =~ /(([0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2})|(([0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4})/ ) {
+         $hash->{MAC} = $1;
        } else {
-         my $msg = "not a valid ip: $1";
+         my $msg = "not a valid mac: $1";
          Log3 $name, 2, "$ModuleName ($name) - " . $msg;
          return $msg;
        }
 
-       if ($a[3] =~ /_/) {
-         if ($a[3] =~ /(([0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2})|(([0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4})/ ) {
-           $hash->{MAC} = $1;
-         } else {
-           my $msg = "not a valid mac: $1";
-           Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-           return $msg;
-         }
-       }
+       $attr{$name}{intervalNormal}       = (defined($a[5]) and $a[5] =~ /^\d+$/ and $a[5] > 0) ? $a[5] : 1;
+       $attr{$name}{intervalPresent}      = (defined($a[6]) and $a[6] =~ /^\d+$/ and $a[6] > 0) ? $a[6] : 1;
+       $hash->{INTERVAL}                  = (defined($a[5]) and $a[5] =~ /^\d+$/ and $a[5] > 0) ? $a[5] : 1;
 
        my $pingAttr = "disable:0,1 "
                     . "preMaxRetries "
@@ -2100,9 +2098,9 @@ The PRESENCE2 module offers several ways to check for the presence of devices su
     <code>define Something PRESENCE2 netcat 192.168.179.21:22</code><br>
 
     <br><b>Mode: combined-check</b><br>
-    <code>define &lt;name&gt; PRESENCE2 combined-check &lt;IP_address_MAC&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 combined-check &lt;IP_address|network_name MAC_address&gt;</code><br>
     <u>Example</u><br>
-    <code>define Something PRESENCE2 netcat 192.168.179.21_a1:a2:a3:a4:a5:a6</code><br>
+    <code>define Something PRESENCE2 netcat 192.168.179.21 a1:a2:a3:a4:a5:a6</code><br>
     The behavior can be influenced via the preMaxRetries and postMaxRetries attributes.<br>
 
     <br><b>Mode: function</b><br>
@@ -2616,9 +2614,9 @@ Options:
     <code>define Something PRESENCE2 netcat 192.168.179.21:22</code><br>
 
     <br><b>Modus: combined-check</b><br>
-    <code>define &lt;name&gt; PRESENCE2 combined-check &lt;IP-Adresse_MAC&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 combined-check &lt;IP-Adresse|Netzwerkname MAC-Adresse&gt;</code><br>
     <u>Beispiel</u><br>
-    <code>define Something PRESENCE2 netcat 192.168.179.21_a1:a2:a3:a4:a5:a6</code><br>
+    <code>define Something PRESENCE2 netcat 192.168.179.21 a1:a2:a3:a4:a5:a6</code><br>
     Das Verhalten kann über die Attribute preMaxRetries und postMaxRetries beeinflusst werden.<br>
 
     <br><b>Modus: function</b><br>
