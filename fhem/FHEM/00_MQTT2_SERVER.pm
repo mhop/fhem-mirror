@@ -555,14 +555,16 @@ MQTT2_SERVER_Read($@)
     $off = MQTT2_SERVER_parseProps("unsub_",$hash,$pl,$off,$dump)
              if($hash->{protoNum} == 5);
 
+    my $s = $hash->{subscriptions};
     while($off < $tlen) {
       ($subscr, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
-      delete $hash->{subscriptions}{$subscr};
+      push(@ret, defined($s->{$subscr}) ? 0 : 0x11);
+      delete($s->{$subscr});
       Log3 $sname, 4, "    topic:$subscr";
     }
 
-    if($hash->{protoNum} == 5) { # UNSUBACK: ok, no properties
-      MQTT2_SERVER_out($hash, pack("CCCn", 0xb0, 3, 0, $pid), $dump);
+    if($hash->{protoNum} == 5) { # UNSUBACK: pid, no properties, reason codes
+      MQTT2_SERVER_out($hash, pack("CCnCC*",0xb0,2+@ret,$pid,0,@ret), $dump);
     } else {
       MQTT2_SERVER_out($hash, pack("CCn", 0xb0, 2, $pid), $dump);
     }
