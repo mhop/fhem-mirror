@@ -1,5 +1,11 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  73_PRESENCE2.pm: kleinere Sachen, commandRef
+ - feature: 73_PRESENCE2.pm:
+            Modus: combined-check (nur Linux)
+            Attribute:
+            thresholdPresence, thresholdToggle
+            preMaxRetries, postMaxRetries nur im Modus: combined-check
  - feature: 98_MemSaver: DEF auch ohne Intervallangabe editierbar uva.
  - new:     98_MemSaver: Rückgabe ungenutzter Speicherblöcke (Linux) an OS
  - bugfix:  93_Log2Syslog: Fix Syntaxfehler in v5.12.8
