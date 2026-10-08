@@ -43,7 +43,7 @@ eval "use Net::Async::Ping;1"       or $missingModul .= "Net::Async::Ping ";
 eval "use List::Util qw(pairmap);1" or $missingModul .= "List::Util ";
 
 my $ModuleName = "PRESENCE2";
-my $ModuleVersion = "01.05";
+my $ModuleVersion = "01.06";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -53,11 +53,26 @@ my %LOG_Text = (
    5 => "DEBUG:"
 );
 
-sub PRESENCE2_doDaemonEntityScan($$);
-sub PRESENCE2_doDaemonCleanup();
 sub PRESENCE2_Log($$$);
 sub PRESENCE2_DebugLog($$$$;$);
 sub PRESENCE2_dbgLogInit($@);
+
+sub PRESENCE2_ProcessState($$);
+
+sub PRESENCE2_daemonScanScheduler($;$);
+sub PRESENCE2_doDaemonUnBlocking($);
+sub PRESENCE2_daemonScanReply($);
+sub PRESENCE2_daemonAbortedScan($);
+sub PRESENCE2_doDaemonEntityScan($$);
+sub PRESENCE2_doDaemonCleanup();
+
+sub PRESENCE2_doEvtSetup($);
+sub PRESENCE2_doEvtCheck($$);
+sub PRESENCE2_doEvtCheckReply($);
+
+sub PRESENCE2_net_ping($$$);
+sub PRESENCE2_net_async_ping($$);
+sub PRESENCE2_combined_check($$$);
 
 #######################################################################
 sub PRESENCE2_Log($$$)
@@ -229,20 +244,242 @@ sub PRESENCE2_dbgLogInit($@) {
 
 #######################################################################
 sub PRESENCE2_Initialize($) {
-    my ($hash) = @_;
+   my ($hash) = @_;
 
-    # Provider
-    $hash->{ReadFn}   = "PRESENCE2_lanBtRead";
-    $hash->{ReadyFn}  = "PRESENCE2_lanBtReady";
-    $hash->{SetFn}    = "PRESENCE2_Set";
-    $hash->{RenameFn} = "PRESENCE2_Rename";
-    $hash->{GetFn}    = "PRESENCE2_Get";
-    $hash->{DefFn}    = "PRESENCE2_Define";
-    $hash->{NotifyFn} = "PRESENCE2_Notify";
-    $hash->{UndefFn}  = "PRESENCE2_Undef";
-    $hash->{AttrFn}   = "PRESENCE2_Attr";
-    $hash->{AttrList} = "disable:0,1 "
+   # Provider
+   $hash->{ReadFn}   = "PRESENCE2_lanBtRead";
+   $hash->{ReadyFn}  = "PRESENCE2_lanBtReady";
+   $hash->{SetFn}    = "PRESENCE2_Set";
+   $hash->{RenameFn} = "PRESENCE2_Rename";
+   $hash->{GetFn}    = "PRESENCE2_Get";
+   $hash->{DefFn}    = "PRESENCE2_Define";
+   $hash->{NotifyFn} = "PRESENCE2_Notify";
+   $hash->{UndefFn}  = "PRESENCE2_Undef";
+   $hash->{AttrFn}   = "PRESENCE2_Attr";
+   $hash->{AttrList} = "disable:0,1 "
+                     . "thresholdAbsence "
+                     . "thresholdPresence "
+                     . "thresholdToggle "
+                     . "intervalNormal "
+                     . "intervalPresent "
+                     . "powerCmd "
+                     . "prGroup:multiple,static,dynamic "
+                     . "prGroupDisp:condense,verbose "
+                     . "FhemLog3Std:0,1 "
+                     . $readingFnAttributes;
+}
+
+#######################################################################
+sub PRESENCE2_Rename($$$) {
+   my ($name, $oldName) = @_;
+   my $dN = PRESENCE2_getDaemonName();
+
+   return if(!defined $dN);
+
+   PRESENCE2_doDaemonCleanup();
+}
+
+#######################################################################
+sub PRESENCE2_Define($$) {
+   my ($hash, $def) = @_;
+   my @a = split("[ \t]+", $def);
+   my $username =  getlogin || getpwuid($<) || "[unknown]";
+   my $name = $hash->{NAME};
+
+   $hash->{NOTIFYDEV} = "global";
+   $hash->{NAME}    = $name;
+   $hash->{VERSION} = $ModuleVersion;
+
+   # initialize DEBUG LOG function
+   $hash->{helper}{FhemLog3Std}  = AttrVal($name, "FhemLog3Std", 0);
+   PRESENCE2_dbgLogInit($hash, "init", "verbose", AttrVal($name, "verbose", -1));
+   # end initialize DEBUG LOG function
+
+   if(defined($a[2]) && defined($a[3])) {
+     $attr{$name}{intervalNormal}       = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
+     $attr{$name}{intervalPresent}      = (defined($a[5]) and $a[5] =~ /^\d+$/ and $a[5] > 0) ? $a[5] : 1;
+     $hash->{INTERVAL}                  = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
+     $hash->{TIMEOUT}                   = AttrVal($name, "nonblockingTimeOut", 60);
+     $hash->{MODE}                      = $a[2];
+     $hash->{ADDRESS}                   = $a[3];
+     $hash->{MAC}                       = "";
+     $hash->{MISSING_MODUL}             = $missingModul;
+     $hash->{helper}{treshHold}         = "init";
+     $hash->{helper}{curState}          = "init";
+     $hash->{helper}{active}            = 1;
+     $hash->{helper}{maybe}             = 0;
+     $hash->{helper}{cnt}{th}           = 0;
+     $hash->{helper}{cnt}{toggle}       = 0;
+     $hash->{helper}{cnt}{maybe}        = 0;
+     $hash->{helper}{cnt}{state}        = 0;
+     $hash->{helper}{cnt}{exec}         = 0;
+     $hash->{helper}{nextScan}          = 0;
+     $hash->{helper}{interval}{present} = 1;
+     $hash->{helper}{interval}{absent}  = 1;
+     $hash->{helper}{interval}{init}    = 30;
+     $hash->{helper}{DISABLED}          = 0;
+     $hash->{helper}{disp}{condense}    = 1;
+     $hash->{helper}{disp}{verbose}     = 0;
+     $hash->{helper}{updateConfig}      = $name . ".Initialize";
+
+     Log3 $name, 3, "$ModuleName ($name) - 'missingModul: $missingModul" if($missingModul ne "");
+
+     $hash->{helper}{Ping}           = ($missingModul !~ /Net::Ping/) ? 1 : 0;
+     $hash->{helper}{IO_Async_Loop}  = ($missingModul !~ /IO::Async::Loop/) ? 1 : 0;
+     $hash->{helper}{Net_Async_Ping} = ($missingModul !~ /Net::Async::Ping/) ? 1 : 0;
+     $hash->{helper}{List_Util}      = ($missingModul !~ /List::Util/) ? 1 : 0;
+
+     if ($a[2] eq "combined-check") {
+       if ($^O !~ m/linux/) {
+         my $msg = "combined-check is only supported by linux";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+
+       if ($a[3] =~ /((?:\d{1,3}\.){3}\d{1,3})/ ) {
+         $hash->{ADDRESS} = $1;
+       } else {
+         my $msg = "not a valid ip: $1";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+
+       if ($a[3] =~ /_/) {
+         if ($a[3] =~ /(([0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2})|(([0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4})/ ) {
+           $hash->{MAC} = $1;
+         } else {
+           my $msg = "not a valid mac: $1";
+           Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+           return $msg;
+         }
+       }
+
+       my $pingAttr = "disable:0,1 "
+                    . "preMaxRetries "
+                    . "postMaxRetries "
+                    . "thresholdAbsence "
+                    . "thresholdPresence "
+                    . "thresholdToggle "
+                    . "intervalNormal "
+                    . "intervalPresent "
+                    . "powerCmd "
+                    . "prGroup:multiple,static,dynamic "
+                    . "prGroupDisp:condense,verbose "
+                    . "FhemLog3Std:0,1 "
+                    . $readingFnAttributes;
+       setDevAttrList($hash->{NAME}, $pingAttr);
+
+       delete $attr{$name}{nonblockingTimeOut};
+       $hash->{MODE}               = "sub combined_check";
+       $hash->{helper}{os}{search} = "present";
+       $hash->{helper}{os}{Cmd}    = "PRESENCE2_combined_check('" .$name. "', '" . $hash->{ADDRESS}. "', '" . $hash->{MAC}. "')";
+
+     }
+     elsif ($a[2] eq "net-ping-tcp") {
+       if ($^O !~ m/linux/) {
+         my $msg = "net-ping-tcp is only supported by linux";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+       elsif (!$hash->{helper}{Ping}) {
+         my $msg = "Perl modul Net::Ping is not installed.";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+       eval {
+              my $p = Net::Ping->new('tcp', 2);
+              $p->ping($hash->{ADDRESS});
+            };
+
+       if ($@) {
+         my $msg = $@;
+         $msg =~ s/at \/.*\/73_PRESENCE2.pm line.*//gs;
+         $msg = "Perl modul Net::Ping - $msg";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+
+       # using default attributes
+
+       delete $attr{$name}{nonblockingTimeOut};
+       $hash->{MODE}               = "sub net-ping:tcp";
+       $hash->{helper}{os}{search} = "present";
+       $hash->{helper}{os}{Cmd}    = "PRESENCE2_net_ping('" .$name. "', '" . $hash->{ADDRESS}. "', 'tcp')";
+
+     }
+     elsif ($a[2] eq "net-ping-icmp") {
+       if ($^O !~ m/linux/) {
+         my $msg = "net-ping-icmp is only supported by linux";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+       elsif (!$hash->{helper}{Ping}) {
+         my $msg = "Perl modul Net::Ping is not installed.";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+
+       eval {
+             my $p = Net::Ping->new('icmp', 2);
+             $p->ping($hash->{ADDRESS});
+            };
+
+       if ($@) {
+         my $msg = $@;
+         $msg =~ s/at \/.*\/73_PRESENCE2.pm line.*//gs;
+         $msg = "Perl modul Net::Ping - $msg";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+
+       # using default attributes
+
+       delete $attr{$name}{nonblockingTimeOut};
+       $hash->{MODE} = "sub net-ping:icmp";
+       $hash->{helper}{os}{search} = "present";
+       $hash->{helper}{os}{Cmd}    = "PRESENCE2_net_ping('" .$name. "', '" . $hash->{ADDRESS}. "', 'icmp')";
+     }
+     elsif ($a[2] eq "net-ping-async") {
+       if ($^O !~ m/linux/) {
+         my $msg = "net-async-ping is only supported by linux";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+       elsif (!$hash->{helper}{IO_Async_Loop}) {
+         my $msg = "Perl modul IO::Async::Loop is not installed.";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+       elsif (!$hash->{helper}{Net_Async_Ping}) {
+         my $msg = "Perl modul Net::Async::Ping is not installed.";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
+
+       # using default attributes
+
+       delete $attr{$name}{nonblockingTimeOut};
+       $hash->{MODE} = "sub net-ping-async";
+       $hash->{helper}{os}{search} = "present";
+       $hash->{helper}{os}{Cmd}    = "PRESENCE2_net_async_ping('" .$name. "', '" . $hash->{ADDRESS}. "')";
+     }
+     elsif ($a[2] eq "lan-ping") {
+       delete $attr{$name}{nonblockingTimeOut};
+       $hash->{helper}{os}{Cmd} = ($^O =~ m/(Win|cygwin)/) ? "ping -n 1 -4 $hash->{ADDRESS}"
+                                :($^O =~ m/solaris/)      ? "ping $hash->{ADDRESS} 4"
+                                :                           "ping -c 1 -w 1 $hash->{ADDRESS} 2>&1"
+                                ;
+ 
+       $hash->{helper}{os}{search} = $^O =~ m/solaris/? 'is alive'
+                                   :                   '(ttl|TTL)=\d+'
+                                   ;
+
+       if ($^O !~ m/solaris/ && $^O !~ m/(Win|cygwin)/) {
+         my $pingAttr = "disable:0,1 "
+                      . "pingParam "
                       . "thresholdAbsence "
+                      . "thresholdPresence "
+                      . "thresholdToggle "
                       . "intervalNormal "
                       . "intervalPresent "
                       . "powerCmd "
@@ -250,347 +487,195 @@ sub PRESENCE2_Initialize($) {
                       . "prGroupDisp:condense,verbose "
                       . "FhemLog3Std:0,1 "
                       . $readingFnAttributes;
-}
+         setDevAttrList($hash->{NAME}, $pingAttr);
+       }
 
-#######################################################################
-sub PRESENCE2_Rename($$$) {
-    my ($name, $oldName) = @_;
-    my $dN = PRESENCE2_getDaemonName();
-    return if(!defined $dN);
-    PRESENCE2_doDaemonCleanup();
-}
+     }
+     elsif ($a[2] eq "netcat") {
+       delete $attr{$name}{nonblockingTimeOut};
+       my ($Address, $Port) = split(/:/, $hash->{ADDRESS});
 
-#######################################################################
-sub PRESENCE2_Define($$) {
-    my ($hash, $def) = @_;
-    my @a = split("[ \t]+", $def);
-    my $username =  getlogin || getpwuid($<) || "[unknown]";
-    my $name = $hash->{NAME};
+       $hash->{helper}{os}{Cmd} = "nc -vz $Address $Port 2>&1";
 
-    $hash->{NOTIFYDEV} = "global";
-    $hash->{NAME}    = $name;
-    $hash->{VERSION} = $ModuleVersion;
+       $hash->{helper}{os}{search} = 'succeeded';
 
-    # initialize DEBUG LOG function
-    $hash->{helper}{FhemLog3Std}  = AttrVal($name, "FhemLog3Std", 0);
-    PRESENCE2_dbgLogInit($hash, "init", "verbose", AttrVal($name, "verbose", -1));
-    # end initialize DEBUG LOG function
-
-    if(defined($a[2]) and defined($a[3])) {
-        $attr{$name}{intervalNormal}       = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
-        $attr{$name}{intervalPresent}      = (defined($a[5]) and $a[5] =~ /^\d+$/ and $a[5] > 0) ? $a[5] : 1;
-        $hash->{INTERVAL}                  = (defined($a[4]) and $a[4] =~ /^\d+$/ and $a[4] > 0) ? $a[4] : 1;
-        $hash->{TIMEOUT}                   = AttrVal($name, "nonblockingTimeOut", 60);
-        $hash->{MODE}                      = $a[2];
-        $hash->{ADDRESS}                   = $a[3];
-        $hash->{MISSING_MODUL}             = $missingModul;
-        $hash->{helper}{active}            = 1;
-        $hash->{helper}{maybe}             = 0;
-        $hash->{helper}{cnt}{th}           = 0;
-        $hash->{helper}{cnt}{maybe}        = 0;
-        $hash->{helper}{cnt}{state}        = 0;
-        $hash->{helper}{cnt}{exec}         = 0;
-        $hash->{helper}{nextScan}          = 0;
-        $hash->{helper}{interval}{present} = 1;
-        $hash->{helper}{interval}{absent}  = 1;
-        $hash->{helper}{interval}{init}    = 30;
-        $hash->{helper}{curState}          = "init";
-        $hash->{helper}{DISABLED}          = 0;
-        $hash->{helper}{disp}{condense}    = 1;
-        $hash->{helper}{disp}{verbose}     = 0;
-        $hash->{helper}{updateConfig}      = $name . ".Initialize";
-
-        Log3 $name, 3, "$ModuleName ($name) - 'missingModul: $missingModul" if($missingModul ne "");
-
-        $hash->{helper}{Ping}           = ($missingModul !~ /Net::Ping/) ? 1 : 0;
-        $hash->{helper}{IO_Async_Loop}  = ($missingModul !~ /IO::Async::Loop/) ? 1 : 0;
-        $hash->{helper}{Net_Async_Ping} = ($missingModul !~ /Net::Async::Ping/) ? 1 : 0;
-        $hash->{helper}{List_Util}      = ($missingModul !~ /List::Util/) ? 1 : 0;
-
-        if    ($a[2] eq "net-ping-tcp") {
-            if ($^O !~ m/linux/) {
-              my $msg = "net-ping-tcp is only supported by linux";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-            elsif (!$hash->{helper}{Ping}) {
-              my $msg = "Perl modul Net::Ping is not installed.";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-            eval {
-              my $p = Net::Ping->new('tcp', 2);
-              $p->ping($hash->{ADDRESS});
-            };
-
-            if ($@) {
-              my $msg = $@;
-              $msg =~ s/at \/.*\/73_PRESENCE2.pm line.*//gs;
-              $msg = "Perl modul Net::Ping - $msg";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-
-            delete $attr{$name}{nonblockingTimeOut};
-            $hash->{MODE} = "sub net-ping:tcp";
-            $hash->{helper}{os}{search} = "present";
-            $hash->{helper}{os}{Cmd} = "PRESENCE2_net_ping('" .$name. "', '" . $hash->{ADDRESS}. "', 'tcp')";
-        }
-        elsif ($a[2] eq "net-ping-icmp") {
-            if ($^O !~ m/linux/) {
-              my $msg = "net-ping-icmp is only supported by linux";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-            elsif (!$hash->{helper}{Ping}) {
-              my $msg = "Perl modul Net::Ping is not installed.";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-
-            eval {
-              my $p = Net::Ping->new('icmp', 2);
-              $p->ping($hash->{ADDRESS});
-            };
-
-            if ($@) {
-              my $msg = $@;
-              $msg =~ s/at \/.*\/73_PRESENCE2.pm line.*//gs;
-              $msg = "Perl modul Net::Ping - $msg";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-
-            delete $attr{$name}{nonblockingTimeOut};
-            $hash->{MODE} = "sub net-ping:icmp";
-            $hash->{helper}{os}{search} = "present";
-            $hash->{helper}{os}{Cmd} = "PRESENCE2_net_ping('" .$name. "', '" . $hash->{ADDRESS}. "', 'icmp')";
-        }
-        elsif ($a[2] eq "net-ping-async") {
-            if ($^O !~ m/linux/) {
-              my $msg = "net-async-ping is only supported by linux";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-            elsif (!$hash->{helper}{IO_Async_Loop}) {
-              my $msg = "Perl modul IO::Async::Loop is not installed.";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-            elsif (!$hash->{helper}{Net_Async_Ping}) {
-              my $msg = "Perl modul Net::Async::Ping is not installed.";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-            delete $attr{$name}{nonblockingTimeOut};
-            $hash->{MODE} = "sub net-ping-async";
-            $hash->{helper}{os}{search} = "present";
-            $hash->{helper}{os}{Cmd} = "PRESENCE2_net_async_ping('" .$name. "', '" . $hash->{ADDRESS}. "')";
-        }
-        elsif ($a[2] eq "lan-ping") {
-            delete $attr{$name}{nonblockingTimeOut};
-            $hash->{helper}{os}{Cmd} = ($^O =~ m/(Win|cygwin)/) ? "ping -n 1 -4 $hash->{ADDRESS}"
-                                      :($^O =~ m/solaris/)      ? "ping $hash->{ADDRESS} 4"
-                                      :                           "ping -c 1 -w 1 $hash->{ADDRESS} 2>&1"
-                                      ;
-
-            $hash->{helper}{os}{search} = $^O =~ m/solaris/? 'is alive'
-                                         :                   '(ttl|TTL)=\d+'
-                                         ;
-
-            if ($^O !~ m/solaris/ && $^O !~ m/(Win|cygwin)/) {
-              my $pingAttr = "disable:0,1 "
-                        . "pingParam "
-                        . "thresholdAbsence "
-                        . "intervalNormal "
-                        . "intervalPresent "
-                        . "powerCmd "
-                        . "prGroup:multiple,static,dynamic "
-                        . "prGroupDisp:condense,verbose "
-                        . "FhemLog3Std:0,1 "
-                        . $readingFnAttributes;
-              setDevAttrList($hash->{NAME}, $pingAttr);
-            }
-
-        }
-        elsif ($a[2] eq "netcat") {
-            delete $attr{$name}{nonblockingTimeOut};
-            my ($Address, $Port) = split(/:/, $hash->{ADDRESS});
-
-            # return "$Address is not a valid IP address" if ($Address !~ m/^\s*([0-9]{1,3}\.){3}[0-9]{1,3}\s*$/);
-
-            $hash->{helper}{os}{Cmd} = "nc -vz $Address $Port 2>&1";
-
-            $hash->{helper}{os}{search} = 'succeeded';
-
-            if ($^O !~ m/solaris/ && $^O !~ m/(Win|cygwin)/) {
-              my $pingAttr = "disable:0,1 "
-                        . "thresholdAbsence "
-                        . "intervalNormal "
-                        . "intervalPresent "
-                        . "powerCmd "
-                        . "prGroup:multiple,static,dynamic "
-                        . "prGroupDisp:condense,verbose "
-                        . "FhemLog3Std:0,1 "
-                        . $readingFnAttributes;
-              setDevAttrList($hash->{NAME}, $pingAttr);
-            }
-
-        }
-        elsif ($a[2] eq "lan-bluetooth") {
-            delete $attr{$name}{nonblockingTimeOut};
-            DevIo_CloseDev($hash);# {DevIo_CloseDev($dev{prBtTest })}
-
-            $attr{$name}{intervalNormal}   = 30;
-            $attr{$name}{intervalPresent}  = 30;
-            my ($dev,$port) = split(":",$a[4].":5222");
-            return "$dev is not a valid IP address" if ($dev !~ m/^\s*([0-9]{1,3}\.){3}[0-9]{1,3}\s*$/);
-            $hash->{DeviceName} = "$dev:$port";
-        }
-        elsif ($a[2] eq "bluetooth") {
-
-            my $hciDev = qx(hcitool dev);
- 
-            delete $attr{$name}{nonblockingTimeOut};
-
-            if ($^O !~ m/linux/) {
-              my $msg = "local bluetooth is only supported by linux";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-
-            my $hcitool = qx(which hcitool);
-            Log3 $name, 5, "$ModuleName ($name) - 'which hcitool' returns: $hcitool";
-            chomp $hcitool;
-
-            unless(-x $hcitool) {
-              my $msg = "no hcitool binary found. Please check that the bluez package is properly installed";
-              Log3 $name, 2, "$ModuleName ($name) - " . $msg;
-              return $msg;
-            }
-
-            unless($a[3] =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/)
-            {
-                my $msg = "given address is not a bluetooth hardware address";
-                Log3 $name, 2, "$ModuleName ($name) - ".$msg;
-                return $msg
-            }
-
-            my $blueAttr = "disable:0,1 "
+       if ($^O !~ m/solaris/ && $^O !~ m/(Win|cygwin)/) {
+         my $pingAttr = "disable:0,1 "
                       . "thresholdAbsence "
+                      . "thresholdPresence "
+                      . "thresholdToggle "
                       . "intervalNormal "
                       . "intervalPresent "
                       . "powerCmd "
                       . "prGroup:multiple,static,dynamic "
                       . "prGroupDisp:condense,verbose "
                       . "FhemLog3Std:0,1 "
-                      . "hcitoolParam:name,info ";
+                      . $readingFnAttributes;
+         setDevAttrList($hash->{NAME}, $pingAttr);
+       }
 
-            if ($hciDev =~ /Devices:/) {
-              $hciDev =~ s/\s+/ /g;
-              $hciDev =~ s/Devices:\s//g;
-              $hciDev =~ s/(\s..:..:..:..:..:..)//g;
-              $hciDev =~ s/\s+$//g;
-              $hciDev =~ s/\s+/,/g;
-              $hash->{helper}{os}{hci} = $hciDev;
-              $blueAttr .= "bluetoothHciDevice:" . $hciDev . " ";
-            }
-            $blueAttr .= $readingFnAttributes;
-            setDevAttrList($hash->{NAME}, $blueAttr);
+     }
+     elsif ($a[2] eq "lan-bluetooth") {
+       delete $attr{$name}{nonblockingTimeOut};
+       DevIo_CloseDev($hash);# {DevIo_CloseDev($dev{prBtTest })}
 
-            $hash->{helper}{os}{bluetoothHciDevice} = AttrVal($name, "bluetoothHciDevice", "");
-            $hash->{helper}{os}{hcitoolParam} = AttrVal($name, "hcitoolParam", "name");
+       $attr{$name}{intervalNormal}   = 30;
+       $attr{$name}{intervalPresent}  = 30;
 
-            $hash->{helper}{os}{Cmd}  = "hcitool";
-            $hash->{helper}{os}{Cmd} .= " -i " . $hash->{helper}{os}{bluetoothHciDevice} if $hash->{helper}{os}{bluetoothHciDevice} ne "";
+       my ($dev,$port) = split(":",$a[4].":5222");
+       return "$dev is not a valid IP address" if ($dev !~ m/^\s*([0-9]{1,3}\.){3}[0-9]{1,3}\s*$/);
+       $hash->{DeviceName} = "$dev:$port";
+     }
+     elsif ($a[2] eq "bluetooth") {
 
-            $hash->{helper}{os}{Cmd} .= ' ' . $hash->{helper}{os}{hcitoolParam} . ' ' . $hash->{ADDRESS} . ' 2>/dev/null';
-            if ($hash->{helper}{os}{hcitoolParam} eq "name") {
-              $hash->{helper}{os}{search} = '[A-Za-z0-9]+';
-            } else {
-              $hash->{helper}{os}{search} = '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}';
-            }
-        }
-        elsif ($a[2] =~ /(shellscript|function)/) {
-            delete $attr{$name}{nonblockingTimeOut};
-            if($def =~ /[ \t]+cmd:(.*?)[ \t]+scan:(.*)[ \t]*$/s) {
-                $hash->{helper}{os}{Cmd} = $1;
-                $hash->{helper}{os}{search} = $2;
+       my $hciDev = qx(hcitool dev);
+ 
+       delete $attr{$name}{nonblockingTimeOut};
 
-                delete $hash->{helper}{ADDRESS};
-                delete $hash->{ADDRESS};
+       if ($^O !~ m/linux/) {
+         my $msg = "local bluetooth is only supported by linux";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
 
-                if($hash->{helper}{os}{Cmd} =~ /\|/) {
-                    my $msg = "The command contains a pipe ( | ) symbol, which is not allowed.";
-                    Log3 $name, 2, "$ModuleName ($name) - ".$msg;
-                    return $msg;
-                }
-            }
-            return "define $name failed. Please enter command and parse string" if(  !defined $hash->{helper}{os}{Cmd}    || $hash->{helper}{os}{Cmd}    eq ""
-                                                                                  || !defined $hash->{helper}{os}{search} || $hash->{helper}{os}{search} eq ""
-                                                                                  );
-        }
-        elsif ($a[2] eq "daemon") {
-            return "only one daemon allowed" if(PRESENCE2_getDaemonName() ne $name);
-            delete $attr{$name}{intervalPresent};
-            delete $attr{$name}{thresholdAbsence};
-            delete $attr{$name}{bluetoothHciDevice};
-            delete $attr{$name}{hcitoolParam};
-            $hash->{helper}{interval}{absent}  = 30;
-            $hash->{helper}{interval}{present} = 30;
+       my $hcitool = qx(which hcitool);
+       Log3 $name, 5, "$ModuleName ($name) - 'which hcitool' returns: $hcitool";
+       chomp $hcitool;
 
-            my $daemonAttr = "disable:0,1 "
-                        . "intervalNormal "
-                        . "nonblockingTimeOut "
-                        . "prGroup:multiple,static,dynamic "
-                        . "prGroupDisp:condense,verbose "
-                        . "FhemLog3Std:0,1 "
-                        . $readingFnAttributes;
-            setDevAttrList($hash->{NAME}, $daemonAttr);
+       unless(-x $hcitool) {
+         my $msg = "no hcitool binary found. Please check that the bluez package is properly installed";
+         Log3 $name, 2, "$ModuleName ($name) - " . $msg;
+         return $msg;
+       }
 
-            foreach (keys %{ $hash->{READINGS} }) {
-              readingsDelete($hash, $_) if $_ =~ /^pGrp__total/ && defined $hash->{READINGS}{$_}{VAL};
-            }
-        }
-        else {
-            my $msg  = "unknown mode \"".$a[2]."\" in define statement. Please use:";
-               $msg -= "lan-ping, netcat, daemon, shellscript, function, bluetooth,";
-               $msg -= " lan-bluetooth, net-ping-icmp, net-ping-tcp, net-ping-async";
-            Log3 $name, 2, "$ModuleName ($name) - ".$msg;
-            return $msg
-        }
-    }
-    else {
-        my $msg = "wrong syntax for define statement: define <name> PRESENCE2 <mode> <device-address> ";
-        Log3 $name, 2, "$ModuleName ($name) - $msg";
-        return $msg;
-    }
+       unless($a[3] =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/) {
+         my $msg = "given address is not a bluetooth hardware address";
+         Log3 $name, 2, "$ModuleName ($name) - ".$msg;
+         return $msg
+       }
 
-    delete($hash->{helper}{cachednr});
+       my $blueAttr = "disable:0,1 "
+                    . "thresholdAbsence "
+                    . "thresholdPresence "
+                    . "thresholdToggle "
+                    . "intervalNormal "
+                    . "intervalPresent "
+                    . "powerCmd "
+                    . "prGroup:multiple,static,dynamic "
+                    . "prGroupDisp:condense,verbose "
+                    . "FhemLog3Std:0,1 "
+                    . "hcitoolParam:name,info ";
 
-    readingsSingleUpdate($hash, "model", $hash->{MODE}, 0);
+       if ($hciDev =~ /Devices:/) {
+         $hciDev =~ s/\s+/ /g;
+         $hciDev =~ s/Devices:\s//g;
+         $hciDev =~ s/(\s..:..:..:..:..:..)//g;
+         $hciDev =~ s/\s+$//g;
+         $hciDev =~ s/\s+/,/g;
+         $hash->{helper}{os}{hci} = $hciDev;
+         $blueAttr .= "bluetoothHciDevice:" . $hciDev . " ";
+       } 
 
-    if ($init_done) {
-       RemoveInternalTimer("PRESENCE2_updateConfig");
-       InternalTimer(2,"PRESENCE2_updateConfig", $hash->{helper}{updateConfig});
-    }
+       $blueAttr .= $readingFnAttributes;
+       setDevAttrList($hash->{NAME}, $blueAttr);
 
-    PRESENCE2_Log $name, 2, "define done";
+       $hash->{helper}{os}{bluetoothHciDevice} = AttrVal($name, "bluetoothHciDevice", "");
+       $hash->{helper}{os}{hcitoolParam} = AttrVal($name, "hcitoolParam", "name");
 
-    return undef;
+       $hash->{helper}{os}{Cmd}  = "hcitool";
+       $hash->{helper}{os}{Cmd} .= " -i " . $hash->{helper}{os}{bluetoothHciDevice} if $hash->{helper}{os}{bluetoothHciDevice} ne "";
+
+       $hash->{helper}{os}{Cmd} .= ' ' . $hash->{helper}{os}{hcitoolParam} . ' ' . $hash->{ADDRESS} . ' 2>/dev/null';
+
+       if ($hash->{helper}{os}{hcitoolParam} eq "name") {
+         $hash->{helper}{os}{search} = '[A-Za-z0-9]+';
+       } else {
+         $hash->{helper}{os}{search} = '([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}';
+       }
+     }
+     elsif ($a[2] =~ /(shellscript|function)/) {
+       delete $attr{$name}{nonblockingTimeOut};
+       if($def =~ /[ \t]+cmd:(.*?)[ \t]+scan:(.*)[ \t]*$/s) {
+         $hash->{helper}{os}{Cmd} = $1;
+         $hash->{helper}{os}{search} = $2;
+
+         delete $hash->{helper}{ADDRESS};
+         delete $hash->{ADDRESS};
+
+         if($hash->{helper}{os}{Cmd} =~ /\|/) {
+           my $msg = "The command contains a pipe ( | ) symbol, which is not allowed.";
+           Log3 $name, 2, "$ModuleName ($name) - ".$msg;
+           return $msg;
+         }
+       }
+       return "define $name failed. Please enter command and parse string" if(  !defined $hash->{helper}{os}{Cmd}    || $hash->{helper}{os}{Cmd}    eq ""
+                                                                             || !defined $hash->{helper}{os}{search} || $hash->{helper}{os}{search} eq ""
+                                                                             );
+     }
+     elsif ($a[2] eq "daemon") {
+       return "only one daemon allowed" if(PRESENCE2_getDaemonName() ne $name);
+       delete $attr{$name}{intervalPresent};
+       delete $attr{$name}{thresholdAbsence};
+       delete $attr{$name}{thresholdPresence};
+       delete $attr{$name}{thresholdToggle};
+       delete $attr{$name}{bluetoothHciDevice};
+       delete $attr{$name}{hcitoolParam};
+       $hash->{helper}{interval}{absent}  = 30;
+       $hash->{helper}{interval}{present} = 30;
+
+       my $daemonAttr = "disable:0,1 "
+                      . "intervalNormal "
+                      . "nonblockingTimeOut "
+                      . "prGroup:multiple,static,dynamic "
+                      . "prGroupDisp:condense,verbose "
+                      . "FhemLog3Std:0,1 "
+                      . $readingFnAttributes;
+       setDevAttrList($hash->{NAME}, $daemonAttr);
+
+       foreach (keys %{ $hash->{READINGS} }) {
+         readingsDelete($hash, $_) if $_ =~ /^pGrp__total/ && defined $hash->{READINGS}{$_}{VAL};
+       }
+     }
+     else {
+       my $msg  = "unknown mode \"".$a[2]."\" in define statement. Please use:";
+          $msg -= "lan-ping, netcat, daemon, shellscript, function, bluetooth,";
+          $msg -= " lan-bluetooth, net-ping-icmp, net-ping-tcp, net-ping-async, combined-check";
+       Log3 $name, 2, "$ModuleName ($name) - ".$msg;
+       return $msg
+     }
+     readingsSingleUpdate($hash, "state", "init", 0);
+   }
+   else {
+     my $msg = "wrong syntax for define statement: define <name> PRESENCE2 <mode> <device-address> ";
+     Log3 $name, 2, "$ModuleName ($name) - $msg";
+     return $msg;
+   }
+
+   delete($hash->{helper}{cachednr});
+
+   readingsSingleUpdate($hash, "model", $hash->{MODE}, 0);
+
+   if ($init_done) {
+     RemoveInternalTimer("PRESENCE2_updateConfig");
+     InternalTimer(2,"PRESENCE2_updateConfig", $hash->{helper}{updateConfig});
+   }
+
+   PRESENCE2_Log $name, 2, "define done";
+
+   return undef;
 }
 
 #######################################################################
 sub PRESENCE2_Undef($$) {
-    my ($hash, $arg) = @_;
+   my ($hash, $arg) = @_;
 
-    if ($hash->{MODE} eq "daemon" && PRESENCE2_getAllEntities()){
-        return "deletion of daemon not possible unless objects still present";
-    }
-    BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
+   if ($hash->{MODE} eq "daemon" && PRESENCE2_getAllEntities()){
+     return "deletion of daemon not possible unless objects still present";
+   }
+   BlockingKill($hash->{helper}{RUNNING_PID}) if(defined($hash->{helper}{RUNNING_PID}));
 
-    RemoveInternalTimer($hash);
-    DevIo_CloseDev($hash);
+   RemoveInternalTimer($hash);
+   DevIo_CloseDev($hash);
 }
 
 #####################################
@@ -652,34 +737,34 @@ sub PRESENCE2_updateConfig($){
 
 #####################################
 sub PRESENCE2_Notify($$) {
-    my ($hash, $dev) = @_;
+   my ($hash, $dev) = @_;
 
-    return undef if(!defined $hash || !defined $hash->{NAME} || !defined $hash->{MODE} || $hash->{MODE} ne "daemon"
-                 || !defined $dev  || !defined $dev->{NAME}  || $dev->{NAME}  ne "global" );
+   return undef if(!defined $hash || !defined $hash->{NAME} || !defined $hash->{MODE} || $hash->{MODE} ne "daemon"
+                || !defined $dev  || !defined $dev->{NAME}  || $dev->{NAME}  ne "global" );
 
-    my $events = deviceEvents($dev, 1);
-    my $name = $hash->{NAME};
+   my $events = deviceEvents($dev, 1);
+   my $name = $hash->{NAME};
 
-    return "" if(IsDisabled($name)); # Return without any further action if the module is disabled
+   return "" if(IsDisabled($name)); # Return without any further action if the module is disabled
 
-    if($dev->{NAME} eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
-    {
+   if($dev->{NAME} eq "global" && grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
+   {
 
-       PRESENCE2_Log $name, 2, "starting initial Config ";
+     PRESENCE2_Log $name, 2, "starting initial Config ";
 
-       # initialize DEBUG LOG function
-       PRESENCE2_Log $name, 2, "starting initial dbgLogInit";
-       PRESENCE2_dbgLogInit($hash, "init", "verbose", AttrVal($name, "verbose", -1));
-       # end initialize DEBUG LOG function
+     # initialize DEBUG LOG function
+     PRESENCE2_Log $name, 2, "starting initial dbgLogInit";
+     PRESENCE2_dbgLogInit($hash, "init", "verbose", AttrVal($name, "verbose", -1));
+     # end initialize DEBUG LOG function
 
-       PRESENCE2_Log $name, 2, "starting initial updateConfig " . $hash->{helper}{updateConfig};
-       RemoveInternalTimer("PRESENCE2_updateConfig");
-       PRESENCE2_updateConfig ($hash->{helper}{updateConfig});
-    }
+     PRESENCE2_Log $name, 2, "starting initial updateConfig " . $hash->{helper}{updateConfig};
+     RemoveInternalTimer("PRESENCE2_updateConfig");
+     PRESENCE2_updateConfig ($hash->{helper}{updateConfig});
+   }
 
-    if (grep /^(ATTR|DELETEATTR).*(presentCycle|presentReading)/,@{$events}){
-        PRESENCE2_doEvtSetup($name."#".$_) foreach(@{$events});
-    }
+   if (grep /^(ATTR|DELETEATTR).*(presentCycle|presentReading)/,@{$events}){
+     PRESENCE2_doEvtSetup($name."#".$_) foreach(@{$events});
+   }
 
 }
 
@@ -860,17 +945,19 @@ sub PRESENCE2_Get($@) {
                                 ,"ADDRESS"
                                 ,"intvNorm"
                                 ,"Pres"
-                                ,"thres"
+                                ,"thresAbs"
+                                ,"thresPre"
                                  );
                 foreach my $e (devspec2array("TYPE=PRESENCE2:FILTER=MODE!=(daemon)")){
-                    push @rets, sprintf ("%-10s %-14s %-14s %-17s %10s:%-5s %5s",
+                    push @rets, sprintf ("%-10s %-14s %-14s %-17s %10s:%-5s %5s %5s",
                                 ,AttrVal    ($e,"prGroup","default")
                                 ,InternalVal($e,"MODE"   ,"--")
                                 ,$e
                                 ,InternalVal($e,"ADDRESS","--")
-                                ,($defs{$name}{helper}{interval}{absent} > $defs{$e}{helper}{interval}{absent}  ? $defs{$name}{helper}{interval}{absent} : $defs{$e}{helper}{interval}{absent})
-                                ,($defs{$name}{helper}{interval}{absent} > $defs{$e}{helper}{interval}{present} ? $defs{$name}{helper}{interval}{absent} : $defs{$e}{helper}{interval}{present})
+                                ,($defs{$name}{helper}{interval}{present} > $defs{$e}{helper}{interval}{absent}  ? $defs{$name}{helper}{interval}{present} : $defs{$e}{helper}{interval}{absent})
+                                ,($defs{$name}{helper}{interval}{absent}  > $defs{$e}{helper}{interval}{present} ? $defs{$name}{helper}{interval}{absent}  : $defs{$e}{helper}{interval}{present})
                                 ,AttrVal($e,"thresholdAbsence","1")
+                                ,AttrVal($e,"thresholdPresence","1")
                                  );
                     ;
                 }
@@ -901,7 +988,7 @@ sub PRESENCE2_Get($@) {
                                 ,"last appear"
                                 ,"stateChng"
                                 ,"maybe"
-                                ,"thresHld"
+                                ,"thHldCnt"
                                 ,"executed"
                                  );
                 foreach my $e (devspec2array("TYPE=PRESENCE2:FILTER=MODE!=(daemon)")){
@@ -910,7 +997,7 @@ sub PRESENCE2_Get($@) {
                                 ,$e
                                 ,ReadingsVal($e,"presence","--")
                                 ,ReadingsVal($e,"lastDisappear","--")
-                                ,ReadingsVal($e,"lastAappear","--")
+                                ,ReadingsVal($e,"lastAppear","--")
                                 ,ReadingsVal($e,"appearCnt","0")
                                 ,ReadingsVal($e,"maybeCnt","0")
                                 ,ReadingsVal($e,"thresHldCnt","0")
@@ -998,9 +1085,29 @@ sub PRESENCE2_Attr(@) {
             }
         }
 
+        elsif($a[2] eq "postMaxRetries") {
+            return $a[2] . " not used by daemon"                  if($hash->{MODE} eq "daemon");
+            return $a[2] . " must be a valid integer number >= 1" if($a[3] !~ /^[1-9][0-9]*$/) ;
+        }
+
+        elsif($a[2] eq "preMaxRetries") {
+            return $a[2] . " not used by daemon"                  if($hash->{MODE} eq "daemon");
+            return $a[2] . " must be a valid integer number >= 1" if($a[3] !~ /^[1-9][0-9]*$/) ;
+        }
+
         elsif($a[2] eq "thresholdAbsence") {
-            return $a[2] . " must be a valid integer number" if($a[3] !~ /^\d+$/) ;
-            return $a[2] . " not used by daemon"             if($hash->{MODE} eq "daemon");
+            return $a[2] . " not used by daemon"                  if($hash->{MODE} eq "daemon");
+            return $a[2] . " must be a valid integer number >= 1" if($a[3] !~ /^[1-9][0-9]*$/) ;
+        }
+
+        elsif($a[2] eq "thresholdPresence") {
+            return $a[2] . " not used by daemon"                  if($hash->{MODE} eq "daemon");
+            return $a[2] . " must be a valid integer number >= 1" if($a[3] !~ /^[1-9][0-9]*$/) ;
+        }
+
+        elsif($a[2] eq "thresholdToggle") {
+            return $a[2] . " not used by daemon"                  if($hash->{MODE} eq "daemon");
+            return $a[2] . " must be a valid integer number >= 0" if($a[3] !~ /^[0-9][0-9]*$/) ;
         }
 
         elsif($a[2] =~ m/^interval(Normal|Present|nonblockingTimeOut)$/) {
@@ -1085,7 +1192,7 @@ sub PRESENCE2_Attr(@) {
 
             if($powerOnFn eq "")
             {
-                return "powerCmd contains no value";
+              return "powerCmd contains no value";
             }
         }
 
@@ -1262,13 +1369,18 @@ sub PRESENCE2_lanBtRead($) {
         PRESENCE2_Log $name, 5, "received data: $line";
 
         if($line =~ /^(absence|absent|present)(;*)(.*)/ && !$hash->{helper}{DISABLED}){
-            my ($state,undef,$data) = ($1,$2,$3);
-            PRESENCE2_Log $name, 4 , "status info:$state";
-            $state = "absent" if($state eq "absence");
-            PRESENCE2_ProcessState($hash, $state);
+            my ($actState, undef, $data) = ($1, $2, $3);
+            PRESENCE2_Log $name, 4 , "status info:$actState";
+            $actState = "absent" if($actState eq "absence");
+
+            if( ($actState =~ m/absent|present/) ) {
+              PRESENCE2_ProcessState($hash, $actState) if ( (ReadingsVal($name, "state", "") ne $actState ) || $hash->{helper}{maybe});
+            } else {
+              readingsBulkUpdate($hash, "state", $actState);
+            }
 
             if(defined $data){
-                if($state eq "present"){
+                if($actState eq "present"){
                     if($data =~ /^(.*);(.+)$/){# multi parameter response
                         foreach(split(";",$data)){
                             my ($read,$val) = split("=",$_,2);
@@ -1332,42 +1444,82 @@ sub PRESENCE2_lanBtProcessAddonData($$){
 }
 
 #####################################
-sub PRESENCE2_ProcessState($$) {
-    my ($hash, $state) = @_;
-    my $name = $hash->{NAME};
 
-    if ($state !~ m/absent|present/)
-    {
-        readingsBulkUpdate($hash, "state", $state);
-        return;
+sub PRESENCE2_ProcessState($$) {
+    my ($hash, $newState) = @_;
+    my $name     = $hash->{NAME};
+
+    my $actState = ReadingsVal($name, "presence", "init");
+    my $curState = ReadingsVal($name, "state", "init");
+
+    if( $hash->{helper}{curState} eq "init" ) {
+      $actState = "init";
     }
 
-    my $thresHld  = ReadingsVal($name, "state", "") eq "present" ? AttrVal($name, "thresholdAbsence", 1) : 1;
+#    PRESENCE2_Log $name, 4, "helper: $hash->{helper}{curState}, newState: $newState, actState: $actState, counter: $hash->{helper}{cnt}{exec}";
+
+    # wenn intitializing (definiert) dann ist state noch nicht gesetzt und erster Durchlauf erfolgt immer sofort.
+    my $thresHldA  = $actState ne "init" ? AttrVal($name, "thresholdAbsence" , 1) : 1;
+    my $thresHldP  = $actState ne "init" ? AttrVal($name, "thresholdPresence", 1) : 1;
+    my $thresHldT  = AttrVal($name, "thresholdToggle", 0);
+
+
+    my $PREorABS   = $newState eq "present";
+    my $HldCNT     = ($PREorABS ? $thresHldP : $thresHldA);
+    my $txtAttempt = " attempts left before going " . ($PREorABS ? "present":"absent");
+
     $hash->{helper}{cnt}{exec}++;
-    if (++$hash->{helper}{cnt}{th} >= $thresHld)
-    {
-        $hash->{helper}{cnt}{th} = 0;
-        if ($hash->{helper}{curState} ne $state){
-            PRESENCE2_Log $name, 4, "changed from $hash->{helper}{curState} to $state";
-            $hash->{helper}{timestamp}{$state} = FmtDateTime(gettimeofday());
-            readingsBulkUpdate($hash, "last".($state eq "present"?"Appear":"Disappear")   , $hash->{helper}{timestamp}{$state});
-            readingsBulkUpdate($hash, "appearCnt", ++$hash->{helper}{cnt}{state}) if ($state eq "present");
-            $hash->{helper}{curState} = $state;
-            PRESENCE2_lanBtUpdtTiming($hash);
+    $hash->{helper}{cnt}{state} = ReadingsVal($name, "appearCnt", 0) unless($hash->{helper}{cnt}{state});
+
+    # zurücksetzen Counter bei Richtungswechsel innerhalb Richtungswechsel
+    if ($hash->{helper}{treshHold} ne $newState) {
+      PRESENCE2_Log $name, 4, "toggle: $newState";
+      $hash->{helper}{treshHold} = $newState;
+      $hash->{helper}{cnt}{th}   = 0;
+      if ($hash->{helper}{maybe}) {
+        $hash->{helper}{cnt}{toggle} ++;
+        if($thresHldT < $hash->{helper}{cnt}{toggle}) {
+          readingsBulkUpdate($hash, "state", "undefined");
         }
-        readingsBulkUpdate($hash, "state"      , $state) if(!$hash->{helper}{DISABLED});
-        readingsBulkUpdate($hash, "thresHldCnt", 0     ) if($hash->{helper}{maybe});
-        $hash->{helper}{maybe} = 0;
+        readingsBulkUpdate($hash, "thresHldCnt", 0);
+        readingsBulkUpdate($hash, "thresHldTgl", $hash->{helper}{cnt}{toggle});
+      }
+    }
+	
+#    PRESENCE2_Log $name, 4, "counter: " .($PREorABS ? "present:" : "absent:"). $HldCNT;
+#    PRESENCE2_Log $name, 4, "testing: actState: $actState, newState: $newState, helper: $hash->{helper}{curState}";
+
+    if ( ++$hash->{helper}{cnt}{th} >= $HldCNT ) {
+
+      $hash->{helper}{cnt}{th} = 0;
+
+      if ($actState ne $newState) {
+        PRESENCE2_Log $name, 4, "changed: actState: $actState, newState: $newState, curState: $hash->{helper}{curState}";
+        if($hash->{helper}{curState} ne $newState) {
+          $hash->{helper}{timestamp}{$newState} = FmtDateTime(gettimeofday());
+          readingsBulkUpdate($hash, "last" . ($PREorABS? "Appear":"Disappear"), $hash->{helper}{timestamp}{$newState});
+          readingsBulkUpdate($hash, "appearCnt", ++$hash->{helper}{cnt}{state}) if($PREorABS);
+        }
+        $hash->{helper}{curState}    = $newState;
+        $hash->{helper}{cnt}{toggle} = 0;
+
+        PRESENCE2_lanBtUpdtTiming($hash);
+      }
+
+      readingsBulkUpdate($hash, "thresHldTgl", $hash->{helper}{cnt}{toggle});
+      readingsBulkUpdate($hash, "state", $newState) if(!$hash->{helper}{DISABLED});
+      readingsBulkUpdate($hash, "thresHldCnt", 0) if ($hash->{helper}{maybe});
+      $hash->{helper}{maybe} = 0;
 
     } else {
-        PRESENCE2_Log $name, 4, "device is $state after $hash->{helper}{cnt}{th} check. "
-                   .($thresHld - $hash->{helper}{cnt}{th})." attempts left before going absent";
-        readingsBulkUpdate($hash, "maybeCnt"   , ++$hash->{helper}{cnt}{maybe}) if(!$hash->{helper}{maybe});
-        readingsBulkUpdate($hash, "thresHldCnt", $hash->{helper}{cnt}{th});
-        $hash->{helper}{maybe} = 1;
+
+      PRESENCE2_Log $name, 4, "device is $newState after $hash->{helper}{cnt}{th} check. " .($HldCNT - $hash->{helper}{cnt}{th}) . $txtAttempt;
+      readingsBulkUpdate($hash, "maybeCnt"   , ++$hash->{helper}{cnt}{maybe}) if(!$hash->{helper}{maybe});
+      readingsBulkUpdate($hash, "thresHldCnt", $hash->{helper}{cnt}{th});
+      $hash->{helper}{maybe} = 1;
     }
 
-    readingsBulkUpdate($hash, "presence", ($hash->{helper}{maybe} ? "maybe ":"") . $state) if(!$hash->{helper}{DISABLED});
+    readingsBulkUpdate($hash, "presence", ($hash->{helper}{maybe} ? "maybe " : "") . $newState) if(!$hash->{helper}{DISABLED});
 }
 
 sub PRESENCE2_daemonScanScheduler($;$) {
@@ -1451,10 +1603,18 @@ sub PRESENCE2_daemonScanReply($) {
     foreach my $res (@result){
       my ($eName, $eStmp) = split('\|',$res);
       my ($eSstate, $eTime) = split('\]', $eStmp);
+
       if ($eName) {
+        PRESENCE2_Log $eName, 4, "ProcessState: $eName $eSstate " .ReadingsVal($eName, "state", "no value");
+
         readingsBeginUpdate($defs{$eName});
-        PRESENCE2_ProcessState($defs{$eName}, $eSstate);
+        if ( ($eSstate =~ m/absent|present/) ) {
+          PRESENCE2_ProcessState($defs{$eName}, $eSstate) if ((ReadingsVal($eName, "state", "") ne $eSstate) || $defs{$eName}->{helper}{maybe});
+        } else {
+          readingsBulkUpdate($defs{$eName}, "state", $eSstate);
+        }
         readingsEndUpdate($defs{$eName}, 1);
+
       }
     }
 
@@ -1768,6 +1928,110 @@ sub PRESENCE2_net_async_ping($$) {
   return $result;
 }
 
+sub PRESENCE2_combined_check($$$) {
+
+   my ($dn, $raw_ip, $raw_mac) = @_;
+   my $result = "unknown";
+
+   PRESENCE2_Log $dn, 3, "ip: $raw_ip, mac: $raw_mac";
+
+   # Konstanten für die Schleifen
+   my $PREMAXRETRIES = AttrVal($dn, "preMaxRetries", 8);
+   my $MAXRETRIES    = AttrVal($dn, "prostMaxRetries", 10);
+
+   # 2. IP-Adresse validieren / Hostname auflösen
+   my $ip = "";
+   if ($raw_ip =~ /((?:\d{1,3}\.){3}\d{1,3})/) {
+     $ip = $1;
+   }
+
+   # Wenn keine IP gefunden wurde, versuchen über 'host -4' aufzulösen
+   if ($ip eq "") {
+     eval {
+       my $host_output = `host -4 $raw_ip 2>/dev/null`;
+       if ($host_output =~ /((?:\d{1,3}\.){3}\d{1,3})/) {
+         $ip = $1;
+       }
+     };
+
+     if ($@) {
+       $result = "subError:" . $@;
+       PRESENCE2_Log $dn, 3, "host: $@";
+       return $result;
+     } 
+   }
+
+   # Falls immer noch keine gültige IP existiert, abbrechen
+   if ($ip eq "") {
+     PRESENCE2_Log $dn, 3, "subError:no valid ip";
+     return "subError:no valid ip"; 
+   }
+
+   # 3. MAC-Adresse in Kleinbuchstaben umwandeln
+   my $mac = lc($raw_mac);
+
+   # 4. Stufe 1: Schnelle Erkennung via arp-scan
+   eval {
+        my $precount = 0;
+        while ($precount < $PREMAXRETRIES) {
+          # Führt arp-scan aus und sucht nach der MAC
+          my $precheck = `sudo arp-scan -q -g $ip 2>/dev/null`;
+        
+          if ($precheck =~ /\Q\)mac\E/i) {
+            $result = "present";
+            last;
+          }
+          $precount++;
+        }
+   };
+
+   if ($@) {
+     $result = "subError:" . $@;
+     PRESENCE2_Log $dn, 3, "arp-scan: $@";
+     return $result;
+   } else {
+     return $result if ($result eq "present");
+   } 
+
+   # 5. Stufe 2: Aggressives Aufwecken via hping3
+   eval {
+        my $count = 0;
+        while ($count < $MAXRETRIES) {
+          # UDP-Pakete an Port 5353 senden (Ausgabe wird unterdrückt)
+          system("sudo hping3 -q -2 -c 10 -p 5353 -i u1 $ip >/dev/null 2>&1");
+        
+          select(undef, undef, undef, 0.2); # sleep 0.2 Sekunden
+
+          # Spezifischen ARP-Eintrag prüfen
+          my $arp_output = qx(sudo arp -an $ip 2>/dev/null);
+		
+          # Den 4. String (Spalte) herausholen, wie im originalen awk '{print \$4}'
+          # Und prüfen, ob die MAC darin vorkommt und die Länge stimmt (17 Zeichen)
+          if ($arp_output =~ /(([0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2})|(([0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4})/) {
+            my $found_mac = $1;
+            if (lc($found_mac) eq $mac && length($found_mac) == 17) {
+              $result = "present";
+              last;
+            }
+          }
+
+          $count++;
+          select(undef, undef, undef, 0.2); # sleep 0.2 Sekunden
+        }
+   };
+
+   if ($@) {
+     $result = "subError:" . $@;
+     PRESENCE2_Log $dn, 3, "hping3 or arp: $@";
+     return $result;
+   } else {
+     return $result if ($result eq "present");
+   } 
+
+   # Wenn alle Versuche fehlschlagen -> Abwesend
+   return "absent";
+}
+
 1;
 
 =pod
@@ -1791,6 +2055,7 @@ The PRESENCE2 module offers several ways to check for the presence of devices su
       <li><b>net-ping-icmp</b> – Device check using the Perl module Net::Ping.</li>
       <li><b>lan-ping-async</b> – Device check using the Perl modules IO::Async::Loop and Net::Async::Ping.</li>
       <li><b>netcat</b> – Device check using the netcat network utility.</li>
+      <li><b>combined-check</b> – Device check using the Linux tools arp-scan and arp in combination with hping3.</li>
       <li><b>function</b> – Execution of a user-defined FHEM command.</li>
       <li><b>shellscript</b> – Execution of a user-defined operating system command.</li>
       <li><b>bluetooth</b> – Bluetooth device scan from the FHEM server.</li>
@@ -1833,6 +2098,12 @@ The PRESENCE2 module offers several ways to check for the presence of devices su
     <code>define &lt;name&gt; PRESENCE2 netcat &lt;ip-address:port&gt;</code><br>
     <u>Example</u><br>
     <code>define Something PRESENCE2 netcat 192.168.179.21:22</code><br>
+
+    <br><b>Mode: combined-check</b><br>
+    <code>define &lt;name&gt; PRESENCE2 combined-check &lt;IP_address_MAC&gt;</code><br>
+    <u>Example</u><br>
+    <code>define Something PRESENCE2 netcat 192.168.179.21_a1:a2:a3:a4:a5:a6</code><br>
+    The behavior can be influenced via the preMaxRetries and postMaxRetries attributes.<br>
 
     <br><b>Mode: function</b><br>
     <code>define &lt;name&gt; PRESENCE2 function cmd:&lt;command&gt; scan:&lt;scanExpression&gt;</code><br>
@@ -2083,15 +2354,18 @@ Options:
     <a id="PRESENCE2-attr-intervalPresent"></a>
     <li>
        <dt><code>attr &lt;name&gt; intervalPresent &lt;seconds&gt;</code></dt>
-       Time in seconds to check status if the device is in state present. It is adjusted to the daemons cycle.<br>
-       Not applicable for daemon entity<br>
+       Sets the check or polling interval (in seconds or cycles, depending on the implementation) once a device has already been detected as present.<br>
+       It is aligned with the daemon cycle.<br>
+       Does not apply to daemon devices (e.g., PsnceDaemon).<br>
+       Works in conjunction with intervalNormal (interval for absence or unspecified status).<br>
     </li><br>
 
     <a id="PRESENCE2-attr-intervalNormal"></a>
     <li>
        <dt><code>attr &lt;name&gt; intervalNormal &lt;seconds&gt;</code></dt>
-       Time in seconds to check status if the device is in state present. It is adjusted to the daemons cycle.<br>
-       Not applicable for daemon entity<br>
+       Defines the check interval in seconds when a device/entity is not present (absent), or controls the master daemon polling raster.<br>
+       Set on the daemon device (e.g., PsnceDaemon) to schedule batch-fork/scan cycles.<br>
+       Set on individual PRESENCE2 entities to override or bind check timing into the grid.<br>
     </li><br>
 
     <a id="PRESENCE2-attr-nonblockingTimeOut"></a>
@@ -2158,11 +2432,48 @@ Options:
     <a id="PRESENCE2-attr-thresholdAbsence"></a>
     <li>
         <dt><code>attr &lt;name&gt; thresholdAbsence &lt;check count&gt;</code></dt>
-        The number of checks that have to result in "present" before the state of the PRESENCE definition is changed to "present".<br>
-        This can be used to verify the permanent presence of a device with multiple check runs before the state is finally changed to "present".<br>
-        If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe present" during the presence verification.<br>
+        The number of checks that have to result in "absent" before the state of the PRESENCE definition is changed to "absent".<br>
+        This can be used to verify the permanent absence of a device with multiple check runs before the state is finally changed to "absent".<br>
+        If this attribute is set to a value &gt;1, the reading state and presence will be set to "maybe absent" during the absence verification.<br>
         <br>
         Default Value is 1 (no presence verification control)<br>
+        The attribute is ignored during Fhem initialization or a `define`/`defmod` operation (if the attribute is supplied at that stage).
+        If both attributes - `thresholdAbsence` and `thresholdPresence` - are set and the presence/absence status toggles, the `state` reading is set to `undefined`.
+    </li><br>
+
+    <a id="PRESENCE2-attr-thresholdPresence"></a>
+    <li>
+        <dt><code>attr &lt;name&gt; thresholdPresence &lt;check count&gt;</code></dt>
+        The number of checks that have to result in "present" before the state of the PRESENCE definition is changed to "present".<br>
+        This can be used to verify the permanent presence of a device with multiple check runs before the state is finally changed to "absent".<br>
+        If this attribute is set to a value &gt;1, the reading presence will be set to "maybe absent" during the absence verification.<br>
+        <br>
+        Default Value is 1 (no absence verification control)<br>
+        The attribute is ignored during Fhem initialization or a `define`/`defmod` operation (if the attribute is supplied at that stage).
+        If both attributes - `thresholdAbsence` and `thresholdPresence` - are set and the presence/absence status toggles, the `state` reading is set to `undefined`.
+    </li><br>
+
+    <a id="PRESENCE2-attr-thresholdToggle"></a>
+    <li>
+        <dt><code>attr &lt;name&gt; thresholdToggle &lt;toggle count&gt;</code></dt>
+        The number of toggle operations — i.e., switching between Absent and Present before the required thresholds are reached —
+        that must occur before the <code>state</code> reading changes to <code>undefined</code>.
+    </li><br>
+
+    <a id="PRESENCE2-attr-preMaxRetries"></a>
+    <li>
+        <dt><code>attr &lt;name&gt; preMaxRetries &lt;number of initial checks&gt;</code></dt>
+        Number of checks that initially attempt to obtain a response via hping3/arp using the IP address.<br>
+        This attribute is only available in combined-check mode.<br>
+        Default setting: 8 attempts        
+    </li><br>
+
+    <a id="PRESENCE2-attr-postMaxRetries"></a>
+    <li>
+        <dt><code>attr &lt;name&gt; postMaxRetries &lt;number of secondary checks&gt;</code></dt>
+        Number of checks that subsequently attempt to obtain a response via arp-scan using the IP address.<br>
+        This attribute is only available in combined-check mode.<br>
+        Default setting: 10 attempts        
     </li><br>
 
     <b>for readings that shall be monitored</b>
@@ -2171,15 +2482,17 @@ Options:
         <dt><code>attr &lt;name&gt; presentCycle &lt;seconds&gt;</code></dt>
         This attribute is available in every device in FHEM. If set, the reading to be monitored will be from the
         Attribute <i>presentReading</i> or the default Reading <i>state</i> by the Presence2 daemon for updating
-        checked. If no update takes place within the defined period of time, the reading "presentState" is displayed in the device.
-        set to "send". In the Presence2 daemon device the reading <i>evt_monitoredDevice</i> is generated and set accordingly.<br>
+        checked.<br>
+        If no update takes place within the defined period of time, the reading "presentState" is displayed in the device set to "send".<br>
+        In the Presence2 daemon device the reading <i>evt_monitoredDevice</i> is generated and set accordingly.<br>
     </li><br>
 
     <a id="PRESENCE2-attr-presentReading"></a>
     <li>
         <dt><code>attr &lt;name&gt; presentReading &lt;name of the reading&gt;</code></dt>
         This attribute is available in every device in FHEM. It defines the reading that <i>presentCycle</i> monitors
-        becomes. If the attribute is not set, the reading <i>state</i> is monitored.<br>
+        becomes.<br>
+        If the attribute is not set, the reading <i>state</i> is monitored.<br>
     </li><br>
 
     <a id="PRESENCE2-attr-powerCmd"></a>
@@ -2212,7 +2525,7 @@ Options:
   <ul>
     <u>General</u><br>
     <ul>
-    <li><b>state</b>: (absent|present|disabled) - The state of the device, check errors or "disabled" when the <a href=#PRESENCE2-attr-disable>disable</a> attribute is enabled.</li>
+    <li><b>state</b>: (absent|present|disabled|undefined) - The state of the device, check errors or "disabled" when the <a href=#PRESENCE2-attr-disable>disable</a> attribute is enabled.</li>
     <li><b>presence</b>: (absent|maybe absent|present|maybe present) - The presence state of the device. The value "maybe absent" only occurs if <a href=#PRESENCE2-attr-thresholdAbsence>thresholdAbsence</a> is activated.</li>
     <li><b>appearCnt</b>: count of entering availale</li>
     <li><b>lastAppear</b>: timestamp of last appearence</li>
@@ -2258,6 +2571,7 @@ Options:
       <li><b>net-ping-icmp</b> – Geräte-Prüfung mit Hilfe von Perl-Modul net::ping.</li>
       <li><b>lan-ping-async</b> – Geräte-Prüfung mit Hilfe von Perl-Module IO::Async::Loop und Net::Async::Ping.</li>
       <li><b>netcat</b> – Geräte-Prüfung mit Hilfe von Netzwerk-netcat.</li>
+      <li><b>combined-check</b> – Geräte-Prüfung über die Linux Tools: arp-scan und arp in Kombination mit hping3.</li>
       <li><b>function</b> – Ausführen eines benutzerdefinierten FHEM-Befehls.</li>
       <li><b>shellscript</b> – Ausführen eines benutzerdefinierten Betriebssystembefehls.</li>
       <li><b>bluetooth</b> – Bluetooth-Gerätescan vom FHEM-Server .</li>
@@ -2300,6 +2614,12 @@ Options:
     <code>define &lt;name&gt; PRESENCE2 netcat &lt;IP-Adresse:Port&gt;</code><br>
     <u>Beispiel</u><br>
     <code>define Something PRESENCE2 netcat 192.168.179.21:22</code><br>
+
+    <br><b>Modus: combined-check</b><br>
+    <code>define &lt;name&gt; PRESENCE2 combined-check &lt;IP-Adresse_MAC&gt;</code><br>
+    <u>Beispiel</u><br>
+    <code>define Something PRESENCE2 netcat 192.168.179.21_a1:a2:a3:a4:a5:a6</code><br>
+    Das Verhalten kann über die Attribute preMaxRetries und postMaxRetries beeinflusst werden.<br>
 
     <br><b>Modus: function</b><br>
     <code>define &lt;name&gt; PRESENCE2 function cmd:&lt;Befehl&gt; scan:&lt;scanExpression&gt;</code><br>
@@ -2550,15 +2870,17 @@ Optionen:
     <a id="PRESENCE2-attr-intervalPresent"></a>
     <li>
        <dt><code>attr &lt;name&gt; intervalPresent &lt;Sekunden&gt;</code></dt>
-       Zeit in Sekunden, um den Status zu überprüfen, ob sich das Gerät im Status "Present" befindet. Es ist an den Daemonenzyklus angepasst.<br>
-       Gilt nicht für Daemon-Entitäten<br>
+       Legt das Prüf- oder Abfrageintervall (in Sekunden oder Zyklen je nach Implementierung) fest, wenn ein Gerät bereits als present (anwesend) erkannt wurde. Es ist an den Daemonenzyklus angepasst.<br>
+       Gilt nicht für Daemon-Geräte (z. B. PsnceDaemon)<br>
+       Wirkt zusammen mit intervalNormal (Intervall bei Abwesenheit oder unspezifischem Status).<br>
     </li><br>
 
     <a id="PRESENCE2-attr-intervalNormal"></a>
     <li>
        <dt><code>attr &lt;name&gt; intervalNormal &lt;Sekunden&gt;</code></dt>
-       Zeit in Sekunden, um den Status zu überprüfen, ob sich das Gerät im Status "Present" befindet. Es ist an den Daemonenzyklus angepasst.<br>
-       Gilt nicht für Daemon-Entitäten<br>
+       Legt das Prüfintervall in Sekunden fest, wenn ein Gerät bzw. eine Entität nicht vorhanden (absent) ist, oder steuert den Abfragezyklus des Master-Daemons.<br>
+       Wird auf dem Daemon-Gerät (z. B. PsnceDaemon) festgelegt, um Batch-Fork-/Scan-Zyklen zu planen.<br>
+       Wird auf einzelnen PRESENCE2-Entitäten festgelegt, um die Prüfzeiten zu überschreiben oder an das Raster zu binden.<br>
     </li><br>
 
     <a id="PRESENCE2-attr-nonblockingTimeOut"></a>
@@ -2625,12 +2947,50 @@ Optionen:
     <a id="PRESENCE2-attr-thresholdAbsence"></a>
     <li>
         <dt><code>attr &lt;name&gt; thresholdAbsence &lt;Anzahl Prüfungen&gt;</code></dt>
-        Die Anzahl der Prüfungen, welche in "present" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "present" wechselt.<br>
-        Mit dieser Funktion kann man die Anwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "present" ge&auml;ndert wird.<br>
-        Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, werden die Readings "state" und "presence" auf den Wert "maybe present" gesetzt,
-        bis der Status final auf "present" wechselt.<br>
+        Die Anzahl der Prüfungen, welche in "absent" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "absent" wechselt.<br>
+        Mit dieser Funktion kann man die Abwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "absent" ge&auml;ndert wird.<br>
+        Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, wird das Reading "presence" auf den Wert "maybe absent" gesetzt,
+        bis der Status final auf "absent" wechselt.<br>
         <br>
         Standardwert ist 1 (keine Kontrolle der Anwesenheitsverifizierung)<br>
+        Bei einer Initialisierung von Fhem oder einem define/defmod (wenn hier schon das Attribut mitgegeben wird) wird das Attribut ignoriert.<br>
+        Sind beide Attribute, thresholdAbsence und thresholdPresence, gesetzt und kommt es zu einem Toggeln der Anwesen-/Abwesenheit, so wird das Reading 'state' auf 'undefined' gesetzt.<br>
+    </li><br>
+
+    <a id="PRESENCE2-attr-thresholdPresence"></a>
+    <li>
+        <dt><code>attr &lt;name&gt; thresholdPresence &lt;Anzahl Prüfungen&gt;</code></dt>
+        Die Anzahl der Prüfungen, welche in "present" resultieren m&uuml;ssen, bevor der Status der PRESENCE-Definition auf "present" wechselt.<br>
+        Mit dieser Funktion kann man die Anwesenheit eines Ger&auml;tes verifizieren bevor der Status final auf "present" ge&auml;ndert wird.<br>
+        Wenn dieses Attribut auf einen Wert &gt;1 gesetzt ist, wird das Reading "presence" auf den Wert "maybe present" gesetzt,
+        bis der Status final auf "present" wechselt.<br>
+        <br>
+        Standardwert ist 1 (keine Kontrolle der Abwesenheitsverifizierung)<br>
+        Bei einer Initialisierung von Fhem oder einem define/defmod (wenn hier schon das Attribut mitgegeben wird) wird das Attribut ignoriert.<br>
+        Sind beide Attribute, thresholdAbsence und thresholdPresence, gesetzt und kommt es zu einem Toggeln der Anwesen-/Abwesenheit, so wird das Reading 'state' auf 'undefined' gesetzt.<br>
+    </li><br>
+
+    <a id="PRESENCE2-attr-thresholdToggle"></a>
+    <li>
+        <dt><code>attr &lt;name&gt; thresholdToggle &lt;Anzahl Toggeln&gt;</code></dt>
+        Anzahl von Toggle Vorgängen, also das Wechseln von Absent/Present noch innerhalb des notwendigen erreichens der Thresholdschwellen,
+        bis es zu einem Wechsel des Readings state auf undefined kommt.
+    </li><br>
+
+    <a id="PRESENCE2-attr-preMaxRetries"></a>
+    <li>
+        <dt><code>attr &lt;name&gt; preMaxRetries&lt;Anzahl Erstprüfungen&gt;</code></dt>
+        Anzahl der Prüfungen die zunächst versuchen eine Rückmeldung über hping3/arp mittels IP Adresse zu erhalten.<br>
+        Das Attribut steht nur im Modus combined-check zur Verfügung.<br>
+        Voreinstellung: 8 Versuche<br>
+    </li><br>
+
+    <a id="PRESENCE2-attr-postMaxRetries"></a>
+    <li>
+        <dt><code>attr &lt;name&gt; postMaxRetries &lt;Anzahl Zweitprüfungen&gt;</code></dt>
+        Anzahl der Prüfungen die als nächstes versuchen eine Rückmeldung über arp-scan mittels IP Adresse zu erhalten.<br>
+        Das Attribut steht nur im Modus combined-check zur Verfügung.<br>
+        Voreinstellung: 10 Versuche<br>
     </li><br>
 
     <b>für Readings, die überwacht werden sollen</b>
@@ -2639,15 +2999,18 @@ Optionen:
         <dt><code>attr &lt;name&gt; presentCycle &lt;Sekunden&gt;</code></dt>
         Dieses Attribut steht in jedem Device in FHEM zur Verfügung. Wenn gesetzt, wird das zu überwachende Reading aus dem
         Attribut <i>presentReading</i> oder dem default Reading <i>state</i> durch den Presence2 Daemon auf Aktualisierung
-        überprüft. Findet innerhalb der definierten Zeitspanne keine Aktuallisierung statt, wird im Device das Reading "presentState"
-        auf "absend" gesetzt. Im Presence2 Daemon Device wird das Reading <i>evt_monitoredDevice</i> generiert und entsprechend gesetzt.<br>
+        überprüft.<br>
+        Findet innerhalb der definierten Zeitspanne keine Aktuallisierung statt, wird im Device das Reading "presentState"
+        auf "absend" gesetzt.<br>
+        Im Presence2 Daemon Device wird das Reading <i>evt_monitoredDevice</i> generiert und entsprechend gesetzt.<br>
     </li><br>
 
     <a id="PRESENCE2-attr-presentReading"></a>
     <li>
         <dt><code>attr &lt;name&gt; presentReading &lt;name des Readings&gt;</code></dt>
         Dieses Attribut steht in jedem Device in FHEM zur Verfügung. Es definiert das Reading, dass von <i>presentCycle</i> überwacht
-        wird. Wird das Attribut nicht gesetzt, wird das Reading <i>state</i> überwacht.<br>
+        wird.<br>
+        Ist das Attribut nicht gesetzt, wird das Reading <i>state</i> überwacht.<br>
     </li><br>
 
     <a id="PRESENCE2-attr-powerCmd"></a>
@@ -2680,7 +3043,7 @@ Optionen:
   <ul>
     <u>Allgemein</u><br>
     <ul>
-    <li><b>Status</b>: (absent|present|disabled) – Der Status des Geräts, Prüffehler oder "deaktiviert", wenn das Attribut <a href=#PRESENCE2-attr-disable>disable</a> aktiviert ist.</li>
+    <li><b>state</b>: (absent|present|disabled|undefined) – Der Status des Geräts, Prüffehler oder "deaktiviert", wenn das Attribut <a href=#PRESENCE2-attr-disable>disable</a> aktiviert ist.</li>
     <li><b>presence</b>: (absent|maybe absent|present|maybe present) – Der Anwesenheits-Status des Geräts. Der Wert "maybe absent" tritt nur auf, wenn <a href=#PRESENCE2-attr-thresholdAbsence>thresholdAbsence</a> aktiviert ist.</li>
     <li><b>appearCnt</b>: Anzahl der verfügbaren Eingaben</li>
     <li><b>lastAppear</b>: Zeitstempel des letzten Erscheinens</li>
