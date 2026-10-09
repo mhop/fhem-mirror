@@ -1,6 +1,6 @@
 ##############################################
 #$Id$
-my $Signalbot_VERSION="3.24";
+my $Signalbot_VERSION="3.25";
 # Simple Interface to Signal CLI running as Dbus service
 # Author: Adimarantis
 # License: GPL
@@ -464,6 +464,7 @@ sub Signalbot_Set($@) {					#
 		return $ret;
 	} elsif ( $cmd eq "trustVerified") {
 		my @cm = split(",",$args[0]);
+	    return "Missing argument" if !defined($cm[0]) or !defined($cm[1]);
 		my $ret=Signalbot_CallSI($hash,"trustVerified",$cm[0],$cm[1]);
 		return $ret;
 	} elsif ( $cmd eq "send" || $cmd eq "reply" || $cmd eq "msg") {
@@ -1417,13 +1418,16 @@ sub Signalbot_ListIdentities_cb($@) {
 	foreach my $ident (@$rec) {
 		my ($idpath,$uuid,$number)=@$ident;
 		#Only for valid numbers - ignore numbers that only have uuids to avoid an error
-		if ($number =~ /^\+[1-9][0-9]{5,}$/) {
-			my $ret=Signalbot_getIdentityProperties($hash,$idpath);
-			if (defined $ret) {
-				my %props=%$ret;
-				my $level=$props{TrustLevel};
-				$hash->{helper}{identities}{$number}{TrustLevel}=$props{TrustLevel};
-				$hash->{helper}{identities}{$number}{SafetyNumber}=$props{SafetyNumber};
+		LogUnicode $hash->{NAME}, 5, $hash->{NAME}.": Identity $ident $idpath $uuid $number";
+		my $ret=Signalbot_getIdentityProperties($hash,$idpath);
+		if (defined $ret) {
+			my %props=%$ret;
+			if (defined (%props{Number}) and %props{Number} ne "") {
+			  my $level=$props{TrustLevel};
+			  $hash->{helper}{identities}{$number}{TrustLevel}=$props{TrustLevel};
+			  $hash->{helper}{identities}{$number}{SafetyNumber}=$props{SafetyNumber};
+			} else {
+				LogUnicode $hash->{NAME}, 3, $hash->{NAME}.": Unknown Identity $uuid with safetynumber $props{SafetyNumber}";
 			}
 		}
 	}
