@@ -73,6 +73,8 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.7" => "10.10.2026  Driftanalyse (aiFannDetectDrift): Ersatz der Quelle airaw durch Werte aus pvHistory (_aiFannDriftHistSlice) -> Verringerung RAM Footprint ".
+                           "CachedHistoryVal: Zeitkontext auf Minute gerundet -> weniger Misses/Verdrängungen im TS_OFFSET_Cache ",
   "2.10.6" => "05.10.2026  siehe Changelog ".
                            "Reading Battery_OptimumBaseSoC_XX parallel zum bestehenden Reading Battery_OptimumTargetSoC_XX welches abgelöst werden soll (Forum: https://forum.fhem.de/index.php?msg=1369429) ".
                            "Nachtverarbeitung: aiDelRawData aus Task 6 nach Task 4 verschoben ".
@@ -6131,7 +6133,7 @@ sub __openMeteo_ApiResponse {
                   my $srwh = $jdata->{hourly}{shortwave_radiation}[$k];                                 # Solarstrahlung GHI
 
                   if ($srwh) {                                                                          # Globalstrahlung für KI
-                      my $ghikj = 10 * (round0 ($srwh * WH2KJ) / 10);                          # Umrechnung Wh/m2 in kJ/m2
+                      my $ghikj = 10 * (round0 ($srwh * WH2KJ) / 10);                                   # Umrechnung Wh/m2 in kJ/m2
 
                       $pvtmstr =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
                       my $tidx = $1.$2.$3.(sprintf "%02d", ($4 + 1));
@@ -12805,7 +12807,7 @@ sub centralTask {
   };
 
   $data{$name}{pvhist}{$day}{99}{dayname} = $dayname;                                           # akt. Wochentagsnamen in pvHistory eintragen
-
+    
   if ($debug !~ /^none$/xs) {
       Log3 ($name, 4, "$name DEBUG> ################################################################");
       Log3 ($name, 4, "$name DEBUG> ###                  New centralTask cycle                   ###");
@@ -31744,7 +31746,7 @@ sub aiFannDetectDrift {
 
   delete @{$data{$name}{neuralnet}{$fanntyp}}{@drift_kpis};
 
-  my $rawref = $data{$name}{aidectree}{airaw};
+  my $rawref = _aiFannDriftHistSlice ($name, $fanntyp, $window, $t);
   return unless $rawref && ref $rawref eq 'HASH';
 
   my @indices = sort { $a <=> $b } keys %$rawref;
@@ -32118,6 +32120,59 @@ sub _aiFannSelectWindow {
   elsif ($drift_score < 1.2 && $age_hours > 72)                                              { return 144 }  # 5) stabiles Modell → vergrößern
 
 return $default;
+}
+
+################################################################
+#  schlanke Zeitreihe (Ist/AI-Prognose) für Drift aus pvHistory
+#  Rückgabe: Hashref {idx}{$fanntyp|$fanntyp.'aifc'} wie airaw
+################################################################
+sub _aiFannDriftHistSlice {
+  my ($name, $fanntyp, $window, $t) = @_;
+  $t //= time;
+
+  my $pvh = $data{$name}{pvhist};
+  return {} unless ref $pvh eq 'HASH';
+
+  my $now = timestringsFromOffset ($name, $t, 0);
+  return {} unless $now;
+
+  my $nowidx = $now->{year}.$now->{month}.$now->{day}.sprintf ("%02d", $now->{hour} + 1);        # laufende Stunde im Indexformat (HOD = Stunde+1)
+  my $noon   = $t - ($now->{hour} * 3600 + $now->{minute} * 60 + $now->{second}) + 43200;        # heute 12:00 als Anker -> stabile Cache-Keys, robust bei Sommerzeit
+
+  my $need    = max ($window, AIMODELMINAGE);                                                    # mind. so viele Slots wie die Drift-Logik prüft
+  my $maxdays = min (27, int ($need / 24) + 2);                                                  # >27: Tagesschlüssel würde auf den aktuellen Tag zurückfallen
+
+  my %slice;
+  my $count = 0;
+
+  DAY:
+  for my $d (0 .. $maxdays) {
+      my $dt   = timestringsFromOffset ($name, $noon, -$d * 86400) or next;
+      my $pvd  = $dt->{day};
+      my $ymd  = $dt->{year}.$dt->{month}.$dt->{day};
+
+      my $dref = $pvh->{$pvd};
+      next unless ref $dref eq 'HASH';
+
+      for my $hod (sort { $b <=> $a } grep { $_ && $_ ne '99' } keys %$dref) {
+          my $idx = $ymd.sprintf ("%02d", $hod);
+
+          next if($idx >= $nowidx);                                                             # laufende Stunde noch unvollständig, Zukunft/Altlasten ausblenden
+
+          my $act = HistoryVal ($name, $pvd, $hod, $fanntyp, undef);
+          next unless (defined $act && $act >= 0);
+
+          my $prd = HistoryVal ($name, $pvd, $hod, $fanntyp.'aifc', undef);
+          next unless (defined $prd && $prd >= 0);
+
+          $slice{$idx}{$fanntyp}        = $act;
+          $slice{$idx}{$fanntyp.'aifc'} = $prd;
+
+          last DAY if(++$count >= $need);
+      }
+  }
+
+return \%slice;
 }
 
 ###########################################################################
@@ -39123,7 +39178,7 @@ sub CachedHistoryVal {
           //= LRU_cache_create ('pvHistCache', 'pvHistory Cache', CACHEPVHMS);                  # Init globalen pvHistory Cache
 
   # --- Zeitkontext Abfrage über TS_OFFSET_CACHE (stabil & gecacht) ---
-  my $dt = timestringsFromOffset ($name, $t, 0);
+  my $dt = timestringsFromOffset ($name, int ($t / 60) * 60, 0);                                # einen Cache-Key pro Minute statt pro Sekunde erzeugen
 
   # --- aktuelle Stunde NICHT cachen -> ändert sich inhaltlich noch
   if ($day == $dt->{day} && $hod >= $dt->{hour} + 1 ) {                                         # hour anpassen gemäß HOD-Logik
