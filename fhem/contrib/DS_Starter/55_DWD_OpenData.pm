@@ -861,27 +861,19 @@ sub Shutdown {
 
   ::RemoveInternalTimer($hash);
 
-  if (defined($hash->{".alertsBlockingCall"})) {
-    ::BlockingKill($hash->{".alertsBlockingCall"});
-  }
-  my $warncellId = $hash->{".warncellId"};
-  if (defined($warncellId)) {
-    my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-    if (defined($hash->{".alertsFile".$communeUnion})) {
-      close($hash->{".alertsFileHandle".$communeUnion});
-      unlink($hash->{".alertsFile".$communeUnion});
-      delete($hash->{".alertsFile".$communeUnion});
+  for my $communeUnion (0, 1) {
+    if (defined($hash->{".alertsBlockingCall".$communeUnion})) {
+      ::BlockingKill($hash->{".alertsBlockingCall".$communeUnion});
+      delete($hash->{".alertsBlockingCall".$communeUnion});
     }
+    RemoveTempFile($hash, ".alertsFile".$communeUnion, ".alertsFileHandle".$communeUnion);
   }
 
   if (defined($hash->{".forecastBlockingCall"})) {
     ::BlockingKill($hash->{".forecastBlockingCall"});
+    delete($hash->{".forecastBlockingCall"});
   }
-  if (defined($hash->{".forecastFile"})) {
-    close($hash->{".forecastFileHandle"});
-    unlink($hash->{".forecastFile"});
-    delete($hash->{".forecastFile"});
-  }
+  RemoveTempFile($hash, ".forecastFile", ".forecastFileHandle");
 
   return undef;
 }
@@ -1655,7 +1647,7 @@ sub GetForecast {
       close($hash->{".forecastFileHandle"});
       unlink($hash->{".forecastFile"});
     }
-    ($hash->{".forecastFileHandle"}, $hash->{".forecastFile"}) = tempfile(UNLINK => 1);
+    ($hash->{".forecastFileHandle"}, $hash->{".forecastFile"}) = tempfile();
     $hash->{".station"} = $station;
     if (defined($hash->{".forecastBlockingCall"})) {
       # kill old blocking call
@@ -1775,6 +1767,33 @@ sub IsDocumentUpdated {
   ::Log3 $name, 5, "$name: IsDocumentUpdated AFTER return update: $update, docSize: $_[3], docTime: $_[4]";
 
   return ($update, $_[3], $_[4]);                        # Heiko
+}
+
+=head2 RemoveTempFile($$$)
+
+Close and delete a temp file created by L</GetForecast($$)> or L</GetAlerts($$)>.
+
+=over
+
+=item * param hash: hash of DWD_OpenData device
+
+=item * param fileKey: name of the hash entry holding the temp file name
+
+=item * param handleKey: name of the hash entry holding the temp file handle
+
+=back
+
+=cut
+
+sub RemoveTempFile {
+  my ($hash, $fileKey, $handleKey) = @_;
+
+  if (defined($hash->{$fileKey})) {
+    close($hash->{$handleKey}) if (defined($hash->{$handleKey}));
+    unlink($hash->{$fileKey});
+    delete($hash->{$fileKey});
+    delete($hash->{$handleKey});
+  }
 }
 
 =over
@@ -2281,6 +2300,7 @@ sub GetForecastFinish {
 
     if (defined($errorMessage) && length($errorMessage) > 0) {
       # error, skip further processing
+      RemoveTempFile($hash, ".forecastFile", ".forecastFileHandle");
     } elsif (!defined($hash->{".forecastFile"})) {
       $errorMessage = "internal temp file name missing";
       ::Log3 $name, 3, "$name: GetForecastFinish ERROR: $errorMessage";
@@ -2348,6 +2368,7 @@ sub GetForecastAbort {
 
   delete $hash->{".forecastBlockingCall"};
   delete $hash->{forecastUpdating};
+  RemoveTempFile($hash, ".forecastFile", ".forecastFileHandle");
   $errorMessage = "downloading and processing weather forecast data failed ($errorMessage)";
   ::Log3 $name, 3, "$name: GetForecastAbort ERROR: $errorMessage";
 
@@ -2543,7 +2564,7 @@ sub GetAlerts {
       close($hash->{".alertsFileHandle".$communeUnion});
       unlink($hash->{".alertsFile".$communeUnion});
     }
-    ($hash->{".alertsFileHandle".$communeUnion}, $hash->{".alertsFile".$communeUnion}) = tempfile(UNLINK => 1);
+    ($hash->{".alertsFileHandle".$communeUnion}, $hash->{".alertsFile".$communeUnion}) = tempfile();
     $hash->{".warncellId"} = $warncellId;
     if (defined($hash->{".alertsBlockingCall".$communeUnion})) {
       # kill old blocking call
@@ -2864,6 +2885,7 @@ sub GetAlertsFinish {
 
     if (defined($errorMessage) && length($errorMessage) > 0) {
       # error, skip further processing
+      RemoveTempFile($hash, ".alertsFile".$communeUnion, ".alertsFileHandle".$communeUnion);
     } 
     elsif (!defined($hash->{".alertsFile".$communeUnion})) {
       $errorMessage = "internal temp file name missing";
@@ -2971,6 +2993,7 @@ sub GetAlertsAbort {
 
   my $communeUnion = IsCommuneUnionWarncellId($warncellId);
   delete $hash->{".alertsBlockingCall".$communeUnion};
+  RemoveTempFile($hash, ".alertsFile".$communeUnion, ".alertsFileHandle".$communeUnion);
   $alertsUpdating[$communeUnion] = undef;
   $errorMessage = "downloading and processing weather alerts data failed ($errorMessage)";
   ::Log3 $name, 3, "$name: GetAlertsAbort ERROR: $errorMessage";
@@ -3158,6 +3181,23 @@ sub DWD_OpenData_Initialize {
 #
 # 10.10.2026 (version 1.17.9) DS_Starter
 # Patch von Rampler eingebaut (Forum: https://forum.fhem.de/index.php?msg=1370034)
+#
+# bugfix: @alertsData, @alertsReceived, @alertsUpdating und @alertsErrorMessage werden jetzt als Listen
+#         statt als Array-Referenz initialisiert
+# bugfix: GetHeaders liefert eine Hash-Referenz (bisher Liste); IsDocumentUpdated angepasst
+# bugfix: GetAlertsStart übernimmt das Ergebnis von IsDocumentUpdated per Rückgabeliste
+#         (update, dwdDocSize, dwdDocTime) statt über Ein-/Ausgabeparameter
+# bugfix: Fehlermeldung beim Abruf der Wetterwarnungen wird in @alertsErrorMessage gespeichert
+#         (wird für die Störungsmeldung in UpdateAlerts benötigt)
+# bugfix: Readings eventDesc und instruction der Störungsmeldung werden bei global encoding != unicode
+#         nach UTF-8 kodiert
+# bugfix: Speicherleck behoben: tempfile(UNLINK => 1) entfernt (File::Temp merkt sich jeden Aufruf bis
+#         Prozessende), Temp-Dateien werden explizit gelöscht
+# bugfix: Temp-Datei und Filehandle werden auch im Fehler-/up-to-date-Fall (Finish) und im Abort aufgeräumt
+# bugfix: Shutdown/Undef: BlockingCall für Alerts wird beendet (Hash-Schlüssel .alertsBlockingCall<N>
+#         korrigiert), Temp-Dateien beider Alert-Caches werden entfernt
+# change: neue Funktion RemoveTempFile
+#
 #
 # 23.09.2025 (version 1.17.8) DS_Starter
 # replace for..when structures
