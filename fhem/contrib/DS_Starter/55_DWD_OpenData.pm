@@ -1,5 +1,5 @@
 ﻿# -----------------------------------------------------------------------------
-# $Id: 55_DWD_OpenData.pm 30026 2025-06-04 08:44:48Z DS_Starter $
+# $Id: 55_DWD_OpenData.pm 30318 2025-09-23 12:49:36Z DS_Starter $
 # -----------------------------------------------------------------------------
 
 =encoding UTF-8
@@ -768,10 +768,10 @@ my @wwdText = ('Bewölkungsentwicklung nicht beobachtet',
                'starkes Gewitter mit Sandsturm',
                'starkes Gewitter mit Graupel oder Hagel');
 
-my @alertsData         = [ undef, undef ];
-my @alertsReceived     = [ undef, undef ];
-my @alertsUpdating     = [ undef, undef ];
-my @alertsErrorMessage = [ undef, undef ];
+my @alertsData         = ( undef, undef );
+my @alertsReceived     = ( undef, undef );
+my @alertsUpdating     = ( undef, undef );
+my @alertsErrorMessage = ( undef, undef );
 
 
 =head1 FHEM CALLBACK FUNCTIONS
@@ -1524,7 +1524,7 @@ sub RotateForecast {
         for (my $d=0; $d<($daysAvailable - $daysForward); $d++) {
           my $sourcePrefix = 'fc'.($daysForward + $d).'_';
           my $destinationPrefix = 'fc'.$d.'_';
-          foreach my $property (@shiftProperties) {
+          for my $property (@shiftProperties) {
             my $sourceReading = $sourcePrefix.$property;
             my $destinationReading = $destinationPrefix.$property;
             my $sourceValue = ::ReadingsVal($name, $sourceReading, undef);
@@ -1587,7 +1587,7 @@ sub PruneForecast {
 
   # find youngest timestamp per day
   my %youngestTimestamps;
-  foreach my $readingName (@readingNames) {
+  for my $readingName (@readingNames) {
     if (!($readingName =~ m/^fc\d*_(day|time|weekday)$/)) {
       my @parts = $readingName =~ /^fc(\d+)_.*/;
       if (scalar(@parts) == 1) {
@@ -1602,7 +1602,7 @@ sub PruneForecast {
   }
 
   # delete readings that are too old
-  foreach my $readingName (@readingNames) {
+  for my $readingName (@readingNames) {
     if (!($readingName =~ m/^fc\d*_(day|time|weekday)$/)) {
       my @parts = $readingName =~ /^fc(\d+)_.*/;
       if (scalar(@parts) == 1) {
@@ -1683,7 +1683,7 @@ sub GetForecast {
 
 =item * param url: URL for wich the HTTP headers should be retrieved.
 
-=item * return hash of header entries: content_length (bytes), last_modified (epoch time) or C<undef> on error
+=item * return hash ref of header entries: content_length (bytes), last_modified (epoch time) or C<undef> on error
 
 =back
 
@@ -1717,7 +1717,7 @@ sub GetHeaders {
         ::Log3 $name, 5, "$name: GetHeaders last_modified formatted: $headers{last_modified}";
       }
     }
-    return %headers;
+    return \%headers;
   }
   return undef;
 }
@@ -1750,7 +1750,8 @@ sub IsDocumentUpdated {
 
   # check if file on webserver was modified
   ::Log3 $name, 5, "$name: IsDocumentUpdated BEFORE";
-  my %headers = GetHeaders($name, $url);
+  my $headersRef = GetHeaders($name, $url);
+  my %headers = defined($headersRef) ? %{$headersRef} : ();
   my $update = 1;
   if (%headers) {
     $_[3] = $headers{content_length}; # docSize
@@ -1842,13 +1843,13 @@ sub GetForecastStart {
   }
 
   # determine if a new forecast report should be downloaded
-  #my ($dwdDocSize, $dwdDocTime);                                       # Heiko
-  my ($update, $dwdDocSize, $dwdDocTime) = IsDocumentUpdated($hash, $url, 'fc');     # Heiko
+  #my ($dwdDocSize, $dwdDocTime);                                       
+  my ($update, $dwdDocSize, $dwdDocTime) = IsDocumentUpdated($hash, $url, 'fc');    
   my $lastDocSize = ::ReadingsVal($name , 'fc_dwdDocSize', 0);
-  my $lastDocTimestamp = ParseDateTimeUTC(::ReadingsVal($name , 'fc_dwdDocTime', '1970-01-01 00:00:00')); # Heiko
+  my $lastDocTimestamp = ParseDateTimeUTC(::ReadingsVal($name , 'fc_dwdDocTime', '1970-01-01 00:00:00')); 
   my $dwdDocTimestamp = length($dwdDocTime) ? ParseDateTimeUTC($dwdDocTime) : time();
   my $maxDocAge = (::AttrVal($name, 'forecastRefresh', 6) - 0.5) * 60 * 60; # [s]
-  $maxDocAge = 0;     # Heiko ... wozu nochmal Wartezeit checken wenn bereits in IsDocumentUpdated?
+  $maxDocAge = 0;    
   $update = $update && ($lastDocSize == 0 || ($dwdDocTimestamp - $lastDocTimestamp) >= $maxDocAge);
 
   ::Log3 $name, 5, "$name: GetForecastStart dwdDocTime: $dwdDocTime, dwdDocTimestamp: $dwdDocTimestamp,  dwdDocSize: $dwdDocSize, lastDocTimestamp: $lastDocTimestamp, maxDocAge: $maxDocAge, lastDocSize: $lastDocSize : update: $update";
@@ -2596,8 +2597,9 @@ sub GetAlertsStart {
   my $alertLanguage = ::AttrVal($name, 'alertLanguage', 'DE');
   my $url = 'https://opendata.dwd.de/weather/alerts/cap/'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_CELLS_STAT/Z_CAP_C_EDZW_LATEST_PVW_STATUS_PREMIUMCELLS_'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_'.$alertLanguage.'.zip';
 
-  my ($dwdDocSize, $dwdDocTime);
-  my $update = IsDocumentUpdated($hash, $url, 'a', $dwdDocSize, $dwdDocTime);
+  #my ($dwdDocSize, $dwdDocTime);
+  #my $update = IsDocumentUpdated($hash, $url, 'a', $dwdDocSize, $dwdDocTime);
+  my ($update, $dwdDocSize, $dwdDocTime) = IsDocumentUpdated($hash, $url, 'a');
 
   my $result;
   if ($update) {
@@ -2681,7 +2683,7 @@ sub ProcessAlerts {
     unzip($zipFileHandle => \@xmlStrings, MultiStream => 1) or die "error unzipping data: $UnzipError\n";
 
     # parse XML strings
-    foreach my $xmlString (@xmlStrings) {
+    for my $xmlString (@xmlStrings) {
       if (substr(${$xmlString}, 0, 2) eq 'PK') {
         # empty string, skip
         next;
@@ -2696,7 +2698,7 @@ sub ProcessAlerts {
       $xpc->registerNs('cap', 'urn:oasis:names:tc:emergency:cap:1.2');
       my $alert = {};
       my $alertNode = $dom->documentElement();
-      foreach my $alertChildNode ($alertNode->nonBlankChildNodes()) {
+      for my $alertChildNode ($alertNode->nonBlankChildNodes()) {
         #::Log3 $name, 5, "$name: ProcessAlerts child node: " . $alertChildNode->nodeName();
         if ($alertChildNode->nodeName() eq 'identifier') {
           $alert->{identifier} = $alertChildNode->textContent();
@@ -2709,14 +2711,14 @@ sub ProcessAlerts {
           # get list of references, separated by whitespace, each reference consisting of 3 parts: sender, identifier, sent
           $alert->{references} = [];
           my @references = split(' ', $alertChildNode->textContent());
-          foreach my $reference (@references) {
+          for my $reference (@references) {
             my @parts = split(',', $reference);
             if (scalar(@parts) == 3) {
               push(@{$alert->{references}}, $parts[2]);
             }
           }
         } elsif ($alertChildNode->nodeName() eq 'info') {
-          foreach my $infoChildNode ($alertChildNode->nonBlankChildNodes()) {
+          for my $infoChildNode ($alertChildNode->nonBlankChildNodes()) {
             #::Log3 $name, 5, "$name: ProcessAlerts child node: '" . $infoChildNode->nodeName() . "'";
             if ($infoChildNode->nodeName() eq 'category') {
               $alert->{category} = $infoChildNode->textContent();
@@ -2846,34 +2848,38 @@ sub GetAlertsFinish {
 
   my %docHeader;
   if ($paramCount > 3) {
-    $docHeader{warncellId} = $warncellId;
+    $docHeader{warncellId}   = $warncellId;
     $docHeader{receivedTime} = $receivedTime;
-    $docHeader{url} = $url;
-    $docHeader{dwdDocSize} = $dwdDocSize;
-    $docHeader{dwdDocTime} = $dwdDocTime;
+    $docHeader{url}          = $url;
+    $docHeader{dwdDocSize}   = $dwdDocSize;
+    $docHeader{dwdDocTime}   = $dwdDocTime;
   }
 
   if (defined($name)) {
     ::Log3 $name, 5, "$name: GetAlertsFinish START (PID $$) $warncellId";
 
-    my $hash = $::defs{$name};
+    my $hash         = $::defs{$name};
     my $communeUnion = IsCommuneUnionWarncellId($warncellId);
     delete $hash->{".alertsBlockingCall".$communeUnion};
 
     if (defined($errorMessage) && length($errorMessage) > 0) {
       # error, skip further processing
-    } elsif (!defined($hash->{".alertsFile".$communeUnion})) {
+    } 
+    elsif (!defined($hash->{".alertsFile".$communeUnion})) {
       $errorMessage = "internal temp file name missing";
       ::Log3 $name, 3, "$name: GetAlertsFinish ERROR: $errorMessage";
-    } else {
+    } 
+    else {
       # deserialize alerts
-      my $fh = $hash->{".alertsFileHandle".$communeUnion};
-      my $terminator = $/;
-      $/ = undef;        # enable slurp file read mode
+      my $fh           = $hash->{".alertsFileHandle".$communeUnion};
+      my $terminator   = $/;
+      $/               = undef;        # enable slurp file read mode
       my $frozenAlerts = <$fh>;
-      $/ = $terminator;  # restore default file read mode
+      $/               = $terminator;  # restore default file read mode
+      
       close($hash->{".alertsFileHandle".$communeUnion});
       unlink($hash->{".alertsFile".$communeUnion});
+      
       my %newAlerts = %{thaw($frozenAlerts)};
       ::Log3 $name, 5, "$name: GetAlertsFinish temp file " . $hash->{".alertsFile".$communeUnion} . " alerts " . keys(%newAlerts) . " size " . length($frozenAlerts);
       delete($hash->{".alertsFile".$communeUnion});
@@ -2881,24 +2887,24 @@ sub GetAlertsFinish {
       # @todo delete global alert list when no differential updates are available?
       my $alerts = {};
 
-      # update global alert list
-      foreach my $alert (values(%newAlerts)) {
+      for my $alert (values(%newAlerts)) {                                      # update global alert list
         my $indentifierExists = defined($alerts->{$alert->{identifier}});
+        
         if ($indentifierExists) {
           ::Log3 $name, 5, "$name: ProcessAlerts identifier " . $alert->{identifier} . " already known, data not updated";
-        } elsif ($alert->{msgType} eq 'Alert') {
-          # add new alert
-          $alerts->{$alert->{identifier}} = $alert;
-        } elsif ($alert->{msgType} eq 'Update') {
-          # delete old alerts
-          foreach my $reference (@{$alert->{references}}) {
+        } 
+        elsif ($alert->{msgType} eq 'Alert') {
+          $alerts->{$alert->{identifier}} = $alert;                             # add new alert
+        } 
+        elsif ($alert->{msgType} eq 'Update') {
+          for my $reference (@{$alert->{references}}) {                         # delete old alerts
             delete $alerts->{$reference};
           }
-          # add new alert
-          $alerts->{$alert->{identifier}} = $alert;
-        } elsif ($alert->{msgType} eq 'Cancel') {
-          # delete old alerts
-          foreach my $reference (@{$alert->{references}}) {
+          
+          $alerts->{$alert->{identifier}} = $alert;                             # add new alert
+        } 
+        elsif ($alert->{msgType} eq 'Cancel') {
+          for my $reference (@{$alert->{references}}) {                         # delete old alerts
             delete $alerts->{$reference};
           }
         }
@@ -2924,6 +2930,7 @@ sub GetAlertsFinish {
         ::readingsBulkUpdate($hash, 'state', "alerts unchanged");
         ::readingsEndUpdate($hash, 1);
       } else {
+        $alertsErrorMessage[$communeUnion] = $errorMessage;
         ::readingsSingleUpdate($hash, 'state', "alerts error: $errorMessage", 1);
       }
     } else {
@@ -3003,14 +3010,15 @@ sub UpdateAlerts {
   ::readingsBeginUpdate($hash);
 
   # create alert for next 24 hours, if retrieval failed
-  my $index = 0;
+  my $index        = 0;
   my $communeUnion = IsCommuneUnionWarncellId($warncellId);
+  
   if (defined($alertsErrorMessage[$communeUnion]) && length($alertsErrorMessage[$communeUnion]) > 0) {
     my $prefix = 'a_'.$index.'_';
     my $time = time();
     ::readingsBulkUpdate($hash, $prefix.'category',     'Met');
     ::readingsBulkUpdate($hash, $prefix.'event',        0);
-    ::readingsBulkUpdate($hash, $prefix.'eventDesc',    'STÖRUNG');
+    ::readingsBulkUpdate($hash, $prefix.'eventDesc',    (!$::unicodeEncoding ? encode('UTF-8', 'STÖRUNG') : 'STÖRUNG'));
     ::readingsBulkUpdate($hash, $prefix.'eventGroup',   'FHEM');
     ::readingsBulkUpdate($hash, $prefix.'responseType', 'Prepare');
     ::readingsBulkUpdate($hash, $prefix.'urgency',      'Immediate');
@@ -3020,7 +3028,7 @@ sub UpdateAlerts {
     ::readingsBulkUpdate($hash, $prefix.'expires',      FormatDateTimeLocal($hash, $time+24*60*60));
     ::readingsBulkUpdate($hash, $prefix.'headline',     'FHEM: Aktualisierung der Wetterwarnungen fehlgeschlagen');
     ::readingsBulkUpdate($hash, $prefix.'description',  "Fehler: $alertsErrorMessage[$communeUnion]");
-    ::readingsBulkUpdate($hash, $prefix.'instruction',  'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.');
+    ::readingsBulkUpdate($hash, $prefix.'instruction',  (!$::unicodeEncoding ? encode('UTF-8', 'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.') : 'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.'));
     ::readingsBulkUpdate($hash, $prefix.'area',         0);
     ::readingsBulkUpdate($hash, $prefix.'areaDesc',     'DWD Open Data Server');
     ::readingsBulkUpdate($hash, $prefix.'altitude',     0);
@@ -3028,14 +3036,16 @@ sub UpdateAlerts {
     $index++;
 
     ::readingsBulkUpdate($hash, 'a_state', "error: $alertsErrorMessage[$communeUnion]");
-  } else {
+  } 
+  else {
     ::readingsBulkUpdate($hash, 'a_state', 'updated');
   }
 
   # prepare processing
   my $alertExcludeEvents = ::AttrVal($name, 'alertExcludeEvents', undef);
-  my @excludeEventsList = split(',', $alertExcludeEvents) if (defined($alertExcludeEvents));
-  foreach my $excludeEvent (@excludeEventsList) {
+  my @excludeEventsList  = split(',', $alertExcludeEvents) if (defined($alertExcludeEvents));
+  
+  for my $excludeEvent (@excludeEventsList) {
     $excludeEvent =~ s/^\s+|\s+$//g; # trim
   }
   my %excludeEvents = map { $_ => 1 } @excludeEventsList;
@@ -3044,11 +3054,13 @@ sub UpdateAlerts {
   if (ref($alertsData[$communeUnion]) eq 'HASH') {
     my $alerts = $alertsData[$communeUnion];
     my @identifiers = sort { $alerts->{$a}->{onset} <=> $alerts->{$b}->{onset} } keys(%{$alerts});
-    foreach my $identifier (@identifiers) {
+    
+    for my $identifier (@identifiers) {
       my $alert = $alerts->{$identifier};
+      
       # find alert for selected warncell
       my $areaIndex = 0;
-      foreach my $wcId (@{$alert->{warncellid}}) {
+      for my $wcId (@{$alert->{warncellid}}) {
         if ($wcId == $warncellId && !(lc($alert->{severity}) eq 'minor' && defined($excludeEvents{$alert->{eventCode}}))) {
           # alert found that is not on the exclude list, create readings
           my $prefix = 'a_'.$index.'_';
@@ -3072,6 +3084,7 @@ sub UpdateAlerts {
           $index++;
           last();
         }
+        
         $areaIndex++;
       }
 
@@ -3142,6 +3155,9 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 10.10.2026 (version 1.17.9) DS_Starter
+# Patch von Rampler eingebaut (Forum: https://forum.fhem.de/index.php?msg=1370034)
 #
 # 23.09.2025 (version 1.17.8) DS_Starter
 # replace for..when structures
