@@ -7,6 +7,7 @@ use strict;
 use warnings;
 
 use CoProcess;
+use Blocking;
 
 use JSON;
 use Data::Dumper;
@@ -44,6 +45,7 @@ gassistant_Initialize($)
                       "gassistantFHEM-home ".
                       "gassistantFHEM-log ".
                       "gassistantFHEM-params ".
+                      "gassistantFHEM-runtime:local,system ".
                       "gassistantFHEM-auth ".
                       #"gassistantFHEM-filter ".
                       #"gassistantFHEM-sshHost gassistantFHEM-sshUser ".
@@ -86,11 +88,8 @@ gassistant_Define($$)
 
   $hash->{NOTIFYDEV} = "global,global:npmjs.*gassistant-fhem.*";
 
-  if( $attr{global}{logdir} ) {
-    CommandAttr(undef, "$name gassistantFHEM-log %L/gassistant-%Y-%m-%d.log") if( !AttrVal($name, 'gassistantFHEM-log', undef ) );
-  } else {
-    CommandAttr(undef, "$name gassistantFHEM-log ./log/gassistant-%Y-%m-%d.log") if( !AttrVal($name, 'gassistantFHEM-log', undef ) );
-  }
+  # during FHEM start the attributes of fhem.cfg are not set yet, the default is set after INITIALIZED
+  gassistant_defaultLog($hash) if( $init_done );
 
   #CommandAttr(undef, "$name gassistantFHEM-filter room=GoogleAssistant") if( !AttrVal($name, 'gassistantFHEM-filter', undef ) );
 
@@ -120,6 +119,21 @@ gassistant_Define($$)
 }
 
 sub
+gassistant_defaultLog($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  return if( AttrVal($name, 'gassistantFHEM-log', undef ) );
+
+  if( $attr{global}{logdir} ) {
+    CommandAttr(undef, "$name gassistantFHEM-log %L/gassistant-%Y-%m-%d.log");
+  } else {
+    CommandAttr(undef, "$name gassistantFHEM-log ./log/gassistant-%Y-%m-%d.log");
+  }
+}
+
+sub
 gassistant_Notify($$)
 {
   my ($hash,$dev) = @_;
@@ -135,6 +149,7 @@ gassistant_Notify($$)
     return undef;
    
   } elsif( grep(m/^INITIALIZED|REREADCFG$/, @{$dev->{CHANGED}}) ) {
+    gassistant_defaultLog($hash);
     CoProcess::start($hash);
     return undef;
   }
@@ -377,6 +392,271 @@ gassistant_configDefault($;$)
   return $configfile;
 }
 
+# Node.js major version of the local runtime
+my $gassistant_nodeMajor = 22;
+
+# gassistant-fhem is installed by this module with an own Node.js in
+# <home>/.fhemconnect/runtime, independent of the system Node.js and without root.
+sub
+gassistant_managedRuntime($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  return 0 if( $^O eq 'MSWin32' );
+  return 0 if( AttrVal($name, 'gassistantFHEM-cmd', undef) );
+  return 0 if( AttrVal($name, 'gassistantFHEM-sshHost', undef) );
+  return AttrVal($name, 'gassistantFHEM-runtime', 'local') eq 'local';
+}
+
+sub
+gassistant_runtimeDir($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  my $home = AttrVal($name, 'gassistantFHEM-home', undef);
+  $home = $ENV{'PWD'} if( $home && $home eq 'PWD' );
+  $home = $ENV{'HOME'} if( !$home );
+  $home = '.' if( !$home );
+
+  return "$home/.fhemconnect/runtime";
+}
+
+# command of the local installation, undef if not installed
+sub
+gassistant_localCmd($)
+{
+  my ($hash) = @_;
+
+  my $node = gassistant_runtimeDir($hash) .'/node';
+  my $bin = "$node/lib/node_modules/gassistant-fhem/bin/gassistant-fhem";
+
+  # start with the own node, the #! line of bin/gassistant-fhem would use the system node
+  return "$node/bin/node $bin" if( -X "$node/bin/node" && -f $bin );
+  return undef;
+}
+
+# installs Node.js (if missing or outdated) and gassistant-fhem@<version> in the background
+sub
+gassistant_install($$)
+{
+  my ($hash, $version) = @_;
+  my $name = $hash->{NAME};
+
+  return "installation already running" if( $hash->{helper}{installPid} );
+
+  delete $hash->{helper}{installFailed};
+  my $dir = gassistant_runtimeDir($hash);
+  readingsSingleUpdate($hash, 'gassistant-fhem-install', "installing gassistant-fhem\@$version...", 1 );
+  Log3 $name, 3, "$name: installing gassistant-fhem\@$version in $dir, log: $dir/install.log";
+
+  my $bc = BlockingCall( 'gassistant_installRun', "$name|$dir|$version", 'gassistant_installDone',
+                         1800, 'gassistant_installAborted', $name );
+  $hash->{helper}{installPid} = $bc->{pid} if( $bc );
+  return undef;
+}
+
+# runs in a forked process
+sub
+gassistant_installRun($)
+{
+  my ($string) = @_;
+  my ($name, $dir, $version) = split( /\|/, $string, 3 );
+
+  # low CPU and IO priority, FHEM and the running gassistant-fhem should not be slowed down
+  setpriority( 0, 0, 19 );
+  system( "ionice -c2 -n7 -p $$ >/dev/null 2>&1" ) if( qx(command -v ionice 2>/dev/null) );
+
+  my $result = eval { gassistant_installSteps($name, $dir, $version) };
+  if( $@ ) {
+    my $err = $@;
+    $err =~ s/[\r\n|]+/ /g;
+    $err =~ s/\s+at \S+ line \d+\.?\s*$//;
+    return "$name|error|$err";
+  }
+  return "$name|ok|$result";
+}
+
+sub
+gassistant_installSteps($$$)
+{
+  my ($name, $dir, $version) = @_;
+
+  my $q = sub { my $s = shift; $s =~ s/'/'\\''/g; return "'$s'" };
+
+  system( 'mkdir -p '. $q->("$dir/tmp") ) == 0 or die "can't create $dir\n";
+  my $log = "$dir/install.log";
+  open( my $fh, '>', $log ) or die "can't write $log: $!\n";
+  close( $fh );
+  my $progress = sub {
+    my ($msg) = @_;
+    open( my $l, '>>', $log ); print $l '# '. localtime() ." $msg\n"; close( $l );
+    BlockingInformParent( 'gassistant_installProgress', [$name, $msg], 0 );
+  };
+  my $run = sub {
+    my ($cmd, $err) = @_;
+    open( my $l, '>>', $log ); print $l "\$ $cmd\n"; close( $l );
+    system( "$cmd >> ". $q->($log) ." 2>&1" ) == 0 or die "$err, see $log\n";
+  };
+
+  my $get;
+  if( qx(command -v curl 2>/dev/null) ) {
+    $get = sub { my ($url, $file) = @_; $run->( 'curl -fsSL --retry 2 -o '. $q->($file) .' '. $q->($url), "download of $url failed" ) };
+  } elsif( qx(command -v wget 2>/dev/null) ) {
+    $get = sub { my ($url, $file) = @_; $run->( 'wget -q -O '. $q->($file) .' '. $q->($url), "download of $url failed" ) };
+  } else {
+    die "curl or wget is required\n";
+  }
+
+  # Node.js build for this system
+  my $machine = qx(uname -m); chomp( $machine );
+  my %arch = ( x86_64 => 'x64', amd64 => 'x64', aarch64 => 'arm64', arm64 => 'arm64', armv7l => 'armv7l', armv6l => 'armv6l' );
+  die "unsupported architecture $machine\n" if( !$arch{$machine} );
+  die "unsupported OS $^O\n" if( $^O ne 'linux' && $^O ne 'darwin' );
+  my @musl = $^O eq 'linux' ? glob('/lib/ld-musl-*') : ();
+  my $musl = @musl ? 1 : 0;
+  my $dist = "$^O-$arch{$machine}". ($musl ? '-musl' : '');
+  my %official = map { $_ => 1 } qw(linux-x64 linux-arm64 linux-armv7l linux-x64-musl darwin-x64 darwin-arm64);
+
+  my $node = "$dir/node";
+  my $current = -X "$node/bin/node" ? qx('$node/bin/node' --version 2>/dev/null) : '';
+  chomp( $current );
+
+  # latest Node.js of the major version
+  $progress->( "checking Node.js $gassistant_nodeMajor..." );
+  my ($latest, $url);
+  eval {
+    if( $official{$dist} ) {
+      $get->( "https://nodejs.org/dist/latest-v$gassistant_nodeMajor.x/SHASUMS256.txt", "$dir/tmp/SHASUMS256.txt" );
+      $url = "https://nodejs.org/dist";
+    } else {
+      # e.g. armv6l (Raspberry Pi Zero/1): unofficial builds
+      $get->( 'https://unofficial-builds.nodejs.org/download/release/index.json', "$dir/tmp/index.json" );
+      open( my $i, '<', "$dir/tmp/index.json" ) or die "index.json: $!\n";
+      my $index = decode_json( join('', <$i>) );
+      close( $i );
+      my ($rel) = grep { $_->{version} =~ m/^v$gassistant_nodeMajor\./ && grep( { $_ eq $dist } @{$_->{files}} ) } @{$index};
+      die "no Node.js $gassistant_nodeMajor for $dist\n" if( !$rel );
+      $url = "https://unofficial-builds.nodejs.org/download/release";
+      $get->( "$url/$rel->{version}/SHASUMS256.txt", "$dir/tmp/SHASUMS256.txt" );
+    }
+    open( my $s, '<', "$dir/tmp/SHASUMS256.txt" ) or die "SHASUMS256.txt: $!\n";
+    while( my $line = <$s> ) {
+      $latest = { version => $2, sha => $1 } if( $line =~ m/^([0-9a-f]{64})\s+node-(v[0-9.]+)-$dist\.tar\.gz$/ );
+    }
+    close( $s );
+    die "no Node.js for $dist\n" if( !$latest );
+  };
+  my $err = $@;
+  die $err if( $err && !$current ); # without Node.js nothing can be installed
+
+  my $target = $node;
+  if( $latest && $current ne $latest->{version} ) {
+    my $file = "$dir/tmp/node-$latest->{version}-$dist.tar.gz";
+    $progress->( "downloading Node.js $latest->{version}..." );
+    $get->( "$url/$latest->{version}/node-$latest->{version}-$dist.tar.gz", $file );
+
+    require Digest::SHA;
+    my $sha = Digest::SHA->new(256)->addfile($file, 'b')->hexdigest;
+    die "checksum of $file is wrong\n" if( $sha ne $latest->{sha} );
+
+    $target = "$dir/node.new";
+    $progress->( "extracting Node.js $latest->{version}..." );
+    $run->( 'rm -rf '. $q->($target) .' '. $q->("$dir/tmp/x") .' && mkdir -p '. $q->("$dir/tmp/x") .
+            ' && tar -xzf '. $q->($file) .' -C '. $q->("$dir/tmp/x") .
+            ' && mv '. $q->("$dir/tmp/x/node-$latest->{version}-$dist") .' '. $q->($target), "extracting Node.js failed" );
+  }
+
+  # gassistant-fhem as global package of the own Node.js (also updates from FHEM work with it)
+  local $ENV{'npm_config_update_notifier'} = 'false';
+  local $ENV{'NODE_ENV'} = 'production';
+  $progress->( "installing gassistant-fhem\@$version with npm (can take several minutes)..." );
+  my $ok = eval {
+    $run->( $q->("$target/bin/node") .' '. $q->("$target/lib/node_modules/npm/bin/npm-cli.js") .
+            ' install -g --prefix '. $q->($target) .' '. $q->("gassistant-fhem\@$version") .
+            ' --no-audit --no-fund --maxsockets=4', "npm install gassistant-fhem\@$version failed" );
+    1;
+  };
+  if( !$ok ) {
+    my $e = $@;
+    system( 'rm -rf '. $q->("$dir/node.new") ) if( $target ne $node );
+    die $e;
+  }
+
+  # switch to the new Node.js
+  if( $target ne $node ) {
+    $run->( 'rm -rf '. $q->("$dir/node.old") .
+            ( -e $node ? ' && mv '. $q->($node) .' '. $q->("$dir/node.old") : '' ) .
+            ' && mv '. $q->($target) .' '. $q->($node) .' && rm -rf '. $q->("$dir/node.old") .' '. $q->("$dir/tmp"),
+            "switching to the new Node.js failed" );
+  }
+
+  my $nodeVersion = qx('$node/bin/node' --version 2>/dev/null); chomp( $nodeVersion );
+  my $gaVersion = '';
+  if( open( my $p, '<', "$node/lib/node_modules/gassistant-fhem/package.json" ) ) {
+    my $pkg = eval { decode_json( join('', <$p>) ) };
+    close( $p );
+    $gaVersion = $pkg->{version} if( $pkg );
+  }
+  my $warn = $err ? " (Node.js update check failed: $err)" : '';
+  $warn =~ s/[\r\n|]+/ /g;
+  return "$nodeVersion|$gaVersion|$warn";
+}
+
+sub
+gassistant_installProgress($$)
+{
+  my ($name, $msg) = @_;
+  my $hash = $defs{$name};
+  return if( !$hash );
+
+  readingsSingleUpdate($hash, 'gassistant-fhem-install', $msg, 1 );
+}
+
+sub
+gassistant_installDone($)
+{
+  my ($string) = @_;
+  my ($name, $status, @r) = split( /\|/, $string );
+  my $hash = $defs{$name};
+  return if( !$hash );
+
+  delete $hash->{helper}{installPid};
+
+  if( $status ne 'ok' ) {
+    $hash->{helper}{installFailed} = 1;
+    readingsSingleUpdate($hash, 'gassistant-fhem-install', "failed: $r[0]", 1 );
+    Log3 $name, 2, "$name: installation of gassistant-fhem failed: $r[0]";
+    CoProcess::start($hash) if( !$hash->{PID} );
+    return;
+  }
+
+  my ($node, $version, $warn) = @r;
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, 'gassistant-fhem-install', "installed $version, Node.js $node". ($warn // ''), 1 );
+  readingsBulkUpdate($hash, 'gassistant-fhem-node', $node, 1 );
+  readingsEndUpdate($hash, 1);
+  Log3 $name, 3, "$name: installed gassistant-fhem $version with Node.js $node";
+
+  # starts or restarts gassistant-fhem with the local installation
+  CoProcess::start($hash);
+}
+
+sub
+gassistant_installAborted($)
+{
+  my ($name) = @_;
+  my $hash = $defs{$name};
+  return if( !$hash );
+
+  delete $hash->{helper}{installPid};
+  $hash->{helper}{installFailed} = 1;
+  readingsSingleUpdate($hash, 'gassistant-fhem-install', 'failed: timeout', 1 );
+  Log3 $name, 2, "$name: installation of gassistant-fhem aborted (timeout)";
+  CoProcess::start($hash) if( !$hash->{PID} );
+}
+
 sub
 gassistant_getCMD($)
 {
@@ -422,12 +702,27 @@ gassistant_getCMD($)
   my $cmd;
   if( $ssh_cmd ) {
     $cmd = AttrVal( $name, "gassistantFHEM-cmd", qx( $ssh_cmd which gassistant-fhem ) );
+  } elsif( gassistant_managedRuntime($hash) ) {
+    $cmd = gassistant_localCmd($hash);
+    if( !$cmd ) {
+      # not installed yet (new or existing installation): install it in the background,
+      # a global installation is used until the installation is finished
+      gassistant_install($hash, 'latest') if( !$hash->{helper}{installFailed} );
+      $cmd = qx( which gassistant-fhem );
+      chomp( $cmd );
+      if( !$cmd || !(-X $cmd) ) {
+        return (undef, "installing gassistant-fhem, see reading gassistant-fhem-install") if( $hash->{helper}{installPid} );
+        return (undef, "installation of gassistant-fhem failed, see ". gassistant_runtimeDir($hash) ."/install.log. retry with 'set $name update'.");
+      }
+      Log3 $name, 3, "$name: using $cmd until the installation in ". gassistant_runtimeDir($hash) ." is finished" if( $hash->{helper}{installPid} );
+    }
   } else {
     $cmd = AttrVal( $name, "gassistantFHEM-cmd", qx( which gassistant-fhem ) );
   }
   chomp( $cmd );
 
-  if( !$ssh_cmd && !(-X $cmd) ) {
+  my ($exec) = split( ' ', $cmd, 2 );
+  if( !$ssh_cmd && !($exec && -X $exec) ) {
     my $msg = "gassistant-fhem not installed. install with 'sudo npm install -g gassistant-fhem --unsafe-perm'.";
     $msg = "$cmd does not exist" if( $cmd );
     return (undef, $msg);
@@ -476,7 +771,7 @@ gassistant_Set($$@)
 {
   my ($hash, $name, $cmd, @args) = @_;
 
-  my $list = "authcode refreshToken createDefaultConfig:noArg clearCredentials:noArg unregister:noArg reload:noArg";
+  my $list = "authcode refreshToken createDefaultConfig:noArg clearCredentials:noArg unregister:noArg reload:noArg update";
 
   if( $cmd eq 'reload' ) {
     $hash->{".triggerUsed"} = 1;
@@ -486,6 +781,19 @@ gassistant_Set($$@)
       FW_directNotify($name, 'reload');
     }
     DoTrigger( $name, "reload" );
+
+    return undef;
+
+  } elsif( $cmd eq 'update' ) {
+    my $version = $args[0] // 'latest';
+    return "usage: set $name $cmd [version]" if( $version !~ m/^[0-9A-Za-z][0-9A-Za-z.+-]*$/ );
+
+    # local installation: installed by this module, gassistant-fhem is restarted afterwards
+    return gassistant_install($hash, $version) if( gassistant_managedRuntime($hash) );
+
+    # otherwise gassistant-fhem updates its global npm installation and restarts itself with 'set $name restart'
+    $hash->{".triggerUsed"} = 1;
+    DoTrigger( $name, "update: $version" );
 
     return undef;
 
@@ -680,14 +988,20 @@ gassistant_Attr($$$)
 
   } elsif( $attrName eq 'gassistantFHEM-log' ) {
     if( $cmd eq "set" && $attrVal && $attrVal ne 'FHEM' ) {
-      fhem( "defmod -temporary gassistantFHEMlog FileLog $attrVal fakelog" );
+      # defmod -temporary fails for an existing device ("Define -temporary first")
+      if( $defs{gassistantFHEMlog} ) {
+        fhem( "modify gassistantFHEMlog $attrVal fakelog" );
+      } else {
+        fhem( "define -temporary gassistantFHEMlog FileLog $attrVal fakelog" );
+      }
       CommandAttr( undef, 'gassistantFHEMlog room hidden' );
       #if( my $room = AttrVal($name, "room", undef ) ) {
       #  CommandAttr( undef,"gassistantFHEMlog room $room" );
       #}
       $hash->{logfile} = $attrVal;
     } else {
-      fhem( "delete gassistantFHEMlog" );
+      fhem( "delete gassistantFHEMlog" ) if( $defs{gassistantFHEMlog} );
+      delete $hash->{logfile};
     }
 
     $attr{$name}{$attrName} = $attrVal;
@@ -766,6 +1080,14 @@ gassistant_Attr($$$)
       Reloads the devices and sends them to Google.
       </li>
 
+    <li>update [version]<br>
+      Updates gassistant-fhem (default: latest version) and restarts it.<br>
+      With gassistantFHEM-runtime local (default) gassistant-fhem and Node.js are installed by this module in
+      &lt;home&gt;/.fhemconnect/runtime, the latest Node.js 22 is also updated.
+      The progress is shown in the reading gassistant-fhem-install.<br>
+      Otherwise the npm of the Node.js installation running gassistant-fhem is used (global installation),
+      the progress is shown in the reading gassistant-fhem-update.</li>
+
     <li>createDefaultConfig<br>
     creates a default gassistant-fhem.cfg file
     gassistantFHEM-config attribut if not already set.</li>
@@ -798,6 +1120,12 @@ gassistant_Attr($$$)
       see <a href="#FileLog">FileLog</a></li>.
     <li>gassistantFHEM-params<br>
       Additional gassistant-fhem cmdline params.</li>
+    <li>gassistantFHEM-runtime local|system<br>
+      local (default): this module installs gassistant-fhem with an own Node.js in &lt;home&gt;/.fhemconnect/runtime
+      (no root rights needed, independent of the Node.js version of the system, needs curl or wget).
+      An existing global installation is used until the local installation is finished.<br>
+      system: use the global installation (which gassistant-fhem).<br>
+      Not used with gassistantFHEM-cmd.</li>
 
     <li>gassistantName<br>
       The name to use for a device with gassistant.</li>
