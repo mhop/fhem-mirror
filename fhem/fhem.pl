@@ -5425,12 +5425,16 @@ json2nameValue($;$$$$)
         $esc = !$esc;
       } elsif($s eq '"' && !$esc) {
         my $val = substr($t,1,$off-1);
+        my %esc = ('"'=>'"', '\\'=>'\\', '/'=>'/',
+                   b=>"\b", f=>"\f", n =>"\n", r=>"\r", t=>"\t", u=>"\\u");
+        my $escErr;
+        $val =~ s/\\(.)/$esc{$1} ? $esc{$1} : ($escErr=$1)/ge;
+        return ("json2nameValue: unexpected \\$escErr",'','') if($escErr);
+
         if($val =~ m/\\u([0-9A-F]{4})/i) {
           $val =~ s/\\u([0-9A-F]{4})/chr(hex($1))/gsie; # toJSON reverse
           $val = Encode::encode("UTF-8", $val) if(!$unicodeEncoding); #128932
         }
-        my %t = ( n =>"\n", '"'=>'"', '\\'=>'\\' );
-        $val =~ s/\\([n"\\])/$t{$1}/ge;
         return (undef, $val, substr($t,$off+1));
       } else {
         $esc = 0;
