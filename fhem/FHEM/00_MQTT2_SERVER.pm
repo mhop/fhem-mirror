@@ -564,7 +564,7 @@ MQTT2_SERVER_Read($@)
     }
 
     if($hash->{protoNum} == 5) { # UNSUBACK: pid, no properties, reason codes
-      MQTT2_SERVER_out($hash, pack("CCnCC*",0xb0,2+@ret,$pid,0,@ret), $dump);
+      MQTT2_SERVER_out($hash, pack("CCnCC*",0xb0,3+@ret,$pid,0,@ret), $dump);
     } else {
       MQTT2_SERVER_out($hash, pack("CCn", 0xb0, 2, $pid), $dump);
     }
