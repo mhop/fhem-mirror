@@ -73,6 +73,8 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.8" => "11.10.2026  ___batAdjustPowerByMargin: Prüfung 'Ziel nicht erreichbar' erfolgt jetzt vor der Margin-Prüfung, daher ".
+                           "volle Ladeleistung auch bei safetyMargin=0 ",
   "2.10.7" => "10.10.2026  Driftanalyse (aiFannDetectDrift): Ersatz der Quelle airaw durch Werte aus pvHistory (_aiFannDriftHistSlice) -> Verringerung RAM Footprint ".
                            "CachedHistoryVal: Zeitkontext auf Minute gerundet -> weniger Misses/Verdrängungen im TS_OFFSET_Cache ",
   "2.10.6" => "05.10.2026  siehe Changelog ".
@@ -17052,12 +17054,13 @@ sub ___batAdjustPowerByMargin {
 
   my $pow;
   my $ratio         = ___batRatio ($runwhneed, $remainingSurp, $befficiency);
-  my $limWithMargin = $limpower * (1.0 + $otpMargin / 100.0);                          # Hinweis: das ist bewusst ein permanenter Sicherheitsaufschlag
-  $limpower         = min ($limpower,      $pinmax);                                   # limpower !> pinmax um invertierte Interpolation zu vermeiden
+  my $limWithMargin = $limpower * (1.0 + $otpMargin / 100.0);                           # Hinweis: das ist bewusst ein permanenter Sicherheitsaufschlag
+  $limpower         = min ($limpower,      $pinmax);                                    # limpower !> pinmax um invertierte Interpolation zu vermeiden
   $limWithMargin    = min ($limWithMargin, $pinmax);
 
-  if    ($limpower <= 0 || $otpMargin == 0)           { $pow = $limpower }
-  elsif ($limWithMargin >= $pinmax || $ratio <= 100)  { $pow = $pinmax }
+  if    ($limpower <= 0)                              { $pow = $limpower }
+  elsif ($ratio <= 100 || $limWithMargin >= $pinmax)  { $pow = $pinmax }                # V2.10.8 Fix: Ziel nicht erreichbar -> pinmax, auch bei otpMargin == 0
+  elsif ($otpMargin == 0)                             { $pow = $limpower }
   elsif ($ratio >= 100 + $otpMargin)                  { $pow = $limWithMargin }
   else                                                { $pow = $pinmax - ($pinmax - $limWithMargin) * ($ratio - 100.0) / $otpMargin }
 

@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  76_SolarForecast: Bat-Steuerung opt-/smartPower mit safetyMargin=0
  - feature: 98_MemSaver: Set Befehl kann 'Tag' mitgeben, Win Unterstützung
  - change:  76_SolarForecast: Version 2.10.7, interne Optimierungen
  - change:  76_SolarForecast: Version 2.10.6
