@@ -372,11 +372,11 @@ sub DOIF_RegisterCell
   
   if ($widsty==2) {
       $reading="state" if ($reading eq '&STATE');
-      return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,$style,$widget,".(defined $command ? "$command":"''").",'$dev','$reading')";
+      return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',($expr),$style,$widget,".(defined $command ? "$command":"''").",'$dev','$reading')";
   } elsif ($widsty==3) {
-      return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr)";
+      return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',($expr))";
   } elsif (($widsty==1) or $trigger) {
-      return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',$expr,$style)";
+      return "$hash->{$table}{package}::DOIF_Widget(".'$hash,$reg,'."'$doifId',($expr),$style)";
   } else {
       return ("$hash->{$table}{package}".$expr);
   }
