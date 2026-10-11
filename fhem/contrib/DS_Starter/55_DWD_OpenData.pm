@@ -1389,7 +1389,9 @@ sub ParseDateTimeLocal {
 sub ParseDateLocal {
   my ($hash, $s) = @_;
   my $t;
-  eval { $t = Timelocal($hash, Time::Piece->strptime($s, '%Y-%m-%d')) };
+  if (defined($s) && $s =~ m/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/) {
+    eval { $t = Timelocal($hash, 0, 0, 0, $3, $2 - 1, $1) };
+  }
   return $t;
 }
 
@@ -1584,7 +1586,7 @@ sub PruneForecast {
       my @parts = $readingName =~ /^fc(\d+)_.*/;
       if (scalar(@parts) == 1) {
         my $relativeDay = $parts[0];
-        my $timestamp = ::time_str2num($hash->{READINGS}{TIME});
+        my $timestamp = ::time_str2num($hash->{READINGS}{$readingName}{TIME});
         my $youngestTimestamp = $youngestTimestamps{$relativeDay};
         if (!defined($youngestTimestamp) || $timestamp > $youngestTimestamp) {
           $youngestTimestamps{$relativeDay} = $timestamp;
@@ -1599,7 +1601,7 @@ sub PruneForecast {
       my @parts = $readingName =~ /^fc(\d+)_.*/;
       if (scalar(@parts) == 1) {
         my $relativeDay = $parts[0];
-        my $timestamp = ::time_str2num($hash->{READINGS}{TIME});
+        my $timestamp = ::time_str2num($hash->{READINGS}{$readingName}{TIME});
         my $youngestTimestamp = $youngestTimestamps{$relativeDay};
         if (defined($youngestTimestamp) && $timestamp < ($youngestTimestamp - 86400)) {
           ::Log3 $name, 3, "$name: PruneForecast WARNING: deleting reading $readingName because it is more than 1 day older than all other readings of the same day";
@@ -2959,7 +2961,7 @@ sub GetAlertsFinish {
       $alertsErrorMessage[$communeUnion] = undef;
     }
 
-    if ($paramCount > 3 && $errorMessage ne 'up-to-date') {
+    if ($paramCount > 3 && $warncellId >= 0 && $errorMessage ne 'up-to-date') {
       # update alert readings for warncell id
       UpdateAlerts($hash, $warncellId, \%docHeader);
     }
@@ -3027,107 +3029,162 @@ sub UpdateAlerts {
   my ($hash, $warncellId, $docHeader) = @_;
   my $name = $hash->{NAME};
 
-  # delete existing alert readings
-  ::CommandDeleteReading(undef, "$name ^(?!a_count|a_state|a_time|a_url|a_dwdDocSize|a_dwdDocTime)a_.*");
-
   ::readingsBeginUpdate($hash);
 
-  # create alert for next 24 hours, if retrieval failed
-  my $index        = 0;
-  my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-  
-  if (defined($alertsErrorMessage[$communeUnion]) && length($alertsErrorMessage[$communeUnion]) > 0) {
-    my $prefix = 'a_'.$index.'_';
-    my $time = time();
-    ::readingsBulkUpdate($hash, $prefix.'category',     'Met');
-    ::readingsBulkUpdate($hash, $prefix.'event',        0);
-    ::readingsBulkUpdate($hash, $prefix.'eventDesc',    (!$::unicodeEncoding ? encode('UTF-8', 'STÖRUNG') : 'STÖRUNG'));
-    ::readingsBulkUpdate($hash, $prefix.'eventGroup',   'FHEM');
-    ::readingsBulkUpdate($hash, $prefix.'responseType', 'Prepare');
-    ::readingsBulkUpdate($hash, $prefix.'urgency',      'Immediate');
-    ::readingsBulkUpdate($hash, $prefix.'severity',     'Severe');
-    ::readingsBulkUpdate($hash, $prefix.'areaColor',    '255, 0, 0');
-    ::readingsBulkUpdate($hash, $prefix.'onset',        FormatDateTimeLocal($hash, $time));
-    ::readingsBulkUpdate($hash, $prefix.'expires',      FormatDateTimeLocal($hash, $time+24*60*60));
-    ::readingsBulkUpdate($hash, $prefix.'headline',     'FHEM: Aktualisierung der Wetterwarnungen fehlgeschlagen');
-    ::readingsBulkUpdate($hash, $prefix.'description',  "Fehler: $alertsErrorMessage[$communeUnion]");
-    ::readingsBulkUpdate($hash, $prefix.'instruction',  (!$::unicodeEncoding ? encode('UTF-8', 'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.') : 'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.'));
-    ::readingsBulkUpdate($hash, $prefix.'area',         0);
-    ::readingsBulkUpdate($hash, $prefix.'areaDesc',     'DWD Open Data Server');
-    ::readingsBulkUpdate($hash, $prefix.'altitude',     0);
-    ::readingsBulkUpdate($hash, $prefix.'ceiling',      0);
-    $index++;
-
-    ::readingsBulkUpdate($hash, 'a_state', "error: $alertsErrorMessage[$communeUnion]");
-  } 
-  else {
-    ::readingsBulkUpdate($hash, 'a_state', 'updated');
-  }
-
   # prepare processing
+  my $communeUnion       = IsCommuneUnionWarncellId($warncellId);
   my $alertExcludeEvents = ::AttrVal($name, 'alertExcludeEvents', undef);
   my @excludeEventsList  = split(',', $alertExcludeEvents) if (defined($alertExcludeEvents));
   
   for my $excludeEvent (@excludeEventsList) {
     $excludeEvent =~ s/^\s+|\s+$//g; # trim
   }
+  
   my %excludeEvents = map { $_ => 1 } @excludeEventsList;
 
-  # order alerts by onset
+  # build new block data in %newReadings (key "a_N_property" => value)
+  my %newReadings;
+  my $index = 0;
+
+  # create alert for next 24 hours, if retrieval failed
+  if (defined($alertsErrorMessage[$communeUnion]) && length($alertsErrorMessage[$communeUnion]) > 0) {
+    my $prefix = 'a_'.$index.'_';
+    my $time = time();
+    $newReadings{$prefix.'category'}     = 'Met';
+    $newReadings{$prefix.'event'}        = 0;
+    $newReadings{$prefix.'eventDesc'}    = (!$::unicodeEncoding ? encode('UTF-8', 'STÖRUNG') : 'STÖRUNG');
+    $newReadings{$prefix.'eventGroup'}   = 'FHEM';
+    $newReadings{$prefix.'responseType'} = 'Prepare';
+    $newReadings{$prefix.'urgency'}      = 'Immediate';
+    $newReadings{$prefix.'severity'}     = 'Severe';
+    $newReadings{$prefix.'areaColor'}    = '255, 0, 0';
+    $newReadings{$prefix.'onset'}        = FormatDateTimeLocal($hash, $time);
+    $newReadings{$prefix.'expires'}      = FormatDateTimeLocal($hash, $time+24*60*60);
+    $newReadings{$prefix.'headline'}     = 'FHEM: Aktualisierung der Wetterwarnungen fehlgeschlagen';
+    $newReadings{$prefix.'description'}  = "Fehler: $alertsErrorMessage[$communeUnion]";
+    $newReadings{$prefix.'instruction'}  = (!$::unicodeEncoding ? encode('UTF-8', 'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.') : 'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.');
+    $newReadings{$prefix.'area'}         = 0;
+    $newReadings{$prefix.'areaDesc'}     = 'DWD Open Data Server';
+    $newReadings{$prefix.'altitude'}     = 0;
+    $newReadings{$prefix.'ceiling'}      = 0;
+    $index++;
+
+    $newReadings{'a_state'} = "error: $alertsErrorMessage[$communeUnion]";
+  } 
+  else {
+    $newReadings{'a_state'} = 'updated';
+  }
+
+  # order alerts by onset (identifier as tie-breaker for a stable block order)
   if (ref($alertsData[$communeUnion]) eq 'HASH') {
     my $alerts = $alertsData[$communeUnion];
-    my @identifiers = sort { $alerts->{$a}->{onset} <=> $alerts->{$b}->{onset} } keys(%{$alerts});
+    my @identifiers = sort { $alerts->{$a}->{onset} <=> $alerts->{$b}->{onset} || $a cmp $b } keys(%{$alerts});
     
     for my $identifier (@identifiers) {
       my $alert = $alerts->{$identifier};
-      
       # find alert for selected warncell
       my $areaIndex = 0;
+      
       for my $wcId (@{$alert->{warncellid}}) {
         if ($wcId == $warncellId && !(lc($alert->{severity}) eq 'minor' && defined($excludeEvents{$alert->{eventCode}}))) {
-          # alert found that is not on the exclude list, create readings
+          # alert found that is not on the exclude list, fill readings
           my $prefix = 'a_'.$index.'_';
-          ::readingsBulkUpdate($hash, $prefix.'category',     $alert->{category});
-          ::readingsBulkUpdate($hash, $prefix.'event',        $alert->{eventCode});
-          ::readingsBulkUpdate($hash, $prefix.'eventDesc',    (!$::unicodeEncoding ? encode('UTF-8', $alert->{event}) : $alert->{event}));
-          ::readingsBulkUpdate($hash, $prefix.'eventGroup',   $alert->{eventGroup});
-          ::readingsBulkUpdate($hash, $prefix.'responseType', $alert->{responseType});
-          ::readingsBulkUpdate($hash, $prefix.'urgency',      $alert->{urgency});
-          ::readingsBulkUpdate($hash, $prefix.'severity',     $alert->{severity});
-          ::readingsBulkUpdate($hash, $prefix.'areaColor',    $alert->{areaColor});
-          ::readingsBulkUpdate($hash, $prefix.'onset',        FormatDateTimeLocal($hash, $alert->{onset}));
-          ::readingsBulkUpdate($hash, $prefix.'expires',      FormatDateTimeLocal($hash, $alert->{expires}));
-          ::readingsBulkUpdate($hash, $prefix.'headline',     (!$::unicodeEncoding ? encode('UTF-8', $alert->{headline}) : $alert->{headline}));
-          ::readingsBulkUpdate($hash, $prefix.'description',  (!$::unicodeEncoding ? encode('UTF-8', $alert->{description}) : $alert->{description}));
-          ::readingsBulkUpdate($hash, $prefix.'instruction',  (!$::unicodeEncoding ? encode('UTF-8', $alert->{instruction}) : $alert->{instruction}));
-          ::readingsBulkUpdate($hash, $prefix.'area',         $alert->{warncellid}[$areaIndex]);
-          ::readingsBulkUpdate($hash, $prefix.'areaDesc',     (!$::unicodeEncoding ? encode('UTF-8', $alert->{areaDesc}[$areaIndex]) : $alert->{areaDesc}[$areaIndex]));
-          ::readingsBulkUpdate($hash, $prefix.'altitude',     floor(0.3048*$alert->{altitude}[$areaIndex] + 0.5));
-          ::readingsBulkUpdate($hash, $prefix.'ceiling',      floor(0.3048*$alert->{ceiling}[$areaIndex] + 0.5));
+          $newReadings{$prefix.'category'}     = $alert->{category};
+          $newReadings{$prefix.'event'}        = $alert->{eventCode};
+          $newReadings{$prefix.'eventDesc'}    = (!$::unicodeEncoding ? encode('UTF-8', $alert->{event}) : $alert->{event});
+          $newReadings{$prefix.'eventGroup'}   = $alert->{eventGroup};
+          $newReadings{$prefix.'responseType'} = $alert->{responseType};
+          $newReadings{$prefix.'urgency'}      = $alert->{urgency};
+          $newReadings{$prefix.'severity'}     = $alert->{severity};
+          $newReadings{$prefix.'areaColor'}    = $alert->{areaColor};
+          $newReadings{$prefix.'onset'}        = FormatDateTimeLocal($hash, $alert->{onset});
+          $newReadings{$prefix.'expires'}      = FormatDateTimeLocal($hash, $alert->{expires});
+          $newReadings{$prefix.'headline'}     = (!$::unicodeEncoding ? encode('UTF-8', $alert->{headline}) : $alert->{headline});
+          $newReadings{$prefix.'description'}  = (!$::unicodeEncoding ? encode('UTF-8', $alert->{description}) : $alert->{description});
+          $newReadings{$prefix.'instruction'}  = (!$::unicodeEncoding ? encode('UTF-8', $alert->{instruction}) : $alert->{instruction});
+          $newReadings{$prefix.'area'}         = $alert->{warncellid}[$areaIndex];
+          $newReadings{$prefix.'areaDesc'}     = (!$::unicodeEncoding ? encode('UTF-8', $alert->{areaDesc}[$areaIndex]) : $alert->{areaDesc}[$areaIndex]);
+          $newReadings{$prefix.'altitude'}     = floor(0.3048*$alert->{altitude}[$areaIndex] + 0.5);
+          $newReadings{$prefix.'ceiling'}      = floor(0.3048*$alert->{ceiling}[$areaIndex] + 0.5);
           $index++;
           last();
         }
-        
         $areaIndex++;
       }
 
       # license
       if ($index == 1 && defined($alert->{license})) {
-        ::readingsBulkUpdate($hash, 'a_copyright', (!$::unicodeEncoding ? encode('UTF-8', $alert->{license}) : $alert->{license}));
+        $newReadings{'a_copyright'} = (!$::unicodeEncoding ? encode('UTF-8', $alert->{license}) : $alert->{license});
       }
     }
   }
 
-  # alert count, receive time and DWD document properties
-  ::readingsBulkUpdate($hash, 'a_count', $index);
+  # alert count and DWD document properties
+  $newReadings{'a_count'} = $index;
   if (defined($docHeader)) {
-    ::readingsBulkUpdate($hash, "a_time", FormatDateTimeLocal($hash, $docHeader->{receivedTime}));
-    ::readingsBulkUpdate($hash, "a_url", $docHeader->{url});
-    ::readingsBulkUpdate($hash, "a_dwdDocSize", $docHeader->{dwdDocSize});
-    ::readingsBulkUpdate($hash, "a_dwdDocTime", $docHeader->{dwdDocTime});
+    $newReadings{'a_time'}       = FormatDateTimeLocal($hash, $docHeader->{receivedTime});
+    $newReadings{'a_url'}        = $docHeader->{url};
+    $newReadings{'a_dwdDocSize'} = $docHeader->{dwdDocSize};
+    $newReadings{'a_dwdDocTime'} = $docHeader->{dwdDocTime};
+  }
+  $newReadings{'state'} = 'alerts updated';
+
+  # determine old a_N_* block indices from current readings
+  my %oldIndices;
+  for my $r (keys %{$hash->{READINGS}}) {
+    if ($r =~ /^a_(\d+)_/) {
+      $oldIndices{$1} = 1;
+    }
   }
 
-  ::readingsBulkUpdate($hash, 'state', 'alerts updated');
+  # determine new a_N_* block indices
+  my %newIndices;
+  for my $r (keys %newReadings) {
+    if ($r =~ /^a_(\d+)_/) {
+      $newIndices{$1} = 1;
+    }
+  }
+
+  # write block only if at least one value in the block changed
+  for my $i (sort {$a <=> $b} keys %newIndices) {
+    my $changed = 0;
+    
+    for my $r (keys %newReadings) {
+      next unless $r =~ /^a_${i}_/;
+      my $old = ::ReadingsVal($name, $r, undef);
+      if (!defined($old) || $old ne $newReadings{$r}) {
+        $changed = 1;
+        last;
+      }
+    }
+    
+    if ($changed) {
+      for my $r (keys %newReadings) {
+        next unless $r =~ /^a_${i}_/;
+        ::readingsBulkUpdate($hash, $r, $newReadings{$r});
+      }
+    }
+  }
+
+  # delete a_N_* blocks that no longer exist
+  for my $i (keys %oldIndices) {
+    if (!$newIndices{$i}) {
+      ::CommandDeleteReading(undef, "$name ^a_${i}_.*");
+    }
+  }
+
+  # delete license reading if no alert remains
+  if (!defined($newReadings{'a_copyright'}) && defined($hash->{READINGS}{'a_copyright'})) {
+    ::CommandDeleteReading(undef, "$name a_copyright");
+  }
+
+  # global readings (always written)
+  for my $r (qw(a_count a_state a_copyright state)) {
+    ::readingsBulkUpdate($hash, $r, $newReadings{$r}) if defined($newReadings{$r});
+  }
+  for my $r (qw(a_time a_url a_dwdDocSize a_dwdDocTime)) {
+    ::readingsBulkUpdate($hash, $r, $newReadings{$r}) if defined($newReadings{$r});
+  }
 
   ::readingsEndUpdate($hash, 1);
 
@@ -3197,7 +3254,16 @@ sub DWD_OpenData_Initialize {
 # bugfix: Shutdown/Undef: BlockingCall für Alerts wird beendet (Hash-Schlüssel .alertsBlockingCall<N>
 #         korrigiert), Temp-Dateien beider Alert-Caches werden entfernt
 # change: neue Funktion RemoveTempFile
-#
+# bugfix: ParseDateLocal lieferte immer undef (Time::Piece-Objekt an Timelocal übergeben), dadurch wurde
+#         RotateForecast nie ausgeführt und fc0_0_* blieb veraltet; Datum wird jetzt per Regex zerlegt
+# bugfix: PruneForecast verwendete $hash->{READINGS}{TIME} statt den Zeitstempel des jeweiligen Readings
+#         (bei forecastPruning=1 wurde nie etwas gelöscht)
+# feature: Alert-Readings (a_N_*) werden nur noch geschrieben, wenn sich der Inhalt des Blocks (irgendein
+#          Eintrag) geändert hat; verhindert Event- und Log-Flooding durch unveränderte Alerts, die bei jedem
+#          Update neu indiziert werden. Nicht mehr vorhandene Blöcke werden gelöscht, Readings unveränderter
+#          Blöcke behalten ihren Zeitstempel
+# change: UpdateAlerts: Alerts mit gleichem Beginn (onset) werden stabil nach Identifier sortiert, damit die
+#         Reihenfolge der Blöcke a_N_* zwischen Updates nicht wechselt
 #
 # 23.09.2025 (version 1.17.8) DS_Starter
 # replace for..when structures
