@@ -525,9 +525,13 @@ MQTT2_SERVER_Read($@)
     }
 
     if($hash->{protoNum} == 5) { # SUBACK: ok, no properties
-      MQTT2_SERVER_out($hash, pack("CCnCC*",0x90,3+@ret,$pid,0,@ret), $dump);
+      MQTT2_SERVER_out($hash, pack("C",0x90).
+                              MQTT2_SERVER_makeLength(3+@ret).
+                              pack("nCC*",$pid,0,@ret), $dump);
     } else {
-      MQTT2_SERVER_out($hash, pack("CCnC*", 0x90,2+@ret,$pid,  @ret), $dump);
+      MQTT2_SERVER_out($hash, pack("C",0x90).
+                              MQTT2_SERVER_makeLength(2+@ret).
+                              pack("nC*",$pid,@ret), $dump);
     }
 
 
@@ -564,7 +568,10 @@ MQTT2_SERVER_Read($@)
     }
 
     if($hash->{protoNum} == 5) { # UNSUBACK: pid, no properties, reason codes
-      MQTT2_SERVER_out($hash, pack("CCnCC*",0xb0,3+@ret,$pid,0,@ret), $dump);
+      MQTT2_SERVER_out($hash, pack("C",0xb0).
+                              MQTT2_SERVER_makeLength(3+@ret).
+                              pack("nCC*",$pid,0,@ret), $dump);
+
     } else {
       MQTT2_SERVER_out($hash, pack("CCn", 0xb0, 2, $pid), $dump);
     }
