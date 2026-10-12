@@ -905,6 +905,27 @@ attr DEVICE setList  \
 attr DEVICE model zigbee2mqtt_human_body_presence_detector
 setreading DEVICE attrTemplateVersion 20230111
 
+#provided by satprofi, forum https://forum.fhem.de/index.php?msg=1364992
+name:zigbee2mqtt_human_body_presence_detector_ZG-204ZM
+desc: Human body presence detector via zigbee2mqtt <br>Tested with: Tuya ZG-204ZM Presence Detector
+filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
+order:L_08a002
+par:BASE_TOPIC;base topic set in configuration.yaml of the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[\b]?([^/:]+)[/].+, ? $1 : undef }
+par:DEV_ID;name of the device in the zigbee2mqtt bridge;{ AttrVal('DEVICE','devicetopic',AttrVal('DEVICE','readingList','')) =~ m,[^/]+[/]([^/:]+).*, ? $1 : undef }
+par:ICON;ICON as set, defaults to people_sensor;{ AttrVal('DEVICE','icon','people_sensor') }
+attr DEVICE icon ICON
+attr DEVICE devStateIcon Motion..true:people_sensor Motion..false:motion_detector
+attr DEVICE devicetopic BASE_TOPIC/DEV_ID
+attr DEVICE stateFormat Motion: presence
+attr DEVICE readingList $\DEVICETOPIC:.* { json2nameValue($EVENT,'',$JSONMAP) }
+attr DEVICE setList  \
+  motion_detection_mode:only_pir,pir_and_radar,only_radar  $DEVICETOPIC/set {"motion_detection_mode":"$EVTPART1"}
+  distance:0,1,2,3,4,5,6 $DEVICETOPIC/set {"static_detection_distance":$EVTPART1}
+  static_detection_sensivity:0,1,2,3,4,5,6,7,8,9,10 $DEVICETOPIC/set {"static_detection_sensivity":$EVTPART1}
+  motion_detection_sensitivity:0,1,2,3,4,5,6,7,8,9,10 $DEVICETOPIC/set {"motion_detection_sensitivity":$EVTPART1}
+attr DEVICE model zigbee2mqtt_ZG_204_ZM
+setreading DEVICE attrTemplateVersion 20260612
+
 name:zigbee2mqtt_Light_Intensity_Sensor
 desc: Light Intensity Sensor via zigbee2mqtt <br>Tested with: Xiaomi MiJia light intensity sensor GZCGQ01LM
 filter:TYPE=MQTT2_DEVICE:FILTER=CID~zigbee.*
