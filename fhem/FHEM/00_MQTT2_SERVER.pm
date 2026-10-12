@@ -519,7 +519,12 @@ MQTT2_SERVER_Read($@)
     while($off < $tlen) {
       ($subscr, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       my $sopt = unpack("C", substr($pl, $off++, 1));
-      $hash->{subscriptions}{$subscr} = { opt=>$sopt, prop=>\%sprops };
+      my $re = $subscr;
+      $re =~ s,^#$,.*,g;
+      $re =~ s,/?#,\\b.*,g;
+      $re =~ s,\+,\\b[^/]+\\b,g;
+      $hash->{subscriptions}{$subscr} = { opt=>$sopt, prop=>\%sprops,
+                              re=>qr/^$re$/, wildcard=>($re ne $subscr) };
       Log3 $sname, 4, "    topic:$subscr options:$sopt";
       push @ret, (($sopt & 3) > 1 ? 1 : 0);    # max qos supported is 1
     }
@@ -683,7 +688,51 @@ MQTT2_SERVER_sendto($$$$$;$$)
   my ($server, $src, $dest, $topic, $val, $retain, $props) = @_;
   return if(IsDisabled($server->{NAME}));
   $val = "" if(!defined($val));
-  my $dump = (AttrVal($server->{NAME},"verbose",1)>=5) ? $server->{NAME} :undef;
+
+  my $ds = $dest->{subscriptions};
+  my $sub = $ds->{$topic};
+  if($sub && !$sub->{wildcard}) { # exact match, no wildcard subscription
+    MQTT2_SERVER_dosendto($sub, $server, $src, $dest, $topic, $val, $retain, $props);
+    return;
+  }
+
+  foreach my $s (keys %{$ds}) {
+    if($topic =~ m/$ds->{$s}{re}/) {
+      MQTT2_SERVER_dosendto($ds->{$s}, $server, $src, $dest, $topic, $val, $retain, $props);
+      last;
+    }
+  }
+}
+
+sub
+MQTT2_SERVER_dosendto($$$$$$;$$)
+{
+  my ($sub, $server, $src, $dest, $topic, $val, $retain, $props) = @_;
+
+  Log3 $server, 5, "  $dest->{NAME} $dest->{cid} => $topic:$val";
+
+  my $srcCid = $src && $src->{cid} ? $src->{cid} : "";
+  my $lr = $retain ? 1 : 0;
+  if($dest->{protoNum} == 5) {
+    my $sopt = $sub->{opt};
+    next if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
+    next if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
+    $lr = 0 if(!($sopt & 0x08) && $src); # RetainAsPublished, 3.8.3.1
+
+    if($props) {
+      my ($tlen,$noff) = MQTT2_SERVER_getLength($props,0); #strip the len
+      $props = substr($props, $noff);
+    } else {
+      $props = "";
+    }
+    my $si = $sub->{prop}{subscription_identifier};
+    $props .= pack("C",11).MQTT2_SERVER_makeLength($si) if(defined($si));
+    $props = MQTT2_SERVER_makeLength(length($props)).$props;
+
+  } else {
+    $props = "";
+
+  }
 
   my $ltopic = $topic;
   my $lval = $val;
@@ -695,50 +744,11 @@ MQTT2_SERVER_sendto($$$$$;$$)
     }
   }
 
-  my $srcCid = $src && $src->{cid} ? $src->{cid} : "";
-  my $ds = $dest->{subscriptions};
-  foreach my $s (keys %{$ds}) {
-
-    my $re = $ds->{$s}{re};
-    if(!defined($re)) {
-      $re = $s;
-      $re =~ s,^#$,.*,g;
-      $re =~ s,/?#,\\b.*,g;
-      $re =~ s,\+,\\b[^/]+\\b,g;
-      $re = qr/^$re$/;
-      $ds->{$s}{re} = $re;
-    }
-    if($topic =~ m/$re/) {
-      Log3 $server, 5, "  $dest->{NAME} $dest->{cid} => $topic:$val";
-
-      my $lr = $retain ? 1 : 0;
-      if($dest->{protoNum} == 5) {
-        my $sopt = $ds->{$s}{opt};
-        next if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
-        next if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
-        $lr = 0 if(!($sopt & 0x08) && $src); # RetainAsPublished, 3.8.3.1
-
-        if($props) {
-          my ($tlen,$noff) = MQTT2_SERVER_getLength($props,0); #strip the len
-          $props = substr($props, $noff);
-        } else {
-          $props = "";
-        }
-        my $si = $ds->{$s}{prop}{subscription_identifier};
-        $props .= pack("C",11).MQTT2_SERVER_makeLength($si) if(defined($si));
-        $props = MQTT2_SERVER_makeLength(length($props)).$props;
-
-      } else {
-        $props = "";
-
-      }
-      my $rl = MQTT2_SERVER_makeLength(2+length($props)+
-                                         length($ltopic)+length($lval));
-      MQTT2_SERVER_out($dest,
-        pack("C",0x30+$lr).$rl.MQTT2_SERVER_makeStr($topic).$props.$lval,$dump);
-      last;       # send a message only once
-    }
-  }
+  my $rl = MQTT2_SERVER_makeLength(2+length($props)+
+                                     length($ltopic)+length($lval));
+  my $dump = (AttrVal($server->{NAME},"verbose",1)>=5) ? $server->{NAME} :undef;
+  MQTT2_SERVER_out($dest,
+    pack("C",0x30+$lr).$rl.MQTT2_SERVER_makeStr($topic).$props.$lval,$dump);
 }
 
 sub
