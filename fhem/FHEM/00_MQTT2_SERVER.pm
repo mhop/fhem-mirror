@@ -709,7 +709,7 @@ MQTT2_SERVER_sendto($$$$$;$$)
         my $sopt = $ds->{$s}{opt};
         next if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
         next if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
-        $lr = 0 if(!($sopt & 0x08)); # RetainAsPublished
+        $lr = 0 if(!($sopt & 0x08) && $src); # RetainAsPublished, 3.8.3.1
 
         if($props) {
           my ($tlen,$noff) = MQTT2_SERVER_getLength($props,0); #strip the len
