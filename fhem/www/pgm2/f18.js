@@ -770,12 +770,14 @@ f18_addDragger(el)
   save()
   {
     var nep = $(el).position();
+    var c = $("div#content");   // 82351
     var cw = $(comp).width();
     var svg = $(comp).find(">svg");
     if($(svg).length==1 && $(svg).attr("id").indexOf("SVGPLOT")==0) // Forum #126070
       cw = $(svg).width();
     f18_setAttr("Pos."+$(el).attr("data-name"), {
       left:nep.left, top:nep.top,
+      left:nep.left+c.scrollLeft(), top:nep.top+c.scrollTop(),
       width:cw, height:$(comp).height(), 
       oTop:cp.top-ep.top, oLeft:cp.left-ep.left
     });
