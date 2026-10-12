@@ -23,6 +23,7 @@ Use of HttpUtils instead of LWP::Simple:
 MOSMIX S forecast data support:
 
   Copyright (C) 2024 DS_Starter + Jens B.
+  Copyright (C) 2026 DS_Starter
 
 Sun position:
 
@@ -77,19 +78,12 @@ our @ISA       = qw(Exporter);
 our @EXPORT    = qw(AzimuthElevation RiseSet);
 our @EXPORT_OK = qw(EpochToJulianDate JulianDateToEpoch);
 
-
-=head2 EpochToJulianDate(;$)
-
-=over
-
-=item * param time: epoch time [s], optional, default: now
-
-=item * return Julian date
-
-=back
-
-=cut
-
+##########################################################################################
+#   EpochToJulianDate
+#
+#   param time: epoch time [s], optional, default: now
+#   return Julian date
+##########################################################################################
 sub EpochToJulianDate {
   my ($epoch) = @_;
 
@@ -100,22 +94,14 @@ sub EpochToJulianDate {
   return gmtime($epoch)->julian_day;
 }
 
-=head2 EpochToGreenwichMeanSideralDate(;$)
-
-Copyright (c) Plataforma Solar de Almerýa, Spain
-
-simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
-
-=over
-
-=item * param time: epoch time [s], optional, default: now
-
-=item * return Greenwich mean sideral date [h]
-
-=back
-
-=cut
-
+##########################################################################################
+#   EpochToGreenwichMeanSideralDate
+#   Copyright (c) Plataforma Solar de Almerýa, Spain
+#   simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
+#
+#   param time: epoch time [s], optional, default: now
+#   return Greenwich mean sideral date [h]
+##########################################################################################
 sub EpochToGreenwichMeanSideralDate {
   my ($epoch) = @_;
 
@@ -130,20 +116,13 @@ sub EpochToGreenwichMeanSideralDate {
   return 6.6974243242 + 0.0657098283*$elapsedDays + $timeAsHours;
 }
 
-=head2 JulianDateToEpoch(;$)
-
-Copyright (C) 2012 E. G. Richards
-
-=over
-
-=item * param jd: Julian date [day], optional, default: now
-
-=item * return Gregorian date [epoch]
-
-=back
-
-=cut
-
+##########################################################################################
+#  JulianDateToEpoch
+#  Copyright (C) 2012 E. G. Richards
+#
+#  param jd: Julian date [day], optional, default: now
+#  return Gregorian date [epoch]
+###########################################################################################
 sub JulianDateToEpoch {
   my ($jd) = @_;
 
@@ -166,22 +145,14 @@ sub JulianDateToEpoch {
   }
 }
 
-=head2 CelestialPosition($)
-
-Copyright (c) Plataforma Solar de Almerýa, Spain
-
-simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
-
-=over
-
-=item * param epoch: epoch time [s], optional, default: now
-
-=item * return array of rightAscension and declination [rad]
-
-=back
-
-=cut
-
+##########################################################################################
+#   CelestialPosition
+#   Copyright (c) Plataforma Solar de Almerýa, Spain
+#   simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
+#
+#   param epoch: epoch time [s], optional, default: now
+#   return array of rightAscension and declination [rad]
+##########################################################################################
 sub CelestialPosition {
   my ($epoch) = @_;
 
@@ -199,39 +170,30 @@ sub CelestialPosition {
   # but without limiting the angle to 2*pi (i.e., the result may be
   # greater than 2*pi)
   my $sinEclipticLongitude = sin($eclipticLongitude);
-  my $y1 = cos($eclipticObliquity)*$sinEclipticLongitude;
-  my $x1 = cos($eclipticLongitude);
-  my $rightAscension = atan2($y1, $x1);
+  my $y1                   = cos($eclipticObliquity)*$sinEclipticLongitude;
+  my $x1                   = cos($eclipticLongitude);
+  my $rightAscension       = atan2($y1, $x1);
+  
   if ($rightAscension < 0.0) {
     $rightAscension = $rightAscension + pi2;
   }
+  
   my $declination = asin(sin($eclipticObliquity)*$sinEclipticLongitude);
 
-  return ($rightAscension, $declination);
+return ($rightAscension, $declination);
 }
 
-=head2 AzimuthElevation(;$$$)
-
-Calculate the azimuth and elevation of the sun for the given time and location.
-
-Copyright (c) Plataforma Solar de Almerýa, Spain
-
-simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
-
-=over
-
-=item * param epoch: epoch time [s], optional, default: now
-
-=item * param longitude: geographic longitude [deg], optional, default: global longitude or Frankfurt, Germany
-
-=item * param latitude: geographic latitude [deg], optional, default: global latitude or Frankfurt, Germany
-
-=item * return array of azimuth and elevation [deg]
-
-=back
-
-=cut
-
+################################################################################################################
+#    AzimuthElevation
+#    Calculate the azimuth and elevation of the sun for the given time and location.
+#    Copyright (c) Plataforma Solar de Almerýa, Spain
+#    simplified algorithm, accurate to within 0.5 minutes of arc for the year 1999-2015
+#
+#    param epoch: epoch time [s], optional, default: now
+#    param longitude: geographic longitude [deg], optional, default: global longitude or Frankfurt, Germany
+#    param latitude: geographic latitude [deg], optional, default: global latitude or Frankfurt, Germany
+#    return array of azimuth and elevation [deg]
+################################################################################################################
 sub AzimuthElevation {
   my ($epoch, $longitudeEast, $latitudeNorth) = @_;
 
@@ -244,86 +206,69 @@ sub AzimuthElevation {
   my ($rightAscensionRadians, $declinationRadians) = CelestialPosition($epoch);
 
   # Calculate local coordinates (azimuth [deg] and zenith angle [rad])
-  my $rad = pi/180;
-  my $greenwichMeanSiderealDate = EpochToGreenwichMeanSideralDate($epoch);
+  my $rad                          = pi/180;
+  my $greenwichMeanSiderealDate    = EpochToGreenwichMeanSideralDate($epoch);
   my $localMeanSiderealDateRadians = ($greenwichMeanSiderealDate*15 + $longitudeEast)*$rad;
-  my $hourAngleRadians = $localMeanSiderealDateRadians - $rightAscensionRadians;
-  my $cosHourAngle = cos($hourAngleRadians);
-  my $latitudeRadians = $latitudeNorth*$rad;
-  my $cosLatitude = cos($latitudeRadians);
-  my $sinLatitude = sin($latitudeRadians);
-  my $zenithAngleRadians = acos($cosLatitude*$cosHourAngle*cos($declinationRadians) + sin($declinationRadians)*$sinLatitude);
-  my $y = -sin($hourAngleRadians);
-  my $x = tan($declinationRadians)*$cosLatitude - $sinLatitude*$cosHourAngle;
-  my $azimuthRadians = atan2($y, $x);
+  my $hourAngleRadians             = $localMeanSiderealDateRadians - $rightAscensionRadians;
+  my $cosHourAngle                 = cos($hourAngleRadians);
+  my $latitudeRadians              = $latitudeNorth*$rad;
+  my $cosLatitude                  = cos($latitudeRadians);
+  my $sinLatitude                  = sin($latitudeRadians);
+  my $zenithAngleRadians           = acos($cosLatitude*$cosHourAngle*cos($declinationRadians) + sin($declinationRadians)*$sinLatitude);
+  my $y                            = -sin($hourAngleRadians);
+  my $x                            = tan($declinationRadians)*$cosLatitude - $sinLatitude*$cosHourAngle;
+  my $azimuthRadians               = atan2($y, $x);
+  
   if ($azimuthRadians < 0.0) {
     $azimuthRadians = $azimuthRadians + pi2;
   }
+  
   my $azimuth = sprintf("%0.1f", $azimuthRadians/$rad); # round(1)
 
   # Parallax correction of zenith angle [deg]
-  my $meanEarthRadius = 6371.01; # [km]
+  my $meanEarthRadius  = 6371.01; # [km]
   my $astronomicalUnit = 149597890; # [km]
-  my $parallax = ($meanEarthRadius/$astronomicalUnit)*sin($zenithAngleRadians);
-  my $zenithAngle = ($zenithAngleRadians + $parallax)/$rad;
+  my $parallax         = ($meanEarthRadius/$astronomicalUnit)*sin($zenithAngleRadians);
+  my $zenithAngle      = ($zenithAngleRadians + $parallax)/$rad;
 
   # Elevation [deg]
   my $elevation = 90 - $zenithAngle;
-  $elevation = sprintf("%0.1f", $elevation); # round(1)
+  $elevation    = sprintf("%0.1f", $elevation); # round(1)
 
-  return ($azimuth, $elevation);
+return ($azimuth, $elevation);
 }
 
-=head2 Mod($$)
-
-Calculate the arithmetic remainder of a division including fractions.
-
-=cut
-
+##########################################################################################
+#   Calculate the arithmetic remainder of a division including fractions.
+##########################################################################################
 sub Mod {
   my ($dividend, $divisor) = @_;
   return 0 if ($divisor == 0);
   return $dividend - int($dividend/$divisor)*$divisor;
 }
 
-=head2 MeanSolarAnomaly($)
-
-Calculate mean solar anomaly for Julian date.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-
-=over
-
-=item * param jd: Julian date
-
-=item * return mean solar anomaly [deg]
-
-=back
-
-=cut
-
+##########################################################################################
+#    MeanSolarAnomaly
+#    Calculate mean solar anomaly for Julian date.
+#    see https://www.aa.quae.nl/en/reken/zonpositie.html
+#
+#    param jd: Julian date
+#    return mean solar anomaly [deg]
+##########################################################################################
 sub MeanSolarAnomaly {
   my ($jd) = @_;
 
   return Mod(357.5291 + 0.98560028*($jd - 2451545), 360);
 }
 
-=head2 EclipticalLongitude($)
-
-Calculate ecliptical longitude of the sun.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-
-=over
-
-=item * param meanSolarAnomalyRadians: mean solar anomaly [rad]
-
-=item * return ecliptical longitude [rad]
-
-=back
-
-=cut
-
+##########################################################################################
+#   EclipticalLongitude
+#   Calculate ecliptical longitude of the sun.
+#   see https://www.aa.quae.nl/en/reken/zonpositie.html
+#
+#   param meanSolarAnomalyRadians: mean solar anomaly [rad]
+#   return ecliptical longitude [rad]
+##########################################################################################
 sub EclipticalLongitude {
   my ($meanSolarAnomalyRadians) = @_;
 
@@ -332,22 +277,14 @@ sub EclipticalLongitude {
   return Mod($meanSolarAnomalyRadians/$rad + $equationOfcenter + 180 + 102.9372, 360)*$rad;
 }
 
-=head2 EquatorialCoordinates($)
-
-Calculate equatorial coordinates of the sun.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-
-=over
-
-=item * param eclipticLongitudeRadians: ecliptic longitude of the sun [rad]
-
-=item * return right ascension and declination [rad]
-
-=back
-
-=cut
-
+##########################################################################################
+#   EquatorialCoordinates
+#   Calculate equatorial coordinates of the sun.
+#   see https://www.aa.quae.nl/en/reken/zonpositie.html
+#
+#   param eclipticLongitudeRadians: ecliptic longitude of the sun [rad]
+#   return right ascension and declination [rad]
+##########################################################################################
 sub EquatorialCoordinates {
   my ($eclipticLongitudeRadians) = @_;
 
@@ -358,26 +295,17 @@ sub EquatorialCoordinates {
   return ($rightAscensionRadians, $declinationRadians);
 }
 
-=head2 HourAngle($$$)
-
-Calculate sun hour angle for Julian date.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-
-=over
-
-=item * param jd: Julian date
-
-=item * param rightAscension: right ascension of sun [deg]
-
-=item * param longitudeEast: geographical longitude [deg]
-
-=item * return hour angle of sun [deg], limited to -180 ... +180
-
-=back
-
-=cut
-
+##########################################################################################
+#   HourAngle
+#   Calculate sun hour angle for Julian date.
+#
+#   see https://www.aa.quae.nl/en/reken/zonpositie.html
+#
+#   param jd: Julian date
+#   param rightAscension: right ascension of sun [deg]
+#   param longitudeEast: geographical longitude [deg]
+#   return hour angle of sun [deg], limited to -180 ... +180
+##########################################################################################
 sub HourAngle {
   my ($jd, $rightAscension, $longitudeEast) = @_;
 
@@ -388,48 +316,31 @@ sub HourAngle {
   return $hourAngle;
 }
 
-=head2 Transit($$$)
-
-Calculate solar transit date for Julian date.
-
-see https://en.wikipedia.org/wiki/Sunrise_equation
-
-=over
-
-=item * param jd: Julian date
-
-=item * param meanSolarAnomalyRadians: mean solar anomaly [rad]
-
-=item * param eclipticalLongitudeRadians: ecliptical longitude of sun [rad]
-
-=item * return date of solar transit [Julian date]
-
-=back
-
-=cut
-
+##########################################################################################
+#   Transit
+#   Calculate solar transit date for Julian date.
+#   see https://en.wikipedia.org/wiki/Sunrise_equation
+#
+#   param jd: Julian date
+#   param meanSolarAnomalyRadians: mean solar anomaly [rad]
+#   param eclipticalLongitudeRadians: ecliptical longitude of sun [rad]
+#   return date of solar transit [Julian date]
+##########################################################################################
 sub Transit {
   my ($jd, $meanSolarAnomalyRadians, $eclipticalLongitudeRadians) = @_;
 
   return $jd + 0.0053*sin($meanSolarAnomalyRadians) - 0.0069*sin(2*$eclipticalLongitudeRadians);
 }
 
-=head2 ElevationCorrection(;$)
-
-Calculate upper solar limb elevation offset angle caused by sun diameter, typical atmospheric refraction and altitude of observer for sunrise.
-
-see https://en.wikipedia.org/wiki/Sunrise_equation
-
-=over
-
-=item * param altitude: altitude of observer [m], optional, default: 0 m
-
-=item * return elevation offset angle of upper solar limb at sunrise [deg]
-
-=back
-
-=cut
-
+##########################################################################################
+#   ElevationCorrection
+#   Calculate upper solar limb elevation offset angle caused by sun diameter, typical 
+#   atmospheric refraction and altitude of observer for sunrise.
+#   see https://en.wikipedia.org/wiki/Sunrise_equation
+#
+#   param altitude: altitude of observer [m], optional, default: 0 m
+#   return elevation offset angle of upper solar limb at sunrise [deg]
+##########################################################################################
 sub ElevationCorrection {
   my ($altitude) = @_;
 
@@ -441,32 +352,20 @@ sub ElevationCorrection {
   return -0.83 - 2.076*sqrt($altitude)/60
 }
 
-=head2 HourAngleOptimization($$$;$$$)
-
-Iteratively improve sun rise (mode = -1), sun transit (mode = 0) and sun set (mode = +1) dates by minimizing hour angle change.
-
-see https://en.wikipedia.org/wiki/Sunrise_equation
-
-=over
-
-=item * param mode: sun rise (mode = -1), sun transit (mode = 0) and sun set (mode = +1)
-
-=item * param jd: estimated Julian date
-
-=item * param longitudeEast: geographical longitude [deg]
-
-=item * param latitudeNorth: geographical latitude [deg], optional, not used for mode = 0
-
-=item * param altitude: altitude of observer [m], optional, not used for mode = 0
-
-=item * param twilightAngle: twilight angle [deg], optional, not used for mode = 0
-
-=item * return array of optimized Julian date and the declination of the sun [rad]
-
-=back
-
-=cut
-
+##########################################################################################
+#   HourAngleOptimization
+#   Iteratively improve sun rise (mode = -1), sun transit (mode = 0) and sun set 
+#   (mode = +1) dates by minimizing hour angle change.
+#   see https://en.wikipedia.org/wiki/Sunrise_equation
+#
+#   param mode: sun rise (mode = -1), sun transit (mode = 0) and sun set (mode = +1)
+#   param jd: estimated Julian date
+#   param longitudeEast: geographical longitude [deg]
+#   param latitudeNorth: geographical latitude [deg], optional, not used for mode = 0
+#   param altitude: altitude of observer [m], optional, not used for mode = 0
+#   param twilightAngle: twilight angle [deg], optional, not used for mode = 0
+#   return array of optimized Julian date and the declination of the sun [rad]
+##########################################################################################
 sub HourAngleOptimization {
   my ($mode, $jd, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle) = @_;
 
@@ -505,35 +404,25 @@ sub HourAngleOptimization {
   return ($jd, $declinationRadians);
 }
 
-=head2 RiseSet(;$$$$$)
-
-Calculate time of sunrise, sun transit and sunset for given time and position including corrections for astronomical refraction, solar disc diameter and altitude of observer.
-
-see https://www.aa.quae.nl/en/reken/zonpositie.html
-see https://en.wikipedia.org/wiki/Sunrise_equation
-
-Note: The calculated times belong to the day in the GMT timezone. If your location is in a different timezone you must add your timezone offset to the epoch time to get the same result for all times between 0:00 and 23:59 of your local time.
-
-Adjust epoch time by time zone offset
-
-=over
-
-=item * param epoch: epoch time [s], optional, default: now
-
-=item * param longitudeEast: geographic longitude [deg], optional, default: global longitude or Frankfurt, Germany
-
-=item * param latitude: geographic latitude [deg], optional, default: global latitude or Frankfurt, Germany
-
-=item * param altitude: altitude of obeserver [m], optional, default: 0 m
-
-=item * param twilightAngle: twilight angle [deg], optional, default: 0 °
-
-=item * return array of sunrise, sun transit and sunset date for a day in the GMT timezone [epoch]
-
-=back
-
-=cut
-
+################################################################################################################
+#   RiseSet
+#   Calculate time of sunrise, sun transit and sunset for given time and position 
+#   including corrections for astronomical refraction, solar disc diameter and altitude of 
+#   observer.
+#   see https://www.aa.quae.nl/en/reken/zonpositie.html
+#   see https://en.wikipedia.org/wiki/Sunrise_equation
+#   Note: The calculated times belong to the day in the GMT timezone. If your location is 
+#   in a different timezone you must add your timezone offset to the epoch time to get the 
+#   same result for all times between 0:00 and 23:59 of your local time.
+#   Adjust epoch time by time zone offset.
+#
+#   param epoch: epoch time [s], optional, default: now
+#   param longitudeEast: geographic longitude [deg], optional, default: global longitude or Frankfurt, Germany
+#   param latitude: geographic latitude [deg], optional, default: global latitude or Frankfurt, Germany
+#   param altitude: altitude of obeserver [m], optional, default: 0 m
+#   param twilightAngle: twilight angle [deg], optional, default: 0 °
+#   return array of sunrise, sun transit and sunset date for a day in the GMT timezone [epoch]
+################################################################################################################
 sub RiseSet {
   my ($epoch, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle) = @_;
 
@@ -541,52 +430,44 @@ sub RiseSet {
     $epoch = time();
   }
 
-  if (!defined($longitudeEast) || !defined($latitudeNorth)) {
-    # undefined: use Frankfurt, Germany
+  if (!defined($longitudeEast) || !defined($latitudeNorth)) {                           # undefined: use Frankfurt, Germany
     $longitudeEast = ::AttrVal("global", "longitude", "8.686");
     $latitudeNorth = ::AttrVal("global", "latitude", "50.112");
   }
-  #$longitudeEast = 5;
-  #$latitudeNorth = 52;
 
-  if (!defined($altitude)) {
-    # undefined: use 0 m (see level)
+  if (!defined($altitude)) {                                                            # undefined: use 0 m (see level)
     $altitude = 0;
   }
-  #$altitude = 0;
 
-  if (!defined($twilightAngle)) {
-    # undefined: use 0°
+  if (!defined($twilightAngle)) {                                                       # undefined: use 0°
     $twilightAngle = 0;
   }
-  #$twilightAngle = 0;
 
   # initial estimate of solar transit date
-  my $julianDateOffset = 2451545 + (32.184 + 37)/86400 - $longitudeEast/360; # 2019: 37 leap seconds
-  my $julianCycle = floor(EpochToJulianDate($epoch) - $julianDateOffset + 0.5);
-  #$julianCycle = floor(2453097 - $julianDateOffset + 0.5);
-  my $solarTransitJD = $julianCycle + $julianDateOffset;
+  my $julianDateOffset = 2451545 + (32.184 + 37)/86400 - $longitudeEast/360;            # 2019: 37 leap seconds
+  my $julianCycle      = floor(EpochToJulianDate($epoch) - $julianDateOffset + 0.5);
+  my $solarTransitJD   = $julianCycle + $julianDateOffset;
 
   # improve estimate of solar transit date
   my $rad = pi/180;
-  my $meanSolarAnomalyRadians = MeanSolarAnomaly($solarTransitJD)*$rad;
+  my $meanSolarAnomalyRadians    = MeanSolarAnomaly($solarTransitJD)*$rad;
   my $eclipticalLongitudeRadians = EclipticalLongitude($meanSolarAnomalyRadians);
-  $solarTransitJD = Transit($solarTransitJD, $meanSolarAnomalyRadians, $eclipticalLongitudeRadians);
+  $solarTransitJD                = Transit($solarTransitJD, $meanSolarAnomalyRadians, $eclipticalLongitudeRadians);
 
   # iteratively improve solar transit date at given longitude
   ($solarTransitJD, my $declinationRadians) = HourAngleOptimization(0, $solarTransitJD, $longitudeEast);
 
   # initial estimate of sun rise/set hour angle at given latitude and altitude
-  my $hourAngleRiseSet = acos((sin((ElevationCorrection($altitude) + $twilightAngle)*$rad) - sin($latitudeNorth*$rad)*sin($declinationRadians))/(cos($latitudeNorth*$rad)*cos($declinationRadians)))/$rad;
+  my $hourAngleRiseSet      = acos((sin((ElevationCorrection($altitude) + $twilightAngle)*$rad) - sin($latitudeNorth*$rad)*sin($declinationRadians))/(cos($latitudeNorth*$rad)*cos($declinationRadians)))/$rad;
   my $hourAngleRiseSetRatio = $hourAngleRiseSet/360;
 
   # initial estimate of sun rise and sun set date
   my $sunRiseJD = $solarTransitJD - $hourAngleRiseSetRatio;
-  my $sunSetJD = $solarTransitJD + $hourAngleRiseSetRatio;
+  my $sunSetJD  = $solarTransitJD + $hourAngleRiseSetRatio;
 
   # iteratively improve sun rise and sun set date
   ($sunRiseJD) = HourAngleOptimization(-1, $sunRiseJD, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle);
-  ($sunSetJD) = HourAngleOptimization(+1, $sunSetJD, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle);
+  ($sunSetJD)  = HourAngleOptimization(+1, $sunSetJD, $longitudeEast, $latitudeNorth, $altitude, $twilightAngle);
 
   #::Log3 "", 3, "RiseSet: sunRiseJD $sunRiseJD solarTransitJD $solarTransitJD sunSetJD $sunSetJD";
 
@@ -629,7 +510,7 @@ use constant PROCESSING_TIMEOUT       => DOWNLOAD_TIMEOUT_MAX + 60; # [s]
 use constant SCHEDULING_RANGE         => 15*60 - PROCESSING_TIMEOUT - 60; # [s]
 
 require Exporter;
-our $VERSION   = '1.017008';
+our $VERSION   = '1.017009';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -768,30 +649,18 @@ my @wwdText = ('Bewölkungsentwicklung nicht beobachtet',
                'starkes Gewitter mit Sandsturm',
                'starkes Gewitter mit Graupel oder Hagel');
 
-my @alertsData         = [ undef, undef ];
-my @alertsReceived     = [ undef, undef ];
-my @alertsUpdating     = [ undef, undef ];
-my @alertsErrorMessage = [ undef, undef ];
+my @alertsData         = ( undef, undef );
+my @alertsReceived     = ( undef, undef );
+my @alertsUpdating     = ( undef, undef );
+my @alertsErrorMessage = ( undef, undef );
 
-
-=head1 FHEM CALLBACK FUNCTIONS
-
-=head2 Define($$)
-
-FHEM I<DefFn>
-
-=over
-
-=item * param hash: hash of DWD_OpenData device
-
-=item * param def: module define parameters, will be ignored
-
-=item * return undef on success or error message
-
-=back
-
-=cut
-
+##############################################################
+#   Define
+#   
+#   param hash: hash of DWD_OpenData device
+#   param def: module define parameters, will be ignored
+#   return undef on success or error message
+##############################################################
 sub Define {
   my ($hash, $def) = @_;
   my $name = $hash->{NAME};
@@ -802,7 +671,8 @@ sub Define {
   # test TZ environment variable
   if (!defined($ENV{"TZ"})) {
     $hash->{FHEM_TZ} = undef;
-  } else {
+  } 
+  else {
     $hash->{FHEM_TZ} = $ENV{"TZ"};
   }
 
@@ -861,27 +731,19 @@ sub Shutdown {
 
   ::RemoveInternalTimer($hash);
 
-  if (defined($hash->{".alertsBlockingCall"})) {
-    ::BlockingKill($hash->{".alertsBlockingCall"});
-  }
-  my $warncellId = $hash->{".warncellId"};
-  if (defined($warncellId)) {
-    my $communeUnion = IsCommuneUnionWarncellId($warncellId);
-    if (defined($hash->{".alertsFile".$communeUnion})) {
-      close($hash->{".alertsFileHandle".$communeUnion});
-      unlink($hash->{".alertsFile".$communeUnion});
-      delete($hash->{".alertsFile".$communeUnion});
+  for my $communeUnion (0, 1) {
+    if (defined($hash->{".alertsBlockingCall".$communeUnion})) {
+      ::BlockingKill($hash->{".alertsBlockingCall".$communeUnion});
+      delete($hash->{".alertsBlockingCall".$communeUnion});
     }
+    RemoveTempFile($hash, ".alertsFile".$communeUnion, ".alertsFileHandle".$communeUnion);
   }
 
   if (defined($hash->{".forecastBlockingCall"})) {
     ::BlockingKill($hash->{".forecastBlockingCall"});
+    delete($hash->{".forecastBlockingCall"});
   }
-  if (defined($hash->{".forecastFile"})) {
-    close($hash->{".forecastFileHandle"});
-    unlink($hash->{".forecastFile"});
-    delete($hash->{".forecastFile"});
-  }
+  RemoveTempFile($hash, ".forecastFile", ".forecastFileHandle");
 
   return undef;
 }
@@ -1262,8 +1124,7 @@ sub LocaltimeOffset  {
 
 sub FormatDateTimeUTC {
   my $t = shift;
-  #return strftime('%Y-%m-%d %H:%M:%SZ', gmtime(@_));         # Heiko
-  return $t.'Z';                                              # Heiko
+  return $t.'Z';                                              
 }
 
 =head2 ParseDateTimeUTC($$)
@@ -1281,9 +1142,9 @@ sub FormatDateTimeUTC {
 sub ParseDateTimeUTC {
   my $int = shift;
   my $t;
-  my ($y, $mo, $d, $h, $m, $s) = $int =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;  # Heiko
-  eval { $t = ::fhemTimeGm($s, $m, $h, $d, $mo - 1, $y - 1900) };                 # Heiko
-  ::Log 1, 'eval: '.$@ if($@);                                          # Heiko
+  my ($y, $mo, $d, $h, $m, $s) = $int =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;  
+  eval { $t = ::fhemTimeGm($s, $m, $h, $d, $mo - 1, $y - 1900) };                
+  ::Log 1, 'eval: '.$@ if($@);                                         
   return $t;
 }
 
@@ -1397,7 +1258,9 @@ sub ParseDateTimeLocal {
 sub ParseDateLocal {
   my ($hash, $s) = @_;
   my $t;
-  eval { $t = Timelocal($hash, Time::Piece->strptime($s, '%Y-%m-%d')) };
+  if (defined($s) && $s =~ m/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/) {
+    eval { $t = Timelocal($hash, 0, 0, 0, $3, $2 - 1, $1) };
+  }
   return $t;
 }
 
@@ -1487,12 +1350,14 @@ sub RotateForecast {
   my $oldToday = defined($oT)? ParseDateLocal($hash, $oT) : undef;
 
   my $stationChanged = ::ReadingsVal($name, 'fc_station', '') ne $station;
+  
   if ($stationChanged) {
     # different station, delete all existing readings
     ::Log3 $name, 3, "$name: RotateForecast: station has changed, deleting existing readings";
     ::CommandDeleteReading(undef, "$name ^fc.*");
     $daysAvailable = 0;
-  } elsif (defined($oldToday)) {
+  } 
+  elsif (defined($oldToday)) {
     # same station, shift existing readings
     if (!defined($today)) {
       my $time = time();
@@ -1524,7 +1389,7 @@ sub RotateForecast {
         for (my $d=0; $d<($daysAvailable - $daysForward); $d++) {
           my $sourcePrefix = 'fc'.($daysForward + $d).'_';
           my $destinationPrefix = 'fc'.$d.'_';
-          foreach my $property (@shiftProperties) {
+          for my $property (@shiftProperties) {
             my $sourceReading = $sourcePrefix.$property;
             my $destinationReading = $destinationPrefix.$property;
             my $sourceValue = ::ReadingsVal($name, $sourceReading, undef);
@@ -1587,13 +1452,15 @@ sub PruneForecast {
 
   # find youngest timestamp per day
   my %youngestTimestamps;
-  foreach my $readingName (@readingNames) {
+  for my $readingName (@readingNames) {
     if (!($readingName =~ m/^fc\d*_(day|time|weekday)$/)) {
       my @parts = $readingName =~ /^fc(\d+)_.*/;
+      
       if (scalar(@parts) == 1) {
-        my $relativeDay = $parts[0];
-        my $timestamp = ::time_str2num($hash->{READINGS}{TIME});
+        my $relativeDay       = $parts[0];
+        my $timestamp         = ::time_str2num($hash->{READINGS}{$readingName}{TIME});
         my $youngestTimestamp = $youngestTimestamps{$relativeDay};
+        
         if (!defined($youngestTimestamp) || $timestamp > $youngestTimestamp) {
           $youngestTimestamps{$relativeDay} = $timestamp;
         }
@@ -1602,13 +1469,15 @@ sub PruneForecast {
   }
 
   # delete readings that are too old
-  foreach my $readingName (@readingNames) {
+  for my $readingName (@readingNames) {
     if (!($readingName =~ m/^fc\d*_(day|time|weekday)$/)) {
       my @parts = $readingName =~ /^fc(\d+)_.*/;
+      
       if (scalar(@parts) == 1) {
-        my $relativeDay = $parts[0];
-        my $timestamp = ::time_str2num($hash->{READINGS}{TIME});
+        my $relativeDay       = $parts[0];
+        my $timestamp         = ::time_str2num($hash->{READINGS}{$readingName}{TIME});
         my $youngestTimestamp = $youngestTimestamps{$relativeDay};
+        
         if (defined($youngestTimestamp) && $timestamp < ($youngestTimestamp - 86400)) {
           ::Log3 $name, 3, "$name: PruneForecast WARNING: deleting reading $readingName because it is more than 1 day older than all other readings of the same day";
           ::CommandDeleteReading(undef, "$name $readingName");
@@ -1650,17 +1519,18 @@ sub GetForecast {
     }
 
     # download, unzip and parse using BlockingCall
-    if (defined($hash->{".forecastFile"})) {
-      # delete old temp file
+    if (defined($hash->{".forecastFile"})) {                                            # delete old temp file
       close($hash->{".forecastFileHandle"});
       unlink($hash->{".forecastFile"});
     }
-    ($hash->{".forecastFileHandle"}, $hash->{".forecastFile"}) = tempfile(UNLINK => 1);
+    
+    ($hash->{".forecastFileHandle"}, $hash->{".forecastFile"}) = tempfile();
     $hash->{".station"} = $station;
-    if (defined($hash->{".forecastBlockingCall"})) {
-      # kill old blocking call
+    
+    if (defined($hash->{".forecastBlockingCall"})) {                                    # kill old blocking call
       ::BlockingKill($hash->{".forecastBlockingCall"});
     }
+    
     my $timeout = ::AttrVal($name, 'downloadTimeout', DOWNLOAD_TIMEOUT_DEFAULT);
     $hash->{".forecastBlockingCall"} = ::BlockingCall("DWD_OpenData::GetForecastStart", $hash, "DWD_OpenData::GetForecastFinish", $timeout, "DWD_OpenData::GetForecastAbort", $hash);
 
@@ -1670,7 +1540,8 @@ sub GetForecast {
 
     ::Log3 $name, 5, "$name: GetForecast END";
     return undef;
-  } else {
+  } 
+  else {
     return "disabled";
   }
 }
@@ -1683,7 +1554,7 @@ sub GetForecast {
 
 =item * param url: URL for wich the HTTP headers should be retrieved.
 
-=item * return hash of header entries: content_length (bytes), last_modified (epoch time) or C<undef> on error
+=item * return hash ref of header entries: content_length (bytes), last_modified (epoch time) or C<undef> on error
 
 =back
 
@@ -1702,22 +1573,25 @@ sub GetHeaders {
   if (!$httpError) {
     my @entries = split /\n/, $param->{httpheader};
     my %headers;
+    
     for my $entry (@entries) {
       if ($entry =~ /Content-Length/xs) {
         ($headers{content_length}) = $entry =~ /Content-Length:\s([0-9]*)/xs;
         ::Log3 $name, 5, "$name: GetHeaders content_length: $headers{content_length}";
-      } elsif ($entry =~ /Last-Modified/xs) {
-        my ($lastModified) = $entry =~ /Last-Modified:\s(.*GMT)/;                                # Heiko
+      } 
+      elsif ($entry =~ /Last-Modified/xs) {
+        my ($lastModified) = $entry =~ /Last-Modified:\s(.*GMT)/;                                
         ::Log3 $name, 5, "$name: GetHeaders last_modified raw: $lastModified";
         eval {
-          my $lm = gmtime(Time::Piece->strptime ($lastModified, '%a, %d %b %Y %H:%M:%S %Z'))->datetime;   # Heiko
-          $lm =~ s/T/ /;                                                                                   # Heiko
-          $headers{last_modified} = $lm;                                                                   # Heiko
+          my $lm = gmtime(Time::Piece->strptime ($lastModified, '%a, %d %b %Y %H:%M:%S %Z'))->datetime;   
+          $lm =~ s/T/ /;                                                                                   
+          $headers{last_modified} = $lm;                                                                   
         };
+        
         ::Log3 $name, 5, "$name: GetHeaders last_modified formatted: $headers{last_modified}";
       }
     }
-    return %headers;
+    return \%headers;
   }
   return undef;
 }
@@ -1750,8 +1624,10 @@ sub IsDocumentUpdated {
 
   # check if file on webserver was modified
   ::Log3 $name, 5, "$name: IsDocumentUpdated BEFORE";
-  my %headers = GetHeaders($name, $url);
+  my $headersRef = GetHeaders($name, $url);
+  my %headers = defined($headersRef) ? %{$headersRef} : ();
   my $update = 1;
+  
   if (%headers) {
     $_[3] = $headers{content_length}; # docSize
     $_[4] = FormatDateTimeUTC($headers{last_modified}); # docTime
@@ -1760,20 +1636,47 @@ sub IsDocumentUpdated {
     my $lastTime = ::ReadingsVal($name , $prefix.'_dwdDocTime', '');
     my $emptyAlertsZipSize = 22; # bytes of empty zip file
     ::Log3 $name, 5, "$name: IsDocumentUpdated docSize:$_[3]/$lastSize docTime:$_[4]/$lastTime URL:$url/$lastURL";
-    if ($url eq $lastURL && ($_[3] == $lastSize && $_[4] eq $lastTime) || ($prefix eq 'a' && $_[3] == $emptyAlertsZipSize && $lastSize == $emptyAlertsZipSize)) {
-      # not modified
+    
+    if ($url eq $lastURL && ($_[3] == $lastSize && $_[4] eq $lastTime) || ($prefix eq 'a' && $_[3] == $emptyAlertsZipSize && $lastSize == $emptyAlertsZipSize)) {       # not modified
       $update = 0;
     }
   }
-  else
-  {
+  else {
     # headers not available
-    $_[3] = 0; # docSize
-    $_[4] = ''; # docTime
+    $_[3] = 0;                          # docSize
+    $_[4] = '';                         # docTime
   }
+  
   ::Log3 $name, 5, "$name: IsDocumentUpdated AFTER return update: $update, docSize: $_[3], docTime: $_[4]";
 
-  return ($update, $_[3], $_[4]);                        # Heiko
+  return ($update, $_[3], $_[4]);
+}
+
+=head2 RemoveTempFile($$$)
+
+Close and delete a temp file created by L</GetForecast($$)> or L</GetAlerts($$)>.
+
+=over
+
+=item * param hash: hash of DWD_OpenData device
+
+=item * param fileKey: name of the hash entry holding the temp file name
+
+=item * param handleKey: name of the hash entry holding the temp file handle
+
+=back
+
+=cut
+
+sub RemoveTempFile {
+  my ($hash, $fileKey, $handleKey) = @_;
+
+  if (defined($hash->{$fileKey})) {
+    close($hash->{$handleKey}) if (defined($hash->{$handleKey}));
+    unlink($hash->{$fileKey});
+    delete($hash->{$fileKey});
+    delete($hash->{$handleKey});
+  }
 }
 
 =over
@@ -1842,13 +1745,13 @@ sub GetForecastStart {
   }
 
   # determine if a new forecast report should be downloaded
-  #my ($dwdDocSize, $dwdDocTime);                                       # Heiko
-  my ($update, $dwdDocSize, $dwdDocTime) = IsDocumentUpdated($hash, $url, 'fc');     # Heiko
+  #my ($dwdDocSize, $dwdDocTime);                                       
+  my ($update, $dwdDocSize, $dwdDocTime) = IsDocumentUpdated($hash, $url, 'fc');    
   my $lastDocSize = ::ReadingsVal($name , 'fc_dwdDocSize', 0);
-  my $lastDocTimestamp = ParseDateTimeUTC(::ReadingsVal($name , 'fc_dwdDocTime', '1970-01-01 00:00:00')); # Heiko
+  my $lastDocTimestamp = ParseDateTimeUTC(::ReadingsVal($name , 'fc_dwdDocTime', '1970-01-01 00:00:00')); 
   my $dwdDocTimestamp = length($dwdDocTime) ? ParseDateTimeUTC($dwdDocTime) : time();
   my $maxDocAge = (::AttrVal($name, 'forecastRefresh', 6) - 0.5) * 60 * 60; # [s]
-  $maxDocAge = 0;     # Heiko ... wozu nochmal Wartezeit checken wenn bereits in IsDocumentUpdated?
+  $maxDocAge = 0;    
   $update = $update && ($lastDocSize == 0 || ($dwdDocTimestamp - $lastDocTimestamp) >= $maxDocAge);
 
   ::Log3 $name, 5, "$name: GetForecastStart dwdDocTime: $dwdDocTime, dwdDocTimestamp: $dwdDocTimestamp,  dwdDocSize: $dwdDocSize, lastDocTimestamp: $lastDocTimestamp, maxDocAge: $maxDocAge, lastDocSize: $lastDocSize : update: $update";
@@ -2280,6 +2183,7 @@ sub GetForecastFinish {
 
     if (defined($errorMessage) && length($errorMessage) > 0) {
       # error, skip further processing
+      RemoveTempFile($hash, ".forecastFile", ".forecastFileHandle");
     } elsif (!defined($hash->{".forecastFile"})) {
       $errorMessage = "internal temp file name missing";
       ::Log3 $name, 3, "$name: GetForecastFinish ERROR: $errorMessage";
@@ -2347,6 +2251,7 @@ sub GetForecastAbort {
 
   delete $hash->{".forecastBlockingCall"};
   delete $hash->{forecastUpdating};
+  RemoveTempFile($hash, ".forecastFile", ".forecastFileHandle");
   $errorMessage = "downloading and processing weather forecast data failed ($errorMessage)";
   ::Log3 $name, 3, "$name: GetForecastAbort ERROR: $errorMessage";
 
@@ -2542,7 +2447,7 @@ sub GetAlerts {
       close($hash->{".alertsFileHandle".$communeUnion});
       unlink($hash->{".alertsFile".$communeUnion});
     }
-    ($hash->{".alertsFileHandle".$communeUnion}, $hash->{".alertsFile".$communeUnion}) = tempfile(UNLINK => 1);
+    ($hash->{".alertsFileHandle".$communeUnion}, $hash->{".alertsFile".$communeUnion}) = tempfile();
     $hash->{".warncellId"} = $warncellId;
     if (defined($hash->{".alertsBlockingCall".$communeUnion})) {
       # kill old blocking call
@@ -2596,8 +2501,9 @@ sub GetAlertsStart {
   my $alertLanguage = ::AttrVal($name, 'alertLanguage', 'DE');
   my $url = 'https://opendata.dwd.de/weather/alerts/cap/'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_CELLS_STAT/Z_CAP_C_EDZW_LATEST_PVW_STATUS_PREMIUMCELLS_'.($communeUnion? 'COMMUNEUNION' : 'DISTRICT').'_'.$alertLanguage.'.zip';
 
-  my ($dwdDocSize, $dwdDocTime);
-  my $update = IsDocumentUpdated($hash, $url, 'a', $dwdDocSize, $dwdDocTime);
+  #my ($dwdDocSize, $dwdDocTime);
+  #my $update = IsDocumentUpdated($hash, $url, 'a', $dwdDocSize, $dwdDocTime);
+  my ($update, $dwdDocSize, $dwdDocTime) = IsDocumentUpdated($hash, $url, 'a');
 
   my $result;
   if ($update) {
@@ -2681,7 +2587,7 @@ sub ProcessAlerts {
     unzip($zipFileHandle => \@xmlStrings, MultiStream => 1) or die "error unzipping data: $UnzipError\n";
 
     # parse XML strings
-    foreach my $xmlString (@xmlStrings) {
+    for my $xmlString (@xmlStrings) {
       if (substr(${$xmlString}, 0, 2) eq 'PK') {
         # empty string, skip
         next;
@@ -2696,7 +2602,7 @@ sub ProcessAlerts {
       $xpc->registerNs('cap', 'urn:oasis:names:tc:emergency:cap:1.2');
       my $alert = {};
       my $alertNode = $dom->documentElement();
-      foreach my $alertChildNode ($alertNode->nonBlankChildNodes()) {
+      for my $alertChildNode ($alertNode->nonBlankChildNodes()) {
         #::Log3 $name, 5, "$name: ProcessAlerts child node: " . $alertChildNode->nodeName();
         if ($alertChildNode->nodeName() eq 'identifier') {
           $alert->{identifier} = $alertChildNode->textContent();
@@ -2709,14 +2615,14 @@ sub ProcessAlerts {
           # get list of references, separated by whitespace, each reference consisting of 3 parts: sender, identifier, sent
           $alert->{references} = [];
           my @references = split(' ', $alertChildNode->textContent());
-          foreach my $reference (@references) {
+          for my $reference (@references) {
             my @parts = split(',', $reference);
             if (scalar(@parts) == 3) {
               push(@{$alert->{references}}, $parts[2]);
             }
           }
         } elsif ($alertChildNode->nodeName() eq 'info') {
-          foreach my $infoChildNode ($alertChildNode->nonBlankChildNodes()) {
+          for my $infoChildNode ($alertChildNode->nonBlankChildNodes()) {
             #::Log3 $name, 5, "$name: ProcessAlerts child node: '" . $infoChildNode->nodeName() . "'";
             if ($infoChildNode->nodeName() eq 'category') {
               $alert->{category} = $infoChildNode->textContent();
@@ -2846,34 +2752,39 @@ sub GetAlertsFinish {
 
   my %docHeader;
   if ($paramCount > 3) {
-    $docHeader{warncellId} = $warncellId;
+    $docHeader{warncellId}   = $warncellId;
     $docHeader{receivedTime} = $receivedTime;
-    $docHeader{url} = $url;
-    $docHeader{dwdDocSize} = $dwdDocSize;
-    $docHeader{dwdDocTime} = $dwdDocTime;
+    $docHeader{url}          = $url;
+    $docHeader{dwdDocSize}   = $dwdDocSize;
+    $docHeader{dwdDocTime}   = $dwdDocTime;
   }
 
   if (defined($name)) {
     ::Log3 $name, 5, "$name: GetAlertsFinish START (PID $$) $warncellId";
 
-    my $hash = $::defs{$name};
+    my $hash         = $::defs{$name};
     my $communeUnion = IsCommuneUnionWarncellId($warncellId);
     delete $hash->{".alertsBlockingCall".$communeUnion};
 
     if (defined($errorMessage) && length($errorMessage) > 0) {
       # error, skip further processing
-    } elsif (!defined($hash->{".alertsFile".$communeUnion})) {
+      RemoveTempFile($hash, ".alertsFile".$communeUnion, ".alertsFileHandle".$communeUnion);
+    } 
+    elsif (!defined($hash->{".alertsFile".$communeUnion})) {
       $errorMessage = "internal temp file name missing";
       ::Log3 $name, 3, "$name: GetAlertsFinish ERROR: $errorMessage";
-    } else {
+    } 
+    else {
       # deserialize alerts
-      my $fh = $hash->{".alertsFileHandle".$communeUnion};
-      my $terminator = $/;
-      $/ = undef;        # enable slurp file read mode
+      my $fh           = $hash->{".alertsFileHandle".$communeUnion};
+      my $terminator   = $/;
+      $/               = undef;        # enable slurp file read mode
       my $frozenAlerts = <$fh>;
-      $/ = $terminator;  # restore default file read mode
+      $/               = $terminator;  # restore default file read mode
+      
       close($hash->{".alertsFileHandle".$communeUnion});
       unlink($hash->{".alertsFile".$communeUnion});
+      
       my %newAlerts = %{thaw($frozenAlerts)};
       ::Log3 $name, 5, "$name: GetAlertsFinish temp file " . $hash->{".alertsFile".$communeUnion} . " alerts " . keys(%newAlerts) . " size " . length($frozenAlerts);
       delete($hash->{".alertsFile".$communeUnion});
@@ -2881,24 +2792,24 @@ sub GetAlertsFinish {
       # @todo delete global alert list when no differential updates are available?
       my $alerts = {};
 
-      # update global alert list
-      foreach my $alert (values(%newAlerts)) {
+      for my $alert (values(%newAlerts)) {                                      # update global alert list
         my $indentifierExists = defined($alerts->{$alert->{identifier}});
+        
         if ($indentifierExists) {
           ::Log3 $name, 5, "$name: ProcessAlerts identifier " . $alert->{identifier} . " already known, data not updated";
-        } elsif ($alert->{msgType} eq 'Alert') {
-          # add new alert
-          $alerts->{$alert->{identifier}} = $alert;
-        } elsif ($alert->{msgType} eq 'Update') {
-          # delete old alerts
-          foreach my $reference (@{$alert->{references}}) {
+        } 
+        elsif ($alert->{msgType} eq 'Alert') {
+          $alerts->{$alert->{identifier}} = $alert;                             # add new alert
+        } 
+        elsif ($alert->{msgType} eq 'Update') {
+          for my $reference (@{$alert->{references}}) {                         # delete old alerts
             delete $alerts->{$reference};
           }
-          # add new alert
-          $alerts->{$alert->{identifier}} = $alert;
-        } elsif ($alert->{msgType} eq 'Cancel') {
-          # delete old alerts
-          foreach my $reference (@{$alert->{references}}) {
+          
+          $alerts->{$alert->{identifier}} = $alert;                             # add new alert
+        } 
+        elsif ($alert->{msgType} eq 'Cancel') {
+          for my $reference (@{$alert->{references}}) {                         # delete old alerts
             delete $alerts->{$reference};
           }
         }
@@ -2924,13 +2835,14 @@ sub GetAlertsFinish {
         ::readingsBulkUpdate($hash, 'state', "alerts unchanged");
         ::readingsEndUpdate($hash, 1);
       } else {
+        $alertsErrorMessage[$communeUnion] = $errorMessage;
         ::readingsSingleUpdate($hash, 'state', "alerts error: $errorMessage", 1);
       }
     } else {
       $alertsErrorMessage[$communeUnion] = undef;
     }
 
-    if ($paramCount > 3 && $errorMessage ne 'up-to-date') {
+    if ($paramCount > 3 && $warncellId >= 0 && $errorMessage ne 'up-to-date') {
       # update alert readings for warncell id
       UpdateAlerts($hash, $warncellId, \%docHeader);
     }
@@ -2964,6 +2876,7 @@ sub GetAlertsAbort {
 
   my $communeUnion = IsCommuneUnionWarncellId($warncellId);
   delete $hash->{".alertsBlockingCall".$communeUnion};
+  RemoveTempFile($hash, ".alertsFile".$communeUnion, ".alertsFileHandle".$communeUnion);
   $alertsUpdating[$communeUnion] = undef;
   $errorMessage = "downloading and processing weather alerts data failed ($errorMessage)";
   ::Log3 $name, 3, "$name: GetAlertsAbort ERROR: $errorMessage";
@@ -2997,105 +2910,172 @@ sub UpdateAlerts {
   my ($hash, $warncellId, $docHeader) = @_;
   my $name = $hash->{NAME};
 
-  # delete existing alert readings
-  ::CommandDeleteReading(undef, "$name ^(?!a_count|a_state|a_time|a_url|a_dwdDocSize|a_dwdDocTime)a_.*");
-
   ::readingsBeginUpdate($hash);
 
-  # create alert for next 24 hours, if retrieval failed
+  # prepare processing
+  my $communeUnion       = IsCommuneUnionWarncellId($warncellId);
+  my $alertExcludeEvents = ::AttrVal($name, 'alertExcludeEvents', undef);
+  my @excludeEventsList  = split(',', $alertExcludeEvents) if (defined($alertExcludeEvents));
+  
+  for my $excludeEvent (@excludeEventsList) {
+    $excludeEvent =~ s/^\s+|\s+$//g; # trim
+  }
+  
+  my %excludeEvents = map { $_ => 1 } @excludeEventsList;
+
+  # build new block data in %newReadings (key "a_N_property" => value)
+  my %newReadings;
   my $index = 0;
-  my $communeUnion = IsCommuneUnionWarncellId($warncellId);
+
+  # create alert for next 24 hours, if retrieval failed
   if (defined($alertsErrorMessage[$communeUnion]) && length($alertsErrorMessage[$communeUnion]) > 0) {
     my $prefix = 'a_'.$index.'_';
     my $time = time();
-    ::readingsBulkUpdate($hash, $prefix.'category',     'Met');
-    ::readingsBulkUpdate($hash, $prefix.'event',        0);
-    ::readingsBulkUpdate($hash, $prefix.'eventDesc',    'STÖRUNG');
-    ::readingsBulkUpdate($hash, $prefix.'eventGroup',   'FHEM');
-    ::readingsBulkUpdate($hash, $prefix.'responseType', 'Prepare');
-    ::readingsBulkUpdate($hash, $prefix.'urgency',      'Immediate');
-    ::readingsBulkUpdate($hash, $prefix.'severity',     'Severe');
-    ::readingsBulkUpdate($hash, $prefix.'areaColor',    '255, 0, 0');
-    ::readingsBulkUpdate($hash, $prefix.'onset',        FormatDateTimeLocal($hash, $time));
-    ::readingsBulkUpdate($hash, $prefix.'expires',      FormatDateTimeLocal($hash, $time+24*60*60));
-    ::readingsBulkUpdate($hash, $prefix.'headline',     'FHEM: Aktualisierung der Wetterwarnungen fehlgeschlagen');
-    ::readingsBulkUpdate($hash, $prefix.'description',  "Fehler: $alertsErrorMessage[$communeUnion]");
-    ::readingsBulkUpdate($hash, $prefix.'instruction',  'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.');
-    ::readingsBulkUpdate($hash, $prefix.'area',         0);
-    ::readingsBulkUpdate($hash, $prefix.'areaDesc',     'DWD Open Data Server');
-    ::readingsBulkUpdate($hash, $prefix.'altitude',     0);
-    ::readingsBulkUpdate($hash, $prefix.'ceiling',      0);
+    
+    $newReadings{$prefix.'category'}     = 'Met';
+    $newReadings{$prefix.'event'}        = 0;
+    $newReadings{$prefix.'eventDesc'}    = (!$::unicodeEncoding ? encode('UTF-8', 'STÖRUNG') : 'STÖRUNG');
+    $newReadings{$prefix.'eventGroup'}   = 'FHEM';
+    $newReadings{$prefix.'responseType'} = 'Prepare';
+    $newReadings{$prefix.'urgency'}      = 'Immediate';
+    $newReadings{$prefix.'severity'}     = 'Severe';
+    $newReadings{$prefix.'areaColor'}    = '255, 0, 0';
+    $newReadings{$prefix.'onset'}        = FormatDateTimeLocal($hash, $time);
+    $newReadings{$prefix.'expires'}      = FormatDateTimeLocal($hash, $time+24*60*60);
+    $newReadings{$prefix.'headline'}     = 'FHEM: Aktualisierung der Wetterwarnungen fehlgeschlagen';
+    $newReadings{$prefix.'description'}  = "Fehler: $alertsErrorMessage[$communeUnion]";
+    $newReadings{$prefix.'instruction'}  = (!$::unicodeEncoding ? encode('UTF-8', 'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.') : 'ACHTUNG! Aktuell stehen aufgrund einer Störung keine aktuellen Wetterwarnungen zur Verfügung.');
+    $newReadings{$prefix.'area'}         = 0;
+    $newReadings{$prefix.'areaDesc'}     = 'DWD Open Data Server';
+    $newReadings{$prefix.'altitude'}     = 0;
+    $newReadings{$prefix.'ceiling'}      = 0;
+    
     $index++;
 
-    ::readingsBulkUpdate($hash, 'a_state', "error: $alertsErrorMessage[$communeUnion]");
-  } else {
-    ::readingsBulkUpdate($hash, 'a_state', 'updated');
+    $newReadings{'a_state'} = "error: $alertsErrorMessage[$communeUnion]";
+  } 
+  else {
+    $newReadings{'a_state'} = 'updated';
   }
 
-  # prepare processing
-  my $alertExcludeEvents = ::AttrVal($name, 'alertExcludeEvents', undef);
-  my @excludeEventsList = split(',', $alertExcludeEvents) if (defined($alertExcludeEvents));
-  foreach my $excludeEvent (@excludeEventsList) {
-    $excludeEvent =~ s/^\s+|\s+$//g; # trim
-  }
-  my %excludeEvents = map { $_ => 1 } @excludeEventsList;
-
-  # order alerts by onset
-  if (ref($alertsData[$communeUnion]) eq 'HASH') {
+  if (ref($alertsData[$communeUnion]) eq 'HASH') {                                                                                      # order alerts by onset (identifier as tie-breaker for a stable block order)
     my $alerts = $alertsData[$communeUnion];
-    my @identifiers = sort { $alerts->{$a}->{onset} <=> $alerts->{$b}->{onset} } keys(%{$alerts});
-    foreach my $identifier (@identifiers) {
-      my $alert = $alerts->{$identifier};
-      # find alert for selected warncell
+    my @identifiers = sort { $alerts->{$a}->{onset} <=> $alerts->{$b}->{onset} || $a cmp $b } keys(%{$alerts});
+    
+    for my $identifier (@identifiers) {
+      my $alert     = $alerts->{$identifier};                                                                                           # find alert for selected warncell
       my $areaIndex = 0;
-      foreach my $wcId (@{$alert->{warncellid}}) {
-        if ($wcId == $warncellId && !(lc($alert->{severity}) eq 'minor' && defined($excludeEvents{$alert->{eventCode}}))) {
-          # alert found that is not on the exclude list, create readings
+      
+      for my $wcId (@{$alert->{warncellid}}) {
+        if ($wcId == $warncellId && !(lc($alert->{severity}) eq 'minor' && defined($excludeEvents{$alert->{eventCode}}))) {             # alert found that is not on the exclude list, fill readings
           my $prefix = 'a_'.$index.'_';
-          ::readingsBulkUpdate($hash, $prefix.'category',     $alert->{category});
-          ::readingsBulkUpdate($hash, $prefix.'event',        $alert->{eventCode});
-          ::readingsBulkUpdate($hash, $prefix.'eventDesc',    (!$::unicodeEncoding ? encode('UTF-8', $alert->{event}) : $alert->{event}));
-          ::readingsBulkUpdate($hash, $prefix.'eventGroup',   $alert->{eventGroup});
-          ::readingsBulkUpdate($hash, $prefix.'responseType', $alert->{responseType});
-          ::readingsBulkUpdate($hash, $prefix.'urgency',      $alert->{urgency});
-          ::readingsBulkUpdate($hash, $prefix.'severity',     $alert->{severity});
-          ::readingsBulkUpdate($hash, $prefix.'areaColor',    $alert->{areaColor});
-          ::readingsBulkUpdate($hash, $prefix.'onset',        FormatDateTimeLocal($hash, $alert->{onset}));
-          ::readingsBulkUpdate($hash, $prefix.'expires',      FormatDateTimeLocal($hash, $alert->{expires}));
-          ::readingsBulkUpdate($hash, $prefix.'headline',     (!$::unicodeEncoding ? encode('UTF-8', $alert->{headline}) : $alert->{headline}));
-          ::readingsBulkUpdate($hash, $prefix.'description',  (!$::unicodeEncoding ? encode('UTF-8', $alert->{description}) : $alert->{description}));
-          ::readingsBulkUpdate($hash, $prefix.'instruction',  (!$::unicodeEncoding ? encode('UTF-8', $alert->{instruction}) : $alert->{instruction}));
-          ::readingsBulkUpdate($hash, $prefix.'area',         $alert->{warncellid}[$areaIndex]);
-          ::readingsBulkUpdate($hash, $prefix.'areaDesc',     (!$::unicodeEncoding ? encode('UTF-8', $alert->{areaDesc}[$areaIndex]) : $alert->{areaDesc}[$areaIndex]));
-          ::readingsBulkUpdate($hash, $prefix.'altitude',     floor(0.3048*$alert->{altitude}[$areaIndex] + 0.5));
-          ::readingsBulkUpdate($hash, $prefix.'ceiling',      floor(0.3048*$alert->{ceiling}[$areaIndex] + 0.5));
+          
+          $newReadings{$prefix.'category'}     = $alert->{category};
+          $newReadings{$prefix.'event'}        = $alert->{eventCode};
+          $newReadings{$prefix.'eventDesc'}    = (!$::unicodeEncoding ? encode('UTF-8', $alert->{event}) : $alert->{event});
+          $newReadings{$prefix.'eventGroup'}   = $alert->{eventGroup};
+          $newReadings{$prefix.'responseType'} = $alert->{responseType};
+          $newReadings{$prefix.'urgency'}      = $alert->{urgency};
+          $newReadings{$prefix.'severity'}     = $alert->{severity};
+          $newReadings{$prefix.'areaColor'}    = $alert->{areaColor};
+          $newReadings{$prefix.'onset'}        = FormatDateTimeLocal($hash, $alert->{onset});
+          $newReadings{$prefix.'expires'}      = FormatDateTimeLocal($hash, $alert->{expires});
+          $newReadings{$prefix.'headline'}     = (!$::unicodeEncoding ? encode('UTF-8', $alert->{headline}) : $alert->{headline});
+          $newReadings{$prefix.'description'}  = (!$::unicodeEncoding ? encode('UTF-8', $alert->{description}) : $alert->{description});
+          $newReadings{$prefix.'instruction'}  = (!$::unicodeEncoding ? encode('UTF-8', $alert->{instruction}) : $alert->{instruction});
+          $newReadings{$prefix.'area'}         = $alert->{warncellid}[$areaIndex];
+          $newReadings{$prefix.'areaDesc'}     = (!$::unicodeEncoding ? encode('UTF-8', $alert->{areaDesc}[$areaIndex]) : $alert->{areaDesc}[$areaIndex]);
+          $newReadings{$prefix.'altitude'}     = floor(0.3048*$alert->{altitude}[$areaIndex] + 0.5);
+          $newReadings{$prefix.'ceiling'}      = floor(0.3048*$alert->{ceiling}[$areaIndex] + 0.5);
+          
           $index++;
           last();
         }
         $areaIndex++;
       }
 
-      # license
-      if ($index == 1 && defined($alert->{license})) {
-        ::readingsBulkUpdate($hash, 'a_copyright', (!$::unicodeEncoding ? encode('UTF-8', $alert->{license}) : $alert->{license}));
+      if ($index == 1 && defined($alert->{license})) {                                                                                  # license
+        $newReadings{'a_copyright'} = (!$::unicodeEncoding ? encode('UTF-8', $alert->{license}) : $alert->{license});
       }
     }
   }
 
-  # alert count, receive time and DWD document properties
-  ::readingsBulkUpdate($hash, 'a_count', $index);
+  # alert count and DWD document properties
+  $newReadings{'a_count'} = $index;
+  
   if (defined($docHeader)) {
-    ::readingsBulkUpdate($hash, "a_time", FormatDateTimeLocal($hash, $docHeader->{receivedTime}));
-    ::readingsBulkUpdate($hash, "a_url", $docHeader->{url});
-    ::readingsBulkUpdate($hash, "a_dwdDocSize", $docHeader->{dwdDocSize});
-    ::readingsBulkUpdate($hash, "a_dwdDocTime", $docHeader->{dwdDocTime});
+    $newReadings{'a_time'}       = FormatDateTimeLocal($hash, $docHeader->{receivedTime});
+    $newReadings{'a_url'}        = $docHeader->{url};
+    $newReadings{'a_dwdDocSize'} = $docHeader->{dwdDocSize};
+    $newReadings{'a_dwdDocTime'} = $docHeader->{dwdDocTime};
+  }
+  
+  $newReadings{'state'} = 'alerts updated';
+
+  # determine old a_N_* block indices from current readings
+  my %oldIndices;
+  
+  for my $r (keys %{$hash->{READINGS}}) {
+    if ($r =~ /^a_(\d+)_/) {
+      $oldIndices{$1} = 1;
+    }
   }
 
-  ::readingsBulkUpdate($hash, 'state', 'alerts updated');
+  # determine new a_N_* block indices
+  my %newIndices;
+  
+  for my $r (keys %newReadings) {
+    if ($r =~ /^a_(\d+)_/) {
+      $newIndices{$1} = 1;
+    }
+  }
+
+  # write block only if at least one value in the block changed
+  for my $i (sort {$a <=> $b} keys %newIndices) {
+    my $changed = 0;
+    
+    for my $r (keys %newReadings) {
+      next unless $r =~ /^a_${i}_/;
+      my $old = ::ReadingsVal($name, $r, undef);
+      
+      if (!defined($old) || $old ne $newReadings{$r}) {
+        $changed = 1;
+        last;
+      }
+    }
+    
+    if ($changed) {
+      for my $r (keys %newReadings) {
+        next unless $r =~ /^a_${i}_/;
+        ::readingsBulkUpdate($hash, $r, $newReadings{$r});
+      }
+    }
+  }
+
+  # delete a_N_* blocks that no longer exist
+  for my $i (keys %oldIndices) {
+    if (!$newIndices{$i}) {
+      ::CommandDeleteReading(undef, "$name ^a_${i}_.*");
+    }
+  }
+
+  # delete license reading if no alert remains
+  if (!defined($newReadings{'a_copyright'}) && defined($hash->{READINGS}{'a_copyright'})) {
+    ::CommandDeleteReading(undef, "$name a_copyright");
+  }
+
+  # global readings (always written)
+  for my $r (qw(a_count a_state a_copyright state)) {
+    ::readingsBulkUpdate($hash, $r, $newReadings{$r}) if defined($newReadings{$r});
+  }
+  
+  for my $r (qw(a_time a_url a_dwdDocSize a_dwdDocTime)) {
+    ::readingsBulkUpdate($hash, $r, $newReadings{$r}) if defined($newReadings{$r});
+  }
 
   ::readingsEndUpdate($hash, 1);
 
-  return undef;
+return undef;
 }
 
 # -----------------------------------------------------------------------------
@@ -3135,13 +3115,40 @@ sub DWD_OpenData_Initialize {
                       .$readingFnAttributes;
 }
 
-# -----------------------------------------------------------------------------
-
 1;
 
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 10.10.2026 (version 1.17.9) DS_Starter
+# Patch von Rampler eingebaut (Forum: https://forum.fhem.de/index.php?msg=1370034)
+#
+# bugfix: @alertsData, @alertsReceived, @alertsUpdating und @alertsErrorMessage werden jetzt als Listen
+#         statt als Array-Referenz initialisiert
+# bugfix: GetHeaders liefert eine Hash-Referenz (bisher Liste); IsDocumentUpdated angepasst
+# bugfix: GetAlertsStart übernimmt das Ergebnis von IsDocumentUpdated per Rückgabeliste
+#         (update, dwdDocSize, dwdDocTime) statt über Ein-/Ausgabeparameter
+# bugfix: Fehlermeldung beim Abruf der Wetterwarnungen wird in @alertsErrorMessage gespeichert
+#         (wird für die Störungsmeldung in UpdateAlerts benötigt)
+# bugfix: Readings eventDesc und instruction der Störungsmeldung werden bei global encoding != unicode
+#         nach UTF-8 kodiert
+# bugfix: Speicherleck behoben: tempfile(UNLINK => 1) entfernt (File::Temp merkt sich jeden Aufruf bis
+#         Prozessende), Temp-Dateien werden explizit gelöscht
+# bugfix: Temp-Datei und Filehandle werden auch im Fehler-/up-to-date-Fall (Finish) und im Abort aufgeräumt
+# bugfix: Shutdown/Undef: BlockingCall für Alerts wird beendet (Hash-Schlüssel .alertsBlockingCall<N>
+#         korrigiert), Temp-Dateien beider Alert-Caches werden entfernt
+# change: neue Funktion RemoveTempFile
+# bugfix: ParseDateLocal lieferte immer undef (Time::Piece-Objekt an Timelocal übergeben), dadurch wurde
+#         RotateForecast nie ausgeführt und fc0_0_* blieb veraltet; Datum wird jetzt per Regex zerlegt
+# bugfix: PruneForecast verwendete $hash->{READINGS}{TIME} statt den Zeitstempel des jeweiligen Readings
+#         (bei forecastPruning=1 wurde nie etwas gelöscht)
+# feature: Alert-Readings (a_N_*) werden nur noch geschrieben, wenn sich der Inhalt des Blocks (irgendein
+#          Eintrag) geändert hat; verhindert Event- und Log-Flooding durch unveränderte Alerts, die bei jedem
+#          Update neu indiziert werden. Nicht mehr vorhandene Blöcke werden gelöscht, Readings unveränderter
+#          Blöcke behalten ihren Zeitstempel
+# change: UpdateAlerts: Alerts mit gleichem Beginn (onset) werden stabil nach Identifier sortiert, damit die
+#         Reihenfolge der Blöcke a_N_* zwischen Updates nicht wechselt
 #
 # 23.09.2025 (version 1.17.8) DS_Starter
 # replace for..when structures
@@ -3281,14 +3288,6 @@ sub DWD_OpenData_Initialize {
 #
 # 18.02.2018 JoWiemann + jensb
 # feature: LWP::Simple replaced by HttpUtils_NonblockingGet
-#
-# -----------------------------------------------------------------------------
-
-# -----------------------------------------------------------------------------
-#
-# @todo forecast: wwd in English
-# @todo forecast: if a property is not available for a given hour the value of the previous or next hour might be used/interpolated?
-# @todo alerts: queue get commands while cache is updating?
 #
 # -----------------------------------------------------------------------------
 
