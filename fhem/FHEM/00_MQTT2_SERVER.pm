@@ -49,7 +49,6 @@ MQTT2_SERVER_Initialize($)
     rePublish:1,0
     rawEvents
     respectRetain:1,0
-    retainDelay
     sslVersion
     sslCertPrefix
     topicConversion:0,1
@@ -523,9 +522,9 @@ MQTT2_SERVER_Read($@)
       $ds->{$subscr} = { opt=>$sopt, prop=>\%sprops };
       if($subscr =~ m,[#+],) {
         my $re = quotemeta($subscr);
-        $re =~ s,\\/,/,g;
+        $re =~ s,/\\#$,(?:/.*)?,;     # 4.7.1.2
         $re =~ s,\\#,.*,g;
-        $re =~ s,\\\+,[^/]+,g;
+        $re =~ s,\\\+,[^/]*,g;        # 4.7.1.3
         $ds->{$subscr}{re} = qr/^$re$/;
       }
       Log3 $sname, 4, "    topic:$subscr options:$sopt";
@@ -713,7 +712,7 @@ MQTT2_SERVER_dosendto($$$$$$;$$)
   my $lr = $retain ? 1 : 0;
   if($dest->{protoNum} == 5) {
     my $sopt = $sub->{opt};
-    return 0 if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
+    return 0 if(($sopt & 0x30) == 0x20 && !$src); # RetainHandling:2, 1:TODO
     return 0 if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
     $lr = 0 if(!($sopt & 0x08) && $src); # RetainAsPublished, 3.8.3.1
 
