@@ -516,15 +516,18 @@ MQTT2_SERVER_Read($@)
     $off = MQTT2_SERVER_parseProps("",\%sprops,$pl,$off,$dump)
              if($hash->{protoNum} == 5);
 
+    my $ds = $hash->{subscriptions};
     while($off < $tlen) {
       ($subscr, $off) = MQTT2_SERVER_getStr($hash, $pl, $off);
       my $sopt = unpack("C", substr($pl, $off++, 1));
-      my $re = $subscr;
-      $re =~ s,^#$,.*,g;
-      $re =~ s,/?#,\\b.*,g;
-      $re =~ s,\+,\\b[^/]+\\b,g;
-      $hash->{subscriptions}{$subscr} = { opt=>$sopt, prop=>\%sprops,
-                              re=>qr/^$re$/, wildcard=>($re ne $subscr) };
+      $ds->{$subscr} = { opt=>$sopt, prop=>\%sprops };
+      if($subscr =~ m,[#+],) {
+        my $re = quotemeta($subscr);
+        $re =~ s,\\/,/,g;
+        $re =~ s,\\#,.*,g;
+        $re =~ s,\\\+,[^/]+,g;
+        $ds->{$subscr}{re} = qr/^$re$/;
+      }
       Log3 $sname, 4, "    topic:$subscr options:$sopt";
       push @ret, (($sopt & 3) > 1 ? 1 : 0);    # max qos supported is 1
     }
@@ -539,19 +542,15 @@ MQTT2_SERVER_Read($@)
                               pack("nC*",$pid,@ret), $dump);
     }
 
-
-    if(!$hash->{answerScheduled} && $shash->{retain}) {
-      $hash->{answerScheduled} = 1;
-      my $rd = AttrNum($sname,"retainDelay",1); #145310
-      InternalTimer($hash->{lastMsgTime}+$rd, sub(){
-        return if(!$hash->{FD}); # Closed in the meantime, #114425
-        delete($hash->{answerScheduled});
-        my $r = $shash->{retain};
-        foreach my $tp (sort { $r->{$a}{ts} <=> $r->{$b}{ts} } keys %{$r}) {
-          MQTT2_SERVER_sendto($shash, undef, $hash, $tp,
+    my $r = $shash->{retain};
+    if($r) {
+      foreach my $tp (sort { $r->{$a}{ts} <=> $r->{$b}{ts} } keys %{$r}) {
+        MQTT2_SERVER_sendto($shash, undef, $hash, $tp,
                               $r->{$tp}{val}, 1, $r->{$tp}{props});
-        }
-      }, undef, 0);
+      }
+      foreach my $s (keys %{$ds}) {
+        $ds->{$s}{retainSent} = 1;
+      }
     }
 
   ####################################
@@ -691,16 +690,16 @@ MQTT2_SERVER_sendto($$$$$;$$)
 
   my $ds = $dest->{subscriptions};
   my $sub = $ds->{$topic};
-  if($sub && !$sub->{wildcard}) { # exact match, no wildcard subscription
-    MQTT2_SERVER_dosendto($sub, $server, $src, $dest, $topic, $val, $retain, $props);
-    return;
-  }
-
+  return if($sub && !$sub->{re}     && # exact match, no wildcard subscription
+            ($src || !$sub->{retainSent}) && 
+            MQTT2_SERVER_dosendto($sub, $server, $src, $dest,
+                                  $topic, $val, $retain, $props));
   foreach my $s (keys %{$ds}) {
-    if($topic =~ m/$ds->{$s}{re}/) {
-      MQTT2_SERVER_dosendto($ds->{$s}, $server, $src, $dest, $topic, $val, $retain, $props);
-      last;
-    }
+    my $sub = $ds->{$s};
+    return if($sub->{re} && $topic =~ m/$sub->{re}/ &&
+              ($src || !$sub->{retainSent}) && 
+              MQTT2_SERVER_dosendto($sub, $server, $src, $dest,
+                                    $topic, $val, $retain, $props));
   }
 }
 
@@ -708,15 +707,14 @@ sub
 MQTT2_SERVER_dosendto($$$$$$;$$)
 {
   my ($sub, $server, $src, $dest, $topic, $val, $retain, $props) = @_;
-
   Log3 $server, 5, "  $dest->{NAME} $dest->{cid} => $topic:$val";
 
   my $srcCid = $src && $src->{cid} ? $src->{cid} : "";
   my $lr = $retain ? 1 : 0;
   if($dest->{protoNum} == 5) {
     my $sopt = $sub->{opt};
-    next if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
-    next if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
+    return 0 if(($sopt & 0x30) == 0x20); # RetainHandling:2, 1:TODO
+    return 0 if($srcCid eq $dest->{cid} && ($sopt&0x04)); # NoLocal
     $lr = 0 if(!($sopt & 0x08) && $src); # RetainAsPublished, 3.8.3.1
 
     if($props) {
@@ -749,6 +747,7 @@ MQTT2_SERVER_dosendto($$$$$$;$$)
   my $dump = (AttrVal($server->{NAME},"verbose",1)>=5) ? $server->{NAME} :undef;
   MQTT2_SERVER_out($dest,
     pack("C",0x30+$lr).$rl.MQTT2_SERVER_makeStr($topic).$props.$lval,$dump);
+  return 1;
 }
 
 sub
@@ -1142,13 +1141,6 @@ MQTT2_SERVER_ReadDebug($$)
       for featurelevel > 6.1. Set this attribute to 1 if you have external
       devices relying on this feature.
       </li>
-
-    <a id="MQTT2_SERVER-attr-retainDelay"></a>
-    <li>retainDelay &lt;seconds&gt;<br>
-      To avoid sending retained messages more than once, they are sent one
-      second after the first subscription, as more than one subscription is
-      expected. For appliances with a short connect time this might bee too
-      long, and can be changed with this attribute.</li>
 
     <a id="MQTT2_SERVER-attr-SSL"></a>
     <li>SSL<br>
