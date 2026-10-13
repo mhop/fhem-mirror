@@ -21,6 +21,18 @@ var f18_cols = {
 };
 var f18_isday;
 
+// hide the page until window.load, see f18 special
+(function() {
+  var h = document.documentElement, on = false;
+  try { on = localStorage.getItem("f18hold") == "true"; } catch(e) {}
+  if(!on)
+    return;
+  h.classList.add("f18hold");
+  var release = function() { h.classList.remove("f18hold"); };
+  $(window).on('load', release);
+  setTimeout(release, 3000);
+})();
+
 $(window).resize(f18_resize);
 $(document).ready(function(){
   f18_room  = $("div#content").attr("room");
@@ -469,6 +481,8 @@ f18_special()
     appendTo = "table#f18ts";
 
     addHider("serviceWorker", true, "WebPush", f18_swToggle, true);
+    addHider("f18hold", false,
+             "Hide page until loaded<br>to avoid layout jumps", null, true);
     addHider("rightMenu", false, "MenuBtn right<br>on small screen",f18_resize);
     addHider("savePinChanges", false, "Save pin changes");
     addHider("showDragger", false, "Dragging active", function(c){
