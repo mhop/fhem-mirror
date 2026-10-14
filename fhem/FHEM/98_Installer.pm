@@ -852,6 +852,7 @@ return $t->{header}.join("\n", @ret).$t->{footer};
 ###############################################################
 #  Aktions-Link (FHEMWEB) bzw. Text für die Diff-Tabelle
 #  mit Sicherheitsrückfrage bei Deinstall
+#  (eigener Dialog im HTML, kein confirm())
 ###############################################################
 sub __DiffActionLink {
   my ($hash, $t, $cmd, $arg, $label, $confirm) = @_;
@@ -859,59 +860,76 @@ sub __DiffActionLink {
   return $label unless($t->{html});
 
   my $href = '?cmd=set '.$hash->{NAME}.' '.$cmd.' '.$arg.' '.$t->{csrf};
-  
-  if ($confirm) {
-      $confirm =~ s/'/\\'/g;
-      
-      my $js = "
-        var existing = document.getElementById('fhemCustomModal');
-        if(existing) existing.remove();
-        var bodyBg = window.getComputedStyle(document.body).backgroundColor;
-        var isDark = false;
-        if (bodyBg) {
-            var rgb = bodyBg.match(/\\d+/g);
-            if (rgb && rgb.length >= 3) {
-                var brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
-                if (brightness < 100) isDark = true;
-            }
-        }
-        var bgCol = isDark ? '#2a2a2a' : '#f8f8f8';
-        var borderCol = isDark ? '#555' : '#4e6f3e';
-        var textCol = isDark ? '#f0f0f0' : '#333';
-        var cancelBg = isDark ? '#555' : '#ccc';
-        var cancelText = isDark ? '#fff' : '#333';
-        var overlay = document.createElement('div');
-        overlay.id = 'fhemCustomModal';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
-        var box = document.createElement('div');
-        box.style.cssText = 'background:' + bgCol + ';border:2px solid ' + borderCol + ';padding:22px;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.4);max-width:400px;text-align:center;font-family:sans-serif;color:' + textCol + ';';
-        var text = document.createElement('div');
-        text.style.cssText = 'margin-bottom:20px;font-size:14px;line-height:1.4;';
-        text.innerText = '$confirm';
-        var btnContainer = document.createElement('div');
-        var btnOk = document.createElement('button');
-        btnOk.innerText = 'OK';
-        btnOk.style.cssText = 'margin-right:10px;padding:6px 18px;background:#4e6f3e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;';
-        btnOk.onclick = function() { window.location.href = '$href'; };
-        var btnCancel = document.createElement('button');
-        btnCancel.innerText = 'Abbrechen';
-        btnCancel.style.cssText = 'padding:6px 18px;background:' + cancelBg + ';color:' + cancelText + ';border:none;border-radius:4px;cursor:pointer;';
-        btnCancel.onclick = function() { overlay.remove(); };
-        btnContainer.appendChild(btnOk);
-        btnContainer.appendChild(btnCancel);
-        box.appendChild(text);
-        box.appendChild(btnContainer);
-        overlay.appendChild(box);
-        document.body.appendChild(overlay);
-        return false;
-      ";
-      
-      $js =~ s/\n/ /g;
 
-      return '<div class="detLink installerAction"><a href="#" onclick="' . $js . '">' . $label . '</a></div>';
-  }
+  return '<div class="detLink installerAction"><a href="'.$href.'">'.$label.'</a></div>' unless($confirm);
 
-return '<div class="detLink installerAction"><a href="' . $href . '">' . $label . '</a></div>';
+  # Text für JavaScript-Strings in einfachen Anführungszeichen maskieren
+  my $jsStr = sub {
+      my $s = shift;
+      $s =~ s/\\/\\\\/g;
+      $s =~ s/'/\\'/g;
+      $s =~ s/\r?\n/ /g;
+      return $s;
+  };
+
+  my $cancel = $t->{lang} eq 'de' ? 'Abbrechen' : 'Cancel';
+
+  my $js = <<'JS';
+    var existing = document.getElementById('fhemCustomModal');
+    if (existing) existing.remove();
+    var color = function(c) {
+      var m = c && c.match(/[\d.]+/g);
+      if (!m || m.length < 3) return null;
+      if (m.length > 3 && parseFloat(m[3]) === 0) return null;
+      return [parseFloat(m[0]), parseFloat(m[1]), parseFloat(m[2])];
+    };
+    var rgb = color(window.getComputedStyle(document.body).backgroundColor) || color(window.getComputedStyle(document.documentElement).backgroundColor);
+    var isDark = rgb ? ((rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 < 100) : false;
+    var bgCol = isDark ? '#2a2a2a' : '#f8f8f8';
+    var borderCol = isDark ? '#555' : '#4e6f3e';
+    var textCol = isDark ? '#f0f0f0' : '#333';
+    var cancelBg = isDark ? '#555' : '#ccc';
+    var cancelText = isDark ? '#fff' : '#333';
+    var overlay = document.createElement('div');
+    overlay.id = 'fhemCustomModal';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    overlay.onkeydown = function(e) { if (e.key === 'Escape') overlay.remove(); };
+    var box = document.createElement('div');
+    box.style.cssText = 'background:' + bgCol + ';border:2px solid ' + borderCol + ';padding:22px;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.4);max-width:400px;text-align:center;font-family:sans-serif;color:' + textCol + ';';
+    var text = document.createElement('div');
+    text.style.cssText = 'margin-bottom:20px;font-size:14px;line-height:1.4;';
+    text.innerText = '%%CONFIRM%%';
+    var btnContainer = document.createElement('div');
+    var btnOk = document.createElement('button');
+    btnOk.innerText = 'OK';
+    btnOk.style.cssText = 'margin-right:10px;padding:6px 18px;background:#4e6f3e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;';
+    btnOk.onclick = function() { window.location.href = '%%HREF%%'; };
+    var btnCancel = document.createElement('button');
+    btnCancel.innerText = '%%CANCEL%%';
+    btnCancel.style.cssText = 'padding:6px 18px;background:' + cancelBg + ';color:' + cancelText + ';border:none;border-radius:4px;cursor:pointer;';
+    btnCancel.onclick = function() { overlay.remove(); };
+    btnContainer.appendChild(btnOk);
+    btnContainer.appendChild(btnCancel);
+    box.appendChild(text);
+    box.appendChild(btnContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    btnCancel.focus();
+    return false;
+JS
+
+  my %repl = (CONFIRM => $jsStr->($confirm), HREF => $jsStr->($href), CANCEL => $jsStr->($cancel));
+  $js =~ s/%%(CONFIRM|HREF|CANCEL)%%/$repl{$1}/g;
+  $js =~ s/\s*\n\s*/ /g;
+
+  # das gesamte Skript als HTML-Attributwert maskieren (der Browser macht das vor der Ausführung rückgängig)
+  $js =~ s/&/&amp;/g;
+  $js =~ s/"/&quot;/g;
+  $js =~ s/</&lt;/g;
+  $js =~ s/>/&gt;/g;
+
+return '<div class="detLink installerAction"><a href="#" onclick="'.$js.'">'.$label.'</a></div>';
 }
 
 ###############################################################
