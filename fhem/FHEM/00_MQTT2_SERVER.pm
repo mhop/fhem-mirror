@@ -522,6 +522,7 @@ MQTT2_SERVER_Read($@)
       $ds->{$subscr} = { opt=>$sopt, prop=>\%sprops };
       if($subscr =~ m,[#+],) {
         my $re = quotemeta($subscr);
+        $re =~ s,\\/,/,g;
         $re =~ s,/\\#$,(?:/.*)?,;     # 4.7.1.2
         $re =~ s,\\#,.*,g;
         $re =~ s,\\\+,[^/]*,g;        # 4.7.1.3
