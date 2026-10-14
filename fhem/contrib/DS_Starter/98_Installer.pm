@@ -802,24 +802,28 @@ sub CreateDiffPerlList {
 
   for my $e (@{$diff->{missing}}) {
       my ($pkg, $fileVer) = @{$e};
-      push @rows, [$pkg, $ver->($fileVer), 'not installed', $red.'Missing'.$close,
+      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      push @rows, [$linkitem, $ver->($fileVer), 'not installed', $red.'Missing'.$close,
                    __DiffActionLink ($hash, $t, 'installPerl', _InstallSpec ($pkg, $fileVer), 'Install')];
   }
 
   for my $e (@{$diff->{outdated}}) {
       my ($pkg, $fileVer, $localVer) = @{$e};
-      push @rows, [$pkg, $ver->($fileVer), $ver->($localVer), $red.'Outdated'.$close,
+      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      push @rows, [$linkitem, $ver->($fileVer), $ver->($localVer), $red.'Outdated'.$close,
                    __DiffActionLink ($hash, $t, 'installPerl', _InstallSpec ($pkg, $fileVer), 'Update')];
   }
 
   for my $e (@{$diff->{newer}}) {
       my ($pkg, $fileVer, $localVer) = @{$e};
-      push @rows, [$pkg, $ver->($fileVer), $ver->($localVer), 'Newer locally', '-'];
+      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      push @rows, [$linkitem, $ver->($fileVer), $ver->($localVer), 'Newer locally', '-'];
   }
 
   for my $e (@{$diff->{extra}}) {
       my ($pkg, undef, $localVer) = @{$e};
-      push @rows, [$pkg, '-', $ver->($localVer), $red.'Extra'.$close,
+      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      push @rows, [$linkitem, '-', $ver->($localVer), $red.'Extra'.$close,
                    __DiffActionLink ($hash, $t, 'uninstallPerl', $pkg, 'Deinstall', "Really uninstall $pkg?")];
   }
 
