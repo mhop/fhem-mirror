@@ -1891,9 +1891,10 @@ sub CreateInstalledPerlList {
       for my $package (sort { lc($a) cmp lc($b) } keys %{$packages}) {
           next if($package eq 'undefined');
 
-          my $version = $packages->{$package}{version};
+          my $version  = $packages->{$package}{version};
+          my $linkitem = '<a href="https://metacpan.org/pod/'.$package.'" target="_blank">'.$package.'</a>';
 
-          push @ret, __TableRow ($t, $linecount, $package, $version ? $version : '?');
+          push @ret, __TableRow ($t, $linecount, $linkitem, $version ? $version : '?');
           $linecount++;
       }
 
@@ -1931,10 +1932,11 @@ sub CreateOutdatedPerlList {
               next if($package eq 'undefined');
               next unless ($isUpdatable{$package});
 
-              my $current = $packages->{$package}{current};
-              my $latest  = $packages->{$package}{latest};
+              my $current  = $packages->{$package}{current};
+              my $latest   = $packages->{$package}{latest};
+              my $linkitem = '<a href="https://metacpan.org/pod/'.$package.'" target="_blank">'.$package.'</a>';
 
-              push @ret, __TableRow ($t, $linecount, $package, defined $current ? $current : '?', defined $latest ? $latest : '?');
+              push @ret, __TableRow ($t, $linecount, $linkitem, defined $current ? $current : '?', defined $latest ? $latest : '?');
               $linecount++;
           }
       }
@@ -1980,7 +1982,7 @@ sub CreatePrereqsList {
   my @ret;
 
   # Perl-Voraussetzungen ermitteln
-  LoadInstallStatusPerl(($defined[0] // '') eq '1' ? 1 : \@defined);
+  LoadInstallStatusPerl (($defined[0] // '') eq '1' ? 1 : \@defined);
 
   my %description = (
       Required    => 'Required dependencies '.$t->{strongOpen}.'must'.$t->{strongClose}.' be installed for the listed FHEM modules to work.',
@@ -2007,8 +2009,7 @@ sub CreatePrereqsList {
               my $linkmod = '';
               my $inScope = 0;
 
-              for my $modName (sort { lc($a) cmp lc($b) } @{$info->{modules}}) {
-                  # Paket nur anzeigen, wenn ein Modul im Installationsumfang es verwendet
+              for my $modName (sort { lc($a) cmp lc($b) } @{$info->{modules}}) {                # Paket nur anzeigen, wenn ein Modul im Installationsumfang es verwendet
                   $inScope = 1 if(grep { $_ eq $modName } @defined);
 
                   my $modLabel = $modName eq 'Global' ? 'FHEM' : $modName;
@@ -3824,6 +3825,7 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
     </li>
     <br>
 
+    <a id="Installer-get-showOutdatedPerlList"></a>
     <li><b>showOutdatedPerlList</b><br>
         Shows the outdated Perl packages with installed and latest version. Only packages that are updatable according to the attributes
         <a href="#Installer-attr-updatePerlDualLifeModules">updatePerlDualLifeModules</a> and <a href="#Installer-attr-updatePerlUsedModulesOnly">updatePerlUsedModulesOnly</a> are listed.<br>
@@ -3831,7 +3833,7 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
     </li>
     <br>
 
-    <a id="Installer-get-showOutdatedPerlList"></a>
+    <a id="Installer-get-showInstalledPerlList"></a>
     <li><b>showInstalledPerlList</b><br>
         Shows all installed Perl packages with their version, as determined by the last execution of <b>outdatedPerl</b>.<br>
         Only offered if this list is available.
@@ -4139,7 +4141,8 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
         Wird nur angeboten, wenn es aktualisierbare Pakete gibt.
     </li>
     <br>
-
+ 
+    <a id="Installer-get-showInstalledPerlList"></a>
     <li><b>showInstalledPerlList</b><br>
         Zeigt alle installierten Perl-Pakete mit Version an, wie bei der letzten Ausführung von <b>outdatedPerl</b> ermittelt.<br>
         Wird nur angeboten, wenn diese Liste vorhanden ist.
