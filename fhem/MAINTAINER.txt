@@ -542,7 +542,7 @@ FHEM/98_HTTPMOD.pm           StefanStrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
 FHEM/98_IF.pm                damian-s             Automatisierung
 FHEM/98_inotify.pm           marvin78             Automatisierung
-FHEM/98_Installer.pm         rudolfkoenig/orphan  Unterstützende Dienste
+FHEM/98_Installer.pm         DS_Starter/orphan    Unterstützende Dienste
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
 FHEM/98_JsonMod.pm           herrmannj            Automatisierung
 FHEM/98_KNX_scan.pm          erwin                KNX/EIB (Forum #122582) https://forum.fhem.de/index.php/topic,122582.0.html
@@ -609,7 +609,7 @@ FHEM/HOMESTATEtk.pm          rudolfkoenig/orphan  Automatisierung
 FHEM/HttpUtils.pm            rudolfkoenig         Automatisierung
 FHEM/LandroidUtils.pm        frober               MQTT https://forum.fhem.de/index.php/topic,111959.0.html
 FHEM/MaxCommon.pm            Wzut                 MAX
-FHEM/Meta.pm                 rudolfkoenig/orphan  FHEM Development
+FHEM/Meta.pm                 DS_Starter/orphan    FHEM Development
 FHEM/msgSchema.pm            rudolfkoenig/orphan  Automatisierung
 FHEM/ONKYOdb.pm              delmar               Multimedia
 FHEM/OpenWeatherMapAPI.pm    CoolTux              Unterstützende Dienste/Wettermodule
