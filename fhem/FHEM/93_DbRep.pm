@@ -58,8 +58,8 @@ use IO::Uncompress::Gunzip qw(gunzip $GunzipError);
 
 # Version History intern
 my %DbRep_vNotesIntern = (
-  "8.54.22" => "16.09.2026  toten Code \$hash->{DBH} entfernt, DbRep_Index: Korrekturen für alle unterstützten Datenbankmodelle ",
-  "1.0.0"   => "19.05.2016  Initial"
+  "8.54.23" => "15.10.2026 Attribut timeout: Online-Hilfe um die unterschiedlichen Defaults bei blockierenden und nicht-blockierenden Routinen ergänzt ",
+  "1.0.0"   => "19.05.2016 Initial"
 );
 
 # Version History extern:
@@ -17842,8 +17842,11 @@ sub bdump {
                                 </li>
 
   <a id="DbRep-attr-timeout"></a>
-  <li><b>timeout </b>         - set the timeout-value for Blocking-Call Routines in background in seconds (default 86400)  </li> <br>
-
+  <li><b>timeout </b>         - This attribute sets the timeout value for database operations in seconds. <br>
+                                For non-blocking routines, the default is 86400. <br>
+								For blocking routines (DbReadingsVal, sqlCmdBlocking), the default is 600.
+                                </li> <br>
+                                
   <a id="DbRep-attr-useAdminCredentials"></a>
   <li><b>useAdminCredentials </b>
                                 - If set, a before with "set &lt;aame&gt; adminCredentials" saved privileged user is used
@@ -21007,8 +21010,10 @@ sub bdump {
                                 </li>
 
   <a id="DbRep-attr-timeout"></a>
-  <li><b>timeout </b>         - das Attribut setzt den Timeout-Wert für die Blocking-Call Routinen in Sekunden
-                                (Default: 86400) </li> <br>
+  <li><b>timeout </b>         - Dieses Attribut legt den Timeout-Wert für Datenbankoperationen in Sekunden fest. <br>
+                                Bei nicht blockierenden Routinen beträgt der Standardwert 86400. <br>
+                                Für blockierende Routinen (DbReadingsVal, sqlCmdBlocking) beträgt der Standardwert 600.
+                                </li> <br>
 
   <a id="DbRep-attr-useAdminCredentials"></a>
   <li><b>useAdminCredentials </b>

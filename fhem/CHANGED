@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  93_DbRep: Online-Hilfe für Attr timeout angepasst
+ - change:  98_Installer: v1.0.1, kleine Anpassung von CPAN-Links
  - change:  98_Installer: neue Version 1.0.0, Forum: #145672
  - change:  55_DWD_OpenData: Ch.log https://forum.fhem.de/index.php?msg=1370097
  - bugfix:  76_SolarForecast: Bat-Steuerung opt-/smartPower mit safetyMargin=0
