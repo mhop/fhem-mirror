@@ -662,6 +662,7 @@ sub _ComparePerlLists {
   my %diff = (missing => [], outdated => [], newer => [], extra => []);
 
   for my $pkg (sort keys %{$fileList}) {
+      next unless (__IsPerlPackageName ($pkg));
       next if($pkg eq 'Perl' || $pkg eq 'undefined');
 
       my $fileVer = ref $fileList->{$pkg} eq 'HASH' ? $fileList->{$pkg}{version} : undef;
@@ -678,6 +679,7 @@ sub _ComparePerlLists {
   }
 
   for my $pkg (sort keys %{$localList}) {
+      next unless (__IsPerlPackageName ($pkg));
       next if($pkg eq 'Perl' || exists $fileList->{$pkg});
       next if($pkg eq 'App::cpanminus' || $pkg eq 'App::cpanoutdated');
 
@@ -687,7 +689,41 @@ sub _ComparePerlLists {
 return \%diff;
 }
 
-# Paketangabe für die Installation: Name@Version, wenn die Version brauchbar ist
+###############################################################
+# gültiger Perl-Paketname (verhindert u.a. HTML/JavaScript in 
+# Ausgaben und Kommandos)
+###############################################################
+sub __IsPerlPackageName {
+  my $pkg = shift;
+
+return (defined $pkg && $pkg =~ /^[A-Za-z_]\w*(?:::\w+)*$/) ? 1 : 0;
+}
+
+###############################################################
+# Link auf die Paketseite bei MetaCPAN (nur im HTML und nur 
+# für gültige Paketnamen)
+###############################################################
+sub __CpanLink {
+  my ($t, $pkg) = @_;
+
+  return $pkg unless($t->{html});
+
+  if ($pkg eq 'Perl' || !__IsPerlPackageName($pkg)) {
+      (my $text = $pkg) =~ s/&/&amp;/g;
+      $text =~ s/</&lt;/g;
+      $text =~ s/>/&gt;/g;
+      $text =~ s/"/&quot;/g;
+
+      return $text;
+  }
+
+return '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank" rel="noopener noreferrer">'.$pkg.'</a>';
+}
+
+###############################################################
+# Paketangabe für die Installation: Name@Version, wenn die 
+# Version brauchbar ist
+###############################################################
 sub _InstallSpec {
   my ($pkg, $version) = @_;
 
@@ -805,27 +841,27 @@ sub CreateDiffPerlList {
 
   for my $e (@{$diff->{missing}}) {
       my ($pkg, $fileVer) = @{$e};
-      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      my $linkitem = __CpanLink ($t, $pkg);
       push @rows, [$linkitem, $ver->($fileVer), 'not installed', $red.'Missing'.$close,
                    __DiffActionLink ($hash, $t, 'installPerl', _InstallSpec ($pkg, $fileVer), 'Install')];
   }
 
   for my $e (@{$diff->{outdated}}) {
       my ($pkg, $fileVer, $localVer) = @{$e};
-      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      my $linkitem = __CpanLink ($t, $pkg);
       push @rows, [$linkitem, $ver->($fileVer), $ver->($localVer), $red.'Outdated'.$close,
                    __DiffActionLink ($hash, $t, 'installPerl', _InstallSpec ($pkg, $fileVer), 'Update')];
   }
 
   for my $e (@{$diff->{newer}}) {
       my ($pkg, $fileVer, $localVer) = @{$e};
-      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      my $linkitem = __CpanLink ($t, $pkg);
       push @rows, [$linkitem, $ver->($fileVer), $ver->($localVer), 'Newer locally', '-'];
   }
 
   for my $e (@{$diff->{extra}}) {
       my ($pkg, undef, $localVer) = @{$e};
-      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      my $linkitem = __CpanLink ($t, $pkg);
       push @rows, [$linkitem, '-', $ver->($localVer), $red.'Extra'.$close,
                    __DiffActionLink ($hash, $t, 'uninstallPerl', $pkg, 'Deinstall', "Really uninstall $pkg?")];
   }
@@ -1917,7 +1953,7 @@ sub CreateInstalledPerlList {
           next if($package eq 'undefined');
 
           my $version  = $packages->{$package}{version};
-          my $linkitem = '<a href="https://metacpan.org/pod/'.$package.'" target="_blank">'.$package.'</a>';
+          my $linkitem = __CpanLink ($t, $package);
 
           push @ret, __TableRow ($t, $linecount, $linkitem, $version ? $version : '?');
           $linecount++;
@@ -1959,7 +1995,7 @@ sub CreateOutdatedPerlList {
 
               my $current  = $packages->{$package}{current};
               my $latest   = $packages->{$package}{latest};
-              my $linkitem = '<a href="https://metacpan.org/pod/'.$package.'" target="_blank">'.$package.'</a>';
+              my $linkitem = __CpanLink ($t, $package);
 
               push @ret, __TableRow ($t, $linecount, $linkitem, defined $current ? $current : '?', defined $latest ? $latest : '?');
               $linecount++;
@@ -2693,10 +2729,10 @@ sub CreateMetadataList {
               my $item = $prereq;
 
               if ($html && $installed ne 'built-in' && $installed ne 'included') {
-                  $item = '<a href="https://metacpan.org/pod/'.$prereq.'" target="_blank">'.$prereq.'</a>';
+                  $item = __CpanLink ($t, $prereq);
               }
               elsif ($html && $installed eq 'included') {
-                  $item = __InfoLink($hash, $t, $isFhem eq 'module' ? 'module' : 'package', $prereq);
+                  $item = __CpanLink ($t, $prereq);
               }
 
               my @cells = (
@@ -4308,7 +4344,7 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
       "abstract": "Modul zur Installation, Aktualisierung und Deinstallation von (CPAN) Perl-Modulen und zur Verwaltung der Systemvoraussetzungen von FHEM"
     }
   },
-  "version": "v1.0.0",
+  "version": "v1.0.1",
   "release_status": "stable",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>"
