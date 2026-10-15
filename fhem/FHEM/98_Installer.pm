@@ -3197,8 +3197,8 @@ sub __ExtPrereqSection {
                   $installed = $t->{colorGreen}.$installed.$t->{colorClose};
               }
 
-              $item = '<a href="https://metacpan.org/pod/'.$prereq.'" target="_blank">'.$prereq.'</a>'
-                if($html && !$isFhem && !$isPerlCore && $prereq ne 'perl');
+              $item = '<a href="https://pypi.org/project/'.$prereq.'/" target="_blank" rel="noopener noreferrer">'.$prereq.'</a>'
+                  if($html && !$isFhem && !$isPerlCore && $prereq ne 'perl' && $prereq =~ /^[A-Za-z0-9][A-Za-z0-9._-]*$/);
           }
           else {
               $installed = $t->{colorGreen}.$installed.$t->{colorClose};
