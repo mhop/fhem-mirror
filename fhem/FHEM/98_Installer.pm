@@ -1209,7 +1209,7 @@ sub ExecuteFhemCommand {
   $installer->{cpanversions}  = 'echo n | TEST=$(which cpanm) || echo "sh: command not found: cpanm"; '
                               . 'which cpanm >/dev/null 2>&1 && sh -c "'.$sudoH.' $(which cpanm) --version 2>&1" 2>&1';
 
-  $installer->{installperl}   = 'echo n | sh -c "'.$sudoH.' $(which cpanm) --quiet '
+  $installer->{installperl}   = 'echo n | sh -c "' .$sudoH. ' PERL_CPANM_HOME=/tmp/cpanm $(which cpanm) --quiet '
                               . $cmd->{installPerlReinstall}
                               . $cmd->{installPerlNoTest}
                               . $cmd->{installPerlEnforced}
@@ -2732,7 +2732,7 @@ sub CreateMetadataList {
                   $item = __CpanLink ($t, $prereq);
               }
               elsif ($html && $installed eq 'included') {
-                  $item = __CpanLink ($t, $prereq);
+                  $item = __InfoLink ($hash, $t, $isFhem eq 'module' ? 'module' : 'package', $prereq);
               }
 
               my @cells = (
@@ -4344,7 +4344,7 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
       "abstract": "Modul zur Installation, Aktualisierung und Deinstallation von (CPAN) Perl-Modulen und zur Verwaltung der Systemvoraussetzungen von FHEM"
     }
   },
-  "version": "v1.0.1",
+  "version": "v1.0.2",
   "release_status": "stable",
   "author": [
     "Heiko Maaz <heiko.maaz@t-online.de>"
