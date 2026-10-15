@@ -17844,7 +17844,7 @@ sub bdump {
   <a id="DbRep-attr-timeout"></a>
   <li><b>timeout </b>         - This attribute sets the timeout value for database operations in seconds. <br>
                                 For non-blocking routines, the default is 86400. <br>
-								For blocking routines (DbReadingsVal, sqlCmdBlocking), the default is 600.
+								For blocking routines (DbReadingsVal, sqlCmdBlocking), the default is 10.
                                 </li> <br>
                                 
   <a id="DbRep-attr-useAdminCredentials"></a>
@@ -21012,7 +21012,7 @@ sub bdump {
   <a id="DbRep-attr-timeout"></a>
   <li><b>timeout </b>         - Dieses Attribut legt den Timeout-Wert für Datenbankoperationen in Sekunden fest. <br>
                                 Bei nicht blockierenden Routinen beträgt der Standardwert 86400. <br>
-                                Für blockierende Routinen (DbReadingsVal, sqlCmdBlocking) beträgt der Standardwert 600.
+                                Für blockierende Routinen (DbReadingsVal, sqlCmdBlocking) beträgt der Standardwert 10.
                                 </li> <br>
 
   <a id="DbRep-attr-useAdminCredentials"></a>
