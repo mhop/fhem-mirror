@@ -1,7 +1,10 @@
 #########################################################################################################################
-# $Id: 98_Installer.pm 28622 2024-03-09 06:21:14Z CoolTux $
+# $Id: 98_Installer.pm 31792 2026-10-15 22:03:55Z DS_Starter $
 #########################################################################################################################
 #       98_Installer.pm
+#
+#       Author:     Julian Pawlowski  julian.pawlowski@gmail.com
+#       Maintainer: 2026 - 2026 Heiko Maaz  e-mail: Heiko dot Maaz at t-online dot de
 #
 #       This script is part of fhem.
 #
@@ -37,7 +40,7 @@ use FHEM::Meta;
 ###############################################################
 #                       Initialize
 ###############################################################
-sub Installer_Initialize ($) {
+sub Installer_Initialize {
   my ($modHash) = @_;
 
   $modHash->{SetFn}    = 'FHEM::Installer::Set';
@@ -157,6 +160,7 @@ use constant {
   HAS_METARequirementsRange => defined eval { require CPAN::Meta::Requirements::Range; },
   POLLINTERVAL              => 1,                                                               # Sekunden zwischen Abfragen des Subprozesses
   UPDATEINTERVAL            => 14400,                                                           # Sekunden zwischen zwei Update-Checks (4 Stunden)
+  BUILDLOGMAXBYTES          => 65536,                                                           # maximale Größe des angezeigten build.log (Ende der Datei)
 };
 
 ###############################################################
@@ -249,10 +253,8 @@ sub Define {
           '.*outdated.*in.progress:system_fhem_reboot@orange',
           '.*in.progress:system_fhem_update@orange',
           'warning.*:message_attention@orange',
-          'error\s.*Perl.*:message_attention@red',
+          'error\s.*Perl.*:message_attention@red:getShowErrorList',
       );
-
-
 
       $attr{$name}{alias}        = 'FHEM Installer Status';
       $attr{$name}{devStateIcon} = join(' ', @icons);
@@ -492,6 +494,10 @@ sub Set {
       return "usage: $cmd <filename>" if(@args != 1);
       return ImportPerlList ($hash, $args[0]);
   }
+  elsif ($opt eq 'getshowerrorlist') {                                  # für devStateIcon: dort können nur Set-Befehle ausgeführt werden (nicht in Set-Liste)
+      return "usage: $cmd" if(@args);
+      return CreateErrorList ($hash);                                
+  }
   else {
       my $list;
 
@@ -659,6 +665,7 @@ sub _ComparePerlLists {
   my %diff = (missing => [], outdated => [], newer => [], extra => []);
 
   for my $pkg (sort keys %{$fileList}) {
+      next unless (__IsPerlPackageName ($pkg));
       next if($pkg eq 'Perl' || $pkg eq 'undefined');
 
       my $fileVer = ref $fileList->{$pkg} eq 'HASH' ? $fileList->{$pkg}{version} : undef;
@@ -675,6 +682,7 @@ sub _ComparePerlLists {
   }
 
   for my $pkg (sort keys %{$localList}) {
+      next unless (__IsPerlPackageName ($pkg));
       next if($pkg eq 'Perl' || exists $fileList->{$pkg});
       next if($pkg eq 'App::cpanminus' || $pkg eq 'App::cpanoutdated');
 
@@ -684,7 +692,41 @@ sub _ComparePerlLists {
 return \%diff;
 }
 
-# Paketangabe für die Installation: Name@Version, wenn die Version brauchbar ist
+###############################################################
+# gültiger Perl-Paketname (verhindert u.a. HTML/JavaScript in 
+# Ausgaben und Kommandos)
+###############################################################
+sub __IsPerlPackageName {
+  my $pkg = shift;
+
+return (defined $pkg && $pkg =~ /^[A-Za-z_]\w*(?:::\w+)*$/) ? 1 : 0;
+}
+
+###############################################################
+# Link auf die Paketseite bei MetaCPAN (nur im HTML und nur 
+# für gültige Paketnamen)
+###############################################################
+sub __CpanLink {
+  my ($t, $pkg) = @_;
+
+  return $pkg unless($t->{html});
+
+  if ($pkg eq 'Perl' || !__IsPerlPackageName($pkg)) {
+      (my $text = $pkg) =~ s/&/&amp;/g;
+      $text =~ s/</&lt;/g;
+      $text =~ s/>/&gt;/g;
+      $text =~ s/"/&quot;/g;
+
+      return $text;
+  }
+
+return '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank" rel="noopener noreferrer">'.$pkg.'</a>';
+}
+
+###############################################################
+# Paketangabe für die Installation: Name@Version, wenn die 
+# Version brauchbar ist
+###############################################################
 sub _InstallSpec {
   my ($pkg, $version) = @_;
 
@@ -728,6 +770,10 @@ sub Get {
       return "usage: $cmd" if(@args);
       return CreateErrorList ($hash);
   }
+  elsif ($opt eq 'showbuildlog') {
+      return "usage: $cmd <number>" if(@args != 1 || $args[0] !~ /^\d+$/);
+      return CreateBuildLogPopup ($hash, $cmd, $args[0]);
+  }
   elsif ($opt eq 'showdiffperllist') {
       return "usage: $cmd <filename>" if(@args != 1);
       return CreateDiffPerlList ($hash, $cmd, $args[0]);
@@ -736,10 +782,10 @@ sub Get {
   my $list;
   my $inst          = ($hash->{".fhem"}{installer} //= {});
   my $installerMode = AttrVal ($name, 'installerMode', 'update');
-
-  my @fhemModules = grep { $_ ne 'Global' && ($installerMode ne 'update' || defined $modules{$_}{LOADED}) }
-                    sort { lc($a) cmp lc($b) } keys %modules;
-
+  my @logs          = __BuildLogPaths ($inst->{errors});
+  my @fhemModules   = grep { $_ ne 'Global' && ($installerMode ne 'update' || defined $modules{$_}{LOADED}) }
+                      sort { lc($a) cmp lc($b) } keys %modules;
+                    
   $list .= ' search showModuleInfo:FHEM,'.join(',', @fhemModules);
 
   if ($installerMode eq 'developer') {
@@ -767,14 +813,11 @@ sub Get {
       $list .= ':noArg';
   }
 
-  $list .= ' showOutdatedPerlList:noArg' if(UpdatablePerlPackages($hash, $name));
   $list .= ' showDiffPerlList:textField,/<path>/<filename>';
-
-  $list .= ' showInstalledPerlList:noArg'
-    if(defined $inst->{listedPerlPackages} && scalar keys %{$inst->{listedPerlPackages}});
-
-  $list .= ' showErrorList:noArg'
-    if(defined $inst->{errors} && scalar @{$inst->{errors}});
+  $list .= ' showOutdatedPerlList:noArg'                 if(UpdatablePerlPackages($hash, $name));
+  $list .= ' showInstalledPerlList:noArg'                if(defined $inst->{listedPerlPackages} && scalar keys %{$inst->{listedPerlPackages}});
+  $list .= ' showErrorList:noArg'                        if(defined $inst->{errors} && scalar @{$inst->{errors}});
+  $list .= ' showBuildLog:'.join(',', 1 .. scalar @logs) if(@logs);
 
 return "Unknown argument $cmd, choose one of $list";
 }
@@ -802,27 +845,27 @@ sub CreateDiffPerlList {
 
   for my $e (@{$diff->{missing}}) {
       my ($pkg, $fileVer) = @{$e};
-      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      my $linkitem = __CpanLink ($t, $pkg);
       push @rows, [$linkitem, $ver->($fileVer), 'not installed', $red.'Missing'.$close,
                    __DiffActionLink ($hash, $t, 'installPerl', _InstallSpec ($pkg, $fileVer), 'Install')];
   }
 
   for my $e (@{$diff->{outdated}}) {
       my ($pkg, $fileVer, $localVer) = @{$e};
-      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      my $linkitem = __CpanLink ($t, $pkg);
       push @rows, [$linkitem, $ver->($fileVer), $ver->($localVer), $red.'Outdated'.$close,
                    __DiffActionLink ($hash, $t, 'installPerl', _InstallSpec ($pkg, $fileVer), 'Update')];
   }
 
   for my $e (@{$diff->{newer}}) {
       my ($pkg, $fileVer, $localVer) = @{$e};
-      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      my $linkitem = __CpanLink ($t, $pkg);
       push @rows, [$linkitem, $ver->($fileVer), $ver->($localVer), 'Newer locally', '-'];
   }
 
   for my $e (@{$diff->{extra}}) {
       my ($pkg, undef, $localVer) = @{$e};
-      my $linkitem = '<a href="https://metacpan.org/pod/'.$pkg.'" target="_blank">'.$pkg.'</a>';
+      my $linkitem = __CpanLink ($t, $pkg);
       push @rows, [$linkitem, '-', $ver->($localVer), $red.'Extra'.$close,
                    __DiffActionLink ($hash, $t, 'uninstallPerl', $pkg, 'Deinstall', "Really uninstall $pkg?")];
   }
@@ -849,6 +892,7 @@ return $t->{header}.join("\n", @ret).$t->{footer};
 ###############################################################
 #  Aktions-Link (FHEMWEB) bzw. Text für die Diff-Tabelle
 #  mit Sicherheitsrückfrage bei Deinstall
+#  (eigener Dialog im HTML, kein confirm())
 ###############################################################
 sub __DiffActionLink {
   my ($hash, $t, $cmd, $arg, $label, $confirm) = @_;
@@ -856,59 +900,76 @@ sub __DiffActionLink {
   return $label unless($t->{html});
 
   my $href = '?cmd=set '.$hash->{NAME}.' '.$cmd.' '.$arg.' '.$t->{csrf};
-  
-  if ($confirm) {
-      $confirm =~ s/'/\\'/g;
-      
-      my $js = "
-        var existing = document.getElementById('fhemCustomModal');
-        if(existing) existing.remove();
-        var bodyBg = window.getComputedStyle(document.body).backgroundColor;
-        var isDark = false;
-        if (bodyBg) {
-            var rgb = bodyBg.match(/\\d+/g);
-            if (rgb && rgb.length >= 3) {
-                var brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
-                if (brightness < 100) isDark = true;
-            }
-        }
-        var bgCol = isDark ? '#2a2a2a' : '#f8f8f8';
-        var borderCol = isDark ? '#555' : '#4e6f3e';
-        var textCol = isDark ? '#f0f0f0' : '#333';
-        var cancelBg = isDark ? '#555' : '#ccc';
-        var cancelText = isDark ? '#fff' : '#333';
-        var overlay = document.createElement('div');
-        overlay.id = 'fhemCustomModal';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
-        var box = document.createElement('div');
-        box.style.cssText = 'background:' + bgCol + ';border:2px solid ' + borderCol + ';padding:22px;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.4);max-width:400px;text-align:center;font-family:sans-serif;color:' + textCol + ';';
-        var text = document.createElement('div');
-        text.style.cssText = 'margin-bottom:20px;font-size:14px;line-height:1.4;';
-        text.innerText = '$confirm';
-        var btnContainer = document.createElement('div');
-        var btnOk = document.createElement('button');
-        btnOk.innerText = 'OK';
-        btnOk.style.cssText = 'margin-right:10px;padding:6px 18px;background:#4e6f3e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;';
-        btnOk.onclick = function() { window.location.href = '$href'; };
-        var btnCancel = document.createElement('button');
-        btnCancel.innerText = 'Abbrechen';
-        btnCancel.style.cssText = 'padding:6px 18px;background:' + cancelBg + ';color:' + cancelText + ';border:none;border-radius:4px;cursor:pointer;';
-        btnCancel.onclick = function() { overlay.remove(); };
-        btnContainer.appendChild(btnOk);
-        btnContainer.appendChild(btnCancel);
-        box.appendChild(text);
-        box.appendChild(btnContainer);
-        overlay.appendChild(box);
-        document.body.appendChild(overlay);
-        return false;
-      ";
-      
-      $js =~ s/\n/ /g;
 
-      return '<div class="detLink installerAction"><a href="#" onclick="' . $js . '">' . $label . '</a></div>';
-  }
+  return '<div class="detLink installerAction"><a href="'.$href.'">'.$label.'</a></div>' unless($confirm);
 
-return '<div class="detLink installerAction"><a href="' . $href . '">' . $label . '</a></div>';
+  # Text für JavaScript-Strings in einfachen Anführungszeichen maskieren
+  my $jsStr = sub {
+      my $s = shift;
+      $s =~ s/\\/\\\\/g;
+      $s =~ s/'/\\'/g;
+      $s =~ s/\r?\n/ /g;
+      return $s;
+  };
+
+  my $cancel = $t->{lang} eq 'de' ? 'Abbrechen' : 'Cancel';
+
+  my $js = <<'JS';
+    var existing = document.getElementById('fhemCustomModal');
+    if (existing) existing.remove();
+    var color = function(c) {
+      var m = c && c.match(/[\d.]+/g);
+      if (!m || m.length < 3) return null;
+      if (m.length > 3 && parseFloat(m[3]) === 0) return null;
+      return [parseFloat(m[0]), parseFloat(m[1]), parseFloat(m[2])];
+    };
+    var rgb = color(window.getComputedStyle(document.body).backgroundColor) || color(window.getComputedStyle(document.documentElement).backgroundColor);
+    var isDark = rgb ? ((rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 < 100) : false;
+    var bgCol = isDark ? '#2a2a2a' : '#f8f8f8';
+    var borderCol = isDark ? '#555' : '#4e6f3e';
+    var textCol = isDark ? '#f0f0f0' : '#333';
+    var cancelBg = isDark ? '#555' : '#ccc';
+    var cancelText = isDark ? '#fff' : '#333';
+    var overlay = document.createElement('div');
+    overlay.id = 'fhemCustomModal';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    overlay.onkeydown = function(e) { if (e.key === 'Escape') overlay.remove(); };
+    var box = document.createElement('div');
+    box.style.cssText = 'background:' + bgCol + ';border:2px solid ' + borderCol + ';padding:22px;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.4);max-width:400px;text-align:center;font-family:sans-serif;color:' + textCol + ';';
+    var text = document.createElement('div');
+    text.style.cssText = 'margin-bottom:20px;font-size:14px;line-height:1.4;';
+    text.innerText = '%%CONFIRM%%';
+    var btnContainer = document.createElement('div');
+    var btnOk = document.createElement('button');
+    btnOk.innerText = 'OK';
+    btnOk.style.cssText = 'margin-right:10px;padding:6px 18px;background:#4e6f3e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;';
+    btnOk.onclick = function() { window.location.href = '%%HREF%%'; };
+    var btnCancel = document.createElement('button');
+    btnCancel.innerText = '%%CANCEL%%';
+    btnCancel.style.cssText = 'padding:6px 18px;background:' + cancelBg + ';color:' + cancelText + ';border:none;border-radius:4px;cursor:pointer;';
+    btnCancel.onclick = function() { overlay.remove(); };
+    btnContainer.appendChild(btnOk);
+    btnContainer.appendChild(btnCancel);
+    box.appendChild(text);
+    box.appendChild(btnContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    btnCancel.focus();
+    return false;
+JS
+
+  my %repl = (CONFIRM => $jsStr->($confirm), HREF => $jsStr->($href), CANCEL => $jsStr->($cancel));
+  $js =~ s/%%(CONFIRM|HREF|CANCEL)%%/$repl{$1}/g;
+  $js =~ s/\s*\n\s*/ /g;
+
+  # das gesamte Skript als HTML-Attributwert maskieren (der Browser macht das vor der Ausführung rückgängig)
+  $js =~ s/&/&amp;/g;
+  $js =~ s/"/&quot;/g;
+  $js =~ s/</&lt;/g;
+  $js =~ s/>/&gt;/g;
+
+return '<div class="detLink installerAction"><a href="#" onclick="'.$js.'">'.$label.'</a></div>';
 }
 
 ###############################################################
@@ -1152,7 +1213,7 @@ sub ExecuteFhemCommand {
   $installer->{cpanversions}  = 'echo n | TEST=$(which cpanm) || echo "sh: command not found: cpanm"; '
                               . 'which cpanm >/dev/null 2>&1 && sh -c "'.$sudoH.' $(which cpanm) --version 2>&1" 2>&1';
 
-  $installer->{installperl}   = 'echo n | sh -c "'.$sudoH.' $(which cpanm) --quiet '
+  $installer->{installperl}   = 'echo n | sh -c "' .$sudoH. ' PERL_CPANM_HOME=/tmp/cpanm $(which cpanm) --quiet '
                               . $cmd->{installPerlReinstall}
                               . $cmd->{installPerlNoTest}
                               . $cmd->{installPerlEnforced}
@@ -1715,135 +1776,7 @@ return;
 }
 
 ###############################################################
-#     Layout-Bausteine für die Ausgabe (FHEMWEB-HTML oder Text)
-###############################################################
-sub __GetLayout {
-  my $hash = shift;
-
-  my $html = (defined $hash->{CL} && $hash->{CL}{TYPE} eq 'FHEMWEB') ? 1 : 0;
-
-  delete $FW_webArgs{addLinks};                            # keine automatischen Links auf FHEM-Devices
-
-  my %t = (
-      html        => $html,
-      header      => '',
-      footer      => '',
-      blockOpen   => '',
-      blockClose  => '',
-      tTitleOpen  => '',
-      tTitleClose => '',
-      tOpen       => '',
-      tClose      => '',
-      tCOpen      => '',
-      tCClose     => '',
-      tHOpen      => '',
-      tHClose     => '',
-      tBOpen      => '',
-      tBClose     => '',
-      tFOpen      => '',
-      tFClose     => '',
-      trOpen      => '',
-      trOpenEven  => '',
-      trOpenOdd   => '',
-      trClose     => '',
-      thOpen      => '',
-      thClose     => "\t\t\t",
-      tdOpen      => '',
-      tdOpen1     => '',
-      tdOpen2     => '',
-      tdOpen3     => '',
-      tdOpen4     => '',
-      tdClose     => "\t\t\t",
-      strongOpen  => '',
-      strongClose => '',
-      colorRed    => '',
-      colorGreen  => '',
-      colorClose  => '',
-      space       => ' ',
-      lb          => "\n",
-  );
-
-  if ($html) {
-      %t = (%t,
-          header      => '<html>',
-          footer      => '</html>',
-          blockOpen   => '<div class="makeTable wide internals">',
-          blockClose  => '</div>',
-          tTitleOpen  => '<span class="mkTitle">',
-          tTitleClose => '</span>',
-          tOpen       => '<table class="block wide internals wrapcolumns">',
-          tClose      => '</table>',
-          tCOpen      => '<caption style="text-align: left; font-size: larger;">',
-          tCClose     => '</caption>',
-          tHOpen      => '<thead>',
-          tHClose     => '</thead>',
-          tBOpen      => '<tbody>',
-          tBClose     => '</tbody>',
-          tFOpen      => '<tfoot style="font-size: smaller;">',
-          tFClose     => '</tfoot>',
-          trOpen      => '<tr class="column">',
-          trOpenEven  => '<tr class="column even">',
-          trOpenOdd   => '<tr class="column odd">',
-          trClose     => '</tr>',
-          thOpen      => '<th style="text-align: left; vertical-align: top;">',
-          thClose     => '</th>',
-          tdOpen      => '<td style="vertical-align: top;">',
-          tdOpen1     => '<td style="vertical-align: top;" colspan="1">',
-          tdOpen2     => '<td style="vertical-align: top;" colspan="2">',
-          tdOpen3     => '<td style="vertical-align: top;" colspan="3">',
-          tdOpen4     => '<td style="vertical-align: top;" colspan="4">',
-          tdClose     => '</td>',
-          strongOpen  => '<strong>',
-          strongClose => '</strong>',
-          colorRed    => '<span style="color: red">',
-          colorGreen  => '<span style="color: green">',
-          colorClose  => '</span>',
-          space       => '&nbsp;',
-          lb          => '<br />',
-      );
-  }
-
-  $t{lang} = lc(AttrVal($hash->{NAME}, 'language', AttrVal('global', 'language', 'EN')));
-  $t{csrf} = $html ? __CsrfParam ($hash) : '';
-
-return \%t;
-}
-
-# Kopfzeilen einer Tabelle
-sub __TableHeader {
-  my ($t, $title, @cols) = @_;
-
-  my @ret = ($t->{blockOpen}.$t->{tOpen}.$t->{tCOpen}.$title.$t->{tCClose}.$t->{tHOpen}.$t->{trOpen});
-
-  push @ret, $t->{thOpen}.$_.$t->{thClose} for (@cols);
-  push @ret, $t->{trClose}.$t->{tHClose};
-
-return @ret;
-}
-
-# Tabellenzeile (gerade/ungerade abwechselnd)
-sub __TableRow {
-  my ($t, $linecount, @cells) = @_;
-
-  my $row = $linecount % 2 == 0 ? $t->{trOpenEven} : $t->{trOpenOdd};
-
-  $row .= $t->{tdOpen}.$_.$t->{tdClose} for (@cells);
-  $row .= $t->{trClose};
-
-return $row;
-}
-
-# CSRF-Parameter für Links in FHEMWEB
-sub __CsrfParam {
-  my $hash = shift;
-
-  my $token = $defs{$hash->{CL}{SNAME}}{CSRFTOKEN};
-
-return defined $token ? '&fwcsrf='.$token : '';
-}
-
-###############################################################
-#                  Fehlerliste
+#           Fehlerliste (neu: Knopf zum build.log)
 ###############################################################
 sub CreateErrorList {
   my $hash = shift;
@@ -1855,6 +1788,11 @@ sub CreateErrorList {
   if (ref $errors eq 'ARRAY' && scalar @{$errors} > 0) {
       push @ret, __TableHeader ($t, 'Error List', 'No.', 'Error Code', 'Description');
 
+      # Nummer jeder build.log, wie sie auch Get showBuildLog erwartet
+      my @logs = __BuildLogPaths ($errors);
+      my %logIdx;
+      @logIdx{@logs} = (1 .. scalar @logs);
+
       my $linecount = 1;
 
       for my $error (@{$errors}) {
@@ -1864,7 +1802,11 @@ sub CreateErrorList {
               $detail = $t->{lb}.$t->{lb}.$t->{strongOpen}.'Detail:'.$t->{strongClose}.$t->{lb}.$error->{detail};
           }
 
-          push @ret, __TableRow ($t, $linecount, $linecount, $error->{code}, $error->{summary}.$detail);
+          # Knopf, wenn die Meldung auf eine build.log verweist
+          my $buttons = join(' ', map { __BuildLogButton ($hash, $t, $logIdx{$_}, $_) } __BuildLogPaths ([$error]));
+          $buttons    = $t->{lb}.$t->{lb}.$buttons if($buttons ne '');
+
+          push @ret, __TableRow ($t, $linecount, $linecount, $error->{code}, $error->{summary}.$detail.$buttons);
           $linecount++;
       }
 
@@ -1875,6 +1817,230 @@ sub CreateErrorList {
   }
 
 return $t->{header}.join("\n", @ret).$t->{footer};
+}
+
+###############################################################
+#   Pfade zu cpanm-build.log in den Fehlermeldungen finden
+#   (eindeutig, in der Reihenfolge des Auftretens)
+###############################################################
+sub __BuildLogPaths {
+  my $errors = shift;
+
+  return () unless(ref $errors eq 'ARRAY');
+
+  my (@paths, %seen);
+
+  for my $error (@{$errors}) {
+      next unless(ref $error eq 'HASH');
+
+      for my $raw (grep { defined } @{$error}{qw(summary detail)}) {
+          my $text = $raw;
+
+          while ($text =~ m{(/[\w.+~/-]+/build\.log)(?![\w.])}g) {
+              my $path = $1;
+
+              next if($path =~ m{(?:^|/)\.\.(?:/|$)});                      # keine Pfadsprünge
+              next if($seen{$path}++);
+
+              push @paths, $path;
+          }
+      }
+  }
+
+return @paths;
+}
+
+###############################################################
+#   Knopf bzw. Hinweis zum Anzeigen einer build.log
+###############################################################
+sub __BuildLogButton {
+  my ($hash, $t, $idx, $path) = @_;
+
+  my $de   = $t->{lang} eq 'de';
+  my $name = $hash->{NAME};
+
+  if (!-r $path) {
+      my $note = !-e $path ? ($de ? 'build.log existiert nicht mehr'                   : 'build.log no longer exists')
+                           : ($de ? 'build.log ist für den FHEM-Benutzer nicht lesbar' : 'build.log is not readable by the FHEM user');
+
+      return $t->{html} ? '<i>('.$note.')</i>' : "($note)";
+  }
+
+  return "(get $name showBuildLog $idx)" unless($t->{html});
+
+  my $href = '?cmd=get '.$name.' showBuildLog '.$idx.' '.$t->{csrf};
+  $href    =~ s/&/&amp;/g;
+
+  my $label = $de ? 'build.log anzeigen' : 'Show build.log';
+
+return '<button type="button" onclick="window.location.href=\''.$href.'\'">&#128196; '.$label.'</button>';
+}
+
+###############################################################
+#   build.log einlesen (nur das Ende, wenn die Datei groß ist)
+#   liefert ($Inhalt, $Fehlertext, $gekürzt, $Dateigröße)
+###############################################################
+sub __ReadBuildLog {
+  my $path = shift;
+
+  return (undef, 'file does not exist') unless(-f $path);
+
+  my $size = -s $path;
+  my $max  = BUILDLOGMAXBYTES;
+
+  open(my $fh, '<', $path) or return (undef, "$!");
+  binmode($fh);
+
+  my $truncated = 0;
+
+  if ($size > $max) {
+      seek($fh, -$max, 2);
+      <$fh>;                                                    # angefangene Zeile verwerfen
+      $truncated = 1;
+  }
+
+  my $log = do { local $/; <$fh> };
+
+  close($fh);
+
+  $log = '' unless(defined $log);
+  $log =~ s/\r//g;
+  $log =~ s/\e\[[0-9;?]*[A-Za-z]//g;                            # ANSI-Farbcodes
+  $log =~ s/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]//g;                # Steuerzeichen
+  $log =~ s/\n+\z//;                                            # Leerzeilen am Ende
+
+return ($log, undef, $truncated, $size);
+}
+
+sub __OsPrettyName {                                            # Name des Betriebssystems (PRETTY_NAME aus /etc/os-release)
+  my $os = $^O;
+
+  if (open(my $fh, '<', '/etc/os-release')) {
+      while (my $line = <$fh>) {
+          next unless($line =~ /^PRETTY_NAME="?([^"\n]+)"?/);
+
+          $os = $1;
+          last;
+      }
+
+      close($fh);
+  }
+
+return $os;
+}
+
+###############################################################
+#   build.log in einem Popup anzeigen
+#   (Get showBuildLog <Nummer>, Nummer = Position in der Fehlerliste)
+#   Der Text enthält zusätzlich Umgebung und Fehlermeldungen 
+#   und ist für die Analyse mit einer KI gedacht.
+###############################################################
+sub CreateBuildLogPopup {
+  my ($hash, $getCmd, $idx) = @_;
+
+  my $name  = $hash->{NAME};
+  my $inst  = $hash->{".fhem"}{installer};
+  my $t     = __GetLayout ($hash);
+  my $de    = $t->{lang} eq 'de';
+  my @paths = __BuildLogPaths ($inst->{errors});
+
+  return ($de ? 'Die aktuelle Fehlerliste verweist auf keine build.log' : 'The current error list does not reference a build.log') unless(@paths);
+
+  return ($de ? "Unbekannte Nummer $idx, verfügbar: 1 bis ".scalar(@paths) : "Unknown number $idx, available: 1 to ".scalar(@paths)) unless($idx >= 1 && $idx <= @paths);
+
+  my $path = $paths[$idx - 1];
+
+  my ($log, $error, $truncated, $size) = __ReadBuildLog ($path);
+
+  if (defined $error) {
+      my $hint = (-e $path && !-r $path)
+               ? ($de ? ' (cpanm läuft über sudo als root, der FHEM-Benutzer braucht Leserechte für diese Datei)'
+                      : ' (cpanm runs via sudo as root, the FHEM user needs read permission for this file)')
+               : '';
+
+      return ($de ? "$path kann nicht gelesen werden: $error" : "Cannot read $path: $error").$hint;
+  }
+
+  # Fehlermeldungen als Text (HTML aus den Details entfernen)
+  my @errTexts;
+  my $n = 0;
+
+  for my $e (@{$inst->{errors}}) {
+      $n++;
+
+      my $detail = (defined $e->{detail} && $e->{detail} ne '') ? $e->{detail} : '';
+      $detail    =~ s/<br\s*\/?>/\n/gi;
+      $detail    =~ s/<[^>]+>//g;
+
+      push @errTexts, "$n. [".($e->{code} // '?').'] '.($e->{summary} // '').($detail ne '' ? " - $detail" : '');
+  }
+
+  my $kb   = int(BUILDLOGMAXBYTES / 1024);
+  my $text = join("\n",
+      ($de ? 'Bei der Installation von Perl-Modulen mit cpanm (FHEM-Modul Installer) ist ein Fehler aufgetreten.'."\n"
+             .'Bitte analysiere die Fehlermeldungen und das build.log, nenne die wahrscheinliche Ursache und beschreibe konkrete Schritte zur Behebung (z. B. fehlende Systempakete mit apt oder fehlende Perl-Abhängigkeiten).'
+           : 'An error occurred while installing Perl modules with cpanm (FHEM module Installer).'."\n"
+             .'Please analyze the error messages and the build.log, name the most likely cause and describe concrete steps to fix it (e.g. missing system packages via apt or missing Perl dependencies).'),
+      '',
+      ($de ? 'Umgebung:' : 'Environment:'),
+      '- Perl: '.sprintf('%vd', $^V),
+      '- '.($de ? 'Betriebssystem' : 'Operating system').': '.__OsPrettyName(),
+      '- cpanm: '.ReadingsVal ($name, 'cpanminusVersion', '?'),
+      '- '.($de ? 'Letztes Kommando' : 'Last command').': '.($inst->{cmd} // '?'),
+      '',
+      ($de ? 'Fehlermeldungen:' : 'Error messages:'),
+      @errTexts,
+      '',
+      "build.log ($path".($truncated ? ', '.($de ? "nur die letzten $kb KB von ".int($size / 1024).' KB' : "only the last $kb KB of ".int($size / 1024).' KB') : '').'):',
+      '-----',
+      $log,
+      '-----',
+  );
+
+  return $text unless($t->{html});
+
+  # Text für HTML maskieren (verhindert u.a. ein vorzeitiges </textarea>)
+  my $escaped = $text;
+  $escaped    =~ s/&/&amp;/g;
+  $escaped    =~ s/</&lt;/g;
+  $escaped    =~ s/>/&gt;/g;
+
+  my $label  = $de ? 'In Zwischenablage kopieren' : 'Copy to clipboard';
+  my $copied = $de ? 'Kopiert!'                   : 'Copied!';
+  my $failed = $de ? 'Kopieren fehlgeschlagen'    : 'Copy failed';
+
+  my $js = <<'JS';
+    var ta = document.getElementById('installerBuildLog');
+    var b = this;
+    var label = b.getAttribute('data-label');
+    var done = function(ok) {
+      b.innerText = ok ? '%%COPIED%%' : '%%FAILED%%';
+      setTimeout(function() { b.innerText = label; }, 2000);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(ta.value).then(function() { done(true); }, function() { done(false); });
+    } else {
+      ta.focus();
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      done(ok);
+    }
+    return false;
+JS
+
+  my %repl = (COPIED => $copied, FAILED => $failed);
+  $js =~ s/%%(COPIED|FAILED)%%/$repl{$1}/g;
+  $js =~ s/\s*\n\s*/ /g;
+  $js =~ s/&/&amp;/g;
+  $js =~ s/"/&quot;/g;
+  $js =~ s/</&lt;/g;
+  $js =~ s/>/&gt;/g;
+
+return $t->{header}
+     . '<button type="button" id="installerCopyBtn" data-label="&#128203; '.$label.'" onclick="'.$js.'">&#128203; '.$label.'</button><br><br>'
+     . '<textarea id="installerBuildLog" readonly wrap="off" style="width:100%;box-sizing:border-box;height:420px;font-family:monospace;font-size:13px;white-space:pre;">'.$escaped.'</textarea>'
+     . $t->{footer};
 }
 
 ###############################################################
@@ -1896,7 +2062,7 @@ sub CreateInstalledPerlList {
           next if($package eq 'undefined');
 
           my $version  = $packages->{$package}{version};
-          my $linkitem = '<a href="https://metacpan.org/pod/'.$package.'" target="_blank">'.$package.'</a>';
+          my $linkitem = __CpanLink ($t, $package);
 
           push @ret, __TableRow ($t, $linecount, $linkitem, $version ? $version : '?');
           $linecount++;
@@ -1938,7 +2104,7 @@ sub CreateOutdatedPerlList {
 
               my $current  = $packages->{$package}{current};
               my $latest   = $packages->{$package}{latest};
-              my $linkitem = '<a href="https://metacpan.org/pod/'.$package.'" target="_blank">'.$package.'</a>';
+              my $linkitem = __CpanLink ($t, $package);
 
               push @ret, __TableRow ($t, $linecount, $linkitem, defined $current ? $current : '?', defined $latest ? $latest : '?');
               $linecount++;
@@ -2170,7 +2336,7 @@ sub CreateSearchList {
   my $search = join('\s*', @_);
   $search    = '.+' unless($search);
 
-  my $t    = __GetLayout($hash);
+  my $t    = __GetLayout ($hash);
   my $html = $t->{html};
   my $lb   = $t->{lb};
   my $name = $hash->{NAME};
@@ -2672,10 +2838,10 @@ sub CreateMetadataList {
               my $item = $prereq;
 
               if ($html && $installed ne 'built-in' && $installed ne 'included') {
-                  $item = '<a href="https://metacpan.org/pod/'.$prereq.'" target="_blank">'.$prereq.'</a>';
+                  $item = __CpanLink ($t, $prereq);
               }
               elsif ($html && $installed eq 'included') {
-                  $item = __InfoLink($hash, $t, $isFhem eq 'module' ? 'module' : 'package', $prereq);
+                  $item = __InfoLink ($hash, $t, $isFhem eq 'module' ? 'module' : 'package', $prereq);
               }
 
               my @cells = (
@@ -2731,6 +2897,140 @@ sub CreateMetadataList {
   push @ret, $t->{tdClose}.$t->{trClose}.$t->{tClose}.$t->{blockClose};
 
 return $t->{header}.join("\n", @ret).$t->{footer};
+}
+
+###############################################################
+#     Layout-Bausteine für die Ausgabe (FHEMWEB-HTML oder Text)
+###############################################################
+sub __GetLayout {
+  my $hash = shift;
+
+  my $html = (defined $hash->{CL} && $hash->{CL}{TYPE} eq 'FHEMWEB') ? 1 : 0;
+
+  delete $FW_webArgs{addLinks};                            # keine automatischen Links auf FHEM-Devices
+
+  my %t = (
+      html        => $html,
+      header      => '',
+      footer      => '',
+      blockOpen   => '',
+      blockClose  => '',
+      tTitleOpen  => '',
+      tTitleClose => '',
+      tOpen       => '',
+      tClose      => '',
+      tCOpen      => '',
+      tCClose     => '',
+      tHOpen      => '',
+      tHClose     => '',
+      tBOpen      => '',
+      tBClose     => '',
+      tFOpen      => '',
+      tFClose     => '',
+      trOpen      => '',
+      trOpenEven  => '',
+      trOpenOdd   => '',
+      trClose     => '',
+      thOpen      => '',
+      thClose     => "\t\t\t",
+      tdOpen      => '',
+      tdOpen1     => '',
+      tdOpen2     => '',
+      tdOpen3     => '',
+      tdOpen4     => '',
+      tdClose     => "\t\t\t",
+      strongOpen  => '',
+      strongClose => '',
+      colorRed    => '',
+      colorGreen  => '',
+      colorClose  => '',
+      space       => ' ',
+      lb          => "\n",
+  );
+
+  if ($html) {
+      %t = (%t,
+          header      => '<html>',
+          footer      => '</html>',
+          blockOpen   => '<div class="makeTable wide internals">',
+          blockClose  => '</div>',
+          tTitleOpen  => '<span class="mkTitle">',
+          tTitleClose => '</span>',
+          tOpen       => '<table class="block wide internals wrapcolumns">',
+          tClose      => '</table>',
+          tCOpen      => '<caption style="text-align: left; font-size: larger;">',
+          tCClose     => '</caption>',
+          tHOpen      => '<thead>',
+          tHClose     => '</thead>',
+          tBOpen      => '<tbody>',
+          tBClose     => '</tbody>',
+          tFOpen      => '<tfoot style="font-size: smaller;">',
+          tFClose     => '</tfoot>',
+          trOpen      => '<tr class="column">',
+          trOpenEven  => '<tr class="column even">',
+          trOpenOdd   => '<tr class="column odd">',
+          trClose     => '</tr>',
+          thOpen      => '<th style="text-align: left; vertical-align: top;">',
+          thClose     => '</th>',
+          tdOpen      => '<td style="vertical-align: top;">',
+          tdOpen1     => '<td style="vertical-align: top;" colspan="1">',
+          tdOpen2     => '<td style="vertical-align: top;" colspan="2">',
+          tdOpen3     => '<td style="vertical-align: top;" colspan="3">',
+          tdOpen4     => '<td style="vertical-align: top;" colspan="4">',
+          tdClose     => '</td>',
+          strongOpen  => '<strong>',
+          strongClose => '</strong>',
+          colorRed    => '<span style="color: red">',
+          colorGreen  => '<span style="color: green">',
+          colorClose  => '</span>',
+          space       => '&nbsp;',
+          lb          => '<br />',
+      );
+  }
+
+  $t{lang} = lc(AttrVal($hash->{NAME}, 'language', AttrVal('global', 'language', 'EN')));
+  $t{csrf} = $html ? __CsrfParam ($hash) : '';
+
+return \%t;
+}
+
+# Kopfzeilen einer Tabelle
+sub __TableHeader {
+  my ($t, $title, @cols) = @_;
+
+  my @ret = ($t->{blockOpen}.$t->{tOpen}.$t->{tCOpen}.$title.$t->{tCClose}.$t->{tHOpen}.$t->{trOpen});
+
+  push @ret, $t->{thOpen}.$_.$t->{thClose} for (@cols);
+  push @ret, $t->{trClose}.$t->{tHClose};
+
+return @ret;
+}
+
+# Tabellenzeile (gerade/ungerade abwechselnd)
+sub __TableRow {
+  my ($t, $linecount, @cells) = @_;
+
+  my $row = $linecount % 2 == 0 ? $t->{trOpenEven} : $t->{trOpenOdd};
+
+  $row .= $t->{tdOpen}.$_.$t->{tdClose} for (@cells);
+  $row .= $t->{trClose};
+
+return $row;
+}
+
+# CSRF-Parameter für Links in FHEMWEB
+sub __CsrfParam {
+  my $hash = shift;
+ 
+  # FHEMWEB-Serverdevice: aus dem Client, sonst das aktuell bearbeitende Device ($FW_wname)
+  no warnings 'once';
+  my $wname = (defined $hash->{CL} && defined $hash->{CL}{SNAME}) ? $hash->{CL}{SNAME} : $main::FW_wname;
+ 
+  return '' unless(defined $wname && defined $defs{$wname});
+ 
+  my $token = $defs{$wname}{CSRFTOKEN};
+ 
+return defined $token ? '&fwcsrf='.$token : '';
 }
 
 ###############################################################
@@ -3140,8 +3440,8 @@ sub __ExtPrereqSection {
                   $installed = $t->{colorGreen}.$installed.$t->{colorClose};
               }
 
-              $item = '<a href="https://metacpan.org/pod/'.$prereq.'" target="_blank">'.$prereq.'</a>'
-                if($html && !$isFhem && !$isPerlCore && $prereq ne 'perl');
+              $item = '<a href="https://pypi.org/project/'.$prereq.'/" target="_blank" rel="noopener noreferrer">'.$prereq.'</a>'
+                  if($html && !$isFhem && !$isPerlCore && $prereq ne 'perl' && $prereq =~ /^[A-Za-z0-9][A-Za-z0-9._-]*$/);
           }
           else {
               $installed = $t->{colorGreen}.$installed.$t->{colorClose};
@@ -3706,6 +4006,14 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
     Which set commands are offered depends on the progress of the detection: As long as <code>cpanm</code> has not been detected, only <b>statusRequest</b> and <b>installPerl App::cpanminus</b> are available,
     afterwards (until <code>cpan-outdated</code> has been detected) <b>installPerl App::cpanoutdated</b>, and then all commands.
     <br><br>
+    
+    <a id="Installer-set-getShowErrorList"></a>
+    <li><b>getShowErrorList</b><br>
+        Displays the error list for the most recently executed command, in the same format as <b>get &lt;name&gt; showErrorList</b>.
+        This command is not available in the drop-down list. It is intended for the <code>devStateIcon</code> attribute, because only set commands can be executed there.
+        Example: <code>error\s.*Perl.*:message_attention@red:getShowErrorList</code>
+    </li>
+    <br>
 
     <a id="Installer-set-installPerl"></a>
     <li><b>installPerl &lt;package&gt; [package ...]</b><br>
@@ -3795,6 +4103,17 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
         The search is not case sensitive. The search term is evaluated as a regular expression, several words are searched in the given order
         with any amount of whitespace between them. Without a search term all hits are shown.<br>
         Example: <code>get fhemInstaller search MQTT</code>
+    </li>
+    <br>
+    
+    <a id="Installer-get-showBuildLog"></a>
+    <li><b>showBuildLog &lt;number&gt;</b><br>
+        Displays a <code>cpanm</code>-<code>build.log</code> referenced by the current error list. The number corresponds to the build log entry from <b>showErrorList</b>.
+        In FHEMWEB, a button is displayed next to the relevant error messages.<br>
+        The output contains environment information, the current error messages, and the corresponding build log.
+        Large log files are automatically truncated so that only the last part is displayed.<br>
+        This option is only available if the current error list references at least one build log.<br>
+        Example: <code>get fhemInstaller showBuildLog 1</code>
     </li>
     <br>
 
@@ -4015,6 +4334,14 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
     Welche Set-Befehle angeboten werden, hängt vom Stand der Ermittlung ab: Solange <code>cpanm</code> nicht erkannt wurde, stehen nur <b>statusRequest</b> und <b>installPerl App::cpanminus</b> zur Verfügung,
     danach (bis <code>cpan-outdated</code> erkannt wurde) <b>installPerl App::cpanoutdated</b>, anschließend alle Befehle.
     <br><br>
+    
+    <a id="Installer-set-getShowErrorList"></a>
+    <li><b>getShowErrorList</b><br>
+        Zeigt die Fehlerliste des zuletzt ausgeführten Befehls an, in derselben Form wie <b>get &lt;name&gt; showErrorList</b>.
+        Der Befehl wird nicht in der Auswahlliste angeboten. Er ist für das Attribut <code>devStateIcon</code> gedacht, weil dort nur Set-Befehle ausgeführt werden können.
+        Beispiel: <code>error\s.*Perl.*:message_attention@red:getShowErrorList</code>
+    </li>
+    <br>
 
     <a id="Installer-set-installPerl"></a>
     <li><b>installPerl &lt;Paket&gt; [Paket ...]</b><br>
@@ -4105,6 +4432,17 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
         mit beliebigem Leerraum dazwischen gesucht. Ohne Suchbegriff werden alle Treffer angezeigt.<br>
         Beispiel: <code>get fhemInstaller search MQTT</code>
     </li>
+    <br>
+    
+    <a id="Installer-get-showBuildLog"></a> 
+    <li><b>showBuildLog &lt;Nummer&gt;</b><br> 
+        Zeigt ein <code>cpanm</code>-<code>build.log</code> an, auf das die aktuelle Fehlerliste verweist. Die Nummer entspricht dem Build-Log-Eintrag aus <b>showErrorList</b>. 
+        In FHEMWEB wird neben passenden Fehlermeldungen ein Button angezeigt.<br> 
+        Die Ausgabe enthält Umgebungsinformationen, die aktuellen Fehlermeldungen sowie das zugehörige Build-Log. 
+        Große Logdateien werden automatisch gekürzt, sodass nur der letzte Teil angezeigt wird.<br> 
+        Wird nur angeboten, wenn die aktuelle Fehlerliste auf mindestens ein Build-Log verweist.<br> 
+        Beispiel: <code>get fhemInstaller showBuildLog 1</code> 
+    </li> 
     <br>
 
     <a id="Installer-get-showDiffPerlList"></a>
@@ -4287,10 +4625,10 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
       "abstract": "Modul zur Installation, Aktualisierung und Deinstallation von (CPAN) Perl-Modulen und zur Verwaltung der Systemvoraussetzungen von FHEM"
     }
   },
-  "version": "v1.0.0",
+  "version": "v1.1.0",
   "release_status": "stable",
   "author": [
-    "Julian Pawlowski <julian.pawlowski@gmail.com>"
+    "Heiko Maaz <heiko.maaz@t-online.de>"
   ],
   "x_fhem_maintainer": [
     "DS_Starter"
@@ -4301,6 +4639,7 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
   "keywords": [
     "Dependencies",
     "Prerequisites",
+    "Installer",
     "Setup"
   ],
   "prereqs": {
@@ -4335,8 +4674,9 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
     }
   },
   "resources": {
-    "bugtracker": {
-      "web": "https://github.com/fhem/Installer/issues"
+    "x_wiki": {
+      "web": "https://wiki.fhem.de/wiki/Meta",
+      "title": "Development Module and Package Meta Data"
     }
   }
 }
