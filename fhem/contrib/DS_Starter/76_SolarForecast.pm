@@ -73,6 +73,11 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.9" => "16.10.2026  __openMeteo_ApiResponse: Klammerung gefixt, Forum: https://forum.fhem.de/index.php?msg=1370333 ",
+  "2.10.8" => "11.10.2026  ___batAdjustPowerByMargin: Prüfung 'Ziel nicht erreichbar' erfolgt jetzt vor der Margin-Prüfung, daher ".
+                           "volle Ladeleistung auch bei safetyMargin=0 ",
+  "2.10.7" => "10.10.2026  Driftanalyse (aiFannDetectDrift): Ersatz der Quelle airaw durch Werte aus pvHistory (_aiFannDriftHistSlice) -> Verringerung RAM Footprint ".
+                           "CachedHistoryVal: Zeitkontext auf Minute gerundet -> weniger Misses/Verdrängungen im TS_OFFSET_Cache ",
   "2.10.6" => "05.10.2026  siehe Changelog ".
                            "Reading Battery_OptimumBaseSoC_XX parallel zum bestehenden Reading Battery_OptimumTargetSoC_XX welches abgelöst werden soll (Forum: https://forum.fhem.de/index.php?msg=1369429) ".
                            "Nachtverarbeitung: aiDelRawData aus Task 6 nach Task 4 verschoben ".
@@ -4287,7 +4292,7 @@ sub __solCast_ApiRequest {
       timeout    => APITIMEOUT,
       name       => $name,
       debug      => $debug,
-      caller     => \&$caller,
+      caller     => $caller,
       stc        => [gettimeofday],
       allstrings => $allstrings,
       string     => $string,
@@ -4467,6 +4472,8 @@ sub __solCast_ApiResponse {
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -4486,7 +4493,6 @@ sub ___solCastErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{SolCast}{'?All'}{response_message} = $msg;
-  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -4499,6 +4505,8 @@ sub ___solCastErrorExit {
       lang           => $paref->{lang}
   };
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -4723,7 +4731,7 @@ sub __forecastSolar_ApiRequest {
       type       => $type,
       debug      => $debug,
       header     => 'Accept: application/json',
-      caller     => \&$caller,
+      caller     => $caller,
       stc        => [gettimeofday],
       allstrings => $allstrings,
       string     => $string,
@@ -4867,6 +4875,8 @@ sub __forecastSolar_ApiResponse {
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                           # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));       # API Laufzeit ermitteln
 
+  no strict 'refs'; 
+  
 return &$caller($param);
 }
 
@@ -4889,7 +4899,6 @@ sub ___forecastSolarErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{ForecastSolar}{'?All'}{response_message} = $msg;
-  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -4901,6 +4910,8 @@ sub ___forecastSolarErrorExit {
       lang           => $paref->{lang}
   };
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -5348,7 +5359,6 @@ sub __VictronVRM_ApiRequestLogin {
   else {
       my $msg = "ERROR - Victron VRM API credentials are not set or couldn't be decrypted. Use 'set $name vrmCredentials' to set it.";
       Log3 ($name, 1, "$name - $msg");
-      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $msg;
       return;
   }
@@ -5377,7 +5387,7 @@ sub __VictronVRM_ApiRequestLogin {
       name     => $name,
       stc      => [gettimeofday],
       debug    => $debug,
-      caller   => \&$caller,
+      caller   => $caller,
       lang     => $paref->{lang},
       chour    => $paref->{chour},
       date     => $paref->{date},
@@ -5419,7 +5429,6 @@ sub __VictronVRM_ApiResponseLogin {
   if ($err ne "") {
       $msg = 'ERROR - Victron VRM API error response: '.$err;
       Log3 ($name, 1, "$name - $msg");
-      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
       $data{$name}{current}{runTimeLastAPIProc}                    = round4 (tv_interval($sta));                            # Verarbeitungszeit ermitteln
@@ -5433,7 +5442,6 @@ sub __VictronVRM_ApiResponseLogin {
       if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API response';
           Log3 ($name, 1, "$name - $msg");
-          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                     # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                 # API Laufzeit ermitteln
@@ -5446,7 +5454,6 @@ sub __VictronVRM_ApiResponseLogin {
       if (defined $jdata->{'error_code'}) {
           $msg = 'ERROR - Victron VRM API error_code response: '.$jdata->{'error_code'};
           Log3 ($name, 3, "$name - $msg");
-          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
@@ -5524,7 +5531,7 @@ sub __VictronVRM_ApiRequestForecast {
       debug    => $debug,
       token    => $token,
       authtype => $authtype,                                       # für Response-Handler durchreichen
-      caller   => \&$caller,
+      caller   => $caller,
       lang     => $paref->{lang},
       header   => { "Content-Type" => "application/json", "x-authorization" => $authheader },
       method   => 'GET',
@@ -5563,7 +5570,6 @@ sub __VictronVRM_ApiResponseForecast {
   if ($err ne "") {
       $msg = 'ERROR - Victron VRM API Forecast response: '.$err;
       Log3 ($name, 1, "$name - $msg");
-      #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
       $data{$name}{statusapi}{VictronKi}{'?All'}{response_message} = $err;
       $data{$name}{current}{runTimeLastAPIProc}                    = round4 (tv_interval($sta));                            # Verarbeitungszeit ermitteln
@@ -5577,7 +5583,6 @@ sub __VictronVRM_ApiResponseForecast {
       if (!$success) {
           $msg = 'ERROR - invalid Victron VRM API Forecast response';
           Log3 ($name, 1, "$name - $msg");
-          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                         # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                     # API Laufzeit ermitteln
@@ -5590,7 +5595,6 @@ sub __VictronVRM_ApiResponseForecast {
       if (defined $jdata->{'error_code'}) {
           $msg = 'ERROR - Victron VRM API Forecast response: '.$jdata->{'error_code'};
           Log3 ($name, 3, "$name - $msg");
-          #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
           $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                         # Verarbeitungszeit ermitteln
           $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                     # API Laufzeit ermitteln
@@ -5623,7 +5627,6 @@ sub __VictronVRM_ApiResponseForecast {
           if (ref $syforecast ne 'ARRAY') {
               $msg = 'ERROR - invalid Victron VRM API Forecast response';
               Log3 ($name, 1, "$name - $msg");
-              #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
               $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                                    # Verarbeitungszeit ermitteln
               $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));                # API Laufzeit ermitteln
@@ -5720,7 +5723,7 @@ sub __VictronVRM_ApiRequestLogout {
       timeout    => APITIMEOUT,
       name       => $name,
       debug      => $debug,
-      caller     => \&$caller,
+      caller     => $caller,
       lang       => $paref->{lang},
       header     => { "Content-Type" => "application/json", "x-authorization" => "Bearer $token" },
       method     => 'GET',
@@ -5955,7 +5958,7 @@ sub __openMeteo_ApiRequest {
       begin          => $paref->{begin},
       callequivalent => $paref->{callequivalent},
       requestmode    => $requestmode,
-      caller         => \&$caller,
+      caller         => $caller,
       stc            => [gettimeofday],
       allstrings     => $allstrings,
       string         => $string,
@@ -6109,7 +6112,7 @@ sub __openMeteo_ApiResponse {
                   my $radwh = $jdata->{hourly}{shortwave_radiation}[$k];                                # Solarstrahlung GHI
 
                   if (defined $radwh) {                                                                 # Globalstrahlung für KI
-                      my $radkJ = 10 * (round0 ($radwh * WH2KJ) / 10);                                  # Umrechnung Wh/m2 in kJ/m2
+                      my $radkJ = 10 * round0 ($radwh * WH2KJ / 10);                                    # Umrechnung Wh/m2 in kJ/m2
                       $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} = $radkJ;                       # Startstunde verschieben
 
                       debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - Global Radiation Rad1h: $radkJ");
@@ -6133,7 +6136,7 @@ sub __openMeteo_ApiResponse {
                   my $srwh = $jdata->{hourly}{shortwave_radiation}[$k];                                 # Solarstrahlung GHI
 
                   if ($srwh) {                                                                          # Globalstrahlung für KI
-                      my $ghikj = 10 * (round0 ($srwh * WH2KJ) / 10);                          # Umrechnung Wh/m2 in kJ/m2
+                      my $ghikj = 10 * round0 ($srwh * WH2KJ / 10);                                     # Umrechnung Wh/m2 in kJ/m2
 
                       $pvtmstr =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
                       my $tidx = $1.$2.$3.(sprintf "%02d", ($4 + 1));
@@ -6293,6 +6296,8 @@ sub __openMeteo_ApiResponse {
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval($sta));                             # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval($stc) - tv_interval($sta));         # API Laufzeit ermitteln
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -6315,7 +6320,6 @@ sub ___openMeteoErrorExit {
   Log3 ($name, $loglevel, "$name - $msg") if(askLogtime ($name, $msg, 300));                                            # 5 Minuten Logzeitfenster
 
   $data{$name}{statusapi}{OpenMeteo}{'?All'}{response_message} = $msg;
-  #singleUpdateState ( {hash => $hash, state => $msg, evt => 1} );
 
   $data{$name}{current}{runTimeLastAPIProc}   = round4 (tv_interval ($paref->{sta}));                                   # Verarbeitungszeit ermitteln
   $data{$name}{current}{runTimeLastAPIAnswer} = round4 (tv_interval ($paref->{stc}) - tv_interval ($paref->{sta}));     # API Laufzeit ermitteln
@@ -6328,6 +6332,8 @@ sub ___openMeteoErrorExit {
       lang           => $paref->{lang}
   };
 
+  no strict 'refs';
+  
 return &$caller($param);
 }
 
@@ -12804,7 +12810,7 @@ sub centralTask {
   };
 
   $data{$name}{pvhist}{$day}{99}{dayname} = $dayname;                                           # akt. Wochentagsnamen in pvHistory eintragen
-
+    
   if ($debug !~ /^none$/xs) {
       Log3 ($name, 4, "$name DEBUG> ################################################################");
       Log3 ($name, 4, "$name DEBUG> ###                  New centralTask cycle                   ###");
@@ -12877,7 +12883,7 @@ sub centralTask {
   undef %{$centpars};
   
   # --- Speicherbereinigung nach dem Zyklus ---
-  mallocTrim ($name);
+  #mallocTrim ($name);
 
 return;
 }
@@ -17049,12 +17055,13 @@ sub ___batAdjustPowerByMargin {
 
   my $pow;
   my $ratio         = ___batRatio ($runwhneed, $remainingSurp, $befficiency);
-  my $limWithMargin = $limpower * (1.0 + $otpMargin / 100.0);                          # Hinweis: das ist bewusst ein permanenter Sicherheitsaufschlag
-  $limpower         = min ($limpower,      $pinmax);                                   # limpower !> pinmax um invertierte Interpolation zu vermeiden
+  my $limWithMargin = $limpower * (1.0 + $otpMargin / 100.0);                           # Hinweis: das ist bewusst ein permanenter Sicherheitsaufschlag
+  $limpower         = min ($limpower,      $pinmax);                                    # limpower !> pinmax um invertierte Interpolation zu vermeiden
   $limWithMargin    = min ($limWithMargin, $pinmax);
 
-  if    ($limpower <= 0 || $otpMargin == 0)           { $pow = $limpower }
-  elsif ($limWithMargin >= $pinmax || $ratio <= 100)  { $pow = $pinmax }
+  if    ($limpower <= 0)                              { $pow = $limpower }
+  elsif ($ratio <= 100 || $limWithMargin >= $pinmax)  { $pow = $pinmax }                # V2.10.8 Fix: Ziel nicht erreichbar -> pinmax, auch bei otpMargin == 0
+  elsif ($otpMargin == 0)                             { $pow = $limpower }
   elsif ($ratio >= 100 + $otpMargin)                  { $pow = $limWithMargin }
   else                                                { $pow = $pinmax - ($pinmax - $limWithMargin) * ($ratio - 100.0) / $otpMargin }
 
@@ -27020,7 +27027,7 @@ sub outputMessages {
 
   my $hc = 0;
 
-  for my $key (sort keys %{$data{$name}{messages}}) {
+  for my $key (reverse sort keys %{$data{$name}{messages}}) {
       next if($key >= IDXLIMIT);
 
       $hc++;
@@ -31743,7 +31750,7 @@ sub aiFannDetectDrift {
 
   delete @{$data{$name}{neuralnet}{$fanntyp}}{@drift_kpis};
 
-  my $rawref = $data{$name}{aidectree}{airaw};
+  my $rawref = _aiFannDriftHistSlice ($name, $fanntyp, $window, $t);
   return unless $rawref && ref $rawref eq 'HASH';
 
   my @indices = sort { $a <=> $b } keys %$rawref;
@@ -32117,6 +32124,59 @@ sub _aiFannSelectWindow {
   elsif ($drift_score < 1.2 && $age_hours > 72)                                              { return 144 }  # 5) stabiles Modell → vergrößern
 
 return $default;
+}
+
+################################################################
+#  schlanke Zeitreihe (Ist/AI-Prognose) für Drift aus pvHistory
+#  Rückgabe: Hashref {idx}{$fanntyp|$fanntyp.'aifc'} wie airaw
+################################################################
+sub _aiFannDriftHistSlice {
+  my ($name, $fanntyp, $window, $t) = @_;
+  $t //= time;
+
+  my $pvh = $data{$name}{pvhist};
+  return {} unless ref $pvh eq 'HASH';
+
+  my $now = timestringsFromOffset ($name, $t, 0);
+  return {} unless $now;
+
+  my $nowidx = $now->{year}.$now->{month}.$now->{day}.sprintf ("%02d", $now->{hour} + 1);        # laufende Stunde im Indexformat (HOD = Stunde+1)
+  my $noon   = $t - ($now->{hour} * 3600 + $now->{minute} * 60 + $now->{second}) + 43200;        # heute 12:00 als Anker -> stabile Cache-Keys, robust bei Sommerzeit
+
+  my $need    = max ($window, AIMODELMINAGE);                                                    # mind. so viele Slots wie die Drift-Logik prüft
+  my $maxdays = min (27, int ($need / 24) + 2);                                                  # >27: Tagesschlüssel würde auf den aktuellen Tag zurückfallen
+
+  my %slice;
+  my $count = 0;
+
+  DAY:
+  for my $d (0 .. $maxdays) {
+      my $dt   = timestringsFromOffset ($name, $noon, -$d * 86400) or next;
+      my $pvd  = $dt->{day};
+      my $ymd  = $dt->{year}.$dt->{month}.$dt->{day};
+
+      my $dref = $pvh->{$pvd};
+      next unless ref $dref eq 'HASH';
+
+      for my $hod (sort { $b <=> $a } grep { $_ && $_ ne '99' } keys %$dref) {
+          my $idx = $ymd.sprintf ("%02d", $hod);
+
+          next if($idx >= $nowidx);                                                             # laufende Stunde noch unvollständig, Zukunft/Altlasten ausblenden
+
+          my $act = HistoryVal ($name, $pvd, $hod, $fanntyp, undef);
+          next unless (defined $act && $act >= 0);
+
+          my $prd = HistoryVal ($name, $pvd, $hod, $fanntyp.'aifc', undef);
+          next unless (defined $prd && $prd >= 0);
+
+          $slice{$idx}{$fanntyp}        = $act;
+          $slice{$idx}{$fanntyp.'aifc'} = $prd;
+
+          last DAY if(++$count >= $need);
+      }
+  }
+
+return \%slice;
 }
 
 ###########################################################################
@@ -36112,10 +36172,9 @@ sub formatWeatherTimestrg {
   # --- Cache-Key generieren ---
   my $key = join '::', 'FMTWTSTR',                                                      # Cache Key ID
                        $date;
-
-  if (my $val = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
-      return $val;
-  }
+  
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                                   # Cache-Hit?
+  return $hit if defined $hit;
 
   my $dt    = timestringsFromOffset ($name, time, 0);
   my $cdate = $dt->{date};
@@ -36572,10 +36631,9 @@ sub azSolar2Astro {
   # --- Cache-Key generieren ---
   my $key = join '::', 'AZSOL',                                                   # Cache Key ID
                        $azsolar;
-
-  if (my $val = MCache_get (\%Multi_Cache, $stats, $key)) {                       # Cache-Hit?
-      return $val;
-  }
+  
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                             # Cache-Hit?
+  return $hit if defined $hit;
 
   my $astro = ($azsolar + 180) % 360;                                             # Berechnung
 
@@ -37563,16 +37621,9 @@ sub isHoliday {
 
   my $t = time();
 
-  if (my $entry = MCache_get (\%Multi_Cache, $stats, $key)) {                           # Cache-Hit?
-      if ($t - $entry->{ts} < 12 * 3600) {                                              # TTL = 12 Stunden
-          return $entry->{val};
-      }
-
-      delete $Multi_Cache{$key};
-      $stats->{evicts}++;                                                               # TTL abgelaufen → Cache-Eintrag verwerfen
+  if (my $entry = MCache_get (\%Multi_Cache, $stats, $key)) {
+      return $entry->{val} if $t - $entry->{ts} < 12 * 3600;                            # TTL = 12 Stunden
   }
-
-  $stats->{misses}++;
 
   my $holiday = 0;
 
@@ -38585,9 +38636,8 @@ sub temp2bin {
   my $key = join '::', 'TEMPBIN',                                                       # Cache Key ID
                        $val;
 
-  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
-      return $hit;
-  }
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                                   # Cache-Hit?
+  return $hit if defined $hit;
 
   my $bin = $val >=  35  ?  35 :
             $val >   32  ?  35 :
@@ -38633,10 +38683,9 @@ sub cloud2bin {
   # --- Cache-Key generieren ---
   my $key = join '::', 'CLOUDBIN',                                                      # Cache Key ID
                        $val;
-
-  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
-      return $hit;
-  }
+  
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                                   # Cache-Hit?
+  return $hit if defined $hit;
 
   my $bin = $val == 100 ? '100' :
             $val >  97  ? '100' :
@@ -38701,9 +38750,8 @@ sub sunalt2bin {
   my $key = join '::', 'SUNALTBIN',                                                     # Cache Key ID
                        $val;
 
-  if (my $hit = MCache_get (\%Multi_Cache, $stats, $key)) {                             # Cache-Hit?
-      return $hit;
-  }
+  my $hit = MCache_get (\%Multi_Cache, $stats, $key);                                   # Cache-Hit?
+  return $hit if defined $hit;
 
   my $bin = $val == 90  ? 90  :
             $val >  87  ? 90  :
@@ -39134,7 +39182,7 @@ sub CachedHistoryVal {
           //= LRU_cache_create ('pvHistCache', 'pvHistory Cache', CACHEPVHMS);                  # Init globalen pvHistory Cache
 
   # --- Zeitkontext Abfrage über TS_OFFSET_CACHE (stabil & gecacht) ---
-  my $dt = timestringsFromOffset ($name, $t, 0);
+  my $dt = timestringsFromOffset ($name, int ($t / 60) * 60, 0);                                # einen Cache-Key pro Minute statt pro Sekunde erzeugen
 
   # --- aktuelle Stunde NICHT cachen -> ändert sich inhaltlich noch
   if ($day == $dt->{day} && $hod >= $dt->{hour} + 1 ) {                                         # hour anpassen gemäß HOD-Logik
@@ -40213,7 +40261,7 @@ sub LRU_debug {
 return;
 }
 
-# --- Mini-Cache Wert lesen
+# --- Mini-Cache Wert lesen (undef = Miss; gespeicherte Werte sind nie undef)
 sub MCache_get {
   my ($cache, $stats, $key) = @_;
 
@@ -40227,17 +40275,23 @@ sub MCache_get {
 return;
 }
 
-# --- Mini-Cache Wert schreiben
+# --- Mini-Cache Wert schreiben (echtes FIFO über Key-Queue)
 sub MCache_set {
   my ($cache, $stats, $key, $value) = @_;
-  $cache->{$key} = $value;
 
-  my $max = $stats->{max};
+  my $order = $stats->{order} //= [];
+  push @$order, $key if !exists $cache->{$key};         # Falls der Schlüssel neu ist, in die Queue einreihen
 
-  if (keys %$cache > $max) {                            # auf X Einträge begrenzen
-      delete $cache->{(keys %$cache)[0]};               # FIFO, reicht völlig
-      $stats->{evicts}++;
- }
+  $cache->{$key} = $value;                              # Wert im Cache speichern/aktualisieren
+
+  while (keys(%$cache) > $stats->{max} && @$order) {    # Bereinigen: So lange Elemente aus der Queue entfernen, bis die tatsächliche Cache-Größe <= max ist
+      my $old = shift @$order;
+        
+      if (exists $cache->{$old}) {                      # Nur mitzählen und löschen, wenn der Key wirklich noch im Hash existiert
+          delete $cache->{$old};
+          $stats->{evicts}++;
+      }
+  }
 
 return;
 }
