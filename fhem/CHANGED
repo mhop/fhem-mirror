@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  55_InfoPanel.pm moved to contrib Forum: #145709
  - feture:  98_Installer: v1.1.0, Forum: #145672
  - change:  93_DbRep: Online-Hilfe für Attr timeout angepasst
  - change:  98_Installer: v1.0.1, kleine Anpassung von CPAN-Links
