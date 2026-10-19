@@ -729,6 +729,7 @@ MQTT2_SERVER_dosendto($$$$$$;$$)
 
   } else {
     $props = "";
+    $lr = 0 if($src); # MQTT-3.3.1-9
 
   }
 
