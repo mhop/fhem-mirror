@@ -25,14 +25,13 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
-use SetExtensions qw/ :all /;
+use SetExtensions;
 
 sub PIONEERAVRZONE_Get;
 sub PIONEERAVRZONE_Set;
 sub PIONEERAVRZONE_Attr;
 sub PIONEERAVRZONE_Define;
 
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 ###################################
 sub PIONEERAVRZONE_Initialize {
@@ -164,7 +163,7 @@ sub PIONEERAVRZONE_Set {
         #### simple set commands without attributes
         #### we just "translate" the human readable command to the PioneerAvr command
         #### lookup in $IOhash->{helper}{SETS}{$zone} if the command exists and what to write to PioneerAvr
-        if ( $cmd ~~ @setsWithoutArg ) {
+        if ( grep { $_ eq $cmd } @setsWithoutArg ) {
             Log3 $name, 5, "PIONEERAVR $name: Set $cmd (setsWithoutArg)";
             my $setCmd = $IOhash->{helper}{SETS}{$zone}{$cmd};
             my $v      = IOWrite( $hash, $setCmd );
@@ -709,9 +708,10 @@ sub PIONEERAVRZONE_Define {
 1;
 
 =pod
+=encoding utf8
 =item device
-=item summary control for the zones of a PIONEER AV receivers via network or serial connection
-=item summary_DE Steuerung der Zonen eines PIONEER AV Receiver per Netzwerk oder seriell
+=item summary control of zones on PIONEER AV receivers via network or serial connection
+=item summary_DE Steuerung der Zonen eines PIONEER AV-Receivers über Netzwerk oder seriell
 =begin html
 
 <a name="PIONEERAVRZONE"></a>
@@ -777,11 +777,11 @@ sub PIONEERAVRZONE_Define {
   </ul>
   <br><br>
 
-  <a name="PIONEERAVRattr"></a>
+  <a name="PIONEERAVRZONEattr"></a>
   <b>Attributes</b>
   <br><br>
   <ul>
-    <li>IOdev Name of the device which communicates with the phisical Pioneer AV receiver via ethernet or rs232</li>
+    <li>IOdev Name of the device which communicates with the physical Pioneer AV receiver via ethernet or rs232</li>
     <li><a href="#verbose">verbose</a></li>
   </ul>
   <br><br> 
@@ -800,10 +800,10 @@ sub PIONEERAVRZONE_Define {
     <code>define &lt;name&gt; PIONEERAVRZONE &lt;zone&gt; </code>
     <br><br>
 
-    Definiert ein PioneerAVR device für eine Zone Zone (zone2, zone3 or hdZone).<p>
+    <p>Definiert ein PIONEERAVRZONE-Device für eine Zone (zone2, zone3 oder hdZone).</p>
     
-    Im Allgemeinen verwendet das logische device PIONEERAVRZONE das zuletzt definierte PIONEERAVR device für die Kommunikation mit dem Pioneer AV Receiver.
-	Mit dem Atribut <code>IODev</code> kann das PIONEERAVRZONE device jedes PIONEERAVR device zur Kommunikation verwenden,
+    Im Allgemeinen verwendet das logische PIONEERAVRZONE-Device das zuletzt definierte PIONEERAVR-Device für die Kommunikation mit dem Pioneer AV Receiver.
+	Mit dem Atribut <code>IODev</code> kann das PIONEERAVRZONE-Device jedes PIONEERAVR-Device zur Kommunikation verwenden,
 	z.B. <code>attr myPioneerAvrZone2 IODev myPioneerAvr</code>.
     <br><br>
 
@@ -854,7 +854,7 @@ sub PIONEERAVRZONE_Define {
   </ul>
   <br><br>
 
-  <a name="PIONEERAVRattr"></a>
+  <a name="PIONEERAVRZONEattr"></a>
   <b>Attributes</b>
   <br><br>
   <ul>
