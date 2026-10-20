@@ -2356,38 +2356,11 @@ sub PIONEERAVR_Read {
     my $buf             = '';
     my $becameAvailable = 0;
 
-    #include previous partial message
-    if ( defined( $hash->{PARTIAL} ) && $hash->{PARTIAL} ) {
-        $buf = $hash->{PARTIAL} . DevIo_SimpleRead($hash);
-    }
-    else {
-        $buf = DevIo_SimpleRead($hash);
-    }
-    return if ( !defined($buf) );
-
-    my $logMsg = "Spontaneously received " . dq($buf);
-    PIONEERAVR_Log( $hash, undef, $logMsg );
-
-# Connection still up!
-# We received something from the Pioneer AV receiver (otherwise we would not be here)
-# So we can assume that the connection is up.
-# We delete the current "inactivity timer" and set a new timer
-#   to check if the connection to the Pioneer AV receiver is still working in 120s
-
-    # reset connectionCheck timer
-    my $checkInterval = AttrVal( $name, "connectionCheck", "60" );
-    RemoveInternalTimer( $hash, "PIONEERAVR_connectionCheck" );
-    if ( $checkInterval ne "off" ) {
-        my $next = gettimeofday() + $checkInterval;
-        $hash->{helper}{nextConnectionCheck} = $next;
-        InternalTimer( $next, "PIONEERAVR_connectionCheck", $hash, 0 );
-        Log3 $hash, 5,
-"PIONEERAVR $name: Connection is up --- Check again in $checkInterval s --> Internal timer set";
-    }
-    else {
-        Log3 $hash, 5,
-          "PIONEERAVR $name: Connection is up --- checkConnection is disabled";
-    }
+    # Read once per ReadFn invocation; incomplete replies stay in PARTIAL.
+    my $chunk = DevIo_SimpleRead($hash);
+    return if ( !defined($chunk) );
+    $buf = ( $hash->{PARTIAL} // "" ) . $chunk;
+    PIONEERAVR_Log( $hash, undef, "Spontaneously received " . dq($buf) );
 
    # $buf can contain more than one line of information
    # the lines are separated by "\r\n"
@@ -2398,6 +2371,18 @@ sub PIONEERAVR_Read {
     # Only a complete protocol reply proves that the receiver is ready.
     # A successful TCP connection alone can occur while the AVR is booting.
     if ( $buf =~ /[^\r\n]+\r\n/ ) {
+        # R or another complete receiver reply proves liveness. Fragments
+        # and empty lines must not extend the active probe's deadline.
+        RemoveInternalTimer( $hash, "PIONEERAVR_ProbeTimeout" );
+        delete $hash->{helper}{connectionProbe};
+        RemoveInternalTimer( $hash, "PIONEERAVR_connectionCheck" );
+        delete $hash->{helper}{nextConnectionCheck};
+        my $interval = AttrVal( $name, "connectionCheck", 60 );
+        if ( $interval ne "off" ) {
+            my $next = gettimeofday() + $interval;
+            $hash->{helper}{nextConnectionCheck} = $next;
+            InternalTimer( $next, "PIONEERAVR_connectionCheck", $hash, 0 );
+        }
         $becameAvailable = !( $hash->{helper}{AVAILABLE} // 0 );
         $hash->{helper}{AVAILABLE} = 1;
         readingsBulkUpdate( $hash, "presence", "present" )
@@ -4266,6 +4251,8 @@ sub PIONEERAVR_ClearSendQueue {
     my ($hash) = @_;
     RemoveInternalTimer( $hash, "PIONEERAVR_SendNext" );
     delete $hash->{helper}{sendQueue};
+    RemoveInternalTimer( $hash, "PIONEERAVR_ProbeTimeout" );
+    delete $hash->{helper}{connectionProbe};
     return;
 }
 
@@ -4292,7 +4279,6 @@ sub PIONEERAVR_ScheduleSend {
     my $queue = $hash->{helper}{sendQueue};
 
     return if ( !$queue || $queue->{timerActive} );
-    return if ( $hash->{helper}{connectionCheckActive} );
     return if ( !@{ $queue->{foreground} } && !@{ $queue->{background} } );
 
     my $now = gettimeofday();
@@ -4315,7 +4301,6 @@ sub PIONEERAVR_SendNext {
     RemoveInternalTimer( $hash, "PIONEERAVR_SendNext" );
     return if ( !$queue );
     delete $queue->{timerActive};
-    return if ( $hash->{helper}{connectionCheckActive} );
 
     # A timer can become stale after deletion or a transport failure. Drop
     # the whole queue instead of sending old controls on a later connection.
@@ -4350,6 +4335,15 @@ sub PIONEERAVR_SendNext {
 
     PIONEERAVR_SendCommand( $hash, $item->{command} );
     $queue->{nextSend} = gettimeofday() + $item->{delayAfter};
+    if ( $item->{connectionProbe} && DevIo_IsOpen($hash)
+        && $queue->{connection} eq DevIo_IsOpen($hash) )
+    {
+        my $deadline = gettimeofday() + AttrVal( $name, "timeout", 5 );
+        $hash->{helper}{connectionProbe} = {
+            connection => $queue->{connection}, deadline => $deadline,
+        };
+        InternalTimer( $deadline, "PIONEERAVR_ProbeTimeout", $hash, 0 );
+    }
     PIONEERAVR_ScheduleSend($hash);
     return;
 }
@@ -4379,33 +4373,23 @@ sub PIONEERAVR_SendCommand {
     return;
 }
 
-######################################################################################
-# PIONEERAVR_connectionCheck is called if PIONEERAVR received no data for 120s
-#   we send a "new line" and expect (if the connection is up) to receive "R"
-#   DevIo_Expect() is used for this
-#   DevIO_Expect() sends a command (just a "new line") and waits up to 5s for a reply
-#   if there is a reply DevIO_Expect() returns the reply
-#   if there is no reply
-#   - DevIO_Expect() tries to close and reopen the connection
-#   - sends the command again
-#   - waits again up to 5 seconds for a reply
-#   - if there is a reply the state is set to "opened"
-#   - if there is no reply the state is set to "disconnected"
-#
-
+# Inactivity checks use the normal ReadFn and an independent deadline timer.
+# Keep DevIo responsible for disconnect handling and ReadyFn reconnects.
 sub PIONEERAVR_connectionCheck {
-    my $hash = shift;
-
-    my $name    = $hash->{NAME};
-    my $verbose = AttrVal( $name, "verbose", "" );
-
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
     RemoveInternalTimer( $hash, "PIONEERAVR_connectionCheck" );
+    delete $hash->{helper}{nextConnectionCheck};
+    return if ( !defined( $defs{$name} ) || $defs{$name} != $hash );
+    return if ( !DevIo_IsOpen($hash) );
+    return if ( PIONEERAVR_PowerSupplyState($hash) eq "off" );
+    return if ( $hash->{helper}{connectionProbe} );
 
-    # DevIo_Expect writes outside the scheduler. Do not let its newline
-    # collide with queued commands or the final command's quiet interval.
-    my $queue = $hash->{helper}{sendQueue};
-    if ( $queue && ( @{ $queue->{foreground} } || @{ $queue->{background} }
-        || ( $queue->{nextSend} // 0 ) > gettimeofday() ) )
+    # A running scan already generates traffic. Wait for its completion and
+    # the final command's quiet interval before inserting an idle probe.
+    my $queue = PIONEERAVR_GetSendQueue($hash);
+    if ( @{ $queue->{foreground} } || @{ $queue->{background} }
+        || ( $queue->{nextSend} // 0 ) > gettimeofday() )
     {
         my $next = gettimeofday() + AttrVal( $name, "timeout", 5 );
         $hash->{helper}{nextConnectionCheck} = $next;
@@ -4413,56 +4397,41 @@ sub PIONEERAVR_connectionCheck {
         return;
     }
 
-    $hash->{STATE} = "opened";    # assume we have an open connection
-    $attr{$name}{verbose} = 0 if ( $verbose eq "" || $verbose < 4 );
+    # Empty command retains the established CR/LF -> R probe. Its deadline
+    # is armed in SendNext, only after the write actually took place.
+    push @{ $queue->{foreground} }, {
+        command => "", delayAfter => 0.1, connectionProbe => 1,
+    };
+    PIONEERAVR_ScheduleSend($hash);
+    return;
+}
 
-    # A reconnect notification may enqueue probes while DevIo_Expect is
-    # still running. Keep those writes deferred until its direct I/O ends.
-    $hash->{helper}{connectionCheckActive} = 1;
-    my $connState =
-      DevIo_Expect( $hash, "\r\n", AttrVal( $name, "timeout", "5" ) );
-    delete $hash->{helper}{connectionCheckActive};
+sub PIONEERAVR_ProbeTimeout {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    my $probe = $hash->{helper}{connectionProbe};
+    return if ( !$probe );
+    RemoveInternalTimer( $hash, "PIONEERAVR_ProbeTimeout" );
 
-    # This legacy probe writes directly via DevIo. Reserve a fresh quiet
-    # interval afterwards before allowing another scheduled command.
-    if ( DevIo_IsOpen($hash) ) {
-        my $sendQueue = PIONEERAVR_GetSendQueue($hash);
-        $sendQueue->{nextSend} = gettimeofday() + 0.1;
-        PIONEERAVR_ScheduleSend($hash);
-    }
-    else {
+    # Do not disconnect a replacement socket or a redefined device on behalf
+    # of an earlier probe. The same cleanup also cancels ordinary sends.
+    if ( !defined( $defs{$name} ) || $defs{$name} != $hash
+        || !DevIo_IsOpen($hash)
+        || $probe->{connection} ne DevIo_IsOpen($hash)
+        || PIONEERAVR_PowerSupplyState($hash) eq "off" )
+    {
         PIONEERAVR_ClearSendQueue($hash);
+        return;
+    }
+    if ( $probe->{deadline} > gettimeofday() ) {
+        InternalTimer( $probe->{deadline}, "PIONEERAVR_ProbeTimeout", $hash, 0 );
+        return;
     }
 
-    # successful connection
-    if ( defined($connState) ) {
-
-        # reset connectionCheck timer
-        my $checkInterval = AttrVal( $name, "connectionCheck", "60" );
-        if ( $checkInterval ne "off" ) {
-            my $next = gettimeofday() + $checkInterval;
-            $hash->{helper}{nextConnectionCheck} = $next;
-            InternalTimer( $next, "PIONEERAVR_connectionCheck", $hash, 0 );
-        }
-
-        if ( $connState =~ m/^R\r?\n?$/ ) {
-            Log3 $name, 5,
-"PIONEERAVR $name: PIONEERAVR_connectionCheck() --- connstate=R -> do nothing: "
-              . dq($connState)
-              . " PARTIAL: "
-              . dq( $hash->{PARTIAL} );
-        }
-        else {
-            $hash->{PARTIAL} .= $connState;
-            Log3 $name, 5,
-"PIONEERAVR $name: PIONEERAVR_connectionCheck() --- connstate<>R -> do nothing: "
-              . dq($connState)
-              . " PARTIAL: "
-              . dq( $hash->{PARTIAL} );
-        }
-    }
-    $attr{$name}{verbose} = $verbose if ( $verbose ne "" );
-    delete $attr{$name}{verbose}     if ( $verbose eq "" );
+    Log3 $name, 3, "PIONEERAVR $name: connection check timed out";
+    PIONEERAVR_ClearSendQueue($hash);
+    # DevIo closes the transport, emits DISCONNECTED and enables ReadyFn.
+    DevIo_Disconnected($hash);
     return;
 }
 
@@ -4829,9 +4798,10 @@ between writes. Full status and input-name scans run in the background;
 interactive commands take priority. Repeated requests for an already pending
 scan are coalesced. A full input scan takes about 36 seconds without blocking
 FHEM during the command intervals. Pending commands are discarded when the
-connection changes or the external power supply is switched off. The existing
-connection check still uses synchronous DevIo_Expect; this change does not
-make that separate probe asynchronous.</p>
+connection changes or the external power supply is switched off. Connection checks use the same paced send path and the normal receive
+handler. Reply timeouts are monitored by a timer starting after transmission;
+complete replies cancel it. On timeout, DevIo handles disconnection and the
+existing ReadyFn reconnect path.</p>
 
   <a id="PIONEERAVR-get" name="PIONEERAVRget"></a>
 <p><b>Note:</b> If a reading with the requested name exists, get returns its stored value without a new receiver request. The request descriptions below apply when no such reading exists. Use <code>set &lt;name&gt; statusRequest</code> to request a status refresh.</p>
@@ -5209,9 +5179,10 @@ Eingangsabfragen laufen im Hintergrund; Bedienbefehle haben Vorrang. Erneute
 Anforderungen eines bereits ausstehenden Scans werden zusammengefasst. Ein
 vollständiger Eingangsscan dauert etwa 36 Sekunden, ohne FHEM während der
 Befehlsabstände zu blockieren. Bei Verbindungswechsel oder abgeschalteter
-externer Stromversorgung werden ausstehende Befehle verworfen. Die bestehende
-Verbindungsprüfung verwendet weiterhin das synchrone DevIo_Expect; diese
-separate Prüfung wird mit dieser Änderung nicht asynchron.</p>
+externer Stromversorgung werden ausstehende Befehle verworfen. Verbindungsprüfungen verwenden denselben getakteten Versandweg und die
+normale Empfangsfunktion. Ein Timer überwacht die Antwortfrist ab dem Versand;
+vollständige Antworten beenden diese Frist. Bei Zeitüberschreitung übernimmt
+DevIo den Verbindungsabbruch und die Wiederverbindung über die bestehende ReadyFn.</p>
 
   <a id="PIONEERAVR-get" name="PIONEERAVRget"></a>
 <p><b>Hinweis:</b> Existiert ein Reading mit dem angefragten Namen, liefert get dessen gespeicherten Wert ohne neue Receiver-Abfrage. Die folgenden Abfragebeschreibungen gelten, wenn kein solches Reading existiert. Eine neue Statusabfrage erfolgt mit <code>set &lt;name&gt; statusRequest</code>.</p>

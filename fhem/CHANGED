@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change:  PIONEERAVR: check connections asynchronously using timers
+            and recover through DevIo after reply timeouts
  - bugfix:  PIONEERAVR: support spaces in input aliases, validate names
             and query the receiver after renaming
  - change:  PIONEERAVR/PIONEERAVRZONE: use timer-based command pacing
