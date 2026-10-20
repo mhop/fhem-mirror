@@ -1,5 +1,8 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix: PIONEERAVR: preserve zero-valued set arguments.
+ - bugfix: PIONEERAVR: synchronize networkStandby reading and legacy
+           internal; check before queueing telnet power-on commands.
  - feature: PIONEERAVR: add statusRequestState reading reporting
             running, done or aborted for full status requests.
  - feature: PIONEERAVR/PIONEERAVRZONE: support disabling receiver

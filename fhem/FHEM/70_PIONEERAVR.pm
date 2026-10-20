@@ -1553,8 +1553,8 @@ sub PIONEERAVR_Set {
     my $cmd      = @$a[1];
     return "Device is disabled; set attribute disable to 0 first."
       if ( PIONEERAVR_IsDisabled($hash) && $cmd ne "?" );
-    my $arg      = ( @$a[2] ? @$a[2] : "" );
-    my $arg2     = ( @$a[3] ? @$a[3] : "" );
+    my $arg      = $a->[2] // "";
+    my $arg2     = $a->[3] // "";
     my $presence = ReadingsVal( $name, "presence", "absent" );
     my @args     = @$a;
     shift @args;
@@ -1689,6 +1689,14 @@ sub PIONEERAVR_Set {
             ### wait 100ms before the first command is accepted by the Pioneer AV receiver
         }
         elsif ( $cmd eq "on" ) {
+            # Refuse before queueing any wake-up or power-on bytes. Keep the
+            # legacy internal as fallback until the first confirmed reading.
+            if ( $hash->{Protocol} eq "telnet"
+                && ReadingsVal( $name, "networkStandby",
+                    $hash->{networkStandby} // "" ) eq "off" ) {
+                return
+"NetworkStandby for the Pioneer AV receiver is off. If Fhem should be able to turn the AV Receiver on from standby enable networkStandby on the Pioneer AV Receiver (e.g. set $name networkStandby on )!";
+            }
             Log3 $name, 5,
 "PIONEERAVR $name: Set $cmd -> 2x newline + 2x PO with 100ms break in between";
             my $setCmd = "";
@@ -1700,13 +1708,7 @@ sub PIONEERAVR_Set {
             PIONEERAVR_Write( $hash, $setCmd, 0.2 );
             PIONEERAVR_Write( $hash, $setCmd );
 
-            if ( ReadingsVal( $name, "networkStandby", "" ) eq "off" ) {
-                return
-"NetworkStandby for the Pioneer AV receiver is off. If Fhem should be able to turn the AV Receiver on from standby enable networkStandby on the Pioneer AV Receiver (e.g. set $name networkStandby on )!";
-            }
-            else {
-                return;
-            }
+            return;
             #### simple set commands without attributes
             #### we just "translate" the human readable command to the PioneerAvr command
             #### lookup in $hash->{helper}{SETS} if the command exists and what to write to PioneerAvr
@@ -3924,7 +3926,7 @@ m/^SUL(\d)(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})
          # STJ1 -> on  -> Pioneer AV receiver can be switched on from standby
          # STJ0 -> off -> Pioneer AV receiver cannot be switched on from standby
         }
-        elsif ( $line =~ m/^STJ([0|1])/ ) {
+        elsif ( $line =~ m/^STJ([01])$/ ) {
             if ( $1 eq '1' ) {
                 $hash->{networkStandby} = "on";
                 Log3 $hash, 5,
@@ -3939,6 +3941,7 @@ m/^SUL(\d)(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})(\d{3})
                   . dq($line)
                   . " interpreted as: networkStandby is off";
             }
+            readingsBulkUpdate( $hash, "networkStandby", $hash->{networkStandby} );
 
             # commands for other zones (Volume, mute, power)
             # Zone 2 command
@@ -4983,7 +4986,7 @@ existing ReadyFn reconnect path.</p>
     <a id="PIONEERAVR-get-networkSettings"></a>
     <li><b>networkSettings</b> - get the IP network settings (ip, netmask, gateway,dhcp, dns1, dns2, proxy) of the Pioneer AV Receiver. The values are stored as INTERNALS not as READINGS </li>
     <a id="PIONEERAVR-get-networkStandby"></a>
-    <li><b>networkStandby</b> - get the current setting of networkStandby -> the value of networkStandby (on|off) is stored as an INTERNAL not as a READING</li>
+    <li><b>networkStandby</b> - Returns the cached reading when available; otherwise queries the receiver. Confirmed replies update the networkStandby reading (on|off) and the legacy internal. Use statusRequest for a fresh status query. For telnet connections, a known off setting rejects set on before any wake-up or power-on commands are queued; an unknown setting permits an attempt. Serial power-on is not blocked by network standby.</li>
     <a id="PIONEERAVR-get-power"></a>
     <li><b>power</b> - get the Power state of the Pioneer AV receiver </li>
     <a id="PIONEERAVR-get-signalSelect"></a>
@@ -5050,6 +5053,7 @@ existing ReadyFn reconnect path.</p>
   <b>Generated readings and events</b>
     <br/><br/>
     <ul>
+        <li><b>networkStandby</b> - Last receiver-confirmed network standby setting (on|off). The legacy internal of the same name is retained for compatibility. Sending a set command does not change the reading until the receiver confirms the setting.</li>
         <li><b>statusRequestState</b> - Progress of a manual or automatic full status request: <code>running</code> while status and input queries are being sent, <code>done</code> after all queries have been sent, or <code>aborted</code> if the scan is cancelled, for example by disable or a lost connection. done does not confirm a successful response to every query; unsupported or unavailable parameters may return receiver errors. Repeated full requests share the running scan. A separate get loadInputNames does not start this reading. The reading is created on the first accepted full request.</li>
         <li><b>audioAutoPhaseControlMS</b> - currently configured Auto Phase Control in ms</li>
         <li><b>audioAutoPhaseControlRevPhase</b> - currently configured Auto Phase Control reverse Phase -> 1 means: reverse phase</li>
@@ -5365,7 +5369,7 @@ DevIo den Verbindungsabbruch und die Wiederverbindung über die bestehende Ready
     <a id="PIONEERAVR-get-networkSettings"></a>
     <li><b>networkSettings</b> - Versucht vom Pioneer AV Receiver die Netzwerkparameter (IP, Gateway, Netmask, Proxy, DHCP, DNS1, DNS2) einzulesen und in INTERNALS abzuspeichern</li>
     <a id="PIONEERAVR-get-networkStandby"></a>
-    <li><b>networkStandby</b> - Versucht vom Pioneer AV Receiver den Parameter networkStandby (kann on oder off sein) einzulesen und als INTERNAL abzuspeichern</li>
+    <li><b>networkStandby</b> - Liefert das gespeicherte Reading, falls vorhanden; andernfalls wird der Receiver abgefragt. Bestätigte Antworten aktualisieren das Reading networkStandby (on|off) und das bisherige Internal. Eine neue Statusabfrage erfolgt mit statusRequest. Bei Telnet-Verbindungen und bekanntem off wird set on abgewiesen, bevor Aufweck- oder Einschaltbefehle eingereiht werden; bei unbekanntem Zustand wird ein Versuch zugelassen. Serielles Einschalten wird durch Network Standby nicht gesperrt.</li>
     <a id="PIONEERAVR-get-power"></a>
     <li><b>power</b> - Versucht vom Pioneer AV Receiver in Erfahrung zu bringen, ob die Main Zone eingeschaltet oder in Standby ist.</li>
     <a id="PIONEERAVR-get-signalSelect"></a>
@@ -5433,6 +5437,7 @@ DevIo den Verbindungsabbruch und die Wiederverbindung über die bestehende Ready
   <b>Erzeugte Readings und Events</b>
     <br/><br/>
     <ul>
+        <li><b>networkStandby</b> - Zuletzt vom Receiver bestätigte Network-Standby-Einstellung (on|off). Das gleichnamige bisherige Internal bleibt aus Kompatibilitätsgründen erhalten. Ein Set-Befehl ändert das Reading erst nach Bestätigung durch den Receiver.</li>
         <li><b>statusRequestState</b> - Fortschritt einer manuellen oder automatischen vollständigen Statusabfrage: <code>running</code> während Status- und Eingangsabfragen gesendet werden, <code>done</code> nachdem alle Abfragen gesendet wurden oder <code>aborted</code> bei Abbruch, etwa durch disable oder Verbindungsverlust. done bestätigt keine erfolgreiche Antwort auf jede Abfrage; nicht unterstützte oder nicht verfügbare Parameter können Receiverfehler liefern. Wiederholte vollständige Statusabfragen teilen sich den laufenden Scan. Ein separates get loadInputNames startet dieses Reading nicht. Es wird bei der ersten angenommenen vollständigen Statusabfrage angelegt.</li>
         <li><b>audioAutoPhaseControlMS</b> - aktuell konfigurierte Auto Phase Control in ms</li>
         <li><b>audioAutoPhaseControlRevPhase</b> - aktuell konfigurierte Auto Phase Control reverse Phase -> 1 bedeutet: reverse phase</li>
