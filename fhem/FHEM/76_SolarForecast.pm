@@ -73,7 +73,8 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.9" => "16.10.2026  __openMeteo_ApiResponse: Klammerung gefixt, Forum: https://forum.fhem.de/index.php?msg=1370333 ",
+  "2.10.9" => "20.10.2026  __openMeteo_ApiResponse: Klammerung gefixt, Forum: https://forum.fhem.de/index.php?msg=1370333 ".
+                           "Message-System: Fix fehlerhafte Sortierung mit idx >=10 ",
   "2.10.8" => "11.10.2026  ___batAdjustPowerByMargin: Prüfung 'Ziel nicht erreichbar' erfolgt jetzt vor der Margin-Prüfung, daher ".
                            "volle Ladeleistung auch bei safetyMargin=0 ",
   "2.10.7" => "10.10.2026  Driftanalyse (aiFannDetectDrift): Ersatz der Quelle airaw durch Werte aus pvHistory (_aiFannDriftHistSlice) -> Verringerung RAM Footprint ".
@@ -26915,7 +26916,7 @@ sub fillupMessageSystem {
 
   ## Aufnahme Stand für alt/neu Vergleich + Clear Messages
   ##########################################################
-  for my $idx (sort keys %{$data{$name}{messages}}) {
+  for my $idx (sort { $a <=> $b } keys %{$data{$name}{messages}}) {
       next if(!isNumeric($idx) || $idx >= IDXLIMIT);
       $otxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
       $otxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
@@ -26931,7 +26932,7 @@ sub fillupMessageSystem {
   ## Messages neu füllen
   ########################################################################
   if (defined $data{$name}{preparedmessages} || defined $data{$name}{filemessages}) {
-      for my $idx (sort keys %{$data{$name}{messages}}) {
+      for my $idx (sort { $a <=> $b } keys %{$data{$name}{messages}}) {
           next if($idx >= IDXLIMIT);
           delete $data{$name}{messages}{$idx};
       }
@@ -26939,7 +26940,7 @@ sub fillupMessageSystem {
       $midx1 = 0;
 
       # --- Integration prepared Messages
-      for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
+      for my $smi (sort { $a <=> $b } keys %{$data{$name}{preparedmessages}}) {
           next if($smi >= IDXLIMIT);
           $midx2++;
           $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
@@ -26948,7 +26949,7 @@ sub fillupMessageSystem {
       }
 
       # --- Integration File Messages
-      for my $mfi (sort keys %{$data{$name}{filemessages}}) {
+      for my $mfi (sort { $a <=> $b } keys %{$data{$name}{filemessages}}) {
           next if($mfi >= IDXLIMIT);
           $midx2++;
           $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
@@ -26962,7 +26963,7 @@ sub fillupMessageSystem {
 
       ## Vergleich auf geänderte Messages
       #####################################
-      for my $idx (sort keys %{$data{$name}{messages}}) {
+      for my $idx (sort { $a <=> $b } keys %{$data{$name}{messages}}) {
           next if($idx >= IDXLIMIT);
           $ntxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
           $ntxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
@@ -26977,10 +26978,7 @@ sub fillupMessageSystem {
   my $midx = max ($midx1, $midx2);
 
   if ($midx && ($data{$name}{messages}{999999}{RD} // 0) != 1) {                                # RD = Read-Bit (undef -> Messages nicht gelesen)
-      #my @aidx   = map { $_ } (1..$midx);                                                       # größte vorhandene Severity finden ...
-      #y @values = map { $data{$name}{messages}{$_}{SV} } @aidx;
-      #$max_sv    = max(@values);
-      $max_sv    = $data{$name}{messages}{$midx}{SV};                                           # der Schweregrad der letzten Meldung
+      $max_sv = $data{$name}{messages}{$midx}{SV};                                              # der Schweregrad der letzten Meldung
   }
 
   my $max_icon = $svicons{$max_sv};                                                             # ... und das dazugehörige Icon
@@ -27027,11 +27025,10 @@ sub outputMessages {
 
   my $hc = 0;
 
-  for my $key (reverse sort keys %{$data{$name}{messages}}) {
+  for my $key (sort { $b <=> $a } keys %{$data{$name}{messages}}) {
       next if($key >= IDXLIMIT);
 
       $hc++;
-      #my $enmsg = encode ('utf8', $data{$name}{messages}{$key}{$lang});
       my $enmsg = $data{$name}{messages}{$key}{$lang};
 
       $out .= qq{<tr>};
