@@ -87,6 +87,9 @@ sub PIONEERAVRZONE_Get {
           . ( join " ", sort keys %$gets );
     }
 
+    return "Parent receiver is disabled; cached readings remain available."
+      if ( PIONEERAVR_IsDisabled($IOhash) );
+
     my $cmd = $IOhash->{helper}{GETS}{$zone}{$cmdName};
 
     my $v = IOWrite( $hash, $cmd );
@@ -106,6 +109,8 @@ sub PIONEERAVRZONE_Set {
     my $cmd = $a[1];
 
     my $IOhash  = $hash->{IODev};
+    return "Parent receiver is disabled; set its attribute disable to 0 first."
+      if ( $IOhash && PIONEERAVR_IsDisabled($IOhash) && $cmd ne "?" );
     my $zone    = $hash->{helper}{ZONE};
     my $vmax    = 0;
     my $zahl    = 0;
@@ -742,6 +747,10 @@ sub PIONEERAVRZONE_Define {
   </ul>
   <br>
 
+  <p>When the parent PIONEERAVR device has <code>disable=1</code>,
+zone controls and fresh queries are rejected. Cached readings retain their
+last-known values. Configure disable on the parent receiver.</p>
+
   <a id="PIONEERAVRZONE-set" name="PIONEERAVRZONEset"></a>
   <b>Set</b>
   <ul>
@@ -851,6 +860,10 @@ sub PIONEERAVRZONE_Define {
     </ul>
   </ul>
   <br>
+
+  <p>Ist am übergeordneten PIONEERAVR-Gerät <code>disable=1</code> gesetzt,
+werden Zonenbefehle und neue Abfragen abgewiesen. Gespeicherte Readings behalten
+ihre zuletzt bekannten Werte. disable wird am übergeordneten Receiver gesetzt.</p>
 
   <a id="PIONEERAVRZONE-set" name="PIONEERAVRZONEset"></a>
   <b>Set</b>

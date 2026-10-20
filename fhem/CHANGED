@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: PIONEERAVR/PIONEERAVRZONE: support disabling receiver
+            communication, including queued commands and timers.
  - change:  PIONEERAVR: check connections asynchronously using timers
             and recover through DevIo after reply timeouts
  - bugfix:  PIONEERAVR: support spaces in input aliases, validate names

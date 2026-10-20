@@ -200,29 +200,9 @@ sub PIONEERAVR_Define {
       AttrVal( $name, "powerSupplyDevice", "" );
     PIONEERAVR_UpdateNotifyDev($hash);
 
-    # connect using serial connection (old blocking style)
-    if ( $hash->{Protocol} eq "serial" ) {
-        my $ret = DevIo_OpenDev( $hash, 0, undef );
-        return $ret;
-    }
-
-    # connect using TCP connection (non-blocking style)
-    else {
-        # add missing port if required
-        $hash->{DeviceName} = $hash->{DeviceName} . ":8102"
-          if ( $hash->{DeviceName} !~ m/^(.+):([0-9]+)$/ );
-
-        DevIo_OpenDev(
-            $hash, 0,
-            undef,
-            sub() {
-                my $hash = shift;
-                my $err  = shift;
-                Log3 $name, 5,
-"PIONEERAVR $name: devName: $devicename HashDevName $hash->{DeviceName}";
-            }
-        );
-    }
+    $hash->{helper}{disabled} = AttrVal( $name, "disable", 0 );
+    $hash->{DeviceName} .= ":8102"
+      if ( $protocol eq "telnet" && $hash->{DeviceName} !~ m/^(.+):([0-9]+)$/ );
 
     $hash->{helper}{receiver} = undef;
 
@@ -1323,6 +1303,14 @@ sub PIONEERAVR_Define {
     ### initialize timer
     $hash->{helper}{nextConnectionCheck} = gettimeofday() + 120;
 
+    if ( PIONEERAVR_IsDisabled($hash) ) {
+        PIONEERAVR_StopCommunication($hash);
+    }
+    else {
+        # Open only after helper tables are initialized; use one guarded path.
+        return PIONEERAVR_OpenDev( $hash, 0 );
+    }
+
     return;
 }
 
@@ -1364,6 +1352,8 @@ sub PIONEERAVR_Ready {
     my $hash = shift;
     my $name = $hash->{NAME};
 
+    return if ( PIONEERAVR_IsDisabled($hash) );
+
     Log3 $name, 5,
         "PIONEERAVR $name: PIONEERAVR_Ready() called at state: "
       . $hash->{STATE}
@@ -1393,6 +1383,10 @@ sub PIONEERAVR_Notify {
     my $dev     = shift;
     my $name    = $hash->{NAME};
     my $devName = $dev->{NAME};
+    if ( PIONEERAVR_IsDisabled($hash) ) {
+        PIONEERAVR_StopCommunication($hash);
+        return;
+    }
     my $definedZones =
       scalar keys %{ $modules{PIONEERAVR_ZONE}{defptr}{$name} };
     my $presence = ReadingsVal( $name, "presence", "-" );
@@ -1540,6 +1534,8 @@ sub PIONEERAVR_DoInit {
 sub PIONEERAVR_Clear {
     my $hash = shift;
     my $name = $hash->{NAME};
+
+    return if ( PIONEERAVR_IsDisabled($hash) );
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Clear() called";
 
     # Clear the pipe
@@ -1555,6 +1551,8 @@ sub PIONEERAVR_Set {
 
     my $name     = $hash->{NAME};
     my $cmd      = @$a[1];
+    return "Device is disabled; set attribute disable to 0 first."
+      if ( PIONEERAVR_IsDisabled($hash) && $cmd ne "?" );
     my $arg      = ( @$a[2] ? @$a[2] : "" );
     my $arg2     = ( @$a[3] ? @$a[3] : "" );
     my $presence = ReadingsVal( $name, "presence", "absent" );
@@ -2314,6 +2312,9 @@ sub PIONEERAVR_Get {
     return $hash->{READINGS}{ @$a[1] }{VAL}
       if ( defined( $hash->{READINGS}{ @$a[1] } ) );
 
+    return "Device is disabled; cached readings remain available."
+      if ( PIONEERAVR_IsDisabled($hash) );
+
     return "Device is offline and cannot be controlled at that stage."
       if ( $presence eq "absent" );
 
@@ -2351,6 +2352,8 @@ sub PIONEERAVR_Read {
     my $hash = shift;
 
     my $name            = $hash->{NAME};
+
+    return if ( PIONEERAVR_IsDisabled($hash) );
     my $state           = '';
     my $msgForZone      = "";
     my $buf             = '';
@@ -4019,6 +4022,21 @@ sub PIONEERAVR_Attr {
     my ( $cmd, $name, $attrName, $attrValue ) = @_;
     my $hash = $defs{$name};
 
+    if ( !defined($attrName) || $attrName eq "disable" ) {
+        return "disable must be 0 or 1"
+          if ( $cmd eq "set" && ( !defined($attrValue) || $attrValue !~ /\A[01]\z/ ) );
+        my $wasDisabled = PIONEERAVR_IsDisabled($hash);
+        $hash->{helper}{disabled} = $cmd eq "set" ? $attrValue : 0;
+        if ( PIONEERAVR_IsDisabled($hash) ) {
+            PIONEERAVR_StopCommunication($hash);
+        }
+        elsif ($wasDisabled) {
+            RemoveInternalTimer( $hash, "PIONEERAVR_ResumeCommunication" );
+            InternalTimer( gettimeofday(), "PIONEERAVR_ResumeCommunication", $hash, 0 );
+        }
+        return;
+    }
+
     if ( $attrName eq "reconnectInterval" ) {
         if ( $cmd eq "set" ) {
             return "reconnectInterval must be an integer between 1 and 300 seconds"
@@ -4054,6 +4072,63 @@ sub PIONEERAVR_Attr {
 #####################################
 # helper functions
 #####################################
+# AttrFn runs before FHEM stores/deletes the attribute. Remember its effective
+# value immediately, and defer re-enabling until all attributes are committed.
+sub PIONEERAVR_IsDisabled {
+    my ($hash) = @_;
+    return $hash->{helper}{disabled} // AttrVal( $hash->{NAME}, "disable", 0 );
+}
+
+sub PIONEERAVR_StopCommunication {
+    my ($hash) = @_;
+    PIONEERAVR_ClearSendQueue($hash);
+    RemoveInternalTimer($hash);
+    delete $hash->{helper}{nextConnectionCheck};
+    $hash->{helper}{AVAILABLE} = 0;
+    DevIo_CloseDev($hash);
+    $hash->{PARTIAL} = "";
+    # Pausing FHEM is not a receiver power command. Keep power/presence and
+    # zone readings as last-known values, but show that communication is paused.
+    my $stateChanged = ReadingsVal( $hash->{NAME}, "state", "" ) ne "disabled";
+    my $avChanged = ReadingsVal( $hash->{NAME}, "stateAV", "" ) ne "disabled";
+    # NotifyFn also receives our own reading events. Do not emit unchanged
+    # disabled states again, otherwise those events could recursively notify us.
+    if ( $stateChanged || $avChanged ) {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate( $hash, "state", "disabled" ) if $stateChanged;
+        readingsBulkUpdate( $hash, "stateAV", "disabled" ) if $avChanged;
+        readingsEndUpdate( $hash, 1 );
+    }
+    return;
+}
+
+sub PIONEERAVR_ResumeCommunication {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+    RemoveInternalTimer( $hash, "PIONEERAVR_ResumeCommunication" );
+    return if ( !defined( $defs{$name} ) || $defs{$name} != $hash );
+    return if ( PIONEERAVR_IsDisabled($hash) );
+    # Also handles deleteattr <name>, which removes all attributes together.
+    $hash->{helper}{powerSupplyDevice} = AttrVal( $name, "powerSupplyDevice", "" );
+    PIONEERAVR_UpdateNotifyDev($hash);
+    readingsSingleUpdate( $hash, "stateAV", "absent", 1 );
+    # Supply events are ignored while disabled. Synchronize the remembered
+    # value so a later off -> on transition can restart communication.
+    my $supplyState = PIONEERAVR_PowerSupplyState($hash);
+    $hash->{helper}{powerSupplyState} = $supplyState
+      if ( $supplyState eq "on" || $supplyState eq "off" );
+    if ( $supplyState eq "off" ) {
+        DevIo_setStates( $hash, "disconnected" );
+        return;
+    }
+    # A pending DevIo connect completes through its callback. Never start a
+    # second connect while an earlier attempt is still in progress.
+    return if ( $hash->{helper}{opening} );
+    delete $hash->{NEXT_OPEN};
+    PIONEERAVR_OpenDev( $hash, 1, 1 );
+    return;
+}
+
 sub PIONEERAVR_UpdateNotifyDev {
     my ($hash) = @_;
     my $name = $hash->{NAME};
@@ -4080,6 +4155,8 @@ sub PIONEERAVR_PowerSupplyState {
 sub PIONEERAVR_PowerSupplyChanged {
     my ($hash) = @_;
     my $name = $hash->{NAME};
+
+    return if ( PIONEERAVR_IsDisabled($hash) );
     my $powerSupplyState = PIONEERAVR_PowerSupplyState($hash);
 
     return
@@ -4112,6 +4189,11 @@ sub PIONEERAVR_AfterOpen {
     my ( $hash, $statusUpdate ) = @_;
     my $name = $hash->{NAME};
 
+    if ( PIONEERAVR_IsDisabled($hash) ) {
+        PIONEERAVR_StopCommunication($hash);
+        return;
+    }
+
     return if ( !$statusUpdate );
     return if ( ReadingsVal( $name, "state", "" ) ne "opened" );
 
@@ -4134,6 +4216,13 @@ sub PIONEERAVR_OpenDev {
     my ( $hash, $reopen, $statusUpdate ) = @_;
     my $name = $hash->{NAME};
 
+    if ( PIONEERAVR_IsDisabled($hash) ) {
+        PIONEERAVR_StopCommunication($hash);
+        return;
+    }
+
+    return if ( $hash->{helper}{opening} );
+
     # Commands from an earlier connection must never be replayed after reconnect.
     PIONEERAVR_ClearSendQueue($hash);
 
@@ -4152,11 +4241,18 @@ sub PIONEERAVR_OpenDev {
 
     # The callback keeps TCP connects non-blocking. DevIo generates
     # CONNECTED/DISCONNECTED; no module-specific init function is needed.
+    $hash->{helper}{opening} = 1;
     DevIo_OpenDev(
         $hash, $reopen, undef,
         sub() {
             my $hash = shift;
             my $err  = shift;
+
+            delete $hash->{helper}{opening};
+            if ( PIONEERAVR_IsDisabled($hash) ) {
+                PIONEERAVR_StopCommunication($hash);
+                return;
+            }
 
             Log3 $name, 4, "PIONEERAVR $name: $err"
               if ($err);
@@ -4199,6 +4295,8 @@ sub PIONEERAVR_Reopen {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
+    return if ( PIONEERAVR_IsDisabled($hash) );
+
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen()";
 
     DevIo_CloseDev($hash);
@@ -4211,6 +4309,8 @@ sub PIONEERAVR_Reopen {
 # delayAfter is internal: normal writes need 100 ms, power-on retries 200 ms.
 sub PIONEERAVR_Write {
     my ( $hash, $msg, $delayAfter ) = @_;
+
+    return if ( PIONEERAVR_IsDisabled($hash) );
 
     return if ( !defined($msg) );
     return if ( !DevIo_IsOpen($hash) );
@@ -4230,6 +4330,8 @@ sub PIONEERAVR_Write {
 # interactive commands, and coalesce repeated requests for the same scan.
 sub PIONEERAVR_QueueBackground {
     my ( $hash, $kind, $commands ) = @_;
+
+    return if ( PIONEERAVR_IsDisabled($hash) );
 
     return if ( !DevIo_IsOpen($hash) );
     return if ( PIONEERAVR_PowerSupplyState($hash) eq "off" );
@@ -4276,6 +4378,8 @@ sub PIONEERAVR_GetSendQueue {
 
 sub PIONEERAVR_ScheduleSend {
     my ($hash) = @_;
+
+    return if ( PIONEERAVR_IsDisabled($hash) );
     my $queue = $hash->{helper}{sendQueue};
 
     return if ( !$queue || $queue->{timerActive} );
@@ -4304,7 +4408,7 @@ sub PIONEERAVR_SendNext {
 
     # A timer can become stale after deletion or a transport failure. Drop
     # the whole queue instead of sending old controls on a later connection.
-    if ( !defined( $defs{$name} ) || $defs{$name} != $hash
+    if ( PIONEERAVR_IsDisabled($hash) || !defined( $defs{$name} ) || $defs{$name} != $hash
         || !DevIo_IsOpen($hash)
         || $queue->{connection} ne DevIo_IsOpen($hash)
         || PIONEERAVR_PowerSupplyState($hash) eq "off" )
@@ -4377,6 +4481,8 @@ sub PIONEERAVR_SendCommand {
 # Keep DevIo responsible for disconnect handling and ReadyFn reconnects.
 sub PIONEERAVR_connectionCheck {
     my ($hash) = @_;
+
+    return if ( PIONEERAVR_IsDisabled($hash) );
     my $name = $hash->{NAME};
     RemoveInternalTimer( $hash, "PIONEERAVR_connectionCheck" );
     delete $hash->{helper}{nextConnectionCheck};
@@ -4415,7 +4521,7 @@ sub PIONEERAVR_ProbeTimeout {
 
     # Do not disconnect a replacement socket or a redefined device on behalf
     # of an earlier probe. The same cleanup also cancels ordinary sends.
-    if ( !defined( $defs{$name} ) || $defs{$name} != $hash
+    if ( PIONEERAVR_IsDisabled($hash) || !defined( $defs{$name} ) || $defs{$name} != $hash
         || !DevIo_IsOpen($hash)
         || $probe->{connection} ne DevIo_IsOpen($hash)
         || PIONEERAVR_PowerSupplyState($hash) eq "off" )
@@ -4438,6 +4544,8 @@ sub PIONEERAVR_ProbeTimeout {
 sub PIONEERAVR_screenUpdate {
     my ($hash)    = @_;
     my $name      = $hash->{NAME};
+
+    return if ( PIONEERAVR_IsDisabled($hash) );
     my $cmd       = "updateScreen";
     my $playerCmd = "";
 
@@ -4900,7 +5008,7 @@ existing ReadyFn reconnect path.</p>
     <a id="PIONEERAVR-attr-alternateVolumeControl"></a>
     <li><b>alternateVolumeControl &lt;enable|disable&gt;</b> - Enables or disables alternate volume control for receivers that do not support setting the volume directly, for example VSX-52x and VSX-82x models.</li>
     <a id="PIONEERAVR-attr-disable"></a>
-    <li><b>disable &lt;0|1&gt;</b> - Currently not evaluated; this attribute disables neither communication nor receiver control.</li>
+    <li><b>disable &lt;0|1&gt;</b> - Pauses communication with the receiver and all attached zones. Setting 1 closes the connection and cancels queued commands and timers; controls are rejected. Receiver power is not changed. state and stateAV show disabled; other readings retain their last-known values. Setting 0 or deleting the attribute reconnects, unless the configured external power supply is off. Cached readings can still be queried.</li>
   </ul>
   <br><br>
   <a id="PIONEERAVR-readings"></a>
@@ -5282,7 +5390,7 @@ DevIo den Verbindungsabbruch und die Wiederverbindung über die bestehende Ready
     <a id="PIONEERAVR-attr-alternateVolumeControl"></a>
     <li><b>alternateVolumeControl &lt;enable|disable&gt;</b> - Aktiviert oder deaktiviert die alternative Lautstärkesteuerung für Receiver, die kein direktes Setzen der Lautstärke unterstützen, beispielsweise VSX-52x- und VSX-82x-Modelle.</li>
     <a id="PIONEERAVR-attr-disable"></a>
-    <li><b>disable &lt;0|1&gt;</b> - Wird derzeit nicht ausgewertet; das Attribut deaktiviert weder Kommunikation noch Receiver-Steuerung.</li>
+    <li><b>disable &lt;0|1&gt;</b> - Pausiert die Kommunikation mit dem Receiver und allen zugeordneten Zonen. Mit 1 werden Verbindung, Warteschlangen und Timer beendet; Steuerbefehle werden abgewiesen. Der Einschaltzustand des Receivers wird nicht verändert. state und stateAV zeigen disabled; andere Readings behalten ihre zuletzt bekannten Werte. Mit 0 oder nach Löschen des Attributs wird die Verbindung wieder aufgebaut, sofern die konfigurierte externe Stromversorgung nicht ausgeschaltet ist. Gespeicherte Readings bleiben abfragbar.</li>
   </ul>
   <br><br>
   <a id="PIONEERAVR-readings"></a>
