@@ -180,7 +180,9 @@ sub PIONEERAVRZONE_Set {
             Log3 $name, 5, "PIONEERAVR $name: Set $cmd ";
             my $setCmd = "";
             IOWrite( $hash, $setCmd );
-            sleep(0.1);
+
+            # PIONEERAVR's shared send timer preserves the wake-up interval
+            # without blocking other devices in the FHEM main loop.
 
             if ( $zone eq "zone2" ) {
                 $setCmd = "APO";
@@ -192,7 +194,6 @@ sub PIONEERAVRZONE_Set {
                 $setCmd = "ZEO";
             }
             IOWrite( $hash, $setCmd );
-            sleep(0.1);
             Log3 $hash, 5, "PIONEERAVR $name: Set_IOwrite: $setCmd";
             return;
 
