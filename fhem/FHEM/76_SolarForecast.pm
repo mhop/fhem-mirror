@@ -73,6 +73,7 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.9" => "16.10.2026  __openMeteo_ApiResponse: Klammerung gefixt, Forum: https://forum.fhem.de/index.php?msg=1370333 ",
   "2.10.8" => "11.10.2026  ___batAdjustPowerByMargin: Prüfung 'Ziel nicht erreichbar' erfolgt jetzt vor der Margin-Prüfung, daher ".
                            "volle Ladeleistung auch bei safetyMargin=0 ",
   "2.10.7" => "10.10.2026  Driftanalyse (aiFannDetectDrift): Ersatz der Quelle airaw durch Werte aus pvHistory (_aiFannDriftHistSlice) -> Verringerung RAM Footprint ".
@@ -6111,7 +6112,7 @@ sub __openMeteo_ApiResponse {
                   my $radwh = $jdata->{hourly}{shortwave_radiation}[$k];                                # Solarstrahlung GHI
 
                   if (defined $radwh) {                                                                 # Globalstrahlung für KI
-                      my $radkJ = 10 * (round0 ($radwh * WH2KJ) / 10);                                  # Umrechnung Wh/m2 in kJ/m2
+                      my $radkJ = 10 * round0 ($radwh * WH2KJ / 10);                                    # Umrechnung Wh/m2 in kJ/m2
                       $data{$name}{solcastapi}{'?All'}{$pvtmstr}{Rad1h} = $radkJ;                       # Startstunde verschieben
 
                       debugLog ($paref, 'apiProcess', "Open-Meteo API $pvtmstr - Global Radiation Rad1h: $radkJ");
@@ -6135,7 +6136,7 @@ sub __openMeteo_ApiResponse {
                   my $srwh = $jdata->{hourly}{shortwave_radiation}[$k];                                 # Solarstrahlung GHI
 
                   if ($srwh) {                                                                          # Globalstrahlung für KI
-                      my $ghikj = 10 * (round0 ($srwh * WH2KJ) / 10);                                   # Umrechnung Wh/m2 in kJ/m2
+                      my $ghikj = 10 * round0 ($srwh * WH2KJ / 10);                                     # Umrechnung Wh/m2 in kJ/m2
 
                       $pvtmstr =~ /^(\d{4})-(\d{2})-(\d{2})\s(\d{2})/xs;
                       my $tidx = $1.$2.$3.(sprintf "%02d", ($4 + 1));

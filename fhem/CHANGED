@@ -1,5 +1,6 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - bugfix:  76_SolarForecast: Version 2.10.9
  - bugfix:  00_SIGNALduino: v4.0.2, Protokolldatei ueber modpath laden,
             leere Protokollliste behoben (RFFHEM #1412)
  - change:  55_InfoPanel.pm moved to contrib Forum: #145709
