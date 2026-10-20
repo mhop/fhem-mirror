@@ -1837,6 +1837,7 @@ FW_createNoArg(elName, devName, vArr, currVal, set, params, cmd)
   var newEl = $('<div style="display:none">').get(0);
   if(elName) 
     $(newEl).append('<input type="hidden" name="'+elName+ '" value="">');
+  newEl.setValueFn = function() { /* #145713 */ };
   return(newEl);
 }
 
