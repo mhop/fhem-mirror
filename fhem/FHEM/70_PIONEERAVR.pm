@@ -4482,7 +4482,7 @@ sub RC_layout_PioneerAVR() {
 =item summary_DE Steuerung von PIONEER AV-Receivern über Netzwerk oder seriell
 =begin html
 
-<a name="PIONEERAVR"></a>
+<a id="PIONEERAVR" name="PIONEERAVR"></a>
 <h3>PIONEERAVR</h3>
 <ul>
   This module allows to remotely control a Pioneer AV receiver (only the Main zone, other zones are controlled by the module PIONEERAVRZONE)
@@ -4845,7 +4845,7 @@ sub RC_layout_PioneerAVR() {
 =end html
 =begin html_DE
 
-<a name="PIONEERAVR"></a>
+<a id="PIONEERAVR" name="PIONEERAVR"></a>
 <h3>PIONEERAVR</h3>
 <ul>
   Dieses Modul erlaubt es einen Pioneer AV Receiver via Fhem zu steuern (nur die MAIN-Zone, etwaige andere Zonen können mit dem Modul PIONEERAVRZONE gesteuert werden) wenn eine Datenverbindung via Ethernet oder RS232 hergestellt werden kann.

@@ -714,7 +714,7 @@ sub PIONEERAVRZONE_Define {
 =item summary_DE Steuerung der Zonen eines PIONEER AV-Receivers über Netzwerk oder seriell
 =begin html
 
-<a name="PIONEERAVRZONE"></a>
+<a id="PIONEERAVRZONE" name="PIONEERAVRZONE"></a>
 <h3>PIONEERAVRZONE</h3>
 <ul>
   <br>
@@ -805,7 +805,7 @@ sub PIONEERAVRZONE_Define {
 =end html
 =begin html_DE
 
-<a name="PIONEERAVRZONE"></a>
+<a id="PIONEERAVRZONE" name="PIONEERAVRZONE"></a>
 <h3>PIONEERAVRZONE</h3>
 <ul>
   <br>
