@@ -4355,6 +4355,26 @@ sub PIONEERAVR_ClearSendQueue {
     delete $hash->{helper}{sendQueue};
     RemoveInternalTimer( $hash, "PIONEERAVR_ProbeTimeout" );
     delete $hash->{helper}{connectionProbe};
+    PIONEERAVR_FinishStatusRequest( $hash, "aborted" );
+    return;
+}
+
+# This reports completion of the outgoing scan, not successful responses to
+# every query. Unsupported or unavailable parameters may return AVR errors.
+sub PIONEERAVR_FinishStatusRequest {
+    my ( $hash, $state ) = @_;
+    return if ( !delete $hash->{helper}{statusRequest} );
+    readingsSingleUpdate( $hash, "statusRequestState", $state, 1 );
+    return;
+}
+
+sub PIONEERAVR_CheckStatusRequest {
+    my ($hash) = @_;
+    my $request = $hash->{helper}{statusRequest};
+    return if ( !$request || $request->{building} );
+    my $queue = $hash->{helper}{sendQueue};
+    return if ( !$queue || $queue->{pending}{status} || $queue->{pending}{inputs} );
+    PIONEERAVR_FinishStatusRequest( $hash, "done" );
     return;
 }
 
@@ -4438,6 +4458,9 @@ sub PIONEERAVR_SendNext {
     return if ( !$item );
 
     PIONEERAVR_SendCommand( $hash, $item->{command} );
+    # SimpleWrite may synchronously report a disconnect and clear the queue.
+    return if ( !$hash->{helper}{sendQueue}
+        || $hash->{helper}{sendQueue} != $queue );
     $queue->{nextSend} = gettimeofday() + $item->{delayAfter};
     if ( $item->{connectionProbe} && DevIo_IsOpen($hash)
         && $queue->{connection} eq DevIo_IsOpen($hash) )
@@ -4448,6 +4471,7 @@ sub PIONEERAVR_SendNext {
         };
         InternalTimer( $deadline, "PIONEERAVR_ProbeTimeout", $hash, 0 );
     }
+    PIONEERAVR_CheckStatusRequest($hash);
     PIONEERAVR_ScheduleSend($hash);
     return;
 }
@@ -4589,6 +4613,15 @@ sub PIONEERAVR_statusUpdate {
     my ($hash) = @_;
     my $name = $hash->{NAME};
 
+    return if ( PIONEERAVR_IsDisabled($hash) || !DevIo_IsOpen($hash)
+        || PIONEERAVR_PowerSupplyState($hash) eq "off" );
+    # Repeated full requests share the running scan, including its input scan.
+    return if ( $hash->{helper}{statusRequest} );
+    PIONEERAVR_GetSendQueue($hash);
+    my $request = { building => 1 };
+    $hash->{helper}{statusRequest} = $request;
+    readingsSingleUpdate( $hash, "statusRequestState", "running", 1 );
+
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_statusUpdate()";
 
     # Stable ordering makes scans reproducible; all zones remain included.
@@ -4600,6 +4633,8 @@ sub PIONEERAVR_statusUpdate {
     }
     PIONEERAVR_QueueBackground( $hash, "status", \@commands );
     PIONEERAVR_askForInputNames( $hash, 5 );
+    delete $request->{building};
+    PIONEERAVR_CheckStatusRequest($hash);
     return;
 }
 #########################################################
@@ -5015,6 +5050,7 @@ existing ReadyFn reconnect path.</p>
   <b>Generated readings and events</b>
     <br/><br/>
     <ul>
+        <li><b>statusRequestState</b> - Progress of a manual or automatic full status request: <code>running</code> while status and input queries are being sent, <code>done</code> after all queries have been sent, or <code>aborted</code> if the scan is cancelled, for example by disable or a lost connection. done does not confirm a successful response to every query; unsupported or unavailable parameters may return receiver errors. Repeated full requests share the running scan. A separate get loadInputNames does not start this reading. The reading is created on the first accepted full request.</li>
         <li><b>audioAutoPhaseControlMS</b> - currently configured Auto Phase Control in ms</li>
         <li><b>audioAutoPhaseControlRevPhase</b> - currently configured Auto Phase Control reverse Phase -> 1 means: reverse phase</li>
         <li><b>audioInputFormat&lt;XXX&gt;</b> - Shows if the channel XXX is available in the audio input signal (1 means: is available)</li>
@@ -5397,6 +5433,7 @@ DevIo den Verbindungsabbruch und die Wiederverbindung über die bestehende Ready
   <b>Erzeugte Readings und Events</b>
     <br/><br/>
     <ul>
+        <li><b>statusRequestState</b> - Fortschritt einer manuellen oder automatischen vollständigen Statusabfrage: <code>running</code> während Status- und Eingangsabfragen gesendet werden, <code>done</code> nachdem alle Abfragen gesendet wurden oder <code>aborted</code> bei Abbruch, etwa durch disable oder Verbindungsverlust. done bestätigt keine erfolgreiche Antwort auf jede Abfrage; nicht unterstützte oder nicht verfügbare Parameter können Receiverfehler liefern. Wiederholte vollständige Statusabfragen teilen sich den laufenden Scan. Ein separates get loadInputNames startet dieses Reading nicht. Es wird bei der ersten angenommenen vollständigen Statusabfrage angelegt.</li>
         <li><b>audioAutoPhaseControlMS</b> - aktuell konfigurierte Auto Phase Control in ms</li>
         <li><b>audioAutoPhaseControlRevPhase</b> - aktuell konfigurierte Auto Phase Control reverse Phase -> 1 bedeutet: reverse phase</li>
         <li><b>audioInputFormat&lt;XXX&gt;</b> - Zeigt ob im Audio Eingangssignal der Kanal XXX vorhanden ist (1 bedeutet: ist vorhanden)</li>
