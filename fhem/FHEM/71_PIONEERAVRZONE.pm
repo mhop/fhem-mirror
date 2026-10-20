@@ -718,7 +718,7 @@ sub PIONEERAVRZONE_Define {
 <h3>PIONEERAVRZONE</h3>
 <ul>
   <br>
-  <a name="PIONEERAVRZONEdefine"></a>
+  <a id="PIONEERAVRZONE-define" name="PIONEERAVRZONEdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; PIONEERAVRZONE &lt;zone&gt; </code>
@@ -740,24 +740,36 @@ sub PIONEERAVRZONE_Define {
     <br>
   </ul>
 
-  <a name="PIONEERAVRZONEset"></a>
+  <a id="PIONEERAVRZONE-set" name="PIONEERAVRZONEset"></a>
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; &lt;what&gt; [&lt;value&gt;]</code>
     <br><br>
     where &lt;what&gt; is one of
+	<a id="PIONEERAVRZONE-set-reopen"></a>
 	<li>reopen</li>
+	<a id="PIONEERAVRZONE-set-off"></a>
 	<li>off <br>put zone into standby</li>
+	<a id="PIONEERAVRZONE-set-on"></a>
 	<li>on <br>turn zone on from standby</li>
+	<a id="PIONEERAVRZONE-set-toggle"></a>
 	<li>toggle <br>toggles zone power</li>
-	<li>volume <0 ... 100><br>zone volume in % of the maximum volume</li>
+	<a id="PIONEERAVRZONE-set-volume"></a>
+	<li>volume &lt;0 ... 100&gt;<br>zone volume in % of the maximum volume</li>
+	<a id="PIONEERAVRZONE-set-volumeUp"></a>
 	<li>volumeUp<br>increases the zone volume by 0.5dB</li>
+	<a id="PIONEERAVRZONE-set-volumeDown"></a>
 	<li>volumeDown<br>decreases the zone volume by 0.5dB</li>
-	<li>volumeStraight<-80.5 ... 12><br>same values for zone volume as shown on the display of the Pioneer AV receiver</li>
-	<li>mute <on|off|toggle></li>
-	<li>input <not on the Pioneer hardware deactivated input><br>the list of possible (i.e. not deactivated)
-	inputs is read in during Fhem start and with <code>get <name> statusRequest</code></li>
+	<a id="PIONEERAVRZONE-set-volumeStraight"></a>
+	<li>volumeStraight &lt;-80.5 ... 12&gt;<br>same values for zone volume as shown on the display of the Pioneer AV receiver</li>
+	<a id="PIONEERAVRZONE-set-mute"></a>
+	<li>mute &lt;on|off|toggle&gt;</li>
+	<a id="PIONEERAVRZONE-set-input"></a>
+	<li>input &lt;not on the Pioneer hardware deactivated input&gt;<br>the list of possible (i.e. not deactivated)
+	inputs is read in during Fhem start and with <code>get &lt;name&gt; statusRequest</code></li>
+	<a id="PIONEERAVRZONE-set-inputUp"></a>
 	<li>inputUp<br>change zone input to next input</li>
+	<a id="PIONEERAVRZONE-set-inputDown"></a>
 	<li>inputDown<br>change zone input to previous input</li>
 	<li><a href="#setExtensions">set extensions</a> are supported (except <code>&lt;name&gt;</code>)</li>
    <br><br>
@@ -767,9 +779,10 @@ sub PIONEERAVRZONE_Define {
     </ul>
     <br><br>
   </ul>
- <a name="PIONEERAVRZONEget"></a>
+ <a id="PIONEERAVRZONE-get" name="PIONEERAVRZONEget"></a>
   <b>Get</b>
   <ul>
+    <a id="PIONEERAVRZONE-get-input"></a>
     <li><code>get &lt;name&gt; input</code>
     <br><br>
     Update the reading for the zone input
@@ -777,11 +790,13 @@ sub PIONEERAVRZONE_Define {
   </ul>
   <br><br>
 
-  <a name="PIONEERAVRZONEattr"></a>
+  <a id="PIONEERAVRZONE-attr" name="PIONEERAVRZONEattr"></a>
   <b>Attributes</b>
   <br><br>
   <ul>
-    <li>IOdev Name of the device which communicates with the physical Pioneer AV receiver via ethernet or rs232</li>
+    <a id="PIONEERAVRZONE-attr-IODev"></a>
+    <li>IODev Name of the device which communicates with the physical Pioneer AV receiver via ethernet or rs232</li>
+    <a id="PIONEERAVRZONE-attr-verbose"></a>
     <li><a href="#verbose">verbose</a></li>
   </ul>
   <br><br> 
@@ -794,7 +809,7 @@ sub PIONEERAVRZONE_Define {
 <h3>PIONEERAVRZONE</h3>
 <ul>
   <br>
-  <a name="PIONEERAVRZONEdefine"></a>
+  <a id="PIONEERAVRZONE-define" name="PIONEERAVRZONEdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; PIONEERAVRZONE &lt;zone&gt; </code>
@@ -815,24 +830,36 @@ sub PIONEERAVRZONE_Define {
     <br>
   </ul>
 
-  <a name="PIONEERAVRZONEset"></a>
+  <a id="PIONEERAVRZONE-set" name="PIONEERAVRZONEset"></a>
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; &lt;was&gt; [&lt;value&gt;]</code>
     <br><br>
     wobei &lt;was&gt; eines der folgenden Befehle sein kann:
+	<a id="PIONEERAVRZONE-set-reopen"></a>
 	<li>reopen</li>
+	<a id="PIONEERAVRZONE-set-off"></a>
 	<li>off <br>Zone in den Standby-Modus schalten</li>
+	<a id="PIONEERAVRZONE-set-on"></a>
 	<li>on <br>Zone aus dem Standby-Modus Einschalten</li>
+	<a id="PIONEERAVRZONE-set-toggle"></a>
 	<li>toggle <br>Zone Ein/Ausschalten</li>
-	<li>volume <0 ... 100><br>Zonenlautstärke in % der maximalen Lautstärke</li>
+	<a id="PIONEERAVRZONE-set-volume"></a>
+	<li>volume &lt;0 ... 100&gt;<br>Zonenlautstärke in % der maximalen Lautstärke</li>
+	<a id="PIONEERAVRZONE-set-volumeUp"></a>
 	<li>volumeUp<br>Zonenlautstärke um 0.5dB erhöhen</li>
+	<a id="PIONEERAVRZONE-set-volumeDown"></a>
 	<li>volumeDown<br>Zonenlautstärke um 0.5dB verringern</li>
-	<li>volumeStraight<-80.5 ... 12><br>Einstellen der Zonenlautstärke mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
-	<li>mute <on|off|toggle></li>
-	<li>input <nicht am Pioneer AV Receiver deaktivierte Eingangsquelle><br> Die Liste der verfügbaren (also der nicht deaktivierten)
-	Eingangsquellen wird beim Start von Fhem und auch mit <code>get <name> statusRequest</code> eingelesen</li>
+	<a id="PIONEERAVRZONE-set-volumeStraight"></a>
+	<li>volumeStraight &lt;-80.5 ... 12&gt;<br>Einstellen der Zonenlautstärke mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
+	<a id="PIONEERAVRZONE-set-mute"></a>
+	<li>mute &lt;on|off|toggle&gt;</li>
+	<a id="PIONEERAVRZONE-set-input"></a>
+	<li>input &lt;nicht am Pioneer AV Receiver deaktivierte Eingangsquelle&gt;<br> Die Liste der verfügbaren (also der nicht deaktivierten)
+	Eingangsquellen wird beim Start von Fhem und auch mit <code>get &lt;name&gt; statusRequest</code> eingelesen</li>
+	<a id="PIONEERAVRZONE-set-inputUp"></a>
 	<li>inputUp<br>nächste Eingangsquelle für die Zone auswählen</li>
+	<a id="PIONEERAVRZONE-set-inputDown"></a>
 	<li>inputDown<br>vorherige Eingangsquelle für die Zone auswählen</li>
 	<li><a href="#setExtensions">set extensions</a> (ausser <code>&lt;name&gt;</code>) werden unterstützt</li>
 
@@ -844,9 +871,10 @@ sub PIONEERAVRZONE_Define {
     </ul>
     <br><br>
   </ul>
- <a name="PIONEERAVRZONEget"></a>
+ <a id="PIONEERAVRZONE-get" name="PIONEERAVRZONEget"></a>
   <b>Get</b>
   <ul>
+    <a id="PIONEERAVRZONE-get-input"></a>
     <li><code>get &lt;name&gt; input</code>
     <br><br>
     reading für die Eingangsquelle aktualisieren
@@ -854,11 +882,13 @@ sub PIONEERAVRZONE_Define {
   </ul>
   <br><br>
 
-  <a name="PIONEERAVRZONEattr"></a>
+  <a id="PIONEERAVRZONE-attr" name="PIONEERAVRZONEattr"></a>
   <b>Attributes</b>
   <br><br>
   <ul>
-    <li>IOdev Name des device welches die Kommunikation mit dem Pioneer AV Receiver zur Verfügung stellt</li>
+    <a id="PIONEERAVRZONE-attr-IODev"></a>
+    <li>IODev Name des device welches die Kommunikation mit dem Pioneer AV Receiver zur Verfügung stellt</li>
+    <a id="PIONEERAVRZONE-attr-verbose"></a>
     <li><a href="#verbose">verbose</a></li>
   </ul>
   <br><br> 
