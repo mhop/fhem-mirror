@@ -1845,7 +1845,7 @@ sub PIONEERAVR_Set {
         elsif ( $cmd eq "hdmiOut" ) {
             Log3 $name, 5, "PIONEERAVR $name: set $cmd " . dq($arg);
             for my $key ( keys %{ $hash->{helper}{HDMIOUT} } ) {
-                if ( $hash->{helper}{LISTENINGMODES}->{$key} eq $arg ) {
+                if ( $hash->{helper}{HDMIOUT}->{$key} eq $arg ) {
                     Log3 $name, 5,
                         "PIONEERAVR $name: set $cmd "
                       . dq($arg)
@@ -2679,13 +2679,6 @@ m/^(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(\d)(
             $hash->{helper}{main}{CURINPUTNR} = $inputNr;
 
             # clear screen information on input change...
-            for my $key ( keys %{ $hash->{helper}{CLEARONINPUTCHANGE} } ) {
-                readingsBulkUpdate( $hash,
-                    $hash->{helper}{CLEARONINPUTCHANGE}->{$key}, "" );
-                Log3 $hash, 5,
-"PIONEERAVR $name: Main Input change ... clear screen... reading:"
-                  . $hash->{helper}{CLEARONINPUTCHANGE}->{$key};
-            }
             for my $key ( keys %{ $hash->{helper}{CLEARONINPUTCHANGE} } ) {
                 readingsBulkUpdate( $hash,
                     $hash->{helper}{CLEARONINPUTCHANGE}->{$key}, "" );
