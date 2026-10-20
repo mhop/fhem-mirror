@@ -717,89 +717,106 @@ sub PIONEERAVRZONE_Define {
 <a id="PIONEERAVRZONE" name="PIONEERAVRZONE"></a>
 <h3>PIONEERAVRZONE</h3>
 <ul>
-  <br>
+  PIONEERAVRZONE controls an additional zone of a receiver through a
+  <a href="#PIONEERAVR">PIONEERAVR</a> I/O device. Supported zone identifiers
+  are <code>zone2</code>, <code>zone3</code> and <code>hdZone</code>. Available
+  commands depend on the selected zone and on the receiver model.
+  <br><br>
+
   <a id="PIONEERAVRZONE-define" name="PIONEERAVRZONEdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PIONEERAVRZONE &lt;zone&gt; </code>
+    <code>define &lt;name&gt; PIONEERAVRZONE &lt;zone2|zone3|hdZone&gt;</code>
     <br><br>
-
-    Defines a Zone (zone2, zone3 or hdZone) of a PioneerAVR device.<br>
-	Note: devices to control zone2, zone3 and/or HD-zone are autocreated on reception of the first message for those zones.<br><br>
-    
-    Normally, the PIONEERAVRZONE device is attached to the latest previously defined PIONEERAVR device
-    for I/O. Use the <code>IODev</code> attribute of the PIONEERAVRZONE device to attach to any
-    PIONEERAVR device, e.g. <code>attr myPioneerAvrZone2 IODev myPioneerAvr</code>.
+    The device normally uses the most recently defined PIONEERAVR device as
+    its I/O device. Set <code>IODev</code> explicitly if more than one receiver
+    exists. Zone devices may also be created automatically when PIONEERAVR
+    receives the first message for a previously undefined zone.
     <br><br>
-
-    Examples:
+    Example:
     <ul>
-      <code>define myPioneerAvrZone2 PIONEERAVRZONE zone2</code><br>
-      <code>attr myPioneerAvrZone2 IODev myPIONEERAVR</code>
+      <code>define VSX923Zone2 PIONEERAVRZONE zone2</code><br>
+      <code>attr VSX923Zone2 IODev VSX923</code>
     </ul>
-    <br>
   </ul>
+  <br>
 
   <a id="PIONEERAVRZONE-set" name="PIONEERAVRZONEset"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;name&gt; &lt;what&gt; [&lt;value&gt;]</code>
+    <code>set &lt;name&gt; &lt;command&gt; [&lt;value&gt;]</code>
     <br><br>
-    where &lt;what&gt; is one of
-	<a id="PIONEERAVRZONE-set-reopen"></a>
-	<li>reopen</li>
-	<a id="PIONEERAVRZONE-set-off"></a>
-	<li>off <br>put zone into standby</li>
-	<a id="PIONEERAVRZONE-set-on"></a>
-	<li>on <br>turn zone on from standby</li>
-	<a id="PIONEERAVRZONE-set-toggle"></a>
-	<li>toggle <br>toggles zone power</li>
-	<a id="PIONEERAVRZONE-set-volume"></a>
-	<li>volume &lt;0 ... 100&gt;<br>zone volume in % of the maximum volume</li>
-	<a id="PIONEERAVRZONE-set-volumeUp"></a>
-	<li>volumeUp<br>increases the zone volume by 0.5dB</li>
-	<a id="PIONEERAVRZONE-set-volumeDown"></a>
-	<li>volumeDown<br>decreases the zone volume by 0.5dB</li>
-	<a id="PIONEERAVRZONE-set-volumeStraight"></a>
-	<li>volumeStraight &lt;-80.5 ... 12&gt;<br>same values for zone volume as shown on the display of the Pioneer AV receiver</li>
-	<a id="PIONEERAVRZONE-set-mute"></a>
-	<li>mute &lt;on|off|toggle&gt;</li>
-	<a id="PIONEERAVRZONE-set-input"></a>
-	<li>input &lt;not on the Pioneer hardware deactivated input&gt;<br>the list of possible (i.e. not deactivated)
-	inputs is read in during Fhem start and with <code>get &lt;name&gt; statusRequest</code></li>
-	<a id="PIONEERAVRZONE-set-inputUp"></a>
-	<li>inputUp<br>change zone input to next input</li>
-	<a id="PIONEERAVRZONE-set-inputDown"></a>
-	<li>inputDown<br>change zone input to previous input</li>
-	<li><a href="#setExtensions">set extensions</a> are supported (except <code>&lt;name&gt;</code>)</li>
-   <br><br>
-    Example:
-    <ul>
-      <code>set VSX923Zone2 on</code><br>
-    </ul>
-    <br><br>
+    <a id="PIONEERAVRZONE-set-off"></a>
+    <li><b>off</b> - Switches the zone to standby.</li>
+    <a id="PIONEERAVRZONE-set-on"></a>
+    <li><b>on</b> - Switches the zone on.</li>
+    <a id="PIONEERAVRZONE-set-toggle"></a>
+    <li><b>toggle</b> - Toggles the zone power state.</li>
+    <a id="PIONEERAVRZONE-set-input"></a>
+    <li><b>input &lt;input name&gt;</b> - Selects an enabled input. The list uses receiver input aliases when available and is refreshed by <code>set &lt;PIONEERAVR&gt; statusRequest</code> or <code>get &lt;PIONEERAVR&gt; loadInputNames</code>.</li>
+    <a id="PIONEERAVRZONE-set-inputUp"></a>
+    <li><b>inputUp</b> - Selects the next zone input.</li>
+    <a id="PIONEERAVRZONE-set-inputDown"></a>
+    <li><b>inputDown</b> - Selects the previous zone input.</li>
+    <a id="PIONEERAVRZONE-set-statusRequest"></a>
+    <li><b>statusRequest</b> - Requests all status values supported for this zone and updates the corresponding readings.</li>
+    <a id="PIONEERAVRZONE-set-volume"></a>
+    <li><b>volume &lt;0 ... 100&gt;</b> - Sets the zone volume as a percentage. Implemented for <code>zone2</code> and <code>zone3</code>.</li>
+    <a id="PIONEERAVRZONE-set-volumeUp"></a>
+    <li><b>volumeUp</b> - Raises the zone volume by 1 dB. Implemented for <code>zone2</code> and <code>zone3</code>.</li>
+    <a id="PIONEERAVRZONE-set-volumeDown"></a>
+    <li><b>volumeDown</b> - Lowers the zone volume by 1 dB. Implemented for <code>zone2</code> and <code>zone3</code>.</li>
+    <a id="PIONEERAVRZONE-set-volumeStraight"></a>
+    <li><b>volumeStraight &lt;-80 ... 0&gt;</b> - Sets the zone volume in dB using the receiver display scale. Implemented for <code>zone2</code> and <code>zone3</code>.</li>
+    <a id="PIONEERAVRZONE-set-mute"></a>
+    <li><b>mute &lt;on|off|toggle&gt;</b> - Controls zone muting. Available for <code>zone2</code> and <code>zone3</code>.</li>
+    <li><a href="#setExtensions">SetExtensions</a> are supported.</li>
   </ul>
- <a id="PIONEERAVRZONE-get" name="PIONEERAVRZONEget"></a>
+  <br>
+
+  <a id="PIONEERAVRZONE-get" name="PIONEERAVRZONEget"></a>
   <b>Get</b>
   <ul>
-    <a id="PIONEERAVRZONE-get-input"></a>
-    <li><code>get &lt;name&gt; input</code>
+    Get commands send an asynchronous status request. The result appears in
+    the corresponding reading after the receiver replies.
     <br><br>
-    Update the reading for the zone input
-    </li>
+    <a id="PIONEERAVRZONE-get-input"></a>
+    <li><b>input</b> - Available for <code>zone2</code>, <code>zone3</code> and <code>hdZone</code>.</li>
+    <a id="PIONEERAVRZONE-get-power"></a>
+    <li><b>power</b> - Available for <code>zone2</code>, <code>zone3</code> and <code>hdZone</code>.</li>
+    <a id="PIONEERAVRZONE-get-volume"></a>
+    <li><b>volume</b> - Available for <code>zone2</code> and <code>zone3</code>.</li>
+    <a id="PIONEERAVRZONE-get-mute"></a>
+    <li><b>mute</b> - Available for <code>zone2</code> and <code>zone3</code>.</li>
+    <a id="PIONEERAVRZONE-get-bass"></a>
+    <li><b>bass</b> - Available for <code>zone2</code>.</li>
+    <a id="PIONEERAVRZONE-get-treble"></a>
+    <li><b>treble</b> - Available for <code>zone2</code>.</li>
   </ul>
-  <br><br>
+  <br>
 
   <a id="PIONEERAVRZONE-attr" name="PIONEERAVRZONEattr"></a>
   <b>Attributes</b>
-  <br><br>
   <ul>
     <a id="PIONEERAVRZONE-attr-IODev"></a>
-    <li>IODev Name of the device which communicates with the physical Pioneer AV receiver via ethernet or rs232</li>
+    <li><b>IODev</b> - PIONEERAVR device used to communicate with the physical receiver. Example: <code>attr VSX923Zone2 IODev VSX923</code>.</li>
     <a id="PIONEERAVRZONE-attr-verbose"></a>
     <li><a href="#verbose">verbose</a></li>
   </ul>
-  <br><br> 
+  <br>
+
+  <a id="PIONEERAVRZONE-readings"></a>
+  <b>Readings</b>
+<p>The current implementation uses different conversions when setting and receiving zone volume. Reported values may therefore differ from the requested value. Received raw values 00...81 map to -81...0 in volumeStraight; raw 00 denotes MIN on the receiver.</p>
+  <ul>
+    <li><b>power</b> - Zone power state.</li>
+    <li><b>input</b> - Selected zone input.</li>
+    <li><b>volume</b> - Zone volume as a percentage, where supported.</li>
+    <li><b>volumeStraight</b> - Zone volume on the receiver display scale, where supported.</li>
+    <li><b>mute</b> - Zone mute state, where supported.</li>
+    <li><b>bass</b>, <b>treble</b> - Requests exist for zone2, but their replies are currently not parsed into zone readings.</li>
+    <li><b>state</b> - Last parsed zone state or command value.</li>
+  </ul>
 </ul>
 
 =end html
@@ -808,90 +825,108 @@ sub PIONEERAVRZONE_Define {
 <a id="PIONEERAVRZONE" name="PIONEERAVRZONE"></a>
 <h3>PIONEERAVRZONE</h3>
 <ul>
-  <br>
+  PIONEERAVRZONE steuert eine zusätzliche Zone eines Receivers über ein
+  <a href="#PIONEERAVR">PIONEERAVR</a>-I/O-Device. Unterstützte
+  Zonenbezeichnungen sind <code>zone2</code>, <code>zone3</code> und
+  <code>hdZone</code>. Die verfügbaren Befehle hängen von der gewählten Zone
+  und vom Receiver-Modell ab.
+  <br><br>
+
   <a id="PIONEERAVRZONE-define" name="PIONEERAVRZONEdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; PIONEERAVRZONE &lt;zone&gt; </code>
+    <code>define &lt;name&gt; PIONEERAVRZONE &lt;zone2|zone3|hdZone&gt;</code>
     <br><br>
-
-    <p>Definiert ein PIONEERAVRZONE-Device für eine Zone (zone2, zone3 oder hdZone).</p>
-    
-    Im Allgemeinen verwendet das logische PIONEERAVRZONE-Device das zuletzt definierte PIONEERAVR-Device für die Kommunikation mit dem Pioneer AV Receiver.
-	Mit dem Atribut <code>IODev</code> kann das PIONEERAVRZONE-Device jedes PIONEERAVR-Device zur Kommunikation verwenden,
-	z.B. <code>attr myPioneerAvrZone2 IODev myPioneerAvr</code>.
+    Das Device verwendet normalerweise das zuletzt definierte PIONEERAVR-Device
+    als I/O-Device. Wenn mehrere Receiver existieren, sollte <code>IODev</code>
+    ausdrücklich gesetzt werden. Ein Zonen-Device kann auch automatisch
+    entstehen, wenn PIONEERAVR erstmals eine Nachricht einer noch nicht
+    definierten Zone empfängt.
     <br><br>
-
-    Examples:
+    Beispiel:
     <ul>
-      <code>define myPioneerAvrZone2 PIONEERAVRZONE zone2</code><br>
-      <code>attr myPioneerAvrZone2 IODev myPIONEERAVR</code>
+      <code>define VSX923Zone2 PIONEERAVRZONE zone2</code><br>
+      <code>attr VSX923Zone2 IODev VSX923</code>
     </ul>
-    <br>
   </ul>
+  <br>
 
   <a id="PIONEERAVRZONE-set" name="PIONEERAVRZONEset"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;name&gt; &lt;was&gt; [&lt;value&gt;]</code>
+    <code>set &lt;name&gt; &lt;Befehl&gt; [&lt;Wert&gt;]</code>
     <br><br>
-    wobei &lt;was&gt; eines der folgenden Befehle sein kann:
-	<a id="PIONEERAVRZONE-set-reopen"></a>
-	<li>reopen</li>
-	<a id="PIONEERAVRZONE-set-off"></a>
-	<li>off <br>Zone in den Standby-Modus schalten</li>
-	<a id="PIONEERAVRZONE-set-on"></a>
-	<li>on <br>Zone aus dem Standby-Modus Einschalten</li>
-	<a id="PIONEERAVRZONE-set-toggle"></a>
-	<li>toggle <br>Zone Ein/Ausschalten</li>
-	<a id="PIONEERAVRZONE-set-volume"></a>
-	<li>volume &lt;0 ... 100&gt;<br>Zonenlautstärke in % der maximalen Lautstärke</li>
-	<a id="PIONEERAVRZONE-set-volumeUp"></a>
-	<li>volumeUp<br>Zonenlautstärke um 0.5dB erhöhen</li>
-	<a id="PIONEERAVRZONE-set-volumeDown"></a>
-	<li>volumeDown<br>Zonenlautstärke um 0.5dB verringern</li>
-	<a id="PIONEERAVRZONE-set-volumeStraight"></a>
-	<li>volumeStraight &lt;-80.5 ... 12&gt;<br>Einstellen der Zonenlautstärke mit einem Wert, wie er am Display des Pioneer AV Receiver angezeigt wird</li>
-	<a id="PIONEERAVRZONE-set-mute"></a>
-	<li>mute &lt;on|off|toggle&gt;</li>
-	<a id="PIONEERAVRZONE-set-input"></a>
-	<li>input &lt;nicht am Pioneer AV Receiver deaktivierte Eingangsquelle&gt;<br> Die Liste der verfügbaren (also der nicht deaktivierten)
-	Eingangsquellen wird beim Start von Fhem und auch mit <code>get &lt;name&gt; statusRequest</code> eingelesen</li>
-	<a id="PIONEERAVRZONE-set-inputUp"></a>
-	<li>inputUp<br>nächste Eingangsquelle für die Zone auswählen</li>
-	<a id="PIONEERAVRZONE-set-inputDown"></a>
-	<li>inputDown<br>vorherige Eingangsquelle für die Zone auswählen</li>
-	<li><a href="#setExtensions">set extensions</a> (ausser <code>&lt;name&gt;</code>) werden unterstützt</li>
-
-	
-   <br><br>
-    Beispiel:
-    <ul>
-      <code>set VSX923Zone2 on</code><br>
-    </ul>
-    <br><br>
+    <a id="PIONEERAVRZONE-set-off"></a>
+    <li><b>off</b> - Schaltet die Zone in den Standby-Modus.</li>
+    <a id="PIONEERAVRZONE-set-on"></a>
+    <li><b>on</b> - Schaltet die Zone ein.</li>
+    <a id="PIONEERAVRZONE-set-toggle"></a>
+    <li><b>toggle</b> - Wechselt den Ein-/Aus-Zustand der Zone.</li>
+    <a id="PIONEERAVRZONE-set-input"></a>
+    <li><b>input &lt;Eingangsname&gt;</b> - Wählt einen aktivierten Eingang. Die Liste verwendet vorhandene Eingangsaliasnamen und wird mit <code>set &lt;PIONEERAVR&gt; statusRequest</code> oder <code>get &lt;PIONEERAVR&gt; loadInputNames</code> aktualisiert.</li>
+    <a id="PIONEERAVRZONE-set-inputUp"></a>
+    <li><b>inputUp</b> - Wählt den nächsten Eingang der Zone.</li>
+    <a id="PIONEERAVRZONE-set-inputDown"></a>
+    <li><b>inputDown</b> - Wählt den vorherigen Eingang der Zone.</li>
+    <a id="PIONEERAVRZONE-set-statusRequest"></a>
+    <li><b>statusRequest</b> - Fragt alle für diese Zone unterstützten Statuswerte ab und aktualisiert die zugehörigen Readings.</li>
+    <a id="PIONEERAVRZONE-set-volume"></a>
+    <li><b>volume &lt;0 ... 100&gt;</b> - Stellt die Zonenlautstärke in Prozent ein. Für <code>zone2</code> und <code>zone3</code> implementiert.</li>
+    <a id="PIONEERAVRZONE-set-volumeUp"></a>
+    <li><b>volumeUp</b> - Erhöht die Zonenlautstärke um 1 dB. Für <code>zone2</code> und <code>zone3</code> implementiert.</li>
+    <a id="PIONEERAVRZONE-set-volumeDown"></a>
+    <li><b>volumeDown</b> - Verringert die Zonenlautstärke um 1 dB. Für <code>zone2</code> und <code>zone3</code> implementiert.</li>
+    <a id="PIONEERAVRZONE-set-volumeStraight"></a>
+    <li><b>volumeStraight &lt;-80 ... 0&gt;</b> - Stellt die Zonenlautstärke in dB auf der am Receiver-Display verwendeten Skala ein. Für <code>zone2</code> und <code>zone3</code> implementiert.</li>
+    <a id="PIONEERAVRZONE-set-mute"></a>
+    <li><b>mute &lt;on|off|toggle&gt;</b> - Steuert die Stummschaltung. Für <code>zone2</code> und <code>zone3</code> verfügbar.</li>
+    <li><a href="#setExtensions">SetExtensions</a> werden unterstützt.</li>
   </ul>
- <a id="PIONEERAVRZONE-get" name="PIONEERAVRZONEget"></a>
+  <br>
+
+  <a id="PIONEERAVRZONE-get" name="PIONEERAVRZONEget"></a>
   <b>Get</b>
   <ul>
-    <a id="PIONEERAVRZONE-get-input"></a>
-    <li><code>get &lt;name&gt; input</code>
+    Get-Befehle senden eine asynchrone Statusabfrage. Das Ergebnis erscheint
+    nach der Antwort des Receivers im entsprechenden Reading.
     <br><br>
-    reading für die Eingangsquelle aktualisieren
-    </li>
+    <a id="PIONEERAVRZONE-get-input"></a>
+    <li><b>input</b> - Für <code>zone2</code>, <code>zone3</code> und <code>hdZone</code> verfügbar.</li>
+    <a id="PIONEERAVRZONE-get-power"></a>
+    <li><b>power</b> - Für <code>zone2</code>, <code>zone3</code> und <code>hdZone</code> verfügbar.</li>
+    <a id="PIONEERAVRZONE-get-volume"></a>
+    <li><b>volume</b> - Für <code>zone2</code> und <code>zone3</code> verfügbar.</li>
+    <a id="PIONEERAVRZONE-get-mute"></a>
+    <li><b>mute</b> - Für <code>zone2</code> und <code>zone3</code> verfügbar.</li>
+    <a id="PIONEERAVRZONE-get-bass"></a>
+    <li><b>bass</b> - Für <code>zone2</code> verfügbar.</li>
+    <a id="PIONEERAVRZONE-get-treble"></a>
+    <li><b>treble</b> - Für <code>zone2</code> verfügbar.</li>
   </ul>
-  <br><br>
+  <br>
 
   <a id="PIONEERAVRZONE-attr" name="PIONEERAVRZONEattr"></a>
-  <b>Attributes</b>
-  <br><br>
+  <b>Attribute</b>
   <ul>
     <a id="PIONEERAVRZONE-attr-IODev"></a>
-    <li>IODev Name des device welches die Kommunikation mit dem Pioneer AV Receiver zur Verfügung stellt</li>
+    <li><b>IODev</b> - PIONEERAVR-Device für die Kommunikation mit dem physischen Receiver. Beispiel: <code>attr VSX923Zone2 IODev VSX923</code>.</li>
     <a id="PIONEERAVRZONE-attr-verbose"></a>
     <li><a href="#verbose">verbose</a></li>
   </ul>
-  <br><br> 
+  <br>
+
+  <a id="PIONEERAVRZONE-readings"></a>
+  <b>Readings</b>
+<p>Die aktuelle Implementierung verwendet beim Setzen und Empfangen der Zonenlautstärke unterschiedliche Umrechnungen. Zurückgemeldete Werte können daher vom Sollwert abweichen. Empfangene Rohwerte 00...81 werden in volumeStraight auf -81...0 abgebildet; Rohwert 00 bedeutet am Receiver MIN.</p>
+  <ul>
+    <li><b>power</b> - Ein-/Aus-Zustand der Zone.</li>
+    <li><b>input</b> - Gewählter Eingang der Zone.</li>
+    <li><b>volume</b> - Zonenlautstärke in Prozent, soweit unterstützt.</li>
+    <li><b>volumeStraight</b> - Zonenlautstärke auf der Display-Skala des Receivers, soweit unterstützt.</li>
+    <li><b>mute</b> - Stummschaltung der Zone, soweit unterstützt.</li>
+    <li><b>bass</b>, <b>treble</b> - Für zone2 abfragbar; die Antworten werden derzeit nicht in Zonen-Readings umgesetzt.</li>
+    <li><b>state</b> - Zuletzt ausgewerteter Zustand oder Befehlswert der Zone.</li>
+  </ul>
 </ul>
 
 =end html_DE
