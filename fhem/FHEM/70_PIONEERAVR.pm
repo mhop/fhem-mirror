@@ -2183,26 +2183,35 @@ sub PIONEERAVR_Set {
             # Rename InputAlias (up to 14 chars)
         }
         elsif ( $cmd eq "renameInputAlias" ) {
-            Log3 $name, 5,
-"PIONEERAVR $name: set $cmd for inputName: $arg new name: $arg2 !";
-            my $inputToChange = undef;
-            for my $key ( keys %{ $hash->{helper}{INPUTNAMES} } ) {
-                if ( $hash->{helper}{INPUTNAMES}->{$key}{aliasName} eq $arg ) {
-                    $inputToChange = sprintf "%02d", $key;
-                }
-                elsif ( $hash->{helper}{INPUTNAMES}->{$key}{name} eq $arg ) {
-                    $inputToChange = sprintf "%02d", $key;
-                }
+            return "Usage: set $name renameInputAlias <inputName> <newInputAlias>"
+              if ( @$a < 4 || !defined( $a->[2] ) || $a->[2] eq "" );
+
+            # The receiver accepts up to 14 characters. Join all remaining
+            # arguments so unquoted names such as 'PIONEER GT' stay intact.
+            my $newAlias = join( " ", @{$a}[ 3 .. $#{$a} ] );
+            return "New input alias must contain 1 to 14 printable ASCII characters"
+              if ( $newAlias !~ /\A[\x20-\x7e]{1,14}\z/
+                || $newAlias !~ /\S/ );
+
+            # Prefer aliases over default names, as input selection does.
+            # Reject duplicate matches instead of choosing a random hash key.
+            my @matches;
+            for my $field ( "aliasName", "name" ) {
+                @matches = grep {
+                    defined( $hash->{helper}{INPUTNAMES}{$_}{$field} )
+                      && $hash->{helper}{INPUTNAMES}{$_}{$field} eq $a->[2]
+                } keys %{ $hash->{helper}{INPUTNAMES} };
+                last if @matches;
             }
-            if ( defined $inputToChange ) {
-                PIONEERAVR_Write( $hash, $arg2 . "1RGB" . $inputToChange );
-                return;
-            }
-            else {
-                my $err =
-"Warning: Could not renameInputAlias as the inputName: $arg was not found!";
-                return $err;
-            }
+            return "Unknown input name: $a->[2]" if !@matches;
+            return "Ambiguous input name: $a->[2]" if @matches > 1;
+
+            my $inputToChange = sprintf "%02d", $matches[0];
+            PIONEERAVR_Write( $hash, $newAlias . "1RGB" . $inputToChange );
+            # Read back through the paced queue; only the receiver response
+            # updates the stored alias, including its existing normalization.
+            PIONEERAVR_Write( $hash, "?RGB" . $inputToChange );
+            return;
 
             # Change "skip input"
         }
@@ -4738,7 +4747,7 @@ sub RC_layout_PioneerAVR() {
     <a id="PIONEERAVR-set-raw"></a>
     <li><b>raw &lt;PioneerKommando&gt;</b> - Sends the command <code>&lt;PioneerCommand&gt;</code> unchanged to the Pioneer AV receiver. A list of all available commands is available in the Pioneer documentation mentioned above</li>
     <a id="PIONEERAVR-set-renameInputAlias"></a>
-    <li><b>renameInputAlias &lt;inputName&gt; &lt;newInputAlias&gt;</b> - Renames the input as it is displayed on the Pioneer AV receiver (and as it is listed in this module)</li>
+    <li><b>renameInputAlias &lt;inputName&gt; &lt;newInputAlias&gt;</b> - Renames an input on the receiver and in this module. The new alias may contain spaces and must contain 1 to 14 printable ASCII characters. Use the existing normalized input name as the first argument. Ambiguous input names are rejected. The alias is queried again after the change; stored names retain their existing normalization.</li>
     <a id="PIONEERAVR-set-remoteControl"></a>
     <li><b>remoteControl &lt;attr&gt;</b> -  where &lt;attr&gt; is one of:
     <ul>
@@ -5115,7 +5124,7 @@ make that separate probe asynchronous.</p>
     <a id="PIONEERAVR-set-raw"></a>
     <li><b>raw &lt;PioneerKommando&gt;</b> - Sendet den Befehl <code>&lt;PioneerKommando&gt;</code> unverändert an den Pioneer AV Receiver. Eine Liste der verfügbaren Pioneer Kommandos ist in dem Link zur Pioneer Dokumentation oben enthalten</li>
     <a id="PIONEERAVR-set-renameInputAlias"></a>
-    <li><b>renameInputAlias &lt;inputName&gt; &lt;neuerInputAlias&gt;</b> - Gibt dem Eingang &lt;inputName&gt; am Pioneer AV Receiver (und in diesem Modul) den neuen Namen &lt;neuerInputAlias&gt;</li>
+    <li><b>renameInputAlias &lt;inputName&gt; &lt;neuerInputAlias&gt;</b> - Benennt einen Eingang am Receiver und in diesem Modul um. Der neue Alias darf Leerzeichen enthalten und muss aus 1 bis 14 druckbaren ASCII-Zeichen bestehen. Als erstes Argument dient der bisherige normalisierte Eingangsname. Mehrdeutige Eingangsnamen werden abgewiesen. Nach der Änderung wird der Alias erneut abgefragt; gespeicherte Namen werden weiterhin wie bisher normalisiert.</li>
     <a id="PIONEERAVR-set-remoteControl"></a>
     <li><b>remoteControl &lt;attr&gt;</b> -  wobei &lt;attr&gt; eines von folgenden sein kann:
     <ul>
