@@ -4509,7 +4509,7 @@ sub RC_layout_PioneerAVR() {
   As long as Fhem is connected to the Pioneer AV receiver no other device (e.g. a smart phone) can connect to the Pioneer AV receiver on the same port.
   Some Pioneer AV receivers offer more than one port though. From Pioneer recommend port numbers:00023,49152-65535, Invalid port numbers:00000,08102
   <br><br>
-  <a name="PIONEERAVRdefine"></a>
+  <a id="PIONEERAVR-define" name="PIONEERAVRdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; PIONEERAVR telnet &lt;IPAddress:Port&gt;</code><br><br>
@@ -4530,7 +4530,7 @@ sub RC_layout_PioneerAVR() {
     <br>
   </ul>
 
-  <a name="PIONEERAVRset"></a>
+  <a id="PIONEERAVR-set" name="PIONEERAVRset"></a>
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; &lt;what&gt; [&lt;value&gt;]</code>
@@ -4684,7 +4684,7 @@ sub RC_layout_PioneerAVR() {
     <br><br>
   </ul>
 
-  <a name="PIONEERAVRget"></a>
+  <a id="PIONEERAVR-get" name="PIONEERAVRget"></a>
   <b>Get</b>
 
   does not return any value but asks the Pioneer AVR for the current status (e.g. of the volume). As soon as the Pioneer AVR replies (the time until the Pioneer AVR replies is unpredictable), the readings or internals of this PIONEERAVR module are updated.
@@ -4744,7 +4744,7 @@ sub RC_layout_PioneerAVR() {
     </ul>
   <br><br>
 
-  <a name="PIONEERAVRattr"></a>
+  <a id="PIONEERAVR-attr" name="PIONEERAVRattr"></a>
   <b>Attributes</b>
   <br><br>
   <ul>
@@ -4874,7 +4874,7 @@ sub RC_layout_PioneerAVR() {
   auf dem gleichen Port eine Verbindung zum Pioneer AV Receiver herstellen.
   Einige Pioneer AV Receiver bieten mehr als einen Port für die Datenverbindung an. Pioneer empfiehlt Port 23 sowie 49152-65535, "Invalid number:00000,08102".
   <br><br>
-  <a name="PIONEERAVRdefine"></a>
+  <a id="PIONEERAVR-define" name="PIONEERAVRdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; PIONEERAVR telnet &lt;IPAddress:Port&gt;</code><br><br>
@@ -4897,7 +4897,7 @@ sub RC_layout_PioneerAVR() {
     <br>
   </ul>
 
-  <a name="PIONEERAVRset"></a>
+  <a id="PIONEERAVR-set" name="PIONEERAVRset"></a>
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; &lt;was&gt; [&lt;value&gt;]</code>
@@ -5053,7 +5053,7 @@ sub RC_layout_PioneerAVR() {
   </ul>
 
 
-  <a name="PIONEERAVRget"></a>
+  <a id="PIONEERAVR-get" name="PIONEERAVRget"></a>
   <b>Get</b>
   <ul>
     <code>get &lt;name&gt; raw &lt;Befehl&gt;</code>
@@ -5115,7 +5115,7 @@ sub RC_layout_PioneerAVR() {
   </ul>
   <br><br>
 
-  <a name="PIONEERAVRattr"></a>
+  <a id="PIONEERAVR-attr" name="PIONEERAVRattr"></a>
   <b>Attribute</b>
   <br><br>
     <ul>
