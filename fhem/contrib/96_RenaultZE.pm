@@ -1,6 +1,6 @@
 ###############################################################################
 #
-# $Id: 96_RenaultZE.pm  2025-04-25 plin $
+# $Id: 96_RenaultZE.pm  2026-10-23 plin $
 # 96_RenaultZE.pm
 #
 # Forum : https://forum.fhem.de/index.php/topic,116273.0.html
@@ -38,9 +38,10 @@
 
 ############################################################################################################################
 # Version History
+# v 1.22 corrected distance from home calculation
 # v 1.21 new GIGY_API key
 # v 1.20 Änderungen von Moli 1:1 übernommen
-# v 1.19.1 Moli Fummelt rum, Logfehler weg, neuer API-Key, charge-mod kill
+# v 1.19.1 User 'Moli Fummelt rum' Logfehler weg, neuer API-Key, charge-mod kill
 # v 1.19 add scubscriptions and act accordingly
 # v 1.18 addesa internalTemperature
 # v 1.17 fixed bug xternalTemperature vs externalTemperature
@@ -114,8 +115,9 @@ use HttpUtils;
 use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
+use Math::Trig qw(deg2rad);
 
-my $RenaultZE_version ="V1.19.1 / 23.06.2026";
+my $RenaultZE_version ="V1.23 / 23.10.2026";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -1686,20 +1688,25 @@ sub RenaultZE_distanceFromHome($$$$)
     my $hlong = AttrVal( $name, "ze_longitude", AttrVal( "global", "longitude", 0.0 ) );
     my $hlat  = AttrVal( $name, "ze_latitude",  AttrVal( "global", "latitude",  0.0 ) );
 
-    #Kreiszahl Pi
-    my $pi = 3.14159;
+    Log3 $name, 2, "RenaultZE_distanceFromHome - Heimkoordinaten nicht gesetzt (ze_latitude/ze_longitude bzw. global latitude/longitude)"
+        if ( $hlat == 0 && $hlong == 0 );
 
-    #Umrechnung von Grad in Radius
-    my $long1 = $long / 180 * $pi;
-    my $lat1  = $lat / 180 * $pi;
-    my $long2 = $hlong / 180 * $pi;
-    my $lat2  = $hlat / 180 * $pi;
+    # Entfernungsberechnung (Haversine), Ergebnis in km
+    my $phi1 = deg2rad($lat);
+    my $phi2 = deg2rad($hlat);
+    my $dphi = deg2rad($hlat  - $lat);
+    my $dlam = deg2rad($hlong - $long);
 
+    my $a = sin($dphi / 2)**2
+          + cos($phi1) * cos($phi2) * sin($dlam / 2)**2;
+    my $distance = 2 * 6371.0088 * atan2( sqrt($a), sqrt(1 - $a) );
+
+    my $dim = "km";
+    my $homeinfo = "";
+    my $homestate = "away";
+    $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 )        if ( $homeRadius eq "auto");
+    Log3 $name, 5, "RenaultZE_distanceFromHome - Check ".$hash."/".$lat." ".$long."/".$homeRadius;
     #Entfernungsberechnung
-    my $distance = acos(sin($long1)*sin($long2) + cos($long1)*cos($long2)*cos($lat2-$lat1));
-
-    #Erdrundung einbeziehen
-    $distance = $distance * 6378.137;
 
     my $dim = "km";
     my $homeinfo = "";
