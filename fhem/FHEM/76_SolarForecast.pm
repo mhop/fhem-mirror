@@ -73,6 +73,9 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
+  "2.10.10"=> "23.10.2026  Perl-Warnungen 'Use of uninitialized value' in __batChargeOptTargetPower und ".
+                           "___batRemainHodsAndSurp, die bei sehr geringer PV-Prognose (kein PV-Überschuss in einzelnen ".
+                           "Stunden) auftraten, Forum: https://forum.fhem.de/index.php?msg=1370567 ",
   "2.10.9" => "20.10.2026  __openMeteo_ApiResponse: Klammerung gefixt, Forum: https://forum.fhem.de/index.php?msg=1370333 ".
                            "Message-System: Fix fehlerhafte Sortierung mit idx >=10 ",
   "2.10.8" => "11.10.2026  ___batAdjustPowerByMargin: Prüfung 'Ziel nicht erreichbar' erfolgt jetzt vor der Margin-Prüfung, daher ".
@@ -16738,9 +16741,9 @@ sub __batChargeOptTargetPower {
   }
 
   my $fipl       = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
-  my @batteries  = grep { !/^(?:fd|speff|surplswh|spday|nhr)$/xs } keys %{$hsurp->{24}};
-  my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert ohne Zeitgewichtung h 00
-
+  my @batteries  = grep { !/^(?:fd|speff|surplswh|spday|nhr)$/xs } keys %{$hsurp->{24}};                   
+  my @sortedhods = sort { ($hsurp->{$a}{surplswh} // 0) <=> ($hsurp->{$b}{surplswh} // 0) } keys %{$hsurp};     # Stunden aufsteigend nach PV-Überschuß sortiert ohne Zeitgewichtung h 00
+  
   my ($fcendwh, $diff, $otp, $ratio);
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
@@ -16751,12 +16754,12 @@ sub __batChargeOptTargetPower {
       my $nexthod = sprintf "%02d", (int $hod + 1);
       my $nextnhr = $hsurp->{$nexthod}{nhr};
 
-      my ($remainingSurp_o, $remainingHodsRef_o) = ___batRemainHodsAndSurp ( $hod,                               # verbleibender Überschuß ohne Zielzeit gesetzt
+      my ($remainingSurp_o, $remainingHodsRef_o) = ___batRemainHodsAndSurp ( $hod,                              # verbleibender Überschuß ohne Zielzeit gesetzt
                                                                              $hsurp,
                                                                              $replacement,
                                                                              \@sortedhods
                                                                           );
-      $hsurp->{$hod}{spday} = $remainingSurp_o;                                                                  # PV Überschuß Resttag
+      $hsurp->{$hod}{spday} = $remainingSurp_o;                                                                 # PV Überschuß Resttag
 
       my ($remainingSurp, $remainingHodsRef);
 
@@ -16781,7 +16784,6 @@ sub __batChargeOptTargetPower {
 
           my $runwh = do {
               if (defined $fc_next_wh)   { $fc_next_wh }
-              #elsif ($nhr eq '00')       { $csocwh }
               elsif ($nhr eq '00')       { $init_soc_wh }                                                        # V 2.6.10 Fix: aus Prozentwert, konsistent mit LR-Abschnitt
               elsif (defined $transfer)  { delete $trans->{$sbn}{$lfd}{transfer} }
               else                       { $init_soc_wh }
@@ -16879,7 +16881,7 @@ sub __batChargeOptTargetPower {
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};
 
-          $limpower     = $limpower // 0 > 0 ? $limpower : 0;
+          $limpower     = ($limpower // 0) > 0 ? $limpower : 0;
           $limpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});
           $limpower     = max ($limpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen
 
@@ -17032,11 +17034,11 @@ sub ___batRemainHodsAndSurp {
 
   if (defined $timeTarget) { @remaining_hods = grep { int $_ >= int $hod && int $_ <= int $timeTarget } @$sortedhodsref }
   else                     { @remaining_hods = grep { int $_ >= int $hod } @$sortedhodsref }
-
-  for my $h (@remaining_hods) {                                              # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
+  
+  for my $h (@remaining_hods) {                                             # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
       my $val = defined $hsurp->{$h}{nhr} && $hsurp->{$h}{nhr} eq '00'
-                ? int ($replacement) // 0
-                : $hsurp->{$h}{surplswh};
+              ? int ($replacement // 0)
+              : ($hsurp->{$h}{surplswh} // 0);
 
       $remainingSurp += int $val;
   }
