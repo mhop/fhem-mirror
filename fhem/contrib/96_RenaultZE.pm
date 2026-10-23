@@ -115,7 +115,7 @@ use HttpUtils;
 use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
-use Math::Trig qw(deg2rad);
+use Math::Trig qw(deg2rad asin);
 
 my $RenaultZE_version ="V1.23 / 23.10.2026";
 
@@ -1680,49 +1680,66 @@ sub RenaultZE_pp_err($$)
     }
     return $output;
 }
+
+sub RenaultZE_haversine_distance {
+    my ($lat1, $lon1, $lat2, $lon2) = @_;
+
+    # Mittlerer Erdradius in Kilometern
+    my $R = 6371.0;
+
+    # Umrechnung der Gradzahlen in Radiant
+    my $phi1         = deg2rad($lat1);
+    my $phi2         = deg2rad($lat2);
+    my $delta_phi    = deg2rad($lat2 - $lat1);
+    my $delta_lambda = deg2rad($lon2 - $lon1);
+
+    # Haversine-Formel
+    my $a = sin($delta_phi / 2)**2 +
+            cos($phi1) * cos($phi2) *
+            sin($delta_lambda / 2)**2;
+
+    # Distanz berechnen
+    my $distance = 2 * $R * asin(sqrt($a));
+
+    return $distance;
+}
+
 sub RenaultZE_distanceFromHome($$$$)
 {
     my ($hash, $lat, $long, $homeRadius) = @_;
     my $name = $hash->{NAME};
     Log3 $name, 5, "RenaultZE_distanceFromHome - In ".$hash."/".$lat." ".$long."/".$homeRadius;
-    my $hlong = AttrVal( $name, "ze_longitude", AttrVal( "global", "longitude", 0.0 ) );
     my $hlat  = AttrVal( $name, "ze_latitude",  AttrVal( "global", "latitude",  0.0 ) );
+    my $hlong = AttrVal( $name, "ze_longitude", AttrVal( "global", "longitude", 0.0 ) );
 
     Log3 $name, 2, "RenaultZE_distanceFromHome - Heimkoordinaten nicht gesetzt (ze_latitude/ze_longitude bzw. global latitude/longitude)"
         if ( $hlat == 0 && $hlong == 0 );
 
     # Entfernungsberechnung (Haversine), Ergebnis in km
-    my $phi1 = deg2rad($lat);
-    my $phi2 = deg2rad($hlat);
-    my $dphi = deg2rad($hlat  - $lat);
-    my $dlam = deg2rad($hlong - $long);
+    my $distance = RenaultZE_haversine_distance($lat, $long, $hlat, $hlong);
 
-    my $a = sin($dphi / 2)**2
-          + cos($phi1) * cos($phi2) * sin($dlam / 2)**2;
-    my $distance = 2 * 6371.0088 * atan2( sqrt($a), sqrt(1 - $a) );
+    my $dim = "m";
+    my $homeinfo = "";
+    my $homestate = "away";
+    $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 )	if ( $homeRadius eq "auto");
+    Log3 $name, 5, "RenaultZE_distanceFromHome - Check ".$hash."/".$lat." ".$long."/".$homeRadius;
 
     my $dim = "km";
     my $homeinfo = "";
     my $homestate = "away";
     $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 )        if ( $homeRadius eq "auto");
     Log3 $name, 5, "RenaultZE_distanceFromHome - Check ".$hash."/".$lat." ".$long."/".$homeRadius;
-    #Entfernungsberechnung
-
-    my $dim = "km";
-    my $homeinfo = "";
-    my $homestate = "away";
-    $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 )	if ( $homeRadius eq "auto");
-    Log3 $name, 5, "RenaultZE_distanceFromHome - Check ".$hash."/".$lat." ".$long."/".$homeRadius;
 
     if ($distance < $homeRadius) {
             $distance = $distance * 1000;
             $dim = "m";
             if ($distance < $homeRadius) {
-		    $homeinfo = "home";
-		    $homestate = "home";
-	    } 
+                    $homeinfo = "home";
+                    $homestate = "home";
+            }
     }
-    $distance = sprintf("%.3f", $distance);
+
+    $distance = sprintf("%.0f", $distance);
     $homeinfo = $distance." ".$dim." away"          if ( $homeinfo eq "");
     if ( $hlong != 0.0 and $hlat != 0.0) {
        readingsSingleUpdate($hash,"distanceFromHome",$distance,1);
