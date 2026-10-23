@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.09.15";
+our $ModulVersion = "26.10.13";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -699,7 +699,7 @@ our %JavaScript = (
         updatecheck           => { 800 => "generic?ui=updatecheck", # {"start":"Updateserver"} put
                                    810 => "generic/updatecheck"},
         updateStatus          => { 800 => "misc/updateStatus",
-                                   810 => "dino/misc/updateStatus"},
+                                   810 => "dino/misc/updateStatus"}, # offline, upToDate, updating, never
         umts                  => { 800 => "generic?ui=umts",
                                    810 => "generic/umts"},
         usb                   => { 800 => "usb",
@@ -755,7 +755,8 @@ our %JavaScript = (
 # c comfort a getData
 # c smarthome a getDevicesAndGroups
 # c smarthome a getAutomations
-
+# xhr 1 back_to_page homeNet handsetupdate 12574 0110477 page update_device
+# xhr 1 back_to_page homeNet type handset uid 12574 0105622 handsetupdate 12574 0105622 apply nop page update_device
 
 our %LuaData = (
         alarm1               => { cmd => "xhr 1 lang de page alarm xhrId all"},
@@ -1382,14 +1383,6 @@ sub Fritz_Get_attrList($@) {
                                 ."Fritz_Helper_removeAfA,Fritz_Helper_reformat "
 
               ."enableDocsisInfo:0,1 ";
-#              my $retPara = "enableBoxReadings:multiple-strict,";
-#                   $retPara .= "box_led,box_vdsl,"                         if ($fwVersion == 0 || $fwVersion >= 680);
-#                   $retPara .= "box_guestWlan,box_usb,box_notify,box_pwr," if ($fwVersion == 0 || $fwVersion >= 700);
-#                   $retPara .= "box_energyMode,box_globalFilter,box_wan,"  if ($fwVersion == 0 || $fwVersion >= 721);
-#                   $retPara .= "box_dns,"                                  if ($fwVersion == 0 || $fwVersion >= 731);
-#                   $retPara .= "box_user,"                                 if ($fwVersion == 0 || $fwVersion >= 752);
-#                   $retPara =~ s/.$/ /;
-#  $retAttr .= $retPara;
 
   if($avmModel =~ /Box/) {
     $retAttr .= "userTickets:0,1,2,3,4,5,6,7,8,9,10,11,12 "
@@ -1498,7 +1491,8 @@ sub Fritz_Get_attrList($@) {
                                 ."box_upnp,box_upnp_control_activated,box_uptime,"
                                 ."box_wlan_Count,box_wlanBand_2.4GHz,box_wlanBand_5GHz,box_wlan_LogExtended ";
 
-    if (($fwVersion == 0 || $fwVersion >= 800) && $avmModel =~ /1700/) {
+    # 1200 AX|1700|3000
+    if (($fwVersion == 0 || $fwVersion >= 732) && exists($hash->{DEFAULT_USER})) {
       if( exists($hash->{fhem}{intBoxUsers}) && $hash->{fhem}{intBoxUsers} eq "&lt;none&gt;") {
         $retAttr .= "boxUser ";
       } elsif (!defined($hash->{fhem}{intBoxUsers}) || $hash->{fhem}{intBoxUsers} eq "") {
@@ -1946,12 +1940,12 @@ sub Fritz_Define_Modul($$)
 
      my $missingMsg = "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.";
      Fritz_Log $hash, 2, $missingMsg;
-     $hash->{WARNING_PERL}         = $missingMsg;
+     $hash->{WARNING_PERL}      = $missingMsg;
      $hash->{APICHECKED}        = (-1);
      $hash->{fhem}{sidTime}     = 0;
      $hash->{fhem}{sidErrCount} = (-1);
 
-     main::readingsSingleUpdate( $hash, "state", $missingMsg, 1);
+     main::readingsSingleUpdate( $hash, "state", "stopped", 1);
 
    } else {
 
@@ -1963,7 +1957,7 @@ sub Fritz_Define_Modul($$)
      $hash->{SID_RENEW_ERR_CNT}      = 0;
      $hash->{SID_RENEW_CNT}          = 0;
      $hash->{STATUS}                 = "active";
-     $hash->{MODEL}            = "";
+     $hash->{MODEL}                  = "";
      $hash->{MODEL_OS}               = "";
      $hash->{XML_PARSER}             = main::AttrVal($name, "xmlParser", $hash->{helper}{XML_Default});
 
@@ -2975,6 +2969,7 @@ sub Fritz_Set_Modul($$@)
    my ($hash, $name, $cmd, @val) = @_;
    my $resultStr = "";
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
+   $mesh =~ s/^none$/master/;
 
    my $retMsgbySet = main::AttrVal($name, "retMsgbySet", "all");
    my $retMsg = "";
@@ -2984,7 +2979,7 @@ sub Fritz_Set_Modul($$@)
    if (!$hash->{WARNING_PERL}) {
 
      $list =  " checkAPIs:" . (!defined($hash->{APICHECKED}) || $hash->{APICHECKED} <= 0 ? "full" : "basic,full");
-     $list .=  " password"
+     $list .= " password"
            .  " update:noArg"
            .  " inActive:on,off";
 
@@ -3045,12 +3040,13 @@ sub Fritz_Set_Modul($$@)
            $hash->{APICHECKED}         = 0; # basic check
            main::RemoveInternalTimer($hash->{helper}{TimerReadout});
            $retMsg = "ERROR: " . $result->{Error};
-           main::readingsSingleUpdate($hash, "state", $retMsg, 0);
+           $hash->{WARNING_PROCESS}    = $retMsg;
+           main::readingsSingleUpdate($hash, "state", "login error", 0);
            return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
          } else {
-           $hash->{fhem}{sid} = $result->{sid};
+           $hash->{fhem}{sid}         = $result->{sid};
+           $hash->{fhem}{sidTime}     = $result->{sidTime};
            $hash->{fhem}{sidNewCount} = defined $result->{sidNew} ? $result->{sidNew} : 0;
-           $hash->{fhem}{sidTime}     = time();
            $hash->{fhem}{sidErrCount} = 0;
            $hash->{WEBCONNECT}        = 1;
          }
@@ -3113,6 +3109,7 @@ sub Fritz_Set_Modul($$@)
        return Fritz_Helper_retMsg($hash, $retMsg, $retMsgbySet);
 
      } #end inactive
+
    } #end missing modul
 
    # available, if password is set correctly
@@ -3172,13 +3169,16 @@ sub Fritz_Set_Modul($$@)
                  .  " lockFilterProfile"
                     if ($mesh eq "master");
 
-           $list .= " wakeUpCall"
-                 .  " dectRingblock"
-                 .  " blockIncomingPhoneCall"
-                 .  " smartHome"
-                    if ($hash->{fhem}{fwVersion} >= 721);
+           if ($hash->{fhem}{fwVersion} >= 721) {
+             $list .= " wakeUpCall"
+                   .  " blockIncomingPhoneCall"
+                   .  " smartHome";
+
+             $list .= " dectRingblock" if ($mesh eq "master");
+           }
 
            $list .= " energyMode:default,eco" if ($hash->{fhem}{fwVersion} >= 750);
+
            $list .= " dnsFilter:on,off,updNow,never,updEvery8h,updDayly,updWeeky,updMonthly" if ($hash->{fhem}{fwVersion} >= 840);
          }
       
@@ -5203,6 +5203,7 @@ sub Fritz_Get_Modul($@)
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
 
    my $retMsg = "";
+   my $list   = "";
 
    # available, if password is set correctly
    if ($hash->{WEBCONNECT} && !$hash->{WARNING_PERL}&& !$hash->{WARNING_NETWORK}) {
@@ -5287,8 +5288,8 @@ sub Fritz_Get_Modul($@)
        return "saved preDefs:\n" . $preDefs;
 
      } elsif( lc $cmd eq "luaquery" && $hash->{LUAQUERY} == 1) {
-     # get Fritzbox luaQuery inetstat:status/Today/BytesReceivedLow
-     # get Fritzbox luaQuery telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)
+       # get Fritzbox luaQuery inetstat:status/Today/BytesReceivedLow
+       # get Fritzbox luaQuery telcfg:settings/AlarmClock/list(Name,Active,Time,Number,Weekdays)
        Fritz_Log $hash, 3, "get $name $cmd " . join(" ", @val);
 
        return "Wrong number of arguments, usage: get $name luaQuery <query>"       if int @val !=1;
@@ -6055,8 +6056,6 @@ sub Fritz_Get_Modul($@)
        }
      }
 
-     my $list = "";
-
      $list .= "luaQuery"                if $hash->{LUAQUERY} == 1;
      $list .= " luaData"                if $hash->{LUADATA} == 1;
 
@@ -6103,11 +6102,24 @@ sub Fritz_Get_Modul($@)
      $list .= " loadSupportData:delete,shReading,shReadingNoFile,shReadingExt,shReadingExtNoFile,fileOnly" if $hash->{LUAQUERY} == 1;
 
      $list .= " showFritzOS:noArg";
-
-     return "Unknown argument $cmd, choose one of $list" if defined $list;
    }
 
-   return "get command not available";
+   if ( lc $cmd eq 'listofdevice') {
+     my $globAttr = main::AttrVal("global","showInternalValues","undef");
+
+     $attr{global}{showInternalValues} = $val[0] eq "full" ? 1 : 0;
+     my $ret = main::CommandList(undef,$name);
+
+     if ($globAttr eq "undef"){
+       delete($attr{global}{showInternalValues});
+     } else {
+       $attr{global}{showInternalValues} = $globAttr;
+     }
+     return $ret;
+   } #end listOfDevice
+
+   $list .= " listOfDevice:normal,full";
+   return "Unknown argument $cmd, choose one of $list" if defined $list;
 
 } # end Fritz_Get
 
@@ -6232,22 +6244,27 @@ sub Fritz_Readout_Start($)
       main::RemoveInternalTimer($hash->{helper}{TimerReadout});
 
       if(exists($hash->{WARNING_PERL})) {
-        main::readingsSingleUpdate( $hash, "state", "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.", 1);
+#        main::readingsSingleUpdate( $hash, "state", "Attention - Cannot start Modul because Perl modul's ( $hash->{helper}{misPerlModul} ) missing on this system.", 1);
+        main::readingsSingleUpdate( $hash, "state", "stopped", 1);
 
       } elsif(exists($hash->{WARNING_NETWORK}) ) {
-        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_NETWORK}, 1 );
+#        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_NETWORK}, 1 );
+        main::readingsSingleUpdate( $hash, "state", "warning", 1 );
         Fritz_Log $hash, 2, $hash->{WARNING_NETWORK};
 
       } elsif(exists($hash->{WARNING_BOXUSER}) && exists($hash->{WARNING_PASSWORD})) {
-        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_PASSWORD}. ". Attention: " . $hash->{WARNING_BOXUSER}, 1 );
+#        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_PASSWORD}. ". Attention: " . $hash->{WARNING_BOXUSER}, 1 );
+        main::readingsSingleUpdate( $hash, "state", "warning credentials", 1 );
         Fritz_Log $hash, 2, $hash->{WARNING_PASSWORD};
 
       } elsif(!exists($hash->{WARNING_BOXUSER}) && exists($hash->{WARNING_PASSWORD})) {
-        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_PASSWORD}, 1 );
+#        main::readingsSingleUpdate( $hash, "state", $hash->{WARNING_PASSWORD}, 1 );
+        main::readingsSingleUpdate( $hash, "state", "warning password", 1 );
         Fritz_Log $hash, 2, $hash->{WARNING_PASSWORD};
 
       } else {
-        main::readingsSingleUpdate( $hash, "state", "Attention - no Password and/or no User set. Please set the credentials", 1 );
+        $hash->{WARNING_PROCESS} = "Attention - no Password and/or no User set. Please set the credentials";
+        main::readingsSingleUpdate( $hash, "state", "warning credentials", 1 );
         Fritz_Log $hash, 2, "no Password set. Please set a Password with set password";
       }
 
@@ -6259,11 +6276,11 @@ sub Fritz_Readout_Start($)
       main::RemoveInternalTimer($hash->{helper}{TimerReadout});
 
       if ($hash->{APICHECKED} == -1) {
-        main::readingsSingleUpdate( $hash, "state", "stopped while to many network errors", 1 );
+        main::readingsSingleUpdate( $hash, "state", "stopped", 1 );
         $hash->{WARNING_PROCESS} = "stopped while to many network errors";
         Fritz_Log $hash, 2, "stopped while to many network errors";
       } else {
-        main::readingsSingleUpdate( $hash, "state", "stopped while to many authentication errors", 1 );
+        main::readingsSingleUpdate( $hash, "state", "stopped", 1 );
         $hash->{WARNING_PROCESS} = "stopped while to many API errors";
         Fritz_Log $hash, 2, "stopped while to many API errors";
       }
@@ -6312,15 +6329,17 @@ sub Fritz_Readout_Start($)
    if ( $hash->{APICHECKED} =~ /[0|2]/ ) {
       $interval = $hash->{CKECKAPI_TMOUT} + 10;
       $timeout  = $hash->{CKECKAPI_TMOUT};
-      main::readingsSingleUpdate( $hash, "state", "check APIs: " . ($hash->{APICHECKED} ? "basic" : "full"), 1 );
-      $runFn = "Fritz::Fritz_Readout_API_Check";
+      main::readingsSingleUpdate( $hash, "state", "checkAPIs: " . ($hash->{APICHECKED} ? "basic" : "full"), 1 );
       $hash->{WARNING_PROCESS} = "check APIs: " . ($hash->{APICHECKED} ? "basic" : "full");
+
+      $runFn = "Fritz::Fritz_Readout_API_Check";
+
    } elsif ( $hash->{APICHECKED} < 0 ) {
       $interval = (main::AttrVal( $name, "reConnectInterval", 180 ) < $hash->{CKECKAPI_TMOUT} ? $hash->{CKECKAPI_TMOUT} + 10 : main::AttrVal( $name, "reConnectInterval", 180 ));
       $timeout  = $hash->{CKECKAPI_TMOUT};
-      main::readingsSingleUpdate( $hash, "state", "check APIs: recheck every $interval sec. with timeout $timeout sec.", 1 );
-      $runFn = "Fritz::Fritz_Readout_API_Check";
+      main::readingsSingleUpdate( $hash, "state", "checkAPIs: recheck", 1 );
       $hash->{WARNING_PROCESS} = "check APIs: recheck every $interval sec. with timeout $timeout sec.";
+      $runFn = "Fritz::Fritz_Readout_API_Check";
    }
 # Run shell or web api, restrict interval
    else {
@@ -6475,7 +6494,8 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
      if( exists($result->{box_users}) ) {
        my $views = $result->{box_users};
 
-       my $bUsers = "";
+       my $bUsers   = $hash->{fhem}{intBoxUsers};
+       my $tmpUsers = "";
        my $doBoxUser = main::AttrVal($name, "enableBoxReadings", "") =~ /box_user/;
        eval {
          for (my $cnt = 0; $cnt < @$views; $cnt++) {
@@ -6490,18 +6510,28 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
              Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_nas_rights", @$views[$cnt]->{nas_rights};
              Fritz_Readout_Add_Reading $hash, $roReadings, "box_user".$cnt."_vpn_access", @$views[$cnt]->{vpn_access};
            }
-           $bUsers .= @$views[$cnt]->{name} . ",";
+           $tmpUsers = @$views[$cnt]->{name};
+           $tmpUsers =~ s/ /&#160;/g;
+
+           if($bUsers !~ /$tmpUsers/g) {
+             $hash->{fhem}{intBoxUsers} .= "," . $tmpUsers;
+           }
+
            if (@$views[$cnt]->{name} =~ /(fritz\d+)/) {
              $hash->{DEFAULT_USER} = $1;
            }
          }
        };
 
-       if ($@) {
+       if ($@ || ($hash->{fhem}{intBoxUsers} eq "") ) {
          Fritz_Log $hash, 3, "ERROR: boxUsers - no Users available";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->intBoxUsers", "&lt;none&gt;";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "->DEFAULT_USER", "";
+         $bUsers = main::AttrVal( $name, "boxUser", "" );
+         Fritz_Readout_Add_Reading $hash, $roReadings, "->DEVICE_USER", $bUsers;
        } else {
-         $hash->{fhem}{intBoxUsers} = $bUsers if $bUsers ne "";
-         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->intBoxUsers", "$bUsers";
+         Fritz_Readout_Add_Reading $hash, $roReadings, "->DEFAULT_USER", $hash->{DEFAULT_USER};
+         Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->intBoxUsers", "$hash->{fhem}{intBoxUsers}";
        }
      }
    }
@@ -8790,7 +8820,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
              # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
              return Fritz_Readout_Response($hash, $resultData, $roReadings) if ( defined $resultData->{Error} || defined $resultData->{AuthorizationRequired});
 
-             $$sidNew += $resultData->{sidNew} if defined $resultData->{sidNew};
+             $$sidNew += $resultData->{sidNew} if defined($resultData->{sidNew});
 
              if ($resultData->{data}->{tamoptions}->{num_selection}) {
                Fritz_Readout_Add_Reading $hash, $roReadings, $tam ."_x_num_selection",       $resultData->{data}->{tamoptions}->{num_selection};
@@ -9351,7 +9381,7 @@ sub Fritz_Readout_Run_Web_LuaData($$$$)
 #         my $TestSIS = '{"pid":"docInfo","hide":{"mobile":true,"ssoSet":true,"liveTv":true},"time":[],"data":{"channelDs":{"docsis31":[{"powerLevel":"-1.6","type":"4K","channel":1,"channelID":0,"frequency":"751 - 861"},{"powerLevel":"7.7","type":"4K","channel":2,"channelID":1,"frequency":"175 - 237"}],"docsis30":[{"type":"256QAM","corrErrors":92890,"mse":"-36.4","powerLevel":"5.1","channel":1,"nonCorrErrors":9773,"latency":0.32,"channelID":7,"frequency":"538"},{"type":"256QAM","corrErrors":20553,"mse":"-37.4","powerLevel":"10.2","channel":2,"nonCorrErrors":9420,"latency":0.32,"channelID":26,"frequency":"698"},{"type":"256QAM","corrErrors":28673,"mse":"-37.6","powerLevel":"10.0","channel":3,"nonCorrErrors":140,"latency":0.32,"channelID":25,"frequency":"690"},{"type":"256QAM","corrErrors":25930,"mse":"-37.6","powerLevel":"10.0","channel":4,"nonCorrErrors":170,"latency":0.32,"channelID":27,"frequency":"706"},{"type":"256QAM","corrErrors":98698,"mse":"-36.6","powerLevel":"8.8","channel":5,"nonCorrErrors":9151,"latency":0.32,"channelID":30,"frequency":"746"},{"type":"256QAM","corrErrors":24614,"mse":"-37.4","powerLevel":"9.4","channel":6,"nonCorrErrors":9419,"latency":0.32,"channelID":28,"frequency":"730"},{"type":"256QAM","corrErrors":25882,"mse":"-37.4","powerLevel":"9.9","channel":7,"nonCorrErrors":9308,"latency":0.32,"channelID":24,"frequency":"682"},{"type":"256QAM","corrErrors":33817,"mse":"-37.4","powerLevel":"9.8","channel":8,"nonCorrErrors":146,"latency":0.32,"channelID":23,"frequency":"674"},{"type":"256QAM","corrErrors":112642,"mse":"-37.6","powerLevel":"7.8","channel":9,"nonCorrErrors":7783,"latency":0.32,"channelID":3,"frequency":"490"},{"type":"256QAM","corrErrors":41161,"mse":"-37.6","powerLevel":"9.8","channel":10,"nonCorrErrors":203,"latency":0.32,"channelID":21,"frequency":"658"},{"type":"256QAM","corrErrors":33219,"mse":"-37.4","powerLevel":"8.8","channel":11,"nonCorrErrors":10962,"latency":0.32,"channelID":18,"frequency":"634"},{"type":"256QAM","corrErrors":32680,"mse":"-37.6","powerLevel":"9.2","channel":12,"nonCorrErrors":145,"latency":0.32,"channelID":19,"frequency":"642"},{"type":"256QAM","corrErrors":33001,"mse":"-37.4","powerLevel":"9.8","channel":13,"nonCorrErrors":7613,"latency":0.32,"channelID":22,"frequency":"666"},{"type":"256QAM","corrErrors":42666,"mse":"-37.4","powerLevel":"8.1","channel":14,"nonCorrErrors":172,"latency":0.32,"channelID":17,"frequency":"626"},{"type":"256QAM","corrErrors":41023,"mse":"-37.4","powerLevel":"9.3","channel":15,"nonCorrErrors":10620,"latency":0.32,"channelID":20,"frequency":"650"},{"type":"256QAM","corrErrors":106921,"mse":"-37.6","powerLevel":"7.4","channel":16,"nonCorrErrors":356,"latency":0.32,"channelID":4,"frequency":"498"},{"type":"256QAM","corrErrors":86650,"mse":"-36.4","powerLevel":"4.9","channel":17,"nonCorrErrors":85,"latency":0.32,"channelID":12,"frequency":"578"},{"type":"256QAM","corrErrors":91838,"mse":"-36.4","powerLevel":"4.8","channel":18,"nonCorrErrors":168,"latency":0.32,"channelID":8,"frequency":"546"},{"type":"256QAM","corrErrors":110719,"mse":"-35.8","powerLevel":"4.5","channel":19,"nonCorrErrors":103,"latency":0.32,"channelID":10,"frequency":"562"},{"type":"256QAM","corrErrors":111846,"mse":"-37.6","powerLevel":"8.2","channel":20,"nonCorrErrors":247,"latency":0.32,"channelID":2,"frequency":"482"},{"type":"256QAM","corrErrors":668242,"mse":"-36.6","powerLevel":"5.8","channel":21,"nonCorrErrors":6800,"latency":0.32,"channelID":5,"frequency":"522"},{"type":"256QAM","corrErrors":104070,"mse":"-36.6","powerLevel":"5.3","channel":22,"nonCorrErrors":149,"latency":0.32,"channelID":6,"frequency":"530"},{"type":"256QAM","corrErrors":120994,"mse":"-35.8","powerLevel":"4.4","channel":23,"nonCorrErrors":10240,"latency":0.32,"channelID":9,"frequency":"554"},{"type":"256QAM","corrErrors":59145,"mse":"-36.4","powerLevel":"5.3","channel":24,"nonCorrErrors":9560,"latency":0.32,"channelID":11,"frequency":"570"},{"type":"256QAM","corrErrors":118271,"mse":"-37.6","powerLevel":"8.4","channel":25,"nonCorrErrors":810,"latency":0.32,"channelID":1,"frequency":"474"},{"type":"256QAM","corrErrors":40255,"mse":"-37.4","powerLevel":"6.5","channel":26,"nonCorrErrors":13474,"latency":0.32,"channelID":15,"frequency":"602"},{"type":"256QAM","corrErrors":62716,"mse":"-36.4","powerLevel":"5.3","channel":27,"nonCorrErrors":9496,"latency":0.32,"channelID":13,"frequency":"586"},{"type":"256QAM","corrErrors":131364,"mse":"-36.6","powerLevel":"8.9","channel":28,"nonCorrErrors":12238,"latency":0.32,"channelID":29,"frequency":"738"}]},"oem":"lgi","readyState":"ready","channelUs":{"docsis31":[],"docsis30":[{"powerLevel":"43.0","type":"64QAM","channel":1,"multiplex":"ATDMA","channelID":4,"frequency":"51"},{"powerLevel":"44.3","type":"64QAM","channel":2,"multiplex":"ATDMA","channelID":2,"frequency":"37"},{"powerLevel":"43.8","type":"64QAM","channel":3,"multiplex":"ATDMA","channelID":3,"frequency":"45"},{"powerLevel":"45.8","type":"64QAM","channel":4,"multiplex":"ATDMA","channelID":1,"frequency":"31"}]}},"sid":"14341afbc7d83b4c"}';
 #         my $TestSIS = '{"pid":"docInfo","hide":{"mobile":true,"ssoSet":true,"liveTv":true},"time":[],"data":{"channelDs":{"docsis30":[{"type":"256QAM","corrErrors":92890,"mse":"-36.4","powerLevel":"5.1","channel":1,"nonCorrErrors":9773,"latency":0.32,"channelID":7,"frequency":"538"},{"type":"256QAM","corrErrors":20553,"mse":"-37.4","powerLevel":"10.2","channel":2,"nonCorrErrors":9420,"latency":0.32,"channelID":26,"frequency":"698"},{"type":"256QAM","corrErrors":28673,"mse":"-37.6","powerLevel":"10.0","channel":3,"nonCorrErrors":140,"latency":0.32,"channelID":25,"frequency":"690"},{"type":"256QAM","corrErrors":25930,"mse":"-37.6","powerLevel":"10.0","channel":4,"nonCorrErrors":170,"latency":0.32,"channelID":27,"frequency":"706"},{"type":"256QAM","corrErrors":98698,"mse":"-36.6","powerLevel":"8.8","channel":5,"nonCorrErrors":9151,"latency":0.32,"channelID":30,"frequency":"746"},{"type":"256QAM","corrErrors":24614,"mse":"-37.4","powerLevel":"9.4","channel":6,"nonCorrErrors":9419,"latency":0.32,"channelID":28,"frequency":"730"},{"type":"256QAM","corrErrors":25882,"mse":"-37.4","powerLevel":"9.9","channel":7,"nonCorrErrors":9308,"latency":0.32,"channelID":24,"frequency":"682"},{"type":"256QAM","corrErrors":33817,"mse":"-37.4","powerLevel":"9.8","channel":8,"nonCorrErrors":146,"latency":0.32,"channelID":23,"frequency":"674"},{"type":"256QAM","corrErrors":112642,"mse":"-37.6","powerLevel":"7.8","channel":9,"nonCorrErrors":7783,"latency":0.32,"channelID":3,"frequency":"490"},{"type":"256QAM","corrErrors":41161,"mse":"-37.6","powerLevel":"9.8","channel":10,"nonCorrErrors":203,"latency":0.32,"channelID":21,"frequency":"658"},{"type":"256QAM","corrErrors":33219,"mse":"-37.4","powerLevel":"8.8","channel":11,"nonCorrErrors":10962,"latency":0.32,"channelID":18,"frequency":"634"},{"type":"256QAM","corrErrors":32680,"mse":"-37.6","powerLevel":"9.2","channel":12,"nonCorrErrors":145,"latency":0.32,"channelID":19,"frequency":"642"},{"type":"256QAM","corrErrors":33001,"mse":"-37.4","powerLevel":"9.8","channel":13,"nonCorrErrors":7613,"latency":0.32,"channelID":22,"frequency":"666"},{"type":"256QAM","corrErrors":42666,"mse":"-37.4","powerLevel":"8.1","channel":14,"nonCorrErrors":172,"latency":0.32,"channelID":17,"frequency":"626"},{"type":"256QAM","corrErrors":41023,"mse":"-37.4","powerLevel":"9.3","channel":15,"nonCorrErrors":10620,"latency":0.32,"channelID":20,"frequency":"650"},{"type":"256QAM","corrErrors":106921,"mse":"-37.6","powerLevel":"7.4","channel":16,"nonCorrErrors":356,"latency":0.32,"channelID":4,"frequency":"498"},{"type":"256QAM","corrErrors":86650,"mse":"-36.4","powerLevel":"4.9","channel":17,"nonCorrErrors":85,"latency":0.32,"channelID":12,"frequency":"578"},{"type":"256QAM","corrErrors":91838,"mse":"-36.4","powerLevel":"4.8","channel":18,"nonCorrErrors":168,"latency":0.32,"channelID":8,"frequency":"546"},{"type":"256QAM","corrErrors":110719,"mse":"-35.8","powerLevel":"4.5","channel":19,"nonCorrErrors":103,"latency":0.32,"channelID":10,"frequency":"562"},{"type":"256QAM","corrErrors":111846,"mse":"-37.6","powerLevel":"8.2","channel":20,"nonCorrErrors":247,"latency":0.32,"channelID":2,"frequency":"482"},{"type":"256QAM","corrErrors":668242,"mse":"-36.6","powerLevel":"5.8","channel":21,"nonCorrErrors":6800,"latency":0.32,"channelID":5,"frequency":"522"},{"type":"256QAM","corrErrors":104070,"mse":"-36.6","powerLevel":"5.3","channel":22,"nonCorrErrors":149,"latency":0.32,"channelID":6,"frequency":"530"},{"type":"256QAM","corrErrors":120994,"mse":"-35.8","powerLevel":"4.4","channel":23,"nonCorrErrors":10240,"latency":0.32,"channelID":9,"frequency":"554"},{"type":"256QAM","corrErrors":59145,"mse":"-36.4","powerLevel":"5.3","channel":24,"nonCorrErrors":9560,"latency":0.32,"channelID":11,"frequency":"570"},{"type":"256QAM","corrErrors":118271,"mse":"-37.6","powerLevel":"8.4","channel":25,"nonCorrErrors":810,"latency":0.32,"channelID":1,"frequency":"474"},{"type":"256QAM","corrErrors":40255,"mse":"-37.4","powerLevel":"6.5","channel":26,"nonCorrErrors":13474,"latency":0.32,"channelID":15,"frequency":"602"},{"type":"256QAM","corrErrors":62716,"mse":"-36.4","powerLevel":"5.3","channel":27,"nonCorrErrors":9496,"latency":0.32,"channelID":13,"frequency":"586"},{"type":"256QAM","corrErrors":131364,"mse":"-36.6","powerLevel":"8.9","channel":28,"nonCorrErrors":12238,"latency":0.32,"channelID":29,"frequency":"738"}]},"oem":"lgi","readyState":"ready","channelUs":{"docsis30":[{"powerLevel":"43.0","type":"64QAM","channel":1,"multiplex":"ATDMA","channelID":4,"frequency":"51"},{"powerLevel":"44.3","type":"64QAM","channel":2,"multiplex":"ATDMA","channelID":2,"frequency":"37"},{"powerLevel":"43.8","type":"64QAM","channel":3,"multiplex":"ATDMA","channelID":3,"frequency":"45"},{"powerLevel":"45.8","type":"64QAM","channel":4,"multiplex":"ATDMA","channelID":1,"frequency":"31"}]}},"sid":"14341afbc7d83b4c"}';
 #         my $TestSIS = '{"pid":"docInfo","hide":{"shareUsb":true,"autoUp":true,"liveTv":true,"update":true,"rrd":true,"mobile":true,"userUp":true,"wizUpdate":true,"ssoSet":true},"timeTillLogout":"1199","time":[],"data":{"channelDs":{"docsis30":[{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.6","channelID":13,"frequency":"250.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":15,"latency":0.32,"mse":"-37.6","channelID":5,"frequency":"186.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.6","channelID":9,"frequency":"218.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":0,"latency":0.32,"mse":"-37.4","channelID":1,"frequency":"154.000"},{"powerLevel":"4.5","nonCorrErrors":0,"modulation":"256QAM","corrErrors":10,"latency":0.32,"mse":"-37.4","channelID":2,"frequency":"162.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":14,"latency":0.32,"mse":"-37.4","channelID":3,"frequency":"170.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":13,"latency":0.32,"mse":"-37.6","channelID":4,"frequency":"178.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":13,"latency":0.32,"mse":"-37.6","channelID":6,"frequency":"194.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.4","channelID":7,"frequency":"202.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":8,"latency":0.32,"mse":"-37.4","channelID":8,"frequency":"210.000"},{"powerLevel":"4.0","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.6","channelID":10,"frequency":"226.000"},{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":5,"latency":0.32,"mse":"-37.6","channelID":11,"frequency":"234.000"},{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.4","channelID":12,"frequency":"242.000"},{"powerLevel":"4.1","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.6","channelID":14,"frequency":"258.000"},{"powerLevel":"4.8","nonCorrErrors":0,"modulation":"256QAM","corrErrors":15,"latency":0.32,"mse":"-37.6","channelID":15,"frequency":"266.000"},{"powerLevel":"4.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":10,"latency":0.32,"mse":"-37.6","channelID":16,"frequency":"274.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":22,"latency":0.32,"mse":"-37.6","channelID":17,"frequency":"282.000"},{"powerLevel":"4.4","nonCorrErrors":0,"modulation":"256QAM","corrErrors":17,"latency":0.32,"mse":"-37.6","channelID":18,"frequency":"290.000"},{"powerLevel":"4.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":34,"latency":0.32,"mse":"-37.4","channelID":19,"frequency":"298.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":32,"latency":0.32,"mse":"-37.6","channelID":20,"frequency":"306.000"},{"powerLevel":"4.4","nonCorrErrors":0,"modulation":"256QAM","corrErrors":28,"latency":0.32,"mse":"-37.4","channelID":21,"frequency":"314.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":29,"latency":0.32,"mse":"-37.4","channelID":22,"frequency":"322.000"},{"powerLevel":"4.8","nonCorrErrors":0,"modulation":"256QAM","corrErrors":32,"latency":0.32,"mse":"-37.6","channelID":23,"frequency":"330.000"},{"powerLevel":"4.6","nonCorrErrors":0,"modulation":"256QAM","corrErrors":27,"latency":0.32,"mse":"-37.6","channelID":24,"frequency":"338.000"}]},"oem":"avm","readyState":"ready","channelUs":{"docsis30":[{"powerLevel":"42.3","modulation":"64QAM","multiplex":"ATDMA","channelID":8,"frequency":"48.400"},{"powerLevel":"42.0","modulation":"64QAM","multiplex":"ATDMA","channelID":10,"frequency":"61.400"},{"powerLevel":"42.0","modulation":"64QAM","multiplex":"ATDMA","channelID":9,"frequency":"54.800"},{"powerLevel":"42.3","modulation":"64QAM","multiplex":"ATDMA","channelID":6,"frequency":"35.200"},{"powerLevel":"41.8","modulation":"64QAM","multiplex":"ATDMA","channelID":7,"frequency":"41.800"}]}},"sid":"ee9c7ab49ebf6e09"}';
-#         my $resultData = Fritz_Helper_process_JSON($hash, $TestSIS, "ee9c7ab49ebf6e09", "");
+#         my $resultData = Fritz_Helper_process_JSON($hash, $TestSIS, "ee9c7ab49ebf6e09", 0, "");
       
          $resultData = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
 
@@ -10526,11 +10556,11 @@ sub Fritz_Readout_Process($$@)
        delete ($hash->{WARNING_NETWORK})  if $rName2 eq "WARNING_NETWORK"  && $rValue eq "";
        if ($rName2 eq "APICHECKED") {
          if($rValue == -1) {
-           main::readingsBulkUpdate( $hash, "state", ": waiting for recheck" ) ;
+           main::readingsBulkUpdate( $hash, "state", "checkAPIs: waiting" ) ;
            $hash->{WARNING_PROCESS} = "disrupted -> waiting for API recheck" ;
            $newState = "check API: waiting for recheck";
          } else {
-           main::readingsBulkUpdate( $hash, "state", "check API: done" ) ;
+           main::readingsBulkUpdate( $hash, "state", "checkAPIs: done" ) ;
            $hash->{WARNING_PROCESS} = "check API:no warning" ;
            $newState = "check API: done";
          }
@@ -10556,13 +10586,13 @@ sub Fritz_Readout_Process($$@)
 
      elsif ( $rName eq "Error" ) {
        main::readingsBulkUpdate( $hash, "retStat_lastReadoutError", $rValue );
-       main::readingsBulkUpdate( $hash, "state", $rValue );
+       main::readingsBulkUpdate( $hash, "state", "error fetching data" );
        $newState = $rValue;
      }
  
      elsif ( $rName eq "Hint" ) {
        main::readingsBulkUpdate( $hash, "retStat_lastReadoutWarning", $rValue );
-       main::readingsBulkUpdate( $hash, "state", $rValue );
+       main::readingsBulkUpdate( $hash, "state", "note fetching data" );
        $newState = $rValue;
      }
  
@@ -10725,8 +10755,8 @@ sub Fritz_Readout_Aborted($)
 
   Fritz_Log $hash, 2, $msg;
 
-  main::readingsSingleUpdate($hash, "retStat_lastReadout", $msg, 1);
-  main::readingsSingleUpdate($hash, "state", $msg, 1);
+  main::readingsSingleUpdate($hash, "retStat_lastReadoutError", $msg, 1);
+  main::readingsSingleUpdate($hash, "state", "aborted fetching data", 1);
 
 } # end Fritz_Readout_Aborted
 
@@ -11435,7 +11465,9 @@ sub Fritz_Readout_API_Check($)
          }
 
        } elsif( $response->is_success && $response->content =~ /\<body\>(.*?)\<\/body\>/isg) {
-         # Fritz_Log "boxUser", 3, "FBUser: \n" . $1;
+
+         Fritz_Log $hash, 5, "FBUser-Web: \n" . $1;
+
          my $mybody = $1;
 
          if($mybody =~ /("activeUsers":\[\{.*?\}\]),/isg) {
@@ -11443,9 +11475,10 @@ sub Fritz_Readout_API_Check($)
            $user_content = "{" .$1. "}";
            Fritz_Log $name, 4, "FBUser: \n" . $user_content;
 
-           my $resultData = Fritz_Helper_process_JSON($hash, $user_content, "", "");
+           my $resultData = Fritz_Helper_process_JSON($hash, $user_content, "", 0, "");
 
            my $cData = $resultData->{activeUsers};
+           Fritz_Log $name, 4, "activeUsers: " . Dumper($cData);
 
            if (ref($cData) eq "ARRAY") {
              my $nbViews = scalar @$cData;
@@ -11468,7 +11501,7 @@ sub Fritz_Readout_API_Check($)
              Fritz_Readout_Add_Reading $hash, \@roReadings, "->DEVICE_USER", $boxUser;
 
              $bUsers =~ s/ /&#160;/g;
-             #Fritz_Log $name, 3, "FBUser: \n" . $bUsers;
+             Fritz_Log $name, 4, "FBUser: " . $bUsers;
 
              Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->intBoxUsers", "$bUsers";
              $hash->{fhem}{intBoxUsers} = $bUsers;
@@ -11519,8 +11552,6 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
 
-     $hash->{fhem}{sidTime} = 0;
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", ($crdOK < 0 ? $crdOK : $hash->{fhem}{sidErrCount} + 1);
 
      my $returnStr = join('|', @roReadings );
@@ -11733,8 +11764,6 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
 
-     $hash->{fhem}{sidTime} = 0;
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
      my $returnStr = join('|', @roReadings );
@@ -11844,13 +11873,17 @@ sub Fritz_Readout_API_Check($)
 
      } else {
 
-       Fritz_Log $hash, 4-$myVerbose, "open Web_Connection succeeded";
+       Fritz_Log $hash, 4-$myVerbose, "open Web_Connection succeeded - sid: $result->{sid} sidTime: $result->{sidTime}";
 
        my $sidNew = defined $result->{sidNew} ? $result->{sidNew} : 0;
 
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sid", $result->{sid};
+       $hash->{fhem}{sid}     = $result->{sid};
+       $hash->{fhem}{sidTime} = $result->{sidTime};
+
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sid",     $hash->{fhem}{sid};
+       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", $hash->{fhem}{sidTime};
+
        Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidNewCount", $sidNew;
-       Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", time();
        Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
        Fritz_Readout_Add_Reading $hash, \@roReadings, "->WEBCONNECT", 1;
 
@@ -11874,8 +11907,6 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $ErrorTXT;
 
-     $hash->{fhem}{sidTime} = 0;
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
 
      my $returnStr = join('|', @roReadings );
@@ -11887,8 +11918,6 @@ sub Fritz_Readout_API_Check($)
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", 55;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", "Ok";
 
-     $hash->{fhem}{sidTime} = 0;
-     Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
      Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", 0;
    }
 
@@ -12116,6 +12145,8 @@ sub Fritz_Readout_API_Check($)
    if(main::ReadingsNum($hash, "shdevices_busyReadout", 0)) {
      Fritz_Readout_Add_Reading ($hash, \@roReadings, "shdevices_busyReadout", 0) if main::AttrVal($hash, "SHInfoExtActive", 0);
    }
+
+   Fritz_Log $hash, 3, "und Schluss - sid: $hash->{fhem}{sid} sidTime: $hash->{fhem}{sidTime}";
 
    my $returnStr = join('|', @roReadings );
 
@@ -15244,7 +15275,7 @@ sub Fritz_Get_DOCSIS_Informations($) {
    my $returnStr;
 
 #   my $TestSIS = '{"pid":"docInfo","hide":{"shareUsb":true,"autoUp":true,"liveTv":true,"update":true,"rrd":true,"mobile":true,"userUp":true,"wizUpdate":true,"ssoSet":true},"timeTillLogout":"1199","time":[],"data":{"channelDs":{"docsis30":[{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.6","channelID":13,"frequency":"250.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":15,"latency":0.32,"mse":"-37.6","channelID":5,"frequency":"186.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.6","channelID":9,"frequency":"218.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":0,"latency":0.32,"mse":"-37.4","channelID":1,"frequency":"154.000"},{"powerLevel":"4.5","nonCorrErrors":0,"modulation":"256QAM","corrErrors":10,"latency":0.32,"mse":"-37.4","channelID":2,"frequency":"162.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":14,"latency":0.32,"mse":"-37.4","channelID":3,"frequency":"170.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":13,"latency":0.32,"mse":"-37.6","channelID":4,"frequency":"178.000"},{"powerLevel":"4.3","nonCorrErrors":0,"modulation":"256QAM","corrErrors":13,"latency":0.32,"mse":"-37.6","channelID":6,"frequency":"194.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":9,"latency":0.32,"mse":"-37.4","channelID":7,"frequency":"202.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":8,"latency":0.32,"mse":"-37.4","channelID":8,"frequency":"210.000"},{"powerLevel":"4.0","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.6","channelID":10,"frequency":"226.000"},{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":5,"latency":0.32,"mse":"-37.6","channelID":11,"frequency":"234.000"},{"powerLevel":"3.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.4","channelID":12,"frequency":"242.000"},{"powerLevel":"4.1","nonCorrErrors":0,"modulation":"256QAM","corrErrors":11,"latency":0.32,"mse":"-37.6","channelID":14,"frequency":"258.000"},{"powerLevel":"4.8","nonCorrErrors":0,"modulation":"256QAM","corrErrors":15,"latency":0.32,"mse":"-37.6","channelID":15,"frequency":"266.000"},{"powerLevel":"4.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":10,"latency":0.32,"mse":"-37.6","channelID":16,"frequency":"274.000"},{"powerLevel":"4.2","nonCorrErrors":0,"modulation":"256QAM","corrErrors":22,"latency":0.32,"mse":"-37.6","channelID":17,"frequency":"282.000"},{"powerLevel":"4.4","nonCorrErrors":0,"modulation":"256QAM","corrErrors":17,"latency":0.32,"mse":"-37.6","channelID":18,"frequency":"290.000"},{"powerLevel":"4.9","nonCorrErrors":0,"modulation":"256QAM","corrErrors":34,"latency":0.32,"mse":"-37.4","channelID":19,"frequency":"298.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":32,"latency":0.32,"mse":"-37.6","channelID":20,"frequency":"306.000"},{"powerLevel":"4.4","nonCorrErrors":0,"modulation":"256QAM","corrErrors":28,"latency":0.32,"mse":"-37.4","channelID":21,"frequency":"314.000"},{"powerLevel":"4.7","nonCorrErrors":0,"modulation":"256QAM","corrErrors":29,"latency":0.32,"mse":"-37.4","channelID":22,"frequency":"322.000"},{"powerLevel":"4.8","nonCorrErrors":0,"modulation":"256QAM","corrErrors":32,"latency":0.32,"mse":"-37.6","channelID":23,"frequency":"330.000"},{"powerLevel":"4.6","nonCorrErrors":0,"modulation":"256QAM","corrErrors":27,"latency":0.32,"mse":"-37.6","channelID":24,"frequency":"338.000"}]},"oem":"avm","readyState":"ready","channelUs":{"docsis30":[{"powerLevel":"42.3","modulation":"64QAM","multiplex":"ATDMA","channelID":8,"frequency":"48.400"},{"powerLevel":"42.0","modulation":"64QAM","multiplex":"ATDMA","channelID":10,"frequency":"61.400"},{"powerLevel":"42.0","modulation":"64QAM","multiplex":"ATDMA","channelID":9,"frequency":"54.800"},{"powerLevel":"42.3","modulation":"64QAM","multiplex":"ATDMA","channelID":6,"frequency":"35.200"},{"powerLevel":"41.8","modulation":"64QAM","multiplex":"ATDMA","channelID":7,"frequency":"41.800"}]}},"sid":"ee9c7ab49ebf6e09"}';
-#   my $result  = Fritz_Helper_process_JSON($hash, $TestSIS, "ee9c7ab49ebf6e09", "");
+#   my $result  = Fritz_Helper_process_JSON($hash, $TestSIS, "ee9c7ab49ebf6e09", 0, "");
 
    my $result = Fritz_call_LuaData($hash, "data", \@webCmdArray) ;
 
@@ -15562,6 +15593,9 @@ sub Fritz_Get_Wlan_Status($$$)
        };
      }
 
+     Fritz_Log $hash, 4, "wNames (bands): $wNames";
+
+
    } elsif(exists($result->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) && ref( $result->{data}->{rep_data}->{wlan_conninfo}->{bandinfo}) eq "ARRAY" ) {
 
      $nbViews = 0;
@@ -15589,6 +15623,7 @@ sub Fritz_Get_Wlan_Status($$$)
        };
 
      }
+     Fritz_Log $hash, 4, "wNames (rep_data): $wNames";
 
    } else {
 
@@ -15625,6 +15660,7 @@ sub Fritz_Get_Wlan_Status($$$)
        $nbViews += 1;
      }
 
+     Fritz_Log $hash, 4, "wNames (.*ghz): $wNames";
    }
 
    Fritz_Readout_Add_Reading $hash, $roReadings, "box_wlanBand_cnt", $nbViews;
@@ -15632,6 +15668,9 @@ sub Fritz_Get_Wlan_Status($$$)
 
    chop ($wNames);
    $wNames =~ s/GHz//g;
+
+   $wNames = "wlan2.4" unless($wNames);
+
    Fritz_Readout_Add_Reading $hash, $roReadings, "fhem->multiple_wlan->names", $wNames;
 
 } # end Fritz_Get_Wlan_Status
@@ -17623,9 +17662,10 @@ sub Fritz_Get_Lua_Kids($$@)
       return \%retHash;
    }
 
-   $jsonResult->{sid}    = $result->{sid};
-   $jsonResult->{sidNew} = $sidNew;
-   $jsonResult->{Error}  = $jsonResult->{error}  if defined $jsonResult->{error};
+   $jsonResult->{sid}     = $result->{sid};
+   $jsonResult->{sidTime} = $result->{sidTime};
+   $jsonResult->{sidNew}  = $sidNew;
+   $jsonResult->{Error}   = $jsonResult->{error}  if defined $jsonResult->{error};
    return $jsonResult;
 
 } # end Fritz_Get_Lua_Kids
@@ -18129,19 +18169,28 @@ sub Fritz_open_Web_Connection ($)
      return \%retHash  if !main::AttrVal($name, "disableHostIPv4check", 0);
    }
 
-# Use old sid if last access later than 9.5 minutes
+   # Use old sid if last access later than 9.5 minutes
    my $sid = $hash->{fhem}{sid};
 
-   if (defined $sid && $hash->{fhem}{sidTime} > time() - 9.5 * 60) {
-      Fritz_Log $hash, 4, "using old SID from " . strftime "%H:%M:%S", localtime($hash->{fhem}{sidTime});
-      %retHash = ( "sid" => $sid, "ResetSID" => "0" ) ;
-      return \%retHash;
+   my $vglTime = time() - (9.5 * 60);
+   Fritz_Log $hash, 3, "sidTime: $hash->{fhem}{sidTime} - vglTime: $vglTime" unless($hash->{fhem}{sidTime});
 
+   if (defined($sid) && ( $hash->{fhem}{sidTime} > $vglTime ) ) {
+
+      $hash->{fhem}{sid}     = $sid;
+      $hash->{fhem}{sidTime} = time();
+
+      Fritz_Log $hash, 4, "using old SID from " . strftime("%H:%M:%S", localtime($hash->{fhem}{sidTime}));
+
+      %retHash = ( "sid" => $sid, "sidTime" => $hash->{fhem}{sidTime}, "sidNew" => 0, "ResetSID" => "0" ) ;
+      return \%retHash;
    } else {
       my $msg;
-      $msg .= "SID: " if defined $sid ? $sid : "no SID";
-      $msg .= " timed out" if defined $hash->{fhem}{sidTime} && $hash->{fhem}{sidTime} < time() - 9.5 * 60;
-      Fritz_Log $hash, 4, "renewing SID while: " . $msg;
+      $msg .= "SID: " . (defined($sid) ? $sid : "no SID");
+      if ( $hash->{fhem}{sidTime} <= $vglTime && defined($sid) ) {
+        $msg .= " timed out (" . strftime("%H:%M:%S", localtime($hash->{fhem}{sidTime})) . ")";
+      }
+      Fritz_Log $hash, 3, "renewing SID while: " . $msg;
    }
 
    my $avmModel = main::InternalVal($name, "MODEL", $hash->{MODEL});
@@ -18149,7 +18198,8 @@ sub Fritz_open_Web_Connection ($)
 
    Fritz_Log $hash, 4, "Fritz_Get_Lan_Device_Info (Fritz!OS: $hash->{fhem}{fwVersionStr}) ";
 
-   if ($user eq "" && $avmModel && $avmModel =~ "Box" && ($hash->{fhem}{fwVersion} >= 725) ) {
+   # Box|1200 AX|1700|3000
+   if ($user eq "" && $avmModel && $avmModel =~ /Box|1700/ && ($hash->{fhem}{fwVersion} >= 725) ) {
       Fritz_Log $hash, 2, "No boxUser set. Please define it (once) with 'attr $name boxUser YourBoxUser'";
       %retHash = ( "Error" => "No attr boxUser set", "ResetSID" => "1", "Web_Connection" => "Error" ) ;
       return \%retHash;
@@ -18172,8 +18222,12 @@ sub Fritz_open_Web_Connection ($)
    $Fritz_TR064pwd = undef;
 
    if ($sid) {
-      Fritz_Log $hash, 5, "Web session opened with sid $sid";
-      %retHash = ( "sid" => $sid, "sidNew" => 1, "ResetSID" => "0" ) ;
+      $hash->{fhem}{sid}     = $sid;
+      $hash->{fhem}{sidTime} = time();
+
+      Fritz_Log $hash, 3, "Web session opened with sid: $sid at: " . strftime("%H:%M:%S", localtime($hash->{fhem}{sidTime}));
+
+      %retHash = ( "sid" => $sid, "sidTime" => $hash->{fhem}{sidTime}, "sidNew" => 1, "ResetSID" => "0" ) ;
       return \%retHash;
    }
 
@@ -18275,8 +18329,7 @@ sub Fritz_call_Lua_Query($$@)
        Fritz_Log $hash, 2, "" . $response->status_line;
        return \%retHash;
      } else {
-#       return Fritz_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
-       return Fritz_Helper_process_JSON($hash, $luaContent, $result->{sid}, $charSet, $sidNew);
+       return Fritz_Helper_process_JSON($hash, $luaContent, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
      }
 
    } else {
@@ -18287,6 +18340,7 @@ sub Fritz_call_Lua_Query($$@)
      }
 
      $jsonResult->{sid}     = $result->{sid};
+     $jsonResult->{sidTime} = $result->{sidTime};
      $jsonResult->{sidNew}  = $sidNew;
      if (defined $response->status_line) {
        $jsonResult->{result}  = '<response status="' . $response->status_line . '">';
@@ -18392,7 +18446,7 @@ sub Fritz_call_LuaData($$$@)
 
      Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
    }
 
    # handling fon_devices informations
@@ -18415,7 +18469,7 @@ sub Fritz_call_LuaData($$$@)
 
      Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
    }
 
    # handling fon_devices informations
@@ -18446,7 +18500,7 @@ sub Fritz_call_LuaData($$$@)
 
        Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-       return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+       return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
 
      }
    }
@@ -18489,7 +18543,7 @@ sub Fritz_call_LuaData($$$@)
 
      Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
    }
 
    # handling TAM informations
@@ -18593,7 +18647,7 @@ sub Fritz_call_LuaData($$$@)
 
      Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
    }
 
    # handling profile informations
@@ -18627,7 +18681,7 @@ sub Fritz_call_LuaData($$$@)
 
      Fritz_Log $hash, 4, "Response JSON: \n: " . $profile_content;
 
-     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
 
    }
 
@@ -18828,7 +18882,7 @@ sub Fritz_call_LuaData($$$@)
        
        Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-       return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+       return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
 
      }
    }
@@ -18901,7 +18955,7 @@ sub Fritz_call_LuaData($$$@)
 
        Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-       return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+       return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
 
      }
    }
@@ -18932,7 +18986,7 @@ sub Fritz_call_LuaData($$$@)
 
       Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-      return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+      return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
    }
 
    # handling for getting wakeUpCall Informations
@@ -18968,7 +19022,7 @@ sub Fritz_call_LuaData($$$@)
  
       Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-      return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+      return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
    }
 
    # handling for getting profile Informations
@@ -19006,13 +19060,13 @@ sub Fritz_call_LuaData($$$@)
 
      Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
    }
 
    # handling non JSON returns
    ###########  HTML #################################
 
-   my $resultJSON = Fritz_Helper_process_JSON($hash, $response->content, $result->{sid}, $charSet, $sidNew);
+   my $resultJSON = Fritz_Helper_process_JSON($hash, $response->content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
 
    if (defined $resultJSON->{Error} && $resultJSON->{Error} =~ /no HASH\/ARRAY from JSON returned/ ) {
 
@@ -19031,9 +19085,6 @@ sub Fritz_call_LuaData($$$@)
        my $json_string = $json_coder->encode($htmlJson);
        $json_string =~ s/^\{\s*"html" : (.*?)\}$/$1/igs;
        $data = $json_string;
-
-#       Fritz_Log $hash, 3, "Response JSON: \n" . $json_string;
-#       return Fritz_Helper_process_JSON($hash, $json_string, $result->{sid}, $charSet, $sidNew);
 
      } else {
 
@@ -19066,7 +19117,7 @@ sub Fritz_call_LuaData($$$@)
 
      Fritz_Log $hash, 4, "Response JSON: \n" . $profile_content;
 
-     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $charSet, $sidNew);
+     return Fritz_Helper_process_JSON($hash, $profile_content, $result->{sid}, $result->{sidTime}, $charSet, $sidNew);
 
    }
 
@@ -19167,7 +19218,7 @@ sub Fritz_write_javaScript($$;@)
 
    Fritz_Log $hash, 4, "_content: " . Fritz_Helper_Dumper($hash, $data, 4);
 
-   return Fritz_Helper_process_JSON($hash, $data, $result->{sid}, $charSet, $sidNew, 1);
+   return Fritz_Helper_process_JSON($hash, $data, $result->{sid}, $result->{sidTime}, $charSet, $sidNew, 1);
 
 } # end Fritz_write_javaScript
 
@@ -19218,7 +19269,7 @@ sub Fritz_call_javaScript($$@)
 
    my $data = $response->content;
 
-   return Fritz_Helper_process_JSON($hash, $data, $result->{sid}, $charSet, $sidNew, 1);
+   return Fritz_Helper_process_JSON($hash, $data, $result->{sid}, $result->{sidTime}, $charSet, $sidNew, 1);
 
 } # end Fritz_call_javaScript
 
@@ -19617,8 +19668,7 @@ sub Fritz_Helper_make_TableRow($@) {
 # Process JSON from lua response
 ############################################
 sub Fritz_Helper_process_JSON($$$@) {
-
-   my ($hash, $jsonText, $sid, $charSet, $sidNew, $fromJS) = @_;
+   my ($hash, $jsonText, $sid, $sidTime, $charSet, $sidNew, $fromJS) = @_;
    $charSet = "" unless defined $charSet;
    $sidNew  = 0 unless defined $sidNew;
    $fromJS  = 0 unless defined $fromJS;
@@ -19671,6 +19721,7 @@ sub Fritz_Helper_process_JSON($$$@) {
        Fritz_Log $hash, 4, "JSON: is ARRAY";
        my %ReturnHash = (
            "sid"    => $sid,
+           "sidTime"=> $sidTime,
            "sidNew" => $sidNew,
            "result" => $jsonResult
        );
@@ -19681,6 +19732,7 @@ sub Fritz_Helper_process_JSON($$$@) {
        Fritz_Log $hash, 4, "JSON: no {data} or {result}";
        my %ReturnHash = (
            "sid"    => $sid,
+           "sidTime"=> $sidTime,
            "sidNew" => $sidNew,
            "data"   => $jsonResult
        );
@@ -19690,9 +19742,10 @@ sub Fritz_Helper_process_JSON($$$@) {
 
      } else {
        Fritz_Log $hash, 4, "JSON: Standard";
-       $jsonResult->{sid}    = $sid;
-       $jsonResult->{sidNew} = $sidNew;
-       $jsonResult->{Error}  = $jsonResult->{error}  if defined $jsonResult->{error};
+       $jsonResult->{sid}     = $sid;
+       $jsonResult->{sidTime} = $sidTime;
+       $jsonResult->{sidNew}  = $sidNew;
+       $jsonResult->{Error}   = $jsonResult->{error}  if defined $jsonResult->{error};
 
        return $jsonResult;
      }
@@ -19706,6 +19759,7 @@ sub Fritz_Helper_process_JSON($$$@) {
      }
 
      $jsonResult->{sid}    = $sid;
+     $jsonResult->{sidTime} = $sidTime;
      $jsonResult->{sidNew} = $sidNew;
      $jsonResult->{Error}  = $jsonResult->{error}  if defined $jsonResult->{error};
 
@@ -21301,23 +21355,22 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_powerLine</b> - Powerline connection active</li>
       <li><b>box_rateDown</b> - Download speed of the last interval in kByte/s</li>
       <li><b>box_rateUp</b> - Upload speed of the last interval in kByte/s</li>
-      <li><b>box_sys_LogNewest</b> - Most recent system event: ID Date Time </li>
       <li><b>box_stdDialPort</b> - Port used by the dialer on the device side</li>
       <li><b>box_tr064</b> - Status of the application interface TR-064 (also required by this module)</li>
       <li><b>box_tr069</b> - Provider remote maintenance TR-069 (security-relevant!)</li>
-      <li><b>box_wlan_Count</b> - Number of devices using WLAN connected</li>
-      <li><b>box_wlan_Active</b> - Current WLAN status</li>
-      <li><b>box_wlanBand_cnt</b> - Number of Wi-Fi bands</li>
-      <li><b>box_wlanBand_2.4GHz</b> - Current status of the 2.4 GHz Wi-Fi. Lower Fritz!OS 7.50</li>
-      <li><b>box_wlanBand_5GHz</b> - Current status of the 5 GHz Wi-Fi. Lower Fritz!OS 7.50</li>
-      <li><b>box_wlanBand_</b><i>n</i><b>GHz_active</b> - Active status of the GHz Wi-Fi. Greater than or equal to Fritz!OS 7.50</li>
-      <li><b>box_wlanBand_</b><i>n</i><b>GHz_usable</b> - Availability status of the GHz Wi-Fi. Greater than or equal to Fritz!OS 7.50</li>
-      <li><b>box_wlan_lastScanTime</b> - Last scan of the WLAN environment. Only available if the enableWLANneighbors attribute is set.</li>
-      <li><b>box_wlan_LogExtended</b> - Status -> "Also log logins and logouts and extended WLAN information."</li>
-      <li><b>box_wlan_LogNewest</b> - Most recent WLAN event: ID Date Time </li>
 
       <br>
-      <li><b>box_cpu...</b>Readings CPU informations. Available when enabled in the enableCPUInfo attribute.</li>
+      <li><b>box_wlan_Count</b> - Number of devices using WLAN connected</li>
+      <li><b>box_wlan_Active</b> - Current WLAN status. If the atribute box_energyMode is set and Fritz!OS >= 7.21</li>
+      <li><b>box_wlanBand_cnt</b> - Number of Wi-Fi bands</li>
+      <li><b>box_wlanBand_2.4GHz</b> - Current status of the 2.4 GHz Wi-Fi. Fritz!OS < 7.50</li>
+      <li><b>box_wlanBand_5GHz</b> - Current status of the 5 GHz Wi-Fi. Fritz!OS < 7.50</li>
+      <li><b>box_wlanBand_</b><i>n</i><b>GHz_active</b> - Active status of the GHz Wi-Fi. Fritz!OS >= 7.50</li>
+      <li><b>box_wlanBand_</b><i>n</i><b>GHz_usable</b> - Availability status of the GHz Wi-Fi. Fritz!OS >= 7.50</li>
+      <li><b>box_wlan_lastScanTime</b> - Last scan of the WLAN environment. Only available if the enableWLANneighbors attribute is set.</li>
+
+      <br>
+      <li><b>box_cpu...</b> - Readings CPU informations. Available when enabled in the enableCPUInfo attribute.</li>
       <li><b>box_cpuCurrentInterval_Data</b> </li>
       <li><b>box_cpu_Data</b> </li>
       <li><b>box_cpuTemp_Data</b> </li>
@@ -21326,13 +21379,13 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_box_cpuRAMPhysFree_Data</b> </li>
 
       <br>
-      <li><b>box_dns...</b>Readings DNS information. Available when enabled in the enableBoxReadings attribute</li> 
+      <li><b>box_dns...</b> - Readings DNS information. Available when enabled in the enableBoxReadings attribute</li> 
       <li><b>box_dns_Server</b><i>n</i> - Provider DNS Server</li> 
       <li><b>box_dns_Srv</b><i>n</i><b>_used_IPv4_</b><i>n</i> - used IPv4 DNS server</li> 
       <li><b>box_dns_Srv</b><i>n</i><b>_used_IPv6_</b><i>n</i> - used IPv6 DNS server</li> 
 
       <br> 
-      <li><b>box_globalFilter...</b>Readings global filters. Available if enabled in the enableBoxReadings attribute.</li>
+      <li><b>box_globalFilter...</b> - Readings global filters. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_globalFilterNetbios</b> - Current status: NetBIOS filter active.</li>
       <li><b>box_globalFilterSmtp</b> - Current status: Email filter active via port 25.</li>
       <li><b>box_globalFilterStealth</b> - Current status: Firewall in stealth mode.</li>
@@ -21340,7 +21393,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_globalFilterWpad</b> - Current status: WPAD filter active.</li>
 
       <br> 
-      <li><b>box_guestWlan...</b>Readings guest WiFi. Available if enabled in the enableBoxReadings attribute.</li>
+      <li><b>box_guestWlan...</b> - Readings guest WiFi. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_guestWlan</b> - Current status of the guest Wi-Fi network.</li>
       <li><b>box_guestWlanCount</b> - Number of devices connected via the guest Wi-Fi network.</li>
       <li><b>box_guestWlanRemain</b> - Time remaining until the guest Wi-Fi network is turned off.</li>
@@ -21351,7 +21404,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_guestWlan_tmoActive</b> - Time limit active</li> 
 
       <br> 
-      <li><b>box_led...</b>Readings LED's. Available if the enableBoxReadings attribute is enabled.</li>
+      <li><b>box_led...</b> - Readings LED's. Available if the enableBoxReadings attribute is enabled.</li>
       <li><b>box_ledCanDim</b> - Indicates whether setting the LED brightness is implemented in the Fritzbox/Repeater.</li>
       <li><b>box_ledDimValue</b> - Indicates the value to which the LEDs are dimmed.</li>
       <li><b>box_ledDisplay</b> - Indicates whether the LEDs are on or off.</li>
@@ -21359,7 +21412,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_ledHasEnv</b> - Indicates whether setting the LED brightness by the ambient brightness is implemented in the Fritzbox/Repeater.</li>
 
       <br> 
-      <li><b>box_ntpTime...</b>Readings ntpTime. Available if the enableBoxReadings attribute is enabled.</li>
+      <li><b>box_ntpTime...</b> - Readings ntpTime. Available if the enableBoxReadings attribute is enabled.</li>
       <li><b>box_ntpTime_chronyEnabled</b> - if set, the Fritz!Box acts as a time server.</li>
       <li><b>box_ntpTime_ntpServer</b> - time server from which the Fritz!Box obtains its time.</li>
       <li><b>box_ntpTime_tzDstEnabled</b> - Daylight Saving Time enabled</li>
@@ -21367,7 +21420,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_ntpTime_tzOffsetMinutes</b> - offset from GMT</li>
 
       <br>
-      <li><b>box_notify...</b>Readings error notifications. Available if enabled in the enableBoxReadings attribute.</li>
+      <li><b>box_notify...</b> - Readings error notifications. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_notify_</b><i>...</i> - the two readings are created when the FritzBox activates the red info LED and displays a corresponding notification.</li>
       <li><b>box_notify_</b><i>...</i><b>_info</b> - placed on the website. The readings contain a button for further information and a button<br>
                                                      to acknowledge the information. This link acknowledges the information in the FritzBox and sets both<br>
@@ -21375,13 +21428,13 @@ sub Fritz_Helper_Dumper($$;@) {
                                                      suffix -solved by FB-. The button is set to '-solved by FB- delete readings'. Using this button, the two readings box_notify_<notify_ID> and box_notify_<notify_ID>_info can now be deleted.<br>
                                                      The readings must be activated using the attribute: enableBoxReadings.</li>
       <br>
-      <li><b>box_proService</b>Allow automatic setup by the internet service provider</li>
-      <li><b>box_proServiceAutoUpdate</b>Allow automatic updates</li>
-      <li><b>box_proServiceDHCP</b>Use the auto-configuration server URL provided via DHCP and PPP</li>
-      <li><b>box_proServiceUSP_TR369</b>Allow connection to your internet service provider via USP (TR-369)</li>
+      <li><b>box_proService</b> - Allow automatic setup by the internet service provider</li>
+      <li><b>box_proServiceAutoUpdate</b> - Allow automatic updates</li>
+      <li><b>box_proServiceDHCP</b> - Use the auto-configuration server URL provided via DHCP and PPP</li>
+      <li><b>box_proServiceUSP_TR369</b> - Allow connection to your internet service provider via USP (TR-369)</li>
       <br>
 
-      <li><b>box_pwr...</b>Readings Energy consumption. Available if enabled in the enableBoxReadings attribute.</li>
+      <li><b>box_pwr...</b> - Readings Energy consumption. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_pwr_Rate_Act</b>Total system - Current energy consumption</li>
       <li><b>box_pwr_Rate_24avg</b>Total system - 24-hour average energy consumption</li>
       <li><b>box_pwr_mainCPU_Act</b>Main processor - Current energy consumption</li>
@@ -21396,7 +21449,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_pwr_USB_24avg</b>USB - 24-hour average energy consumption</li>
 
       <br>
-      <li><b>box_usb...</b>Readings of USB ports. Available when enabled in the enableBoxReadings attribute</li> 
+      <li><b>box_usb...</b> - Readings of USB ports. Available when enabled in the enableBoxReadings attribute</li> 
       <li><b>box_usb_FTP_activ</b></li> 
       <li><b>box_usb_FTP_enabled</b></li> 
       <li><b>box_usb_NAS_enabled</b></li> 
@@ -21421,7 +21474,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_vdsl_upStreamMaxRate</b> - Maximum upstream data rate (Mbps)</li>
 
       <br>
-      <li><b>box_user...</b>Readings user informations.  Available when the enableBoxReadings attribute is enabled.</li>
+      <li><b>box_user...</b> - Readings user informations.  Available when the enableBoxReadings attribute is enabled.</li>
       <li><b>box_user</b><i>n</i><b>_admin_rights</b></li>
       <li><b>box_user</b><i>n</i><b>_dial_rights</b></li>
       <li><b>box_user</b><i>n</i><b>_enabled</b></li>
@@ -21431,10 +21484,11 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_user</b><i>n</i><b>_vpn_access</b></li>
 
       <br>
-      <li><b>box_sys_Log...</b>Readings System logs. Available when the enableBoxReadings attribute is enabled.</li>
-      <li><b>box_sys_LogNewest</b><i>n</i>Last log date system log.</li>
-      <li><b>box_wlan_LogNewest</b><i>n</i>Last log date WLAN log.</li>
-      <li><b>box_fon_LogNewest</b><i>n</i>Last log date phone log.</li>
+      <li><b>box_sys_Log...</b> - Readings System logs. Available when the enableBoxReadings attribute is enabled.</li>
+      <li><b>box_sys_LogNewest</b><i>n</i> - Last log date system log.</li>
+      <li><b>box_fon_LogNewest</b><i>n</i> - Last log date phone log.</li>
+      <li><b>box_wlan_LogExtended</b> - Status -> "Also log logins and logouts and extended WLAN information."</li>
+      <li><b>box_wlan_LogNewest</b> - Most recent WLAN event: ID Date Time </li>
 
       <br>
       <li><b>alarm...</b>Alarm Readings. Available when the enableAlarmInfo attribute is enabled.</li>
@@ -21445,7 +21499,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>alarm</b><i>n</i><b>_wdays</b> - Weekdays of alarm <i>1</i></li>
 
       <br>
-      <li><b>callHandling...</b>Readings callHandling. Available when the enableCallRedi attribute is enabled.</li>
+      <li><b>callHandling...</b> - Readings callHandling. Available when the enableCallRedi attribute is enabled.</li>
 
       <br>
       <li>Redings available for Fritz!OS < 271</li>
@@ -21462,11 +21516,11 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>callHandling</b><i>n</i><b>_type</b> - Type of call forwarding/handling.<i>1</i></li>
 
       <br>
-      <li><b>kidprofile...</b>Readings kidprofile. Available when the enableKidProfiles attribute is enabled.</li>
+      <li><b>kidprofile...</b> - Readings kidprofile. Available when the enableKidProfiles attribute is enabled.</li>
       <li><b>kidprofile</b><i>n</i>Internet access profiles.</li>
 
       <br>
-      <li><b>docsis...</b>Readings docsis. Available when the enableDocsisInfo attribute is enabled</li>
+      <li><b>docsis...</b> - Readings docsis. Available when the enableDocsisInfo attribute is enabled</li>
       <li><b>docsis_Available</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Ds_channelIDs</b> - Fritz!Box Cable only</li> 
       <li><b>docsis30_Ds_channelsCnt</b> - Fritz!Box Cable only</li> 
@@ -22728,30 +22782,35 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_upnp_control_activated</b> - Status Kontrolle über UPNP</li>
       <li><b>box_uptime</b> - Laufzeit seit letztem Neustart</li>
       <li><b>box_uptimeConnect</b> - Verbindungsdauer seit letztem Neuverbinden</li>
+
+      <br>
       <li><b>box_DSL_Act</b> - DSL: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
       <li><b>box_Rate_Act</b> - Gesamt: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
       <li><b>box_WLAN_Act</b> - WLAN: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
       <li><b>box_mainCPU_Act</b> - CPU: aktueller Stromverbrauch in Prozent der maximalen Leistung</li>
+
+      <br>
       <li><b>box_powerLine</b> - verbindung über Powerline aktiv</li>
       <li><b>box_rateDown</b> - Download-Geschwindigkeit des letzten Intervals in kByte/s</li>
       <li><b>box_rateUp</b> - Upload-Geschwindigkeit des letzten Intervals in kByte/s</li>
-      <li><b>box_sys_LogNewest</b> - aktuellstes Systemereignis: ID Datum Zeit </li>
+
+      <br>
       <li><b>box_stdDialPort</b> - Anschluss der geräteseitig von der Wählhilfe genutzt wird</li>
       <li><b>box_tr064</b> - Status der Anwendungsschnittstelle TR-064 (wird auch von diesem Modul benötigt)</li>
       <li><b>box_tr069</b> - Provider-Fernwartung TR-069 (sicherheitsrelevant!)</li>
-      <li><b>box_wlan_Count</b> - Anzahl der Geräte die über WLAN verbunden sind</li>
-      <li><b>box_wlan_Active</b> - Akteuller Status des WLAN</li>
-      <li><b>box_wlanBand_cnt</b> - Anzahl der Wlan Bänder</li>
-      <li><b>box_wlanBand_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN. Kleiner Fritz!OS 7.50</li>
-      <li><b>box_wlanBand_5GHz</b> - Aktueller Status des 5-GHz-WLAN. Kleiner Fritz!OS 7.50</li>
-      <li><b>box_wlanBand_</b><i>n</i><b>GHz_active</b> - Aktiv-Status des GHz-WLAN. Größer/Gleich Fritz!OS 7.50</li>
-      <li><b>box_wlanBand_</b><i>n</i><b>GHz_usable</b> - Verfügbarkeits-Status des GHz-WLAN. Größer/Gleich Fritz!OS 7.50</li>
-      <li><b>box_wlan_lastScanTime</b> - Letzter Scan der WLAN Umgebung. Ist nur vorhanden, wenn das Attribut enableWLANneighbors gesetzt ist.</li>
-      <li><b>box_wlan_LogExtended</b> - Status -> "Auch An- und Abmeldungen und erweiterte WLAN-Informationen protokollieren".</li>
-      <li><b>box_wlan_LogNewest</b> - aktuellstes WLAN-Ereignis: ID Datum Zeit </li>
 
       <br>
-      <li><b>box_cpu...</b>Readings CPU Informationen. Verfügbar, wenn im Attribut enableCPUInfo aktiviert</li>
+      <li><b>box_wlan_Count</b> - Anzahl der Geräte die über WLAN verbunden sind</li>
+      <li><b>box_wlan_Active</b> - Aktueller Status des WLAN. Bei aktiviertem Attribut box_energyMode und Fritz!OS >= 7.21</li>
+      <li><b>box_wlanBand_cnt</b> - Anzahl der Wlan Bänder</li>
+      <li><b>box_wlanBand_2.4GHz</b> - Aktueller Status des 2.4-GHz-WLAN. Fritz!OS < 7.50</li>
+      <li><b>box_wlanBand_5GHz</b> - Aktueller Status des 5-GHz-WLAN. Fritz!OS < 7.50</li>
+      <li><b>box_wlanBand_</b><i>n</i><b>GHz_active</b> - Aktiv-Status des GHz-WLAN. Fritz!OS >= 7.50</li>
+      <li><b>box_wlanBand_</b><i>n</i><b>GHz_usable</b> - Verfügbarkeits-Status des GHz-WLAN. Fritz!OS >= 7.50</li>
+      <li><b>box_wlan_lastScanTime </b> - Letzter Scan der WLAN Umgebung. Ist nur vorhanden, wenn das Attribut enableWLANneighbors gesetzt ist.</li>
+
+      <br>
+      <li><b>box_cpu...</b> - Readings CPU Informationen. Verfügbar, wenn im Attribut enableCPUInfo aktiviert</li>
       <li><b> box_cpuCurrentInterval_Data</b> </li>
       <li><b>box_cpu_Data</b> </li>
       <li><b>box_cpuTemp_Data</b> </li>
@@ -22760,13 +22819,13 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_box_cpuRAMPhysFree_Data</b> </li>
 
       <br>
-      <li><b>box_dns...</b>Readings DNS Informationen. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_dns...</b> - Readings DNS Informationen. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_dns_Server</b><i>n</i> - Provider DNS Server</li>
       <li><b>box_dns_Srv</b><i>n</i><b>_used_IPv4_</b><i>n</i> - benutzte IPv4 DNS Server</li>
       <li><b>box_dns_Srv</b><i>n</i><b>_used_IPv6_</b><i>n</i> - benutzte IPv6 DNS Server</li>
 
       <br>
-      <li><b>box_globalFilter...</b>Readings globale Filter. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_globalFilter...</b>- Readings globale Filter. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_globalFilterNetbios</b> - Aktueller Status: NetBIOS-Filter aktiv</li>
       <li><b>box_globalFilterSmtp</b> - Aktueller Status: E-Mail-Filter über Port 25 aktiv</li>
       <li><b>box_globalFilterStealth</b> - Aktueller Status: Firewall im Stealth Mode</li>
@@ -22774,7 +22833,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_globalFilterWpad</b> - Aktueller Status: WPAD-Filter aktiv</li>
 
       <br>
-      <li><b>box_guestWlan...</b>Readings Gäste WLAN. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_guestWlan...</b>- Readings Gäste WLAN. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_guestWlan</b> - Aktueller Status des Gäste-WLAN</li>
       <li><b>box_guestWlanCount</b> - Anzahl der Geräte die über das Gäste-WLAN verbunden sind</li>
       <li><b>box_guestWlanRemain</b> - Verbleibende Zeit bis zum Ausschalten des Gäste-WLAN</li>
@@ -22785,7 +22844,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_guestWlan_tmoActive</b> - Zeitbrenzung aktiv</li>
 
       <br>
-      <li><b>box_led...</b>Readings LED's. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_led...</b> - Readings LED's. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_ledCanDim</b> - zeigt an, ob das setzen der Helligkeit der Led's in der Fritzbox/dem Repeater implementiert ist</li>
       <li><b>box_ledDimValue</b> - zeigt an, auf welchen Wert die Led's gedimmt sind</li>
       <li><b>box_ledDisplay</b> - zeigt an, ob die Led's an oder aus sind</li>
@@ -22793,7 +22852,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_ledHasEnv</b> - zeigt an, ob das setzen der Led Helligkeit durch die Umgebungshelligkeit in der Fritzbox/dem Repeater implementiert ist</li>
 
       <br> 
-      <li><b>box_ntpTime...</b>Readings ntpTime. Verfügbar, wenn im Attribut enableBoxReadings aktiviert.</li>
+      <li><b>box_ntpTime...</b> - Readings ntpTime. Verfügbar, wenn im Attribut enableBoxReadings aktiviert.</li>
       <li><b>box_ntpTime_chronyEnabled</b> - wenn gesetzt, dann arbeitet die Fritz!Box als Zeitserver.</li>
       <li><b>box_ntpTime_ntpServer</b> - Zeitserver von dem die Fritz!Box ihre Zeit erhält.</li>
       <li><b>box_ntpTime_tzDstEnabled</b> - Sommerzeit aktiviert</li>
@@ -22801,7 +22860,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_ntpTime_tzOffsetMinutes</b> - Abweichung zu GMT</li>
 
       <br>
-      <li><b>box_notify...</b>Readings Fehlerhinweise. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_notify...</b> - Readings Fehlerhinweise. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_notify_</b><i>...</i> - die beiden Readings werden erstellt, wenn die FritzBox die Info LED rot aktiviert und einen entsprechenden Hinweis</li>
       <li><b>box_notify_</b><i>...</i><b>_info</b> - auf der Webseite platziert. In den Readings befinden sich ein Button für weitere Informationen und ein Button<br>
                                                      um die Information zu quittieren. Durch diesen Link wird die Info in der FritzBox quittiert und es werden die beiden<br>
@@ -22811,13 +22870,13 @@ sub Fritz_Helper_Dumper($$;@) {
                                                      Die Readings müssen über das Attribut: enableBoxReadings aktiviert werden.</li>
 
       <br>
-      <li><b>box_proService</b>Automatische Einrichtung durch den Internetanbieter zulassen</li>
-      <li><b>box_proServiceAutoUpdate</b>Automatische Updates zulassen</li>
-      <li><b>box_proServiceDHCP</b>URL des Auto Configuration Servers über DHCP und PPP beachten</li>
-      <li><b>box_proServiceUSP_TR369</b>Anbindung an Ihren Internetanbieter über USP (TR-369) erlauben</li>
+      <li><b>box_proService</b> - Automatische Einrichtung durch den Internetanbieter zulassen</li>
+      <li><b>box_proServiceAutoUpdate</b> - Automatische Updates zulassen</li>
+      <li><b>box_proServiceDHCP</b> - URL des Auto Configuration Servers über DHCP und PPP beachten</li>
+      <li><b>box_proServiceUSP_TR369</b> - Anbindung an Ihren Internetanbieter über USP (TR-369) erlauben</li>
 
       <br>
-      <li><b>box_pwr...</b>Readings Energieverbrauch. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_pwr...</b> - Readings Energieverbrauch. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_pwr_Rate_Act</b>Gesamtsystem - Energieverbrauch aktuell</li>
       <li><b>box_pwr_Rate_24avg</b>Gesamtsystem - Energieverbrauch 24-Stunden-Mittel</li>
       <li><b>box_pwr_mainCPU_Act</b>Hauptprozessor - Energieverbrauch aktuell</li>
@@ -22832,7 +22891,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_pwr_USB_24avg</b>USB - Energieverbrauch 24-Stunden-Mittel</li>
 
       <br>
-      <li><b>box_usb...</b>Readings USB Anschlüsse. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_usb...</b> - Readings USB Anschlüsse. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_usb_FTP_activ</b></li>
       <li><b>box_usb_FTP_enabled</b></li>
       <li><b>box_usb_NAS_enabled</b></li>
@@ -22850,7 +22909,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_usb_</b><i>n</i><b>_devType</b></li>
 
       <br>
-      <li><b>box_user...</b>Readings Benutzer Informationen. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_user...</b> - Readings Benutzer Informationen. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_user</b><i>n</i><b>_admin_rights</b></li>
       <li><b>box_user</b><i>n</i><b>_dial_rights</b></li>
       <li><b>box_user</b><i>n</i><b>_enabled</b></li>
@@ -22860,20 +22919,21 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_user</b><i>n</i><b>_vpn_access</b></li>
 
       <br>
-      <li><b>box_vdsl...</b>Readings VDSL. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_vdsl...</b> - Readings VDSL. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
       <li><b>box_vdsl_downStreamRate</b> - Aktuelle DownStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_downStreamMaxRate</b> - Maximale DownStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamRate</b> - Aktuelle UpStream Datenrate (MBit/s)</li>
       <li><b>box_vdsl_upStreamMaxRate</b> - Maximale UpStream Datenrate (MBit/s)</li>
 
       <br>
-      <li><b>box_sys_Log...</b>Readings System-Logs. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
-      <li><b>box_sys_LogNewest</b><i>n</i>Letztes Log-Datum System-Log</li>
-      <li><b>box_wlan_LogNewest</b><i>n</i>Letztes Log-Datum WLAN-Log</li>
-      <li><b>box_fon_LogNewest</b><i>n</i>Letztes Log-Datum Telefon-Log</li>
+      <li><b>box_sys_Log...</b> - Readings System-Logs. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
+      <li><b>box_sys_LogNewest</b><i>n</i> - Letztes Log-Datum System-Log</li>
+      <li><b>box_fon_LogNewest</b><i>n</i> - Letztes Log-Datum Telefon-Log</li>
+      <li><b>box_wlan_LogNewest </b> - aktuellstes WLAN-Ereignis: ID Datum Zeit </li>
+      <li><b>box_wlan_LogExtended </b> - Status -> "Auch An- und Abmeldungen und erweiterte WLAN-Informationen protokollieren".</li>
 
       <br>
-      <li><b>alarm...</b>Readings alarm. Verfügbar, wenn das Attribut enableAlarmInfo aktiviert ist</li>
+      <li><b>alarm...</b> - Readings alarm. Verfügbar, wenn das Attribut enableAlarmInfo aktiviert ist</li>
       <li><b>alarm</b><i>n</i> - Name des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_state</b> - Aktueller Status des Weckrufs <i>1</i></li>
       <li><b>alarm</b><i>n</i><b>_target</b> - Interne Nummer des Weckrufs <i>1</i></li>
@@ -22881,7 +22941,7 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>alarm</b><i>n</i><b>_wdays</b> - Wochentage des Weckrufs <i>1</i></li>
 
       <br>
-      <li><b>callHandling...</b>Readings callHandling. Verfügbar, wenn das Attribut enableCallRedi aktiviert ist</li>
+      <li><b>callHandling...</b> - Readings callHandling. Verfügbar, wenn das Attribut enableCallRedi aktiviert ist</li>
 
       <br>
       <li>Readings für Fritz!OS < 721</li>
@@ -22898,11 +22958,11 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>callHandling</b><i>n</i><b>_type</b> - Typ der Rufumleitung/-behandlung <i>1</i></li>
 
       <br>
-      <li><b>kidprofile...</b>Readings kidprofile. Verfügbar, wenn das Attribut enableKidProfiles aktiviert ist</li>
-      <li><b>kidprofile</b><i>n</i>Internet Zugriffsprofile</li>
+      <li><b>kidprofile...</b> - Readings kidprofile. Verfügbar, wenn das Attribut enableKidProfiles aktiviert ist</li>
+      <li><b>kidprofile</b><i>n</i> Internet Zugriffsprofile</li>
 
       <br>
-      <li><b>docsis...</b>Readings docsis. Verfügbar, wenn das Attribut enabledocsisInfo aktiviert ist</li>
+      <li><b>docsis...</b> - Readings docsis. Verfügbar, wenn das Attribut enabledocsisInfo aktiviert ist</li>
       <li><b>docsis_Available</b> - Nur Fritz!Box Cable</li> 
       <li><b>docsis30_Ds_channelIDs</b> - Nur Fritz!Box Cable</li>
       <li><b>docsis30_Ds_channelsCnt</b> - Nur Fritz!Box Cable</li>
@@ -23475,3 +23535,7 @@ sub Fritz_Helper_Dumper($$;@) {
 # page=support
 # twofactor=1
 # sid=<hier kommt die SID hin>
+
+# http://192.168.0.1/api/v0/beta/fritzmesh/peers
+# Request method PUT
+#[{"UID":"nexuspeer812","triggerTrustCommand":true},{"UID":"nexuspeer815","triggerTrustCommand":true}]
