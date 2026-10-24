@@ -231,24 +231,28 @@ sub Define {
   return $@ unless (FHEM::Meta::SetInternals ($hash));
   use version 0.77; our $VERSION = FHEM::Meta::Get($hash, 'version');
 
-  my $name = $a[0];
-  my $host = $a[2] ? $a[2] : 'localhost';                  # aktuell ungenutzt
+  my $name    = $a[0];
+  my $defattr = (($a[2] // '') eq 'defaultAttr') ? 'defaultAttr' : ''; 
 
-  Undef($hash, undef) if($hash->{OLDDEF});                 # modify
+  Undef ($hash, undef) if(defined $hash->{OLDDEF});         # modify bzw. defmod auf ein bestehendes Device
 
   $hash->{NOTIFYDEV} = "global,$name";
-
-  # nur eine Instanz erlaubt
-  if (defined $modules{$hash->{TYPE}}{defptr}{localhost}) {
-      return "Existing instance: ".$modules{$hash->{TYPE}}{defptr}{localhost}{NAME};
+  $hash->{DEF}       = $defattr;                            # DEF immer setzen
+  
+  # nur eine Instanz erlaubt (das Device selbst bei modify ist keine zweite Instanz)
+  my $other = $modules{$hash->{TYPE}}{defptr}{localhost};
+  
+  if (defined $other && $other != $hash) {
+      return "Existing instance: ".$other->{NAME};
   }
 
   $modules{$hash->{TYPE}}{defptr}{localhost} = $hash;
 
   # Voreinstellungen für FHEMWEB
-  if (!defined $hash->{OLDDEF}) {
+  if ($defattr && !defined $hash->{OLDDEF}) {
       my @icons = (
           '.*updates.available:security@orange:outdatedPerl',
+          'ready:security@grey:outdatedPerl',
           'up.to.date:security@green:outdatedPerl',
           '.*outdated.*in.progress:system_fhem_reboot@orange',
           '.*in.progress:system_fhem_update@orange',
@@ -382,14 +386,14 @@ sub Notify {
       }
       else {
           $inst->{cmd} = 'getCpanVersion';
-          AsynchronousExecuteFhemCommand ($hash);
+          SP_asynchronousExecuteFhemCommand ($hash);
       }
   }
 
   # nach erfolgreicher Aktion die Liste veralteter Pakete neu holen
   if ($devname eq $name && grep { /^(?:installedPerl|uninstalledPerl|updatedPerl):.successful$/ } @{$events}) {
       $inst->{cmd} = 'outdatedPerl';
-      AsynchronousExecuteFhemCommand ($hash);
+      SP_asynchronousExecuteFhemCommand ($hash);
   }
 
 return;
@@ -521,7 +525,7 @@ sub Set {
       return "Unknown argument $cmd, choose one of $list";
   }
 
-  AsynchronousExecuteFhemCommand ($hash);
+  SP_asynchronousExecuteFhemCommand ($hash);
 
 return $ret;
 }
@@ -581,7 +585,7 @@ sub ImportPerlList {
 
   Log3 ($name, 3, "Installer ($name) - import from $filename: installing ".scalar(@toInstall)." Perl packages");
 
-  AsynchronousExecuteFhemCommand ($hash);
+  SP_asynchronousExecuteFhemCommand ($hash);
 
 return 'Installation started in background for '.scalar(@{$diff->{missing}}).' missing and '.scalar(@{$diff->{outdated}}).' outdated package(s)';
 }
@@ -1063,7 +1067,7 @@ sub ProcessUpdateTimer {
 
   if (__ToDay() ne $lastCheck || $state eq 'disabled') {
       $hash->{".fhem"}{installer}{cmd} = 'outdatedPerl';
-      AsynchronousExecuteFhemCommand ($hash);
+      SP_asynchronousExecuteFhemCommand ($hash);
   }
 
 return;
@@ -1078,6 +1082,7 @@ sub CleanSubprocess {
   my $name = $hash->{NAME};
 
   delete $hash->{".fhem"}{subprocess};
+  delete $hash->{".fhem"}{subprocessPid};
 
   Log3 ($name, 4, "Installer ($name) - clean Subprocess");
 
@@ -1085,9 +1090,89 @@ return;
 }
 
 ###############################################################
+#   Fehlerergebnis (JSON) für einen fehlgeschlagenen Subprozess
+#   Format wie die Fehlerliste der Handler: Array von Fehler-Hashes
+###############################################################
+sub __ChildErrorJson {
+  my ($code, $summary, $detail) = @_;
+
+  my @args = ($code, $summary);
+  push @args, $detail if(defined $detail && $detail ne '');
+
+return encode_json ({ error => [ __NewError (@args) ] });
+}
+
+###############################################################
+#           Subprozess auf Ergebnis abfragen
+###############################################################
+sub PollChild {
+  my $hash = shift;
+
+  my $name       = $hash->{NAME};
+  my $subprocess = $hash->{".fhem"}{subprocess};
+
+  # Subprocess-Objekt fehlt oder ist ungültig
+  if (!ref $subprocess || ref $subprocess ne 'SubProcess') {
+      my $error = (defined $subprocess && ref $subprocess) ? ($subprocess->{lasterror} // '') : '';
+      my $emsg  = __ChildErrorJson ('E503', 'Child process suddenly ended', $error);
+
+      Log3 ($name, 5, "Installer ($name) - $emsg");
+
+      CleanSubprocess ($hash);
+      PreProcessing   ($hash, $emsg);
+
+      return;
+  }
+
+  my $json = $subprocess->readFromChild();
+
+  # Kindprozess beendet, ohne ein Ergebnis zu liefern (z.B. abgestürzt oder abgebrochen)
+  if (!defined $json) {
+      my $pid = $hash->{".fhem"}{subprocessPid};
+
+      if (defined $pid && waitpid ($pid, WNOHANG) != 0) {
+          $json = $subprocess->readFromChild();                                 # Ergebnis kann noch in der Pipe liegen
+
+          if (!defined $json) {
+              my $emsg = __ChildErrorJson ('E503', 'Child process ended without result', ($subprocess->{lasterror} // ''));
+
+              Log3 ($name, 1, "Installer ($name) - child process (PID= $pid) ended without result");
+
+              CleanSubprocess ($hash);
+              PreProcessing   ($hash, $emsg);
+
+              return;
+          }
+      }
+  }
+
+  # noch kein Ergebnis -> erneut abfragen
+  if (!defined $json) {
+      Log3 ($name, 5, "Installer ($name) - still waiting (".($subprocess->{lasterror} // '').").");
+      InternalTimer(gettimeofday() + POLLINTERVAL, 'FHEM::Installer::PollChild', $hash, 0);
+
+      return;
+  }
+
+  Log3 ($name, 4, "Installer ($name) - got result from asynchronous parsing.");
+
+  $subprocess->wait();
+
+  Log3 ($name, 4, "Installer ($name) - asynchronous finished.");
+
+  CleanSubprocess ($hash);
+  PreProcessing   ($hash, $json);
+
+return;
+}
+
+####################################################################################################
+#                                       Begin Childprocess
+####################################################################################################
+###############################################################
 #     Kommando asynchron in einem Subprozess ausführen
 ###############################################################
-sub AsynchronousExecuteFhemCommand {
+sub SP_asynchronousExecuteFhemCommand {
   my $hash = shift;
 
   require "SubProcess.pm";
@@ -1095,7 +1180,7 @@ sub AsynchronousExecuteFhemCommand {
   my $name = $hash->{NAME};
   my $inst = ($hash->{".fhem"}{installer} //= {});
 
-  my $subprocess           = SubProcess->new({ onRun => \&OnRun });
+  my $subprocess           = SubProcess->new({ onRun => \&SP_onRun });
   $subprocess->{installer} = $inst;                                             # gleiche Referenz wie in $hash
 
   $inst->{debug} = AttrVal($name, 'verbose', 0) > 3 ? 1 : 0;
@@ -1127,7 +1212,8 @@ sub AsynchronousExecuteFhemCommand {
   Event ($hash, 'BEGIN');
   Log3  ($name, 4, "Installer ($name) - execute command asynchronously (PID= $pid)");
 
-  $hash->{".fhem"}{subprocess} = $subprocess;
+  $hash->{".fhem"}{subprocess}    = $subprocess;
+  $hash->{".fhem"}{subprocessPid} = $pid;                                       # zur Erkennung eines beendeten Kindprozesses
 
   InternalTimer(gettimeofday() + POLLINTERVAL, 'FHEM::Installer::PollChild', $hash, 0);
 
@@ -1137,64 +1223,26 @@ return;
 }
 
 ###############################################################
-#           Subprozess auf Ergebnis abfragen
-###############################################################
-sub PollChild {
-  my $hash = shift;
-
-  my $name       = $hash->{NAME};
-  my $subprocess = $hash->{".fhem"}{subprocess};
-
-  # Subprocess-Objekt fehlt oder ist ungültig
-  if (!ref $subprocess || ref $subprocess ne 'SubProcess') {
-      my $error = (defined $subprocess && ref $subprocess) ? ($subprocess->{lasterror} // '') : '';
-      my $emsg  = $error ne '' ? '{"error":"'.$error.'"}' : '{"error":"Child process suddenly ended"}';
-
-      Log3 ($name, 5, "Installer ($name) - $emsg");
-
-      CleanSubprocess ($hash);
-      PreProcessing   ($hash, $emsg);
-
-      return;
-  }
-
-  my $json = $subprocess->readFromChild();
-
-  # noch kein Ergebnis -> erneut abfragen
-  if (!defined $json) {
-      Log3 ($name, 5, "Installer ($name) - still waiting (".$subprocess->{lasterror}.").");
-      InternalTimer(gettimeofday() + POLLINTERVAL, 'FHEM::Installer::PollChild', $hash, 0);
-
-      return;
-  }
-
-  Log3 ($name, 4, "Installer ($name) - got result from asynchronous parsing.");
-
-  $subprocess->wait();
-
-  Log3 ($name, 4, "Installer ($name) - asynchronous finished.");
-
-  CleanSubprocess ($hash);
-  PreProcessing   ($hash, $json);
-
-return;
-}
-
-####################################################################################################
-#                                       Begin Childprocess
-####################################################################################################
-###############################################################
 #                  Subprozess: Einstieg
 ###############################################################
-sub OnRun {
+sub SP_onRun {
   my $subprocess = shift;
 
-  my $response = ExecuteFhemCommand ($subprocess->{installer});
+  my $response = eval { SP_executeFhemCommand ($subprocess->{installer}) };
+
+  # Exception im Kindprozess als Fehlerergebnis an den Parent melden,
+  # sonst wartet der Parent endlos und der Status wird nie zurückgesetzt
+  if (my $err = $@) {
+      chomp $err;
+      Log3 ('Installer SP_onRun', 1, "Installer - error in child process: $err");
+
+      $response = { error => [ __NewError ('E502', 'Error in child process', $err) ] };
+  }
 
   my $json = eval { encode_json ($response) };
 
   if ($@) {
-      Log3 ('Installer OnRun', 3, "Installer - JSON error: $@");
+      Log3 ('Installer SP_onRun', 3, "Installer - JSON error: $@");
       $json = "{\"jsonerror\":\"$@\"}";
   }
 
@@ -1206,7 +1254,7 @@ return;
 ###############################################################
 #     Kommando aufbauen und den passenden Handler starten
 ###############################################################
-sub ExecuteFhemCommand {
+sub SP_executeFhemCommand {
   my $cmd = shift;
 
   my $installer = { debug => $cmd->{debug} };
@@ -1254,7 +1302,7 @@ sub ExecuteFhemCommand {
       }
 
       __Debug ($installer, $installer->{installperl});
-      $response = CpanInstall ($installer);
+      $response = SP_cpanInstall ($installer);
   }
   elsif ($cmd->{cmd} =~ /^uninstallperl (.+)/i) {
       my $pkglist = join(' ', __ParsePackages($1, 0));
@@ -1263,113 +1311,24 @@ sub ExecuteFhemCommand {
       $installer->{uninstallperl} =~ s/%PACKAGES%/$pkglist/gi;
 
       __Debug ($installer, $installer->{uninstallperl});
-      $response = CpanUninstall ($installer);
+      $response = SP_cpanUninstall ($installer);
   }
   elsif (lc($cmd->{cmd}) eq 'outdatedperl') {
       __Debug ($installer, $installer->{outdatedperl});
-      $response = CpanOutdated ($installer);
+      $response = SP_cpanOutdated ($installer);
   }
   elsif (lc($cmd->{cmd}) eq 'getcpanversion') {
       __Debug ($installer, $installer->{cpanversions});
-      $response = GetCpanVersion ($installer);
+      $response = SP_getCpanVersion ($installer);
   }
 
 return $response;
 }
 
 ###############################################################
-#                  Hilfsfunktionen
-###############################################################
-
-# Debug-Ausgabe (landet im Log des Hauptprozesses)
-sub __Debug {
-  my ($cmd, $text) = @_;
-
-  print "$text\n" if($cmd->{debug});
-
-return;
-}
-
-# Paketliste "[@scope/]Name[@Version|latest] ..." -> Paketnamen
-# $withVersion: Versionsangabe (außer 'latest') mit übernehmen
-sub __ParsePackages {
-  my ($list, $withVersion) = @_;
-
-  my @packages;
-
-  for my $package (split / /, $list) {
-      next unless($package =~ $pkgRe);
-      push @packages, $2.(($withVersion && $3 && $3 ne 'latest') ? '@'.$3 : '');
-  }
-
-return @packages;
-}
-
-# Fehler-Hash; 'detail' nur wenn als 3. Argument übergeben
-sub __NewError {
-  my ($code, $summary) = @_;
-
-  my $error = { code => $code, summary => $summary };
-  $error->{detail} = $_[2] if(@_ > 2);
-
-return $error;
-}
-
-sub __NoOutputError {
-  my $p = shift;
-
-return __NewError ('E500', 'Unknown error - Missing command output', $p);
-}
-
-# "not found" in einer Zeile erkennen -> E404 oder undef
-sub __MatchNotFound {
-  my $line = shift;
-
-  for my $re (@notFoundRe) {
-      return __NewError ('E404', "Not Found - $3 is not installed", $line) if($line =~ $re);
-  }
-
-return;
-}
-
-# Fehler "passwordless sudo erforderlich" mit Hinweis auf die sudoers-Zeilen
-# @bins: 'cpanm' und/oder 'perl' (Reihenfolge = Reihenfolge der Zeilen)
-sub __SudoError {
-  my ($line, @bins) = @_;
-
-  my $user   = scalar getpwuid($<);
-  my $prefix = "  $user ALL=(ALL) NOPASSWD:SETENV: ";
-  my @rules;
-
-  for my $bin (@bins) {
-      my $path = `which $bin`;
-      $path    =~ s/\n//g;
-
-      push @rules, $bin eq 'cpanm' ? $prefix.$path.' *' : $prefix.$path.' - App\:\:cpanminus';
-  }
-
-  my $detail = $line
-             . '<br /><br />'
-             . "You may add the following lines to /etc/sudoers.d/$user:\n"
-             . '<pre>'.join("\n", @rules).'</pre>';
-
-return __NewError ('E403', 'Forbidden - passwordless sudo permissions required', $detail);
-}
-
-# cpan-outdated vorhanden?
-sub __CheckCpanOutdated {
-  my $h = shift;
-
-  my $cpanoutdated             = `which cpan-outdated`;
-  $h->{versions}{cpanoutdated} = 0 if($cpanoutdated =~ /^\/.+/);
-
-return;
-}
-
-###############################################################
 #                  cpanm-Version ermitteln
 ###############################################################
-sub GetCpanVersion {
+sub SP_getCpanVersion {
   my $cmd = shift;
 
   my $h            = {};
@@ -1437,7 +1396,7 @@ return $h;
 ###############################################################
 #                  Perl-Pakete installieren
 ###############################################################
-sub CpanInstall {
+sub SP_cpanInstall {
   my $cmd = shift;
 
   my $h = {};
@@ -1506,7 +1465,7 @@ return $h;
 ###############################################################
 #                  Perl-Pakete deinstallieren
 ###############################################################
-sub CpanUninstall {
+sub SP_cpanUninstall {
   my $cmd = shift;
 
   my $h = {};
@@ -1559,7 +1518,7 @@ return $h;
 ###############################################################
 #     Veraltete Perl-Pakete und installierte Module ermitteln
 ###############################################################
-sub CpanOutdated {
+sub SP_cpanOutdated {
   my $cmd = shift;
 
   my $h = {};
@@ -1639,16 +1598,28 @@ sub CpanOutdated {
       next if($module eq 'CPAN::outdated');
 
       my ($missing) = $ExtUtilsInstalled->validate($module);
-      #my $version   = $ExtUtilsInstalled->version($module);
       my $version   = $ExtUtilsInstalled->version($module);
 
-      # Packlist trägt einen Distributionsnamen (HTML-TableExtract): Version aus der Moduldatei lesen
-      if ((!defined $version || $version eq '') && $module =~ /-/) {
-          (my $suffix = $module) =~ s{-}{/}g;
+      # $VERSION kann ein version-Objekt sein (qv / version->declare): Vergleiche wie "eq ''" würden
+      # sonst "Invalid version format (version required)" auslösen -> vorher in einen String wandeln
+      $version = "$version" if(defined $version);
+
+      # Packlist-Name ohne Version: Version aus der Moduldatei lesen. Gibt es keine passende Moduldatei,
+      # ist der Name kein CPAN-Modul (z.B. Net, Pod, cpan::outdated) und wird nicht aufgelistet.
+      # Distributionsnamen mit '-' (HTML-TableExtract) bleiben erhalten, ihr Link zeigt auf die Distribution.
+      if (!defined $version || $version eq '') {
+          (my $suffix = $module) =~ s{(?:::|-)}{/}g;
           $suffix    .= '.pm';
 
           my ($file) = grep { m{/\Q$suffix\E$} } $ExtUtilsInstalled->files($module);
-          $version   = MM->parse_version($file) if(defined $file);
+          
+          if (defined $file) {
+              $version = MM->parse_version($file);
+              $version = '' if(!defined $version || $version eq 'undef');          # Modul ohne $VERSION
+          }
+          elsif ($module !~ /-/) {
+              next;
+          }
       }
 
       $h->{listedPerl}{$module}{missing} = $missing if($missing);
@@ -1675,6 +1646,10 @@ sub PreProcessing {
 
   if ($@) {
       Log3 ($name, 2, "Installer ($name) - JSON error: $@");
+
+      my $failed = $hash->{".fhem"}{installer}{cmd} // '?';
+      readingsSingleUpdate ($hash, 'state', "error '$failed'", 1);
+
       return;
   }
 
@@ -3969,6 +3944,91 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
               keys %{"${module}::"};
 }
 
+# Debug-Ausgabe (landet im Log des Hauptprozesses)
+sub __Debug {
+  my ($cmd, $text) = @_;
+
+  print "$text\n" if($cmd->{debug});
+
+return;
+}
+
+# Paketliste "[@scope/]Name[@Version|latest] ..." -> Paketnamen
+# $withVersion: Versionsangabe (außer 'latest') mit übernehmen
+sub __ParsePackages {
+  my ($list, $withVersion) = @_;
+
+  my @packages;
+
+  for my $package (split / /, $list) {
+      next unless($package =~ $pkgRe);
+      push @packages, $2.(($withVersion && $3 && $3 ne 'latest') ? '@'.$3 : '');
+  }
+
+return @packages;
+}
+
+# Fehler-Hash; 'detail' nur wenn als 3. Argument übergeben
+sub __NewError {
+  my ($code, $summary) = @_;
+
+  my $error = { code => $code, summary => $summary };
+  $error->{detail} = $_[2] if(@_ > 2);
+
+return $error;
+}
+
+sub __NoOutputError {
+  my $p = shift;
+
+return __NewError ('E500', 'Unknown error - Missing command output', $p);
+}
+
+# "not found" in einer Zeile erkennen -> E404 oder undef
+sub __MatchNotFound {
+  my $line = shift;
+
+  for my $re (@notFoundRe) {
+      return __NewError ('E404', "Not Found - $3 is not installed", $line) if($line =~ $re);
+  }
+
+return;
+}
+
+# Fehler "passwordless sudo erforderlich" mit Hinweis auf die sudoers-Zeilen
+# @bins: 'cpanm' und/oder 'perl' (Reihenfolge = Reihenfolge der Zeilen)
+sub __SudoError {
+  my ($line, @bins) = @_;
+
+  my $user   = scalar getpwuid($<);
+  my $prefix = "  $user ALL=(ALL) NOPASSWD:SETENV: ";
+  my @rules;
+
+  for my $bin (@bins) {
+      my $path = `which $bin`;
+      $path    =~ s/\n//g;
+
+      push @rules, $bin eq 'cpanm' ? $prefix.$path.' *' : $prefix.$path.' - App\:\:cpanminus';
+  }
+
+  my $detail = $line
+             . '<br /><br />'
+             . "You may add the following lines to /etc/sudoers.d/$user:\n"
+             . '<pre>'.join("\n", @rules).'</pre>';
+
+return __NewError ('E403', 'Forbidden - passwordless sudo permissions required', $detail);
+}
+
+# cpan-outdated vorhanden?
+sub __CheckCpanOutdated {
+  my $h = shift;
+
+  my $cpanoutdated             = `which cpan-outdated`;
+  $h->{versions}{cpanoutdated} = 0 if($cpanoutdated =~ /^\/.+/);
+
+return;
+}
+
 1;
 
 =pod
@@ -4005,11 +4065,13 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
   <a id="Installer-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; Installer</code><br><br>
-    The module has no parameters. Only one instance can be defined.<br>
-    Example: <code>define fhemInstaller Installer</code><br><br>
-    When the device is created for the first time, the module sets presets for FHEMWEB (<code>alias</code>, <code>devStateIcon</code>, <code>group</code>, <code>icon</code> and <code>room</code>).
-    After FHEM has started, it loads the metadata of the modules in use and requests the versions of Perl and <code>cpanm</code>.
+    <code>define &lt;name&gt; Installer [defaultAttr]</code><br><br>
+    <code>defaultAttr</code> - optional. With this addition the module sets presets for FHEMWEB when the device is created
+    (<code>alias</code>, <code>devStateIcon</code>, <code>group</code>, <code>icon</code> and <code>room</code>). This also applies when the configuration is read at FHEM startup,
+    as long as the addition is part of the definition. On <code>modify</code> the presets are not set. Without the addition no attributes are set.<br>
+    Only one instance can be defined.<br>
+    Examples: <code>define fhemInstaller Installer</code> or <code>define fhemInstaller Installer defaultAttr</code><br><br>
+    After FHEM has started, the module loads the metadata of the modules in use and requests the versions of Perl and <code>cpanm</code>.
     The list of outdated Perl packages is then updated automatically once a day (every 4 hours it is checked whether the date has changed since the last update).
   </ul>
   <br>
@@ -4333,11 +4395,13 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
   <a id="Installer-define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; Installer</code><br><br>
-    Das Modul hat keine Parameter. Es kann nur eine Instanz definiert werden.<br>
-    Beispiel: <code>define fhemInstaller Installer</code><br><br>
-    Beim erstmaligen Anlegen setzt das Modul Voreinstellungen für FHEMWEB (<code>alias</code>, <code>devStateIcon</code>, <code>group</code>, <code>icon</code> und <code>room</code>).
-    Nach dem Start von FHEM lädt es die Metadaten der verwendeten Module und fragt die Versionen von Perl und <code>cpanm</code> ab.
+    <code>define &lt;name&gt; Installer [defaultAttr]</code><br><br>
+    <code>defaultAttr</code> - optional. Mit diesem Zusatz setzt das Modul beim Anlegen des Devices Voreinstellungen für FHEMWEB
+    (<code>alias</code>, <code>devStateIcon</code>, <code>group</code>, <code>icon</code> und <code>room</code>). Das gilt auch beim Einlesen der Konfiguration beim Start von FHEM,
+    solange der Zusatz in der Definition steht. Bei <code>modify</code> werden die Voreinstellungen nicht gesetzt. Ohne den Zusatz werden keine Attribute gesetzt.<br>
+    Es kann nur eine Instanz definiert werden.<br>
+    Beispiele: <code>define fhemInstaller Installer</code> oder <code>define fhemInstaller Installer defaultAttr</code><br><br>
+    Nach dem Start von FHEM lädt das Modul die Metadaten der verwendeten Module und fragt die Versionen von Perl und <code>cpanm</code> ab.
     Danach wird die Liste der veralteten Perl-Pakete einmal täglich automatisch aktualisiert (Prüfung alle 4 Stunden, ob sich das Datum seit der letzten Aktualisierung geändert hat).
   </ul>
   <br>
@@ -4641,7 +4705,7 @@ return grep { defined &{"${module}::$_"} && ($inPackage ? __in_package(\&{"${mod
       "abstract": "Modul zur Installation, Aktualisierung und Deinstallation von (CPAN) Perl-Modulen und zur Verwaltung der Systemvoraussetzungen von FHEM"
     }
   },
-  "version": "v1.1.0",
+  "version": "v1.2.0",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>",

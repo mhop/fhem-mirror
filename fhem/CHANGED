@@ -1,5 +1,7 @@
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - change: 98_Installer: v1.2.0, Forum: #145672
+ - change: Meta.pm: v1.0.0, Meta refaktoriert
  - bugfix:  76_SolarForecast: Version 2.10.10, 
             Forum: https://forum.fhem.de/index.php?msg=1370567
  - bugfix: 72_FritzSmart: Fehlerkorrekturen/commandref
