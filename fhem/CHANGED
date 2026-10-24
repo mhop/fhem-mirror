@@ -3,6 +3,8 @@
 - 2026-10-24 (6.4)
 # Add changes at the top of the list. Keep it in ASCII, and 80-char wide.
 # Do not insert empty lines here, update check depends on
+ - feature: 98_CDCOpenData.pm: Umstellung auf ODIM-HDF5 files.
+                               Dank an Franz alias alkazaa
  - change: 98_Installer: v1.2.0, Forum: #145672
  - change: Meta.pm: v1.0.0, Meta refaktoriert
  - bugfix:  76_SolarForecast: Version 2.10.10, 
