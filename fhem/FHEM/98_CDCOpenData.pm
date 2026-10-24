@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.14a";
+my $ModulVersion = "01.15";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -66,10 +66,10 @@ sub CDCOpenData_Readout_Process($$);
 
 use Net::FTP;
 eval "use IO::Uncompress::Gunzip qw(gunzip);1"   or $missingModul .= "IO::Uncompress::Gunzip install: sudo apt-get install libio-compress-perl ";
-eval "use IO::Uncompress::Bunzip2 qw(bunzip2);1" or $missingModul .= "IO::Uncompress::Bunzip2 install: sudo apt-get install libio-compress-perl ";
 eval "use Archive::Tar;1"                        or $missingModul .= "Archive::Tar install: sudo apt-get install libarchive-extract-perl ";
 eval "use POSIX;1"                               or $missingModul .= "POSIX install: sudo apt-get install libtemplate-plugin-posix-perl ";
 eval "use File::Path;1"                          or $missingModul .= "File::Path not available ";
+eval "use File::Temp;1"                          or $missingModul .= "File::Temp not available ";
 eval "use FHEM::Scheduler::Cron;1"               or $missingModul .= "FHEM::Scheduler::Cron: update Fhem ";
 eval "use List::Util qw(pairs);1"                or $missingModul .= "List::Util: update Perl ";
 eval "use Time::Local;1"                         or $missingModul .= "Time::Local ";
@@ -329,7 +329,17 @@ sub CDCOpenData_Define($$)
 
    return "CDCOpenData_Define: define <name> CDCOpenData <[name:]latitude,longitude>" . @args if(@args < 1 && @args > 2);
 
-   my $name = $args[0];
+   my $name      = $args[0];
+   $hash->{NAME} = $name;
+
+   # since October 2026 DWD delivers the radar forecast as ODIM-HDF5 files. They are read with the
+   # command line tool 'h5dump' (Debian/Raspbian: sudo apt-get install hdf5-tools)
+
+   my $h5dump = CDCOpenData_find_h5dump();
+   unless ($h5dump) {
+     CDCOpenData_Log $name, 3, "h5dump not found";
+     return "Error|h5dump not found, install: sudo apt-get install hdf5-tools";
+   }
 
    if (!defined $args[2]) {
       my $home = AttrVal("global", "latitude", 49.473067) . "," . AttrVal("global", "longitude", 6.800607);
@@ -357,7 +367,6 @@ sub CDCOpenData_Define($$)
       return $msg;
    }
 
-   $hash->{NAME}         = $name;
    $hash->{VERSION}      = $ModulVersion;
 
    $hash->{STATE}        = "Initializing";
@@ -1164,10 +1173,24 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
 
    my $HOST    = $hash->{DWDHOST};
    my $DWDpath = "/weather/radar/composite/rv/";
+   my $DWDtar  = "composite_rv_LATEST.tar";
+   # the hd5 files contain the precipitation of each 5 minute interval in mm (quantity ACRR).
+   my $rainFactor = 1; # set to 12 if mm/hr is preferred as unit of rain intensity
 
    CDCOpenData_Log $name, 5, "################ get_RegenRadar_atLocations called ################";
 
-   use IO::Uncompress::Bunzip2 qw(bunzip2 $Bunzip2Error);
+   # since October 2026 DWD delivers the radar forecast as ODIM-HDF5 files. They are read with the
+   # command line tool 'h5dump' (Debian/Raspbian: sudo apt-get install hdf5-tools)
+   my $h5dump = CDCOpenData_find_h5dump();
+   unless ($h5dump) {
+     CDCOpenData_Log $name, 3, "h5dump not found";
+     if ($fromGet) {
+       return "ERROR: h5dump not found, install: sudo apt-get install hdf5-tools";
+     } else {
+       $returnStr = "Error|h5dump not found, install: sudo apt-get install hdf5-tools";
+       return $returnStr;
+     }
+   }
 
    # create ftp instance to DWD opendata server:
    my $passive = AttrVal($name, "sFTP_Passive", 0);
@@ -1229,119 +1252,165 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
    my $geoCnt = 0;
    my $geoName = "";
 
-   # get handle to the remote file "DE1200_RV_LATEST.tar.bz2":
-   my $remote_tar_bz2_file_handle = $ftp->retr("DE1200_RV_LATEST.tar.bz2");
+   # download the archive "composite_rv_LATEST.tar" (uncompressed tar, 25 ODIM-HDF5 files, one per 5 minutes
+   # of the forecast) into a temporary directory. It is removed automatically when $tmpdir goes out of scope.
+   my $tmpdir   = File::Temp->newdir();
+   my $tar_file = "$tmpdir/composite_rv_LATEST.tar";
 
-   unless( $remote_tar_bz2_file_handle ) {
+   unless ( $ftp->get($DWDtar, $tar_file) ) {
+     my $msg = $ftp->message // "";
+     $msg =~ s/\s+$//;
+     $ftp->quit;
      if ($fromGet) {
-       $ftp->quit;
-       $returnStr = "ERROR: reading 'DE1200_RV_LATEST.tar.bz2' failed";
+       $returnStr = "ERROR: reading '$DWDtar' failed: $msg";
        return $returnStr;
      } else {
-       $ftp->quit;
-       $returnStr = "Error|reading 'DE1200_RV_LATEST.tar.bz2' failed";
+       $returnStr = "Error|reading '$DWDtar' failed: $msg";
        $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
        return $returnStr;
      }
    }
-
-   # uncompress tar file in-memory and get handle to the in-memory file:
-   my $uncompressed_fh;
-   unless ( $uncompressed_fh = IO::Uncompress::Bunzip2->new($remote_tar_bz2_file_handle) ) {
-     if ($fromGet) {
-       close $remote_tar_bz2_file_handle;
-       $ftp->quit;
-       $returnStr = "ERROR: IO::Uncompress::Bunzip2 failed: $IO::Uncompress::Bunzip2::Bunzip2Error";
-       return $returnStr;
-     } else {
-       close $remote_tar_bz2_file_handle;
-       $ftp->quit;
-       $returnStr = "Error|IO::Uncompress::Bunzip2 failed: $IO::Uncompress::Bunzip2::Bunzip2Error";
-       $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
-       return $returnStr;
-     }
-
-   } else {
-
-     # Read the tar archive from the uncompressed file handle
-     my $tar = Archive::Tar->new;
-     $tar->read($uncompressed_fh);
-
-     my @list_of_files_in_tar = $tar->list_files;
-     my $filename = $list_of_files_in_tar[0];
-
-     $filename =~ /DE1200_RV(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)_000/;
-     my $firsttime = timegm( 0, $5, $4, $3, $2-1, $1);
-
-     my $timestamp;
-     my $file_content;
-     my $ETX_index;
-     my $geo_index;
-     my $rain_forecast;
-
-     foreach my $location (split / /, $geoRef) {
-       CDCOpenData_Log $name, 5, "geoLocation: " . $location;
-
-       if ($location =~ /(.*?):/) {
-         $geoName = $1;
-         $location =~ s/.*?://;
-       } else {
-         $geoName = "loc" . $geoCnt;
-       }
-       $geoName .= "_rain_radar";
-
-       CDCOpenData_Log $name, 5, "geoName: " . $geoName;
-
-       $location =~ s/(.*?)://;
-       $geo_index = CDCOpenData_index_for_geo_position( (split(/,/,$location))[0], (split(/,/,$location))[1], "WGS84");
-
-       foreach my $file (@list_of_files_in_tar) {
-         # parse forecast timestamp from filename
-         $file =~ /DE1200_RV(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)_(\d\d\d)/;
-         $timestamp = strftime ("%Y-%m-%d_%H:%M:%S", localtime($firsttime + 60 * $6));
-		
-         $file_content = $tar->get_content($file);
-         if ($file_content) {
-           my $rName = $geoName . ":" . $timestamp;
- 
-           # find index of ETX character (it marks the end of the header)
-           $ETX_index = index($file_content,"\x03");
-
-           $rain_forecast = substr($file_content, $ETX_index + 1 + 2 * $geo_index, 2);  # read 2 bytes at that position
-
-           # unpack the little-endian number and mask out bits 13..16
-           # unit of precipitation is 0.01 ltr/m²/h
-
-           $rain_forecast = unpack( 'v*', $rain_forecast ) & 0xFFF;
-
-           # A value of 2500 in the file marks invalid data.
-           # It is reset to -1 in order to keep the y-axis scale small when plotting.
-
-           if ($rain_forecast == 2500) {
-             $rain_forecast = -1 ;
-             CDCOpenData_Log $name, 4, "Regen Radar: " . $rName . ": error in value";
-           } else {
-             $rain_forecast *= 0.01;
-           }
-		 
-           CDCOpenData_Log $name, 5, "Regen Radar: " . $rName . ": $rain_forecast";
-
-           CDCOpenData_Readout_Add_Reading $hash, \@roReadings, $rName, $rain_forecast;
-           $returnStr .= $rName . ": " . $rain_forecast . "|";
-
-         } else {
-           CDCOpenData_Log $name, 4, "Regen Radar: no filecontent: " . $file;
-         }
-       }
-     }
-
-     # Close the file handles
-     close $uncompressed_fh;
-
-   }
-
-   close $remote_tar_bz2_file_handle;
    $ftp->quit;
+
+   # read the tar archive into memory
+   my $tar = Archive::Tar->new($tar_file);
+   unlink $tar_file;
+
+   unless ($tar) {
+     my $msg = Archive::Tar->error;
+     if ($fromGet) {
+       $returnStr = "ERROR: Archive::Tar failed: $msg";
+       return $returnStr;
+     } else {
+       $returnStr = "Error|Archive::Tar failed: $msg";
+       $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
+       return $returnStr;
+     }
+   }
+
+   # members are named composite_rv_YYYYMMDD_HHMM_MMM-hd5, MMM = forecast minute (000, 005, ... 120)
+   my %hd5_member;
+   my $firsttime;
+   foreach my $member ($tar->list_files) {
+     next unless $member =~ /composite_rv_(\d{4})(\d\d)(\d\d)_(\d\d)(\d\d)_(\d{3})[.-]hd5$/;
+     $hd5_member{$6 + 0} = $member;
+     $firsttime //= timegm( 0, $5, $4, $3, $2-1, $1);   # start time of the forecast run (UTC)
+   }
+
+   unless (%hd5_member) {
+     if ($fromGet) {
+       $returnStr = "ERROR: no hd5 files found in '$DWDtar'";
+       return $returnStr;
+     } else {
+       $returnStr = "Error|no hd5 files found in '$DWDtar'";
+       $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
+       return $returnStr;
+     }
+   }
+
+   # locations -> name and row/column in the 1200 x 1100 grid
+   my @locs;
+   foreach my $location (split / /, $geoRef) {
+     CDCOpenData_Log $name, 5, "geoLocation: " . $location;
+
+     if ($location =~ /(.*?):/) {
+       $geoName = $1;
+       $location =~ s/.*?://;
+     } else {
+       $geoName = "loc" . $geoCnt;
+     }
+     $geoName .= "_rain_radar";
+
+     CDCOpenData_Log $name, 5, "geoName: " . $geoName;
+
+     my ($row, $col) = CDCOpenData_rowcol_for_geo_position( (split(/,/,$location))[0], (split(/,/,$location))[1] );
+     CDCOpenData_Log $name, 4, "Regen Radar: " . $geoName . ": position is outside of the radar grid" unless defined $row;
+
+     push @locs, { name => $geoName, row => $row, col => $col };
+   }
+
+   # read the raw value for each location out of each hd5 file
+   my %raw;                       # $raw{<location index>}{<forecast minute>}
+   my ($gain, $offset, $nodata);
+
+   foreach my $minute (sort { $a <=> $b } keys %hd5_member) {
+     my $file_content = $tar->get_content($hd5_member{$minute});
+
+     unless ($file_content) {
+       CDCOpenData_Log $name, 4, "Regen Radar: no filecontent: " . $hd5_member{$minute};
+       next;
+     }
+
+     # h5dump needs a real file
+     my $hd5_file = "$tmpdir/rv_$minute.hd5";
+     if ( open(my $out, '>:raw', $hd5_file) ) {
+       print $out $file_content;
+       close $out;
+     } else {
+       CDCOpenData_Log $name, 3, "Regen Radar: cannot write $hd5_file: $!";
+       next;
+     }
+
+     # scaling from the first file: precipitation [mm per 5 min] = gain * raw + offset
+     unless (defined $gain) {
+       $gain   = CDCOpenData_h5_value($h5dump, '-a', '/dataset1/data1/what/gain',   $hd5_file);
+       $offset = CDCOpenData_h5_value($h5dump, '-a', '/dataset1/data1/what/offset', $hd5_file);
+       $nodata = CDCOpenData_h5_value($h5dump, '-a', '/dataset1/data1/what/nodata', $hd5_file);
+       $nodata = 4294967295 unless defined $nodata;
+       unless (defined $gain && defined $offset) {
+         unlink $hd5_file;
+         CDCOpenData_Log $name, 3, "Regen Radar: cannot read gain/offset from " . $hd5_member{$minute};
+         undef $gain;
+         next;
+       }
+     }
+
+     for my $i (0 .. $#locs) {
+       next unless defined $locs[$i]{row};
+       $raw{$i}{$minute} = CDCOpenData_h5_value($h5dump, '-d', '/dataset1/data1/data',
+                                                '-s', $locs[$i]{row} . "," . $locs[$i]{col}, '-c', '1,1', $hd5_file);
+     }
+     unlink $hd5_file;
+   }
+
+   unless (defined $gain) {
+     if ($fromGet) {
+       $returnStr = "ERROR: reading hd5 data from '$DWDtar' failed";
+       return $returnStr;
+     } else {
+       $returnStr = "Error|reading hd5 data from '$DWDtar' failed";
+       $returnStr .= "|" . join('|', @roReadings ) if int @roReadings;
+       return $returnStr;
+     }
+   }
+
+   # create the readings
+   for my $i (0 .. $#locs) {
+     foreach my $minute (sort { $a <=> $b } keys %hd5_member) {
+       # forecast timestamp
+       my $timestamp = strftime ("%Y-%m-%d_%H:%M:%S", localtime($firsttime + 60 * $minute));
+       my $rName = $locs[$i]{name} . ":" . $timestamp;
+       my $rain_forecast = defined $locs[$i]{row} ? $raw{$i}{$minute} : undef;
+
+       # the hd5 files contain mm per 5 min, converted to mm/h (= liter/m²/h) by $rainFactor
+       # raw value 0 = no precipitation, 'nodata' (4294967295) = outside the radar coverage.
+       # Invalid data are set to -1 in order to keep the y-axis scale small when plotting.
+
+       if (!defined $rain_forecast || $rain_forecast !~ /^\d+$/ || $rain_forecast == $nodata) {
+         $rain_forecast = -1;
+         CDCOpenData_Log $name, 4, "Regen Radar: " . $rName . ": error in value";
+       } elsif ($rain_forecast == 0) {
+         $rain_forecast = 0;
+       } else {
+         $rain_forecast = 0 + sprintf("%.3f", ($gain * $rain_forecast + $offset) * $rainFactor);
+       }
+
+       CDCOpenData_Log $name, 5, "Regen Radar: " . $rName . ": $rain_forecast";
+
+       CDCOpenData_Readout_Add_Reading $hash, \@roReadings, $rName, $rain_forecast;
+       $returnStr .= $rName . ": " . $rain_forecast . "|";
+     }
+   }
 
    CDCOpenData_Log $name, 5, "################ End get_RegenRadar_atLocations ################";
 
@@ -2276,6 +2345,70 @@ sub CDCOpenData_index_for_geo_position ($$$) {
    return $index
 
 } # end CDCOpenData_index_for_geo_position
+
+# row and column of a geo position in the 1200 x 1100 grid of the DWD RV composite (ODIM-HDF5 format).
+# Same projection as CDCOpenData_index_for_geo_position(..., "WGS84"), but row 0 is the northern edge
+# of the grid (the former binary format started at the southern edge).
+# Returns an empty list if the position is outside of the grid.
+############################################
+sub CDCOpenData_rowcol_for_geo_position {
+
+   my ($lat,$long) = @_;
+   my $pi = 4 * atan2(1,1);
+   $lat  *= $pi/180;
+   $long *= $pi/180;
+   my $lambda0 = 10*$pi/180;
+
+   my $ecc   = 0.08181919084262032;
+   my $k0    = 11862667.042661695;
+   my $x0    = 543196.83521776402;
+   my $y0    = 3622588.861931001;
+   my $scale = 1000;
+
+   my $sinlat = sin($lat);
+   my $t = $pi/4 - $lat/2;
+   my $s = $k0 * (sin($t)/cos($t)) / ((1 - $ecc * $sinlat)/(1 + $ecc * $sinlat))**(0.5*$ecc);
+
+   my $x =  ($x0 + ($s * sin($long - $lambda0))) / $scale;
+   my $y =  ($y0 - ($s * cos($long - $lambda0))) / $scale;
+
+   my $col = floor($x + 0.5);
+   my $row = floor(0.5 - $y);
+
+   return () if ($row < 0 || $row > 1199 || $col < 0 || $col > 1099);
+   return ($row, $col);
+
+} # end CDCOpenData_rowcol_for_geo_position
+
+# find the command line tool h5dump (package hdf5-tools)
+############################################
+sub CDCOpenData_find_h5dump {
+
+   foreach my $dir ( split(/:/, ($ENV{PATH} // "")), "/usr/bin", "/usr/local/bin", "/opt/bin" ) {
+     return "$dir/h5dump" if ($dir ne "" && -x "$dir/h5dump");
+   }
+   return undef;
+
+} # end CDCOpenData_find_h5dump
+
+# read a single value (dataset element or attribute) with h5dump, returns undef on failure
+############################################
+sub CDCOpenData_h5_value {
+
+   my ($h5dump, @args) = @_;
+   my $val;
+
+   open(my $ph, '-|', $h5dump, @args) or return undef;
+   while (my $line = <$ph>) {
+     if ($line =~ /^\s*\((?:\d+,?)+\):\s*(\S+)\s*$/) {
+       $val = $1;
+       last;
+     }
+   }
+   close($ph);
+   return $val;
+
+} # end CDCOpenData_h5_value
 
 # 
 ############################################
