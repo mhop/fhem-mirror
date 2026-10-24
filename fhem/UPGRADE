@@ -62,5 +62,5 @@ enable the old feature.
 - 2025-03-29 (6.4) 
   - no known changes
 
-- 2026-10-xx (6.5)
+- 2026-10-24 (6.5)
   - 55_InfoPanel.pm moved to contrib/betateilchen
