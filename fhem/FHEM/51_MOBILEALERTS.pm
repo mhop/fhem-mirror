@@ -829,6 +829,65 @@ sub MOBILEALERTS_Parse_10_d3 ($$$) {
     MOBILEALERTS_Parse_d3( $hash, $message, $messagefull );
 }
 
+sub MOBILEALERTS_Parse_17_d3 ($$$) {
+    my ( $hash, $message, $messagefull ) = @_;
+    my ( $txCounter, $raw_temperature, $raw_prevTemperature,
+        $raw_prevTemperature2, $raw_prevTemperature3 )
+      = unpack( "nnnnn", $message );
+
+    MOBILEALERTS_readingsBulkUpdateIfChanged( $hash, 0, "deviceType",
+        "MA10870" );
+
+    # txCounter
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "txCounter",
+        MOBILEALERTS_decodeTxCounter($txCounter) );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "triggered",
+        MOBILEALERTS_triggeredTxCounter($txCounter) );
+
+    # Power status (Bit 15: 0 = OK / power present, 1 = off / power failure)
+    my $power = ( $raw_temperature & 0x8000 ) ? "off" : "ok";
+    my $alarm = ( $raw_temperature & 0x8000 ) ? "on"  : "off";
+
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "power", $power );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "alarm", $alarm );
+
+    # Temperature
+    my $temp_val = $raw_temperature & 0x7fff;
+    my $temperature =
+      MOBILEALERTS_decodeTemperature($temp_val) +
+      $hash->{".corrTemperature"};
+
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "temperature", $temperature );
+    MOBILEALERTS_readingsBulkUpdate( $hash, 0, "temperatureString",
+        MOBILEALERTS_temperatureToString($temperature) );
+
+    my $prev_temp_val = $raw_prevTemperature & 0x7fff;
+    my $prevTemperature =
+      MOBILEALERTS_decodeTemperature($prev_temp_val) +
+      $hash->{".corrTemperature"};
+
+    MOBILEALERTS_readingsBulkUpdate( $hash, 1, "prevTemperature",
+        $prevTemperature );
+
+    if ( defined $raw_prevTemperature2 ) {
+        my $prev_temp_val2 = $raw_prevTemperature2 & 0x7fff;
+        my $prevTemperature2 =
+          MOBILEALERTS_decodeTemperature($prev_temp_val2) +
+          $hash->{".corrTemperature"};
+        MOBILEALERTS_readingsBulkUpdate( $hash, 4, "prevTemperature2",
+            $prevTemperature2 );
+    }
+
+    # state
+    if ( $power eq "off" || $temperature < -1000 ) {
+        MOBILEALERTS_readingsBulkUpdate( $hash, 0, "state", "power: " . $power );
+    }
+    else {
+        MOBILEALERTS_readingsBulkUpdate( $hash, 0, "state",
+            "T: " . $temperature . " power: " . $power );
+    }
+}
+
 sub MOBILEALERTS_Parse_d3 ($$$) {
     my ( $hash, $message ) = @_;
     my @data;
@@ -1552,7 +1611,7 @@ sub MOBILEALERTS_ActionDetector($) {
   The MOBILEALERTS is a fhem module for the german MobileAlerts devices and TFA WEATHERHUB devices.
   <br><br>
   The fhem module represents a MobileAlerts device. The connection is provided by the <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> module.
-  Currently supported: MA10100, MA10101, MA10200, MA10230, MA10238, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO, MA10860, MA10880<br>
+  Currently supported: MA10100, MA10101, MA10200, MA10230, MA10238, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO, MA10860, MA10870, MA10880<br>
   Supported but untested: ./.<br>
   <br>
 
@@ -1605,6 +1664,8 @@ sub MOBILEALERTS_ActionDetector($) {
     <li>airPressure<br>Barometric pressure in hPa</li>
     <li>airPressureString<br>Barometric pressure as String</li>
     <li>alarm1, alarm2, alarm3, alarm4<br>Active Alarms (values: on/off)</li>
+    <li>power<br>Mains power status for MA10870 (ok or off)</li>
+    <li>alarm<br>Alarm state for MA10870 (on or off)</li>
   </ul>
   <br>  
 
@@ -1652,7 +1713,7 @@ sub MOBILEALERTS_ActionDetector($) {
   <br><br>
   Dieses FHEM Modul stellt jeweils ein MobileAlerts Ger&auml;t dar. Die Verbindung wird durch das 
   <a href="#MOBILEALERTSGW">MOBILELAERTSGW</a> Modul bereitgestellt.<br>
-  Aktuell werden unterst&uuml;zt: MA10100, MA10101, MA10200, MA10238, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO, MA10860, MA10880<br>
+  Aktuell werden unterst&uuml;zt: MA10100, MA10101, MA10200, MA10238, MA10230, MA10300, MA10650, MA10320PRO, MA10350, MA10410, MA10450, MA10660, MA10700, TFA 30.3312.02, MA10800, WL2000, TFA30.3060.01.IT, MA10120PRO, MA10860, MA10870, MA10880<br>
   Unterst&uuml;zt aber ungetestet: ./.<br>
   <br>
 
@@ -1705,6 +1766,8 @@ sub MOBILEALERTS_ActionDetector($) {
     <li>airPressure<br>Luftdruck in hPa</li>
     <li>airPressureString<br>Luftdruck in hPa als Zeichenkette</li>
     <li>alarm1, alarm2, alarm3, alarm4<br>Aktive Alarme (Werte: on/off)</li>
+    <li>power<br>Netzspannungsstatus f&uuml;r MA10870 (ok oder off)</li>
+    <li>alarm<br>Alarm-Status f&uuml;r MA10870 (on oder off)</li>
   </ul>
   <br>    
 
