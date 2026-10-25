@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.24 changed address retrieval to openstreetmap 
 # v 1.23 fetch GPS location evcen when there is no ze_AboPackSmartNavigation  subscription 
 # v 1.22 corrected distance from home calculation
 # v 1.21 new GIGY_API key
@@ -116,8 +117,9 @@ use HttpUtils;
 use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
+use Encode;
 
-my $RenaultZE_version ="V1.23 / 25.10.2026";
+my $RenaultZE_version ="V1.24 / 25.10.2026";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -1709,12 +1711,6 @@ sub RenaultZE_distanceFromHome($$$$)
     # Entfernungsberechnung (Haversine), Ergebnis in km
     my $distance = RenaultZE_haversine_distance($lat, $long, $hlat, $hlong);
 
-    my $dim = "m";
-    my $homeinfo = "";
-    my $homestate = "away";
-    $homeRadius  = AttrVal( $name, "ze_homeRadius", 20 )	if ( $homeRadius eq "auto");
-    Log3 $name, 5, "RenaultZE_distanceFromHome - Check ".$hash."/".$lat." ".$long."/".$homeRadius;
-
     my $dim = "km";
     my $homeinfo = "";
     my $homestate = "away";
@@ -1749,16 +1745,26 @@ sub RenaultZE_gAddress1($$$)
     my ($hash,$lat,$long) = @_;
     my $name = $hash->{NAME};
 
-    Log3 $name, 5, "RenaultZE_gAddress1 - In ".$hash."/".$name." ".$lat."/".$long;
+    Log3 $name, 5, "RenaultZE_gAddress1 - In ".$hash."/".$name." ".($lat//'undef')."/".($long//'undef');
     readingsSingleUpdate($hash,"ze_Step","RenaultZE_gAddress1",1);
 
-    my $url = "https://www.google.com/maps/place/$lat+$long";
-    Log3 $name, 5, "RenaultZE_gData_Step1 - URL ".$url;
+    # Koordinaten prüfen und mit Dezimalpunkt formatieren
+    unless (defined($lat) && defined($long) && $lat =~ /^-?\d+(\.\d+)?$/ && $long =~ /^-?\d+(\.\d+)?$/)
+    {
+        Log3 $name, 2, "RenaultZE_gAddress1 - ungültige Koordinaten: ".($lat//'undef')."/".($long//'undef');
+        return 1;
+    }
+
+    # OpenStreetMap Nominatim Reverse-Geocoding
+    my $url = sprintf("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=%.6f&lon=%.6f&zoom=18&addressdetails=1",$lat,$long);
+    Log3 $name, 5, "RenaultZE_gAddress1 - URL ".$url;
+
     my $param = {
                     url        => $url,
                     hash       => $hash,
                     timeout    => 15,
                     method     => "GET",
+                    header     => "User-Agent: FHEM-RenaultZE-Geocode/1.0\r\nAccept-Language: de",   # Nominatim verlangt eindeutigen User-Agent
                     callback   => \&RenaultZE_gAddress2
                 };
 
@@ -1767,31 +1773,48 @@ sub RenaultZE_gAddress1($$$)
     return 0;
 }
 
-sub RenaultZE_gAddress2($)
+sub RenaultZE_gAddress2($$$)
 {
     my ($param, $err, $data) = @_;
     my $hash = $param->{hash};
     my $name = $hash->{NAME};
 
     Log3 $name, 5, "RenaultZE_gAddress2 - In ".$hash."/".$name;
-    Log3 $name, 5, "RenaultZE_gAddress2 - In err".$hash."/".$err;
-    Log3 $name, 5, "RenaultZE_gAddress2 - In data".$hash."/".$data;
+    Log3 $name, 5, "RenaultZE_gAddress2 - In err ".$hash."/".($err//'');
+    Log3 $name, 5, "RenaultZE_gAddress2 - In data ".$hash."/".($data//'');
     readingsSingleUpdate($hash,"ze_Step","RenaultZE_gAddress2",1);
 
-    #    RenaultZE_Error_err($hash,"RenaultZE_gAddress2",$param->{url},$err,$data)                     if($err ne "");
-    #    RenaultZE_Log_Data($hash,"RenaultZE_gAddress2",$param->{url},$err,$data)                      if($data ne "");
-    #    RenaultZE_Error_errorCode2($hash,"RenaultZE_gAddress2",$param->{url},$err,$data)              if($data =~ /error/);
+    if (defined($err) && $err ne "")
+    {
+        Log3 $name, 2, "RenaultZE_gAddress2 - HTTP-Fehler: ".$err;
+        return undef;
+    }
 
-    #    my $lastErr = $hash->{READINGS}{ze_lastErr}{VAL};
-    #    return undef                                                                                  if ($lastErr ne "");
+    my $json = eval { decode_json($data) };
+    if ($@ || ref($json) ne "HASH")
+    {
+        Log3 $name, 2, "RenaultZE_gAddress2 - JSON-Fehler: ".($@ // "keine gültige Antwort");
+        return undef;
+    }
 
-    $data =~ s/.*meta content=\"(.*)\" itemprop=\"description\".*/$1/sg;
-    Log3 $name, 5, "RenaultZE_gAddress2 - Address ".$data;
+    if (defined($json->{error}))
+    {
+        Log3 $name, 2, "RenaultZE_gAddress2 - Nominatim-Fehler: ".$json->{error};
+        return undef;
+    }
+
+    my $address = $json->{display_name} // "";
+    return undef if ($address eq "");
+
+    $address = Encode::encode_utf8($address);                                                                            # FHEM-Readings erwarten Bytes
+    Log3 $name, 5, "RenaultZE_gAddress2 - Address ".$address;
+
     my $oldinfo = ReadingsVal($name,"homeInfo","");
-    my $newinfo = $oldinfo." (".$data.")";
+    my $newinfo = $oldinfo." (".$address.")";
     readingsSingleUpdate($hash,"homeInfo",$newinfo,1);
 
     Log3 $name, 5, "RenaultZE_gAddress2 - Out";
+    return undef;
 }
 
 sub RenaultZE_checkAPIkeys1($)
