@@ -38,6 +38,7 @@
 
 ############################################################################################################################
 # Version History
+# v 1.23 fetch GPS location evcen when there is no ze_AboPackSmartNavigation  subscription 
 # v 1.22 corrected distance from home calculation
 # v 1.21 new GIGY_API key
 # v 1.20 Änderungen von Moli 1:1 übernommen
@@ -115,9 +116,8 @@ use HttpUtils;
 use Time::Piece;
 #use JSON qw(decode_json);
 use JSON;
-use Math::Trig qw(deg2rad asin);
 
-my $RenaultZE_version ="V1.23 / 23.10.2026";
+my $RenaultZE_version ="V1.23 / 25.10.2026";
 
 my %RenaultZE_sets = (
 	"AC:on,cancel"       => "",
@@ -529,8 +529,8 @@ sub RenaultZE_Main3($) {
                  Log3 $name, 5, "RenaultZE_gData_Step1 - cockpit - RC=".$res;
 	      }, undef);
 	      InternalTimer( gettimeofday() + 2, sub() { my $a = 1; 
-                 $res = RenaultZE_gData_Step1($hash,'location')				if ($phase eq "2" and $getLocation eq "1" and $naviAbo eq "yes");
-                 Log3 $name, 5, "RenaultZE_gData_Step1 - location - RC=".$res		if ($phase eq "2" and $getLocation eq "1" and $naviAbo eq "yes");
+                 $res = RenaultZE_gData_Step1($hash,'location')				if ($phase eq "2" and $getLocation eq "1");
+                 Log3 $name, 5, "RenaultZE_gData_Step1 - location - RC=".$res		if ($phase eq "2" and $getLocation eq "1");
 	      }, undef);
 	      InternalTimer( gettimeofday() + 3, sub() { my $a = 1; 
                  $res = RenaultZE_gData_Step1($hash,'hvac-status')				if ($phase eq "1");
@@ -1099,7 +1099,7 @@ sub RenaultZE_gData_Step2($)
 	if ( $oldlat != $gpsLatitude or $oldlong != $gpsLongitude ) {
             Log3 $name, 5, "RenaultZE_gData_Step2 - GPS ".$oldlat."/".$gpsLatitude." ".$oldlong."/".$gpsLongitude;
   	    RenaultZE_distanceFromHome($hash,$gpsLatitude,$gpsLongitude,"auto");
-    	}
+	}
         readingsBeginUpdate($hash);
         readingsBulkUpdate($hash,"gpsLatitude",$gpsLatitude);
         readingsBulkUpdate($hash,"gpsLongitude",$gpsLongitude);
@@ -1682,26 +1682,17 @@ sub RenaultZE_pp_err($$)
 }
 
 sub RenaultZE_haversine_distance {
-    my ($lat1, $lon1, $lat2, $lon2) = @_;
+  my ($carlatitude, $carlongitude, $homelatitude, $homelongitude) = @_;
 
-    # Mittlerer Erdradius in Kilometern
-    my $R = 6371.0;
+  my $rad = atan2(1,1) / 45;
+  my $dlat = ($homelatitude - $carlatitude) * $rad;
+  my $dlon = ($homelongitude - $carlongitude) * $rad;
 
-    # Umrechnung der Gradzahlen in Radiant
-    my $phi1         = deg2rad($lat1);
-    my $phi2         = deg2rad($lat2);
-    my $delta_phi    = deg2rad($lat2 - $lat1);
-    my $delta_lambda = deg2rad($lon2 - $lon1);
+  my $a = sin($dlat/2)**2
+        + cos($carlatitude*$rad) * cos($homelatitude*$rad)
+        * sin($dlon/2)**2;
 
-    # Haversine-Formel
-    my $a = sin($delta_phi / 2)**2 +
-            cos($phi1) * cos($phi2) *
-            sin($delta_lambda / 2)**2;
-
-    # Distanz berechnen
-    my $distance = 2 * $R * asin(sqrt($a));
-
-    return $distance;
+  return 6371 * 2 * atan2(sqrt($a), sqrt(1-$a));
 }
 
 sub RenaultZE_distanceFromHome($$$$)
@@ -2026,7 +2017,7 @@ sub RenaultZE_EpochFromDateTime($) {
                 Connected Services subscribed? yes/no
             </li>
             <a name="ze_AboPackSmartNavigation"></a><li><i>ze_AboPackSmartNavigation</i> yes|no<br>
-                Pack Smart Navigation subscribed? yes/no
+                Pack Smart Navigation subscribed? yes/no (currently unused)
             </li>
             <a name="ze_brand"></a><li><i>ze_brand</i> Renault|Dacia<br>
                 Car brand, default is Renault
