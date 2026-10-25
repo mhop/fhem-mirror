@@ -1803,7 +1803,20 @@ sub RenaultZE_gAddress2($$$)
         return undef;
     }
 
-    my $address = $json->{display_name} // "";
+    #my $address = $json->{display_name} // "";A
+    my $a = $json->{address} // {};
+
+    # Straße: je nach Ort liefert Nominatim unterschiedliche Schlüssel
+    my $street = $a->{road} // $a->{pedestrian} // $a->{footway} // $a->{path}
+          // $a->{residential} // $a->{square} // "";
+    $street .= " ".$a->{house_number}            if ($street ne "" && defined($a->{house_number}));
+
+    # Ort: Stadt, Kleinstadt, Dorf usw.
+    my $city = $a->{city} // $a->{town} // $a->{village} // $a->{hamlet} // $a->{municipality} // "";
+    my $plzOrt = join(" ", grep { defined && $_ ne "" } ($a->{postcode}, $city));
+
+    my $address = join(", ", grep { $_ ne "" } ($street, $plzOrt));
+    $address = $json->{display_name} // ""      if ($address eq "");   # Fallback auf volle Adresse
     return undef if ($address eq "");
 
     $address = Encode::encode_utf8($address);                                                                            # FHEM-Readings erwarten Bytes
