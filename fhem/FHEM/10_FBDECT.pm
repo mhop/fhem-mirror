@@ -477,10 +477,12 @@ FBDECT_ParseHttp($$$)
     9 => "switch",
    10 => "repeater",
    11 => "microphone",
-   13 => "HANFUNUnit",
+   13 => "HANFUNUnit", # DECT/ZigBee/etc channel unit
    15 => "switch",
    16 => "dimmer",
    17 => "colorswitch",
+   18 => "blind",
+   20 => "humiditySensor",
   );
   my %ecTxt = (0 => "noError (0)",
                1 => "notMounted (1)",
