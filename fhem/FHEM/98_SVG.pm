@@ -1242,6 +1242,8 @@ SVG_doShowLog($$$$;$)
 
     } else {
       my $da = SVG_getData($wl, $f, $t, $srcDesc, 0); # substcfg needs it(!)
+      $data{SVG_from} = $f;
+      $data{SVG_to} = $t;
       ($cfg, $plot) = SVG_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
       my $ret = SVG_render($wl, $f, $t, $cfg, $da,
                         $plot, $FW_wname, $FW_cssdir, $srcDesc, $noHeader);
