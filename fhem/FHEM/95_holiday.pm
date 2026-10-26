@@ -190,11 +190,11 @@ holiday_refresh($;$$)
       my $yday=$fd[7];
       # create time object of target date - mktime counts months and their
       # days from 0 instead of 1, so subtract 1 from each
-      my $tgt=mktime(0,0,1,$a[4],$a[3]-1,$fd[5],0,0,-1);
+      my $tgt=mktime(0,0,1,$a[4],$a[3]-1,$fd[5],0,0,0);
       my $tgtmin=$tgt;
       my $tgtmax=$tgt;
       my $weeksecs=7*24*60*60; # 7 days, 24 hours, 60 minutes, 60seconds each
-      my $cd=mktime(0,0,1,$fd[3],$fd[4],$fd[5],0,0,-1);
+      my $cd=mktime(0,0,1,$fd[3],$fd[4],$fd[5],0,0,0);
       if ( $a[1] =~ /^-([0-9])*$/ ) {
         $tgtmin -= $1*$weeksecs; # Minimum: target date minus $1 weeks
         $tgtmax = $tgtmin+$weeksecs; # Maximum: one week after minimum
