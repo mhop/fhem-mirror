@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.15";
+my $ModulVersion = "01.16";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -863,7 +863,29 @@ sub CDCOpenData_Set($$@)
    my $resultStr = "";
 
    my $list =  " update:noArg"
-            .  " htmlBarAsStateFormat:on,off";
+            .  " htmlBarAsStateFormat:";
+
+   my $geoRefList;
+   my $geoCnt = 0;
+
+   my $geoRef = $hash->{LOCATION};
+      $geoRef .= " " . AttrVal($name, "locations", "");
+
+   foreach my $location (split / /, $geoRef) {
+     my $geoName;
+     if ($location =~ /(.*?):/) {
+       $geoName = $1;
+       $location =~ s/.*?://;
+     } else {
+       $geoName = "loc" . $geoCnt++;
+     }
+     $geoRefList .= $geoName . "_rain_radar,";
+   }
+
+   chop($geoRefList);
+
+   $list .= $geoRefList;
+
 
    if ( lc $cmd eq 'update' ) {
       CDCOpenData_Log $hash, 3, "set $name $cmd " . join(" ", @val);
@@ -874,13 +896,10 @@ sub CDCOpenData_Set($$@)
    }
 
    elsif ( lc $cmd eq 'htmlbarasstateformat' ) {
-      return "wrong parameter" if int @val != 1 || $val[0] !~ /on|off/;
-      if ($val[0] eq "on") {
-        fhem("attr $name stateFormat {CDCOpenData_radar2html('" . $name . "','Home_rain_radar',0)}");
-      } else {
-        fhem("deleteattr -silent $name stateFormat");
-        $hash->{STATE} = ReadingsVal($name, "state", "");
-      }
+      return "wrong parameter" if int @val != 1 || $val[0] !~ /$geoRefList/;
+
+      fhem("attr $name stateFormat {CDCOpenData_radar2html('" . $name . "', $val[0], 0)}");
+
       return 'please save the change in the stateFormat attribute by clicking on “Save config”';
    }
 
@@ -1290,11 +1309,13 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
 
    # members are named composite_rv_YYYYMMDD_HHMM_MMM-hd5, MMM = forecast minute (000, 005, ... 120)
    my %hd5_member;
-   my $firsttime;
+   my $firsttime; 
+
    foreach my $member ($tar->list_files) {
      next unless $member =~ /composite_rv_(\d{4})(\d\d)(\d\d)_(\d\d)(\d\d)_(\d{3})[.-]hd5$/;
      $hd5_member{$6 + 0} = $member;
-     $firsttime //= timegm( 0, $5, $4, $3, $2-1, $1);   # start time of the forecast run (UTC)
+     #              timegm($sec, $min, $hour, $mday, $mon, $year)
+     $firsttime //= timegm(0,    $5,   $4,    $3,    $2-1, $1);   # start time of the forecast run (UTC)
    }
 
    unless (%hd5_member) {
@@ -1317,7 +1338,7 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
        $geoName = $1;
        $location =~ s/.*?://;
      } else {
-       $geoName = "loc" . $geoCnt;
+       $geoName = "loc" . $geoCnt++;
      }
      $geoName .= "_rain_radar";
 
@@ -1353,10 +1374,12 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
 
      # scaling from the first file: precipitation [mm per 5 min] = gain * raw + offset
      unless (defined $gain) {
-       $gain   = CDCOpenData_h5_value($h5dump, '-a', '/dataset1/data1/what/gain',   $hd5_file);
-       $offset = CDCOpenData_h5_value($h5dump, '-a', '/dataset1/data1/what/offset', $hd5_file);
-       $nodata = CDCOpenData_h5_value($h5dump, '-a', '/dataset1/data1/what/nodata', $hd5_file);
+
+       $gain   = CDCOpenData_h5_value($hash, $h5dump, '-a', '/dataset1/data1/what/gain',   $hd5_file);
+       $offset = CDCOpenData_h5_value($hash, $h5dump, '-a', '/dataset1/data1/what/offset', $hd5_file);
+       $nodata = CDCOpenData_h5_value($hash, $h5dump, '-a', '/dataset1/data1/what/nodata', $hd5_file);
        $nodata = 4294967295 unless defined $nodata;
+
        unless (defined $gain && defined $offset) {
          unlink $hd5_file;
          CDCOpenData_Log $name, 3, "Regen Radar: cannot read gain/offset from " . $hd5_member{$minute};
@@ -1367,7 +1390,7 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
 
      for my $i (0 .. $#locs) {
        next unless defined $locs[$i]{row};
-       $raw{$i}{$minute} = CDCOpenData_h5_value($h5dump, '-d', '/dataset1/data1/data',
+       $raw{$i}{$minute} = CDCOpenData_h5_value($hash, $h5dump, '-d', '/dataset1/data1/data',
                                                 '-s', $locs[$i]{row} . "," . $locs[$i]{col}, '-c', '1,1', $hd5_file);
      }
      unlink $hd5_file;
@@ -1404,8 +1427,6 @@ sub CDCOpenData_get_RegenRadar_atLocations($$$$) {
        } else {
          $rain_forecast = 0 + sprintf("%.3f", ($gain * $rain_forecast + $offset) * $rainFactor);
        }
-
-       CDCOpenData_Log $name, 5, "Regen Radar: " . $rName . ": $rain_forecast";
 
        CDCOpenData_Readout_Add_Reading $hash, \@roReadings, $rName, $rain_forecast;
        $returnStr .= $rName . ": " . $rain_forecast . "|";
@@ -1588,14 +1609,20 @@ sub CDCOpenData_Readout_Run_Rain_Since_Midnight ($@) {
          if (! -e $tmpDir . $localname ) {
 
            # get handle to the remote file:
-           my $retr_fh = $ftp->retr($file);
+           if( my $retr_fh = $ftp->retr($file)) {
 
-           # use this handle to unzip the remote file 'on-the-fly':
-           if (my $status = gunzip $retr_fh => $tmpDir . $localname, AutoClose => 1) {
-             CDCOpenData_Log $name, 4,  "Rain_Since_Midnight - Loaded new local file $tmpDir$localname: $status";
+             # use this handle to unzip the remote file 'on-the-fly':
+             if (my $status = gunzip $retr_fh => $tmpDir . $localname, AutoClose => 1) {
+               CDCOpenData_Log $name, 4,  "Rain_Since_Midnight - Loaded new local file $tmpDir$localname: $status";
+             } else {
+               CDCOpenData_Log $name, 3, "Rain_Since_Midnight - $GunzipError";
+               next;
+             }
            } else {
-             CDCOpenData_Log $name, 3, "Rain_Since_Midnight - $GunzipError";
+             CDCOpenData_Log $name, 2, "Rain_Since_Midnight - error getting $file";
+             next;
            }
+
          }
 
          # read value at index matching the geo-position:
@@ -2395,16 +2422,25 @@ sub CDCOpenData_find_h5dump {
 ############################################
 sub CDCOpenData_h5_value {
 
-   my ($h5dump, @args) = @_;
+   my ($hash, $h5dump, @args) = @_;
+   my $name = $hash->{'NAME'};
+
    my $val;
 
    open(my $ph, '-|', $h5dump, @args) or return undef;
    while (my $line = <$ph>) {
      if ($line =~ /^\s*\((?:\d+,?)+\):\s*(\S+)\s*$/) {
+
        $val = $1;
+       if ($val eq '4.29497e+09' || $val eq '4.29497e+009') {
+         $val = 4294967295;
+       } else {
+         $val = $1;
+       }
        last;
      }
    }
+
    close($ph);
    return $val;
 
@@ -2599,8 +2635,8 @@ sub CDCOpenData_myCalcColor {
 
 =pod
 =item device
-=item summary Controls some features of AVM's FRITZ!BOX, FRITZ!Repeater and Fritz!Fon.
-=item summary_DE Steuert einige Funktionen von AVM's FRITZ!BOX, Fritz!Repeater und Fritz!Fon.
+=item summary Forecast values for the daily amount of rainfall, provided by the DWD.
+=item summary_DE Vom DWD bereitgestellte Vorhersagewerte für die pro Tag fallende Regenmenge.
 
 =begin html
 
@@ -2608,7 +2644,13 @@ sub CDCOpenData_myCalcColor {
 <h3>CDCOpenData</h3>
 <div>
 <ul>
-   The DWD provides values ​​for the amount of rain that has fallen per day, which are based on rain radar measurements and whose values ​​have been adjusted to the amounts measured by the weather station. The spatial resolution is 1 km, which makes the data interesting for those who do not have their own rainfall measurement available.
+   Forecast values for the daily amount of rainfall, provided by the DWD.<br>
+   These values are based on rain radar measurements and whose values have been adjusted to the amounts measured by the weather station.<br>
+   The spatial resolution is 1 km, which makes the data interesting for those who do not have their own rainfall measurement available.<br>
+   <br>
+   Since October 2026 DWD delivers the radar forecast as ODIM-HDF5 files. They are read with the<br>
+   command line tool 'h5dump' (Debian/Raspbian: sudo apt-get install hdf5-tools)<br>
+   The hdf5-tools are strictly required for using the module.<br>
    <br>
    <br>
 
@@ -2638,7 +2680,7 @@ sub CDCOpenData_myCalcColor {
       </li><br>
 
       <li><a name="htmlBarAsStateFormat"></a>
-         <dt><code>set &lt;name&gt; htmlBarAsStateFormat &lt;on|off&gt;</code></dt>
+         <dt><code>set &lt;name&gt; htmlBarAsStateFormat &lt;reading&gt;</code></dt>
          <br>
          Defines an HTML bar to display the rain radar in the stateFormat attribute.<br>
          In order to persist the change, it must be saved by clicking on 'Save config'.<br>
@@ -2804,7 +2846,13 @@ sub CDCOpenData_myCalcColor {
 <h3>CDCOpenData</h3>
 <div>
 <ul>
-   Der DWD stellt Werte der pro Tag gefallenen Regenmengen zur Verfügung, die auf Regenradar-Messungen beruhen und deren Werte an die gemessenen Mengen der Wetterstation angeeicht wurden. Die räumliche Auflösung beträgt dabei 1 km, was die Daten für diejenigen interessant macht, die keine eigene Regenmengenmessung zur Verfügung haben.
+   Vom DWD bereitgestellte Vorhersagewerte für die pro Tag fallende Regenmenge.<br>
+   Die Werte beruhen auf Regenradar-Messungen die an die gemessenen Mengen der Wetterstation angeeicht wurden.<br>
+   Die räumliche Auflösung beträgt dabei 1 km, was die Daten für diejenigen interessant macht, die keine eigene Regenmengenmessung zur Verfügung haben.<br>
+   <br>
+   Seit Oktober 2026 stellt der DWD die Radarvorhersage als ODIM-HDF5-Dateien bereit. Diese lassen sich mit dem<br>
+   Befehlszeilen-Tool „h5dump“ (Debian/Raspbian: sudo apt-get install hdf5-tools) auslesen.<br>
+   Die hdf5-tools sind für die Nutzung des Moduls zwingend erforderlich.
    <br>
    <br>
 
@@ -2834,7 +2882,7 @@ sub CDCOpenData_myCalcColor {
       </li><br>
 
       <li><a name="htmlBarAsStateFormat"></a>
-         <dt><code>set &lt;name&gt; htmlBarAsStateFormat &lt;on|off&gt;</code></dt>
+         <dt><code>set &lt;name&gt; htmlBarAsStateFormat &lt;reading&gt;</code></dt>
          <br>
          Definiert eine HTML Bar zur Anzeige des Regen Radars im Attribut stateFormat.<br>
          Um die Änderung zu persistieren muss sie durch klicken auf 'Save config' gesichert werden.<br>
