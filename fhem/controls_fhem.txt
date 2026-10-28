@@ -1,4 +1,4 @@
-REV 31848
+REV 31850
 DIR unused
 UPD 2026-10-27_07:45:04 466600 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -482,7 +482,7 @@ UPD 2022-04-20_07:45:02 64930 FHEM/95_PostMe.pm
 UPD 2022-04-15_07:45:02 23392 FHEM/95_ShareMaster.pm
 UPD 2024-04-21_07:45:03 46458 FHEM/95_Shares.pm
 UPD 2020-11-26_07:45:03 193526 FHEM/95_YAAHM.pm
-UPD 2026-10-27_07:45:04 23571 FHEM/95_holiday.pm
+UPD 2026-10-28_07:45:03 23118 FHEM/95_holiday.pm
 UPD 2023-04-22_07:45:02 21580 FHEM/95_remotecontrol.pm
 UPD 2020-03-22_07:45:03 80216 FHEM/96_SIP.pm
 UPD 2022-10-27_07:45:03 45404 FHEM/96_Snapcast.pm
@@ -770,8 +770,8 @@ UPD 2026-10-27_07:45:12 5627029 docs/commandref.html
 UPD 2026-10-27_07:45:16 3626520 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-10-27_07:45:18 335207 docs/commandref_modular.html
-UPD 2026-10-27_07:45:19 347031 docs/commandref_modular_DE.html
+UPD 2026-10-28_07:45:17 335207 docs/commandref_modular.html
+UPD 2026-10-28_07:45:18 347031 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
