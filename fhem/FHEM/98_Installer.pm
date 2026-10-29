@@ -82,6 +82,7 @@ use Data::Dumper;
 use Config;
 use ExtUtils::Installed;
 use B qw(svref_2object);
+use File::Spec;
 
 # Imports aus main:: (vor der Modul-Kompilierung)
 BEGIN {
@@ -161,6 +162,7 @@ use constant {
   POLLINTERVAL              => 1,                                                               # Sekunden zwischen Abfragen des Subprozesses
   UPDATEINTERVAL            => 14400,                                                           # Sekunden zwischen zwei Update-Checks (4 Stunden)
   BUILDLOGMAXBYTES          => 65536,                                                           # maximale Größe des angezeigten build.log (Ende der Datei)
+  CONTAINSINLINEMAX         => 3,                                                               # bis zu dieser Anzahl werden enthaltene Module ohne Aufklappen angezeigt (0 = immer einklappen)
 };
 
 ###############################################################
@@ -1593,6 +1595,12 @@ sub SP_cpanOutdated {
 
   # installierte Perl-Module auflisten
   my $ExtUtilsInstalled = ExtUtils::Installed->new();
+  
+  # Verzeichnisse aus @INC (längste zuerst), um Modulnamen aus Dateipfaden abzuleiten
+  my @inc = sort { length($b) <=> length($a) }
+            grep { File::Spec->file_name_is_absolute ($_) }
+            map  { File::Spec->canonpath ($_) }
+            grep { !ref } @INC;
 
   for my $module ($ExtUtilsInstalled->modules()) {
       next if($module eq 'CPAN::outdated');
@@ -1626,10 +1634,43 @@ sub SP_cpanOutdated {
 
       my $numified = eval { version->parse($version)->numify };
       $h->{listedPerl}{$module}{version} = $numified // 0;
+      
+      # in der Distribution enthaltene Module (z.B. DBD::Mem in DBI), ohne den Eintrag selbst
+      my @contained = $module eq 'Perl' ? () : grep { $_ ne $module } __PackListModules ($ExtUtilsInstalled, $module, \@inc);
+
+      $h->{listedPerl}{$module}{modules} = \@contained if(@contained);
   }
 
 return $h;
 }
+
+###############################################################
+# In einer Distribution enthaltene Module (z.B. DBD::Mem in DBI)
+# Die Namen werden aus den .pm-Dateien der .packlist abgeleitet,
+# relativ zu den Verzeichnissen aus @INC.
+###############################################################
+sub __PackListModules {
+  my ($installed, $module, $inc) = @_;
+
+  my (%seen, @modules);
+
+  for my $file ($installed->files($module)) {
+      next unless($file =~ /\.pm$/);
+
+      for my $dir (@{$inc}) {
+          next unless(index($file, "$dir/") == 0);
+
+          (my $name = substr($file, length($dir) + 1)) =~ s/\.pm$//;
+          $name =~ s{/}{::}g;
+
+          push @modules, $name if(__IsPerlPackageName ($name) && !$seen{$name}++);
+          last;
+      }
+  }
+
+return sort { lc($a) cmp lc($b) } @modules;
+}
+
 ####################################################################################################
 #                                       End Childprocess
 ####################################################################################################
@@ -2045,17 +2086,19 @@ sub CreateInstalledPerlList {
   my @ret;
 
   if (ref $packages eq 'HASH' && scalar keys %{$packages} > 0) {
-      push @ret, __TableHeader ($t, 'Installed Perl Packages', 'Name', 'Version');
+      push @ret, __TableHeader ($t, 'Installed Perl Packages', 'Name', 'Version', 'Contains'.($t->{html} ? __ContainsToggle ($t) : ''));
 
       my $linecount = 1;
 
       for my $package (sort { lc($a) cmp lc($b) } keys %{$packages}) {
           next if($package eq 'undefined');
-
+          
           my $version  = $packages->{$package}{version};
           my $linkitem = __CpanLink ($t, $package);
+          my $contains = __ContainsCell ($t, $packages->{$package}{modules});
 
-          push @ret, __TableRow ($t, $linecount, $linkitem, $version ? $version : '?');
+          push @ret, __TableRow ($t, $linecount, $linkitem, $version ? $version : '?', $contains);
+          
           $linecount++;
       }
 
@@ -3022,6 +3065,40 @@ sub __CsrfParam {
   my $token = $defs{$wname}{CSRFTOKEN};
  
 return defined $token ? '&fwcsrf='.$token : '';
+}
+
+# Zelle "Contains": enthaltene Module, bei vielen Modulen aufklappbar (nur im HTML)
+sub __ContainsCell {
+  my ($t, $modules) = @_;
+
+  return '' unless(ref $modules eq 'ARRAY' && @{$modules});
+
+  #my $list = join(', ', map { __CpanLink ($t, $_) } @{$modules});
+  my $list = join(', ', @{$modules});                                                                           # Modulnamen ohne Links: nicht jedes enthaltene Modul ist bei MetaCPAN eingetragen (z.B. DP in Data::Peek)
+  $list    =~ s/&/&amp;/g;  $list =~ s/</&lt;/g;  $list =~ s/>/&gt;/g;  $list =~ s/"/&quot;/g if($t->{html});
+
+  return $list if(!$t->{html} || @{$modules} <= CONTAINSINLINEMAX);
+
+  my $label = scalar(@{$modules}).' '.($t->{lang} eq 'de' ? 'Module' : 'modules');
+
+return '<details><summary style="cursor:pointer;">'.$label.'</summary>'.$list.'</details>';
+}
+
+#  Schalter in der Spaltenüberschrift: alle auf- bzw. zuklappen
+sub __ContainsToggle {
+  my $t = shift;
+
+  my $de   = $t->{lang} eq 'de';
+  my $link = sub {
+      my ($open, $symbol, $title) = @_;
+
+      my $js = "Array.prototype.forEach.call(this.closest('table').querySelectorAll('details'),function(d){d.open=".($open ? 'true' : 'false').";});return false;";
+
+      return '<a href="#" onclick="'.$js.'" title="'.$title.'">'.$symbol.'</a>';
+  };
+
+return ' '.$link->(1, '[+]', $de ? 'Alle aufklappen' : 'Expand all')
+      .' '.$link->(0, '[-]', $de ? 'Alle zuklappen'  : 'Collapse all');
 }
 
 ###############################################################
@@ -4136,7 +4213,8 @@ return;
     <li><b>zzExportPerlList &lt;filename&gt;</b><br>
         Exports the list of installed Perl packages (name and version) into a JSON file. An existing file is overwritten.
         The list is taken from the last execution of <b>outdatedPerl</b> and is kept after a restart of FHEM.
-        If <b>outdatedPerl</b> has never been executed, the export is rejected. The file is written with the permissions of the FHEM user.<br>
+        If <b>outdatedPerl</b> has never been executed, the export is rejected. The file is written with the permissions of the FHEM user.
+        The same packages are exported as shown by <b>showInstalledPerlList</b>, that is only packages that were installed with <code>cpanm</code>, <code>CPAN.pm</code> or <code>make install</code>.<br>
         Example: <code>set fhemInstaller zzExportPerlList /opt/fhem/perl_packages.json</code>
     </li>
     <br>
@@ -4147,6 +4225,8 @@ return;
         of all missing packages and of all packages whose local version is older than the one in the file. In each case the version given in the file is installed.
         Packages with a newer local version are left unchanged, the entry <code>Perl</code> is ignored.
         This requires that <b>outdatedPerl</b> has been executed beforehand. The differences can be reviewed in advance with <b>showDiffPerlList</b>.<br>
+        The comparison uses the list of <b>showInstalledPerlList</b>. A package installed locally through the package manager of the operating system (e.g. <code>apt</code>) is not part of it and is therefore treated as not installed.
+        It is then installed additionally with <code>cpanm</code>.<br>
         Example: <code>set fhemInstaller zzImportPerlList /opt/fhem/perl_packages.json</code>
     </li>
     
@@ -4171,7 +4251,7 @@ return;
           <li>the file name of a FHEM configuration file: the modules used there with <code>define</code>. In <code>installerMode</code> <b>install</b> the <code>*.cfg</code> files from the directory of the global attribute <code>modpath</code> are offered for selection.</li>
           <li>a list of module names, separated by spaces: exactly these modules</li>
         </ul>
-        Example: <code>get fhemInstaller checkPrereqs 76_SolarForecast</code>
+        Example: <code>get fhemInstaller checkPrereqs SolarForecast</code>
     </li>
     <br>
 
@@ -4194,7 +4274,7 @@ return;
         Example: <code>get fhemInstaller showBuildLog 1</code>
     </li>
     <br>
-
+    
     <a id="Installer-get-showDiffPerlList"></a>
     <li><b>showDiffPerlList &lt;filename&gt;</b><br>
         Reads an exported JSON package list and compares it with the most recently determined list of locally installed Perl packages.
@@ -4207,6 +4287,8 @@ return;
         </ul>
         The entry <code>Perl</code> is ignored, <code>App::cpanminus</code> and <code>App::cpanoutdated</code> are never offered for removal.
         This requires that <b>outdatedPerl</b> has been executed beforehand.<br>
+        The local list is the one from <b>showInstalledPerlList</b>: packages installed through the package manager of the operating system (e.g. <code>apt</code>) are missing there.
+        They therefore never appear as <i>Extra</i>, whereas such a package from the file appears as <i>Missing</i>.<br>
         <b>Caution:</b> "Deinstall" can also remove packages that are required by other modules.<br>
         Example: <code>get fhemInstaller showDiffPerlList /opt/fhem/perl_packages.json</code>
     </li>
@@ -4233,11 +4315,17 @@ return;
         Only offered if there are updatable packages.
     </li>
     <br>
-
+    
     <a id="Installer-get-showInstalledPerlList"></a>
     <li><b>showInstalledPerlList</b><br>
-        Shows all installed Perl packages with their version, as determined by the last execution of <b>outdatedPerl</b>.<br>
-        Only offered if this list is available.
+        Displays the installed Perl packages along with their versions, as determined the last time <b>outdatedPerl</b> was run.<br>
+        The list includes only packages installed using <code>cpanm</code>, <code>CPAN.pm</code>, or <code>make install</code> - that is, packages that left behind a <code>.packlist</code>.
+        Packages installed via the operating system’s package manager (e.g., <code>apt</code>) generally do not have a <code>.packlist</code> and therefore do not appear.
+        Perl core modules are not listed individually; the entry <code>Perl</code> represents them.
+        For each installed distribution, there is one entry with the main name derived from the <code>.packlist</code>; there is not a separate entry for every module it contains.
+        Modules that are part of a larger distribution appear under that distribution’s name; for example, <code>DBD::Mem</code> appears under <code>DBI</code>. <br>
+        The "Contains" column displays the modules included in a distribution; if there are more than 3 modules, they appear as a collapsible list. Use [+] and [-] in the column header to expand or collapse all rows.
+        The modules listed here are displayed as text without links, since not every module is registered with MetaCPAN.
     </li>
     <br>
 
@@ -4461,12 +4549,13 @@ return;
         Beispiel: <code>set fhemInstaller uninstallPerl JSON::XS</code>
     </li>
     <br>
-    
+        
     <a id="Installer-set-zzExportPerlList"></a>
     <li><b>zzExportPerlList &lt;Dateiname&gt;</b><br>
         Exportiert die Liste der installierten Perl-Pakete (Name und Version) in eine JSON-Datei. Eine bereits vorhandene Datei wird überschrieben.
         Die Liste stammt aus der letzten Ausführung von <b>outdatedPerl</b> und bleibt auch nach einem Neustart von FHEM erhalten.
-        Wurde <b>outdatedPerl</b> noch nie ausgeführt, wird der Export abgelehnt. Die Datei wird mit den Rechten des FHEM-Benutzers geschrieben.<br>
+        Wurde <b>outdatedPerl</b> noch nie ausgeführt, wird der Export abgelehnt. Die Datei wird mit den Rechten des FHEM-Benutzers geschrieben.
+        Exportiert werden dieselben Pakete wie bei <b>showInstalledPerlList</b>, also nur Pakete, die mit <code>cpanm</code>, <code>CPAN.pm</code> oder <code>make install</code> installiert wurden.<br>
         Beispiel: <code>set fhemInstaller zzExportPerlList /opt/fhem/perl_packages.json</code>
     </li>
     <br>
@@ -4477,6 +4566,8 @@ return;
         aller fehlenden Pakete sowie aller Pakete, deren lokale Version älter ist als in der Datei. Installiert wird jeweils die in der Datei angegebene Version.
         Pakete mit neuerer lokaler Version bleiben unverändert, der Eintrag <code>Perl</code> wird ignoriert.
         Voraussetzung ist, dass vorher <b>outdatedPerl</b> ausgeführt wurde. Die Unterschiede können vorab mit <b>showDiffPerlList</b> angesehen werden.<br>
+        Verglichen wird mit der Liste von <b>showInstalledPerlList</b>. Ein lokal über die Paketverwaltung des Betriebssystems (z. B. <code>apt</code>) installiertes Paket steht dort nicht und gilt deshalb als nicht installiert.
+        Es wird dann zusätzlich mit <code>cpanm</code> installiert.<br>
         Beispiel: <code>set fhemInstaller zzImportPerlList /opt/fhem/perl_packages.json</code>
     </li>
     
@@ -4501,7 +4592,7 @@ return;
           <li>ein Dateiname einer FHEM-Konfigurationsdatei: die darin mit <code>define</code> verwendeten Module. Im <code>installerMode</code> <b>install</b> werden die <code>*.cfg</code>-Dateien aus dem Verzeichnis des globalen Attributs <code>modpath</code> zur Auswahl angeboten.</li>
           <li>eine Liste von Modulnamen, durch Leerzeichen getrennt: genau diese Module</li>
         </ul>
-        Beispiel: <code>get fhemInstaller checkPrereqs 76_SolarForecast</code>
+        Beispiel: <code>get fhemInstaller checkPrereqs SolarForecast</code>
     </li>
     <br>
 
@@ -4524,7 +4615,7 @@ return;
         Beispiel: <code>get fhemInstaller showBuildLog 1</code> 
     </li> 
     <br>
-
+    
     <a id="Installer-get-showDiffPerlList"></a>
     <li><b>showDiffPerlList &lt;Dateiname&gt;</b><br>
         Liest eine exportierte JSON-Paketliste ein und vergleicht sie mit der zuletzt ermittelten Liste der lokal installierten Perl-Pakete.
@@ -4537,6 +4628,8 @@ return;
         </ul>
         Der Eintrag <code>Perl</code> wird ignoriert, <code>App::cpanminus</code> und <code>App::cpanoutdated</code> werden nie zur Deinstallation angeboten.
         Voraussetzung ist, dass vorher <b>outdatedPerl</b> ausgeführt wurde.<br>
+        Die lokale Liste ist die von <b>showInstalledPerlList</b>: Über die Paketverwaltung des Betriebssystems (z. B. <code>apt</code>) installierte Pakete fehlen dort.
+        Sie erscheinen deshalb nie als <i>Extra</i>, ein solches Paket aus der Datei erscheint dagegen als <i>Missing</i>.<br>
         <b>Achtung:</b> Mit "Deinstall" können auch Pakete entfernt werden, die von anderen Modulen benötigt werden.<br>
         Beispiel: <code>get fhemInstaller showDiffPerlList /opt/fhem/perl_packages.json</code>
     </li>
@@ -4563,11 +4656,17 @@ return;
         Wird nur angeboten, wenn es aktualisierbare Pakete gibt.
     </li>
     <br>
- 
+    
     <a id="Installer-get-showInstalledPerlList"></a>
     <li><b>showInstalledPerlList</b><br>
-        Zeigt alle installierten Perl-Pakete mit Version an, wie bei der letzten Ausführung von <b>outdatedPerl</b> ermittelt.<br>
-        Wird nur angeboten, wenn diese Liste vorhanden ist.
+        Zeigt die installierten Perl-Pakete mit Version an, wie bei der letzten Ausführung von <b>outdatedPerl</b> ermittelt.<br>
+        Die Liste enthält nur Pakete, die mit <code>cpanm</code>, <code>CPAN.pm</code> oder <code>make install</code> installiert wurden, also Pakete, die eine <code>.packlist</code> hinterlassen haben.
+        Pakete, die über die Paketverwaltung des Betriebssystems (z. B. <code>apt</code>) installiert wurden, haben in der Regel keine <code>.packlist</code> und erscheinen deshalb nicht.
+        Perl-Core-Module werden nicht einzeln aufgeführt, der Eintrag <code>Perl</code> steht für sie.
+        Pro installierter Distribution gibt es einen Eintrag mit dem aus der <code>.packlist</code> ableiteten Hauptnamen, nicht für jedes enthaltene Modul.
+        Module, die zu einer größeren Distribution gehören, erscheinen unter deren Namen, z.B. <code>DBD::Mem</code> unter <code>DBI</code>. <br>
+        In der Spalte Contains werden die enthaltenen Module einer Distribution angezeigt; bei mehr als 3 Modulen als aufklappbare Liste. Mit [+] und [-] in der Spaltenüberschrift lassen sich alle Zeilen auf- bzw. zuklappen. 
+        Die enthaltenen Module werden als Text ohne Links angezeigt, da nicht jedes Modul bei MetaCPAN eingetragen ist.
     </li>
     <br>
 
@@ -4705,7 +4804,7 @@ return;
       "abstract": "Modul zur Installation, Aktualisierung und Deinstallation von (CPAN) Perl-Modulen und zur Verwaltung der Systemvoraussetzungen von FHEM"
     }
   },
-  "version": "v1.2.0",
+  "version": "v1.3.0",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>",
@@ -4733,6 +4832,7 @@ return;
         "FHEM::Meta": 0.001006,
         "FHEM::npmjs": 0,
         "File::stat": 0,
+        "File::Spec": 0,
         "GPUtils": 0,
         "HttpUtils": 0,
         "IO::Socket::SSL": 0,
