@@ -54,7 +54,7 @@ use warnings;
 use Blocking;
 use HttpUtils;
 
-my $ModulVersion = "01.16";
+my $ModulVersion = "01.16a";
 my $missingModul = "";
 
 sub CDCOpenData_Log($$$);
@@ -898,7 +898,7 @@ sub CDCOpenData_Set($$@)
    elsif ( lc $cmd eq 'htmlbarasstateformat' ) {
       return "wrong parameter" if int @val != 1 || $val[0] !~ /$geoRefList/;
 
-      fhem("attr $name stateFormat {CDCOpenData_radar2html('" . $name . "', $val[0], 0)}");
+      CommandAttr(undef,"$name stateFormat {CDCOpenData_radar2html('$name','$val[0]',0)}");
 
       return 'please save the change in the stateFormat attribute by clicking on “Save config”';
    }
