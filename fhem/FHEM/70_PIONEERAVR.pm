@@ -46,6 +46,7 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 use SetExtensions;
 use Time::HiRes qw(gettimeofday);
 use DevIo;
@@ -144,7 +145,7 @@ sub PIONEERAVR_Initialize {
             },
         },
     };
-    return;
+    return FHEM::Meta::InitMod(__FILE__, $hash);
 }
 
 ######################################
@@ -5494,4 +5495,58 @@ DevIo den Verbindungsabbruch und die Wiederverbindung über die bestehende Ready
 </ul>
 
 =end html_DE
+=cut
+
+=pod
+
+=for :application/json;q=META.json 70_PIONEERAVR.pm
+{
+  "abstract": "control for PIONEER AV receivers via network or serial connection",
+  "x_lang": {
+    "de": {
+      "abstract": "Steuerung von PIONEER AV-Receivern über Netzwerk oder seriell"
+    }
+  },
+  "license": [
+    "GPL_2"
+  ],
+  "keywords": [
+    "Pioneer",
+    "AV receiver",
+    "audio",
+    "telnet",
+    "serial"
+  ],
+  "resources": {
+    "homepage": "https://github.com/50watt/fhem-pioneeravr",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/50watt/fhem-pioneeravr.git",
+      "web": "https://github.com/50watt/fhem-pioneeravr"
+    },
+    "bugtracker": {
+      "web": "https://github.com/50watt/fhem-pioneeravr/issues"
+    },
+    "x_commandref": {
+      "web": "https://commandref.fhem.de/#PIONEERAVR"
+    }
+  },
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "strict": 0,
+        "warnings": 0,
+        "FHEM::Meta": 0,
+        "SetExtensions": 0,
+        "Time::HiRes": 0,
+        "DevIo": 0
+      }
+    }
+  },
+  "x_fhem_maintainer": [
+    "50watt"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut

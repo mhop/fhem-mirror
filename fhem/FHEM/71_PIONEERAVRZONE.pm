@@ -24,6 +24,7 @@ package main;
 
 use strict;
 use warnings;
+use FHEM::Meta;
 use Time::HiRes qw(gettimeofday);
 use SetExtensions;
 
@@ -46,7 +47,7 @@ sub PIONEERAVRZONE_Initialize {
 
     $hash->{AttrFn}   = "PIONEERAVRZONE_Attr";
     $hash->{AttrList} = "IODev " . $readingFnAttributes;
-	return;
+    return FHEM::Meta::InitMod(__FILE__, $hash);
 }
 
 ###################################
@@ -944,4 +945,58 @@ ihre zuletzt bekannten Werte. disable wird am übergeordneten Receiver gesetzt.<
 </ul>
 
 =end html_DE
+=cut
+
+=pod
+
+=for :application/json;q=META.json 71_PIONEERAVRZONE.pm
+{
+  "abstract": "control of zones on PIONEER AV receivers via network or serial connection",
+  "x_lang": {
+    "de": {
+      "abstract": "Steuerung der Zonen eines PIONEER AV-Receivers über Netzwerk oder seriell"
+    }
+  },
+  "license": [
+    "GPL_2"
+  ],
+  "keywords": [
+    "Pioneer",
+    "AV receiver",
+    "audio",
+    "telnet",
+    "serial",
+    "zone"
+  ],
+  "resources": {
+    "homepage": "https://github.com/50watt/fhem-pioneeravr",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/50watt/fhem-pioneeravr.git",
+      "web": "https://github.com/50watt/fhem-pioneeravr"
+    },
+    "bugtracker": {
+      "web": "https://github.com/50watt/fhem-pioneeravr/issues"
+    },
+    "x_commandref": {
+      "web": "https://commandref.fhem.de/#PIONEERAVRZONE"
+    }
+  },
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "strict": 0,
+        "warnings": 0,
+        "FHEM::Meta": 0,
+        "SetExtensions": 0,
+        "Time::HiRes": 0
+      }
+    }
+  },
+  "x_fhem_maintainer": [
+    "50watt"
+  ]
+}
+=end :application/json;q=META.json
+
 =cut
