@@ -12,7 +12,7 @@ use warnings;
 use File::Basename qw(dirname);
 use File::Path qw(make_path);
 use File::Spec;
-use JSON::PP qw(decode_json encode_json);
+use JSON::PP qw(decode_json);
 
 sub export_name_for_hash {
   my ($hash) = @_;
@@ -76,7 +76,7 @@ sub write_cookie_export {
   open my $fh, '>', $tmp_path or return qq[failed to open $tmp_path: $!];
   binmode $fh, ':raw';
 
-  my $json = encode_json($cookie);
+  my $json = _encode_export($cookie);
   if (!print {$fh} $json) {
     my $err = $!;
     close $fh;
@@ -186,6 +186,25 @@ sub trigger_import_for_device {
 
   no warnings 'once';
   return trigger_import($main::defs{$name}, %args);
+}
+
+# echodevice picks the cookie with /"localCookie":".*session-id=(.*?)","?/. The greedy `.*`
+# matches the last `session-id=` in the whole document, so the current localCookie has to be
+# the last cookie in the text (formerRegistrationData carries an old loginCookie that Amazon
+# rejects) and has to be followed by another key (csrf) to end at `",`. Perl randomizes hash
+# order per process, so the key order is fixed here.
+my %EXPORT_KEY_RANK = (localCookie => 1, csrf => 2);
+
+sub _encode_export {
+  my ($cookie) = @_;
+
+  my $json = JSON::PP->new->utf8->canonical->sort_by(sub {
+    my $rank_a = $EXPORT_KEY_RANK{$JSON::PP::a} // 0;
+    my $rank_b = $EXPORT_KEY_RANK{$JSON::PP::b} // 0;
+    return $rank_a <=> $rank_b || $JSON::PP::a cmp $JSON::PP::b;
+  });
+
+  return $json->encode($cookie);
 }
 
 sub _normalize_export_payload {
