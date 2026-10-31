@@ -1,4 +1,4 @@
-REV 31855
+REV 31857
 DIR unused
 UPD 2026-10-30_07:45:04 466712 ./CHANGED
 UPD 2020-10-26_19:49:05 18092 ./GPL_V2.txt
@@ -770,8 +770,8 @@ UPD 2026-10-30_07:45:11 5628951 docs/commandref.html
 UPD 2026-10-30_07:45:16 3628418 docs/commandref_DE.html
 UPD 2026-01-05_07:45:03 86606 docs/commandref_frame.html
 UPD 2026-01-05_07:45:03 97294 docs/commandref_frame_DE.html
-UPD 2026-10-30_07:45:17 335207 docs/commandref_modular.html
-UPD 2026-10-30_07:45:18 347031 docs/commandref_modular_DE.html
+UPD 2026-10-31_07:45:16 335207 docs/commandref_modular.html
+UPD 2026-10-31_07:45:17 347031 docs/commandref_modular_DE.html
 UPD 2015-07-28_14:05:35 4778 docs/cul_rfr.jpg
 UPD 2015-07-28_14:05:35 19949 docs/faq.html
 UPD 2015-07-28_14:05:35 938 docs/fhemdoc.js
@@ -780,7 +780,7 @@ UPD 2015-07-28_14:05:35 160143 docs/tirreG.jpg
 UPD 2026-08-10_07:45:11 34143 lib/FHEM/APIs/Weather/OpenWeatherMapAPI.pm
 UPD 2026-08-09_07:45:03 40012 lib/FHEM/APIs/Weather/wundergroundAPI.pm
 UPD 2026-06-15_07:45:03 2462 lib/FHEM/AlexaCookieService/Client.pm
-UPD 2026-07-18_07:45:03 5377 lib/FHEM/AlexaCookieService/EchodeviceImport.pm
+UPD 2026-10-31_07:45:03 6164 lib/FHEM/AlexaCookieService/EchodeviceImport.pm
 UPD 2026-06-15_07:45:03 1887 lib/FHEM/AlexaCookieService/State.pm
 UPD 2026-02-16_07:45:03 76647 lib/FHEM/Automation/ShuttersControl.pm
 UPD 2026-02-16_07:45:03 2735 lib/FHEM/Automation/ShuttersControl/Dev.pm
