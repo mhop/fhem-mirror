@@ -50,6 +50,8 @@ use FHEM::Meta;
 use SetExtensions;
 use Time::HiRes qw(gettimeofday);
 use DevIo;
+use HttpUtils;
+use vars qw(%selectlist);
 
 #########################
 # Forward declaration
@@ -178,6 +180,9 @@ sub PIONEERAVR_Define {
         return $msg;
     }
 
+    PIONEERAVR_CancelCompatibilityProbe($hash);
+    delete $hash->{helper}{compatibilityAttempted};
+    readingsSingleUpdate( $hash, "protocolCompatibility", "unknown", 1 );
     PIONEERAVR_ClearSendQueue($hash);
     RemoveInternalTimer($hash);
     DevIo_CloseDev($hash);
@@ -1329,6 +1334,7 @@ sub PIONEERAVR_Undef {
     my $name = $hash->{NAME};
 
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Undef() called";
+    PIONEERAVR_CancelCompatibilityProbe($hash);
 
     PIONEERAVR_ClearSendQueue($hash);
     RemoveInternalTimer($hash);
@@ -1461,6 +1467,7 @@ sub PIONEERAVR_Notify {
 
             # disable connectionCheck and wait
             # until DevIo reopened the connection
+            PIONEERAVR_CancelCompatibilityProbe($hash);
             PIONEERAVR_ClearSendQueue($hash);
             RemoveInternalTimer($hash);
             delete $hash->{helper}{nextConnectionCheck};
@@ -1554,6 +1561,9 @@ sub PIONEERAVR_Set {
     my $cmd      = @$a[1];
     return "Device is disabled; set attribute disable to 0 first."
       if ( PIONEERAVR_IsDisabled($hash) && $cmd ne "?" );
+    return "Receiver uses ISCP; please use the FHEM module ONKYO_AVR. Retry detection with set reopen."
+      if ( $cmd ne "?" && $cmd ne "reopen"
+        && ReadingsVal($name, "protocolCompatibility", "unknown") eq "incompatible" );
     my $arg      = $a->[2] // "";
     my $arg2     = $a->[3] // "";
     my $presence = ReadingsVal( $name, "presence", "absent" );
@@ -2366,6 +2376,18 @@ sub PIONEERAVR_Read {
     my $chunk = DevIo_SimpleRead($hash);
     return if ( !defined($chunk) );
     $buf = ( $hash->{PARTIAL} // "" ) . $chunk;
+    # Detect binary ISCP before CR/LF handling, including split headers.
+    if ( length($buf) && (index("ISCP", $buf) == 0 || $buf =~ /^ISCP/) ) {
+        my $iscp = PIONEERAVR_ISCPReply($buf);
+        if ( $iscp == 1 ) { PIONEERAVR_Incompatible($hash); }
+        $hash->{PARTIAL} = $iscp == 0 ? $buf : "";
+        return;
+    }
+    # Unknown/binary traffic must never prove Pioneer readiness.
+    if ( $buf =~ /[^\x20-\x7e\r\n]/ || length($buf) > 65536 ) {
+        $hash->{PARTIAL} = "";
+        return;
+    }
     PIONEERAVR_Log( $hash, undef, "Spontaneously received " . dq($buf) );
 
    # $buf can contain more than one line of information
@@ -2376,7 +2398,11 @@ sub PIONEERAVR_Read {
 
     # Only a complete protocol reply proves that the receiver is ready.
     # A successful TCP connection alone can occur while the AVR is booting.
-    if ( $buf =~ /[^\r\n]+\r\n/ ) {
+    if ( $buf =~ /(?:^|\r\n)(?:R|PWR[01]|MUT[01]|VOL\d{3}|FN\d{2}|RGD<\d{3}><[^\r\n]+>)\r\n/ ) {
+        PIONEERAVR_CancelCompatibilityProbe($hash);
+        RemoveInternalTimer($hash, "PIONEERAVR_CompatibilityTimeout");
+        readingsBulkUpdate($hash, "protocolCompatibility", "compatible")
+          if ( ReadingsVal($name, "protocolCompatibility", "unknown") ne "compatible" );
         # R or another complete receiver reply proves liveness. Fragments
         # and empty lines must not extend the active probe's deadline.
         RemoveInternalTimer( $hash, "PIONEERAVR_ProbeTimeout" );
@@ -4085,6 +4111,7 @@ sub PIONEERAVR_IsDisabled {
 
 sub PIONEERAVR_StopCommunication {
     my ($hash) = @_;
+    PIONEERAVR_CancelCompatibilityProbe($hash);
     PIONEERAVR_ClearSendQueue($hash);
     RemoveInternalTimer($hash);
     delete $hash->{helper}{nextConnectionCheck};
@@ -4173,6 +4200,7 @@ sub PIONEERAVR_PowerSupplyChanged {
       "PIONEERAVR $name: power supply changed to $powerSupplyState";
 
     if ( $powerSupplyState eq "off" ) {
+        PIONEERAVR_CancelCompatibilityProbe($hash);
         PIONEERAVR_ClearSendQueue($hash);
         RemoveInternalTimer($hash);
         DevIo_CloseDev($hash);
@@ -4198,6 +4226,13 @@ sub PIONEERAVR_AfterOpen {
         return;
     }
 
+    if ( $hash->{Protocol} eq "telnet"
+        && ReadingsVal($name, "protocolCompatibility", "unknown") eq "unknown"
+        && !$hash->{helper}{compatibilityAttempted} ) {
+        RemoveInternalTimer($hash, "PIONEERAVR_CompatibilityTimeout");
+        InternalTimer(gettimeofday() + AttrVal($name, "timeout", 5),
+            "PIONEERAVR_CompatibilityTimeout", $hash, 0);
+    }
     return if ( !$statusUpdate );
     return if ( ReadingsVal( $name, "state", "" ) ne "opened" );
 
@@ -4225,6 +4260,7 @@ sub PIONEERAVR_OpenDev {
         return;
     }
 
+    return if ( ReadingsVal($name, "protocolCompatibility", "unknown") eq "incompatible" );
     return if ( $hash->{helper}{opening} );
 
     # Commands from an earlier connection must never be replayed after reconnect.
@@ -4261,7 +4297,7 @@ sub PIONEERAVR_OpenDev {
             Log3 $name, 4, "PIONEERAVR $name: $err"
               if ($err);
 
-            return if ($err);
+            if ($err) { PIONEERAVR_CompatibilityTimeout($hash); return; }
 
             PIONEERAVR_AfterOpen( $hash, $statusUpdate );
         }
@@ -4302,6 +4338,9 @@ sub PIONEERAVR_Reopen {
     return if ( PIONEERAVR_IsDisabled($hash) );
 
     Log3 $name, 5, "PIONEERAVR $name: PIONEERAVR_Reopen()";
+    PIONEERAVR_CancelCompatibilityProbe($hash);
+    delete $hash->{helper}{compatibilityAttempted};
+    readingsSingleUpdate($hash, "protocolCompatibility", "unknown", 1);
 
     DevIo_CloseDev($hash);
     delete $hash->{NEXT_OPEN};
@@ -4316,6 +4355,7 @@ sub PIONEERAVR_Write {
 
     return if ( PIONEERAVR_IsDisabled($hash) );
 
+    return if ( ReadingsVal($hash->{NAME}, "protocolCompatibility", "unknown") eq "incompatible" );
     return if ( !defined($msg) );
     return if ( !DevIo_IsOpen($hash) );
     return if ( PIONEERAVR_PowerSupplyState($hash) eq "off" );
@@ -4566,6 +4606,137 @@ sub PIONEERAVR_ProbeTimeout {
     PIONEERAVR_ClearSendQueue($hash);
     # DevIo closes the transport, emits DISCONNECTED and enables ReadyFn.
     DevIo_Disconnected($hash);
+    PIONEERAVR_CompatibilityTimeout($hash);
+    return;
+}
+
+
+# A positive ISCP reply is evidence; an open socket or silence is not.
+# Return 0 for incomplete data, -1 for invalid data, 1 for a valid frame.
+sub PIONEERAVR_ISCPReply {
+    my ($buf) = @_;
+    return 0 if ( length($buf) < 16 );
+    my ($magic, $header, $size, $version, $reserved) = unpack("a4 N N C a3", $buf);
+    return -1 if ( $magic ne "ISCP" || $header != 16 || $version != 1
+        || $reserved ne "\0\0\0" || $size < 8 || $size > 65536 );
+    return 0 if ( length($buf) < $header + $size );
+    my $payload = substr($buf, $header, $size);
+    return $payload =~ /\A!1[A-Z0-9]{3}(?!QSTN)[^\x00-\x1f]+[\x1a\r\n]+\z/ ? 1 : -1;
+}
+
+sub PIONEERAVR_CancelCompatibilityProbe {
+    my ($hash) = @_;
+    my $probe = delete $hash->{helper}{compatibilityProbe};
+    return if (!$probe);
+    RemoveInternalTimer($probe);
+    HttpUtils_Close($probe);
+    # Detach the owner so late DNS/connect callbacks cannot change it.
+    delete $probe->{owner};
+    return;
+}
+
+sub PIONEERAVR_Incompatible {
+    my ($hash) = @_;
+    return if ( ReadingsVal($hash->{NAME}, "protocolCompatibility", "unknown") eq "incompatible" );
+    PIONEERAVR_CancelCompatibilityProbe($hash);
+    PIONEERAVR_ClearSendQueue($hash);
+    RemoveInternalTimer($hash);
+    readingsSingleUpdate($hash, "protocolCompatibility", "incompatible", 1);
+    DevIo_Disconnected($hash);
+    $hash->{STATE} = "incompatible";
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "protocolCompatibility", "incompatible");
+    readingsBulkUpdate($hash, "presence", "absent");
+    readingsBulkUpdate($hash, "state", "incompatible");
+    readingsBulkUpdate($hash, "stateAV", "incompatible");
+    readingsEndUpdate($hash, 1);
+    $hash->{PARTIAL} = "";
+    Log3 $hash, 2, "PIONEERAVR $hash->{NAME}: receiver uses ISCP; please use ONKYO_AVR. Retry detection with set reopen.";
+    return;
+}
+
+# One read-only fallback per definition/manual reopen. Reconnects do not
+# repeatedly probe a second port, and serial transports never use this path.
+sub PIONEERAVR_CompatibilityTimeout {
+    my ($hash) = @_;
+    RemoveInternalTimer($hash, "PIONEERAVR_CompatibilityTimeout");
+    my $name = $hash->{NAME};
+    return if ( !defined($defs{$name}) || $defs{$name} != $hash
+        || PIONEERAVR_IsDisabled($hash) || $hash->{Protocol} ne "telnet"
+        || PIONEERAVR_PowerSupplyState($hash) eq "off"
+        || ReadingsVal($name, "protocolCompatibility", "unknown") ne "unknown"
+        || $hash->{helper}{compatibilityAttempted} );
+    # Same host only, standard ISCP port. Do not reinterpret serial paths,
+    # URLs, or a receiver's configurable Pioneer port as an ISCP endpoint.
+    return if ( $hash->{DeviceName} !~ /\A(\[[0-9a-fA-F:]+\]|[^:\/\s]+):\d+\z/ );
+    my $host = $1;
+    $hash->{helper}{compatibilityAttempted} = 1;
+    my $probe = {
+        NAME => $name, owner => $hash, noConn2 => 1,
+        url => "http://$host:60128/", timeout => AttrVal($name, "timeout", 5),
+        loglevel => 5, buf => "",
+        # Pack exactly like ONKYO_AVR_Pack: binary header and !1 payload.
+        output => pack("a4 N N N a*", "ISCP", 16, 11, 0x01000000, "!1PWRQSTN\r\n"),
+        callback => \&PIONEERAVR_CompatibilityConnected,
+    };
+    $hash->{helper}{compatibilityProbe} = $probe;
+    InternalTimer(gettimeofday() + $probe->{timeout}, "PIONEERAVR_CompatibilityExpired", $probe, 0);
+    my $err = HttpUtils_Connect($probe);
+    PIONEERAVR_CompatibilityConnected($probe, $err) if ($err);
+    return;
+}
+
+sub PIONEERAVR_CompatibilityExpired {
+    my ($probe) = @_;
+    my $hash = $probe->{owner};
+    PIONEERAVR_CancelCompatibilityProbe($hash) if ($hash);
+    return;
+}
+
+sub PIONEERAVR_CompatibilityConnected {
+    my ($probe, $err) = @_;
+    my $hash = $probe->{owner};
+    if ( !$hash || !defined($defs{$hash->{NAME}}) || $defs{$hash->{NAME}} != $hash
+        || !$hash->{helper}{compatibilityProbe} || $hash->{helper}{compatibilityProbe} != $probe ) {
+        HttpUtils_Close($probe);
+        return;
+    }
+    if ($err || PIONEERAVR_IsDisabled($hash) || PIONEERAVR_PowerSupplyState($hash) eq "off") {
+        PIONEERAVR_CancelCompatibilityProbe($hash);
+        return;
+    }
+    $probe->{conn}->blocking(0);
+    $probe->{FD} = $probe->{conn}->fileno();
+    $probe->{directReadFn} = \&PIONEERAVR_CompatibilityRead;
+    $probe->{directWriteFn} = \&PIONEERAVR_CompatibilityWrite;
+    $selectlist{$probe} = $probe;
+    return;
+}
+
+sub PIONEERAVR_CompatibilityWrite {
+    my ($probe) = @_;
+    my $sent = syswrite($probe->{conn}, $probe->{output});
+    return if ( !defined($sent) && ($!{EAGAIN} || $!{EWOULDBLOCK}) );
+    return PIONEERAVR_CompatibilityExpired($probe) if (!defined($sent) || !$sent);
+    substr($probe->{output}, 0, $sent, "");
+    delete $probe->{directWriteFn} if ( !length($probe->{output}) );
+    return;
+}
+
+sub PIONEERAVR_CompatibilityRead {
+    my ($probe) = @_;
+    my $chunk;
+    my $read = sysread($probe->{conn}, $chunk, 4096);
+    return if ( !defined($read) && ($!{EAGAIN} || $!{EWOULDBLOCK}) );
+    return PIONEERAVR_CompatibilityExpired($probe) if (!defined($read) || !$read);
+    $probe->{buf} .= $chunk;
+    my $result = PIONEERAVR_ISCPReply($probe->{buf});
+    if ($result == 1) {
+        my $hash = $probe->{owner};
+        PIONEERAVR_Incompatible($hash) if ($hash);
+    } elsif ($result < 0) {
+        PIONEERAVR_CompatibilityExpired($probe);
+    }
     return;
 }
 
@@ -4765,6 +4936,29 @@ sub RC_layout_PioneerAVR() {
   As long as Fhem is connected to the Pioneer AV receiver no other device (e.g. a smart phone) can connect to the Pioneer AV receiver on the same port.
   Some Pioneer AV receivers offer more than one port though. From Pioneer recommend port numbers:00023,49152-65535, Invalid port numbers:00000,08102
   <br><br>
+  <p><b>Supported receivers and model years</b><br>
+  PIONEERAVR implements the legacy Pioneer ASCII IP/RS-232 protocol, based on
+  the FY14 command list from 2013. Hardware testing was performed with a
+  <b>VSX-923</b> over TCP/IP. Other receivers are supported only insofar as they
+  implement that protocol; individual commands and zones depend on the model.
+  Many newer Pioneer receivers from the 2016 generation onward use the
+  Onkyo/Pioneer ISCP protocol instead. For those devices use
+  <a href="#ONKYO_AVR">ONKYO_AVR</a>. The VSX-1131 is a newer-generation model
+  reported not to work with PIONEERAVR. Model numbers and years alone are not a
+  reliable compatibility test; no entire 9xx/11xx range is enabled or blocked.</p>
+  <p>The <code>protocolCompatibility</code> reading is <code>unknown</code>
+  until a recognized Pioneer reply confirms <code>compatible</code>, or a valid
+  ISCP reply confirms <code>incompatible</code>. An open TCP port or a timeout
+  does not prove compatibility or incompatibility. After the first unsuccessful
+  TCP connection/response check, a single asynchronous, read-only ISCP power
+  query is sent to the same host on port 60128, with the configured timeout.
+  This also runs when <code>connectionCheck=off</code>. Serial connections do
+  not open this additional network connection. On confirmed ISCP, queued work
+  is cancelled, the connection is closed, and controls/reconnects are stopped
+  with a hint to use ONKYO_AVR. <code>set &lt;name&gt; reopen</code> or a new
+  definition resets detection and allows another attempt. Silence leaves
+  <code>unknown</code>, for example when network standby is disabled or another
+  controller occupies the receiver port.</p>
   <a id="PIONEERAVR-define" name="PIONEERAVRdefine"></a>
   <b>Define</b>
   <ul>
@@ -5054,6 +5248,7 @@ existing ReadyFn reconnect path.</p>
   <b>Generated readings and events</b>
     <br/><br/>
     <ul>
+        <li><b>protocolCompatibility</b> - Detected protocol compatibility: unknown, compatible (Pioneer ASCII), or incompatible (ISCP; use ONKYO_AVR). Reset with set reopen or redefine. See supported receivers above.</li>
         <li><b>networkStandby</b> - Last receiver-confirmed network standby setting (on|off). The legacy internal of the same name is retained for compatibility. Sending a set command does not change the reading until the receiver confirms the setting.</li>
         <li><b>statusRequestState</b> - Progress of a manual or automatic full status request: <code>running</code> while status and input queries are being sent, <code>done</code> after all queries have been sent, or <code>aborted</code> if the scan is cancelled, for example by disable or a lost connection. done does not confirm a successful response to every query; unsupported or unavailable parameters may return receiver errors. Repeated full requests share the running scan. A separate get loadInputNames does not start this reading. The reading is created on the first accepted full request.</li>
         <li><b>audioAutoPhaseControlMS</b> - currently configured Auto Phase Control in ms</li>
@@ -5144,6 +5339,31 @@ existing ReadyFn reconnect path.</p>
   auf dem gleichen Port eine Verbindung zum Pioneer AV Receiver herstellen.
   Einige Pioneer AV Receiver bieten mehr als einen Port für die Datenverbindung an. Pioneer empfiehlt Port 23 sowie 49152-65535, "Invalid number:00000,08102".
   <br><br>
+  <p><b>Unterst&uuml;tzte Receiver und Modelljahre</b><br>
+  PIONEERAVR verwendet das bisherige Pioneer-ASCII-Protokoll f&uuml;r IP/RS232
+  auf Basis der FY14-Befehlsliste von 2013. An echter Hardware wurde der
+  <b>VSX-923</b> &uuml;ber TCP/IP getestet. Andere Ger&auml;te werden unterst&uuml;tzt,
+  soweit sie dieses Protokoll implementieren; einzelne Befehle und Zonen sind
+  modellabh&auml;ngig. Viele neuere Pioneer-Receiver ab der Modellgeneration 2016
+  verwenden stattdessen das Onkyo/Pioneer-ISCP-Protokoll. Daf&uuml;r ist
+  <a href="#ONKYO_AVR">ONKYO_AVR</a> vorgesehen. Der VSX-1131 geh&ouml;rt zur neueren
+  Generation und wurde als mit PIONEERAVR nicht funktionsf&auml;hig gemeldet.
+  Modellnummer und Baujahr sind nur Anhaltspunkte; ganze 9xx-/11xx-Baureihen
+  werden weder pauschal freigegeben noch gesperrt.</p>
+  <p>Das Reading <code>protocolCompatibility</code> bleibt <code>unknown</code>,
+  bis eine erkannte Pioneer-Antwort <code>compatible</code> oder eine g&uuml;ltige
+  ISCP-Antwort <code>incompatible</code> best&auml;tigt. Ein offener TCP-Port oder
+  ein Timeout beweist keine Kompatibilit&auml;t oder Inkompatibilit&auml;t.
+  Nach der ersten erfolglosen TCP-Verbindungs-/Antwortpr&uuml;fung erfolgt einmalig
+  eine asynchrone, rein lesende ISCP-Power-Abfrage an denselben Host auf Port
+  60128 mit dem konfigurierten Timeout. Das gilt auch bei
+  <code>connectionCheck=off</code>. Bei seriellen Verbindungen wird keine
+  zus&auml;tzliche Netzwerkverbindung ge&ouml;ffnet. Bei best&auml;tigtem ISCP werden
+  wartende Befehle verworfen, die Verbindung geschlossen und Bedienbefehle
+  sowie Wiederverbindungen mit Hinweis auf ONKYO_AVR gestoppt.
+  <code>set &lt;name&gt; reopen</code> oder eine neue Definition setzt die Erkennung
+  zur&uuml;ck. Ohne Antwort bleibt das Ergebnis <code>unknown</code>, etwa bei
+  ausgeschaltetem Network Standby oder einem durch andere Controller belegten Port.</p>
   <a id="PIONEERAVR-define" name="PIONEERAVRdefine"></a>
   <b>Define</b>
   <ul>
@@ -5438,6 +5658,7 @@ DevIo den Verbindungsabbruch und die Wiederverbindung über die bestehende Ready
   <b>Erzeugte Readings und Events</b>
     <br/><br/>
     <ul>
+        <li><b>protocolCompatibility</b> - Erkannte Protokollkompatibilit&auml;t: unknown, compatible (Pioneer ASCII) oder incompatible (ISCP; ONKYO_AVR verwenden). Zur&uuml;cksetzen mit set reopen oder Neudefinition. Siehe unterst&uuml;tzte Receiver oben.</li>
         <li><b>networkStandby</b> - Zuletzt vom Receiver bestätigte Network-Standby-Einstellung (on|off). Das gleichnamige bisherige Internal bleibt aus Kompatibilitätsgründen erhalten. Ein Set-Befehl ändert das Reading erst nach Bestätigung durch den Receiver.</li>
         <li><b>statusRequestState</b> - Fortschritt einer manuellen oder automatischen vollständigen Statusabfrage: <code>running</code> während Status- und Eingangsabfragen gesendet werden, <code>done</code> nachdem alle Abfragen gesendet wurden oder <code>aborted</code> bei Abbruch, etwa durch disable oder Verbindungsverlust. done bestätigt keine erfolgreiche Antwort auf jede Abfrage; nicht unterstützte oder nicht verfügbare Parameter können Receiverfehler liefern. Wiederholte vollständige Statusabfragen teilen sich den laufenden Scan. Ein separates get loadInputNames startet dieses Reading nicht. Es wird bei der ersten angenommenen vollständigen Statusabfrage angelegt.</li>
         <li><b>audioAutoPhaseControlMS</b> - aktuell konfigurierte Auto Phase Control in ms</li>
@@ -5539,6 +5760,7 @@ DevIo den Verbindungsabbruch und die Wiederverbindung über die bestehende Ready
         "FHEM::Meta": 0,
         "SetExtensions": 0,
         "Time::HiRes": 0,
+        "HttpUtils": 0,
         "DevIo": 0
       }
     }
