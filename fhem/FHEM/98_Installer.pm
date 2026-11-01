@@ -234,7 +234,7 @@ sub Define {
   use version 0.77; our $VERSION = FHEM::Meta::Get($hash, 'version');
 
   my $name    = $a[0];
-  my $defattr = (($a[2] // '') eq 'defaultAttr') ? 'defaultAttr' : ''; 
+  my $defattr = (($a[2] // '') eq 'defaultAttr') ? 'defaultAttr' : 'no definition'; 
 
   Undef ($hash, undef) if(defined $hash->{OLDDEF});         # modify bzw. defmod auf ein bestehendes Device
 
@@ -251,7 +251,7 @@ sub Define {
   $modules{$hash->{TYPE}}{defptr}{localhost} = $hash;
 
   # Voreinstellungen für FHEMWEB
-  if ($defattr && !defined $hash->{OLDDEF}) {
+  if ($defattr eq 'defaultAttr' && !defined $hash->{OLDDEF}) {
       my @icons = (
           '.*updates.available:security@orange:outdatedPerl',
           'ready:security@grey:outdatedPerl',
@@ -1601,6 +1601,15 @@ sub SP_cpanOutdated {
             grep { File::Spec->file_name_is_absolute ($_) }
             map  { File::Spec->canonpath ($_) }
             grep { !ref } @INC;
+            
+  # Suchreihenfolge von Perl: Verzeichnisse aus @INC ohne Doppelte, in dieser Reihenfolge
+  my %seenDir;
+  my @incOrder = grep { !$seenDir{$_}++ }
+                 grep { File::Spec->file_name_is_absolute ($_) }
+                 map  { File::Spec->canonpath ($_) }
+                 grep { !ref } @INC;
+
+  my $hasDpkg  = -x '/usr/bin/dpkg' ? 1 : 0;
 
   for my $module ($ExtUtilsInstalled->modules()) {
       next if($module eq 'CPAN::outdated');
@@ -1639,6 +1648,11 @@ sub SP_cpanOutdated {
       my @contained = $module eq 'Perl' ? () : grep { $_ ne $module } __PackListModules ($ExtUtilsInstalled, $module, \@inc);
 
       $h->{listedPerl}{$module}{modules} = \@contained if(@contained);
+      
+      # weitere Kopien in anderen @INC-Verzeichnissen (z.B. apt-Paket und cpanm), verdeckt durch die erste
+      my @shadowed = $module eq 'Perl' ? () : __ShadowedCopies ($module, \@incOrder, $hasDpkg);
+
+      $h->{listedPerl}{$module}{shadowed} = \@shadowed if(@shadowed);
   }
 
 return $h;
@@ -2086,18 +2100,27 @@ sub CreateInstalledPerlList {
   my @ret;
 
   if (ref $packages eq 'HASH' && scalar keys %{$packages} > 0) {
-      push @ret, __TableHeader ($t, 'Installed Perl Packages', 'Name', 'Version', 'Contains'.($t->{html} ? __ContainsToggle ($t) : ''));
+      # Spalte "Note" nur, wenn mindestens ein Eintrag eine verdeckte Kopie hat
+      my $hasShadow = grep { ref $packages->{$_} eq 'HASH' && ref $packages->{$_}{shadowed} eq 'ARRAY' && @{$packages->{$_}{shadowed}} } keys %{$packages};
 
+      my @cols = ('Name', 'Version', 'Contains'.($t->{html} ? __ContainsToggle ($t) : ''));
+      push @cols, 'Note' if($hasShadow);
+      push @ret, __TableHeader ($t, 'Installed Perl Packages', @cols);
+      
       my $linecount = 1;
 
       for my $package (sort { lc($a) cmp lc($b) } keys %{$packages}) {
           next if($package eq 'undefined');
           
-          my $version  = $packages->{$package}{version};
+          my $entry    = ref $packages->{$package} eq 'HASH' ? $packages->{$package} : {};
+          my $version  = $entry->{version};
           my $linkitem = __CpanLink ($t, $package);
-          my $contains = __ContainsCell ($t, $packages->{$package}{modules});
+          my $contains = __ContainsCell ($t, $entry->{modules});
 
-          push @ret, __TableRow ($t, $linecount, $linkitem, $version ? $version : '?', $contains);
+          my @cells = ($linkitem, $version ? $version : '?', $contains);
+          push @cells, __ShadowNote ($t, $hash->{NAME}, $package, $entry->{shadowed}) if($hasShadow);
+
+          push @ret, __TableRow ($t, $linecount, @cells);
           
           $linecount++;
       }
@@ -2368,7 +2391,6 @@ sub CreateSearchList {
   my $hash   = shift;
   my $getCmd = shift;
   my $search = join('\s*', @_);
-  $search    = '.+' unless($search);
 
   my $t    = __GetLayout ($hash);
   my $html = $t->{html};
@@ -2379,18 +2401,38 @@ sub CreateSearchList {
 
   # Suchfeld
   if ($html) {
-      my $token     = $defs{$hash->{CL}{SNAME}}{CSRFTOKEN};
-      my $csrfInput = defined $token ? '<input type="hidden" name="fwcsrf" value="'.$token.'">' : '';
+      my $token      = $defs{$hash->{CL}{SNAME}}{CSRFTOKEN};
+      my $csrfInput  = defined $token ? '<input type="hidden" name="fwcsrf" value="'.$token.'">' : '';
+      my $searchAttr = __HtmlText ($search);
 
       $t->{header} .= '<div class="wide">'
                     . '<form id="fhemsearch" method="get" action="?" onsubmit="cmd.value = \'get '.$name.' search \'+ q.value" style="float: left; margin-right: 2em;">'
                     . $csrfInput
                     . '<input type="hidden" name="cmd" value="">'
                     . '<label for="q" style="margin-right: 0.5em;">Search:</label>'
-                    . '<input type="text" name="q" id="q" value="'.$search.'" autocorrect="off" autocapitalize="off">'
+                    . '<input type="text" name="q" id="q" value="'.$searchAttr.'" autocorrect="off" autocapitalize="off">'
                     . '</form>'
                     . '<div class="detLink installerBack" style="float: right"><a href="?detail='.$name.'">&larr; back to FHEM Installer</a></div>'
                     . '</div>';
+  }
+  
+  # ohne Suchbegriff keine Suche (die Ergebnismenge wäre viel zu groß)
+  if ($search eq '') {
+      my $msg = $t->{lang} eq 'de' ? 'Bitte mindestens einen Suchbegriff angeben.' : 'Please enter at least one search term.';
+
+      return $html ? $t->{header}.'<div style="clear: both; padding-top: 1em;">'.$msg.'</div>'.$t->{footer} : "usage: get $name search <search term>";
+  }
+  
+  # ungültigen regulären Ausdruck abfangen (statt eines Perl-Fehlers), Warnungen dabei unterdrücken
+  my $re = do { local $SIG{__WARN__} = sub { }; eval { qr/$search/i } };
+
+  if (!$re) {
+      (my $err = $@) =~ s/ at \S+ line \d+.*//s;
+      $err           =~ s/\n.*//s;
+
+      return $html
+           ? $t->{header}.'<div style="clear: both; padding-top: 1em;">'.($t->{lang} eq 'de' ? 'Ungültiger regulärer Ausdruck: ' : 'Invalid regular expression: ').__HtmlText ($err).'</div>'.$t->{footer}
+           : "Invalid regular expression: $err";
   }
 
   # passende Devices
@@ -2400,7 +2442,7 @@ sub CreateSearchList {
       my $type = $defs{$device}{TYPE};
 
       next unless(defined $type && !defined $defs{$device}{TEMPORARY} && defined $modules{$type});
-      next unless($device =~ /$search/i);
+      next unless($device =~ $re);
 
       FHEM::Meta::Load($type);
 
@@ -2417,7 +2459,7 @@ sub CreateSearchList {
   @rows = ();
 
   for my $module (sort { lc($a) cmp lc($b) } keys %modules) {
-      next unless($module =~ /$search/i);
+      next unless($module =~ $re);
 
       FHEM::Meta::Load ($module);
 
@@ -2431,7 +2473,7 @@ sub CreateSearchList {
   @rows = ();
 
   for my $package (sort { lc($a) cmp lc($b) } keys %packages) {
-      next unless($package =~ /$search/i);
+      next unless($package =~ $re);
 
       FHEM::Meta::Load ($package);
 
@@ -2446,7 +2488,7 @@ sub CreateSearchList {
   $found{keywords} = 0;
 
   for my $keyword (sort { lc($a) cmp lc($b) } keys %FHEM::Meta::keywords) {
-      next unless($keyword =~ /$search/i);
+      next unless($keyword =~ $re);
 
       push @ret, '<a name="searchResultKeywords"></a>' if($html && !$found{keywords});
       $found{keywords}++;
@@ -2484,7 +2526,7 @@ sub CreateSearchList {
   @rows = ();
 
   for my $maintainer (sort { lc($a) cmp lc($b) } keys %FHEM::Meta::maintainers) {
-      next unless($maintainer =~ /$search/i);
+      next unless($maintainer =~ $re);
 
       my $info = $FHEM::Meta::maintainers{$maintainer};
       my @cells = ($maintainer);
@@ -2509,7 +2551,7 @@ sub CreateSearchList {
   for my $dependent (sort { lc($a) cmp lc($b) } keys %{$FHEM::Meta::dependents{pkgs}}) {
       next if(FHEM::Meta::ModuleIsPerlCore($dependent));
       next if(FHEM::Meta::ModuleIsInternal($dependent));
-      next unless($dependent =~ /$search/i);
+      next unless($dependent =~ $re);
 
       my @references;
 
@@ -2522,9 +2564,32 @@ sub CreateSearchList {
 
       push @rows, [$dependent, join($lb, map { __InfoLink($hash, $t, __ItemType($_), $_) } @references)];
   }
-
+  
   $found{perl} = scalar @rows;
   push @ret, __SearchTable ($t, 'searchResultPerl', 'Perl Packages', ['Name', 'Referenced from'], \@rows) if(@rows);
+  
+  # passende installierte Perl-Pakete (aus dem letzten outdatedPerl) und die in ihnen enthaltenen Module
+  @rows = ();
+
+  my $listed = $hash->{".fhem"}{installer}{listedPerlPackages};
+
+  if (ref $listed eq 'HASH') {
+      for my $package (sort { lc($a) cmp lc($b) } keys %{$listed}) {
+          next if($package eq 'undefined');
+
+          my $info    = ref $listed->{$package} eq 'HASH' ? $listed->{$package} : {};
+          my $modules = ref $info->{modules} eq 'ARRAY' ? $info->{modules} : [];
+          my @matches = grep { $_ =~ $re } @{$modules};
+
+          next unless($package =~ $re || @matches);
+
+          push @rows, [__CpanLink ($t, $package), $info->{version} ? $info->{version} : '?', __ContainsCell ($t, \@matches)];
+      }
+  }
+
+  $found{installed} = scalar @rows;
+  push @ret, __SearchTable ($t, 'searchResultInstalled', 'Installed Perl Packages', ['Name', 'Version', 'Matching modules'], \@rows) if(@rows);
+
 
   my $found = 0;
   $found   += $_ for (values %found);
@@ -2552,12 +2617,13 @@ sub CreateSearchList {
       my @summary = ($found.' total search '.($found > 1 ? 'results:' : 'result:'));
 
       my @sections = (                                     # Schlüssel, Anker, Singular, Plural
-          ['devices',     'searchResultDevices',     'device',       'devices'      ],
-          ['modules',     'searchResultModules',     'module',       'modules'      ],
-          ['packages',    'searchResultPackages',    'package',      'packages'     ],
-          ['keywords',    'searchResultKeywords',    'keyword',      'keywords'     ],
-          ['maintainers', 'searchResultMaintainers', 'author',       'authors'      ],
-          ['perl',        'searchResultPerl',        'Perl package', 'Perl packages'],
+          ['devices',     'searchResultDevices',     'device',                 'devices'      ],
+          ['modules',     'searchResultModules',     'module',                 'modules'      ],
+          ['packages',    'searchResultPackages',    'package',                'packages'     ],
+          ['keywords',    'searchResultKeywords',    'keyword',                'keywords'     ],
+          ['maintainers', 'searchResultMaintainers', 'author',                 'authors'      ],
+          ['perl',        'searchResultPerl',        'Perl package',           'Perl packages'],
+          ['installed',   'searchResultInstalled',   'installed Perl package', 'installed Perl packages'],
       );
 
       for my $section (@sections) {
@@ -2597,6 +2663,18 @@ return $t->{header}.join("\n", @ret).$t->{footer};
 ###############################################################
 #                  Hilfsfunktionen für die Ausgabe
 ###############################################################
+# Text für die Ausgabe in HTML maskieren
+sub __HtmlText {
+  my $text = shift;
+
+  $text =~ s/&/&amp;/g;
+  $text =~ s/</&lt;/g;
+  $text =~ s/>/&gt;/g;
+  $text =~ s/"/&quot;/g;
+
+return $text;
+}
+
 # Link auf showModuleInfo / showPackageInfo ($type: module | package)
 sub __InfoLink {
   my ($hash, $t, $type, $item, $label) = @_;
@@ -2654,7 +2732,6 @@ return @ret;
 # - show master/slave dependencies
 # - show parent/child dependencies
 # - show other dependant/related modules
-# - fill empty keywords
 # - Get Community Support URL from MAINTAINERS.txt
 
 ###############################################################
@@ -4106,6 +4183,113 @@ sub __CheckCpanOutdated {
 return;
 }
 
+###############################################################
+#   Besitzer einer Datei laut dpkg (Name des apt-Pakets) 
+#   oder undef
+###############################################################
+sub __DpkgOwner {
+  my $file = shift;
+
+  # Fehlermeldungen von dpkg ("no path found") nicht in das Log schreiben
+  open(my $oldErr, '>&', \*STDERR) or return;
+  open(STDERR, '>', File::Spec->devnull);
+
+  my $line;
+
+  if (open(my $fh, '-|', 'dpkg', '-S', $file)) {
+      $line = <$fh>;
+      close($fh);
+  }
+
+  open(STDERR, '>&', $oldErr);
+
+return (defined $line && $line =~ /^(.+): \Q$file\E$/) ? $1 : undef;
+}
+
+###############################################################
+#   Weitere Kopien eines Moduls in @INC (verdeckt durch die 
+#   erste Fundstelle)
+#   Liefert je verdeckter Kopie: Pfad, Version, apt-Paket 
+#   (falls ermittelbar) und die Beziehung zur aktiven Kopie 
+#   (older | newer | same)
+###############################################################
+sub __ShadowedCopies {
+  my ($module, $inc, $hasDpkg) = @_;
+
+  return () unless(__IsPerlPackageName ($module));
+
+  (my $rel = $module) =~ s{::}{/}g;
+  $rel .= '.pm';
+
+  my @found = grep { -f "$_/$rel" } @{$inc};
+
+  return () unless(@found > 1);
+
+  my $active  = shift @found;                                   # die erste Fundstelle wird von Perl verwendet
+  my $actVer  = eval { version->parse (MM->parse_version ("$active/$rel"))->numify };
+  my @copies;
+
+  for my $dir (@found) {
+      my $file = "$dir/$rel";
+      my $ver  = eval { version->parse (MM->parse_version ($file))->numify };
+      my %copy = (path => $file, version => ($ver // 0));
+
+      $copy{package} = __DpkgOwner ($file) if($hasDpkg);
+
+      if ($ver && $actVer) {
+          $copy{relation} = $ver < $actVer ? 'older' : $ver > $actVer ? 'newer' : 'same';
+      }
+
+      push @copies, \%copy;
+  }
+
+return @copies;
+}
+
+###############################################################
+#   Spalte "Note" in showInstalledPerlList
+#   (Text im HTML maskiert; Hinweis zum Vorgehen als Tooltip)
+###############################################################
+sub __ShadowNote {
+  my ($t, $name, $package, $shadowed) = @_;
+
+  return '' unless(ref $shadowed eq 'ARRAY' && @{$shadowed});
+
+  my $de       = $t->{lang} eq 'de';
+  my %relation = $de ? (older => 'älter', newer => 'neuer', same => 'gleiche Version')
+                     : (older => 'older', newer => 'newer', same => 'same version');
+  my @notes;
+
+  for my $copy (@{$shadowed}) {
+      next unless(ref $copy eq 'HASH');
+
+      my $pkg    = $copy->{package};
+      my $origin = defined $pkg ? "apt: $pkg" : ($de ? 'in ' : 'in ').$copy->{path};
+      my $rel    = $relation{$copy->{relation} // ''};
+      my $text   = ($de ? 'Verdeckte Kopie ' : 'Hidden copy ').($copy->{version} ? $copy->{version} : '?')." ($origin)".(defined $rel ? ", $rel" : '');
+
+      # Hinweis zum Vorgehen, nur wenn das apt-Paket bekannt ist
+      my $tip = '';
+
+      if (defined $pkg && ($copy->{relation} // '') ne 'newer') {
+          $tip = $de
+               ? "Die Kopie aus dem apt-Paket wird nicht verwendet. Entfernen: zuerst mit 'apt-get -s remove $pkg' prüfen, was mit entfernt würde, dann 'sudo apt-get remove $pkg'. Alternativ die Kopie von cpanm mit 'set $name uninstallPerl $package' entfernen."
+               : "The copy from the apt package is not used. To remove it: first check with 'apt-get -s remove $pkg' what would be removed as well, then 'sudo apt-get remove $pkg'. Alternatively remove the cpanm copy with 'set $name uninstallPerl $package'.";
+      }
+      elsif (defined $pkg) {
+          $tip = $de
+               ? "Die neuere apt-Kopie wird von der älteren Kopie verdeckt. Die aktive Kopie mit 'set $name updatePerl $package' aktualisieren oder mit 'set $name uninstallPerl $package' entfernen."
+               : "The newer apt copy is hidden by the older copy. Update the active copy with 'set $name updatePerl $package' or remove it with 'set $name uninstallPerl $package'.";
+      }
+
+      push @notes, $t->{html}
+                 ? '<span'.($tip ne '' ? ' title="'.__HtmlText ($tip).'"' : '').'>'.__HtmlText ($text).'</span>'
+                 : $text;
+  }
+
+return join($t->{lb}, @notes);
+}
+
 1;
 
 =pod
@@ -4259,7 +4443,10 @@ return;
     <li><b>search [search term]</b><br>
         Searches FHEM for device names, module names, package names, keywords, authors and Perl packages.
         The search is not case sensitive. The search term is evaluated as a regular expression, several words are searched in the given order
-        with any amount of whitespace between them. Without a search term all hits are shown.<br>
+        with any amount of whitespace between them. At least one search term is required. <br>
+        The section <i>Perl Packages</i> contains the Perl packages that FHEM modules name as a prerequisite in their metadata, whether or not they are installed. <br>
+        The section <i>Installed Perl Packages</i> searches the installed Perl packages (from the last execution of <b>outdatedPerl</b>) and the modules they contain. <br>
+        This shows which distribution contains a module, for example <code>DBD::Mem</code> in <code>DBI</code>. <br>
         Example: <code>get fhemInstaller search MQTT</code>
     </li>
     <br>
@@ -4325,7 +4512,19 @@ return;
         For each installed distribution, there is one entry with the main name derived from the <code>.packlist</code>; there is not a separate entry for every module it contains.
         Modules that are part of a larger distribution appear under that distribution’s name; for example, <code>DBD::Mem</code> appears under <code>DBI</code>. <br>
         The "Contains" column displays the modules included in a distribution; if there are more than 3 modules, they appear as a collapsible list. Use [+] and [-] in the column header to expand or collapse all rows.
-        The modules listed here are displayed as text without links, since not every module is registered with MetaCPAN.
+        <br><br>
+        The column <b>Note</b> only appears if at least one entry has a hidden copy. It points to it: if the same module exists in several directories of <code>@INC</code>
+        (typically one version installed via <code>apt</code> and one via <code>cpanm</code>), Perl uses the first one found and the other copies are hidden.
+        It shows the version of the hidden copy, its origin (on Debian-based systems the name of the <code>apt</code> package, otherwise the path)
+        and whether it is older or newer than the copy in use. The tooltip names the possible course of action.<br>
+        A hidden copy does not do direct harm. The drawback: updates of the <code>apt</code> package do not take effect as long as an older copy comes first;
+        the copy from <code>cpanm</code> in use is only updated by <b>updatePerl</b>. There are two ways to clean up:
+        <ul>
+          <li>remove the <code>apt</code> copy. First check with <code>apt-get -s remove &lt;package&gt;</code> (simulation) which packages would be removed as well,
+              for a package-based FHEM installation this can include FHEM itself. Only if that is harmless: <code>sudo apt-get remove &lt;package&gt;</code></li>
+          <li>remove the copy from <code>cpanm</code> with <b>uninstallPerl</b>, the <code>apt</code> version is then active again and managed by <code>apt</code></li>
+        </ul>
+        The installer does not remove anything via <code>apt</code> itself.
     </li>
     <br>
 
@@ -4595,12 +4794,15 @@ return;
         Beispiel: <code>get fhemInstaller checkPrereqs SolarForecast</code>
     </li>
     <br>
-
+    
     <a id="Installer-get-search"></a>
     <li><b>search [Suchbegriff]</b><br>
         Durchsucht FHEM nach Device-Namen, Modulnamen, Package-Namen, Keywords, Autoren und Perl-Paketen.
         Die Suche unterscheidet nicht zwischen Groß- und Kleinschreibung. Der Suchbegriff wird als regulärer Ausdruck ausgewertet, mehrere Wörter werden in dieser Reihenfolge
-        mit beliebigem Leerraum dazwischen gesucht. Ohne Suchbegriff werden alle Treffer angezeigt.<br>
+        mit beliebigem Leerraum dazwischen gesucht. Es muss mindestens ein Suchbegriff angegeben werden. <br>
+        Der Abschnitt <i>Perl Packages</i> enthält die Perl-Pakete, die FHEM-Module in ihren Metadaten als Voraussetzung nennen, unabhängig davon, ob sie installiert sind. <br>
+        Der Abschnitt <i>Installed Perl Packages</i> durchsucht die installierten Perl-Pakete (aus der letzten Ausführung von <b>outdatedPerl</b>) und die in ihnen enthaltenen Module. <br>
+        So lässt sich herausfinden, in welcher Distribution ein Modul steckt, zum Beispiel <code>DBD::Mem</code> in <code>DBI</code>. <br>
         Beispiel: <code>get fhemInstaller search MQTT</code>
     </li>
     <br>
@@ -4666,7 +4868,19 @@ return;
         Pro installierter Distribution gibt es einen Eintrag mit dem aus der <code>.packlist</code> ableiteten Hauptnamen, nicht für jedes enthaltene Modul.
         Module, die zu einer größeren Distribution gehören, erscheinen unter deren Namen, z.B. <code>DBD::Mem</code> unter <code>DBI</code>. <br>
         In der Spalte Contains werden die enthaltenen Module einer Distribution angezeigt; bei mehr als 3 Modulen als aufklappbare Liste. Mit [+] und [-] in der Spaltenüberschrift lassen sich alle Zeilen auf- bzw. zuklappen. 
-        Die enthaltenen Module werden als Text ohne Links angezeigt, da nicht jedes Modul bei MetaCPAN eingetragen ist.
+        <br><br>
+        Die Spalte <b>Note</b> erscheint nur, wenn mindestens ein Eintrag eine verdeckte Kopie hat. Sie weist darauf hin: Liegt dasselbe Modul in mehreren Verzeichnissen von <code>@INC</code>
+        (typisch: eine Version über <code>apt</code> und eine über <code>cpanm</code> installiert), verwendet Perl die erste Fundstelle, die weiteren Kopien sind verdeckt.
+        Angezeigt werden die Version der verdeckten Kopie, ihre Herkunft (auf Debian-basierten Systemen mit dem Namen des <code>apt</code>-Pakets, sonst der Pfad)
+        und ob sie älter oder neuer als die verwendete Kopie ist. Der Tooltip nennt das mögliche Vorgehen.<br>
+        Eine verdeckte Kopie schadet nicht direkt. Der Nachteil: Updates des <code>apt</code>-Pakets werden nicht wirksam, solange eine ältere Kopie davorliegt;
+        die verwendete Kopie von <code>cpanm</code> wird nur über <b>updatePerl</b> aktualisiert. Zum Aufräumen gibt es zwei Wege:
+        <ul>
+          <li>die <code>apt</code>-Kopie entfernen. Vorher mit <code>apt-get -s remove &lt;Paket&gt;</code> (Simulation) prüfen, welche Pakete dabei ebenfalls entfernt würden,
+              bei einer FHEM-Installation per Paket kann das auch FHEM selbst betreffen. Nur wenn das unproblematisch ist: <code>sudo apt-get remove &lt;Paket&gt;</code></li>
+          <li>die Kopie von <code>cpanm</code> mit <b>uninstallPerl</b> entfernen, dann ist wieder die <code>apt</code>-Version aktiv und wird von <code>apt</code> verwaltet</li>
+        </ul>
+        Der Installer entfernt selbst nichts über <code>apt</code>.
     </li>
     <br>
 
@@ -4804,7 +5018,7 @@ return;
       "abstract": "Modul zur Installation, Aktualisierung und Deinstallation von (CPAN) Perl-Modulen und zur Verwaltung der Systemvoraussetzungen von FHEM"
     }
   },
-  "version": "v1.3.0",
+  "version": "v1.4.0",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>",
