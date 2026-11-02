@@ -73,15 +73,9 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.9" => "16.10.2026  __openMeteo_ApiResponse: Klammerung gefixt, Forum: https://forum.fhem.de/index.php?msg=1370333 ",
-  "2.10.8" => "11.10.2026  ___batAdjustPowerByMargin: Prüfung 'Ziel nicht erreichbar' erfolgt jetzt vor der Margin-Prüfung, daher ".
-                           "volle Ladeleistung auch bei safetyMargin=0 ",
-  "2.10.7" => "10.10.2026  Driftanalyse (aiFannDetectDrift): Ersatz der Quelle airaw durch Werte aus pvHistory (_aiFannDriftHistSlice) -> Verringerung RAM Footprint ".
-                           "CachedHistoryVal: Zeitkontext auf Minute gerundet -> weniger Misses/Verdrängungen im TS_OFFSET_Cache ",
-  "2.10.6" => "05.10.2026  siehe Changelog ".
-                           "Reading Battery_OptimumBaseSoC_XX parallel zum bestehenden Reading Battery_OptimumTargetSoC_XX welches abgelöst werden soll (Forum: https://forum.fhem.de/index.php?msg=1369429) ".
-                           "Nachtverarbeitung: aiDelRawData aus Task 6 nach Task 4 verschoben ".
-                           "Wrapper AIF_modelRun gehärtet und Fehlerausgabe in _aiFannPredict verbessert ",
+  "2.10.11"=> "30.10.2026  Patch Subs _aiFannBevHistArray, _aiFannCycleConsumerHistArray, _aiFannHpOpmodeHistArray, getPvHistTargetArray, timestringsFromOffset ".
+              "feature: setupEnvironment - neuer Schlüssel rainAmount (eigener Regenmengenmesser überschreibt rr1c der aktuellen Stunde), headerShowEnv=rainAmount, ".
+              "__parseAttrEnvironment: Schlüssel-Parser ohne Restwerte aus Vorgängeraufrufen ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -9701,6 +9695,7 @@ sub _attrEnvironment {                   ## no critic "not used"
       presence    => { comp => '.*:.*:.*',       act => 1 },
       windSpeed   => { comp => '.*:.*',          act => 1 },
       gridStatus  => { comp => '.*:.*:.*',       act => 1 },
+      rainAmount  => { comp => '.*:.*',          act => 1 }, 
   };
 
   my ($a, $h) = parseParams ($aVal);
@@ -10672,7 +10667,7 @@ sub __attrKeyAction {
               my @hse = split ",", $akeyval;
 
               for my $env (@hse) {
-                  if (!grep /^$env$/, qw (outsideTemp presence windSpeed gridStatus)) {
+                  if (!grep /^$env$/, qw (outsideTemp presence windSpeed gridStatus rainAmount)) {
                       return qq{The value '$env' is not valid for key '$akey'};
                   }
               }
@@ -10758,9 +10753,9 @@ sub __attrKeyAction {
           state %devRdgCodeKeys;
           state %devRdgKeys;
 
-          %devCodeKeys    = map { $_ => 1 } qw(swoncond swoffcond spignorecond) unless %devCodeKeys;        # Device + Code/Regex Pflicht
-          %devRdgCodeKeys = map { $_ => 1 } qw(presence gridStatus)             unless %devRdgCodeKeys;     # Device + Reading + Code/Regex Pflicht
-          %devRdgKeys     = map { $_ => 1 } qw(outsideTemp windSpeed)           unless %devRdgKeys;         # Device + Reading, Code optional
+          %devCodeKeys    = map { $_ => 1 } qw(swoncond swoffcond spignorecond)  unless %devCodeKeys;       # Device + Code/Regex Pflicht
+          %devRdgCodeKeys = map { $_ => 1 } qw(presence gridStatus)              unless %devRdgCodeKeys;    # Device + Reading + Code/Regex Pflicht
+          %devRdgKeys     = map { $_ => 1 } qw(outsideTemp windSpeed rainAmount) unless %devRdgKeys;        # Device + Reading, Code optional
 
           if ($devCodeKeys{$akey}) {
               ($err) = checkDevRdCond ($name, $akey, $akeyval, 1, 0, 1);                            # mit Device-Check, Code check
@@ -12817,6 +12812,11 @@ sub centralTask {
       Log3 ($name, 4, "$name DEBUG> ################################################################");
       Log3 ($name, 4, "$name DEBUG> current hour of day: ".($chour+1));
   }
+  
+  # Speichertest Start
+  #####################
+  # mallocTrim ($name);
+  # my $rss0 = do { open my $fh, '<', '/proc/self/status' or last; (map { /^VmRSS:\s+(\d+)/ ? $1 : () } <$fh>)[0] };
 
   singleUpdateState ( {hash => $hash, state => $centpars->{state}, evt => $centpars->{evt}} );
 
@@ -12882,8 +12882,11 @@ sub centralTask {
 
   undef %{$centpars};
   
-  # --- Speicherbereinigung nach dem Zyklus ---
-  #mallocTrim ($name);
+  # Speichertest Ende
+  #####################
+  # mallocTrim ($name);                                                                                               # Rückgabe aller freigegebenen Arenen
+  # my $rss1 = do { open my $fh, '<', '/proc/self/status' or last; (map { /^VmRSS:\s+(\d+)/ ? $1 : () } <$fh>)[0] };  # vor setTimeTracking
+  # Log3 ($name, 1, "$name DEBUG> RSS start=$rss0 end=$rss1 delta=".($rss1 - $rss0)." kB");
 
 return;
 }
@@ -14005,6 +14008,12 @@ sub _transferWeatherValues {
               my $outTemp    = ReadingsNum ($outTempDev, $outTempRdg, undef);
               $temp          = $outTemp if(defined $outTemp);
           }
+          
+          # --- Regenmengenmesser verarbeiten (überschreibt rr1c der API)
+          if ($peh && defined $peh->{rainDev}) {
+              my $rain = ReadingsNum ($peh->{rainDev}, $peh->{rainRdg}, undef);
+              $rr1c    = round2 ($rain) if(defined $rain && $rain >= 0);
+          }
 
           # --- vorhandenen Windmesser verarbeiten
           if ($peh && defined $peh->{windDev}) {
@@ -14032,6 +14041,7 @@ sub _transferWeatherValues {
 
           $data{$name}{current}{outsideTemp} = round1 ($temp);
           $data{$name}{current}{windspeed}   = round1 ($windspeed);
+          $data{$name}{current}{rainAmount}  = round1 ($rr1c) if(defined $rr1c);
       }
 
       my $nhtstr                                       = 'NextHour'.(sprintf "%02d", $num);
@@ -15757,11 +15767,11 @@ sub __parseAttrEnvironment {
 
   my ($pa, $ph) = parseParams ($env);
 
-  my ($oustmpdev, $oustmprdg)             = split (':', $ph->{outsideTemp}, 2) if(defined $ph->{outsideTemp});
-  my ($winddev,     $windrdg)             = split (':', $ph->{windSpeed},   2) if(defined $ph->{windSpeed});
-  my ($presendev, $presenrdg, $presenrgx) = split (':', $ph->{presence},    3) if(defined $ph->{presence});
-  my ($gridstdev, $gridstrdg, $gridstrgx) = split (':', $ph->{gridStatus},  3) if(defined $ph->{gridStatus});
-
+  my ($oustmpdev, $oustmprdg)             = split (':', $ph->{outsideTemp} // '', 2);
+  my ($winddev,     $windrdg)             = split (':', $ph->{windSpeed}   // '', 2);
+  my ($presendev, $presenrdg, $presenrgx) = split (':', $ph->{presence}    // '', 3);
+  my ($gridstdev, $gridstrdg, $gridstrgx) = split (':', $ph->{gridStatus}  // '', 3);
+  my ($raindev,     $rainrdg)             = split (':', $ph->{rainAmount}  // '', 2);
 
   my $parsed = {
       outsideTempDev  => $oustmpdev,
@@ -15774,6 +15784,8 @@ sub __parseAttrEnvironment {
       gridstdev       => $gridstdev,
       gridstrdg       => $gridstrdg,
       gridstrgx       => $gridstrgx,
+      rainDev         => $raindev,
+      rainRdg         => $rainrdg,
   };
 
 return $parsed;
@@ -16737,9 +16749,9 @@ sub __batChargeOptTargetPower {
   }
 
   my $fipl       = CurrentVal ($name, 'feedinPowerLimit', INFINITE);
-  my @batteries  = grep { !/^(?:fd|speff|surplswh|spday|nhr)$/xs } keys %{$hsurp->{24}};
-  my @sortedhods = sort { $hsurp->{$a}{surplswh} <=> $hsurp->{$b}{surplswh} } keys %{$hsurp};                    # Stunden aufsteigend nach PV-Überschuß sortiert ohne Zeitgewichtung h 00
-
+  my @batteries  = grep { !/^(?:fd|speff|surplswh|spday|nhr)$/xs } keys %{$hsurp->{24}};                   
+  my @sortedhods = sort { ($hsurp->{$a}{surplswh} // 0) <=> ($hsurp->{$b}{surplswh} // 0) } keys %{$hsurp};     # Stunden aufsteigend nach PV-Überschuß sortiert ohne Zeitgewichtung h 00
+  
   my ($fcendwh, $diff, $otp, $ratio);
 
   for my $hod (sort { $a <=> $b } keys %{$hsurp}) {
@@ -16750,12 +16762,12 @@ sub __batChargeOptTargetPower {
       my $nexthod = sprintf "%02d", (int $hod + 1);
       my $nextnhr = $hsurp->{$nexthod}{nhr};
 
-      my ($remainingSurp_o, $remainingHodsRef_o) = ___batRemainHodsAndSurp ( $hod,                               # verbleibender Überschuß ohne Zielzeit gesetzt
+      my ($remainingSurp_o, $remainingHodsRef_o) = ___batRemainHodsAndSurp ( $hod,                              # verbleibender Überschuß ohne Zielzeit gesetzt
                                                                              $hsurp,
                                                                              $replacement,
                                                                              \@sortedhods
                                                                           );
-      $hsurp->{$hod}{spday} = $remainingSurp_o;                                                                  # PV Überschuß Resttag
+      $hsurp->{$hod}{spday} = $remainingSurp_o;                                                                 # PV Überschuß Resttag
 
       my ($remainingSurp, $remainingHodsRef);
 
@@ -16780,7 +16792,6 @@ sub __batChargeOptTargetPower {
 
           my $runwh = do {
               if (defined $fc_next_wh)   { $fc_next_wh }
-              #elsif ($nhr eq '00')       { $csocwh }
               elsif ($nhr eq '00')       { $init_soc_wh }                                                        # V 2.6.10 Fix: aus Prozentwert, konsistent mit LR-Abschnitt
               elsif (defined $transfer)  { delete $trans->{$sbn}{$lfd}{transfer} }
               else                       { $init_soc_wh }
@@ -16878,7 +16889,7 @@ sub __batChargeOptTargetPower {
                           ? min ($fref->{ph}, $spls)                                                             # Ladeleistung auf den kleineren Wert begrenzen (es kommen Nachberechnungen)
                           : $fref->{ph};
 
-          $limpower     = $limpower // 0 > 0 ? $limpower : 0;
+          $limpower     = ($limpower // 0) > 0 ? $limpower : 0;
           $limpower     = $bpinmax if(!$hsurp->{$hod}{$sbn}{lcintime});
           $limpower     = max ($limpower, $bpinreduced);                                                         # Mindestladeleistung bpinreduced sicherstellen
 
@@ -17031,11 +17042,11 @@ sub ___batRemainHodsAndSurp {
 
   if (defined $timeTarget) { @remaining_hods = grep { int $_ >= int $hod && int $_ <= int $timeTarget } @$sortedhodsref }
   else                     { @remaining_hods = grep { int $_ >= int $hod } @$sortedhodsref }
-
-  for my $h (@remaining_hods) {                                              # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
+  
+  for my $h (@remaining_hods) {                                             # Gesamtwert PV-Überschuß aller Stunden mit PV-Überschuß ermitteln
       my $val = defined $hsurp->{$h}{nhr} && $hsurp->{$h}{nhr} eq '00'
-                ? int ($replacement) // 0
-                : $hsurp->{$h}{surplswh};
+              ? int ($replacement // 0)
+              : ($hsurp->{$h}{surplswh} // 0);
 
       $remainingSurp += int $val;
   }
@@ -22768,6 +22779,16 @@ sub _graphicHeader {
                      : $presence
                      ? FW_makeImage ('user_available')
                      : FW_makeImage ('user_n_a@grey');
+                     
+      my $rain      = CurrentVal ($name, 'rainAmount', 0);                                              # Regenmenge letzte Stunde
+      
+      my $rainicon  = $rain == 0    ? 'weather_rain_light@grey'                                         # trocken
+                      : $rain < 2.5 ? 'weather_rain_light'                                              # leicht
+                      : $rain < 7.6 ? 'weather_rain'                                                    # mäßig
+                      :               'weather_rain_heavy';                                             # stark
+      
+      my $rainimg   = FW_makeImage ($rainicon);
+      my $raintxt   = (defined $rain ? $rain : '-').' mm';
 
       my $windspeed = CurrentVal ($name, 'windspeed', '');                                              # Wind
       $windspeed    = round1 ($windspeed) if(defined $windspeed);
@@ -23031,6 +23052,7 @@ sub _graphicHeader {
       push @parts1, [ $gridimg, 3 ]                    if(grep /^gridStatus$/,  @$sa);              # Grid verfügbar Symbol
       push @parts1, [ $windimg, 1 ], [ $windspeed, 1 ] if(grep /^windSpeed$/,   @$sa);              # Windanzeige
       push @parts1, [ $tempimg, 0 ], [ $temptxt,   3 ] if(grep /^outsideTemp$/, @$sa);              # Außentemperatur
+      push @parts1, [ $rainimg, 1 ], [ $raintxt,   3 ] if(grep /^rainAmount$/,  @$sa);              # Regenmenge
 
       push @parts1,
           [ $sriseimg, 1 ],
@@ -26915,7 +26937,7 @@ sub fillupMessageSystem {
 
   ## Aufnahme Stand für alt/neu Vergleich + Clear Messages
   ##########################################################
-  for my $idx (sort keys %{$data{$name}{messages}}) {
+  for my $idx (sort { $a <=> $b } keys %{$data{$name}{messages}}) {
       next if(!isNumeric($idx) || $idx >= IDXLIMIT);
       $otxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
       $otxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
@@ -26931,7 +26953,7 @@ sub fillupMessageSystem {
   ## Messages neu füllen
   ########################################################################
   if (defined $data{$name}{preparedmessages} || defined $data{$name}{filemessages}) {
-      for my $idx (sort keys %{$data{$name}{messages}}) {
+      for my $idx (sort { $a <=> $b } keys %{$data{$name}{messages}}) {
           next if($idx >= IDXLIMIT);
           delete $data{$name}{messages}{$idx};
       }
@@ -26939,7 +26961,7 @@ sub fillupMessageSystem {
       $midx1 = 0;
 
       # --- Integration prepared Messages
-      for my $smi (sort keys %{$data{$name}{preparedmessages}}) {
+      for my $smi (sort { $a <=> $b } keys %{$data{$name}{preparedmessages}}) {
           next if($smi >= IDXLIMIT);
           $midx2++;
           $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
@@ -26948,7 +26970,7 @@ sub fillupMessageSystem {
       }
 
       # --- Integration File Messages
-      for my $mfi (sort keys %{$data{$name}{filemessages}}) {
+      for my $mfi (sort { $a <=> $b } keys %{$data{$name}{filemessages}}) {
           next if($mfi >= IDXLIMIT);
           $midx2++;
           $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
@@ -26962,7 +26984,7 @@ sub fillupMessageSystem {
 
       ## Vergleich auf geänderte Messages
       #####################################
-      for my $idx (sort keys %{$data{$name}{messages}}) {
+      for my $idx (sort { $a <=> $b } keys %{$data{$name}{messages}}) {
           next if($idx >= IDXLIMIT);
           $ntxt .= $data{$name}{messages}{$idx}{SV} if(defined $data{$name}{messages}{$idx}{SV});
           $ntxt .= $data{$name}{messages}{$idx}{DE} if(defined $data{$name}{messages}{$idx}{DE});
@@ -26977,10 +26999,7 @@ sub fillupMessageSystem {
   my $midx = max ($midx1, $midx2);
 
   if ($midx && ($data{$name}{messages}{999999}{RD} // 0) != 1) {                                # RD = Read-Bit (undef -> Messages nicht gelesen)
-      #my @aidx   = map { $_ } (1..$midx);                                                       # größte vorhandene Severity finden ...
-      #y @values = map { $data{$name}{messages}{$_}{SV} } @aidx;
-      #$max_sv    = max(@values);
-      $max_sv    = $data{$name}{messages}{$midx}{SV};                                           # der Schweregrad der letzten Meldung
+      $max_sv = $data{$name}{messages}{$midx}{SV};                                              # der Schweregrad der letzten Meldung
   }
 
   my $max_icon = $svicons{$max_sv};                                                             # ... und das dazugehörige Icon
@@ -27027,11 +27046,10 @@ sub outputMessages {
 
   my $hc = 0;
 
-  for my $key (reverse sort keys %{$data{$name}{messages}}) {
+  for my $key (sort { $b <=> $a } keys %{$data{$name}{messages}}) {
       next if($key >= IDXLIMIT);
 
       $hc++;
-      #my $enmsg = encode ('utf8', $data{$name}{messages}{$key}{$lang});
       my $enmsg = $data{$name}{messages}{$key}{$lang};
 
       $out .= qq{<tr>};
@@ -28944,8 +28962,6 @@ sub aiFannConInfer {
 
   my $hash = $defs{$name};
   my ($msg, $presence, $comftemp);
-
-  #debugLog ($paref, 'aiData', "AI FANN - Start checking consumption values (further output depends on the content and time of the last log entry)");
   
   $data{$name}{current}{$fanntyp.'NNGetResultState'} = 'ok';
 
@@ -29346,7 +29362,7 @@ sub aiFannConInfer {
                     );
 
       unless ($features) {
-          $msg = 'ERROR in FANN Feature Registry Builder Version: $bv';
+          $msg = "ERROR in FANN Feature Registry Builder: $profile";
           $data{$name}{current}{$fanntyp.'NNGetResultState'} = $msg;
 
           return $msg;
@@ -29374,7 +29390,7 @@ sub aiFannConInfer {
 
       if ($nngrst ne 'ok') {
           Log3 ($name, 2, "$name - WARNING - AI FANN '$fanntyp' forecast ignored and Legacy value is used, cause: $nngrst")
-                  if(askLogtime ($name, $msg, 300));                                                                                            # Log mit Mehrfachverhinderung
+                  if(askLogtime ($name, "conNNState_$fanntyp", 300));                                                                                            # Log mit Mehrfachverhinderung
           return;
       }
 
@@ -31232,6 +31248,12 @@ return $rethash;
 #  Filterkriterium: dieselbe Zeile muss par1 (='con') >= 0
 #  haben, damit der Index identisch zu @flat_targets bleibt.
 #
+#  WICHTIG: Cache und Rückgabe verwenden getrennte Array-Kopien.
+#  Der Aufrufer (aiFannConInfer) erweitert die zurückgegebenen Arrays
+#  per push in place. Würde dieselbe Referenz im LRU-Cache liegen,
+#  würden die gecachten Arrays bei jedem Lauf wachsen und spätere
+#  Läufe (gleicher Cache-Key) bekämen verfälschte, zu lange Serien.
+#
 #  Return: (\@active, \@load_raw, \@n_active, \@soc_deficit_norm,
 #           \@energy_remaining, \@charge_intensity,
 #           \@prio_frac, \@auto_frac, \@other_frac)
@@ -31243,51 +31265,51 @@ sub _aiFannBevHistArray {
   my $limit   = $paref->{limit} // 200;
   my $range   = $paref->{range};
   my $fanntyp = $paref->{fanntyp};
-  
+
   my (@active, @load_raw, @n_active, @soc_deficit_norm, @energy_remaining, @charge_intensity);
   my (@prio_frac, @auto_frac, @other_frac);
-  
+
   return (\@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining, \@charge_intensity,
           \@prio_frac, \@auto_frac, \@other_frac)
       unless exists $data{$name}{pvhist};
-  
+
   # --- Cache-Objekt initialisieren ---
   my $hash  = $defs{$name};
   my $cache = $hash->{'.pvHistCache'} //= LRU_cache_create ('pvHistCache', 'pvHistory Cache', CACHEPVHMS);
-  
+
   # --- Zeitkontext über TS_OFFSET_CACHE (stabil & gecacht) ---
   my $dt   = timestringsFromOffset ($name, $t, 0);
   my $year = $dt->{year};
   my $mon  = $dt->{month};
   my $mday = $dt->{day};
   my $hour = $dt->{hour};
-  
+
   # --- Cache-Key generieren ---
   my $key = join '::', 'BEVHISTARR', $name, $year, $mon, $mday, $hour, $limit;          # Cache Key ID
-  
+
   # --- Cache-Hit? ---
   if (my $cached = LRU_get ($name, $cache, $key)) {
-      return @$cached;                                                                  # (\@p1, \@p2, \@p3, \@p4, ....)
+      return map { [ @$_ ] } @$cached;                                                  # Kopien zurückgeben, Cache bleibt unverändert
   }
-  
+
   # --- Kein Cache-Hit → Originalberechnung ---
   # --- identische Tagesreihenfolge wie getPvHistTargetArray ---
   my $ph         = $data{$name}{pvhist};
   my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;
   my @days_upto  = sort { $a <=> $b } grep { $_ <= $mday } keys %$ph;
-  
+
   for my $day (@days_after, @days_upto) {
       for my $hod (sort { $a <=> $b } keys %{ $ph->{$day} }) {
           next if $hod < 1 || $hod > 24;
           last if ($day == $mday && $hod == $hour + 1);
           my $rec = $ph->{$day}{$hod};
-          
-          next unless defined $rec->{$fanntyp};                                             # identisches Filterkriterium wie getPvHistTargetArray
+
+          next unless defined $rec->{$fanntyp};                                         # identisches Filterkriterium wie getPvHistTargetArray
           next unless $rec->{$fanntyp} >= 0;
-          
+
           my $bev_sig          = _aiFannBevConsumerAggregate ($rec);
           my $soc_deficit_norm = _aiFannNormBevSocDeficit ($bev_sig->{soc_deficit}, $range);
-          
+
           push @active,           $bev_sig->{active};
           push @load_raw,         $bev_sig->{load};
           push @n_active,         $bev_sig->{n_active_ratio};
@@ -31299,11 +31321,11 @@ sub _aiFannBevHistArray {
           push @other_frac,       $bev_sig->{other_frac};
       }
   }
-  
+
   # --- Limit anwenden (identisch zu getPvHistTargetArray) ---
   my $n   = scalar @active;
   my $min = $n < $limit ? $n : $limit;
-  
+
   @active           = @active          [-$min .. -1];
   @load_raw         = @load_raw        [-$min .. -1];
   @n_active         = @n_active        [-$min .. -1];
@@ -31313,10 +31335,11 @@ sub _aiFannBevHistArray {
   @prio_frac        = @prio_frac       [-$min .. -1];
   @auto_frac        = @auto_frac       [-$min .. -1];
   @other_frac       = @other_frac      [-$min .. -1];
-  
-  # --- Ergebnis cachen ---
-  LRU_insert ($name, $cache, $key, [ \@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining, \@charge_intensity,
-                                     \@prio_frac, \@auto_frac, \@other_frac ]);
+
+  # --- Ergebnis cachen: eigene Kopien ablegen, damit spätere push-Operationen des Aufrufers den Cache nicht verändern ---
+  LRU_insert ($name, $cache, $key, [ map { [ @$_ ] } (\@active, \@load_raw, \@n_active, \@soc_deficit_norm,
+                                                       \@energy_remaining, \@charge_intensity,
+                                                       \@prio_frac, \@auto_frac, \@other_frac) ]);
 
 return (\@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining, \@charge_intensity,
         \@prio_frac, \@auto_frac, \@other_frac);
@@ -31331,6 +31354,9 @@ return (\@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining
 #  Aggregiert csmeXX aller Consumer die weder heatpump noch bev sind.
 #  Filterkriterium: dieselbe Zeile muss par1 (='con') >= 0
 #  haben, damit der Index identisch zu @flat_targets bleibt.
+#
+#  WICHTIG: Cache und Rückgabe verwenden getrennte Array-Kopien
+#  (siehe _aiFannBevHistArray).
 #
 #  Return: \@cycle_csme_raw
 ######################################################################################
@@ -31361,7 +31387,7 @@ sub _aiFannCycleConsumerHistArray {
 
   # --- Cache-Hit? ---
   if (my $cached = LRU_get ($name, $cache, $key)) {
-      return @$cached;                                                        # (\@cycle_csme_raw)
+      return map { [ @$_ ] } @$cached;                                        # Kopie zurückgeben (\@cycle_csme_raw)
   }
 
   # --- Kein Cache-Hit → Originalberechnung ---
@@ -31400,12 +31426,12 @@ sub _aiFannCycleConsumerHistArray {
   }
 
   # --- Limit anwenden ---
-  my $n   = scalar @cycle_csme_raw;
-  my $min = $n < $limit ? $n : $limit;
+  my $n           = scalar @cycle_csme_raw;
+  my $min         = $n < $limit ? $n : $limit;
   @cycle_csme_raw = @cycle_csme_raw[-$min .. -1];
 
-  # --- Ergebnis cachen ---
-  LRU_insert ($name, $cache, $key, [ \@cycle_csme_raw ]);
+  # --- Ergebnis cachen: eigene Kopie ablegen ---
+  LRU_insert ($name, $cache, $key, [ [ @cycle_csme_raw ] ]);
 
 return (\@cycle_csme_raw);
 }
@@ -31415,7 +31441,10 @@ return (\@cycle_csme_raw);
 #  Iteration von getPvHistTargetArray (gleiche Filterkriterien,
 #  gleiche Reihenfolge, gleicher Cutoff).
 #
-#  Return: (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@active)
+#  WICHTIG: Cache und Rückgabe verwenden getrennte Array-Kopien
+#  (siehe _aiFannBevHistArray).
+#
+#  Return: (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active)
 ######################################################################################
 sub _aiFannHpOpmodeHistArray {
   my $paref   = shift;
@@ -31445,7 +31474,7 @@ sub _aiFannHpOpmodeHistArray {
 
   # --- Cache-Hit? ---
   if (my $cached = LRU_get ($name, $cache, $key)) {
-      return @$cached;
+      return map { [ @$_ ] } @$cached;                                              # Kopien zurückgeben, Cache bleibt unverändert
   }
 
   # --- Kein Cache-Hit → Originalberechnung ---
@@ -31461,7 +31490,7 @@ sub _aiFannHpOpmodeHistArray {
           last if ($day == $mday && $hod == $hour + 1);
 
           my $rec = $ph->{$day}{$hod};
-          next unless defined $rec->{$fanntyp};                                         # identisches Filterkriterium wie getPvHistTargetArray
+          next unless defined $rec->{$fanntyp};                                     # identisches Filterkriterium wie getPvHistTargetArray
           next unless $rec->{$fanntyp} >= 0;
 
           my $hp_sig = _aiFannHpOpmodeAggregate ($rec);
@@ -31489,7 +31518,9 @@ sub _aiFannHpOpmodeHistArray {
   @active      = @active     [-$min .. -1];
   @eco         = @eco        [-$min .. -1];
 
-  LRU_insert ($name, $cache, $key, [ \@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active ]);
+  # --- Ergebnis cachen: eigene Kopien ablegen, damit spätere push-Operationen des Aufrufers den Cache nicht verändern ---
+  LRU_insert ($name, $cache, $key, [ map { [ @$_ ] } (\@heating, \@defrost, \@hotwater, \@cooling,
+                                                       \@pool, \@poolheating, \@eco, \@active) ]);
 
 return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active);
 }
@@ -36383,9 +36414,9 @@ sub timestringsFromOffset {
 
   my $hash  = $defs{$name};
   my $cache = $hash->{'.tsCache'};
-
+  
   if (my $cached = LRU_get ($name, $cache, $key)) {
-      return $cached;
+      return { %$cached };                                                                      # Kopie zurückgeben, Cache bleibt unverändert
   }
 
   $epoch = int($epoch / 1000) if $epoch > 1_000_000_000_000;                                    # Millisekunden → Sekunden
@@ -36417,7 +36448,7 @@ sub timestringsFromOffset {
       dofyear => sprintf("%03d", $yday + 1),                                                    # Day of the year (001-366)
   };
 
-  LRU_insert ($name, $cache, $key, $dt);
+  LRU_insert ($name, $cache, $key, { %$dt });                                                   # eigene Kopie ablegen, Aufrufer bekommt das Original
 
 return $dt;
 }
@@ -38613,11 +38644,10 @@ sub getPvHistTargetArray {
       splice @p3keys, 0, $remove if defined $par3;
   }
 
-  # --- Ergebnis cachen ---
-  my $res = [ \@p1keys, \@p2keys, \@p3keys ];
-  LRU_insert ($name, $cache, $key, $res);
+  # --- Ergebnis cachen: eigene Kopien ablegen, Aufrufer bekommt die Originale ---
+  LRU_insert ($name, $cache, $key, [ map { [ @$_ ] } (\@p1keys, \@p2keys, \@p3keys) ]);
 
-return @$res;
+return (\@p1keys, \@p2keys, \@p3keys);
 }
 
 ################################################################
@@ -42722,6 +42752,7 @@ to ensure that the system configuration is correct.
             <tr><td>                            </td><td><b>gridStatus</b>  - current availability/current connection status to the public network                                                 </td></tr>
             <tr><td>                            </td><td><b>outsideTemp</b> - the current outdoor temperature                                                                                      </td></tr>
             <tr><td>                            </td><td><b>presence</b>    - presence status                                                                                                      </td></tr>
+            <tr><td>                            </td><td><b>rainAmount</b>  - the current rainfall of the last hour in mm (measured value or weather API)                                          </td></tr>
             <tr><td>                            </td><td><b>windSpeed</b>   - the current wind speed (smoothed)                                                                                    </td></tr>
             <tr><td>                            </td><td>                                                                                                                                          </td></tr>
             <tr><td> <b>hourStyle</b>           </td><td>Format of the time in the bar chart.                                                                                                      </td></tr>
@@ -43212,6 +43243,10 @@ to ensure that the system configuration is correct.
             <tr><td> <b>presence</b>              </td><td>A &lt;device&gt;:&lt;reading&gt;:&lt;regex&gt; combination that provides the presence status of the residents. The specified regular expression   </td></tr>
             <tr><td>                              </td><td>must return Boolean value 'true' for the 'presence' status, otherwise 'false'.                                                                    </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                              </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>rainAmount</b>            </td><td>A &lt;Device&gt;:&lt;Reading&gt; combination that provides the rainfall of the current hour in mm (l/m2). The measured value overrides            </td></tr>
+            <tr><td>                              </td><td>the precipitation value (rr1c) of the weather API for the current hour. Valid values are numbers &gt;= 0.                                         </td></tr>
+            <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;                                                                                                            </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>windSpeed</b>             </td><td>A <Device>:<Reading> combination that provides the currently measured wind speed in m/s.                                                          </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Device&gt;:&lt;Reading&gt;                                                                                                            </td></tr>
@@ -45915,6 +45950,7 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td>                            </td><td><b>gridStatus</b>  - aktuelle Verfügbarkeit/aktueller Verbindungsstatus zum öffentlichen Netz                                   </td></tr>
             <tr><td>                            </td><td><b>outsideTemp</b> - die aktuelle Außentemperatur                                                                               </td></tr>
             <tr><td>                            </td><td><b>presence</b>    - der Anwesenheitsstatus                                                                                     </td></tr>
+            <tr><td>                            </td><td><b>rainAmount</b>  - die aktuelle Regenmenge der letzten Stunde in mm (Messwert oder Wetter-API)                                </td></tr>
             <tr><td>                            </td><td><b>windSpeed</b>   - die aktuelle Windgeschwindigkeit (geglätted)                                                               </td></tr>
             <tr><td>                            </td><td>                                                                                                                                </td></tr>
             <tr><td> <b>hourStyle</b>           </td><td>Format der Zeitangabe in der Balkengrafik.                                                                                      </td></tr>
@@ -46406,6 +46442,10 @@ die ordnungsgemäße Anlagenkonfiguration geprüft werden.
             <tr><td> <b>presence</b>              </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt; Kombination, die den Anwesenheitsstatus der Bewohner liefert. Der angegebene reguläre Ausdruck   </td></tr>
             <tr><td>                              </td><td>muß Boolean 'true' für den Status 'Anwesenheit' ergeben, sonst 'false'.                                                                           </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;:&lt;Regex&gt;                                                                                               </td></tr>
+            <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
+            <tr><td> <b>rainAmount</b>            </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt; Kombination, die die Regenmenge der aktuellen Stunde in mm (l/m2) liefert. Der Messwert überschreibt für       </td></tr>
+            <tr><td>                              </td><td>die aktuelle Stunde den Niederschlagswert (rr1c) der Wetter-API. Gültig sind Zahlen &gt;= 0.                                                      </td></tr>
+            <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;                                                                                                             </td></tr>
             <tr><td>                              </td><td>                                                                                                                                                  </td></tr>
             <tr><td> <b>windSpeed</b>             </td><td>Eine &lt;Gerät&gt;:&lt;Reading&gt; Kombination, die die aktuell gemessene Windgeschwindigkeit in m/s liefert.                                     </td></tr>
             <tr><td>                              </td><td>Syntax: &lt;Gerät&gt;:&lt;Reading&gt;                                                                                                             </td></tr>
