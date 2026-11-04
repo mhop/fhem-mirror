@@ -679,10 +679,11 @@ contrib/deprecated/20_FRM_LCD.pm ntruchsess       (deprecated)
 contrib/deprecated/70_Pushalot.pm Talkabout       (deprecated)
 contrib/deprecated/95_PachLog.pm  rudolfkoenig/orphan (deprecated)
 contrib/DoorPi/70_DoorPi.pm  pahenning            Automatisierung
-contrib/fhemweb_iconAnimated.js   schwatter       Frontends
 contrib/fhemweb_gauge.js          schwatter       Frontends
+contrib/fhemweb_iconAnimated.js   schwatter       Frontends
 contrib/fhemweb_minichart.js      schwatter       Frontends
 contrib/fhemweb_multigauge.js     schwatter       Frontends
+contrib/fhemweb_popup.js          schwatter       Frontends
 contrib/fhemweb_shutter_h.js      schwatter       Frontends
 contrib/fhemweb_shutter_v.js      schwatter       Frontends
 contrib/Infratec/*           Wzut                 Bastelecke
@@ -696,7 +697,7 @@ contrib/SolarForecast/*      DS_Starter           Solaranlagen
 contrib/voicecontrol.js      schwatter            Frontends
 contrib/WebViewControl/*     Dirk                 Mobile Devices
 contrib/Widgets/DateTimePicker* Matscher          Frontends
-contrib/Wzut/*		     Wzut		  MAX
+contrib/Wzut/*               Wzut                 MAX
 contrib/YAF/*                MarcP                Frontends
 
 www/pgm2/automowerconnect.js Ellert               Frontends

@@ -1,13 +1,15 @@
-FW_version["fhemweb_popup.js"] = "$Id: fhemweb_popup.js 2.5.0 schwatter $";
+FW_version["fhemweb_popup.js"] = "$Id: fhemweb_popup.js 2.5.2 $";
 FW_widgets['popup'] = { createFn: popupWidgetCreate };
 
 function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
+    // FW_callCreateFn ruft JEDE geladene createFn für JEDES Widget auf:
+    // alles, was nicht "popup" ist, muss hier zurück an FHEM.
     if (!vArr || vArr[0] !== 'popup') return undefined;
 
     const dev = devName || 'unknown';
     const readingsConfig = vArr.slice(1);
 
-    // CSS für das Popup und das CSS-MENÜ-ICON
+    // CSS für das Popup und das REINE CSS-MENÜ-ICON
     const styleId = 'fhemwebPopupWidgetStyles';
     if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
@@ -39,6 +41,18 @@ function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
     const showIcon = ($row) => {
         $row.find('.fhem-popup-icon').show();
         $row.find('.fhem-popup-label').hide();
+    };
+
+    // Beschriftung einer webCmd-Zelle. Icons (cmdIcon) enthalten im SVG auch
+    // Metadaten-Text, darum nie den Text der Zelle samt Icon verwenden.
+    const widgetLabel = ($td) => {
+        const informId = $td.find('[informId]').addBack('[informId]').attr('informId');
+        if (informId) return informId.replace(`${dev}-`, '');
+        const $icon = $td.find('[data-txt], img[title]').first();
+        if ($icon.length) return $icon.attr('data-txt') || $icon.attr('title');
+        const $copy = $td.clone();
+        $copy.find('svg').remove();
+        return $copy.text().trim();
     };
 
     // Popup-Logik über native FW_okDialog
@@ -120,8 +134,7 @@ function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
         $button.closest('tr').find('> td').has('.col3').not('.fhem-popup-td').each(function() {
             const $td = $(this);
             const $holder = $('<td style="display:none"></td>');
-            const informId = $td.find('[informId]').addBack('[informId]').attr('informId') || '';
-            const label = informId.replace(`${dev}-`, '') || $td.text().trim();
+            const label = widgetLabel($td);
             $td.before($holder);
             moved.push({ $td, $holder });
             $(`<tr class="${rowClass()}"></tr>`)
@@ -138,6 +151,12 @@ function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
         const isTouch = window.matchMedia('(pointer: coarse)').matches;
         FW_okDialog($popupContent, isTouch ? undefined : $button);
         reactivate($table);   // Slider neu vermessen
+
+        // Widgets, die ihre Zelle selbst ausblenden, hinterlassen keine leere Zeile.
+        // Geprüft wird der Inline-Style: Die f18-Regel fürs Hochformat zählt nicht.
+        $table.find('td').filter(function() {
+            return this.style.display === 'none';
+        }).closest('tr').hide();
 
         // dialogclose statt removeFn: FW_okDialog ruft removeFn bei Escape nicht auf
         $('#FW_okDialog').one('dialogclose', function() {
