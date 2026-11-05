@@ -4231,7 +4231,15 @@ sub __ShadowedCopies {
 
   for my $dir (@found) {
       my $file = "$dir/$rel";
-      my $ver  = eval { version->parse (MM->parse_version ($file))->numify };
+    
+      my $ver = do {
+          local $SIG{__WARN__} = sub {
+              my ($msg) = @_;
+              CORE::warn($msg) unless $msg =~ /alpha->numify\(\) is lossy/;
+          };
+          eval { version->parse(MM->parse_version($file))->numify };
+      };
+      
       my %copy = (path => $file, version => ($ver // 0));
 
       $copy{package} = __DpkgOwner ($file) if($hasDpkg);
@@ -5018,7 +5026,7 @@ return join($t->{lb}, @notes);
       "abstract": "Modul zur Installation, Aktualisierung und Deinstallation von (CPAN) Perl-Modulen und zur Verwaltung der Systemvoraussetzungen von FHEM"
     }
   },
-  "version": "v1.4.0",
+  "version": "v1.4.1",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>",
