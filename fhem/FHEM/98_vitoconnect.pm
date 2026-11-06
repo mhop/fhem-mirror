@@ -84,6 +84,8 @@ sub vitoconnect_StoreKeyValue;          # Werte verschlüsselt speichern
 sub vitoconnect_ReadKeyValue;           # verschlüsselte Werte auslesen
 sub vitoconnect_DeleteKeyValue;         # verschlüsselte Werte löschen
 
+sub vitoconnect_writeDebugFile;         # Debug-/Diagnosedatei ueber FHEM-Core FileWrite schreiben (kein Path::Tiny)
+
 
 package main;
 use strict;
@@ -94,7 +96,12 @@ use JSON;
 use HttpUtils;
 use Encode qw(decode encode);
 use Data::Dumper;
-use Path::Tiny;
+# Path::Tiny wird nicht mehr verwendet: der nach 'main' exportierte Funktionsname
+# 'path' kollidierte in manchen Installationen mit gleichnamigen Funktionen anderer
+# Module -> path(...) lieferte dann statt eines Path::Tiny-Objekts einen Skalar und
+# $dir->child(...) warf "Can't locate object method child via package 6" -> FHEM-Crash.
+# Dateizugriff laeuft jetzt ueber die FHEM-Core-Funktion FileWrite (siehe vitoconnect_writeDebugFile).
+#use Path::Tiny;
 use DateTime;
 use Time::Piece;
 use Time::Seconds;
@@ -106,6 +113,8 @@ use FHEM::SynoModules::SMUtils qw (
                                   );                                                 # Hilfsroutinen Modul
 
 my %vNotesIntern = (
+  "1.3.0"  => "04.11.2026  Remove Path::Tiny and use FileWrite",
+  "1.2.0"  => "22.08.2026  Quota Warning erst ab 90%",
   "1.1.9"  => "28.06.2026  Neues Reading apiQuotaUsedPercentLastDay - zeigt im Nachhinein wie nah man gestern am 1450/Tag-Limit war. Bei Multi-Device basiert auf apiCallsLastDayAccount, sonst auf apiCallsLastDay.",
   "1.1.8"  => "28.06.2026  Neues Reading apiCallsLastDayAccount fuer Multi-Device-Symmetrie zu apiCallsTodayAccount (Summe der gestrigen Calls ueber alle Devices mit gleichem apiKey). Live-berechnet, kann in den ersten Minuten nach Mitternacht kurz inkonsistent sein.",
   "1.1.7"  => "26.06.2026  24h-Cleanup laeuft jetzt fuer alle Listen-Typen (errors/info/status/service/unknown), auch wenn Type aktuell leer ist. Behebt Stale-Eintraege in unknown.list aus Stride-Bug-Zeit. Leere Liste leert das Reading sauber.",
@@ -3811,6 +3820,44 @@ sub vitoconnect_getGw {
 
 
 #####################################################################################################################
+# Debug-/Diagnosedatei schreiben (ersetzt Path::Tiny path()/child()/openw_utf8)
+#
+# Nutzt die FHEM-Core-Funktion FileWrite aus fhem.pl statt Path::Tiny. Vorteile:
+#  - kein nach 'main' exportiertes path() -> keine Namenskollision mit anderen Modulen
+#    (ehemaliger Crash "Can't locate object method child via package 6")
+#  - FileWrite liefert bei Fehler einen Text zurueck statt die Instanz zu crashen
+#  - configDB-faehig (FileWrite nutzt automatisch cfgDB_FileWrite falls aktiv)
+#  - UTF-8-Kodierung wie zuvor openw_utf8 (FileWrite setzt :encoding(UTF-8))
+#
+# Parameter:
+#  $name     : Devicename (fuer Log3)
+#  $filename : Dateiname OHNE Pfad, z.B. "gw.json" (Verzeichnis = global/logdir)
+#  $content  : zu schreibender Inhalt (mehrzeiliger String, z.B. aus Dumper())
+#####################################################################################################################
+sub vitoconnect_writeDebugFile {
+    my ($name, $filename, $content) = @_;
+
+    my $dir  = AttrVal("global", "logdir", "log");      # FHEM-Logverzeichnis
+    my $path = $dir . "/" . $filename;                  # vollstaendiger Dateiname
+
+    # FileWrite erwartet ein Array von Zeilen (haengt an jede Zeile ein \n an).
+    # Dumper()-Ausgabe ist mehrzeilig -> in Zeilen zerlegen, damit die Datei
+    # genauso aussieht wie frueher (kein zusaetzliches Leerzeichen/Blob).
+    my @rows = split /\n/, (defined $content ? $content : "");
+
+    my $err = FileWrite($path, @rows);                  # Core-Funktion, kein Path::Tiny
+
+    if ($err) {
+        Log3($name, 1, $name . " - Fehler beim Schreiben von " . $path . ": " . $err);
+        return $err;
+    }
+
+    Log3($name, 3, $name . " Datei: " . $path . " geschrieben");
+    return undef;
+}
+
+
+#####################################################################################################################
 # Gateway-Serial speichern, Anwort von Abfrage Gateway-Serial
 #####################################################################################################################
 sub vitoconnect_getGwCallback {
@@ -3834,12 +3881,7 @@ sub vitoconnect_getGwCallback {
         }
         
         if ($hash->{".logResponseOnce"} )   {
-            my $dir         = path( AttrVal("global","logdir","log"));
-            my $file        = $dir->child("gw.json");
-            my $file_handle = $file->openw_utf8();
-            $file_handle->print(Dumper($items));            # Datei 'gw.json' schreiben
-            $file_handle->close();
-            Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
+            vitoconnect_writeDebugFile($name, "gw.json", Dumper($items));   # Datei 'gw.json' schreiben (FileWrite, kein Path::Tiny)
             }
             
             # Alle Gateways holen und in hash schreiben, immer machen falls neue Geräte hinzu kommen
@@ -3962,12 +4004,7 @@ sub vitoconnect_getInstallationCallback {
             return;
         }
         if ($hash->{".logResponseOnce"})    {
-            my $dir         = path( AttrVal("global","logdir","log"));
-            my $file        = $dir->child("installation_" . $gw . ".json");
-            my $file_handle = $file->openw_utf8();
-            $file_handle->print(Dumper($items));                # Datei 'installation.json' schreiben
-            $file_handle->close();
-            Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
+            vitoconnect_writeDebugFile($name, "installation_" . $gw . ".json", Dumper($items));   # Datei 'installation_<gw>.json' schreiben (FileWrite)
         }
             
         if (AttrVal( $name, 'vitoconnect_gw_readings', 0 ) eq "1") {
@@ -4031,12 +4068,7 @@ sub vitoconnect_getInstallationFeaturesCallback {
     else                                                {   #  kein Fehler aufgetreten
     
          if ($hash->{".logResponseOnce"})    {
-            my $dir         = path( AttrVal("global","logdir","log"));
-            my $file        = $dir->child("installation_features_" . $gw . ".json");
-            my $file_handle = $file->openw_utf8();
-            $file_handle->print(Dumper($decode_json));                # Datei 'installation.json' schreiben
-            $file_handle->close();
-            Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
+            vitoconnect_writeDebugFile($name, "installation_features_" . $gw . ".json", Dumper($decode_json));   # Datei 'installation_features_<gw>.json' schreiben (FileWrite)
         }
         
         if (AttrVal( $name, 'vitoconnect_gw_readings', 0 ) eq "1") {
@@ -4097,13 +4129,7 @@ sub vitoconnect_getDeviceCallback {
             return;
         }
         if ( $hash->{".logResponseOnce"} )  {
-            my $dir         = path( AttrVal("global","logdir","log"));
-            my $filename    = "device_" . $gw . ".json";
-            my $file        = $dir->child($filename);
-            my $file_handle = $file->openw_utf8();
-            $file_handle->print(Dumper($items));            # Datei 'device.json' schreiben
-            $file_handle->close();
-            Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
+            vitoconnect_writeDebugFile($name, "device_" . $gw . ".json", Dumper($items));   # Datei 'device_<gw>.json' schreiben (FileWrite)
         }
         if (AttrVal( $name, 'vitoconnect_gw_readings', 0 ) eq "1") {
           readingsSingleUpdate($hash,"device",$response_body,1);    # im Reading 'device' merken
@@ -4175,12 +4201,7 @@ sub vitoconnect_getFeaturesCallback {
     else                                                {   # kein Fehler aufgetreten
     
       if ($hash->{".logResponseOnce"})    {
-            my $dir         = path( AttrVal("global","logdir","log"));
-            my $file        = $dir->child("gw_features_" . $gw . ".json");
-            my $file_handle = $file->openw_utf8();
-            $file_handle->print(Dumper($decode_json));                # Datei 'installation.json' schreiben
-            $file_handle->close();
-            Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
+            vitoconnect_writeDebugFile($name, "gw_features_" . $gw . ".json", Dumper($decode_json));   # Datei 'gw_features_<gw>.json' schreiben (FileWrite)
       }
     
     if (AttrVal( $name, 'vitoconnect_gw_readings', 0 ) eq "1") {    
@@ -4263,12 +4284,7 @@ sub vitoconnect_getResourceCallback {
         vitoconnect_incrementApiCallsToday($hash);
 
         if ($hash->{".logResponseOnce"} ) {
-            my $dir         = path(AttrVal("global","logdir","log"));   # Verzeichnis
-            my $file        = $dir->child("resource_".$gw.".json");             # Dateiname
-            my $file_handle = $file->openw_utf8();
-            $file_handle->print(Dumper($response_body));                        # Datei 'resource.json' schreiben
-            $file_handle->close();
-            Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
+            vitoconnect_writeDebugFile($name, "resource_" . $gw . ".json", Dumper($response_body));   # Datei 'resource_<gw>.json' schreiben (FileWrite)
             $hash->{".logResponseOnce"} = 0;
         }
         
@@ -5022,7 +5038,7 @@ sub vitoconnect_incrementApiCallsToday {
     # Quota in Prozent vom Tageslimit (1450, siehe Modul-Header).
     my $percent = int($quotaBase * 100 / $API_DAILY_LIMIT);
     readingsSingleUpdate($hash, "apiQuotaUsedPercent", $percent, 1);
-    Log3($name, 3, "$name - WARNUNG: API-Quota bei ${percent}% (>= 80%)") if $percent >= 80;
+    Log3($name, 3, "$name - WARNUNG: API-Quota bei ${percent}% (>= 90%)") if $percent >= 90;
 
     # Gleiche Logik fuer den Vortag: zeigt im Nachhinein wie nah man am Limit war.
     # Kein Warnlog, weil rein historisch.
@@ -5099,13 +5115,8 @@ sub vitoconnect_errorHandling {
                              . "error: " . ($items->{error} // 'undef') . " "
                              . "reason: " . ($items->{extendedPayload}->{reason} // 'undef');
              
-                my $dir         = path( AttrVal("global","logdir","log"));
-                my $file        = $dir->child("vitoconnect_" . $gw . ".err");
-                my $file_handle = $file->openw_utf8();
-                $file_handle->print(Dumper($items));                            # Datei 'vitoconnect_serial.err' schreiben
-                $file_handle->close();
-                Log3($name,3,$name." Datei: ".$dir."/".$file." geschrieben");
-                
+                vitoconnect_writeDebugFile($name, "vitoconnect_" . $gw . ".err", Dumper($items));   # Datei 'vitoconnect_<gw>.err' schreiben (FileWrite)
+
                 InternalTimer(gettimeofday() + $hash->{intervall},"vitoconnect_GetUpdate",$hash);
                 return(1);
             }
@@ -5460,11 +5471,10 @@ sub vitoconnect_DeleteKeyValue {
      
     vitoconnect requires the following libraries:
     <ul>
-        <li>Path::Tiny</li>
         <li>JSON</li>
         <li>JSON:XS</li>
         <li>DateTime</li>
-    </ul>   
+    </ul>
          
     Use <code>sudo apt install libtypes-path-tiny-perl libjson-perl libdatetime-perl</code> or 
     install the libraries via CPAN. 
@@ -5705,7 +5715,6 @@ sub vitoconnect_DeleteKeyValue {
      
     Für die Nutzung werden die folgenden Bibliotheken benötigt:
     <ul>
-    <li>Path::Tiny</li>
     <li>JSON</li>
     <li>JSON::XS</li>
     <li>DateTime</li>
