@@ -510,7 +510,7 @@ use constant PROCESSING_TIMEOUT       => DOWNLOAD_TIMEOUT_MAX + 60; # [s]
 use constant SCHEDULING_RANGE         => 15*60 - PROCESSING_TIMEOUT - 60; # [s]
 
 require Exporter;
-our $VERSION   = '1.017009';
+our $VERSION   = '1.017010';
 our @ISA       = qw(Exporter);
 our @EXPORT    = qw(GetForecast GetAlerts UpdateAlerts UPDATE_DISTRICTS UPDATE_COMMUNEUNIONS UPDATE_ALL);
 our @EXPORT_OK = qw(IsCommuneUnionWarncellId);
@@ -1141,11 +1141,40 @@ sub FormatDateTimeUTC {
 
 sub ParseDateTimeUTC {
   my $int = shift;
+
+  # Eingabe prüfen
+  return if (!defined($int) || $int eq '');
+
+  # Eventuelle Leerzeichen entfernen
+  $int =~ s/^\s+|\s+$//g;
+
+  # Zeitstempel zerlegen
+  my ($y, $mo, $d, $h, $m, $s) = $int =~ /^([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})Z?$/;
+
+  # Format und Werte prüfen
+  if (!defined($y) || !defined($mo) || !defined($d) ||
+      !defined($h) || !defined($m) || !defined($s) ||
+      $mo < 1 || $mo > 12 ||
+      $d < 1 || $d > 31 ||
+      $h > 23 || $m > 59 || $s > 59) {
+
+    ::Log 3, "DWD_OpenData: Invalid UTC timestamp: '$int'";
+    return;
+  }
+
+  # UTC-Zeitstempel erzeugen
   my $t;
-  my ($y, $mo, $d, $h, $m, $s) = $int =~ /([0-9]{4})-([0-9]{2})-([0-9]{2})\s([0-9]{2}):([0-9]{2}):([0-9]{2})/xs;  
-  eval { $t = ::fhemTimeGm($s, $m, $h, $d, $mo - 1, $y - 1900) };                
-  ::Log 1, 'eval: '.$@ if($@);                                         
-  return $t;
+
+  eval {
+    $t = ::fhemTimeGm($s, $m, $h, $d, $mo - 1, $y - 1900);
+  };
+
+  if ($@ || !defined($t)) {
+    ::Log 3, qq{DWD_OpenData: Error parsing UTC timestamp "$int": $@};
+    return;
+  }
+
+return $t;
 }
 
 =head2 FormatDateTimeLocal($$)
@@ -1732,33 +1761,39 @@ sub GetForecastStart {
   my $name = $hash->{NAME};
   my $station = $hash->{".station"};
 
-  # give main process time to execute
-  usleep(100);
+  usleep(100);                                              # give main process time to execute
 
   # get forecast for station from DWD server
   my $url;
   my $mosmixType = ::AttrVal($name, 'forecastRefresh', 6) < 6 ? 'S' : 'L';
   if ($mosmixType eq 'S') {
     $url = "https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_S/all_stations/kml/MOSMIX_S_LATEST_240.kmz";
-  } else {
+  } 
+  else {
     $url = 'https://opendata.dwd.de/weather/local_forecasts/mos/MOSMIX_L/single_stations/' . $station . '/kml/MOSMIX_L_LATEST_' . $station . '.kmz';
   }
 
-  # determine if a new forecast report should be downloaded
-  #my ($dwdDocSize, $dwdDocTime);                                       
+  # determine if a new forecast report should be downloaded                                       
   my ($update, $dwdDocSize, $dwdDocTime) = IsDocumentUpdated($hash, $url, 'fc');    
-  my $lastDocSize = ::ReadingsVal($name , 'fc_dwdDocSize', 0);
-  my $lastDocTimestamp = ParseDateTimeUTC(::ReadingsVal($name , 'fc_dwdDocTime', '1970-01-01 00:00:00')); 
-  my $dwdDocTimestamp = length($dwdDocTime) ? ParseDateTimeUTC($dwdDocTime) : time();
-  my $maxDocAge = (::AttrVal($name, 'forecastRefresh', 6) - 0.5) * 60 * 60; # [s]
-  $maxDocAge = 0;    
-  $update = $update && ($lastDocSize == 0 || ($dwdDocTimestamp - $lastDocTimestamp) >= $maxDocAge);
+  my $lastDocSize      = ::ReadingsVal($name , 'fc_dwdDocSize', 0);
+  my $lastDocTimestamp = ParseDateTimeUTC (::ReadingsVal($name , 'fc_dwdDocTime', '1970-01-01 00:00:00'));
+  $lastDocTimestamp    = 0 if(!defined($lastDocTimestamp));                     # Bei ungültigem Reading mit Zeitstempel 0 starten
+
+  my $dwdDocTimestamp = defined($dwdDocTime) && length($dwdDocTime)
+                      ? ParseDateTimeUTC ($dwdDocTime) 
+                      : undef;
+
+  # Bei ungültigem Server-Zeitstempel aktuelle Zeit verwenden
+  $dwdDocTimestamp = time() if (!defined($dwdDocTimestamp));
+  my $maxDocAge    = (::AttrVal ($name, 'forecastRefresh', 6) - 0.5) * 60 * 60; # [s]
+  $maxDocAge       = 0;    
+  $update          = $update && ($lastDocSize == 0 || ($dwdDocTimestamp - $lastDocTimestamp) >= $maxDocAge);
 
   ::Log3 $name, 5, "$name: GetForecastStart dwdDocTime: $dwdDocTime, dwdDocTimestamp: $dwdDocTimestamp,  dwdDocSize: $dwdDocSize, lastDocTimestamp: $lastDocTimestamp, maxDocAge: $maxDocAge, lastDocSize: $lastDocSize : update: $update";
 
   my $result;
-  if ($update) {
-    # define download and processing properties
+  
+  if ($update) {                                        # define download and processing properties
     my $param = {
                   url           => $url,
                   method        => "GET",
@@ -1777,14 +1812,14 @@ sub GetForecastStart {
     $result = ProcessForecast($param);
 
     ::Log3 $name, 5, "$name: GetForecastStart END";
-  } else {
-    # already up to date
+  } 
+  else {                                                # already up to date
     $result = [$name, 'up-to-date'];
 
     ::Log3 $name, 5, "$name: GetForecastStart UP-TO-DATE";
   }
 
-  return $result;
+return $result;
 }
 
 =head2 getStationPos($$$)
@@ -3082,7 +3117,6 @@ return undef;
 
 package main;
 
-
 =head1 FHEM INIT FUNCTION
 
 =head2 DWD_OpenData_Initialize($)
@@ -3113,6 +3147,8 @@ sub DWD_OpenData_Initialize {
                       .'timezone '
                       .'downloadTimeout '
                       .$readingFnAttributes;
+
+return:
 }
 
 1;
@@ -3120,6 +3156,9 @@ sub DWD_OpenData_Initialize {
 # -----------------------------------------------------------------------------
 #
 # CHANGES
+#
+# 06.11.2026 (version 1.17.10) DS_Starter
+# Patch von Rampler eingebaut (Forum: https://forum.fhem.de/index.php?msg=1371238)
 #
 # 10.10.2026 (version 1.17.9) DS_Starter
 # Patch von Rampler eingebaut (Forum: https://forum.fhem.de/index.php?msg=1370034)

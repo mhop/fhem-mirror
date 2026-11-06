@@ -541,7 +541,7 @@ FHEM/98_HTTPMOD.pm           StefanStrobel        Sonstiges
 FHEM/98_Hyperion.pm          DeeSPe               Beleuchtung
 FHEM/98_IF.pm                damian-s             Automatisierung
 FHEM/98_inotify.pm           marvin78             Automatisierung
-FHEM/98_Installer.pm         DS_Starter/orphan    Unterstützende Dienste
+FHEM/98_Installer.pm         DS_Starter           Unterstützende Dienste
 FHEM/98_JsonList2.pm         rudolfkoenig         Automatisierung
 FHEM/98_JsonMod.pm           herrmannj            Automatisierung
 FHEM/98_KNX_scan.pm          erwin                KNX/EIB (Forum #122582) https://forum.fhem.de/index.php/topic,122582.0.html
