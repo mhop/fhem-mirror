@@ -1,3 +1,4 @@
+ - feature: 98_Analyze: neues Modul zur Systemanalyse (RAM-Verbrauch, Leaks)
  - change: 55_DWD_OpenData: mögliche Warnungen beseitigt (Patch Rampler)
  - bugfix: 98_vitoconnect: PathTiny removed, quota 90%
  - bugfix: 98_Installer: Warnung "alpha->numify() is lossy" eliminiert 

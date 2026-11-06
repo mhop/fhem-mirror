@@ -499,6 +499,7 @@ FHEM/97_PiXtendV2            PiXtend              Sonstige Systeme https://forum
 FHEM/97_TrashCal.pm          Tobias               Unterstützende Dienste
 FHEM/98_AirUnit.pm           vuffiraa             Sonstiges
 FHEM/98_alarmclock.pm        FlorianZ             Unterstützende Dienste
+FHEM/98_Analyze.pm           DS_Starter           Unterstützende Dienste
 FHEM/98_apptime.pm           martinp876           Sonstiges
 FHEM/98_archetype.pm         orphan/Beta-User     Automatisierung https://forum.fhem.de/index.php/topic,125930.0.html
 FHEM/98_ArduCounter.pm       StefanStrobel        Sonstiges
