@@ -1,3 +1,4 @@
+ - bugfix: 98_vitoconnect: PathTiny removed, quota 90%
  - bugfix: 98_Installer: Warnung "alpha->numify() is lossy" eliminiert 
  - feature: 98_Installer: v1.4.0, Forum: #145672
  - feature: 98_Installer: v1.3.0, Forum: #145672
