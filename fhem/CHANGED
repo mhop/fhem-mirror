@@ -1,3 +1,4 @@
+ - feature: 98_Installer: neues Attribut installPerlMetaCPAN
  - feature: 98_Analyze: neues Modul zur Systemanalyse (RAM-Verbrauch, Leaks)
  - change: 55_DWD_OpenData: mögliche Warnungen beseitigt (Patch Rampler)
  - bugfix: 98_vitoconnect: PathTiny removed, quota 90%

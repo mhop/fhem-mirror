@@ -60,6 +60,7 @@ sub Installer_Initialize {
       'installPerlReinstall:0,1',
       'installPerlNoTest:0,1',
       'installPerlEnforced:0,1',
+      'installPerlMetaCPAN:0,1',
   );
 
   $modHash->{AttrList} = join(' ', @attrs).' '.$readingFnAttributes;
@@ -1192,6 +1193,7 @@ sub SP_asynchronousExecuteFhemCommand {
       installPerlReinstall => '--reinstall ',
       installPerlNoTest    => '--notest ',
       installPerlEnforced  => '--force ',
+      installPerlMetaCPAN  => '--metacpan ',
   );
 
   for my $attrName (sort keys %cpanmOpts) {
@@ -1272,6 +1274,7 @@ sub SP_executeFhemCommand {
                               . $cmd->{installPerlReinstall}
                               . $cmd->{installPerlNoTest}
                               . $cmd->{installPerlEnforced}
+                              . $cmd->{installPerlMetaCPAN}
                               . '%PACKAGES%" 2>&1';
 
   $installer->{uninstallperl} = 'echo n | sh -c "'.$sudoH.' $(which cpanm) -U --quiet --force %PACKAGES%" 2>&1';
@@ -4365,8 +4368,8 @@ return join($t->{lb}, @notes);
     <a id="Installer-set-installPerl"></a>
     <li><b>installPerl &lt;package&gt; [package ...]</b><br>
         Installs one or more Perl packages using <code>cpanm</code>. Optionally a version can be given (<code>package@version</code>).
-        The behavior can be controlled with the attributes <a href="#Installer-attr-installPerlReinstall">installPerlReinstall</a>, <a href="#Installer-attr-installPerlNoTest">installPerlNoTest</a>
-        and <a href="#Installer-attr-installPerlEnforced">installPerlEnforced</a>.<br>
+        The behavior can be controlled with the attributes <a href="#Installer-attr-installPerlReinstall">installPerlReinstall</a>, <a href="#Installer-attr-installPerlNoTest">installPerlNoTest</a>,
+        <a href="#Installer-attr-installPerlEnforced">installPerlEnforced</a> and <a href="#Installer-attr-installPerlMetaCPAN">installPerlMetaCPAN</a>.<br>
         Example: <code>set fhemInstaller installPerl JSON::XS Net::MQTT::Simple@1.29</code>
     </li>
     <br>
@@ -4629,6 +4632,18 @@ return join($t->{lb}, @notes);
     With <b>1</b> packages are installed even if their tests fail (<code>cpanm --force</code>). <br>
     (default: 0)
     </li>
+    <br>
+
+    <a id="Installer-attr-installPerlMetaCPAN"></a>
+    <li><b>installPerlMetaCPAN 0 | 1</b> <br>
+    With <b>1</b> <code>cpanm</code> is called with <code>--metacpan</code> and queries modules and dependencies through the MetaCPAN API instead of the CPAN MetaDB (cpanmetadb) as usual.
+    This can help if both sources return different versions or the CPAN MetaDB is not reachable.
+    The list of outdated packages still comes from <code>cpan-outdated</code> (index of the CPAN mirrors) and is not affected by this attribute.
+    A package can therefore keep showing up as outdated if MetaCPAN considers a different version as current.
+    Requests with a version (<code>package@version</code>, also by <b>updatePerl</b>) are resolved by <code>cpanm</code> through MetaCPAN anyway.
+    This requires a <code>cpanm</code> version that knows <code>--metacpan</code> (listed in the documentation of 1.7043 and 1.7049). <br>
+    (default: 0)
+    </li>
   </ul>
   <br>
 
@@ -4721,8 +4736,8 @@ return join($t->{lb}, @notes);
     <a id="Installer-set-installPerl"></a>
     <li><b>installPerl &lt;Paket&gt; [Paket ...]</b><br>
         Installiert ein oder mehrere Perl-Pakete mit <code>cpanm</code>. Optional kann eine Version angegeben werden (<code>Paket@Version</code>).
-        Das Verhalten lässt sich mit den Attributen <a href="#Installer-attr-installPerlReinstall">installPerlReinstall</a>, <a href="#Installer-attr-installPerlNoTest">installPerlNoTest</a>
-        und <a href="#Installer-attr-installPerlEnforced">installPerlEnforced</a> steuern.<br>
+        Das Verhalten lässt sich mit den Attributen <a href="#Installer-attr-installPerlReinstall">installPerlReinstall</a>, <a href="#Installer-attr-installPerlNoTest">installPerlNoTest</a>,
+        <a href="#Installer-attr-installPerlEnforced">installPerlEnforced</a> und <a href="#Installer-attr-installPerlMetaCPAN">installPerlMetaCPAN</a> steuern.<br>
         Beispiel: <code>set fhemInstaller installPerl JSON::XS Net::MQTT::Simple@1.29</code>
     </li>
     <br>
@@ -4985,6 +5000,18 @@ return join($t->{lb}, @notes);
     Mit <b>1</b> werden Pakete auch dann installiert, wenn ihre Tests fehlschlagen (<code>cpanm --force</code>). <br>
     (default: 0)
     </li>
+    <br>
+
+    <a id="Installer-attr-installPerlMetaCPAN"></a>
+    <li><b>installPerlMetaCPAN 0 | 1</b> <br>
+    Mit <b>1</b> wird <code>cpanm</code> mit <code>--metacpan</code> aufgerufen und fragt Module und Abhängigkeiten über die MetaCPAN-API ab, statt wie üblich über die CPAN MetaDB (cpanmetadb).
+    Das kann helfen, wenn beide Quellen unterschiedliche Versionen liefern oder die CPAN MetaDB nicht erreichbar ist.
+    Die Liste der veralteten Pakete stammt weiterhin aus <code>cpan-outdated</code> (Index der CPAN-Spiegel) und wird vom Attribut nicht beeinflusst.
+    Ein Paket kann deshalb weiter als veraltet erscheinen, wenn MetaCPAN eine andere Version als aktuell ansieht.
+    Angaben mit Version (<code>Paket@Version</code>, auch bei <b>updatePerl</b>) löst <code>cpanm</code> ohnehin über MetaCPAN auf.
+    Voraussetzung ist eine <code>cpanm</code>-Version, die <code>--metacpan</code> kennt (in der Dokumentation von 1.7043 und 1.7049 enthalten). <br>
+    (default: 0)
+    </li>
   </ul>
   <br>
 
@@ -5026,7 +5053,7 @@ return join($t->{lb}, @notes);
       "abstract": "Modul zur Installation, Aktualisierung und Deinstallation von (CPAN) Perl-Modulen und zur Verwaltung der Systemvoraussetzungen von FHEM"
     }
   },
-  "version": "v1.4.1",
+  "version": "v1.5.0",
   "release_status": "stable",
   "author": [
     "Julian Pawlowski <julian.pawlowski@gmail.com>",
