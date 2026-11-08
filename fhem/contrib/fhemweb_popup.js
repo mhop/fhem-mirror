@@ -1,4 +1,4 @@
-FW_version["fhemweb_popup.js"] = "$Id: fhemweb_popup.js 2.5.2 $";
+FW_version["fhemweb_popup.js"] = "$Id: fhemweb_popup.js 2.8.0 $";
 FW_widgets['popup'] = { createFn: popupWidgetCreate };
 
 function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
@@ -7,7 +7,12 @@ function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
     if (!vArr || vArr[0] !== 'popup') return undefined;
 
     const dev = devName || 'unknown';
-    const readingsConfig = vArr.slice(1);
+    // Standard: Popup-Button nur auf schmalen Bildschirmen (wie f18 slim).
+    // Schalter "alwaysVisible": bei jeder Breite zeigen.
+    // "desktopOnly" ist der alte Name und wird weiter verstanden.
+    const isSwitch = v => ['alwaysvisible', 'desktoponly'].includes(v.toLowerCase());
+    const alwaysVisible = vArr.some(isSwitch);
+    const readingsConfig = vArr.slice(1).filter(v => !isSwitch(v));
 
     // CSS für das Popup und das REINE CSS-MENÜ-ICON
     const styleId = 'fhemwebPopupWidgetStyles';
@@ -28,6 +33,13 @@ function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
             @media screen and (max-width: 480px) and (orientation: portrait) {
                 #content.slim table.block tr td.fhem-popup-td { display: table-cell !important; width: auto !important; }
                 #content.slim table.block.wrapcolumns tr td.fhem-popup-td { display: block !important; }
+            }
+
+            /* Nur sichtbar, wo f18 die Spalten ausblendet (Hochformat <= 480px),
+               außer mit alwaysVisible */
+            .fhem-popup-btn:not(.fhem-popup-always) { display: none !important; }
+            @media screen and (max-width: 480px) and (orientation: portrait) {
+                .fhem-popup-btn:not(.fhem-popup-always) { display: inline-block !important; }
             }
 
             .fhem-popup-btn { display: inline-block; padding: 6px; cursor: pointer; vertical-align: middle; }
@@ -179,6 +191,8 @@ function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
         </a>
     `);
     
+    if (alwaysVisible) $button.addClass('fhem-popup-always');
+
     $button.on('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
