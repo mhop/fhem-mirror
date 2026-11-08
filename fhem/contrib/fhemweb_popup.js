@@ -9,8 +9,7 @@ function popupWidgetCreate(elName, devName, vArr, currVal, set, params, cmd) {
     const dev = devName || 'unknown';
     // Standard: Popup-Button nur auf schmalen Bildschirmen (wie f18 slim).
     // Schalter "alwaysVisible": bei jeder Breite zeigen.
-    // "desktopOnly" ist der alte Name und wird weiter verstanden.
-    const isSwitch = v => ['alwaysvisible', 'desktoponly'].includes(v.toLowerCase());
+    const isSwitch = v => v.toLowerCase() === 'alwaysvisible';
     const alwaysVisible = vArr.some(isSwitch);
     const readingsConfig = vArr.slice(1).filter(v => !isSwitch(v));
 
