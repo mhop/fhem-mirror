@@ -1,3 +1,11 @@
+ - bugfix:  46_TeslaPowerwall2AC: feat: update TeslaPowerwall2AC to v3.0.0
+               - Bumps version to v3.0.0
+               - Implements automatic recovery for invalid auth tokens
+               - Resolves queue and timer race conditions
+               - Improves HTTP and JSON error robustness
+               - Prevents sensitive tokens from appearing in logs
+               - Makes registration endpoint optional and removes
+                 redundant API requests
  - feature: 98_Installer: neues Attribut installPerlMetaCPAN
  - feature: 98_Analyze: neues Modul zur Systemanalyse (RAM-Verbrauch, Leaks)
  - change: 55_DWD_OpenData: mögliche Warnungen beseitigt (Patch Rampler)
