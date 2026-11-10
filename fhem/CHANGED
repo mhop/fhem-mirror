@@ -1,3 +1,4 @@
+ - change:  76_SolarForecast: Version 2.11.0
  - bugfix:  46_TeslaPowerwall2AC: feat: update TeslaPowerwall2AC to v3.0.0
                - Bumps version to v3.0.0
                - Implements automatic recovery for invalid auth tokens
