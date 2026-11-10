@@ -703,7 +703,7 @@ sub FlattenJSON {
     my $logLvl = ($cT =~ /json/i ? 3 : 4);
     if ($@) {
         Log3 $name, $logLvl, "$name: error while parsing JSON data: $@";
-        Log3 $name, 3, "$name: Content-Type was $cT";
+        Log3 $name, $logLvl, "$name: Content-Type was $cT";
     } 
     else {
         JsonFlatter($hash, $decoded);

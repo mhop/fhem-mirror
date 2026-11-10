@@ -8,5 +8,6 @@ Pragma: no-cache
        "token_type":"example",
        "expires_in":3600,
        "refresh_token":"tGzv3JOkF0XG5Qx2TlKWIA",
+       "refresh_expires_in":7200,
        "example_parameter":"example_value"
 }

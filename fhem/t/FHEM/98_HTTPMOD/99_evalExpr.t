@@ -43,7 +43,7 @@ is $result, "0.00", "FormatVal with %.2f format and undef value";
 my $time = mktime(0,10,14,1,2,122,0,0,-1); # 1.3.2022 14:10
 $result  = FmtDateTimeNice ($time);
 Log3 $name, 1, "result time formatted is $result";
-is $result, "Di 1.Mar 2022 14:10", "FmtDateTimeNice";
+is $result, "Di 1. Mar 2022 14:10", "FmtDateTimeNice";
 
 
 done_testing;
