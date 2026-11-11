@@ -71,6 +71,7 @@ BEGIN {
           devspec2array
           getKeyValue
           init_done
+          unicodeEncoding
           InternalTimer
           intAt
           IsDisabled
@@ -98,7 +99,7 @@ BEGIN {
 
 # Versions History intern
   my %vNotesIntern = (
-    "0.6.1"  => "06.11.2026  Hinweis: nur Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
+    "0.7.0"  => "10.11.2026  Hinweis: nur Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
     "0.1.0"  => "25.11.2020  initial "
   );
 
@@ -124,6 +125,7 @@ BEGIN {
     rssTrend       => { fn => \&_getRssTrend       },
     lastResult     => { fn => \&_getLastResult     },
     crashList      => { fn => \&_getCrashList      },
+    track          => { fn => \&_getTrack          },
   );
 
   my %hexcl = ();                                                                                        # keine Standard-Excludes, Typen per Attribut excludeTypes ausschließen
@@ -131,24 +133,27 @@ BEGIN {
   my @MAINHASHES = qw(attr cmds data defaultattr defs inform intAt logInform modules oldvalue
                       readyfnlist selectlist duplicate internal_data);                                   # FHEM Kernstrukturen
 
-  my $RVSIZE  = 24;                                                                                      # Bytes pro Referenz-Slot (SV head), Devel::Size::size() zählt ihn nicht
+  my $RVSIZE     = 24;                                                                                   # Bytes pro Referenz-Slot (SV head), Devel::Size::size() zählt ihn nicht
   my $CRUMBDEPTH = 2;                                                                                    # bis zu dieser Tiefe wird jedes Kind einzeln gemessen und protokolliert ($defs{dev}{key}{sub})
   my $CRUMBFAN   = 2000;                                                                                 # Container mit mehr Kindern werden nicht einzeln protokolliert
   my %NOWALK     = map { $_ => 1 } qw(CODE GLOB IO FORMAT LVALUE REGEXP);                                # Sockets, Dateihandles, Code usw. werden nie angefasst
-  my $PARTMIN = 512;                                                                                     # nur Teilstrukturen >= $PARTMIN Bytes werden gespeichert
+  my $PARTMIN    = 512;                                                                                  # nur Teilstrukturen >= $PARTMIN Bytes werden gespeichert
 
   my %UNIT = (                                                                                           # Einheit je Kategorie im Snapshot ('B' Bytes, 'kB', '#' Anzahl)
     proc => 'kB', cnt => '#', type => 'B', typen => '#', dev => 'B', part => 'B', reads => '#',
     mod  => 'B',  main => 'B', file => 'B', var => 'B',  pkg => 'B', pkgvar => 'B', timer => '#', timerdev => '#',
+    track => 'B', trackn => '#',
   );
 
-  my @CATORDER = qw(proc cnt timer timerdev reads part dev type typen var pkgvar file pkg main mod);    # Reihenfolge der Ausgabe
+  my @CATORDER = qw(proc cnt timer timerdev track trackn reads part dev type typen var pkgvar file pkg main mod);    # Reihenfolge der Ausgabe
 
   my %CATTITLE = (
     proc     => 'Process memory (kB)',
     cnt      => 'Counters',
     timer    => 'Timers by function',
     timerdev => 'Timers by device',
+    track    => 'Tracked objects (attribute trackObjects, size)',
+    trackn   => 'Tracked objects (attribute trackObjects, number of entries)',
     reads    => 'Readings per device',
     part     => 'Parts of devices ($defs{device}{key})',
     dev      => 'Devices',
@@ -160,6 +165,158 @@ BEGIN {
     pkg      => 'Packages (our variables)',
     main     => 'FHEM core hashes',
     mod      => 'Module hashes ($modules{TYPE})',
+  );
+
+# Texte (EN/DE), Sprache gemäß globalem Attribut 'language' (DE -> deutsch, sonst englisch), Zugriff über _t()
+  my %TXT = (
+    attr_int         => { EN => q{The value of %s is not valid. Use an integer ≥ %s.},
+                          DE => q{Der Wert von %s ist ungültig. Verwende eine ganze Zahl ≥ %s.} },
+    attr_hours       => { EN => q{The value of %s is not valid. Use hours as number, e.g. 6 (0 = off).},
+                          DE => q{Der Wert von %s ist ungültig. Gib Stunden als Zahl an, z.B. 6 (0 = aus).} },
+    attr_sample      => { EN => q{The value of %s must be 0 (off) or at least 60 seconds.},
+                          DE => q{Der Wert von %s muss 0 (aus) oder mindestens 60 Sekunden sein.} },
+    attr_track       => { EN => q{Invalid entry in %s: "%s". Allowed: $hash{key}[index] (e.g. $defs{myDevice}{.cache}), %%Package::name (also @ and $) or file.pm:%%name.},
+                          DE => q{Ungültiger Eintrag in %s: "%s". Erlaubt: $hash{key}[index] (z.B. $defs{meinDevice}{.cache}), %%Paket::name (auch @ und $) oder datei.pm:%%name.} },
+    label_invalid    => { EN => q{The label "%s" is not valid. Allowed are letters, digits, '_', '-' and '.'.},
+                          DE => q{Das Label "%s" ist ungültig. Erlaubt sind Buchstaben, Ziffern, '_', '-' und '.'.} },
+    del_needs        => { EN => q{The command "deleteSnapshot" needs a label or "all".},
+                          DE => q{Das Kommando "deleteSnapshot" benötigt ein Label oder "all".} },
+    del_all          => { EN => q{all snapshots deleted},
+                          DE => q{alle Snapshots gelöscht} },
+    snap_missing     => { EN => q{Snapshot "%s" does not exist.},
+                          DE => q{Snapshot "%s" existiert nicht.} },
+    snap_deleted     => { EN => q{snapshot '%s' deleted},
+                          DE => q{Snapshot '%s' gelöscht} },
+    no_dev_type      => { EN => q{No device of TYPE "%s" found.},
+                          DE => q{Kein Device vom TYPE "%s" gefunden.} },
+    tree_needs       => { EN => q{The command "%s" needs an argument, e.g. $defs{myDevice}{helper} or $data.},
+                          DE => q{Das Kommando "%s" benötigt ein Argument, z.B. $defs{meinDevice}{helper} oder $data.} },
+    not_ref          => { EN => q{%s is not a reference. Value (%d Bytes):},
+                          DE => q{%s ist keine Referenz. Wert (%d Bytes):} },
+    no_job           => { EN => q{no job is running},
+                          DE => q{es läuft kein Job} },
+    job_aborted      => { EN => q{job aborted},
+                          DE => q{Job abgebrochen} },
+    no_snaps         => { EN => q{no snapshots available. Use: set %s snapshot <label>},
+                          DE => q{keine Snapshots vorhanden. Verwende: set %s snapshot <label>} },
+    snap_notexist_av => { EN => q{Snapshot "%s" does not exist (available: %s)},
+                          DE => q{Snapshot "%s" existiert nicht (vorhanden: %s)} },
+    need_two         => { EN => q{need at least two snapshots. Use: set %s snapshot <label>},
+                          DE => q{es werden mindestens zwei Snapshots benötigt. Verwende: set %s snapshot <label>} },
+    snap_missing_av  => { EN => q{Snapshot missing (available: %s)},
+                          DE => q{Snapshot fehlt (vorhanden: %s)} },
+    need_three       => { EN => q{need at least 3 snapshots (have %d). Take them some hours apart: set %s snapshot <label>},
+                          DE => q{es werden mindestens 3 Snapshots benötigt (vorhanden: %d). Lege sie im Abstand von einigen Stunden an: set %s snapshot <label>} },
+    proc_hint        => { EN => q{Hint: private/pss/shared change whenever child processes (BlockingCall) start or end. Use rss for trends and compare private/pss only for equal number of child processes.},
+                          DE => q{Hinweis: private/pss/shared ändern sich, sobald Kindprozesse (BlockingCall) starten oder enden. Für Trends rss verwenden, private/pss nur bei gleicher Anzahl Kindprozesse vergleichen.} },
+    rss_notenough    => { EN => q{not enough samples yet (attribute sampleInterval, default 600 s).},
+                          DE => q{noch nicht genug Messwerte (Attribut sampleInterval, Standard 600 s).} },
+    rss_ns           => { EN => q{not enough samples},
+                          DE => q{nicht genug Messwerte} },
+    rss_hint         => { EN => q{Hint: the process size grows after start-up until the Perl heap is warmed up and rarely shrinks afterwards. A trend is only meaningful after some hours; use snapshots/diff to find the cause.},
+                          DE => q{Hinweis: die Prozessgröße wächst nach dem Start, bis der Perl-Heap warmgelaufen ist, und schrumpft danach selten. Ein Trend ist erst nach einigen Stunden aussagekräftig; die Ursache lässt sich mit Snapshots/diff finden.} },
+    no_result        => { EN => q{no result available yet},
+                          DE => q{noch kein Ergebnis vorhanden} },
+    job_running      => { EN => q{Job '%s' is still running. Use 'set %s abortJob' to cancel it.},
+                          DE => q{Job '%s' läuft noch. Mit 'set %s abortJob' kann er abgebrochen werden.} },
+    fork_failed      => { EN => q{Cannot start the background process (fork failed). You can set attribute useFork=0 to analyze inside the FHEM process (blocks FHEM while running).},
+                          DE => q{Der Hintergrundprozess kann nicht gestartet werden (fork fehlgeschlagen). Mit dem Attribut useFork=0 kann innerhalb des FHEM-Prozesses analysiert werden (blockiert FHEM während der Laufzeit).} },
+    analysis_failed  => { EN => q{Analysis failed: %s},
+                          DE => q{Analyse fehlgeschlagen: %s} },
+    crash_msg        => { EN => q{Analysis '%s' ended without a result (%s).},
+                          DE => q{Analyse '%s' ohne Ergebnis beendet (%s).} },
+    crash_last       => { EN => q{Last object being measured: %s},
+                          DE => q{Zuletzt gemessenes Objekt: %s} },
+    crash_retry      => { EN => q{Crash at %s (%s): object skipped, measurement repeated (attempt %d of %d)},
+                          DE => q{Absturz bei %s (%s): Objekt übersprungen, Messung wird wiederholt (Versuch %d von %d)} },
+    crash_restartfail=> { EN => q{Restart failed: %s},
+                          DE => q{Neustart fehlgeschlagen: %s} },
+    crash_maxretry   => { EN => q{The maximum number of automatic retries (%d) is reached. Start the job again, every run skips the objects found so far.},
+                          DE => q{Die maximale Anzahl automatischer Wiederholungen (%d) ist erreicht. Den Job erneut starten, jeder Lauf überspringt die bisher gefundenen Objekte.} },
+    crash_onlist     => { EN => q{The object is on the crash list and is skipped in future runs (get %s crashList). Remove it with 'set %s clearCrashList <object>' once the cause is fixed.},
+                          DE => q{Das Objekt steht auf der Crash-Liste und wird in künftigen Läufen übersprungen (get %s crashList). Nach Behebung der Ursache mit 'set %s clearCrashList <object>' entfernen.} },
+    crash_inside     => { EN => q{The crash happened inside this object or its direct content (for example sockets, file handles or magic values).},
+                          DE => q{Der Absturz ereignete sich innerhalb dieses Objekts oder seines direkten Inhalts (z.B. Sockets, Dateihandles oder Magic-Werte).} },
+    crash_unknown    => { EN => q{The breadcrumb file contains no object, the crash location is unknown.},
+                          DE => q{Die Breadcrumb-Datei enthält kein Objekt, die Absturzstelle ist unbekannt.} },
+    crash_exclude    => { EN => q{Exclude suspected device types with attribute excludeTypes.},
+                          DE => q{Verdächtige Device-Typen mit dem Attribut excludeTypes ausschließen.} },
+    crash_empty      => { EN => q{The crash list is empty.},
+                          DE => q{Die Crash-Liste ist leer.} },
+    crash_head       => { EN => q{Objects that crashed the analysis and are skipped (remove with: set %s clearCrashList <object>|all):},
+                          DE => q{Objekte, die die Analyse zum Absturz gebracht haben und übersprungen werden (entfernen mit: set %s clearCrashList <object>|all):} },
+    clear_needs      => { EN => q{The command "clearCrashList" needs an object from the crash list or "all".},
+                          DE => q{Das Kommando "clearCrashList" benötigt ein Objekt aus der Crash-Liste oder "all".} },
+    clear_notlisted  => { EN => q{"%s" is not on the crash list.},
+                          DE => q{"%s" steht nicht auf der Crash-Liste.} },
+    clear_all        => { EN => q{crash list cleared},
+                          DE => q{Crash-Liste geleert} },
+    clear_one        => { EN => q{%s removed from the crash list},
+                          DE => q{%s von der Crash-Liste entfernt} },
+    path_parse       => { EN => q{Cannot parse object path "%s". Example: $defs{myDevice}{helper}},
+                          DE => q{Der Objektpfad "%s" kann nicht gelesen werden. Beispiel: $defs{meinDevice}{helper}} },
+    path_parse_near  => { EN => q{Cannot parse object path "%s" near "%s"},
+                          DE => q{Der Objektpfad "%s" kann bei "%s" nicht gelesen werden} },
+    path_noroot      => { EN => q{No hash or array named "%s" found in FHEM.},
+                          DE => q{In FHEM wurde kein Hash oder Array "%s" gefunden.} },
+    path_nokey       => { EN => q{Key {%s} not found below %s},
+                          DE => q{Schlüssel {%s} unterhalb von %s nicht gefunden} },
+    path_noidx       => { EN => q{Index [%s] not found below %s},
+                          DE => q{Index [%s] unterhalb von %s nicht gefunden} },
+    path_notcont     => { EN => q{%s is not a hash or array reference, cannot go down to "%s"},
+                          DE => q{%s ist keine Hash- oder Array-Referenz, "%s" kann nicht aufgelöst werden} },
+    unattr_note      => { EN => q{  (not attributable = Perl interpreter, loaded code, shared libraries, memory fragmentation)},
+                          DE => q{  (nicht zuordenbar = Perl-Interpreter, geladener Code, Shared Libraries, Speicherfragmentierung)} },
+    unattr_note_nd   => { EN => q{  (not attributable = Perl interpreter, loaded code, shared libraries, memory fragmentation, file-scope variables of modules - see attribute deepScan)},
+                          DE => q{  (nicht zuordenbar = Perl-Interpreter, geladener Code, Shared Libraries, Speicherfragmentierung, file-scope-Variablen der Module - siehe Attribut deepScan)} },
+    diff_kids        => { EN => q{  Note: the number of child processes differs - private/pss/shared are not comparable, use rss.},
+                          DE => q{  Hinweis: die Anzahl der Kindprozesse unterscheidet sich - private/pss/shared sind nicht vergleichbar, rss verwenden.} },
+    diff_hint        => { EN => q{Hint: for a reliable verdict take at least 3 snapshots some hours apart and use "get &lt;name&gt; leakCandidates".},
+                          DE => q{Hinweis: für eine belastbare Aussage mindestens 3 Snapshots im Abstand von einigen Stunden anlegen und "get &lt;name&gt; leakCandidates" verwenden.} },
+    leak_head        => { EN => q{Leak candidates: objects growing in at least %d of %d intervals without ever shrinking},
+                          DE => q{Leak-Kandidaten: Objekte, die in mindestens %d von %d Intervallen wachsen und nie schrumpfen} },
+    leak_none        => { EN => q{No consistently growing object found.},
+                          DE => q{Kein durchgehend wachsendes Objekt gefunden.} },
+    interp_head      => { EN => q{Interpretation:},
+                          DE => q{Interpretation:} },
+    interp_part      => { EN => q{  part/dev/type  : data inside a device grows (readings, helper hashes, queues, caches) -> look at the TYPE and use "set &lt;name&gt; xHashDetail $defs{device}{key}".},
+                          DE => q{  part/dev/type  : Daten innerhalb eines Devices wachsen (Readings, Helper-Hashes, Queues, Caches) -> den TYPE ansehen und "set &lt;name&gt; xHashDetail $defs{device}{key}" verwenden.} },
+    interp_var       => { EN => q{  var/pkgvar/file: global or file-scope variables of a module grow (needs deepScan, PadWalker for file-scope variables).},
+                          DE => q{  var/pkgvar/file: globale oder file-scope-Variablen eines Moduls wachsen (benötigt deepScan, für file-scope-Variablen zusätzlich PadWalker).} },
+    interp_timer     => { EN => q{  timer/timerdev : timers accumulate -> a module sets timers without removing old ones.},
+                          DE => q{  timer/timerdev : Timer sammeln sich an -> ein Modul setzt Timer, ohne alte zu entfernen.} },
+    interp_cnt       => { EN => q{  cnt fds/kids   : file descriptor or child process leak (e.g. BlockingCall children not ending).},
+                          DE => q{  cnt fds/kids   : Leck bei Dateideskriptoren oder Kindprozessen (z.B. BlockingCall-Kinder, die nicht enden).} },
+    interp_track     => { EN => q{  track/trackn   : a tracked object (attribute trackObjects) grows in size or number of entries -> see "get &lt;name&gt; track".},
+                          DE => q{  track/trackn   : ein getracktes Objekt (Attribut trackObjects) wächst in Größe oder Anzahl der Einträge -> siehe "get &lt;name&gt; track".} },
+    interp_proc      => { EN => q{  proc unattributed grows but no structure does: memory outside the walked structures (XS/C libraries, fragmentation, file-scope variables without deepScan).},
+                          DE => q{  proc unattributed wächst, aber keine Struktur: Speicher außerhalb der durchsuchten Strukturen (XS/C-Bibliotheken, Fragmentierung, file-scope-Variablen ohne deepScan).} },
+    tree_excl        => { EN => q{Sizes are exclusive: shared references and references to other devices/core hashes are counted once or not at all.},
+                          DE => q{Die Größen sind exklusiv: gemeinsam genutzte Referenzen sowie Referenzen auf andere Devices/Kern-Hashes werden nur einmal oder gar nicht gezählt.} },
+    track_none       => { EN => q{No objects are tracked. Set attribute trackObjects, e.g. trackObjects $defs{myDevice}{.cache} (see commandref).},
+                          DE => q{Es werden keine Objekte getrackt. Attribut trackObjects setzen, z.B. trackObjects $defs{meinDevice}{.cache} (siehe Commandref).} },
+    track_nosamples  => { EN => q{No samples yet. Tracked objects are measured with every snapshot (set %s snapshot <label> or attribute autoSnapshot).},
+                          DE => q{Noch keine Messwerte. Getrackte Objekte werden mit jedem Snapshot gemessen (set %s snapshot <label> oder Attribut autoSnapshot).} },
+    track_unknown    => { EN => q{Tracked object "%s" not found. Use "all" or an object from the list (attribute trackObjects).},
+                          DE => q{Getracktes Objekt "%s" nicht gefunden. "all" oder ein Objekt aus der Liste (Attribut trackObjects) angeben.} },
+    track_hint       => { EN => q{Hint: the values are taken with every snapshot (also automatic ones). Details: get %s track &lt;object&gt;},
+                          DE => q{Hinweis: die Werte werden mit jedem Snapshot erfasst (auch automatischen). Details: get %s track &lt;Objekt&gt;} },
+    track_shown      => { EN => q{(last %d of %d samples shown)},
+                          DE => q{(die letzten %d von %d Messwerten)} },
+    track_net        => { EN => q{Net change over %.1f h: %s (%s/h), entries %s (%s/h)},
+                          DE => q{Netto-Änderung über %.1f h: %s (%s/h), Einträge %s (%s/h)} },
+    track_err_head   => { EN => q{Tracked objects not measured},
+                          DE => q{Getrackte Objekte nicht gemessen} },
+    track_err_pw     => { EN => q{PadWalker is not installed},
+                          DE => q{PadWalker ist nicht installiert} },
+    track_err_var    => { EN => q{variable %s not found in %s (it must be used by at least one function of that file)},
+                          DE => q{Variable %s in %s nicht gefunden (sie muss von mindestens einer Funktion der Datei verwendet werden)} },
+    track_err_pkg    => { EN => q{package variable %s not found},
+                          DE => q{Paketvariable %s nicht gefunden} },
+    track_err_crash  => { EN => q{on the crash list},
+                          DE => q{steht auf der Crash-Liste} },
+    track_err_undef  => { EN => q{value is not defined},
+                          DE => q{Wert ist nicht definiert} },
   );
 
 ################################################################
@@ -176,7 +333,7 @@ sub Initialize {
  $hash->{FW_deviceOverview}     = 1;
 
  $hash->{AttrList} = "analyzeObject ".
-                     "autoSnapshot ".                                  # Stunden, 0 = aus
+                     "autoSnapshot ".                                   # Stunden, 0 = aus
                      "crashRetries ".
                      "deepScan:1,0 ".
                      "disable:1,0 ".
@@ -187,13 +344,15 @@ sub Initialize {
                      "maxNodes ".
                      "maxSnapshots ".
                      "noOutput:1,0 ".
-                     "sampleInterval ".                                # Sekunden, 0 = aus
+                     "sampleInterval ".                                 # Sekunden, 0 = aus
                      "topNum ".
+                     "trackMaxSamples ".
+                     "trackObjects ".
                      "treeDepth ".
                      "useFork:1,0 ".
                      $readingFnAttributes;
 
- FHEM::Meta::InitMod( __FILE__, $hash ) if(!$modMetaAbsent);  # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
+ FHEM::Meta::InitMod( __FILE__, $hash ) if(!$modMetaAbsent);            # für Meta.pm (https://forum.fhem.de/index.php/topic,97589.0.html)
 
 return;
 }
@@ -220,7 +379,7 @@ sub Define {
   }
 
   my @a = split /\s+/x, $def;
-  return "Usage: define <name> Analyze" if(@a != 2);
+  return "Usage: define &lt;name&gt; Analyze" if(@a != 2);
 
   $hash->{HELPER}{MODMETAABSENT} = 1 if($modMetaAbsent);                                              # Modul Meta.pm nicht vorhanden
   $hash->{HELPER}{SNAP}          = {};
@@ -314,19 +473,29 @@ sub Attr {
 
     if ($cmd eq "set") {
         my %int = ( crashRetries => 0, largeObjectNum => 1, maxNodes => 1, maxSnapshots => 1, forkTimeout => 1,
-                    leakMinBytes   => 0, sampleInterval => 0, topNum => 1, treeDepth => 1 );
+                    leakMinBytes   => 0, sampleInterval => 0, topNum => 1, treeDepth => 1, trackMaxSamples => 2 );
 
         if (exists $int{$aName}) {
-            return qq{The value of $aName is not valid. Use an integer ≥ $int{$aName}.} if($aVal !~ /^[0-9]+$/x || $aVal < $int{$aName});
+            return _t ('attr_int', $aName, $int{$aName}) if($aVal !~ /^[0-9]+$/x || $aVal < $int{$aName});
         }
 
         if ($aName eq 'autoSnapshot') {
-            return qq{The value of $aName is not valid. Use hours as number, e.g. 6 (0 = off).} if($aVal !~ /^[0-9]+(?:\.[0-9]+)?$/x);
+            return _t ('attr_hours', $aName) if($aVal !~ /^[0-9]+(?:\.[0-9]+)?$/x);
         }
 
         if ($aName eq 'sampleInterval') {
-            return qq{The value of $aName must be 0 (off) or at least 60 seconds.} if($aVal != 0 && $aVal < 60);
+            return _t ('attr_sample', $aName) if($aVal != 0 && $aVal < 60);
         }
+
+        if ($aName eq 'trackObjects') {
+            my (undef, $bad) = _trackParse ($aVal);
+            return _t ('attr_track', $aName, join (', ', @$bad)) if(@$bad);
+        }
+    }
+
+    if ($aName eq 'trackObjects') {                                                       # Verlauf und Readings nicht mehr getrackter Objekte entfernen
+        my ($ok) = $cmd eq 'set' ? _trackParse ($aVal) : ([]);
+        _trackCleanup ($hash, $ok);
     }
 
     if ($aName =~ /^(?:autoSnapshot|sampleInterval|disable)$/x) {                         # Timer neu aufsetzen (Attribut ist erst nach Rückkehr gesetzt)
@@ -347,6 +516,11 @@ sub startTimers {
   RemoveInternalTimer ($hash, 'FHEM::Analyze::sampleTimer');
   RemoveInternalTimer ($hash, 'FHEM::Analyze::autoTimer');
 
+  if (!$hash->{HELPER}{INITREAD}) {                                                  # einmal pro Start: aus dem Statefile wiederhergestellte Readings sind veraltet
+      $hash->{HELPER}{INITREAD} = 1;
+      _initReadings ($hash);
+  }
+
   _checkStaleTrace ($hash);                                                          # Absturz einer früheren Analyse erkennen
 
   return if(IsDisabled($name));
@@ -355,6 +529,28 @@ sub startTimers {
 
   my $ah = AttrVal ($name, 'autoSnapshot', 0);
   InternalTimer (gettimeofday() + $ah * 3600, 'FHEM::Analyze::autoTimer', $hash) if($ah > 0);
+
+return;
+}
+
+################################################################
+#   Readings nach dem Start zurücksetzen. Das Statefile wird erst nach Define eingelesen
+#   und stellt Readings wieder her, deren Grundlage (Snapshots, Probenverlauf, Tracking)
+#   nach einem Neustart nicht mehr existiert. Nur die Readings, die beim Start gültig
+#   sind, werden neu gesetzt, alle anderen entstehen mit der nächsten Messung.
+################################################################
+sub _initReadings {
+  my $hash = shift;
+  my $name = $hash->{NAME};
+
+  _delReadings ($hash, qr/^(?!state$)/x);
+
+  readingsBeginUpdate ($hash);
+  readingsBulkUpdate  ($hash, 'state',          IsDisabled ($name) ? 'disabled' : 'Initialized');
+  readingsBulkUpdate  ($hash, 'crashListCount', scalar keys %{$hash->{HELPER}{CRASH} // {}});
+  readingsBulkUpdate  ($hash, 'snapshots',      0);
+  readingsBulkUpdate  ($hash, 'snapshot_last',  '-');
+  readingsEndUpdate   ($hash, 1);
 
 return;
 }
@@ -468,6 +664,8 @@ sub Get {
   my $opt  = shift @a;
   my $labels = join ",", @{$hash->{HELPER}{SNAPORD}};
 
+  my ($tlist) = _trackParse (AttrVal ($name, 'trackObjects', q{}));
+
   my $getlist = "Unknown argument $opt, choose one of ".
                 "snapshots:noArg ".
                 "report".($labels ? ":$labels" : "")." ".
@@ -477,7 +675,9 @@ sub Get {
                 "process:noArg ".
                 "rssTrend:noArg ".
                 "lastResult:noArg ".
-                "crashList:noArg "
+                "crashList:noArg ".
+                "track".(@$tlist ? ":widgetList,".(scalar @$tlist + 2).",select,all,".join (',', map { _trackKey ($_->{spec}) } @$tlist).
+                                    ",2,textField,rows&nbsp;e.g.&nbsp;100" : ":noArg")." "
                 ;
 
   if ($hget{$opt} && defined &{$hget{$opt}{fn}}) {
@@ -502,7 +702,7 @@ sub _setSnapshot {
   my $hash  = $paref->{hash};
   my $prop  = $paref->{prop} // 'snap_'.strftime('%Y%m%d_%H%M%S', localtime);
 
-  return qq{The label "$prop" is not valid. Allowed are letters, digits, '_', '-' and '.'.} if($prop !~ /^[\w.\-]+$/x);
+  return _t ('label_invalid', $prop) if($prop !~ /^[\w.\-]+$/x);
 
 return _startJob ($hash, { mode => 'snapshot', label => $prop });
 }
@@ -513,23 +713,23 @@ return _startJob ($hash, { mode => 'snapshot', label => $prop });
 sub _setDeleteSnapshot {
   my $paref = shift;
   my $hash  = $paref->{hash};
-  my $prop  = $paref->{prop} // return qq{The command "deleteSnapshot" needs a label or "all".};
+  my $prop  = $paref->{prop} // return _t ('del_needs');
 
   if ($prop eq 'all') {
       $hash->{HELPER}{SNAP}    = {};
       $hash->{HELPER}{SNAPORD} = [];
       _updateSnapReadings ($hash);
-      return "all snapshots deleted";
+      return _t ('del_all');
   }
 
-  return qq{Snapshot "$prop" does not exist.} if(!$hash->{HELPER}{SNAP}{$prop});
+  return _t ('snap_missing', $prop) if(!$hash->{HELPER}{SNAP}{$prop});
 
   delete $hash->{HELPER}{SNAP}{$prop};
   @{$hash->{HELPER}{SNAPORD}} = grep { $_ ne $prop } @{$hash->{HELPER}{SNAPORD}};
 
   _updateSnapReadings ($hash);
 
-return "snapshot '$prop' deleted";
+return _t ('snap_deleted', $prop);
 }
 
 ######################################################################################
@@ -560,7 +760,7 @@ sub _setDeviceType {
   my $allt  = ($opt eq 'allDevices' || !$prop) ? '.*' : $prop;
   my @devs  = devspec2array ("TYPE=$allt");
 
-  return qq{No device of TYPE "$allt" found.} if(!@devs);
+  return _t ('no_dev_type', $allt) if(!@devs);
 
 return _startJob ($hash, { mode => 'devices', devs => \@devs, label => $allt });
 }
@@ -576,14 +776,14 @@ sub _setTree {
 
   my $arg   = $paref->{arg} || AttrVal ($name, 'analyzeObject', q{});
 
-  return qq{The command "$opt" needs an argument, e.g. \$defs{myDevice}{helper} or \$data.} if(!$arg);
+  return _t ('tree_needs', $opt) if(!$arg);
 
   my ($ref, $path, $err) = _resolvePath ($arg);
   return $err if($err);
 
   if (!ref $ref) {                                                                    # Wert ist keine Referenz
       local $Data::Dumper::Terse = 1;
-      return "$path is not a reference. Value (".Devel::Size::size($ref)." Bytes):\n\n".Dumper ($ref);
+      return _t ('not_ref', $path, Devel::Size::size($ref))."\n\n".Dumper ($ref);
   }
 
 return _startJob ($hash, { mode => 'tree', spec => $arg, label => $path });
@@ -596,7 +796,7 @@ sub _setAbortJob {
   my $paref = shift;
   my $hash  = $paref->{hash};
 
-  return "no job is running" if(!$hash->{HELPER}{RUNNING_PID});
+  return _t ('no_job') if(!$hash->{HELPER}{RUNNING_PID});
 
   BlockingKill ($hash->{HELPER}{RUNNING_PID});
   RemoveInternalTimer ($hash, 'FHEM::Analyze::watchJob');
@@ -607,7 +807,7 @@ sub _setAbortJob {
 
   readingsSingleUpdate ($hash, 'state', 'aborted', 1);
 
-return "job aborted";
+return _t ('job_aborted');
 }
 
 ######################################################################################
@@ -618,7 +818,7 @@ sub _getSnapshots {
   my $hash  = $paref->{hash};
 
   my @s = _orderedSnaps ($hash);
-  return "no snapshots available. Use: set $paref->{name} snapshot <label>" if(!@s);
+  return _t ('no_snaps', $paref->{name}) if(!@s);
 
   my @o = ('label                          taken                 rss        attributed  devices  timers  fds  kids');
 
@@ -643,10 +843,10 @@ sub _getReport {
   my $label = $paref->{args}[0];
 
   my @s = _orderedSnaps ($hash);
-  return "no snapshots available. Use: set $name snapshot <label>" if(!@s);
+  return _t ('no_snaps', $name) if(!@s);
 
   my $snap = $label ? $hash->{HELPER}{SNAP}{$label} : $s[-1];
-  return qq{Snapshot "$label" does not exist (available: }.join (', ', map { $_->{label} } @s).")" if(!$snap);
+  return _t ('snap_notexist_av', $label, join (', ', map { $_->{label} } @s)) if(!$snap);
 
 return _reportSnap ($snap, AttrVal ($name, 'topNum', 15));
 }
@@ -661,14 +861,14 @@ sub _getDiff {
   my ($l0, $l1) = @{$paref->{args}};
 
   my @s = _orderedSnaps ($hash);
-  return "need at least two snapshots. Use: set $name snapshot <label>" if(@s < 2);
+  return _t ('need_two', $name) if(@s < 2);
 
   my ($s0, $s1);
   if (!$l0)    { ($s0, $s1) = @s[-2, -1]; }                                          # ohne Angabe: die letzten beiden
   elsif (!$l1) { ($s0, $s1) = ($hash->{HELPER}{SNAP}{$l0}, $s[-1]); }                # nur A: A gegen den neuesten
   else         { ($s0, $s1) = @{$hash->{HELPER}{SNAP}}{($l0, $l1)}; }
 
-  return "Snapshot missing (available: ".join (', ', map { $_->{label} } @s).")" if(!$s0 || !$s1);
+  return _t ('snap_missing_av', join (', ', map { $_->{label} } @s)) if(!$s0 || !$s1);
 
 return _reportDiff ($s0, $s1, AttrVal ($name, 'topNum', 15));
 }
@@ -682,7 +882,7 @@ sub _getLeakCandidates {
   my $name  = $paref->{name};
 
   my @s = _orderedSnaps ($hash);
-  return "need at least 3 snapshots (have ".scalar (@s)."). Take them some hours apart: set $name snapshot <label>" if(@s < 3);
+  return _t ('need_three', scalar (@s), $name) if(@s < 3);
 
 return _reportLeaks (\@s, AttrVal ($name, 'topNum', 15), AttrVal ($name, 'leakMinBytes', 2048));
 }
@@ -715,10 +915,9 @@ sub _getProcess {
   my $c = counters ();
 
 return sprintf ("rss %d kB (peak %d kB, anonymous %d kB)\npss %d kB  private %d kB  shared %d kB  swap %d kB\n".
-                "devices %d  timers %d  fds %d  child processes %d  selectlist %d  readyfnlist %d\n\n".
-                "Hint: private/pss/shared change whenever child processes (BlockingCall) start or end. ".
-                "Use rss for trends and compare private/pss only for equal number of child processes.",
-                @{$p}{qw(rss hwm anon pss priv shared swap)}, @{$c}{qw(defs timers fds kids select ready)});
+                "devices %d  timers %d  fds %d  child processes %d  selectlist %d  readyfnlist %d\n\n",
+                @{$p}{qw(rss hwm anon pss priv shared swap)}, @{$c}{qw(defs timers fds kids select ready)}).
+                _t ('proc_hint');
 }
 
 ######################################################################################
@@ -729,18 +928,144 @@ sub _getRssTrend {
   my $hash  = $paref->{hash};
   my $log   = $hash->{HELPER}{RSSLOG} // [];
 
-  return "not enough samples yet (attribute sampleInterval, default 600 s)." if(@$log < 6);
+  return _t ('rss_notenough') if(@$log < 6);
 
   my @o = (sprintf ("%d samples from %s to %s", scalar @$log, strftime ('%Y-%m-%d %H:%M', localtime $log->[0][0]),
                                                            strftime ('%Y-%m-%d %H:%M', localtime $log->[-1][0])));
 
   for my $h (1, 6, 24, 72) {
       my $s = _rssSlope ($log, $h);
-      push @o, sprintf ("  last %2d h: %s", $h, defined $s ? sprintf ("%+.1f kB/h", $s) : 'not enough samples');
+      push @o, sprintf ("  last %2d h: %s", $h, defined $s ? sprintf ("%+.1f kB/h", $s) : _t ('rss_ns'));
   }
 
-  push @o, '', "Hint: the process size grows after start-up until the Perl heap is warmed up and rarely shrinks afterwards. ".
-                "A trend is only meaningful after some hours; use snapshots/diff to find the cause.";
+  push @o, '', _t ('rss_hint');
+
+return join ("\n", @o);
+}
+
+######################################################################################
+#                                   Getter track
+#   get <name> track [all|<Objekt>] [<Zeilen>]
+######################################################################################
+sub _getTrack {
+  my $paref        = shift;
+  my $hash         = $paref->{hash};
+  my $name         = $paref->{name};
+  my ($sel, $rows) = @{$paref->{args}};
+
+  if (defined $sel && $sel =~ /^(.*),([^,]*)$/xs) {                               # widgetList liefert 'Auswahl,Textfeld' als ein Argument (Komma auch bei leerem Textfeld)
+      $sel  = $1;
+      $rows = $2 if(!defined $rows || $rows eq q{});
+  }
+
+  my ($list) = _trackParse (AttrVal ($name, 'trackObjects', q{}));
+  return _t ('track_none') if(!@$list);
+
+  my $tr = $hash->{HELPER}{TRACK} // {};
+  return _t ('track_nosamples', $name) if(!grep { $tr->{$_->{spec}} && @{$tr->{$_->{spec}}} } @$list);
+
+  if (!defined $sel || $sel eq q{} || lc ($sel) eq 'all') {
+      return _trackOverview ($name, $list, $tr);
+  }
+
+  my $t     = _trackSpec ($sel);                                                  # Schreibweise des Attributs (auch ohne führendes $)
+  my $key   = _trackKey  ($sel);                                                  # Schreibweise der Auswahlliste
+  my ($one) = grep { ($t && $_->{spec} eq $t->{spec}) || _trackKey ($_->{spec}) eq $key } @$list;
+
+  return _t ('track_unknown', $sel) if(!$one);
+
+return _trackSeries ($one, $tr->{$one->{spec}} // [], $rows);
+}
+
+######################################################################################
+#   Schreibweise eines Objekts in der Auswahlliste: der Doppelpunkt ist im Widget-Syntax von
+#   FHEMWEB ein Trenner und wird daher durch '/' ersetzt (%FHEM::Modul::x -> %FHEM/Modul/x,
+#   datei.pm:%x -> datei.pm/%x)
+######################################################################################
+sub _trackKey {
+  my $spec = shift // q{};
+
+  $spec =~ s/:+/\//xg;
+
+return $spec;
+}
+
+######################################################################################
+sub _trackOverview {
+  my ($name, $list, $tr) = @_;
+
+  my $fmt = "%12s  %9s  %12s  %10s  %7s  %s";
+  my @o   = (sprintf ($fmt, 'size', 'entries', 'change', 'per hour', 'samples', 'object'));
+
+  for my $t (@$list) {
+      my $s = $tr->{$t->{spec}} // [];
+      my @v = grep { defined $_->[1] } @$s;
+
+      if (!@v) {
+          push @o, sprintf ($fmt, '-', '-', '-', '-', scalar @$s, $t->{spec});
+          next;
+      }
+
+      my ($f, $l) = @v[0, -1];
+      my $h       = ($l->[0] - $f->[0]) / 3600;
+      my $db      = $l->[1] - $f->[1];
+
+      push @o, sprintf ($fmt, _hs ($l->[1]), defined $l->[2] ? $l->[2] : '-', _fmtDelta ('track', $db),
+                        @v > 1 && $h ? _fmtDelta ('track', $db / $h).'/h' : '-', scalar @$s, $t->{spec});
+  }
+
+  push @o, '', _t ('track_hint', $name);
+
+return join ("\n", @o);
+}
+
+######################################################################################
+sub _trackSeries {
+  my ($t, $s, $rows) = @_;
+
+  $rows = 40 if(!defined $rows || $rows !~ /^[0-9]+$/x || !$rows);
+
+  my @o = (sprintf ("Tracked object %s", $t->{spec}));
+  my (@l, $pv, $first, $last);
+
+  for my $x (@$s) {
+      my ($tm, $b, $n) = @$x;
+      my ($ds, $rate)  = ('-', '-');
+
+      if (defined $b) {
+          if ($pv) {
+              my $d  = $b - $pv->[1];
+              my $hh = ($tm - $pv->[0]) / 3600;
+              $ds    = _fmtDelta ('track', $d);
+              $rate  = _fmtDelta ('track', $d / $hh).'/h' if($hh);
+          }
+
+          $pv    = $x;
+          $first = $x if(!$first);
+          $last  = $x;
+      }
+
+      push @l, sprintf ("%-19s  %12s  %9s  %12s  %10s", strftime ('%Y-%m-%d %H:%M:%S', localtime $tm),
+                        defined $b ? _hs ($b) : 'n/a', defined $n ? $n : '-', $ds, $rate);
+  }
+
+  push @o, sprintf ("%-19s  %12s  %9s  %12s  %10s", 'time', 'size', 'entries', 'delta size', 'per hour');
+
+  if (@l > $rows) {
+      @l = @l[-$rows .. -1];
+      push @o, _t ('track_shown', $rows, scalar @$s);
+  }
+
+  push @o, @l;
+
+  if ($first && $last && $last != $first) {
+      my $h  = ($last->[0] - $first->[0]) / 3600;
+      my $db = $last->[1] - $first->[1];
+      my $dn = defined $last->[2] && defined $first->[2] ? $last->[2] - $first->[2] : undef;
+
+      push @o, '', _t ('track_net', $h, _fmtDelta ('track', $db), $h ? _fmtDelta ('track', $db / $h) : '-',
+                       defined $dn ? sprintf ('%+d', $dn) : '-', defined $dn && $h ? sprintf ('%+.1f', $dn / $h) : '-');
+  }
 
 return join ("\n", @o);
 }
@@ -751,7 +1076,7 @@ return join ("\n", @o);
 sub _getLastResult {
   my $paref = shift;
 
-return $paref->{hash}{HELPER}{LASTTEXT} // 'no result available yet';
+return $paref->{hash}{HELPER}{LASTTEXT} // _t ('no_result');
 }
 
 #############################################################################################
@@ -769,7 +1094,7 @@ sub _startJob {
   my $name = $hash->{NAME};
 
   if ($hash->{HELPER}{RUNNING_PID}) {
-      return "Job '".($hash->{HELPER}{JOB}{mode} // '?')."' is still running. Use 'set $name abortJob' to cancel it.";
+      return _t ('job_running', ($hash->{HELPER}{JOB}{mode} // '?'), $name);
   }
 
   $job->{time}  = time;
@@ -795,6 +1120,9 @@ sub _startJob {
   my %excl = %hexcl;
   $excl{$_} = 1 for grep { $_ } split /[\s,]+/x, AttrVal ($name, 'excludeTypes', '');
 
+  my ($tl) = $job->{mode} eq 'snapshot' ? _trackParse (AttrVal ($name, 'trackObjects', q{})) : ([]);
+  $job->{track} = $tl;                                                                # Liste der getrackten Objekte dieses Jobs
+
   my $pars = {
       name      => $name,
       id        => $job->{id},
@@ -807,6 +1135,7 @@ sub _startJob {
       treeDepth => AttrVal ($name, 'treeDepth', 3),
       treeTop   => AttrVal ($name, 'topNum', 15),
       excl      => \%excl,
+      track     => $tl,
       skip      => { map { $_ => 1 } keys %{$hash->{HELPER}{CRASH} // {}} },       # Objekte aus der Crash-Liste werden übersprungen
       trace     => _traceFile ($name),                                             # Breadcrumb-Datei
   };
@@ -822,7 +1151,7 @@ sub _startJob {
       if (!$bc) {
           delete $hash->{HELPER}{JOB};
           delete $hash->{JOB};
-          return "Cannot start the background process (fork failed). You can set attribute useFork=0 to analyze inside the FHEM process (blocks FHEM while running).";
+          return _t ('fork_failed');
       }
 
       $hash->{HELPER}{RUNNING_PID} = $bc;
@@ -970,14 +1299,14 @@ sub _handleCrash {
   unlink $file;
 
   my $path = $t && $t->{path} ne 'start' ? $t->{path} : undef;
-  my $msg  = "Analysis '".($job->{mode} // '?')."' ended without a result ($cause).";
+  my $msg  = _t ('crash_msg', ($job->{mode} // '?'), $cause);
   my @adv;
 
   my $retry = $job->{retry} // 0;
   my $max   = AttrVal ($name, 'crashRetries', 3);
 
   if ($path) {
-      $msg .= " Last object being measured: $path";
+      $msg .= ' '._t ('crash_last', $path);
 
       _addCrash ($hash, $path, $cause);
       Log3 ($name, 1, "$name - $msg - added to the crash list, it is skipped from now on");
@@ -987,24 +1316,24 @@ sub _handleCrash {
 
           $nj{retry} = $retry + 1;
           $nj{notes} = [ @{$job->{notes} // []},
-                         "Crash at $path ($cause): object skipped, measurement repeated (attempt ".($retry + 1)." of $max)" ];
+                         _t ('crash_retry', $path, $cause, $retry + 1, $max) ];
 
           my $r = _startJob ($hash, \%nj);
           return if(!$r);                                                          # läuft erneut im Hintergrund
 
-          $msg .= " Restart failed: $r";
+          $msg .= ' '._t ('crash_restartfail', $r);
       }
       elsif ($job->{fork}) {
-          push @adv, "The maximum number of automatic retries ($max) is reached. Start the job again, every run skips the objects found so far.";
+          push @adv, _t ('crash_maxretry', $max);
       }
 
-      push @adv, "The object is on the crash list and is skipped in future runs (get $name crashList). Remove it with 'set $name clearCrashList <object>' once the cause is fixed.",
-                 "The crash happened inside this object or its direct content (for example sockets, file handles or magic values).";
+      push @adv, _t ('crash_onlist', $name, $name),
+                 _t ('crash_inside');
   }
   else {
-      $msg .= " The breadcrumb file contains no object, the crash location is unknown.";
+      $msg .= ' '._t ('crash_unknown');
       Log3 ($name, 1, "$name - $msg");
-      push @adv, "Exclude suspected device types with attribute excludeTypes.";
+      push @adv, _t ('crash_exclude');
   }
 
   readingsSingleUpdate ($hash, 'state', 'error: crashed'.($path ? " at $path" : ''), 1);
@@ -1155,9 +1484,9 @@ sub _getCrashList {
   my $paref = shift;
   my $c     = $paref->{hash}{HELPER}{CRASH} // {};
 
-  return 'The crash list is empty.' if(!%$c);
+  return _t ('crash_empty') if(!%$c);
 
-  my @o = ('Objects that crashed the analysis and are skipped (remove with: set '.$paref->{name}.' clearCrashList <object>|all):', '');
+  my @o = (_t ('crash_head', $paref->{name}), '');
 
   for my $p (sort keys %$c) {
       push @o, sprintf ("  %s  (%s, %s)", $p, strftime ('%Y-%m-%d %H:%M:%S', localtime $c->{$p}{time}), $c->{$p}{cause});
@@ -1174,19 +1503,19 @@ sub _setClearCrashList {
 
   $arg =~ s/\s+//xg;
 
-  return qq{The command "clearCrashList" needs an object from the crash list or "all".} if(!$arg);
+  return _t ('clear_needs') if(!$arg);
 
   if ($arg eq 'all') {
       $hash->{HELPER}{CRASH} = {};
   }
   else {
-      return qq{"$arg" is not on the crash list.} if(!$hash->{HELPER}{CRASH}{$arg});
+      return _t ('clear_notlisted', $arg) if(!$hash->{HELPER}{CRASH}{$arg});
       delete $hash->{HELPER}{CRASH}{$arg};
   }
 
   _saveCrash ($hash);
 
-return $arg eq 'all' ? 'crash list cleared' : "$arg removed from the crash list";
+return $arg eq 'all' ? _t ('clear_all') : _t ('clear_one', $arg);
 }
 
 ######################################################################################
@@ -1219,7 +1548,7 @@ sub _finishJob {
       my $e = $res->{error} // 'unknown error';
       Log3 ($name, 2, "$name - analysis failed: $e");
       readingsSingleUpdate ($hash, 'state', 'error', 1);
-      return $hash->{HELPER}{LASTTEXT} = "Analysis failed: $e";
+      return $hash->{HELPER}{LASTTEXT} = _t ('analysis_failed', $e);
   }
 
   my $top  = AttrVal ($name, 'topNum', 15);
@@ -1243,10 +1572,12 @@ sub _finishJob {
           skippedPaths => $res->{skippedPaths},
           skipc   => $res->{skipc},
           deep    => $res->{deep},
+          trackErr => $res->{trackErr},
       };
 
       _storeSnapshot ($hash, $snap);
       _setReadings   ($hash, \%flat, 1);
+      _storeTrack    ($hash, $job, \%flat);
 
       $hash->{HELPER}{SNAP_LAST} = $job->{label};
       $text = _reportSnap ($snap, $top);
@@ -1361,6 +1692,8 @@ sub _setReadings {
 return;
 }
 
+######################################################################################
+#      Löschen von Readings per Regex
 ######################################################################################
 sub _delReadings {
   my ($hash, $re) = @_;
@@ -1639,6 +1972,7 @@ sub _measure {
 
   my (%flat, @skipped, %tsz, %tn);
   my $attrib = 0;
+  my $trackErr;
 
   for my $d (sort @devs) {
       my $h = $defs{$d};
@@ -1655,7 +1989,7 @@ sub _measure {
 
       my %own;                                                                      # eigene Snapshot-Ablage nicht mitmessen, sonst würde sie als "wachsend" erscheinen
       if ($type eq 'Analyze' && ref $h->{HELPER} eq 'HASH') {
-          for my $k (qw(SNAP RSSLOG LASTTEXT)) { $own{$k} = delete $h->{HELPER}{$k} if(exists $h->{HELPER}{$k}); }
+          for my $k (qw(SNAP RSSLOG LASTTEXT TRACK)) { $own{$k} = delete $h->{HELPER}{$k} if(exists $h->{HELPER}{$k}); }
       }
 
       my ($size, $parts, $nread) = _measureDevice ($ctx, $h, $d);
@@ -1694,6 +2028,8 @@ sub _measure {
       }
 
       $attrib += _measureDeep ($ctx, \%flat) if($p->{deep});
+
+      $trackErr = _measureTrack ($p, $ctx, \%flat) if($p->{track} && @{$p->{track}});   # nicht in 'attributed' enthalten (eigene Messkontexte)
   }
 
 return {
@@ -1706,6 +2042,7 @@ return {
     skipc      => $ctx->{skipc},
     secs       => tv_interval ($t0),
     deep       => $p->{deep} ? 1 : 0,
+    trackErr   => $trackErr,
 };
 }
 
@@ -1813,7 +2150,23 @@ sub _resolvePath {
   $spec =~ s/\s+//xg;
 
   my ($root, $rest) = $spec =~ /^\$?([A-Za-z_]\w*)(.*)$/x
-      or return (undef, undef, qq{Cannot parse object path "$spec". Example: \$defs{myDevice}{helper}});
+      or return (undef, undef, _t ('path_parse', $spec));
+
+  no strict 'refs';                                                               ## no critic 'NoStrict'
+  my $ref = *{"main::$root"}{HASH} // *{"main::$root"}{ARRAY};
+  use strict 'refs';
+
+  return (undef, undef, _t ('path_noroot', $root)) if(!$ref);
+
+return _descend ($ref, '$'.$root, $rest, $spec);
+}
+
+######################################################################################
+#   Teilpfad {key}[index]... ab einer Referenz auflösen
+#   Rückgabe: ($ref, $pfad, $fehlertext)
+######################################################################################
+sub _descend {
+  my ($ref, $path, $rest, $spec) = @_;
 
   my @seg;
   my $pos = 0;
@@ -1829,36 +2182,279 @@ sub _resolvePath {
       $pos = pos ($rest);
   }
 
-  return (undef, undef, qq{Cannot parse object path "$spec" near "}.substr ($rest, $pos).qq{"}) if($pos != length $rest);
-
-  no strict 'refs';                                                               ## no critic 'NoStrict'
-  my $ref = *{"main::$root"}{HASH} // *{"main::$root"}{ARRAY};
-  use strict 'refs';
-
-  return (undef, undef, qq{No hash or array named "$root" found in FHEM.}) if(!$ref);
-
-  my $path = '$'.$root;
+  return (undef, undef, _t ('path_parse_near', $spec, substr ($rest, $pos))) if($pos != length $rest);
 
   for my $s (@seg) {
       my ($type, $key) = @$s;
       my $rt = reftype ($ref) // q{};
 
       if ($rt eq 'HASH') {
-          return (undef, undef, qq{Key {$key} not found below $path}) if(!exists $ref->{$key});
+          return (undef, undef, _t ('path_nokey', $key, $path)) if(!exists $ref->{$key});
           $ref   = $ref->{$key};
           $path .= "{$key}";
       }
       elsif ($rt eq 'ARRAY' && $key =~ /^\d+$/x) {
-          return (undef, undef, qq{Index [$key] not found below $path}) if($key > $#{$ref});
+          return (undef, undef, _t ('path_noidx', $key, $path)) if($key > $#{$ref});
           $ref   = $ref->[$key];
           $path .= "[$key]";
       }
       else {
-          return (undef, undef, qq{$path is not a hash or array reference, cannot go down to "$key"});
+          return (undef, undef, _t ('path_notcont', $path, $key));
       }
   }
 
 return ($ref, $path, undef);
+}
+
+######################################################################################
+#   Tracking: Attribut trackObjects auswerten
+#   Erlaubt sind (Trenner: Leerzeichen oder Komma, Schlüssel ohne diese Zeichen)
+#     $defs{dev}{.key}  $data{x}[2]   Hash/Array der FHEM-Hauptebene (wie xHashDetail)
+#     %FHEM::Modul::name              Paketvariable (our), auch @ und $
+#     datei.pm:%name                  file-scope 'my' Variable (benötigt PadWalker)
+#   Rückgabe: (\@gültige, \@ungültige Einträge)
+######################################################################################
+sub _trackParse {
+  my $str = shift // q{};
+
+  my (@ok, @bad, %seen);
+
+  for my $e (grep { length } split /[\s,]+/x, $str) {
+      my $t = _trackSpec ($e);
+
+      if (!$t) {
+          push @bad, $e;
+          next;
+      }
+
+      push @ok, $t if(!$seen{$t->{spec}}++);
+  }
+
+return (\@ok, \@bad);
+}
+
+######################################################################################
+sub _trackSpec {
+  my $e = shift;
+
+  my $t;
+
+  if ($e =~ /^([\w.\-]+\.(?:pm|pl)):([\$\@%][A-Za-z_]\w*)((?:\{[^}]*\}|\[[0-9]+\])*)$/x) {
+      $t = { kind => 'file', file => $1, var => $2, rest => $3, spec => "$1:$2$3" };
+  }
+  elsif ($e =~ /^([\$\@%])((?:[A-Za-z_]\w*::)+[A-Za-z_]\w*)((?:\{[^}]*\}|\[[0-9]+\])*)$/x) {
+      $t = { kind => 'pkg', sigil => $1, name => $2, rest => $3, spec => "$1$2$3" };
+  }
+  elsif ($e =~ /^\$?([A-Za-z_]\w*)((?:\{[^}]*\}|\[[0-9]+\])*)$/x) {
+      $t = { kind => 'main', spec => '$'.$1.$2 };
+  }
+
+  return if(!$t);
+
+  (my $id = $t->{spec}) =~ s/^[\$\@%]//x;                                         # Basis für den Readingnamen: track_<id>_bytes|count
+  $id =~ s/[^A-Za-z0-9_\-]+/_/xg;
+  $id =~ s/^_+|_+$//xg;
+  $t->{id} = $id;
+
+return $t;
+}
+
+######################################################################################
+#   Verlauf und Readings von Objekten entfernen, die nicht mehr getrackt werden
+######################################################################################
+sub _trackCleanup {
+  my ($hash, $list) = @_;
+
+  my %keep = map { $_->{spec} => 1 } @$list;
+  my %kid  = map { $_->{id}   => 1 } @$list;
+
+  delete $hash->{HELPER}{TRACK}{$_} for grep { !$keep{$_} } keys %{$hash->{HELPER}{TRACK} // {}};
+
+  for my $r (keys %{$hash->{READINGS} // {}}) {
+      next if($r !~ /^track_(.+)_(?:bytes|count)$/x);
+      readingsDelete ($hash, $r) if(!$kid{$1});
+  }
+
+return;
+}
+
+######################################################################################
+#   Messwerte der getrackten Objekte in Verlauf (Ringpuffer) und Readings übernehmen
+#   Verlauf: $hash->{HELPER}{TRACK}{<spec>} = [[Zeit, Bytes, Einträge], ...]
+######################################################################################
+sub _storeTrack {
+  my ($hash, $job, $flat) = @_;
+
+  my $list = $job->{track} // [];
+  return if(!@$list);
+
+  my $name = $hash->{NAME};
+  my $max  = AttrVal ($name, 'trackMaxSamples', 500);
+  my $tr   = $hash->{HELPER}{TRACK} //= {};
+  my @del;
+
+  readingsBeginUpdate ($hash);
+
+  for my $t (@$list) {
+      my $b = $flat->{"track:$t->{spec}"};
+      my $n = $flat->{"trackn:$t->{spec}"};
+
+      my $s = $tr->{$t->{spec}} //= [];
+      push @$s, [$job->{time}, $b, $n];
+      shift @$s while(@$s > $max);
+
+      for my $v (['bytes', $b], ['count', $n]) {
+          my $rn = "track_$t->{id}_$v->[0]";
+
+          if (defined $v->[1]) { readingsBulkUpdate ($hash, $rn, $v->[1]); }
+          else                 { push @del, $rn; }                                                  # Objekt in diesem Lauf nicht messbar: kein Wert statt eines veralteten
+      }
+  }
+
+  readingsEndUpdate ($hash, 1);
+
+  readingsDelete ($hash, $_) for @del;
+
+return;
+}
+
+######################################################################################
+#   file-scope 'my' Variablen der angegebenen Dateien über die Closures ihrer Subs suchen
+#   (PadWalker). Es werden nur Subs der genannten Dateien untersucht, deepScan ist nicht nötig.
+#   Rückgabe: { datei.pm => { '%name' => Referenz, ... } }
+######################################################################################
+sub _fileVars {
+  my ($ctx, $files) = @_;
+
+  my %found;
+  return \%found if(!$hasPadWalker);
+
+  my @pkgs;
+  _packages ('FHEM', 0, \@pkgs);
+
+  my %done;
+
+  no strict 'refs';                                                               ## no critic 'NoStrict'
+
+  for my $pkg ('main', @pkgs) {
+      for my $k (keys %{"${pkg}::"}) {
+          next if($k =~ /::$/x || $k !~ /^\w+$/x);
+
+          my $cv = eval { *{"${pkg}::$k"}{CODE} } or next;
+          next if($done{refaddr ($cv)}++);
+
+          my $file = eval { B::svref_2object ($cv)->FILE } // next;
+          (my $fk  = $file) =~ s{^.*/}{}x;
+          next if(!$files->{$fk});
+
+          next if(_skipped ($ctx, "closed_over:$fk"));
+          _crumb ($ctx, "closed_over:$fk");
+
+          my $vars = eval { PadWalker::closed_over ($cv) } or next;
+          $found{$fk}{$_} //= $vars->{$_} for keys %$vars;
+      }
+  }
+
+return \%found;
+}
+
+######################################################################################
+#   Objekt eines Tracking-Eintrags auflösen
+#   Rückgabe: ($ref, $pfad, $fehlertext)
+######################################################################################
+sub _trackResolve {
+  my ($t, $fv) = @_;
+
+  return _resolvePath ($t->{spec}) if($t->{kind} eq 'main');
+
+  my ($ref, $path, $sigil);
+
+  if ($t->{kind} eq 'file') {
+      return (undef, undef, _t ('track_err_pw')) if(!$hasPadWalker);
+
+      $ref = $fv->{$t->{file}}{$t->{var}};
+      return (undef, undef, _t ('track_err_var', $t->{var}, $t->{file})) if(!$ref);
+
+      $sigil = substr ($t->{var}, 0, 1);
+      $path  = "var:$t->{file}:$t->{var}";
+  }
+  else {
+      my ($pkg, $var) = $t->{name} =~ /^(.+)::([^:]+)$/x;
+      $sigil          = $t->{sigil};
+      $path           = "pkgvar:$sigil$t->{name}";
+
+      no strict 'refs';                                                           ## no critic 'NoStrict'
+      if (%{"${pkg}::"} && exists ${"${pkg}::"}{$var}) {
+          $ref = *{"${pkg}::$var"}{$sigil eq '%' ? 'HASH' : $sigil eq '@' ? 'ARRAY' : 'SCALAR'};
+      }
+      use strict 'refs';
+
+      return (undef, undef, _t ('track_err_pkg', "$sigil$t->{name}")) if(!$ref);
+  }
+
+  $ref = ${$ref} if($sigil eq '$');                                               # Skalar: Wert (kann selbst eine Referenz sein)
+
+return _descend ($ref, $path, $t->{rest}, $t->{spec}) if(length $t->{rest});
+
+return ($ref, $path, undef);
+}
+
+######################################################################################
+#   getrackte Objekte (Attribut trackObjects): Größe und Anzahl der Einträge je Objekt.
+#   Jedes Objekt wird mit eigenem Kontext gemessen, die Größe ist daher inklusiv und
+#   unabhängig von der Messreihenfolge. Die Werte gehen nicht in 'attributed' ein,
+#   sonst würde doppelt gezählt.
+#   Rückgabe: { spec => Grund } der nicht messbaren Objekte
+######################################################################################
+sub _measureTrack {
+  my ($p, $ctx0, $flat) = @_;
+
+  my %err;
+  my $list  = $p->{track} // [];
+  my %files = map { $_->{file} => 1 } grep { $_->{kind} eq 'file' } @$list;
+  my $fv    = %files ? _fileVars ($ctx0, \%files) : {};
+
+  for my $t (@$list) {
+      my ($ref, $path, $e) = _trackResolve ($t, $fv);
+
+      if ($e) {
+          $err{$t->{spec}} = $e;
+          next;
+      }
+
+      if ($ctx0->{skip}{$path}) {                                                 # Objekt steht auf der Crash-Liste
+          $err{$t->{spec}} = _t ('track_err_crash');
+          next;
+      }
+
+      if (!defined $ref) {
+          $err{$t->{spec}} = _t ('track_err_undef');
+          next;
+      }
+
+      my ($bytes, $cnt);
+
+      if (!ref $ref) {                                                            # einfacher Wert
+          $bytes = Devel::Size::size ($ref);
+      }
+      else {
+          my $c = _newCtx ($p);
+          @{$c}{qw(trace mode)} = @{$ctx0}{qw(trace mode)};                       # Breadcrumb-Datei weiter verwenden
+          delete $c->{foreign}{refaddr ($ref)};                                   # das Objekt selbst ist nicht 'fremd'
+
+          $bytes = _walkCrumb ($c, $ref, $path, 1);
+
+          my $rt = reftype ($ref) // q{};
+          if (!_isTied ($ref, $rt)) {
+              $cnt = $rt eq 'HASH' ? scalar keys %$ref : $rt eq 'ARRAY' ? scalar @$ref : undef;
+          }
+      }
+
+      $flat->{"track:$t->{spec}"}  = $bytes;
+      $flat->{"trackn:$t->{spec}"} = $cnt if(defined $cnt);
+  }
+
+return \%err;
 }
 
 ######################################################################################
@@ -1884,7 +2480,7 @@ sub _measureTree {
   push @out, sprintf ("Object %s: %s total, type %s%s, %d objects walked in %.1f s%s",
                       $path, _hs ($node->{size}), $node->{type} // '?', $node->{class} ? " ($node->{class})" : '',
                       $ctx->{nodes}, tv_interval ($t0), $ctx->{trunc} ? ' (TRUNCATED by maxNodes)' : '');
-  push @out, "Sizes are exclusive: shared references and references to other devices/core hashes are counted once or not at all.";
+  push @out, _t ('tree_excl');
   push @out, 'Not measured (no data memory): '.join (', ', map { "$_ x$ctx->{skipc}{$_}" } sort keys %{$ctx->{skipc}}) if(%{$ctx->{skipc}});
   push @out, 'Skipped (crash list): '.join (', ', @{$ctx->{skippedPaths}}) if(@{$ctx->{skippedPaths}});
   push @out, '';
@@ -2181,6 +2777,22 @@ return ($n * $sxy - $sx * $sy) / $den;
 #############################################################################################
 
 ######################################################################################
+# Text in der Sprache des globalen Attributs 'language' (DE, sonst EN)
+# Ohne Argumente wird der Text unverändert geliefert, sonst über sprintf aufgefüllt
+######################################################################################
+sub _t {
+  my $key = shift;
+
+  my $t = $TXT{$key} or return $key;
+  my $l = uc (AttrVal ('global', 'language', 'EN'));
+  my $f = $t->{$l} // $t->{EN};
+  
+  utf8::encode ($f) if(!$unicodeEncoding);                                        # bytestream: FHEM erwartet UTF-8 Bytes, unicode: Zeichenstrings (kodiert wird beim Ausgeben)
+
+return @_ ? sprintf ($f, @_) : $f;
+}
+
+######################################################################################
 sub _hs {                                                                         # Bytes lesbar
   my $bytes = shift // 0;
   my $sign = $bytes < 0 ? '-' : q{};
@@ -2278,8 +2890,7 @@ sub _reportSnap {
   if (defined $f->{'proc:attributed'}) {
       push @o, sprintf ("Attributed to FHEM data structures: %d kB of %d kB rss;  not attributable: %d kB",
                         $f->{'proc:attributed'}, $f->{'proc:rss'} // 0, $f->{'proc:unattributed'} // 0);
-      push @o, "  (not attributable = Perl interpreter, loaded code, shared libraries, memory fragmentation".
-               ($s->{deep} ? q{} : ", file-scope variables of modules - see attribute deepScan").")";
+      push @o, $s->{deep} ? _t ('unattr_note') : _t ('unattr_note_nd');
   }
 
   push @o, '';
@@ -2295,9 +2906,10 @@ sub _reportSnap {
       pkgvar => 'Largest package variables (our)',
       reads  => 'Devices with most readings',
       timer  => 'Timers by function',
+      track  => 'Tracked objects',
   );
 
-  for my $c (qw(type dev part main mod file var pkgvar reads timer)) {
+  for my $c (qw(track type dev part main mod file var pkgvar reads timer)) {
       my @l = _topLines ($f, $c, ($c eq 'main' ? 20 : $top));
       next if(!@l);
 
@@ -2309,6 +2921,14 @@ sub _reportSnap {
           my $t = _cat ($f, 'type');
           my @k = sort { $t->{$b} <=> $t->{$a} || $a cmp $b } keys %$t;
           @l    = map { sprintf ("  %12s  %4dx  avg %-10s  %s", _hs ($t->{$_}), $n->{$_} // 0, _hs ($n->{$_} ? $t->{$_} / $n->{$_} : 0), $_) }
+                  @k[0 .. ($#k < $top - 1 ? $#k : $top - 1)];
+      }
+
+      if ($c eq 'track') {                                                           # getrackte Objekte mit Anzahl der Einträge
+          my $n = _cat ($f, 'trackn');
+          my $t = _cat ($f, 'track');
+          my @k = sort { $t->{$b} <=> $t->{$a} || $a cmp $b } keys %$t;
+          @l    = map { sprintf ("  %12s  %7s entries  %s", _hs ($t->{$_}), defined $n->{$_} ? $n->{$_} : '-', $_) }
                   @k[0 .. ($#k < $top - 1 ? $#k : $top - 1)];
       }
 
@@ -2325,6 +2945,10 @@ sub _reportSnap {
 
   if ($s->{skipc} && %{$s->{skipc}}) {
       push @o, 'Not measured (no data memory): '.join (', ', map { "$_ x$s->{skipc}{$_}" } sort keys %{$s->{skipc}}), '';
+  }
+
+  if ($s->{trackErr} && %{$s->{trackErr}}) {
+      push @o, _t ('track_err_head').': '.join (', ', map { "$_ ($s->{trackErr}{$_})" } sort keys %{$s->{trackErr}}), '';
   }
 
 return join ("\n", @o);
@@ -2357,7 +2981,7 @@ sub _reportDiff {
   }
 
   if (($f0->{'cnt:kids'} // 0) != ($f1->{'cnt:kids'} // 0)) {
-      push @o, '  Note: the number of child processes differs - private/pss/shared are not comparable, use rss.';
+      push @o, _t ('diff_kids');
   }
 
   push @o, '', 'Counters:';
@@ -2383,7 +3007,7 @@ sub _reportDiff {
                @g[0 .. ($#g < $top - 1 ? $#g : $top - 1)];
   }
 
-  push @o, '', 'Hint: for a reliable verdict take at least 3 snapshots some hours apart and use "get <name> leakCandidates".';
+  push @o, '', _t ('diff_hint');
 
 return join ("\n", @o);
 }
@@ -2427,7 +3051,7 @@ sub _reportLeaks {
       push @{$cand{$cat}}, { key => $rest, net => $net, rate => $hours ? $net / $hours : 0, v => \@v };
   }
 
-  my @o = (sprintf ("Leak candidates: objects growing in at least %d of %d intervals without ever shrinking", $need, $n - 1),
+  my @o = (_t ('leak_head', $need, $n - 1),
            sprintf ("Snapshots: %s   period: %.1f h", join (', ', map { $_->{label} } @$snaps), $hours), '');
 
   my $found = 0;
@@ -2447,14 +3071,9 @@ sub _reportLeaks {
       push @o, '';
   }
 
-  push @o, "No consistently growing object found.", '' if(!$found);
+  push @o, _t ('leak_none'), '' if(!$found);
 
-  push @o, 'Interpretation:',
-           '  part/dev/type  : data inside a device grows (readings, helper hashes, queues, caches) -> look at the TYPE and use "set <name> xHashDetail \$defs{device}{key}".',
-           '  var/pkgvar/file: global or file-scope variables of a module grow (needs deepScan, PadWalker for file-scope variables).',
-           '  timer/timerdev : timers accumulate -> a module sets timers without removing old ones.',
-           '  cnt fds/kids   : file descriptor or child process leak (e.g. BlockingCall children not ending).',
-           '  proc unattributed grows but no structure does: memory outside the walked structures (XS/C libraries, fragmentation, file-scope variables without deepScan).';
+  push @o, _t ('interp_head'), _t ('interp_part'), _t ('interp_var'), _t ('interp_timer'), _t ('interp_cnt'), _t ('interp_track'), _t ('interp_proc');
 
 return join ("\n", @o);
 }
@@ -2613,6 +3232,7 @@ return @sorted;
         also package variables and file-scope variables of the modules are included. The snapshot is stored under the label and a report is shown.
         The label may consist of letters, digits, <code>_</code>, <code>-</code> and <code>.</code>. Without a label <code>snap_&lt;date&gt;_&lt;time&gt;</code> is used. An existing snapshot with the same label is replaced,
         if more than <a href="#Analyze-attr-maxSnapshots">maxSnapshots</a> exist, the oldest one is deleted.<br>
+        <br>
         Example: <code>set anaData snapshot t0</code>
     </li>
     <br>
@@ -2633,6 +3253,7 @@ return @sorted;
     <a id="Analyze-set-deviceType"></a>
     <li><b>deviceType &lt;TYPE&gt;</b><br>
         Like <b>allDevices</b>, but only for the devices of one module type. A regular expression is allowed.<br>
+        <br>
         Example: <code>set anaData deviceType HTTPMOD</code>
     </li>
     <br>
@@ -2645,6 +3266,7 @@ return @sorted;
         If no argument is given, the object from the attribute <a href="#Analyze-attr-analyzeObject">analyzeObject</a> is used.<br>
         The depth of the tree is set by <a href="#Analyze-attr-treeDepth">treeDepth</a>, the number of entries shown per level by <a href="#Analyze-attr-topNum">topNum</a>.
         The readings <b>*_largestObject</b> contain the largest direct substructures with their complete path, which can be copied directly into a further <b>xHashDetail</b>.<br>
+        <br>
         Example: <code>set anaData xHashDetail $data{SolCast6}</code>
     </li>
     <br>
@@ -2665,6 +3287,7 @@ return @sorted;
     <li><b>clearCrashList &lt;object&gt;|all</b><br>
         Removes an object (as shown by <b>get crashList</b>) or all objects from the crash list. They are measured again in the next run.
         Useful after the cause of a crash was fixed, for example after a module update.<br>
+        <br>
         Example: <code>set anaData clearCrashList $defs{myDevice}{helper}{big}</code>
     </li>
   </ul>
@@ -2673,6 +3296,7 @@ return @sorted;
   <a id="Analyze-get"></a>
   <b>Get</b>
   <ul>
+    The explanations and hints in the outputs are shown in German if the global attribute <b>language</b> is <b>DE</b>, otherwise in English. Table headings and object names are always English.<br><br>
     <a id="Analyze-get-snapshots"></a>
     <li><b>snapshots</b><br>
         Lists the stored snapshots with time, process size, attributed memory and the number of devices, timers, file descriptors and child processes.
@@ -2690,6 +3314,7 @@ return @sorted;
     <li><b>diff [&lt;label1&gt; [&lt;label2&gt;]]</b><br>
         Compares two snapshots and lists the growth of the process memory (also per hour), of the counters and of all measured objects.
         Without a label the last two snapshots are compared, with one label this snapshot is compared with the latest one.<br>
+        <br>
         Example: <code>get anaData diff t0 t1</code>
     </li>
     <br>
@@ -2704,6 +3329,7 @@ return @sorted;
           <li><b>var, pkgvar, file, pkg</b> - global or file-scope variables of a module grow (requires <a href="#Analyze-attr-deepScan">deepScan</a>, file-scope variables also PadWalker).</li>
           <li><b>timer, timerdev</b> - timers pile up, a module sets timers without removing old ones.</li>
           <li><b>cnt fds, kids</b> - file descriptors or child processes are not released.</li>
+          <li><b>track, trackn</b> - a tracked object (attribute <a href="#Analyze-attr-trackObjects">trackObjects</a>) grows in size or in number of entries. Details with <a href="#Analyze-get-track">get track</a>.</li>
           <li><b>proc unattributed</b> grows, but no structure does - memory outside of the measured structures (C libraries, fragmentation, file-scope variables without deepScan).</li>
         </ul>
     </li>
@@ -2738,6 +3364,17 @@ return @sorted;
     <li><b>crashList</b><br>
         Shows the objects that crashed the measuring process, with time and cause. These objects are skipped in all measurements. The list is kept over a restart of FHEM.
         When a job crashes, the path of the object that was measured at that moment is added automatically.
+    </li>
+    <br>
+
+    <a id="Analyze-get-track"></a>
+    <li><b>track [all | &lt;object&gt;] [&lt;rows&gt;]</b><br>
+        Shows the history of the objects that are tracked with the attribute <a href="#Analyze-attr-trackObjects">trackObjects</a>.
+        Without argument (or with <b>all</b>) an overview with the last size, the number of entries, the change and the change per hour over the whole recorded period is shown.
+        With the path of an object from the attribute every recorded sample is listed with the difference to the previous one. <b>&lt;rows&gt;</b> limits the output to the latest samples (default: 40).<br>
+        The drop-down list offers <b>all</b> and every object of the attribute, followed by a text field for <b>&lt;rows&gt;</b>. In the list the colons of package and file-scope paths are replaced by "/" (e.g. <code>93_DbLog.pm/%cache</code>), because the colon is a separator in the FHEMWEB widget syntax. On the command line the original notation is accepted as well.<br>
+        The values are recorded with every snapshot (manual or by <a href="#Analyze-attr-autoSnapshot">autoSnapshot</a>). The history is kept in memory (see <a href="#Analyze-attr-trackMaxSamples">trackMaxSamples</a>) and is empty again after a restart of FHEM.
+        For a long-term evaluation the readings <b>track_&lt;object&gt;_bytes</b> and <b>track_&lt;object&gt;_count</b> can be logged and plotted.
     </li>
   </ul>
   <br>
@@ -2848,6 +3485,32 @@ return @sorted;
     </li>
     <br>
 
+    <a id="Analyze-attr-trackMaxSamples"></a>
+    <li><b>trackMaxSamples &lt;number&gt;</b> <br>
+    Maximum number of samples that are kept per object tracked with <a href="#Analyze-attr-trackObjects">trackObjects</a>. The oldest sample is dropped first. <br>
+    (default: 500)
+    </li>
+    <br>
+
+    <a id="Analyze-attr-trackObjects"></a>
+    <li><b>trackObjects &lt;object&gt; [&lt;object&gt; ...]</b> <br>
+    List of objects (separated by blank or comma, keys must not contain blanks or commas) whose size and number of entries are recorded with every snapshot, so that their growth can be evaluated over a longer period (<a href="#Analyze-get-track">get track</a>).
+    Allowed are:
+    <ul>
+      <li><code>$defs{myDevice}{.pvHistCache}</code>, <code>$data{x}{y}[2]</code> - hashes and arrays of the FHEM main level (same syntax as <b>xHashDetail</b>)</li>
+      <li><code>%FHEM::Module::cache</code>, <code>@Package::list</code>, <code>$Package::value</code> - package variables (<code>our</code>), optionally followed by <code>{key}</code> or <code>[index]</code></li>
+      <li><code>93_DbLog.pm:%cache</code> - file-scope <code>my</code> variable of a module file (requires <code>PadWalker</code>, the variable must be used by at least one function of the file)</li>
+    </ul>
+    Neither <a href="#Analyze-attr-deepScan">deepScan</a> nor a snapshot with deep scan is required, for file-scope variables only the named file is searched.
+    Every object is measured on its own, so its size is complete and independent of other objects. The sizes are <b>not</b> part of the attributed memory, otherwise they would be counted twice.
+    Objects that cannot be found are listed in the snapshot report. They are also evaluated by <b>diff</b> and <b>leakCandidates</b>.<br>
+    The readings <b>track_&lt;object&gt;_bytes</b> and <b>track_&lt;object&gt;_count</b> are created for each object. The name is derived from the path, for example
+    <code>track_defs_myDevice_pvHistCache_bytes</code>. <br>
+    <br>
+    Example: <code>attr &lt;name&gt; trackObjects $defs{VictronVRM}{.pvHistCache} 93_DbLog.pm:%cache</code>
+    </li>
+    <br>
+
     <a id="Analyze-attr-treeDepth"></a>
     <li><b>treeDepth &lt;number&gt;</b> <br>
     Depth of the tree shown by <b>xHashDetail</b> and <b>mainHash</b>. Deeper levels are included in the sizes but not shown. <br>
@@ -2868,6 +3531,7 @@ return @sorted;
   <a id="Analyze-Readings"></a>
   <b>Readings</b>
   <ul>
+    Readings that belong to a snapshot or to the periodic sampling are removed when FHEM starts, because the snapshots and samples only exist in memory. Only <b>state</b>, <b>crashListCount</b>, <b>snapshots</b> and <b>snapshot_last</b> are set again, all others are created by the next measurement.<br><br>
     <table>
       <colgroup><col width="15%"><col width="85%"></colgroup>
       <tr><td> <b>NN_largestObject</b>          </td><td>the largest objects, format <code>&lt;size in bytes&gt;, &lt;object&gt;</code>, for example <code>1048576, $data{SolCast6}</code>. The object can be copied into <b>xHashDetail</b>.     </td></tr>
@@ -2887,6 +3551,8 @@ return @sorted;
       <tr><td> <b>proc_swap_kB</b>              </td><td>swapped memory in kB (last snapshot)                                                                                                                                                </td></tr>
       <tr><td> <b>snapshot_last</b>             </td><td>label of the latest snapshot                                                                                                                                                        </td></tr>
       <tr><td> <b>snapshots</b>                 </td><td>number of stored snapshots                                                                                                                                                          </td></tr>
+      <tr><td> <b>track_&lt;object&gt;_bytes</b> </td><td>size in bytes of an object tracked with <b>trackObjects</b> (last snapshot)                                                                                                       </td></tr>
+      <tr><td> <b>track_&lt;object&gt;_count</b> </td><td>number of entries of an object tracked with <b>trackObjects</b> (last snapshot)                                                                                                    </td></tr>
       <tr><td> <b>unattributed_kB</b>           </td><td>part of the process size that cannot be attributed to measured structures (interpreter, program code, libraries, fragmentation, without deepScan also file-scope variables)            </td></tr>
       <tr><td> <b>state</b>                     </td><td>current state of the module. Possible values:                                                                                                                                       </td></tr>
       <tr><td>                                  </td><td><ul><b>Initialized</b> - the device was created                                                  </ul>                                                                        </td></tr>
@@ -2997,6 +3663,7 @@ return @sorted;
         werden zusätzlich Paketvariablen und file-scope Variablen der Module erfasst. Der Snapshot wird unter dem Label gespeichert und ein Bericht angezeigt.
         Das Label darf aus Buchstaben, Ziffern, <code>_</code>, <code>-</code> und <code>.</code> bestehen. Ohne Label wird <code>snap_&lt;Datum&gt;_&lt;Zeit&gt;</code> verwendet. Ein vorhandener Snapshot mit gleichem Label wird ersetzt,
         gibt es mehr als <a href="#Analyze-attr-maxSnapshots">maxSnapshots</a>, wird der älteste gelöscht.<br>
+        <br>
         Beispiel: <code>set anaData snapshot t0</code>
     </li>
     <br>
@@ -3017,6 +3684,7 @@ return @sorted;
     <a id="Analyze-set-deviceType"></a>
     <li><b>deviceType &lt;TYPE&gt;</b><br>
         Wie <b>allDevices</b>, aber nur für die Devices eines Modultyps. Ein regulärer Ausdruck ist erlaubt.<br>
+        <br>
         Beispiel: <code>set anaData deviceType HTTPMOD</code>
     </li>
     <br>
@@ -3029,6 +3697,7 @@ return @sorted;
         Ohne Angabe wird das Objekt aus dem Attribut <a href="#Analyze-attr-analyzeObject">analyzeObject</a> verwendet.<br>
         Die Tiefe des Baums bestimmt <a href="#Analyze-attr-treeDepth">treeDepth</a>, die Anzahl der gezeigten Einträge pro Ebene <a href="#Analyze-attr-topNum">topNum</a>.
         Die Readings <b>*_largestObject</b> enthalten die größten direkten Unterstrukturen mit vollständigem Pfad, der direkt in ein weiteres <b>xHashDetail</b> kopiert werden kann.<br>
+        <br>
         Beispiel: <code>set anaData xHashDetail $data{SolCast6}</code>
     </li>
     <br>
@@ -3049,6 +3718,7 @@ return @sorted;
     <li><b>clearCrashList &lt;Objekt&gt;|all</b><br>
         Entfernt ein Objekt (wie von <b>get crashList</b> angezeigt) oder alle Objekte aus der Crash-Liste. Sie werden im nächsten Lauf wieder gemessen.
         Sinnvoll, nachdem die Ursache eines Absturzes behoben wurde, zum Beispiel nach einem Modul-Update.<br>
+        <br>
         Beispiel: <code>set anaData clearCrashList $defs{myDevice}{helper}{big}</code>
     </li>
   </ul>
@@ -3057,6 +3727,7 @@ return @sorted;
   <a id="Analyze-get"></a>
   <b>Get</b>
   <ul>
+    Die Erläuterungen und Hinweise in den Ausgaben erscheinen auf Deutsch, wenn das globale Attribut <b>language</b> den Wert <b>DE</b> hat, sonst auf Englisch. Tabellenköpfe und Objektnamen sind immer englisch.<br><br>
     <a id="Analyze-get-snapshots"></a>
     <li><b>snapshots</b><br>
         Listet die gespeicherten Snapshots mit Zeit, Prozessgröße, zugeordnetem Speicher und der Anzahl der Devices, Timer, Filedeskriptoren und Kindprozesse.
@@ -3074,6 +3745,7 @@ return @sorted;
     <li><b>diff [&lt;Label1&gt; [&lt;Label2&gt;]]</b><br>
         Vergleicht zwei Snapshots und listet das Wachstum des Prozessspeichers (auch je Stunde), der Zähler und aller gemessenen Objekte auf.
         Ohne Label werden die letzten beiden Snapshots verglichen, mit einem Label dieser Snapshot mit dem neuesten.<br>
+        <br>
         Beispiel: <code>get anaData diff t0 t1</code>
     </li>
     <br>
@@ -3088,6 +3760,7 @@ return @sorted;
           <li><b>var, pkgvar, file, pkg</b> - globale oder file-scope Variablen eines Moduls wachsen (setzt <a href="#Analyze-attr-deepScan">deepScan</a> voraus, file-scope Variablen zusätzlich PadWalker).</li>
           <li><b>timer, timerdev</b> - Timer häufen sich an, ein Modul setzt Timer, ohne alte zu entfernen.</li>
           <li><b>cnt fds, kids</b> - Filedeskriptoren oder Kindprozesse werden nicht freigegeben.</li>
+          <li><b>track, trackn</b> - ein getracktes Objekt (Attribut <a href="#Analyze-attr-trackObjects">trackObjects</a>) wächst in der Größe oder in der Anzahl der Einträge. Details mit <a href="#Analyze-get-track">get track</a>.</li>
           <li><b>proc unattributed</b> wächst, aber keine Struktur - Speicher außerhalb der gemessenen Strukturen (C-Bibliotheken, Fragmentierung, file-scope Variablen ohne deepScan).</li>
         </ul>
     </li>
@@ -3122,6 +3795,17 @@ return @sorted;
     <li><b>crashList</b><br>
         Zeigt die Objekte, die den Messprozess zum Absturz gebracht haben, mit Zeit und Ursache. Diese Objekte werden bei allen Messungen übersprungen. Die Liste bleibt über einen Neustart von FHEM erhalten.
         Stürzt ein Job ab, wird der Pfad des Objekts, das in diesem Moment gemessen wurde, automatisch aufgenommen.
+    </li>
+    <br>
+
+    <a id="Analyze-get-track"></a>
+    <li><b>track [all | &lt;Objekt&gt;] [&lt;Zeilen&gt;]</b><br>
+        Zeigt den Verlauf der Objekte, die mit dem Attribut <a href="#Analyze-attr-trackObjects">trackObjects</a> getrackt werden.
+        Ohne Argument (oder mit <b>all</b>) erscheint eine Übersicht mit der letzten Größe, der Anzahl der Einträge, der Änderung und der Änderung pro Stunde über den gesamten aufgezeichneten Zeitraum.
+        Mit dem Pfad eines Objekts aus dem Attribut wird jeder aufgezeichnete Messwert mit der Differenz zum vorherigen aufgelistet. <b>&lt;Zeilen&gt;</b> begrenzt die Ausgabe auf die letzten Messwerte (default: 40).<br>
+        Die Auswahlliste bietet <b>all</b> und jedes Objekt des Attributs an, danach folgt ein Textfeld für <b>&lt;Zeilen&gt;</b>. In der Liste sind die Doppelpunkte von Paket- und file-scope-Pfaden durch "/" ersetzt (z.B. <code>93_DbLog.pm/%cache</code>), weil der Doppelpunkt in der Widget-Syntax von FHEMWEB ein Trenner ist. In der Kommandozeile wird auch die Originalschreibweise akzeptiert.<br>
+        Die Werte werden mit jedem Snapshot aufgezeichnet (manuell oder durch <a href="#Analyze-attr-autoSnapshot">autoSnapshot</a>). Der Verlauf liegt im Speicher (siehe <a href="#Analyze-attr-trackMaxSamples">trackMaxSamples</a>) und ist nach einem Neustart von FHEM wieder leer.
+        Für eine Langzeitauswertung können die Readings <b>track_&lt;Objekt&gt;_bytes</b> und <b>track_&lt;Objekt&gt;_count</b> geloggt und geplottet werden.
     </li>
   </ul>
   <br>
@@ -3232,6 +3916,32 @@ return @sorted;
     </li>
     <br>
 
+    <a id="Analyze-attr-trackMaxSamples"></a>
+    <li><b>trackMaxSamples &lt;Anzahl&gt;</b> <br>
+    Maximale Anzahl der Messwerte, die je Objekt aus <a href="#Analyze-attr-trackObjects">trackObjects</a> gehalten werden. Der älteste Messwert fällt zuerst weg. <br>
+    (default: 500)
+    </li>
+    <br>
+
+    <a id="Analyze-attr-trackObjects"></a>
+    <li><b>trackObjects &lt;Objekt&gt; [&lt;Objekt&gt; ...]</b> <br>
+    Liste von Objekten (getrennt durch Leerzeichen oder Komma, Schlüssel dürfen weder Leerzeichen noch Kommas enthalten), deren Größe und Anzahl der Einträge mit jedem Snapshot aufgezeichnet werden. So lässt sich ihr Wachstum über einen längeren Zeitraum auswerten (<a href="#Analyze-get-track">get track</a>).
+    Erlaubt sind:
+    <ul>
+      <li><code>$defs{meinDevice}{.pvHistCache}</code>, <code>$data{x}{y}[2]</code> - Hashes und Arrays der FHEM-Hauptebene (gleiche Syntax wie bei <b>xHashDetail</b>)</li>
+      <li><code>%FHEM::Modul::cache</code>, <code>@Paket::liste</code>, <code>$Paket::wert</code> - Paketvariablen (<code>our</code>), optional gefolgt von <code>{key}</code> oder <code>[index]</code></li>
+      <li><code>93_DbLog.pm:%cache</code> - file-scope <code>my</code> Variable einer Moduldatei (benötigt <code>PadWalker</code>, die Variable muss von mindestens einer Funktion der Datei verwendet werden)</li>
+    </ul>
+    Weder <a href="#Analyze-attr-deepScan">deepScan</a> noch ein Snapshot mit Deep Scan ist nötig, bei file-scope Variablen wird nur die genannte Datei durchsucht.
+    Jedes Objekt wird für sich gemessen, die Größe ist daher vollständig und unabhängig von anderen Objekten. Die Größen sind <b>nicht</b> Teil des zugeordneten Speichers, sonst würden sie doppelt gezählt.
+    Objekte, die nicht gefunden werden, stehen im Bericht des Snapshots. Sie werden auch von <b>diff</b> und <b>leakCandidates</b> ausgewertet.<br>
+    Je Objekt entstehen die Readings <b>track_&lt;Objekt&gt;_bytes</b> und <b>track_&lt;Objekt&gt;_count</b>. Der Name wird aus dem Pfad abgeleitet, zum Beispiel
+    <code>track_defs_meinDevice_pvHistCache_bytes</code>. <br>
+    <br>
+    Beispiel: <code>attr &lt;name&gt; trackObjects $defs{VictronVRM}{.pvHistCache} 93_DbLog.pm:%cache</code>
+    </li>
+    <br>
+
     <a id="Analyze-attr-treeDepth"></a>
     <li><b>treeDepth &lt;Anzahl&gt;</b> <br>
     Tiefe des Baums, den <b>xHashDetail</b> und <b>mainHash</b> anzeigen. Tiefere Ebenen sind in den Größen enthalten, werden aber nicht angezeigt. <br>
@@ -3252,6 +3962,7 @@ return @sorted;
   <a id="Analyze-Readings"></a>
   <b>Readings</b>
   <ul>
+    Readings, die zu einem Snapshot oder zur periodischen Messung gehören, werden beim Start von FHEM entfernt, weil Snapshots und Messwerte nur im Speicher liegen. Nur <b>state</b>, <b>crashListCount</b>, <b>snapshots</b> und <b>snapshot_last</b> werden neu gesetzt, alle anderen entstehen mit der nächsten Messung.<br><br>
     <table>
       <colgroup><col width="15%"><col width="85%"></colgroup>
       <tr><td> <b>NN_largestObject</b>          </td><td>die größten Objekte, Format <code>&lt;Größe in Bytes&gt;, &lt;Objekt&gt;</code>, zum Beispiel <code>1048576, $data{SolCast6}</code>. Das Objekt kann in <b>xHashDetail</b> kopiert werden.   </td></tr>
@@ -3271,6 +3982,8 @@ return @sorted;
       <tr><td> <b>proc_swap_kB</b>              </td><td>ausgelagerter Speicher in kB (letzter Snapshot)                                                                                                                                                </td></tr>
       <tr><td> <b>snapshot_last</b>             </td><td>Label des neuesten Snapshots                                                                                                                                                                   </td></tr>
       <tr><td> <b>snapshots</b>                 </td><td>Anzahl der gespeicherten Snapshots                                                                                                                                                             </td></tr>
+      <tr><td> <b>track_&lt;Objekt&gt;_bytes</b> </td><td>Größe in Bytes eines mit <b>trackObjects</b> getrackten Objekts (letzter Snapshot)                                                                                                </td></tr>
+      <tr><td> <b>track_&lt;Objekt&gt;_count</b> </td><td>Anzahl der Einträge eines mit <b>trackObjects</b> getrackten Objekts (letzter Snapshot)                                                                                            </td></tr>
       <tr><td> <b>unattributed_kB</b>           </td><td>Teil der Prozessgröße, der nicht gemessenen Strukturen zugeordnet werden kann (Interpreter, Programmcode, Bibliotheken, Fragmentierung, ohne deepScan auch file-scope Variablen)               </td></tr>
       <tr><td> <b>state</b>                     </td><td>aktueller Zustand des Moduls. Mögliche Werte:                                                                                                                                                  </td></tr>
       <tr><td>                                  </td><td><ul><b>Initialized</b> - das Device wurde angelegt                                                   </ul>                                                                                      </td></tr>
