@@ -1,3 +1,5 @@
+ - bugfix: 72_FritzSmart: Fehlerkorrekturen/commandref
+ - bugfix:  73_PRESENCE2.pm: commandRef
  - feature: 98_Analyze: v0.7.0: neues Attr trackObjects
  - change:  76_SolarForecast: Version 2.11.0
  - bugfix:  46_TeslaPowerwall2AC: feat: update TeslaPowerwall2AC to v3.0.0
