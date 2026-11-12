@@ -41,7 +41,7 @@ use strict;
 use warnings;
 our $UserAgentParaU;
 our $UserAgentParaP;
-our $ModulVersion = "26.10.13";
+our $ModulVersion = "26.11.11";
 
 ###############################################################################
 # handle package UserAgentClient
@@ -5203,7 +5203,22 @@ sub Fritz_Get_Modul($@)
    my $mesh = main::ReadingsVal($name, "box_meshRole", "master");
 
    my $retMsg = "";
-   my $list   = "";
+   my $list   = "list:normal,full";
+
+   if ($cmd eq "list") {
+     my $globAttr = main::AttrVal("global","showInternalValues","undef");
+
+     $attr{global}{showInternalValues} = $val[0] eq "full" ? 1 : 0;
+     my $ret = main::CommandList(undef,$name);
+
+     if ($globAttr eq "undef"){
+       delete $attr{global}{showInternalValues};
+     } else{
+       $attr{global}{showInternalValues} = $globAttr;
+     }
+     return $ret;
+   }
+
 
    # available, if password is set correctly
    if ($hash->{WEBCONNECT} && !$hash->{WARNING_PERL}&& !$hash->{WARNING_NETWORK}) {
@@ -6056,7 +6071,7 @@ sub Fritz_Get_Modul($@)
        }
      }
 
-     $list .= "luaQuery"                if $hash->{LUAQUERY} == 1;
+     $list .= " luaQuery"                if $hash->{LUAQUERY} == 1;
      $list .= " luaData"                if $hash->{LUADATA} == 1;
 
      # Eventuell mal eine Liste hinterlegen
@@ -7239,7 +7254,7 @@ sub Fritz_Readout_Run_Web_LuaQuery($$$$) {
 
 #-------------------------------------------------------------------------------------
 # Power Rate
-   Fritz_Readout_Add_Reading $hash, $roReadings, "box_powerRate", $result->{box_powerRate} if $hash->{fhem}{fwVersion} > 0 && $hash->{fhem}{fwVersion} < 705;
+   Fritz_Readout_Add_Reading $hash, $roReadings, "box_powerRate", $result->{box_powerRate}; # if $hash->{fhem}{fwVersion} > 0 && $hash->{fhem}{fwVersion} < 705;
 
 #-------------------------------------------------------------------------------------
 # Box Features
@@ -10320,6 +10335,20 @@ sub Fritz_Readout_Response($$$@)
       # Hinweis wenn Fehler beim Lesen der Fritz-Device-Antwort
       push @{$roReadings}, "Hint", "network: $result->{Error} in " .$sub. ":" .$xline;
       Fritz_Log $hash, 4, "Network: " . $result->{Error} . " - " . $sub . "(" . $xline . ")";
+    } elsif ($result->{Error} =~ /offline/) {
+      # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
+      push @{$roReadings}, "->APICHECKED", -1;
+      push @{$roReadings}, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+
+      push @{$roReadings}, "->APICHECK_RET_CODES", $result->{Error};
+      push @{$roReadings}, "Error", "network: $result->{Error} in " .$sub. ":" .$xline;
+      push @{$roReadings}, "->WEBCONNECT", 0;
+      $hash->{fhem}{sidErrCount} = -1;
+      push @{$roReadings}, "fhem->sidErrCount", $hash->{fhem}{sidErrCount};
+
+      Fritz_Log $hash, 2, "Network: " . $result->{Error} . " - " . $sub . "(" . $xline . ")";
+      $returnStr = "Error|" . $result->{Error};
+      $returnStr .= "|";
     } else {
       # Abbruch wenn Fehler beim Lesen der Fritz-Device-Antwort
       push @{$roReadings}, "->APICHECKED", -1;
@@ -10328,7 +10357,8 @@ sub Fritz_Readout_Response($$$@)
       push @{$roReadings}, "->APICHECK_RET_CODES", $result->{Error};
       push @{$roReadings}, "Error", "network: $result->{Error} in " .$sub. ":" .$xline;
       push @{$roReadings}, "->WEBCONNECT", 0;
-      push @{$roReadings}, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+      $hash->{fhem}{sidErrCount} += 1;
+      push @{$roReadings}, "fhem->sidErrCount", $hash->{fhem}{sidErrCount};
 
       Fritz_Log $hash, 2, "Network: " . $result->{Error} . " - " . $sub . "(" . $xline . ")";
       $returnStr = "Error|" . $result->{Error};
@@ -10344,7 +10374,8 @@ sub Fritz_Readout_Response($$$@)
     push @{$roReadings}, "->APICHECK_RET_CODES", $result->{AuthorizationRequired};
     push @{$roReadings}, "Error", "cannot connect due to authorisation error";
     push @{$roReadings}, "->WEBCONNECT", 0;
-    push @{$roReadings}, "fhem->sidErrCount", $hash->{fhem}{sidErrCount} + 1;
+    $hash->{fhem}{sidErrCount} += 1;
+    push @{$roReadings}, "fhem->sidErrCount", $hash->{fhem}{sidErrCount};
 
     Fritz_Log $hash, 2, "AuthorizationRequired=" . $result->{AuthorizationRequired} . " - " . $sub . "(" . $xline . ")";
     $returnStr = "Error|Authorization required";
@@ -10458,6 +10489,9 @@ sub Fritz_Readout_Process($$@)
 #     main::readingsBulkUpdate( $hash, "state", $values{Hint} );
 #     $newState = $values{Hint};
 #   }
+
+   # hash bereinigen
+   delete $hash->{fhem}{landevice};
 
    # Statistics
    if (defined $values{".calledFrom"} && $values{".calledFrom"} eq "runWeb") {
@@ -12086,7 +12120,31 @@ sub Fritz_Readout_API_Check($)
        Fritz_Log $hash, 4, "ReadOut gestartet: $queryStr";
        $response = Fritz_call_Lua_Query( $hash, $queryStr, "", "luaQuery") ;
 
+       if ( defined $response->{Error} && $response->{Error} eq "no valid SID" ) {
+         $apiError .= "no valid SID";
+
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECK_RET_CODES", $apiError;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "Error", $apiError;
+
+         Fritz_Readout_Add_Reading $hash, \@roReadings, ".calledFrom", "checkApis";
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
+
+         $hash->{fhem}{sidTime} = 0;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidTime", 0;
+         Fritz_Readout_Add_Reading $hash, \@roReadings, "fhem->sidErrCount", (-1);
+
+         push @roReadings, "readoutTime", sprintf( "%.2f", time() - $startTime);
+
+         my $returnStr = join('|', @roReadings );
+         Fritz_Log $hash, 4-$myVerbose, "0 - Handover to main process: (" . length ($returnStr) . "): " . $returnStr;
+         return $name . "|" . encode_base64($returnStr,"");
+       }
+
        if ( !defined $response->{sid} || defined $response->{Error} || defined $response->{AuthorizationRequired} ) {
+
+         Fritz_Log $hash, 4, "Lua_Query: " . Dumper($response);
+
          Fritz_Readout_Add_Reading $hash, \@roReadings, "->APICHECKED", -1;
          Fritz_Readout_Add_Reading $hash, \@roReadings, "->CKECKAPI_TMOUT", $hash->{CKECKAPI_MAX_TMOUT};
 
@@ -12096,6 +12154,7 @@ sub Fritz_Readout_API_Check($)
          $apiError .= " error: $response->{Error}" if defined $response->{Error};
          $apiError .= " authorization: $response->{AuthorizationRequired}" if defined $response->{AuthorizationRequired};
          Fritz_Log $hash, 4, "$queryStr: not Ok";
+
        } else {
 
          foreach my $key (keys %{ $hash->{helper}{LuaQueryCmd} }) {
@@ -12109,13 +12168,8 @@ sub Fritz_Readout_API_Check($)
              my $views   = $response->{$key};
              my $nbViews = scalar @$views;
 
-#             if($nbViews) {
-               Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: Ok";
-               Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 1;
-#              } else {
-#               Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: 3 not Ok";
-#               Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 0;
-#              }
+             Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: Ok";
+             Fritz_Readout_Add_Reading $hash, \@roReadings, "helper->LuaQueryCmd->" . $key . "->active", 1;
 
            } elsif ($response->{$key} eq "") {
              Fritz_Log $hash, 4, "$key = $hash->{helper}{LuaQueryCmd}{$key}{cmd}: 4 not Ok";
@@ -18253,13 +18307,15 @@ sub Fritz_call_Lua_Query($$@)
 
    my $result = Fritz_open_Web_Connection( $hash );
 
+   # Fritz_Log $hash, 3, "open_Web_Connection: " . Dumper($result);
    return $result unless $result->{sid};
 
    $sidNew = $result->{sidNew} if defined $result->{sidNew};
 
    my $Authorisation = 'AVM-SID ' . $result->{sid};
 
-   Fritz_Log $hash, 4, "Request data via API " . $f_lua;
+   Fritz_Log $hash, 4, "Request data via API: " . $f_lua;
+   # Fritz_Log $hash, 3, "Request data query: " . $queryStr;
    my $host = $hash->{HOST};
    my $url = 'http://' . $host;
 
@@ -18275,13 +18331,14 @@ sub Fritz_call_Lua_Query($$@)
          $url .= '?sid=' . $result->{sid};
        }
      }
-     Fritz_Log $hash, 4, "luaFunction call: " . $url;
 
    } else {
      Fritz_Log $hash, 2, "Wrong function name. function_name: " . $f_lua;
      my %retHash = ( "Error" => "Wrong function name", "function_name" => $f_lua ) ;
      return \%retHash;
    }
+
+   Fritz_Log $hash, 4, "luaFunction call: " . $url;
 
    my $agent    = LWP::UserAgent->new( env_proxy => 1, keep_alive => 1, protocols_allowed => ['http'], timeout => $hash->{AGENTTMOUT});
    my $response;
@@ -18315,7 +18372,14 @@ sub Fritz_call_Lua_Query($$@)
    $luaContent =~ s/\n//gsm;
    chop($luaContent);
 
+   if( $luaContent =~ /"sid":"0000000000000000"/ ) {
+     my %retHash = ("Error" => "no valid SID", "ResetSID" => "1");
+     Fritz_Log $hash, 2, "no valid SID (0000000000000000)" . $response->status_line;
+     return \%retHash;
+   }
+
    $luaContent .= ',"status_line":"' . $response->status_line .'"}';
+   Fritz_Log $hash, 4, "Response: " . $luaContent;
 
 #################
 #   Fritz_Log $hash, 4, "Response: " . $response->content;
@@ -19689,6 +19753,13 @@ sub Fritz_Helper_process_JSON($$$@) {
    $jsonText =~ s/[\x0A\x0D]//g;                       # crlf
    $jsonText =~ s/;\z//g;                              # if semicolon as last character
 
+   my $xline       = ( caller(0) )[2];
+   my $xsubroutine = ( caller(1) )[3];
+   my $sub         = ( split( ':', $xsubroutine ) )[2];
+   $sub =~ s/Fritz_//       if ( defined $sub );
+   $sub ||= 'no-subroutine-specified';
+   Fritz_Log $hash, 4, "Decode JSON string: $xline $xsubroutine $sub";
+
    Fritz_Log $hash, 4, "Decode JSON string:\n" . $jsonText;
 
    my $jsonResult ;
@@ -20882,6 +20953,12 @@ sub Fritz_Helper_Dumper($$;@) {
          Needs FRITZ!OS 7.21 or higher.
       </li><br>
 
+      <li><a name="list"></a>
+         <dt><code>get &lt;name&gt; list &lt;normal|full&gt;</code></dt>
+         &lt;normal&gt; - execute list command.<br>
+         &lt;full&gt; - execute list command and include hidden entries.<br>
+      </li><br>
+
       <li><a name="loadSupportData"></a>
         <dt><code>get <name>loadSupportData [noRet] &lt;<delete|shReading|shReadingExt|shReadingNoFile|shReadingExtNoFile|fileOnly>&gt;</code></dt>
         <br>
@@ -21432,8 +21509,11 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_proServiceAutoUpdate</b> - Allow automatic updates</li>
       <li><b>box_proServiceDHCP</b> - Use the auto-configuration server URL provided via DHCP and PPP</li>
       <li><b>box_proServiceUSP_TR369</b> - Allow connection to your internet service provider via USP (TR-369)</li>
-      <br>
 
+      <br>
+      <li><b>box_powerRate</b>Total system - Current energy consumption (outdated)</li>
+
+      <br>
       <li><b>box_pwr...</b> - Readings Energy consumption. Available if enabled in the enableBoxReadings attribute.</li>
       <li><b>box_pwr_Rate_Act</b>Total system - Current energy consumption</li>
       <li><b>box_pwr_Rate_24avg</b>Total system - 24-hour average energy consumption</li>
@@ -22308,6 +22388,12 @@ sub Fritz_Helper_Dumper($$;@) {
 	 Benötigt FRITZ!OS 7.21 oder höher.
       </li><br>
 
+      <li><a name="list"></a>
+         <dt><code>get &lt;name&gt; list &lt;normal|full&gt;</code></dt>
+         &lt;normal&gt; - List ausführen.<br>
+         &lt;full&gt; - List ausführen und versteckte Einträge einschließen.<br>
+      </li><br>
+
       <li><a name="loadSupportData"></a>
          <dt><code>get &lt;name&gt; loadSupportData [noRet] &lt;delete|shReading|shReadingExt|shReadingNoFile|shReadingExtNoFile|fileOnly&gt;</code></dt>
          <br>
@@ -22874,6 +22960,9 @@ sub Fritz_Helper_Dumper($$;@) {
       <li><b>box_proServiceAutoUpdate</b> - Automatische Updates zulassen</li>
       <li><b>box_proServiceDHCP</b> - URL des Auto Configuration Servers über DHCP und PPP beachten</li>
       <li><b>box_proServiceUSP_TR369</b> - Anbindung an Ihren Internetanbieter über USP (TR-369) erlauben</li>
+
+      <br>
+      <li><b>box_powerRate</b>Gesamtsystem - Energieverbrauch aktuell (veraltet)</li>
 
       <br>
       <li><b>box_pwr...</b> - Readings Energieverbrauch. Verfügbar, wenn im Attribut enableBoxReadings aktiviert</li>
