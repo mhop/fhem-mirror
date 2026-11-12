@@ -43,7 +43,7 @@ eval "use Net::Async::Ping;1"       or $missingModul .= "Net::Async::Ping ";
 eval "use List::Util qw(pairmap);1" or $missingModul .= "List::Util ";
 
 my $ModuleName = "PRESENCE2";
-my $ModuleVersion = "01.06b";
+my $ModuleVersion = "01.06c";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -2312,7 +2312,7 @@ Options:
   <ul>
      <a id="PRESENCE2-get-list"></a>
      <li>
-         <dt><code>set &lt;name&gt; list &lt;normal|full&gt;</code></dt>
+         <dt><code>get &lt;name&gt; list &lt;normal|full&gt;</code></dt>
          &lt;normal&gt; - execute list command.<br>
          &lt;full&gt; - execute list command and include hidden entries.<br>
      </li><br>
@@ -2828,7 +2828,7 @@ Optionen:
   <ul>
      <a id="PRESENCE2-get-list"></a>
      <li>
-         <dt><code>set &lt;name&gt; list &lt;normal|full&gt;</code></dt>
+         <dt><code>get &lt;name&gt; list &lt;normal|full&gt;</code></dt>
          &lt;normal&gt; - List ausführen.<br>
          &lt;full&gt; - List ausführen und versteckte Einträge einschließen.<br>
      </li><br>
