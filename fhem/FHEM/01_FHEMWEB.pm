@@ -2210,7 +2210,7 @@ FW_showRoom()
   my ($idx,$svgIdx) = (1,1);
   @atEnds =  sort { $sortIndex{$a} cmp $sortIndex{$b} } @atEnds;
   $FW_svgData{$FW_cname} = { FW_RET=>$FW_RET, RES=>\%res, ATENDS=>\@atEnds };
-  my $svgDataUsed = 1;
+  my $svgDataUsed = 0;
   foreach my $d (@atEnds) {
     no strict "refs";
     my $fn = $modules{$defs{$d}{TYPE}}{FW_summaryFn};
