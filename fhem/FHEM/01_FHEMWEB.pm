@@ -3847,6 +3847,8 @@ FW_log($$)
     then requests from all interfaces (not only localhost / 127.0.0.1) are
     serviced. If IP is specified, then FHEMWEB will only listen on this IP.<br>
     To enable listening on IPV6 see the comments <a href="#telnet">here</a>.
+    For non-local IP addresses you have enable authentification (see the
+    allowed module) or set the allowfrom attribute.
     <br>
   </ul>
   <br>
@@ -4696,8 +4698,9 @@ FW_log($$)
     Aktiviert das Webfrontend auf dem Port &lt;tcp-portnr&gt;. Mit dem
     Parameter global werden Anfragen von allen Netzwerkschnittstellen
     akzeptiert (nicht nur vom localhost / 127.0.0.1). Falls IP angegeben wurde,
-    dann werden nur Anfragen an diese IP Adresse akzeptiert.  <br>
-
+    dann werden nur Anfragen an diese IP Adresse akzeptiert.
+    F&uuml;r nicht-lokale IP-Adressen ist Authentifizierung (allowed Modul}
+    notwendig.<br>
     Informationen f&uuml;r den Betrieb mit IPv6 finden Sie <a
     href="#telnet">hier</a>.<br>
   </ul>

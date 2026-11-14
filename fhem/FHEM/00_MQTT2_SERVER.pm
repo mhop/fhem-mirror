@@ -1005,7 +1005,10 @@ MQTT2_SERVER_ReadDebug($$)
     Enable the server on port &lt;tcp-portnr&gt;. If global is specified,
     then requests from all interfaces (not only localhost / 127.0.0.1) are
     serviced. If IP is specified, then MQTT2_SERVER will only listen on this
-    IP.<br>
+    IP.
+    For non-local IP addresses you have enable authentification (see the
+    allowed module) or set the allowfrom attribute.
+    <br>
     To enable listening on IPV6 see the comments <a href="#telnet">here</a>.
     <br>
     Notes:<br>
@@ -1045,6 +1048,7 @@ MQTT2_SERVER_ReadDebug($$)
   <ul>
 
     <li><a href="#allowfrom">allowfrom</a>
+      Detailed description for this attribute is in the FHEMWEB module.
       </li><br>
 
     <a id="MQTT2_SERVER-attr-autocreate"></a>
