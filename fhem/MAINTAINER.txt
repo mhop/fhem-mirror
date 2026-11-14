@@ -713,6 +713,7 @@ www/pgm2/doif.js                     Ellert       Frontends
 www/pgm2/fhemweb_controlminidash.js  schwatter    Frontends
 www/pgm2/fhemweb_fbcalllist.js       mb/orphan    Frontends
 www/pgm2/fhemweb_gauge.js            schwatter    Frontends
+www/pgm2/fhemweb_iconAnimated.js     schwatter    Frontends
 www/pgm2/fhemweb_iconButtons.js      Ellert       Frontends
 www/pgm2/fhemweb_iconLabel.js        Ellert       Frontends
 www/pgm2/fhemweb_iconRadio.js        Ellert       Frontends
