@@ -712,12 +712,12 @@ www/pgm2/dashboard*          DS_Starter           Frontends
 www/pgm2/doif.js                     Ellert       Frontends
 www/pgm2/fhemweb_controlminidash.js  schwatter    Frontends
 www/pgm2/fhemweb_fbcalllist.js       mb/orphan    Frontends
-www/pgm2/fhemweb_gauge.js            schwatter       Frontends
+www/pgm2/fhemweb_gauge.js            schwatter    Frontends
 www/pgm2/fhemweb_iconButtons.js      Ellert       Frontends
 www/pgm2/fhemweb_iconLabel.js        Ellert       Frontends
 www/pgm2/fhemweb_iconRadio.js        Ellert       Frontends
 www/pgm2/fhemweb_iconSwitch.js       Ellert       Frontends
-www/pgm2/fhemweb_multigauge.js       schwatter       Frontends
+www/pgm2/fhemweb_multigauge.js       schwatter    Frontends
 www/pgm2/fhemweb_popup.js            schwatter    Frontends
 www/pgm2/fhemweb_readingsGroup.js    justme1968   Frontends/readingsGroup readingsHistory
 www/pgm2/fhemweb_readingsHistory.js  justme1968   Frontends/readingsGroup readingsHistory
