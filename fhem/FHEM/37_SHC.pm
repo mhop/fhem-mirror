@@ -127,7 +127,7 @@ sub SHC_Set($@)
   my $cmd  = shift @a;
   my $arg  = join("", @a);
 
-  my $list = "raw:noArg";
+  my $list = "raw:noArg reset:noArg";
   return $list if ($cmd eq '?');
 
   if ($cmd eq "raw") {
@@ -136,6 +136,10 @@ sub SHC_Set($@)
     #return "Expecting a even length hex number" if((length($arg)&1) == 1 || $arg !~ m/^[\dA-F]{12,}$/ );
     Log3 $name, 4, "$name: set $name $cmd $arg";
     SHC_SimpleWrite($hash, $arg);
+
+  } elsif ($cmd eq "reset") {
+    Log3 $name, 4, "$name: set $name $cmd";
+    SHC_SimpleWrite($hash, "q110011");
 
   } else {
     return "Unknown argument $cmd, choose one of " . $list;
@@ -418,6 +422,10 @@ sub SHC_SimpleWrite(@)
   <ul>
     <li>raw &lt;data&gt;<br>
         not supported yet
+    </li><br>
+    <li>reset<br>
+        Resets the base station (user command reset including RFM12 power off).
+        The base station reports the startup reason after restarting.
     </li><br>
   </ul>
 

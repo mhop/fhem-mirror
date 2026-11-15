@@ -2,7 +2,7 @@
 # This file is part of the smarthomatic module for FHEM.
 #
 # Copyright (c) 2014 Stefan Baumann
-#               2014, 2015, 2019, 2022, 2023, 2024 Uwe Freese
+#               2014, 2015, 2019, 2022, 2023, 2024, 2025 Uwe Freese
 #
 # You can find smarthomatic at www.smarthomatic.org.
 # You can find FHEM at www.fhem.de.
@@ -39,6 +39,7 @@ my %icons = (
   "Dimmer"              => "light_ceiling",
   "EnvSensor"           => "temperature_humidity",
   "Controller"          => "display_dot",
+  "IRTransceiver"       => "it_remote",
   "Proxy"               => "it_router",
   "RGBDimmer"           => "control_arrow_turn_right",
   "SoilMoistureMeter"   => "sani_irrigation"
@@ -49,6 +50,7 @@ my %dev_state_icons = (
   "Dimmer"              => "on:on off:off set.*:light_question:off",
   "EnvSensor"           => undef,
   "Controller"          => undef,
+  "IRTransceiver"       => undef,
   "Proxy"               => undef,
   "RGBDimmer"           => undef,
   "SoilMoistureMeter"   => ".*H:\\s\\d\\..*:ampel_rot"
@@ -59,6 +61,7 @@ my %web_cmds = (
   "Dimmer"              => "on:off:statusRequest",
   "EnvSensor"           => undef,
   "Controller"          => undef,
+  "IRTransceiver"       => undef,
   "Proxy"               => undef,
   "RGBDimmer"           => undef,
   "SoilMoistureMeter"   => undef
@@ -83,6 +86,7 @@ my %dev_state_format = (
     "color",               "Color: ",
     "brightness",          "Brightness: "
   ],
+  "IRTransceiver"       => ["code", "Code: "],
   "RGBDimmer"           => [
     "color",               "Color: ",
     "brightness",          "Brightness: "
@@ -114,6 +118,7 @@ my %sets = (
                            "Backlight " .
                            "Tone " .
                            "Melody",
+  "IRTransceiver"       => "InfraredRemoteCode",
   "RGBDimmer"           => "Color " .
                            "ColorAnimation " .
                            "Dimmer.Brightness:slider,0,1,100 " .
@@ -127,12 +132,13 @@ my %sets = (
 # Supported get commands
 # use syntax from set commands
 my %gets = (
-  "PowerSwitch" => "",
-  "Dimmer"      => "",
-  "EnvSensor"   => "din:all,1,2,3,4,5,6,7,8 ain:all,1,2,3,4,5 ain_volt:1,2,3,4,5",
-  "Controller"  => "",
-  "RGBDimmer"   => "",
-  "Custom"      => ""
+  "PowerSwitch"   => "",
+  "Dimmer"        => "",
+  "EnvSensor"     => "din:all,1,2,3,4,5,6,7,8 ain:all,1,2,3,4,5 ain_volt:1,2,3,4,5",
+  "Controller"    => "",
+  "IRTransceiver" => "",
+  "RGBDimmer"     => "",
+  "Custom"        => ""
 );
 
 sub SHCdev_Parse($$);
@@ -152,7 +158,7 @@ sub SHCdev_Initialize($)
                        ." readonly:1"
                        ." forceOn:1"
                        ." $readingFnAttributes"
-                       ." devtype:EnvSensor,Dimmer,PowerSwitch,Controller,Proxy,RGBDimmer,SoilMoistureMeter";
+                       ." devtype:EnvSensor,Dimmer,PowerSwitch,Controller,IRTransceiver,Proxy,RGBDimmer,SoilMoistureMeter";
 }
 
 #####################################
@@ -267,10 +273,12 @@ sub SHCdev_Parse($$)
       readingsBulkUpdate($rhash, "version", "$major.$minor.$patch-$vhash");
     } elsif ($msgname eq "DeviceInfo") {
       my $devtype = $parser->getField("DeviceType");
-      my $major = $parser->getField("VersionMajor");
-      my $minor = $parser->getField("VersionMinor");
-      my $patch = $parser->getField("VersionPatch");
-      my $vhash = $parser->getField("VersionHash");
+      my $major   = $parser->getField("VersionMajor");
+      my $minor   = $parser->getField("VersionMinor");
+      my $patch   = $parser->getField("VersionPatch");
+      my $vhash   = $parser->getField("VersionHash");
+      my $hwmajor = $parser->getField("HardwareVersionMajor");
+      my $hwminor = $parser->getField("HardwareVersionMinor");
 
       # Assign device type
       my $devtypeOld = AttrVal( $rname, "devtype", undef );
@@ -280,10 +288,16 @@ sub SHCdev_Parse($$)
       }
 
       readingsBulkUpdate($rhash, "version", "$major.$minor.$patch-$vhash");
+      readingsBulkUpdate($rhash, "hardwareVersion", "$hwmajor.$hwminor");
     } elsif ($msgname eq "HardwareError") {
       readingsBulkUpdate($rhash, "hardwareErrorCode", $parser->getField("ErrorCode"));
     } elsif ($msgname eq "BatteryStatus") {
       readingsBulkUpdate($rhash, "battery", $parser->getField("Percentage"));
+    } elsif ($msgname eq "RXCycle") {
+      readingsBulkUpdate($rhash, "rxCycleOnSec", $parser->getField("OnSec"));
+      readingsBulkUpdate($rhash, "rxCycleOffSec", $parser->getField("OffSec"));
+      readingsBulkUpdate($rhash, "rxCycleOnRemainingSec", $parser->getField("OnRemainingSec"));
+      readingsBulkUpdate($rhash, "rxCycleOffRemainingSec", $parser->getField("OffRemainingSec"));
     }
   } elsif ($msggroupname eq "GPIO") {
     if ($msgname eq "DigitalPortTimeout") {
@@ -395,6 +409,11 @@ sub SHCdev_Parse($$)
         readingsBulkUpdate($rhash, "menuSelectionDelivery", 1);
       }
     }
+    elsif ($msgname eq "InfraredRemoteCode") {
+      my $code = $parser->getField("Code");
+      my $hex = sprintf("%02x" x length($code), map { ord } split //, $code);
+      readingsBulkUpdate($rhash, "code", $hex);
+    }
   } elsif ($msggroupname eq "Audio") {
     if ($msgname eq "Tone") {
       my $tone = $parser->getField("Tone");
@@ -443,6 +462,9 @@ sub SHCdev_Parse($$)
 
       readingsBulkUpdate($rhash, "backlightMode",        $mode);
       readingsBulkUpdate($rhash, "backlightAutoTimeSec", $autotimeoutsec);
+	} elsif ($msgname eq "Text") {
+      my $text = $parser->getField("Text");
+      readingsBulkUpdate($rhash, "text",        $text);
 	}
   }
 
@@ -527,9 +549,9 @@ sub SHCdev_Set($@)
   }
 
   # TODO:
-  # Currently the commands for every device type are defined in %sets but not used to verify the commands. Instead
-  # the SetExtension.pm modulesis used for this purpose.
-  # For more sophisticated device types this has to be revisited
+  # Currently the commands for every device type are defined in %sets but not used to verify the commands.
+  # The SetExtension.pm module is used for this purpose instead.
+  # For more sophisticated device types this has to be revisited.
 
   my $readonly = AttrVal($name, "readonly", "0");
 
@@ -643,6 +665,21 @@ sub SHCdev_Set($@)
     } else {
       return SetExtensions($hash, "", $name, @aa);
     }
+  } elsif ($devtype eq "IRTransceiver") {
+    if ($cmd eq 'InfraredRemoteCode') {
+      my $hex = $arg;
+      my $code = "";
+
+      for (my $i = 0; $i < length($hex); $i += 2) {
+        my $byte = substr($hex, $i, 2);
+        return unless $byte =~ /^[0-9a-fA-F]{2}$/;
+        $code .= chr(hex($byte));
+      }
+
+      $parser->initPacket("Controller", "InfraredRemoteCode", "Set");
+      $parser->setField("Controller", "InfraredRemoteCode", "Code", $code);
+      SHCdev_Send($hash);
+    }
   } elsif (($devtype eq "Controller") || ($devtype eq "RGBDimmer")) {
     if ($cmd eq 'Color') {
       #TODO Verify argument values
@@ -653,7 +690,7 @@ sub SHCdev_Set($@)
 
       readingsSingleUpdate($hash, "state", "set-color:$color", 1);
       $parser->initPacket("Dimmer", "Color", "SetGet");
-      $parser->setField("Dimmer", "Color", "Color",   $color);
+      $parser->setField("Dimmer", "Color", "Color", $color);
       SHCdev_Send($hash);
     } elsif ($cmd eq 'Tone') {
       #TODO Verify argument values
@@ -664,7 +701,7 @@ sub SHCdev_Set($@)
 
       readingsSingleUpdate($hash, "state", "set-tone:$tone", 1);
       $parser->initPacket("Audio", "Tone", "SetGet");
-      $parser->setField("Audio", "Tone", "Tone",   $tone);
+      $parser->setField("Audio", "Tone", "Tone", $tone);
       SHCdev_Send($hash);
     } elsif ($cmd eq 'ColorAnimation') {
       #TODO Verify argument values
@@ -896,6 +933,7 @@ sub SHCdev_Send($)
   <ul>
     <li>EnvSensor</li>
     <li>PowerSwitch</li>
+    <li>IRTransceiver</li>
     <li>Dimmer</li>
     <li>Controller</li>
     <li>RGBDimmer</li>
@@ -967,6 +1005,9 @@ sub SHCdev_Send($)
     <li>MenuSelection &lt;Index00&gt; &lt;Index01&gt; ... &lt;Index15&gt;<br>
         A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Controller_MenuSelection">www.smarthomatic.org</a>. Supported by Controller.<br>
         When the MenuSelection was initiated by the user with the controller, the reading <b>menuSelectionDelivery</b> will be set additionally to the index00, ... readings. This can be used to distinguish if the menu selection was user initiated or done programmatically by a FHEM "set" command, especially to keep more than one controller with the same options in sync reacting on a change of the menuSelectionDelivery reading.
+    </li><br>
+    <li>InfraredRemoteCode &lt;Code&gt;<br>
+        A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Controller_InfraredRemoteCode">www.smarthomatic.org</a>. Supported by IRTransceiver.
     </li><br>
     <li>Backlight &lt;Mode&gt; &lt;AutoTimeoutSec&gt;<br>
         A detailed description is available at <a href="http://www.smarthomatic.org/basics/message_catalog.html#Display_Backlight">www.smarthomatic.org</a>. Supported by Controller.

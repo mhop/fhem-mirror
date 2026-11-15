@@ -389,7 +389,7 @@ sub getValue
       last;
     }
 
-    $res .= Chr($c);
+    $res .= chr($c);
   }
 
   return $res;

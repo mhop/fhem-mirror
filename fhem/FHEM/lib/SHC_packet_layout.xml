@@ -190,7 +190,7 @@
 		<MessageGroupID>0</MessageGroupID>
 		<Message>
 			<Name>DeviceInfo</Name>
-			<Description>Reports DeviceType and current firmware version. Version information is only available when set in source code, which is usually only done for official builds by the build robot.</Description>
+			<Description>Reports DeviceType, current firmware version and hardware revision. Firmware version information is only available when set in source code, which is usually only done for official builds by the build robot. Hardware revision is set in E2P or detected by the firmware.</Description>
 			<MessageID>2</MessageID>
 			<MessageType>0</MessageType>
 			<MessageType>8</MessageType>
@@ -215,6 +215,10 @@
 				<Element>
 					<Value>40</Value>
 					<Name>PowerSwitch</Name>
+				</Element>
+				<Element>
+					<Value>43</Value>
+					<Name>IRTransceiver</Name>
 				</Element>
 				<Element>
 					<Value>45</Value>
@@ -269,13 +273,27 @@
 				<MinVal>0</MinVal>
 				<MaxVal>4294967295</MaxVal>
 			</UIntValue>
+			<UIntValue>
+				<ID>HardwareVersionMajor</ID>
+				<Description>Different major version means a major redesign of the schematic or PCB layout.</Description>
+				<Bits>8</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>255</MaxVal>
+			</UIntValue>
+			<UIntValue>
+				<ID>HardwareVersionMinor</ID>
+				<Description>Different minor number means updated schematic or PCB layout with minor functionality changes and usually compatibility of the firmware.</Description>
+				<Bits>8</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>255</MaxVal>
+			</UIntValue>
 		</Message>
 		<Message>
 			<Name>HardwareError</Name>
 			<Description>Reports detected problems with the hardware.</Description>
 			<MessageID>3</MessageID>
 			<MessageType>8</MessageType>
-			<Validity>test</Validity>
+			<Validity>released</Validity>
 			<EnumValue>
 				<ID>ErrorCode</ID>
 				<Description>Lists the type of error that occurred.</Description>
@@ -296,7 +314,60 @@
 					<Value>3</Value>
 					<Name>TransceiverWatchdogReset</Name>
 				</Element>
+				<Element>
+					<Value>4</Value>
+					<Name>TransceiverDynamicWatchdogReset</Name>
+				</Element>
+				<Element>
+					<Value>5</Value>
+					<Name>TransceiverFailedRequestReset</Name>
+				</Element>
+				<Element>
+					<Value>6</Value>
+					<Name>UserCommandReset</Name>
+				</Element>
 			</EnumValue>
+		</Message>
+		<Message>
+			<Name>RXCycle</Name>
+			<Description>For devices which are not available for incoming messages the whole time (listening in receive mode), this message describes the cycle for this functionality. It's used in battery powered devices to reduce power consumption.</Description>
+			<MessageID>8</MessageID>
+			<MessageType>0</MessageType>
+			<MessageType>1</MessageType>
+			<MessageType>2</MessageType>
+			<MessageType>3</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<MessageType>10</MessageType>
+			<Validity>test</Validity>
+			<UIntValue>
+				<ID>OnSec</ID>
+				<Description>This is the time in seconds for which the device will stay in receive mode per cycle. When setting this, it influences only all future cycles, not the current one. The value is permanently remembered on the device. The special value 0 means that the value shall not be modified. 65535 means that the device shall stay in receive mode the whole time (in this case, RXOffSec needs to be set to 0, and will be set to 0 as well). The device might reject setting the value too low (so it would practically not be reachable anymore) with an error in the Ack message.</Description>
+				<Bits>16</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>65535</MaxVal>
+			</UIntValue>
+			<UIntValue>
+				<ID>OffSec</ID>
+				<Description>This is the time in seconds for which the device will turn off reception per cycle. When setting this, it influences only all future cycles, not the current one. The value is permanently remembered on the device. The special value 0 means that the value shall not be modified. 65535 means that the device shall switch off reception forever (in this case, RXOnSec needs to be set to 0, and will be set to 0 as well). Since the device would never be reachable anymore, the device can (and usually will) reject this request, or any other request with a value it considers too high with an error in the Ack message.</Description>
+				<Bits>16</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>65535</MaxVal>
+			</UIntValue>
+			<UIntValue>
+				<ID>OnRemainingSec</ID>
+				<Description>The time for which the device will stay in receive mode in the current cycle, listening to messages, until it switches off receive mode and will not listen anymore to incoming requests. 0 indicates that receive mode is off already. The value can only be set when it is still in receive mode (otherwise it can't react to messages). In a Set request, 0 means to ignore the value. 65535 means forever and might be rejected.</Description>
+				<Bits>16</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>65535</MaxVal>
+			</UIntValue>
+			<UIntValue>
+				<ID>OffRemainingSec</ID>
+				<Description>The time for which the device will still not listen to any messages, until it switches on receive mode and starts listening again to incoming requests. The device can send this as a status message just before it goes to RX off mode. 0 indicates that receive mode is on already. The value can only be set when the device is in receive mode. Setting it means that the device switches off reception immediately for the given time. In a Set request, 0 means to ignore the setting. 65536 ("forever") or a value which the device considers being too high might be rejected with an error in the Ack.</Description>
+				<Bits>16</Bits>
+				<MinVal>0</MinVal>
+				<MaxVal>65535</MaxVal>
+			</UIntValue>
 		</Message>
 		<Message>
 			<Name>BatteryStatus</Name>
@@ -712,6 +783,20 @@
 					<DefaultVal>0</DefaultVal>
 				</UIntValue>
 			</Array>
+		</Message>
+		<Message>
+			<Name>InfraredRemoteCode</Name>
+			<Description>The three bytes within this packet represent a NEC code that can be received or transmitted.</Description>
+			<MessageID>10</MessageID>
+			<MessageType>1</MessageType>
+			<MessageType>8</MessageType>
+			<MessageType>9</MessageType>
+			<Validity>test</Validity>
+			<ByteArray>
+				<ID>Code</ID>
+				<Description>3 bytes for the NEC code.</Description>
+				<Bytes>3</Bytes>
+			</ByteArray>
 		</Message>
 	</MessageGroup>
 	<MessageGroup>
