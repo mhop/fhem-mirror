@@ -105,7 +105,7 @@ BEGIN {
         setKeyValue
         CommandAttr
         CommandDeleteAttr
-
+        defs
     ));
 };
 
@@ -607,14 +607,22 @@ sub StoreKeyValue {
 #####################################################
 # reads obfuscated value 
 sub ReadKeyValue {
-    my $hash  = shift;
+    my $p1    = shift;
     my $kName = shift;
-    my $name  = $hash->{NAME};
+    my $hash;
+    my $name;
+    if (!ref($p1) or ref($p1) ne "HASH") {
+        $name = $p1;
+        $hash = $defs{$name};
+    } else {
+        $hash = $p1;
+        $name = $hash->{NAME};
+    }
     my $index = $hash->{TYPE}."_".$hash->{NAME}."_".$kName;
     my $key   = getUniqueId().$index;
     my ($value, $err);
 
-    Log3 $name, 5, "$name: ReadKeyValue tries to read value for $kName from file";
+    Log3 $name, 5, "$name: ReadKeyValue " . FhemCaller() . " tries to read value for $kName from file";
     ($err, $value) = getKeyValue($index);
     if ( defined($err) ) {
         Log3 $name, 4, "$name: ReadKeyValue is unable to read value from file: $err";
