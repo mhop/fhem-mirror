@@ -1422,6 +1422,7 @@ SVG_escape($)
   $txt =~ s/</&lt;/g;
   $txt =~ s/>/&gt;/g;
   $txt =~ s/'/&apos;/g;
+  $txt =~ s/"/&quot;/g;
   return $txt;
 }
 
@@ -1533,7 +1534,7 @@ SVG_render($$$$$$$$$$)
       my $name = "y".($idx)."label";
       $name = "ylabel" if( $idx == 1 );
       my $t = ($conf{$name} ? $conf{$name} : "");
-      $t =~ s/"//g;
+      $t = SVG_escape($t);
       ($off1,$off2) = ($x-($idx)*$axis_width+3*$th/4, $oh/2);
       SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
           "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
@@ -1543,7 +1544,7 @@ SVG_render($$$$$$$$$$)
       my $name = "y".($idx)."label";
       $name = "ylabel" if( $idx == 1 );
       my $t = ($conf{$name} ? $conf{$name} : "");
-      $t =~ s/"//g;
+      $t = SVG_escape($t);
       ($off1,$off2) = ($x+$w+($idx-$use_left_axis)*$axis_width-$th/4, $oh/2);
       SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
           "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
@@ -1986,7 +1987,7 @@ SVG_render($$$$$$$$$$)
 
     my $yh = $y+$h;
     #-- Title attributes
-    my $tl = $conf{lTitle}[$idx] ? $conf{lTitle}[$idx]  : "";
+    my $tl = SVG_escape($conf{lTitle}[$idx] ? $conf{lTitle}[$idx] : "");
     #my $dec = int(log($hmul*3)/log(10)); # perl can be compiled without log() !
     my $dec = length(sprintf("%d",$hmul*3))-1;
     $dec = 0 if($dec < 0);
@@ -2353,6 +2354,7 @@ SVG_render($$$$$$$$$$)
     my $style = $conf{lStyle}[$i];
     $style =~ s/class="/class="legend /;
     $desc = SVG_escape($desc);
+    $t = SVG_escape($t);
     SVG_pO "<text line_id=\"line_$i\" x=\"$txtoff1\" y=\"$txtoff2\" ".
         "text-anchor=\"$caption_anchor\" $style>$t<title>$desc</title></text>";
 
