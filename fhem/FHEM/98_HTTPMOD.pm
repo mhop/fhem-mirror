@@ -3698,7 +3698,8 @@ sub HTTPMOD_CGI {
         The way the replacement value is defined can be specified with the replacement mode. If the mode is <code>reading</code>, 
         then the value is interpreted as the name of a reading of the same device or as device:reading to refer to another device.
         If the mode is <code>internal</code>, then the value is interpreted as the name of an internal of the same device or as device:internal to refer to another device.<br>
-        The mode <code>text</code> will use the value as a static text and the mode <code>expression</code> will evaluate the value as a perl expression to compute the replacement. Inside such a replacement expression it is possible to refer to capture groups of the replacement regex.<br>
+        The mode <code>text</code> will use the value as a static text and the mode <code>expression</code> will evaluate the value as a perl expression to compute the replacement. 
+        Inside such a replacement expression it is possible to refer to capture groups of the replacement regex.<br>
         The mode <code>key</code> will use a value from a key / value pair that is stored in an obfuscated form in the file system with the set storeKeyValue command. This can be useful for storing passwords.<br>
         <br>
         Example:
@@ -3851,7 +3852,7 @@ sub HTTPMOD_CGI {
             <li><code>setXXNoArg</code>: define set command without argument</li>
             <li><code>setXXTextArg</code>: treat argument as plain text</li>
             <li><code>setXXParseResponse</code>: parse the HTTP response of this set command</li>
-            <li><code>setXXAsLink</code>: generate a link instead of sending an HTTP request immediately (useful for browser-driven flows)</li>
+            <li><code>setXXAsLink</code>: generate a link instead of sending an HTTP request immediately (useful for browser-driven flows). With JavaScript the link will be followed automatically without clicking it</li>
             <li><code>setXXLocal</code>: only update readings locally, no HTTP call</li>
         </ul>
         <br>
@@ -4763,7 +4764,7 @@ sub HTTPMOD_CGI {
             <code>(get|set)XXNoArg</code>, <code>(get|set)XXTextArg</code>, <code>(get|set)XXValueSeparator</code>,
             <code>(get|set)XXIMap</code>, <code>(get|set)XXIExpr</code>.
             <code>setXXParseResponse</code> aktiviert Parsing der set-Response, <code>setXXLocal</code> arbeitet ohne HTTP-Request,
-            <code>setXXAsLink</code> erzeugt Link-Ausgaben (z.B. für Browser-/OAuth-Flows).
+            <code>setXXAsLink</code> erzeugt Link-Ausgaben und leitet den Browser automatisch weiter (z.B. für Browser-/OAuth-Flows).
         </li>
         <li><b>Authentifizierung und Session:</b> Re-Auth-Erkennung über <code>reAuthRegex</code>, <code>reAuthJSON</code>,
             <code>reAuthXPath</code>, <code>reAuthXPath-Strict</code> sowie XX-spezifische Varianten.
