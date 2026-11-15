@@ -51,6 +51,7 @@ filename2MIMEType($) {
 sub
 urlEncode($) {
   $_= $_[0];
+  $_ = Encode::encode("UTF-8", $_) if($unicodeEncoding);
   s/([\x00-\x2F \x3A-\x40 \x5B-\x60 \x7B-\xFF])/sprintf("%%%02X",ord($1))/eg;
   return $_;
 }
@@ -58,6 +59,7 @@ urlEncode($) {
 sub
 urlEncodePath($) {
   $_= $_[0];
+  $_ = Encode::encode("UTF-8", $_) if($unicodeEncoding);
   s/([\x00-\x20 \x25 \x3F \x7B-\xFF])/sprintf("%%%02x",ord($1))/eg;
   return $_;
 }
@@ -67,6 +69,7 @@ sub
 urlDecode($) {
   $_= $_[0];
   s/%([0-9A-F][0-9A-F])/chr(hex($1))/egi;
+  $_ = Encode::decode("UTF-8", $_) if($unicodeEncoding);
   return $_;
 }
 

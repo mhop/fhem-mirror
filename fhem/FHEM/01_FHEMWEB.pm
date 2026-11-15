@@ -3078,16 +3078,20 @@ FW_readIconsFrom($$)
         unless($entry eq "." || $entry eq ".." || $entry eq ".svn");
 
     } else {
-      if($entry =~ m/^iconalias.txt$/i && open(FH, "$FW_icondir/$ldir/$entry")){
-        while(my $l = <FH>) {
-          chomp($l);
-          my @a = split(" ", $l);
-          next if($l =~ m/^#/ || @a < 2);
-          $FW_icons{$dir}{$a[0]} = $a[1];
+      if($entry =~ m/^iconalias.txt$/i) {
+        my ($err, @rows) = FileRead("$FW_icondir/$ldir/$entry");
+        if($err) {
+          Log 1, $err;
+        } else {
+          foreach my $l (@rows) {
+            my @a = split(" ", $l);
+            next if($l =~ m/^#/ || @a < 2);
+            $FW_icons{$dir}{$a[0]} = $a[1];
+          }
         }
-        close(FH);
       } elsif($entry =~ m/(gif|ico|jpg|png|jpeg|svg)$/i) {
         my $filename = $subdir ? "$subdir/$entry" : $entry;
+        $filename = Encode::decode("UTF-8", $filename) if($unicodeEncoding);
         $FW_icons{$dir}{$filename} = $filename;
 
         my $tag = $filename;     # Add it without extension too
