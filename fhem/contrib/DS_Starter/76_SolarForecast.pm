@@ -72,7 +72,7 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.11.0" => "08.11.2026  Hinweis: nur noch Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
+  "2.12.0" => "18.11.2026  Hinweis: nur noch Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
