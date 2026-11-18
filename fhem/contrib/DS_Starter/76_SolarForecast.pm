@@ -48,7 +48,6 @@ use Color;
 use utf8;
 use HttpUtils;
 
-#use Test::Memory::Usage;                                                            # https://metacpan.org/pod/Test::Memory::Usage
 #use Devel::Size qw(total_size);
 
 eval "use FHEM::Meta;1"                   or my $modMetaAbsent = 1;                  ## no critic 'eval'
@@ -73,9 +72,7 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.10.11"=> "30.10.2026  Patch Subs _aiFannBevHistArray, _aiFannCycleConsumerHistArray, _aiFannHpOpmodeHistArray, getPvHistTargetArray, timestringsFromOffset ".
-              "feature: setupEnvironment - neuer Schlüssel rainAmount (eigener Regenmengenmesser überschreibt rr1c der aktuellen Stunde), headerShowEnv=rainAmount, ".
-              "__parseAttrEnvironment: Schlüssel-Parser ohne Restwerte aus Vorgängeraufrufen ",
+  "2.11.0" => "08.11.2026  Hinweis: nur noch Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -230,7 +227,7 @@ use constant {
   BGHPATH         => 'https://raw.githubusercontent.com/nasseeder1/FHEM-SolarForecast/refs/heads/main/',    # Basispfad GitHub SolarForecast Files
 
   CACHETIRMS      => 2000,                                                          # max. Size Tilted Irradiance Cache
-  CACHETSOMS      => 4000,                                                          # max. Size TimestringsFromOffset Cache
+  CACHETSOMS      => 700,                                                           # max. Size TimestringsFromOffset Cache
   CACHEPVHMS      => 500,                                                           # max. Size pvHistory Cache
   CACHETSTSMPMS   => 2000,                                                          # max. Size timestringToTimestamp Cache
   CACHESUNPOSMS   => 500,                                                           # max. Size Sonnenposition Cache
@@ -359,7 +356,7 @@ use constant {
 
 ## Storage und Caches
 ######################
-my @widgetreadings = ();                                                            # Array der Hilfsreadings als Attributspeicher
+my %widgetreadings;                                                                 # Merker versteckter Hilfsreadings als Attributspeicher
 my %Multi_Cache;                                                                    # Multifunktions Mini Cache
 my %MCache_Stats;                                                                   # Statistik für Mini Caches
 
@@ -5167,17 +5164,20 @@ sub ___computeTiltedIrradianceCached {
   #debugLog ($paref, 'apiProcess', "DWD API Tilted - num=$num, dday=$dday, chour=$chour, hod=$hod, nhtstr=$nhtstr, rel=$rel");
 
   if (!defined $sunalt || !defined $sunaz) {
-      if (!defined $sunalt || !defined $sunaz) {
-          debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
-                                         ."Value of sunaz/sunalt not stored in Nexthours or pvHistory, workaround using G_tilt=0");
-      }
-      elsif ($sunalt <= 0) {
-          debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
-                                         ."sunalt=$sunalt (sun below horizon for full hour), G_tilt=0");
-      }
+      debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
+                                     ."Value of sunaz/sunalt not stored in Nexthours or pvHistory, workaround using G_tilt=0");
 
       return (0, 0);
   }
+  
+  return (0, 0) if(!defined $rad || $rad <= 0);                                 # keine Strahlung -> nichts zu berechnen, kein Cache-Zugriff
+
+  my $pi       = 4 * atan2 (1,1);                                               # klassischer Perl-Trick, um π (Pi) mathematisch exakt zu berechnen – ohne es als feste Zahl einzutragen
+  my $deg      = $pi / 180.0;
+  my $sunalt_r = $sunalt * $deg;
+  my $sin_ele  = sin ($sunalt_r);
+
+  return (0, 0) if($sin_ele < 0.01);                                            # Sonne zu tief (ca. 0.57°) -> kein Cache-Zugriff
 
   my $cache_key = join '::', 'TILTIRR',                                         # Cache Key ID
                               $name,
@@ -5210,19 +5210,11 @@ sub ___computeTiltedIrradianceCached {
   # --- Neuberechnung
   my $sg  = $rad * KJ2WH;                                                       # rad=kJ/m²h -> 1kJ = 0,27778 Wh
   my $rho = 0.2;                                                                # Bodenalbedo
-  my $pi  = 4 * atan2 (1,1);                                                    # klassischer Perl-Trick, um π (Pi) mathematisch exakt zu berechnen – ohne es als feste Zahl einzutragen
-  my $deg = $pi / 180.0;
-
-  return (0, 0) if(!defined ($sg) || $sg <= 0);
 
   my $sunaz_r  = $sunaz    * $deg;
-  my $sunalt_r = $sunalt   * $deg;
   my $azimut_r = $str_azi  * $deg;
   my $tilt_r   = $str_tilt * $deg;
-  my $sin_ele  = sin ($sunalt_r);
   my $cos_ele  = cos ($sunalt_r);
-
-  return (0, 0) if($sin_ele < 0.01);                                            # entspricht ca. 0.57° Sonnenstand
 
   my $I0n = SOLARCONSTANT * (1.0 + 0.033 * cos (2.0 * $pi * $dofyear / 365.0));
   my $I0h = $I0n * $sin_ele;
@@ -11634,6 +11626,7 @@ sub Delete {
   }
 
   delete $data{$name};
+  delete $widgetreadings{$name};
 
 return;
 }
@@ -12734,7 +12727,7 @@ sub centralTask {
 
   ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
   ########################################################################################################################
-  #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);                 # 27.04.
+  #my $gbw = AttrVal ($name, 'graphicBeamWidth', undef);               
   #my $gco = AttrVal ($name, 'graphicControl', '');
 
   #if (defined $gbw) {
@@ -12744,8 +12737,10 @@ sub centralTask {
   #}
 
   if (!CurrentVal($name, 'TCF_cleanup_done', 0)) {
-      readingsDelete ($hash, 'Tomorrow_ConsumptionForecast');               # 07.06.
-      $data{$name}{current}{TCF_cleanup_done} = 1;                          # läuft nur einmal pro Session
+      
+      readingsDelete($hash, 'Battery_OptimumTargetSoC_'.$_) for qw(01 02 03);       # 08.11.
+      
+      $data{$name}{current}{TCF_cleanup_done} = 1;                                  # läuft nur einmal pro Session
   }
 
   if (!CurrentVal($name, 'pvh_00_cleanup_done', 0)) {             # 09.07.
@@ -12755,19 +12750,6 @@ sub centralTask {
           delete $data{$name}{circular}{'00'};
       }
     $data{$name}{current}{pvh_00_cleanup_done} = 1;               # läuft nur einmal pro Session
-  }
-
-  if (isHeatPumpUsed($name) && !CurrentVal($name, 'airaw_hp_cleanup_done', 0)) {             # 23.06.
-    my @hpStates = split /\|/, HPOPMODES;
-    for my $idx (keys %{$data{$name}{aidectree}{airaw}}) {
-        for my $s (@hpStates) {
-            for my $ci (1..MAXCONSUMER) {
-                my $c = sprintf "%02d", $ci;
-                delete $data{$name}{aidectree}{airaw}{$idx}{"csm${c}_${s}_minutes"};
-            }
-        }
-    }
-    $data{$name}{current}{airaw_hp_cleanup_done} = 1;               # läuft nur einmal pro Session
   }
 
 ##########################################################################################################################
@@ -13351,11 +13333,11 @@ sub _specialActivities {
       if (!defined $hash->{HELPER}{T1RUN}) {
           $hash->{HELPER}{T1RUN} = 1;
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 1 started");
+          __logDailyTask ($name, 'Daily special tasks - Task 1 started');
 
           __deleteEveryHourControls      ($paref);                                              # Sperrsignale der Stundenwerte-Steuerung löschen
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 1 finished");
+          __logDailyTask ($name, 'Daily special tasks - Task 1 finished');
       }
   }
   else {
@@ -13368,7 +13350,7 @@ sub _specialActivities {
       if (!defined $hash->{HELPER}{T2RUN}) {
           $hash->{HELPER}{T2RUN} = 1;
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 2 started");
+          __logDailyTask ($name, 'Daily special tasks - Task 2 started');
 
           $date = timestringsFromOffset ($name, $t, -7200)->{date};                             # Vortag (2 h Differenz reichen aus)
           $ts   = $date." 23:59:59";
@@ -13385,14 +13367,9 @@ sub _specialActivities {
           deleteReadingspec ($hash, '(Today_Hour(.*_Grid.*|.*_PV.*|.*_PPreal.*|.*_Bat.*)|powerTrigger_.*|Today_MaxPVforecast.*)');
           readingsDelete    ($hash, 'Today_PVdeviation');
           readingsDelete    ($hash, 'Today_PVreal');
-
-          if (scalar(@widgetreadings)) {                                                          # vermeide Schleife falls FHEMWEB geöfffnet
-              my @acopy       = @widgetreadings;
-              @widgetreadings = ();
-
-              for my $wdr (@acopy) {                                                              # Array der Hilfsreadings (Attributspeicher) löschen
-                  readingsDelete ($hash, $wdr);
-              }
+          
+          if (my $wr = delete $widgetreadings{$name}) {                                           # Hilfsreadings (Attributspeicher) dieses Devices löschen
+              readingsDelete ($hash, $_) for keys %$wr;
           }
 
           my ($rapi, $wapi) = getStatusApiName ($hash);
@@ -13434,7 +13411,8 @@ sub _specialActivities {
           writeCacheFile ($hash, 'plantconfig', $plantcfg.$name);                               # Anlagenkonfiguration sichern
 
           Log3 ($name, 3, "$name - history day >$day< deleted");
-          Log3 ($name, 4, "$name - Daily special tasks - Task 2 finished");
+          
+          __logDailyTask ($name, 'Daily special tasks - Task 2 finished');
       }
   }
   else {
@@ -13447,7 +13425,7 @@ sub _specialActivities {
       if (!defined $hash->{HELPER}{T3RUN}) {
           $hash->{HELPER}{T3RUN} = 1;
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 3 started");
+          __logDailyTask ($name, 'Daily special tasks - Task 3 started');
 
           for my $c (keys %{$data{$name}{consumers}}) {                                         # Planungsdaten regulär löschen
               next if(ConsumerVal ($hash, $c, "plandelete", "regular") ne "regular");
@@ -13456,7 +13434,7 @@ sub _specialActivities {
 
           writeCacheFile ($hash, 'consumers', $csmcache.$name);                                 # Cache File Consumer schreiben
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 3 finished");
+          __logDailyTask ($name, 'Daily special tasks - Task 3 finished');
       }
   }
   else {
@@ -13469,7 +13447,7 @@ sub _specialActivities {
       if (!defined $hash->{HELPER}{T4RUN}) {
           $hash->{HELPER}{T4RUN} = 1;
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 4 started");
+          __logDailyTask ($name, 'Daily special tasks - Task 4 started');
 
           __delObsoleteAPIData ($paref);                                                        # Bereinigung obsoleter Daten im solcastapi Hash
           aiDelRawData         ($paref);                                                        # KI Raw Daten löschen welche die maximale Haltezeit überschritten haben
@@ -13483,7 +13461,7 @@ sub _specialActivities {
           
           mallocTrim ($name);                                                                   # Rückgabe aller freigegebenen Arenen
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 4 finished");
+          __logDailyTask ($name, 'Daily special tasks - Task 4 finished');
       }
   }
   else {
@@ -13496,7 +13474,7 @@ sub _specialActivities {
       if (!defined $hash->{HELPER}{T5RUN}) {
           $hash->{HELPER}{T5RUN} = 1;
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 5 started");
+          __logDailyTask ($name, 'Daily special tasks - Task 5 started');
 
           if (CurrentVal ($name, 'backupFilesKeep', 3)) {
               periodicWriteMemcache ($hash, 'bckp');                                          # Backup Files erstellen und alte Versionen löschen (unterbleibt bei 'backupFilesKeep' == 0)
@@ -13505,7 +13483,7 @@ sub _specialActivities {
           readingsDelete ($hash, 'Error');
           readingsDelete ($hash, 'Errorcode');
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 5 finished");
+          __logDailyTask ($name, 'Daily special tasks - Task 5 finished');
       }
   }
   else {
@@ -13518,11 +13496,11 @@ sub _specialActivities {
       if (!defined $hash->{HELPER}{T6RUN}) {
           $hash->{HELPER}{T6RUN} = 1;
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 6 started");
+          __logDailyTask ($name, 'Daily special tasks - Task 6 started');
 
           aiManageInstance ($paref);                                                            # AI PV-Forecast füllen, trainieren und sichern
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 6 finished");
+          __logDailyTask ($name, 'Daily special tasks - Task 6 finished');
       }
   }
   else {
@@ -13545,13 +13523,13 @@ sub _specialActivities {
           my $ltctrts                  = timestringToTimestamp ($hash, $tfodate.' 00:00:00');                   # ...auf Tag genau
           my $newctrstts               = $ltctrts + ($aiconpd * 86400);
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 7 started");
+          __logDailyTask ($name, 'Daily special tasks - Task 7 started');
 
           $paref->{fanntyp} = $fanntyp;
           aiFannEnterTrain ($paref) if($prepared && $t >= $newctrstts);                                         # NN Consumption Forecast Training starten
           delete $paref->{fanntyp};
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 7 finished");
+          __logDailyTask ($name, 'Daily special tasks - Task 7 finished');
       }
   }
   else {
@@ -13564,16 +13542,39 @@ sub _specialActivities {
       if (!defined $hash->{HELPER}{T8RUN}) {
           $hash->{HELPER}{T8RUN} = 1;
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 7 started");
+          __logDailyTask ($name, 'Daily special tasks - Task 8 started');
 
           __createAdditionalEvents ($paref);                                                            # zusätzliche Events erzeugen - PV Vorhersage bis Ende des kommenden Tages
 
-          Log3 ($name, 4, "$name - Daily special tasks - Task 7 finished");
+          __logDailyTask ($name, 'Daily special tasks - Task 8 finished');
       }
   }
   else {
       delete $hash->{HELPER}{T8RUN};
   }
+
+return;
+}
+
+#############################################################################
+#          Daily Task mit RSS-Protokollierung auf Linux
+#############################################################################
+sub __logDailyTask {
+  my ($name, $txt) = @_;
+
+  my $msg = "$name - $txt";
+
+  if ($^O eq 'linux' && open (my $fh, '<', "/proc/$$/status")) {
+      my ($rss) = grep { /^VmRSS/ } <$fh>;
+      close $fh;
+
+      if (defined $rss) {
+          $rss =~ s/\D//g;
+          $msg .= " (RSS=$rss kB)";
+      }
+  }
+
+  Log3 ($name, 4, $msg);
 
 return;
 }
@@ -15890,12 +15891,7 @@ sub _batSocTarget {
           ## pvHistory/Readings schreiben
           #################################
           writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $lowSoc, day => $day, hour => 99 } );
-          
-          ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-          ########################################################################################################################          
-          storeReading   ($name, 'Battery_OptimumTargetSoC_'.$bn, $lowSoc.' %');
-          ########################################################################################################################
-          
+                    
           storeReading   ($name, 'Battery_OptimumBaseSoC_'.$bn, $lowSoc.' %');
           storeReading   ($name, 'Battery_ChargeRequest_'.$bn, 0);
 
@@ -16059,14 +16055,9 @@ sub _batSocTarget {
       ## pvHistory/Readings schreiben
       #################################
       writeToHistory ( { paref => $paref, key => 'batsetsoc'.$bn, val => $target, day => $day, hour => 99 } );
-      
-      ### nicht mehr benötigte Daten verarbeiten - Bereich kann später wieder raus !!
-      ########################################################################################################################                
-      storeReading   ($name, 'Battery_OptimumTargetSoC_'.$bn, $target.' %');
-      ########################################################################################################################
-      
-      storeReading   ($name, 'Battery_OptimumBaseSoC_'.$bn, $target.' %');
-      storeReading   ($name, 'Battery_ChargeRequest_'.$bn,    $chargereq);
+
+      storeReading ($name, 'Battery_OptimumBaseSoC_'.$bn, $target.' %');
+      storeReading ($name, 'Battery_ChargeRequest_'.$bn,    $chargereq);
   }
 
 return;
@@ -23628,9 +23619,9 @@ sub ___ownSpecGetFWwidget {
               $reading = $elm;
           }
       }
-
+      
       if ($reading && $reading =~ /^\./xs) {                                             # verstecktes Reading für spätere Löschung merken
-          push @widgetreadings, $reading;
+          $widgetreadings{$name}{$reading} = 1;                                          # Hash dedupliziert, kein unbegrenztes Wachstum
           readingsSingleUpdate ($defs{$name}, $reading, $current, 0);
       }
 
@@ -31330,11 +31321,14 @@ sub _aiFannBevHistArray {
 
   # --- Cache-Hit? ---
   if (my $cached = LRU_get ($name, $cache, $key)) {
-      return map { [ @$_ ] } @$cached;                                                  # Kopien zurückgeben, Cache bleibt unverändert
+      $hash->{HELPER}{CNT_BEVHIST_HIT}++;                                               # Hit-Zähler
+      return map { aiUnpackSeries ($_) } @$cached;                                      # frische Kopien bzw. aus Nullserien expandierte Arrays
   }
 
   # --- Kein Cache-Hit → Originalberechnung ---
   # --- identische Tagesreihenfolge wie getPvHistTargetArray ---
+  $hash->{HELPER}{CNT_BEVHIST_MISS}++;                                                  # Miss-Zähler
+  
   my $ph         = $data{$name}{pvhist};
   my @days_after = sort { $a <=> $b } grep { $_ >  $mday } keys %$ph;
   my @days_upto  = sort { $a <=> $b } grep { $_ <= $mday } keys %$ph;
@@ -31380,9 +31374,10 @@ sub _aiFannBevHistArray {
   @phases_ratio     = @phases_ratio    [-$min .. -1];
 
   # --- Ergebnis cachen: eigene Kopien ablegen, damit spätere push-Operationen des Aufrufers den Cache nicht verändern ---
-  LRU_insert ($name, $cache, $key, [ map { [ @$_ ] } (\@active, \@load_raw, \@n_active, \@soc_deficit_norm,
-                                                       \@energy_remaining, \@charge_intensity,
-                                                       \@prio_frac, \@auto_frac, \@other_frac, \@phases_ratio) ]);
+  LRU_purge_stale ($name, $cache, $key);                            # veraltete Einträge löschen
+  LRU_insert      ($name, $cache, $key, [ map { aiPackSeries ($_) } (\@active, \@load_raw, \@n_active, \@soc_deficit_norm,
+                                                                     \@energy_remaining, \@charge_intensity,
+                                                                     \@prio_frac, \@auto_frac, \@other_frac, \@phases_ratio) ]);
 
 return (\@active, \@load_raw, \@n_active, \@soc_deficit_norm, \@energy_remaining, \@charge_intensity,
         \@prio_frac, \@auto_frac, \@other_frac, \@phases_ratio);
@@ -31430,7 +31425,7 @@ sub _aiFannCycleConsumerHistArray {
 
   # --- Cache-Hit? ---
   if (my $cached = LRU_get ($name, $cache, $key)) {
-      return map { [ @$_ ] } @$cached;                                        # Kopie zurückgeben (\@cycle_csme_raw)
+      return map { aiUnpackSeries ($_) } @$cached;                                  # frische Kopie (\@cycle_csme_raw) bzw. aus Nullserie expandiert 
   }
 
   # --- Kein Cache-Hit → Originalberechnung ---
@@ -31442,10 +31437,10 @@ sub _aiFannCycleConsumerHistArray {
   for my $day (@days_after, @days_upto) {
       for my $hod (sort { $a <=> $b } keys %{ $ph->{$day} }) {
           next if $hod < 1 || $hod > 24;
-          last if ($day == $mday && $hod == $hour + 1);                      # nur abgeschlossene Stunden
+          last if ($day == $mday && $hod == $hour + 1);                             # nur abgeschlossene Stunden
 
           my $rec = $ph->{$day}{$hod};
-          next unless defined $rec->{$fanntyp};                              # identisches Filterkriterium wie getPvHistTargetArray
+          next unless defined $rec->{$fanntyp};                                     # identisches Filterkriterium wie getPvHistTargetArray
           next unless $rec->{$fanntyp} >= 0;
 
           my $cycle_csme = 0;
@@ -31455,13 +31450,13 @@ sub _aiFannCycleConsumerHistArray {
               my $type      = ConsumerVal ($name, $c, 'type', '');
 
               next unless $type;
-              next if $type =~ /heatpump|bev/xs;                            # durch eigene Feature-Blöcke abgedeckt
+              next if $type =~ /heatpump|bev/xs;                                    # durch eigene Feature-Blöcke abgedeckt
 
               my $exconfc = $rec->{"exconfc${c}"} // 0;
-              next if $exconfc;                                             # Energieanteil vom User ausgeschlossen (konsistent zu dest_base-Bereinigung)
+              next if $exconfc;                                                     # Energieanteil vom User ausgeschlossen (konsistent zu dest_base-Bereinigung)
 
               my $val      = $rec->{"csme${c}"} // 0;
-              $cycle_csme += max (0, $val);                                 # Schutz gegen negative Werte
+              $cycle_csme += max (0, $val);                                         # Schutz gegen negative Werte
           }
 
           push @cycle_csme_raw, $cycle_csme;
@@ -31473,8 +31468,9 @@ sub _aiFannCycleConsumerHistArray {
   my $min         = $n < $limit ? $n : $limit;
   @cycle_csme_raw = @cycle_csme_raw[-$min .. -1];
 
-  # --- Ergebnis cachen: eigene Kopie ablegen ---
-  LRU_insert ($name, $cache, $key, [ [ @cycle_csme_raw ] ]);
+  # --- Ergebnis cachen: eigene Kopie ablegen (Nullserien kompakt) ---
+  LRU_purge_stale ($name, $cache, $key);                                            # veraltete Einträge löschen
+  LRU_insert      ($name, $cache, $key, [ aiPackSeries (\@cycle_csme_raw) ]);      
 
 return (\@cycle_csme_raw);
 }
@@ -31517,7 +31513,7 @@ sub _aiFannHpOpmodeHistArray {
 
   # --- Cache-Hit? ---
   if (my $cached = LRU_get ($name, $cache, $key)) {
-      return map { [ @$_ ] } @$cached;                                              # Kopien zurückgeben, Cache bleibt unverändert
+      return map { aiUnpackSeries ($_) } @$cached;                                  # frische Kopie bzw. aus Nullserie expandiert
   }
 
   # --- Kein Cache-Hit → Originalberechnung ---
@@ -31562,8 +31558,9 @@ sub _aiFannHpOpmodeHistArray {
   @eco         = @eco        [-$min .. -1];
 
   # --- Ergebnis cachen: eigene Kopien ablegen, damit spätere push-Operationen des Aufrufers den Cache nicht verändern ---
-  LRU_insert ($name, $cache, $key, [ map { [ @$_ ] } (\@heating, \@defrost, \@hotwater, \@cooling,
-                                                       \@pool, \@poolheating, \@eco, \@active) ]);
+  LRU_purge_stale ($name, $cache, $key);                                            # veraltete Einträge löschen
+  LRU_insert      ($name, $cache, $key, [ map { aiPackSeries ($_) } (\@heating, \@defrost, \@hotwater, \@cooling,
+                                                                     \@pool, \@poolheating, \@eco, \@active) ]);
 
 return (\@heating, \@defrost, \@hotwater, \@cooling, \@pool, \@poolheating, \@eco, \@active);
 }
@@ -31638,7 +31635,7 @@ sub _aiFannApplyBiasCorrection {
   my $rmse_rel         = AiNeuralVal ($name, $fanntyp, 'RmseRel',           100);
   my $mae              = AiNeuralVal ($name, $fanntyp, 'Mae',               100);
   my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',        1.0);
-  my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',         0.0);               # DriftBias ist der relative Drift gegenüber dem letzten Referenzpunkt (DriftRefBias)
+  my $drift_level      = AiNeuralVal ($name, $fanntyp, 'DriftLevel',        0.0);               # gemessene Niveauabweichung ...
   my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio', 1.0);
   my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',       0);
 
@@ -31701,13 +31698,12 @@ sub _aiFannApplyBiasCorrection {
   $ds_adapted = max (0.70, min(1.10, $ds_adapted));                                             # final clamp
 
 
-  # --- Bias-Korrektur ---
-  # Drift-Bias clampen
-  my $drift_bias_max     = 1.0 * $mae;
-  my $clamped_drift_bias = $drift_bias;
+  # --- Bias-Korrektur ---  
+  # Drift-Niveau-Korrektur: nur die Hälfte der gemessenen Abweichung, absolut auf 0.5 * MAE begrenzt
+  my $drift_bias_max     = 0.5 * $mae;
+  my $clamped_drift_bias = 0.5 * $drift_level;
   $clamped_drift_bias    =  $drift_bias_max if($clamped_drift_bias >  $drift_bias_max);
   $clamped_drift_bias    = -$drift_bias_max if($clamped_drift_bias < -$drift_bias_max);
-
 
   # --- Sicherheitsbegrenzung des Bias ---
   my $max_bias     = 0.5 * $mae;                                                                # Maximal 50% des MAE berücksichtigen
@@ -31736,9 +31732,13 @@ sub _aiFannApplyBiasCorrection {
       $is_baseline = 0;
   }
 
-  $clamped_drift_bias = 0                          if(!$drift_enabled);                         # Level-Skalierung Freischaltung
-  $res                = $res + $clamped_drift_bias if($is_baseline);                            # Drift-Bias nur auf Baseline anwenden (bei Freischaltung)
+  $clamped_drift_bias = 0 if(!$drift_enabled);                                                  # Level-Skalierung Freischaltung
 
+  if ($is_baseline) {                                                                           # Drift-Korrektur nur auf Baseline anwenden (bei Freischaltung)
+      my $rel_max         = 0.30 * $res;                                                        # relative Begrenzung: höchstens 30 % der (skalierten) Prognose, nach oben wie unten
+      $clamped_drift_bias = max (-$rel_max, min ($rel_max, $clamped_drift_bias));
+      $res                = $res + $clamped_drift_bias;
+  }
 
   # --- Statische Trainingskalibrierung (Peak-geschützt) ---
   # Korrigiert strukturellen Slope-Fehler aus dem Training.
@@ -31816,11 +31816,14 @@ sub aiFannDetectDrift {
   my $fanntyp = shift;
 
   my $window = _aiFannSelectWindow ($name, $fanntyp);                                       # optimales Drift-Detct-Fenster ermitteln (vor Löschen Kennwerte)
-
+  
   my @drift_kpis = qw (
       DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftRefMae DriftIndex
       DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag DriftSemRatio DriftWindowSize
+      DriftLevel
   );
+
+  my $prev_bias_live_saved = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive', undef);         # vor dem Löschen sichern, sonst ist die EMA auf bias_live wirkungslos
 
   delete @{$data{$name}{neuralnet}{$fanntyp}}{@drift_kpis};
 
@@ -31908,6 +31911,8 @@ sub aiFannDetectDrift {
 
   # --- Slope/Bias pro Stunde berechnen
   my $prev_bias_live_hour;
+  my $quant30 = CircularVal ($name, 99, $fanntyp.'_quantile30', 0);                 # Grundlast-Referenz (wie in _aiFannApplyBiasCorrection)
+  my @level_list; 
 
   for my $idx (@tail_idx) {
       next if(!$idx);
@@ -31923,11 +31928,12 @@ sub aiFannDetectDrift {
       push @targets,    $a;
       push @preds,      $p;
       push @slope_list, ($p / $a) if($a != 0);
+      push @level_list, ($a - $p) if($quant30 > 0 && ($idx % 100) >= 7 && $p <= 1.2 * $quant30);    # gleiche Bedingungen wie bei der Anwendung: hod >= 7 und Baseline
 
-      my $bias_hour = $a - $p;                                                      # real - Prognose!
+      my $bias_hour = $a - $p;                                                                      # real - Prognose!
 
       # --- Clamping gegen extreme Ausreißer
-      my $max_bias = 3 * $ref_mae;                                                  # 3x Modell-MAE
+      my $max_bias = 3 * $ref_mae;                                                                  # 3x Modell-MAE
       $bias_hour   = max (-$max_bias, min($max_bias, $bias_hour));
 
       # --- Glättung
@@ -31982,7 +31988,7 @@ sub aiFannDetectDrift {
   my $ref_slope   = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope', $slope_model);
 
   # --- Bias-Live glätten (EMA) ---
-  my $prev_bias_live = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive', $bias_live);
+  my $prev_bias_live = $prev_bias_live_saved // $bias_live;
   $bias_live         = 0.7 * $bias_live + 0.3 * $prev_bias_live;
 
   my $slope_drift = $ref_slope  != 0 ? ($slope_live / $ref_slope ) : 0;
@@ -32084,12 +32090,21 @@ sub aiFannDetectDrift {
                                                    debug           => $debug,
                                                 } );
 
+  # --- Niveau-Korrektur der Grundlast (ersetzt DriftBias als additive Korrekturgröße in _aiFannApplyBiasCorrection)
+  # Median der signierten Fehler (Ist - unkorrigierte KI-Prognose) der Grundlaststunden, positiv = Prognose war zu niedrig.
+  # Mindestens 6 Stunden erforderlich; bei Daten-/Sensorproblemen (Safety-Block) keine Korrektur.
+  my $drift_level   = @level_list >= 6 ? medianArray (\@level_list) : 0;
+  $drift_level      = 0 if($block_reason && $block_reason =~ /^(?:no_data|slope_implausible|rmse_anomaly|bias_implausible)$/);
+  $nn->{DriftLevel} = round2 ($drift_level);
+
   if (!$block_reason) {                                                                             # Rekalibrierung
       my $drifthzn3th = ($flag eq 'severe') ? 4 : DRIFTHZN3TH;                                      # V 2.6.2 - 4h bei severe, sonst 8h -> schnellere Rekalibrierung nur bei schwerem Drift
 
       if (($nn->{DriftZone3Hours} // 0) >= $drifthzn3th) {                                          
-          # ---- Effektiver Bias-Drift: Kombination aus DriftBias und MAE-Drift
-          my $bias_drift_effective = 0.5 * $bias_drift + 0.5 * ($mae_live - $ref_mae);
+          # ---- Effektiver Bias-Drift: nur der vorzeichenbehaftete Drift der Bias-Referenz
+          # Der MAE-Term entfällt: ref_mae ist der Trainings-MAE, (mae_live - ref_mae) ist bei stochastischen Haushalten
+          # dauerhaft > 0 und würde die Referenz bei jeder Rekalibrierung weiter anheben.
+          my $bias_drift_effective = 0.5 * $bias_drift;
           $bias_drift_effective    = max(-2*$ref_mae, min(2*$ref_mae, $bias_drift_effective));      # Clamping gegen Überreaktionen
           my $new_bias             = $ref_bias + 0.4 * $bias_drift_effective;                       # Sanfte Anpassung (40 % statt 70 %)
 
@@ -32097,7 +32112,8 @@ sub aiFannDetectDrift {
           my $slope_error           = $slope_live - $ref_slope;
           my $slope_drift_effective = 0.6 * $slope_error + 0.4 * ($rmse_rel_ratio - 1.0) * 0.1;     # Effektiver Slope-Drift: Kombination aus Slope-Drift und RMSE-Drift
           my $new_slope             = $ref_slope + $slope_drift_effective;                          # Neue Steigung
-          $new_slope                = max (0.85, min (1.15, $new_slope));                           # Clamping für Stabilität
+          my $slope_floor           = max (0.05, min (0.85, $slope_model));                         # Untergrenze am Trainings-Slope orientieren (ModelSlope 0.30 darf nicht auf 0.85 springen)
+          $new_slope                = max ($slope_floor, min (1.15, $new_slope));                   # Clamping für Stabilität
 
           $nn->{DriftRefBias}        = $new_bias;
           $nn->{DriftRefSlope}       = $new_slope;
@@ -32128,7 +32144,7 @@ sub aiFannDetectDrift {
   if ($debug =~ /aiProcess/xs) {
       Log3 ($name, 1, sprintf(
           "%s DEBUG> DRIFT [%s]: ".
-          "Flag=%s | WindowSize=%d | Block=%s | SlopeLive=%.3f | DriftSlope=%.3f | BiasLive=%.2f | DriftBias=%.2f | ".
+          "Flag=%s | WindowSize=%d | Block=%s | SlopeLive=%.3f | DriftSlope=%.3f | BiasLive=%.2f | DriftBias=%.2f | DriftLevel=%.2f | ".
           "RMSErelLive=%.1f | RMSErelRatio=%.2f | BiasVarNorm=%.2f | DriftIndex=%.2f | DriftScore=%.2f | ".
           "Zone3Hours=%d | Hist=[%s] | Retrain=%s (%s)",
           $name,
@@ -32140,6 +32156,7 @@ sub aiFannDetectDrift {
           $slope_drift,
           $bias_live,
           $bias_drift,
+          $drift_level,
           $rmse_rel_live,
           $rmse_rel_ratio,
           $bias_var_norm,
@@ -32240,8 +32257,15 @@ sub _aiFannDriftHistSlice {
           my $act = HistoryVal ($name, $pvd, $hod, $fanntyp, undef);
           next unless (defined $act && $act >= 0);
 
-          my $prd = HistoryVal ($name, $pvd, $hod, $fanntyp.'aifc', undef);
-          next unless (defined $prd && $prd >= 0);
+          #my $prd = HistoryVal ($name, $pvd, $hod, $fanntyp.'aifc', undef);
+          #next unless (defined $prd && $prd >= 0);
+          
+          my $prd = HistoryVal ($name, $pvd, $hod, $fanntyp.'aifc',     undef);                # conaifc enthaelt bereits die korrigierte Prognose
+          my $crr = HistoryVal ($name, $pvd, $hod, $fanntyp.'biascorr', undef);                # darin enthaltene Bias-/Drift-Korrektur (Wh)
+          next unless (defined $prd && defined $crr);
+
+          $prd -= $crr;                                                                        # unkorrigierte KI-Rohprognose rekonstruieren (Rundungsfehler max. 1 Wh)
+          next unless ($prd >= 0);
 
           $slice{$idx}{$fanntyp}        = $act;
           $slice{$idx}{$fanntyp.'aifc'} = $prd;
@@ -38610,7 +38634,7 @@ sub getPvHistTargetArray {
 
   # --- Cache-Hit? ---
   if (my $cached = LRU_get ($name, $cache, $key)) {
-      return map { [@$_] } @$cached;                                                        # (\@p1, \@p2, \@p3)
+      return map { aiUnpackSeries ($_) } @$cached;                                          # frische Kopie (\@p1, \@p2, \@p3) bzw. aus Nullserie expandiert 
   }
 
   # --- Kein Cache-Hit → Originalberechnung ---
@@ -38688,7 +38712,8 @@ sub getPvHistTargetArray {
   }
 
   # --- Ergebnis cachen: eigene Kopien ablegen, Aufrufer bekommt die Originale ---
-  LRU_insert ($name, $cache, $key, [ map { [ @$_ ] } (\@p1keys, \@p2keys, \@p3keys) ]);
+  LRU_purge_stale ($name, $cache, $key);                                                        # veraltete Einträge löschen
+  LRU_insert      ($name, $cache, $key, [ map { aiPackSeries ($_) } (\@p1keys, \@p2keys, \@p3keys) ]);
 
 return (\@p1keys, \@p2keys, \@p3keys);
 }
@@ -40040,7 +40065,7 @@ sub LRU_insert {
       LRU_evict_tail ($name, $cache);
   }
 
-  if (getDebug($defs{$name}) =~ /$title/xs) {
+  if (index (getDebug ($defs{$name}), $title) >= 0) {
       Log3 ($name, 1, "$name DEBUG> $title INSERT key: $key, value: $value")
            if(askLogtime($name, "$key:$value", 300));
   }
@@ -40075,7 +40100,7 @@ sub LRU_get {
   if (!exists $cache->{data}{$key}) {                                           # Cache-Miss
       $cache->{stats}{misses}++;
 
-      if (getDebug($defs{$name}) =~ /$title/xs) {
+      if (index (getDebug ($defs{$name}), $title) >= 0) {
           Log3 ($name, 1, "$name DEBUG> $title MISS for key: $key")
                if(askLogtime($name, $key, 300));
       }
@@ -40087,7 +40112,7 @@ sub LRU_get {
 
   my $cached = $cache->{data}{$key};
 
-  if (getDebug($defs{$name}) =~ /$title/xs) {
+  if (index (getDebug ($defs{$name}), $title) >= 0) {
       Log3 ($name, 1, "$name DEBUG> $title HIT for key: $key -> $cached")
            if(askLogtime($name, "$key:$cached", 300));
   }
@@ -40163,7 +40188,7 @@ sub LRU_evict_tail {
 
   return unless $tail;
 
-  if (getDebug($defs{$name}) =~ /$title/xs) {
+  if (index (getDebug ($defs{$name}), $title) >= 0) {
       Log3 ($name, 1, "$name DEBUG> $title FULL -> evicting tail: $tail")
           if(askLogtime($name, $tail, 300));
   }
@@ -40287,6 +40312,63 @@ sub LRU_reset {
 return;
 }
 
+# --- veraltete Stunden-Keys finden und löschen
+# Key: PREFIX::name::year::mon::mday::hour::<Rest> 
+# BEVHISTARR :: SolCast :: 2026 :: 11 :: 08 :: 11 :: 600
+# PREFIX        Device     Jahr    Monat Tag   Std   Rest (z. B. Limit)
+sub LRU_purge_stale {
+  my ($name, $cache, $keepkey) = @_;
+
+  my @p = split /::/, $keepkey;
+  return if @p < 7;
+
+  my $rest = join '::', @p[6..$#p];
+
+  for my $k (keys %{ $cache->{data} }) {
+      next if $k eq $keepkey;
+
+      my @q = split /::/, $k;
+      next if @q < 7 || $q[0] ne $p[0] || $q[1] ne $p[1];
+      next if join ('::', @q[6..$#q]) ne $rest;
+
+      LRU_delete ($name, $cache, $k);
+  }
+
+return;
+}
+
+# Genau einen Eintrag entfernen.
+# Knoten aus lru herausnehmen und die Nachbarn umhängen. 
+# Hat der Knoten einen Vorgänger, zeigt dessen next jetzt auf den 
+# Nachfolger des gelöschten Knotens. 
+# War er der Head, wird sein Nachfolger neuer Head. 
+# Entsprechend für den Nachfolger: Dessen prev zeigt auf den Vorgänger, 
+# und war der Knoten der Tail, wird sein Vorgänger neuer Tail.
+# Dann -> Wert aus data löschen und den Zähler ${ $cache->{size} } um eins verringern.
+sub LRU_delete {
+  my ($name, $cache, $key) = @_;
+
+  return 0 if !exists $cache->{lru}{$key};
+
+  if (!LRU_sanity_check ($cache)) {
+      LRU_reset ($name, $cache);
+      return 0;
+  }
+
+  my $node = delete $cache->{lru}{$key};
+
+  if (defined $node->{prev}) { $cache->{lru}{$node->{prev}}{next} = $node->{next}; }
+  else                       { ${ $cache->{head} } = $node->{next};                }
+
+  if (defined $node->{next}) { $cache->{lru}{$node->{next}}{prev} = $node->{prev}; }
+  else                       { ${ $cache->{tail} } = $node->{prev};                }
+
+  delete $cache->{data}{$key};
+  ${ $cache->{size} }--;
+
+return 1;
+}
+
 # --- Cache debuggen
 sub LRU_debug {
   my ($name, $cache) = @_;
@@ -40334,6 +40416,29 @@ sub LRU_debug {
 return;
 }
 
+###########################################################################
+#          Nullserien im Cache kompakt ablegen / auslesen
+###########################################################################
+sub aiPackSeries {                                                      # Cache-Ablage: Nullserie -> nur Länge, sonst echte Kopie
+  my $arr = shift;
+
+  my @probe = @$arr;                                                    # Prüfung auf Kopie, damit die Originale unverändert bleiben
+
+  no warnings 'numeric';
+  return scalar @probe if @probe && !grep { !defined $_ || $_ != 0 } @probe;
+
+return [ @$arr ];
+}
+
+sub aiUnpackSeries {                                                    # Rückgabe: immer frische Kopie
+  my $e = shift;
+
+return ref $e ? [ @$e ] : [ (0) x $e ];
+}
+
+###########################################################################
+#                   Mini-Cache Verwaltungsroutinen
+###########################################################################
 # --- Mini-Cache Wert lesen (undef = Miss; gespeicherte Werte sind nie undef)
 sub MCache_get {
   my ($cache, $stats, $key) = @_;
