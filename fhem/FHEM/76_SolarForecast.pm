@@ -72,7 +72,7 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.11.0" => "08.11.2026  Hinweis: nur noch Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
+  "2.12.0" => "18.11.2026  Hinweis: nur noch Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -5164,17 +5164,20 @@ sub ___computeTiltedIrradianceCached {
   #debugLog ($paref, 'apiProcess', "DWD API Tilted - num=$num, dday=$dday, chour=$chour, hod=$hod, nhtstr=$nhtstr, rel=$rel");
 
   if (!defined $sunalt || !defined $sunaz) {
-      if (!defined $sunalt || !defined $sunaz) {
-          debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
-                                         ."Value of sunaz/sunalt not stored in Nexthours or pvHistory, workaround using G_tilt=0");
-      }
-      elsif ($sunalt <= 0) {
-          debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
-                                         ."sunalt=$sunalt (sun below horizon for full hour), G_tilt=0");
-      }
+      debugLog ($paref, 'apiProcess', "DWD API Tilted - day=$dday hod=$hod -> "
+                                     ."Value of sunaz/sunalt not stored in Nexthours or pvHistory, workaround using G_tilt=0");
 
       return (0, 0);
   }
+  
+  return (0, 0) if(!defined $rad || $rad <= 0);                                 # keine Strahlung -> nichts zu berechnen, kein Cache-Zugriff
+
+  my $pi       = 4 * atan2 (1,1);                                               # klassischer Perl-Trick, um π (Pi) mathematisch exakt zu berechnen – ohne es als feste Zahl einzutragen
+  my $deg      = $pi / 180.0;
+  my $sunalt_r = $sunalt * $deg;
+  my $sin_ele  = sin ($sunalt_r);
+
+  return (0, 0) if($sin_ele < 0.01);                                            # Sonne zu tief (ca. 0.57°) -> kein Cache-Zugriff
 
   my $cache_key = join '::', 'TILTIRR',                                         # Cache Key ID
                               $name,
@@ -5207,19 +5210,11 @@ sub ___computeTiltedIrradianceCached {
   # --- Neuberechnung
   my $sg  = $rad * KJ2WH;                                                       # rad=kJ/m²h -> 1kJ = 0,27778 Wh
   my $rho = 0.2;                                                                # Bodenalbedo
-  my $pi  = 4 * atan2 (1,1);                                                    # klassischer Perl-Trick, um π (Pi) mathematisch exakt zu berechnen – ohne es als feste Zahl einzutragen
-  my $deg = $pi / 180.0;
-
-  return (0, 0) if(!defined ($sg) || $sg <= 0);
 
   my $sunaz_r  = $sunaz    * $deg;
-  my $sunalt_r = $sunalt   * $deg;
   my $azimut_r = $str_azi  * $deg;
   my $tilt_r   = $str_tilt * $deg;
-  my $sin_ele  = sin ($sunalt_r);
   my $cos_ele  = cos ($sunalt_r);
-
-  return (0, 0) if($sin_ele < 0.01);                                            # entspricht ca. 0.57° Sonnenstand
 
   my $I0n = SOLARCONSTANT * (1.0 + 0.033 * cos (2.0 * $pi * $dofyear / 365.0));
   my $I0h = $I0n * $sin_ele;
@@ -31640,7 +31635,7 @@ sub _aiFannApplyBiasCorrection {
   my $rmse_rel         = AiNeuralVal ($name, $fanntyp, 'RmseRel',           100);
   my $mae              = AiNeuralVal ($name, $fanntyp, 'Mae',               100);
   my $drift_slope      = AiNeuralVal ($name, $fanntyp, 'DriftSlope',        1.0);
-  my $drift_bias       = AiNeuralVal ($name, $fanntyp, 'DriftBias',         0.0);               # DriftBias ist der relative Drift gegenüber dem letzten Referenzpunkt (DriftRefBias)
+  my $drift_level      = AiNeuralVal ($name, $fanntyp, 'DriftLevel',        0.0);               # gemessene Niveauabweichung ...
   my $drift_rmse_ratio = AiNeuralVal ($name, $fanntyp, 'DriftRmseRelRatio', 1.0);
   my $model_age        = AiNeuralVal ($name, $fanntyp, 'ModelAgeHours',       0);
 
@@ -31703,13 +31698,12 @@ sub _aiFannApplyBiasCorrection {
   $ds_adapted = max (0.70, min(1.10, $ds_adapted));                                             # final clamp
 
 
-  # --- Bias-Korrektur ---
-  # Drift-Bias clampen
-  my $drift_bias_max     = 1.0 * $mae;
-  my $clamped_drift_bias = $drift_bias;
+  # --- Bias-Korrektur ---  
+  # Drift-Niveau-Korrektur: nur die Hälfte der gemessenen Abweichung, absolut auf 0.5 * MAE begrenzt
+  my $drift_bias_max     = 0.5 * $mae;
+  my $clamped_drift_bias = 0.5 * $drift_level;
   $clamped_drift_bias    =  $drift_bias_max if($clamped_drift_bias >  $drift_bias_max);
   $clamped_drift_bias    = -$drift_bias_max if($clamped_drift_bias < -$drift_bias_max);
-
 
   # --- Sicherheitsbegrenzung des Bias ---
   my $max_bias     = 0.5 * $mae;                                                                # Maximal 50% des MAE berücksichtigen
@@ -31738,9 +31732,13 @@ sub _aiFannApplyBiasCorrection {
       $is_baseline = 0;
   }
 
-  $clamped_drift_bias = 0                          if(!$drift_enabled);                         # Level-Skalierung Freischaltung
-  $res                = $res + $clamped_drift_bias if($is_baseline);                            # Drift-Bias nur auf Baseline anwenden (bei Freischaltung)
+  $clamped_drift_bias = 0 if(!$drift_enabled);                                                  # Level-Skalierung Freischaltung
 
+  if ($is_baseline) {                                                                           # Drift-Korrektur nur auf Baseline anwenden (bei Freischaltung)
+      my $rel_max         = 0.30 * $res;                                                        # relative Begrenzung: höchstens 30 % der (skalierten) Prognose, nach oben wie unten
+      $clamped_drift_bias = max (-$rel_max, min ($rel_max, $clamped_drift_bias));
+      $res                = $res + $clamped_drift_bias;
+  }
 
   # --- Statische Trainingskalibrierung (Peak-geschützt) ---
   # Korrigiert strukturellen Slope-Fehler aus dem Training.
@@ -31818,11 +31816,14 @@ sub aiFannDetectDrift {
   my $fanntyp = shift;
 
   my $window = _aiFannSelectWindow ($name, $fanntyp);                                       # optimales Drift-Detct-Fenster ermitteln (vor Löschen Kennwerte)
-
+  
   my @drift_kpis = qw (
       DriftBias DriftSlope DriftSlopeLive DriftBiasLive DriftRefMae DriftIndex
       DriftScore DriftRmseRelRatio DriftRefRmse DriftFlag DriftSemRatio DriftWindowSize
+      DriftLevel
   );
+
+  my $prev_bias_live_saved = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive', undef);         # vor dem Löschen sichern, sonst ist die EMA auf bias_live wirkungslos
 
   delete @{$data{$name}{neuralnet}{$fanntyp}}{@drift_kpis};
 
@@ -31910,6 +31911,8 @@ sub aiFannDetectDrift {
 
   # --- Slope/Bias pro Stunde berechnen
   my $prev_bias_live_hour;
+  my $quant30 = CircularVal ($name, 99, $fanntyp.'_quantile30', 0);                 # Grundlast-Referenz (wie in _aiFannApplyBiasCorrection)
+  my @level_list; 
 
   for my $idx (@tail_idx) {
       next if(!$idx);
@@ -31925,11 +31928,12 @@ sub aiFannDetectDrift {
       push @targets,    $a;
       push @preds,      $p;
       push @slope_list, ($p / $a) if($a != 0);
+      push @level_list, ($a - $p) if($quant30 > 0 && ($idx % 100) >= 7 && $p <= 1.2 * $quant30);    # gleiche Bedingungen wie bei der Anwendung: hod >= 7 und Baseline
 
-      my $bias_hour = $a - $p;                                                      # real - Prognose!
+      my $bias_hour = $a - $p;                                                                      # real - Prognose!
 
       # --- Clamping gegen extreme Ausreißer
-      my $max_bias = 3 * $ref_mae;                                                  # 3x Modell-MAE
+      my $max_bias = 3 * $ref_mae;                                                                  # 3x Modell-MAE
       $bias_hour   = max (-$max_bias, min($max_bias, $bias_hour));
 
       # --- Glättung
@@ -31984,7 +31988,7 @@ sub aiFannDetectDrift {
   my $ref_slope   = AiNeuralVal ($name, $fanntyp, 'DriftRefSlope', $slope_model);
 
   # --- Bias-Live glätten (EMA) ---
-  my $prev_bias_live = AiNeuralVal ($name, $fanntyp, 'DriftBiasLive', $bias_live);
+  my $prev_bias_live = $prev_bias_live_saved // $bias_live;
   $bias_live         = 0.7 * $bias_live + 0.3 * $prev_bias_live;
 
   my $slope_drift = $ref_slope  != 0 ? ($slope_live / $ref_slope ) : 0;
@@ -32086,12 +32090,21 @@ sub aiFannDetectDrift {
                                                    debug           => $debug,
                                                 } );
 
+  # --- Niveau-Korrektur der Grundlast (ersetzt DriftBias als additive Korrekturgröße in _aiFannApplyBiasCorrection)
+  # Median der signierten Fehler (Ist - unkorrigierte KI-Prognose) der Grundlaststunden, positiv = Prognose war zu niedrig.
+  # Mindestens 6 Stunden erforderlich; bei Daten-/Sensorproblemen (Safety-Block) keine Korrektur.
+  my $drift_level   = @level_list >= 6 ? medianArray (\@level_list) : 0;
+  $drift_level      = 0 if($block_reason && $block_reason =~ /^(?:no_data|slope_implausible|rmse_anomaly|bias_implausible)$/);
+  $nn->{DriftLevel} = round2 ($drift_level);
+
   if (!$block_reason) {                                                                             # Rekalibrierung
       my $drifthzn3th = ($flag eq 'severe') ? 4 : DRIFTHZN3TH;                                      # V 2.6.2 - 4h bei severe, sonst 8h -> schnellere Rekalibrierung nur bei schwerem Drift
 
       if (($nn->{DriftZone3Hours} // 0) >= $drifthzn3th) {                                          
-          # ---- Effektiver Bias-Drift: Kombination aus DriftBias und MAE-Drift
-          my $bias_drift_effective = 0.5 * $bias_drift + 0.5 * ($mae_live - $ref_mae);
+          # ---- Effektiver Bias-Drift: nur der vorzeichenbehaftete Drift der Bias-Referenz
+          # Der MAE-Term entfällt: ref_mae ist der Trainings-MAE, (mae_live - ref_mae) ist bei stochastischen Haushalten
+          # dauerhaft > 0 und würde die Referenz bei jeder Rekalibrierung weiter anheben.
+          my $bias_drift_effective = 0.5 * $bias_drift;
           $bias_drift_effective    = max(-2*$ref_mae, min(2*$ref_mae, $bias_drift_effective));      # Clamping gegen Überreaktionen
           my $new_bias             = $ref_bias + 0.4 * $bias_drift_effective;                       # Sanfte Anpassung (40 % statt 70 %)
 
@@ -32099,7 +32112,8 @@ sub aiFannDetectDrift {
           my $slope_error           = $slope_live - $ref_slope;
           my $slope_drift_effective = 0.6 * $slope_error + 0.4 * ($rmse_rel_ratio - 1.0) * 0.1;     # Effektiver Slope-Drift: Kombination aus Slope-Drift und RMSE-Drift
           my $new_slope             = $ref_slope + $slope_drift_effective;                          # Neue Steigung
-          $new_slope                = max (0.85, min (1.15, $new_slope));                           # Clamping für Stabilität
+          my $slope_floor           = max (0.05, min (0.85, $slope_model));                         # Untergrenze am Trainings-Slope orientieren (ModelSlope 0.30 darf nicht auf 0.85 springen)
+          $new_slope                = max ($slope_floor, min (1.15, $new_slope));                   # Clamping für Stabilität
 
           $nn->{DriftRefBias}        = $new_bias;
           $nn->{DriftRefSlope}       = $new_slope;
@@ -32130,7 +32144,7 @@ sub aiFannDetectDrift {
   if ($debug =~ /aiProcess/xs) {
       Log3 ($name, 1, sprintf(
           "%s DEBUG> DRIFT [%s]: ".
-          "Flag=%s | WindowSize=%d | Block=%s | SlopeLive=%.3f | DriftSlope=%.3f | BiasLive=%.2f | DriftBias=%.2f | ".
+          "Flag=%s | WindowSize=%d | Block=%s | SlopeLive=%.3f | DriftSlope=%.3f | BiasLive=%.2f | DriftBias=%.2f | DriftLevel=%.2f | ".
           "RMSErelLive=%.1f | RMSErelRatio=%.2f | BiasVarNorm=%.2f | DriftIndex=%.2f | DriftScore=%.2f | ".
           "Zone3Hours=%d | Hist=[%s] | Retrain=%s (%s)",
           $name,
@@ -32142,6 +32156,7 @@ sub aiFannDetectDrift {
           $slope_drift,
           $bias_live,
           $bias_drift,
+          $drift_level,
           $rmse_rel_live,
           $rmse_rel_ratio,
           $bias_var_norm,
@@ -32242,8 +32257,15 @@ sub _aiFannDriftHistSlice {
           my $act = HistoryVal ($name, $pvd, $hod, $fanntyp, undef);
           next unless (defined $act && $act >= 0);
 
-          my $prd = HistoryVal ($name, $pvd, $hod, $fanntyp.'aifc', undef);
-          next unless (defined $prd && $prd >= 0);
+          #my $prd = HistoryVal ($name, $pvd, $hod, $fanntyp.'aifc', undef);
+          #next unless (defined $prd && $prd >= 0);
+          
+          my $prd = HistoryVal ($name, $pvd, $hod, $fanntyp.'aifc',     undef);                # conaifc enthaelt bereits die korrigierte Prognose
+          my $crr = HistoryVal ($name, $pvd, $hod, $fanntyp.'biascorr', undef);                # darin enthaltene Bias-/Drift-Korrektur (Wh)
+          next unless (defined $prd && defined $crr);
+
+          $prd -= $crr;                                                                        # unkorrigierte KI-Rohprognose rekonstruieren (Rundungsfehler max. 1 Wh)
+          next unless ($prd >= 0);
 
           $slice{$idx}{$fanntyp}        = $act;
           $slice{$idx}{$fanntyp.'aifc'} = $prd;
