@@ -846,7 +846,7 @@ FW_closeConn($)
     }
   }
 
-  POSIX::exit(0) if($hash->{isChild});
+  POSIX::_exit(0) if($hash->{isChild}); # 145967
   FW_Read($hash, 1) if($hash->{BUF});
 }
 
