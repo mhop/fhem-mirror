@@ -3079,7 +3079,8 @@ FW_readIconsFrom($$)
 
     } else {
       if($entry =~ m/^iconalias.txt$/i) {
-        my ($err, @rows) = FileRead("$FW_icondir/$ldir/$entry");
+        my %param = (FileName=>"$FW_icondir/$ldir/$entry", ForceType=>"file");
+        my ($err, @rows) = FileRead(\%param);
         if($err) {
           Log 1, $err;
         } else {
