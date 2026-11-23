@@ -1534,6 +1534,7 @@ SVG_render($$$$$$$$$$)
       my $name = "y".($idx)."label";
       $name = "ylabel" if( $idx == 1 );
       my $t = ($conf{$name} ? $conf{$name} : "");
+      $t =~ s/^"(.*)"$/$1/;
       $t = SVG_escape($t);
       ($off1,$off2) = ($x-($idx)*$axis_width+3*$th/4, $oh/2);
       SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
@@ -1544,6 +1545,7 @@ SVG_render($$$$$$$$$$)
       my $name = "y".($idx)."label";
       $name = "ylabel" if( $idx == 1 );
       my $t = ($conf{$name} ? $conf{$name} : "");
+      $t =~ s/^"(.*)"$/$1/;
       $t = SVG_escape($t);
       ($off1,$off2) = ($x+$w+($idx-$use_left_axis)*$axis_width-$th/4, $oh/2);
       SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
