@@ -720,7 +720,7 @@ FW_errmsg(txt, timeout)
 }
 
 function
-FW_okDialog(txt, parent, removeFn)
+FW_okDialog(txt, parent, removeFn, timeout)
 {
   $("#FW_okDialog").remove();
   var div = $("<div id='FW_okDialog'>");
@@ -747,6 +747,8 @@ FW_okDialog(txt, parent, removeFn)
       of: parent, collision: "flipfit"
     });
   setTimeout(function(){$("body").scrollTop(oldPos);}, 1); // Not ideal.
+  if(timeout)
+    setTimeout(function(){$("#FW_okDialog").remove()}, timeout*1000);
 }
 
 function
