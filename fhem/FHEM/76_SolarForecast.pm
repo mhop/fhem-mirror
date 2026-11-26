@@ -72,7 +72,7 @@ use MIME::Base64;
 
 # Versions History intern
 my %vNotesIntern = (
-  "2.12.0" => "18.11.2026  Hinweis: nur noch Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
+  "2.13.0" => "23.11.2026  Hinweis: nur noch Fortschreibung der Version, Tracking der Änderungen in Changelog.md ",
   "0.1.0"  => "09.12.2020  initiale Version "
 );
 
@@ -151,6 +151,7 @@ BEGIN {
           FW_widgetOverride
           FW_wname
           readyfnlist
+          unicodeEncoding
          )
   );
 
@@ -4303,12 +4304,11 @@ sub __solCast_ApiRequest {
       lang       => $paref->{lang},
       firstreq   => $paref->{firstreq},
       method     => "GET",
-      callback   => \&__solCast_ApiResponse
+      callback   => \&__solCast_ApiResponse,
   };
 
-  if ($debug =~ /apiCall/x) {
-      $param->{loglevel} = 1;
-  }
+  $param->{loglevel}      = 1  if($debug =~ /apiCall/x);
+  $param->{forceEncoding} = '' if(isUnicodeEnc());                      # Antwort als Rohbytes (decode_json erwartet Bytes)
 
   HttpUtils_NonblockingGet ($param);
 
@@ -4743,10 +4743,9 @@ sub __forecastSolar_ApiRequest {
       method     => 'GET',
       callback   => \&__forecastSolar_ApiResponse
   };
-
-  if ($debug =~ /apiCall/x) {
-      $param->{loglevel} = 1;
-  }
+  
+  $param->{loglevel}      = 1  if($debug =~ /apiCall/x);
+  $param->{forceEncoding} = '' if(isUnicodeEnc());                   # Antwort als Rohbytes (decode_json erwartet Bytes)
 
   HttpUtils_NonblockingGet ($param);
 
@@ -4848,7 +4847,7 @@ sub __forecastSolar_ApiResponse {
       $data{$name}{statusapi}{ForecastSolar}{'?All'}{requests_remaining}      = $jdata->{'message'}{'ratelimit'}{'remaining'};          # verbleibende Requests in Periode
       $data{$name}{statusapi}{ForecastSolar}{'?All'}{requests_limit_period}   = $jdata->{'message'}{'ratelimit'}{'period'};             # Requests Limit Periode
       $data{$name}{statusapi}{ForecastSolar}{'?All'}{requests_limit}          = $jdata->{'message'}{'ratelimit'}{'limit'};              # Requests Limit in Periode
-      $data{$name}{statusapi}{ForecastSolar}{'?All'}{place}                   = encode ('utf8', $jdata->{'message'}{'info'}{'place'});
+      $data{$name}{statusapi}{ForecastSolar}{'?All'}{place}                   = encodeFhem ($jdata->{'message'}{'info'}{'place'});
 
       if ($debug =~ /apiCall/x) {
           Log3 ($name, 1, qq{$name DEBUG> ForecastSolar API Call - server response for PV string "$string"});
@@ -5397,9 +5396,8 @@ sub __VictronVRM_ApiRequestLogin {
       callback => \&__VictronVRM_ApiResponseLogin
   };
 
-  if ($debug =~ /apiCall/x) {
-      $param->{loglevel} = 1;
-  }
+  $param->{loglevel}      = 1  if($debug =~ /apiCall/x);
+  $param->{forceEncoding} = '' if(isUnicodeEnc());                   # Antwort als Rohbytes (decode_json erwartet Bytes)
 
   HttpUtils_NonblockingGet ($param);
 
@@ -5537,9 +5535,8 @@ sub __VictronVRM_ApiRequestForecast {
       callback => \&__VictronVRM_ApiResponseForecast
   };
 
-  if ($debug =~ /apiCall/x) {
-      $param->{loglevel} = 1;
-  }
+  $param->{loglevel}      = 1  if($debug =~ /apiCall/x);
+  $param->{forceEncoding} = '' if(isUnicodeEnc());                   # Antwort als Rohbytes (decode_json erwartet Bytes)
 
   HttpUtils_NonblockingGet ($param);
 
@@ -5729,9 +5726,8 @@ sub __VictronVRM_ApiRequestLogout {
       callback   => \&__VictronVRM_ApiResponseLogout
   };
 
-  if ($debug =~ /apiCall/x) {
-      $param->{loglevel} = 1;
-  }
+  $param->{loglevel}      = 1  if($debug =~ /apiCall/x);
+  $param->{forceEncoding} = '' if(isUnicodeEnc());                   # Antwort als Rohbytes (decode_json erwartet Bytes)
 
   HttpUtils_NonblockingGet ($param);
 
@@ -5966,9 +5962,8 @@ sub __openMeteo_ApiRequest {
       callback       => \&__openMeteo_ApiResponse
   };
 
-  if ($debug =~ /apiCall/x) {
-      $param->{loglevel} = 1;
-  }
+  $param->{loglevel}      = 1  if($debug =~ /apiCall/x);
+  $param->{forceEncoding} = '' if(isUnicodeEnc());                   # Antwort als Rohbytes (decode_json erwartet Bytes)
 
   HttpUtils_NonblockingGet ($param);
 
@@ -6990,8 +6985,8 @@ sub __generateCatOut {
   ## Ausgabe
   ############
   my $out  = '<html>';
-  $out    .= '<b>'.encode('utf8', $hqtxt{dwdcat}{$lang}).'</b><br>';                             # The Deutscher Wetterdienst Station Catalog
-  $out    .= encode('utf8', $hqtxt{nrsele}{$lang}).' '.$noe.'<br>';                              # Selected entries
+  $out    .= '<b>'.encodeFhem ($hqtxt{dwdcat}{$lang}).'</b><br>';                             # The Deutscher Wetterdienst Station Catalog
+  $out    .= encodeFhem ($hqtxt{nrsele}{$lang}).' '.$noe.'<br>';                              # Selected entries
   $out    .= "($select) <br><br>";
 
   $out    .= qq{<table class="roomoverview" style="text-align:left; border:1px solid; padding:5px; border-spacing:5px; margin-left:auto; margin-right:auto;">};
@@ -7076,10 +7071,9 @@ sub __dwdStatCatalog_Request {
       method   => 'GET',
       callback => \&__dwdStatCatalog_Response
   };
-
-  if ($debug =~ /dwdComm/x) {
-      $param->{loglevel} = 1;
-  }
+  
+  $param->{loglevel}      = 1  if($debug =~ /dwdComm/x);
+  $param->{forceEncoding} = '' if(isUnicodeEnc());                   # Antwort als Rohbytes (decode_json erwartet Bytes)
 
   HttpUtils_NonblockingGet ($param);
 
@@ -7116,7 +7110,7 @@ sub __dwdStatCatalog_Response {
       my @datarr = split "\n", $dat;
 
       for my $s (@datarr) {
-          $s = encode ('utf8', $s);
+          $s = encodeFhem ($s);
 
           my ($id, $tail) = split " ", $s, 2;
 
@@ -7328,7 +7322,7 @@ sub __getaiFannPromptExport {          ## no critic "not used"
 
   if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
       return $lang eq 'DE'
-           ? encode('utf8', "Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause")
+           ? encodeFhem ("Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause")
            : "The AI for forecasting $fanntyp is not yet operational.\n<b>Cause:</b> $cause";
   }
 
@@ -7539,13 +7533,13 @@ Here are the metrics:
 --------------------------------------------------------------------
 INTRO_EN
 
-  $intro = encode('utf8', $intro);
+  $intro = encodeFhem ($intro);
 
   my @ctxParts;
-  push @ctxParts, ($lang eq 'DE' ? encode('utf8', 'Wärmepumpe und/oder Klimaanlage')        : 'heat pump and/or AC')                   if $profile =~ /heatpump/i;
+  push @ctxParts, ($lang eq 'DE' ? encodeFhem ('Wärmepumpe und/oder Klimaanlage')        : 'heat pump and/or AC')                   if $profile =~ /heatpump/i;
   push @ctxParts, ($lang eq 'DE' ? 'E-Auto'                                                 : 'EV')                                    if $profile =~ /bev/i;
   push @ctxParts, ($lang eq 'DE' ? 'PV-gesteuertem Lastmanagement'                          : 'PV-controlled load management')         if $profile =~ /pv/i;
-  push @ctxParts, ($lang eq 'DE' ? encode('utf8', 'ausgeprägten Tages-/Verbrauchsrhythmen') : 'pronounced daily/consumption rhythms')  if $profile =~ /active/i;
+  push @ctxParts, ($lang eq 'DE' ? encodeFhem ('ausgeprägten Tages-/Verbrauchsrhythmen') : 'pronounced daily/consumption rhythms')  if $profile =~ /active/i;
 
   my $profileCtx = @ctxParts
                  ? ($lang eq 'DE' ? 'Haushalt mit '                   : 'Household with ') . join(', ', @ctxParts)
@@ -7559,19 +7553,19 @@ INTRO_EN
      $general .= '- '.$hqtxt{ailatr}{$lang}.' '.($atf ? (timestampToTimestring ($name, $atf, $lang))[0] : '-')." (".$hqtxt{aitris}{$lang}." $rtt)\n";
      $general .= '- '.$hqtxt{airest}{$lang}.": $ars\n";
      $general .= '- '.$hqtxt{ailgrt}{$lang}.' '.($agt ? ($agt * 1000).' ms' : '-')."\n";
-     $general .= '- '.(encode('utf8', $hqtxt{vbnrhp}{$lang})).": $hpinst\n";
+     $general .= '- '.(encodeFhem ($hqtxt{vbnrhp}{$lang})).": $hpinst\n";
 
-  my $rating  = encode('utf8', ($lang eq 'DE' ? 'Bewertungsüberblick' : 'Rating overview'))."\n";
+  my $rating  = encodeFhem (($lang eq 'DE' ? 'Bewertungsüberblick' : 'Rating overview'))."\n";
      $rating .= '- '.$hqtxt{treval}{$lang}.": $retrqal ($retrres)\n";
-     $rating .= '- '.$hqtxt{dpreal}{$lang}.": ".(encode('utf8', $dpr_hint))."\n";
-     $rating .= '- '.$hqtxt{lrnbeh}{$lang}.": ".(encode('utf8', $epoch_label))." ($epoch_rel_pct % ".$hqtxt{utiopc}{$lang}.")\n";
-     $rating .= '- '.$hqtxt{nserat}{$lang}.": ".(encode('utf8', $display_noiselvl))." ($nslvl)\n";
-     $rating .= '- '.$hqtxt{drfrat}{$lang}.": ".(encode('utf8', $display_driftflag))."\n";
-     $rating .= '- '.(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).": $recomd_translated $show_retreason\n";
+     $rating .= '- '.$hqtxt{dpreal}{$lang}.": ".(encodeFhem ($dpr_hint))."\n";
+     $rating .= '- '.$hqtxt{lrnbeh}{$lang}.": ".(encodeFhem ($epoch_label))." ($epoch_rel_pct % ".$hqtxt{utiopc}{$lang}.")\n";
+     $rating .= '- '.$hqtxt{nserat}{$lang}.": ".(encodeFhem ($display_noiselvl))." ($nslvl)\n";
+     $rating .= '- '.$hqtxt{drfrat}{$lang}.": ".(encodeFhem ($display_driftflag))."\n";
+     $rating .= '- '.(encodeFhem ($hqtxt{rcdfor}{$lang}.' Retrain')).": $recomd_translated $show_retreason\n";
 
   my $model  = $hqtxt{nmdpar}{$lang}."\n";
      $model .= '- '.$hqtxt{nnmlim}{$lang}.": PV=$pvmaxlim Wh, $tgt: Min=$tgtmin Wh / Max=$tgtmax Wh\n";
-     $model .= '- '.$hqtxt{tradat}{$lang}.": $dsnum ".(encode('utf8', $hqtxt{dtsets}{$lang}))." (Training=$trdnum, Validation=$tednum)\n";
+     $model .= '- '.$hqtxt{tradat}{$lang}.": $dsnum ".(encodeFhem ($hqtxt{dtsets}{$lang}))." (Training=$trdnum, Validation=$tednum)\n";
      $model .= '- '.$hqtxt{archit}{$lang}.": Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum\n";
      $model .= '- '.$hqtxt{hyppar}{$lang}.": Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim\n";
      $model .= '- '.$hqtxt{actvat}{$lang}.": Hidden=$conhaf, Steepness=$hidste, Output=$conoaf\n";
@@ -7591,7 +7585,7 @@ INTRO_EN
      $keyfig .= "- Model Slope: $slope\n";
      $keyfig .= '- '.$hqtxt{treval}{$lang}.": $retrqal\n";
 
-  my $ermsr  =  (encode('utf8', $hqtxt{fcerma}{$lang}))."\n";
+  my $ermsr  =  (encodeFhem ($hqtxt{fcerma}{$lang}))."\n";
      $ermsr .= "- MAE: $conmae Wh\n";
      $ermsr .= "- MedAE: $comdae Wh\n";
      $ermsr .= "- RMSE: $cormse Wh\n";
@@ -7603,7 +7597,7 @@ INTRO_EN
 
   my $noise  = $hqtxt{noise}{$lang}."\n";
      $noise .= '- '.$hqtxt{nserat}{$lang}.": $nslvl\n";
-     $noise .= '- '.(encode('utf8', $hqtxt{rcdfor}{$lang})).' Bit_Fail'.": $bfsug (".$hqtxt{setof}{$lang}." aiControl->aiConBitFailLimit)\n";
+     $noise .= '- '.(encodeFhem ($hqtxt{rcdfor}{$lang})).' Bit_Fail'.": $bfsug (".$hqtxt{setof}{$lang}." aiControl->aiConBitFailLimit)\n";
 
   my $drift_title = $hqtxt{drftid}{$lang}.' ('.$hqtxt{calasf}{$lang}.' '.$hqtxt{modage}{$lang}.' > '.AIMODELMINAGE.' h)';
   my $drift  = $drift_title."\n";
@@ -7618,8 +7612,8 @@ INTRO_EN
      $drift .= "- Bias Drift: $drift_bias\n";
      $drift .= "- Score: $drift_score\n";
      $drift .= "- Index: $drift_index\n";
-     $drift .= '- '.$hqtxt{drfrat}{$lang}.": ".(encode('utf8', $display_driftflag))."\n";
-     $drift .= '- '.(encode('utf8', $hqtxt{rcdfor}{$lang})).' Retrain'.": $recomd_translated $show_retreason\n";
+     $drift .= '- '.$hqtxt{drfrat}{$lang}.": ".(encodeFhem ($display_driftflag))."\n";
+     $drift .= '- '.(encodeFhem ($hqtxt{rcdfor}{$lang})).' Retrain'.": $recomd_translated $show_retreason\n";
      $drift .= '- '.$hqtxt{lstrcl}{$lang}.": $last_recaltm\n";
 
   ####################################################################
@@ -7639,10 +7633,10 @@ INTRO_EN
   # HTML-Hülle für die Anzeige im FW_okDialog-Popup:
   # Textarea (readonly, monospace) + Copy-Button.
   # $rs ist an dieser Stelle bereits ein reiner Byte-String (alle
-  # Bestandteile sind oben schon korrekt encode('utf8', ...)
+  # Bestandteile sind oben schon korrekt encodeFhem (...)
   # bzw. stammen unverändert aus %hqtxt). Für die Platzierung als
   # Element-Inhalt müssen nur noch die HTML-Metazeichen escaped
-  # werden - NICHT nochmal encode('utf8', ...) auf $rs anwenden,
+  # werden - NICHT nochmal encodeFhem (...) auf $rs anwenden,
   # das würde zu einer Doppel-Encodierung (erneuten Umlaut-Salat)
   # führen.
   ####################################################################
@@ -7652,8 +7646,8 @@ INTRO_EN
 
   my $taId    = 'aiPromptExportTA_'.$name;
   my $btnId   = 'aiPromptExportBtn_'.$name;
-  my $btnTxt  = $lang eq 'DE' ? encode('utf8', 'In Zwischenablage kopieren') : 'Copy to clipboard';
-  my $doneTxt = $lang eq 'DE' ? encode('utf8', 'Kopiert') : 'Copied';
+  my $btnTxt  = $lang eq 'DE' ? encodeFhem ('In Zwischenablage kopieren') : 'Copy to clipboard';
+  my $doneTxt = $lang eq 'DE' ? encodeFhem ('Kopiert') : 'Copied';
 
   my $html  = '<style>';
   $html    .= '#'.$taId.'{width:98%;min-height:420px;font-family:monospace;font-size:0.82em;'.
@@ -7698,7 +7692,7 @@ sub __getaiFannState {            ## no critic "not used"
 
   if (!$prepared || (!$rdy && $cause !~ /Training\sonly/xs)) {
       return $lang eq 'DE'
-           ? encode('utf8', "Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause")
+           ? encodeFhem ("Die KI für die $fanntyp Vorhersage ist noch nicht einsatzbereit.\n<b>Grund:</b> $cause")
            : "The AI for forecasting $fanntyp is not yet operational.\n<b>Cause:</b> $cause";
   }
 
@@ -7872,21 +7866,21 @@ sub __getaiFannState {            ## no critic "not used"
   $atf     = '<b>'.$hqtxt{ailatr}{$lang}.'</b> '.($atf ? (timestampToTimestring ($name, $atf, $lang))[0] : '-');
   $agt     = '<b>'.$hqtxt{ailgrt}{$lang}.'</b> '.($agt ? ($agt * 1000).' ms' : '-');
   $aiAlpha = '<b>Alpha:</b> '.$aiAlpha;
-  $hpinst  = '<b>'.(encode('utf8', $hqtxt{vbnrhp}{$lang})).': </b> '.$hpinst;
+  $hpinst  = '<b>'.(encodeFhem ($hqtxt{vbnrhp}{$lang})).': </b> '.$hpinst;
 
   # Überblick über die Bewertungen
   #################################
   my $show_retreason = $drift_retreason eq '-'
                      ? ''
-                     : "(".$hqtxt{hcause}{$lang}.": ".(encode('utf8', $display_reason)).")";
+                     : "(".$hqtxt{hcause}{$lang}.": ".(encodeFhem ($display_reason)).")";
 
   my $rating_content = "<b>".$hqtxt{treval}{$lang}.":</b> $modampel ($retrres)\n";
-  $rating_content   .= "<b>".$hqtxt{dpreal}{$lang}.":</b> $dpr_ampel (".encode('utf8', $dpr_hint).")\n";    
-  $rating_content   .= "<b>".$hqtxt{lrnbeh}{$lang}.":</b> $epoch_ampel ".(encode('utf8', $epoch_label))." ($epoch_rel_pct % ".$hqtxt{utiopc}{$lang}.") \n";
-  $rating_content   .= "<b>".$hqtxt{setins}{$lang}.":</b> ".(encode('utf8', $epoch_hints))."\n" if($epoch_hints);
-  $rating_content   .= "<b>".$hqtxt{nserat}{$lang}.":</b> ".(encode('utf8', $display_noiselvl))." ($nslvl)\n";
-  $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
-  $rating_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
+  $rating_content   .= "<b>".$hqtxt{dpreal}{$lang}.":</b> $dpr_ampel (".encodeFhem ($dpr_hint).")\n";    
+  $rating_content   .= "<b>".$hqtxt{lrnbeh}{$lang}.":</b> $epoch_ampel ".(encodeFhem ($epoch_label))." ($epoch_rel_pct % ".$hqtxt{utiopc}{$lang}.") \n";
+  $rating_content   .= "<b>".$hqtxt{setins}{$lang}.":</b> ".(encodeFhem ($epoch_hints))."\n" if($epoch_hints);
+  $rating_content   .= "<b>".$hqtxt{nserat}{$lang}.":</b> ".(encodeFhem ($display_noiselvl))." ($nslvl)\n";
+  $rating_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encodeFhem ($display_driftflag))."\n";
+  $rating_content   .= "<b>".(encodeFhem ($hqtxt{rcdfor}{$lang}.' Retrain')).
                        ":</b> $retrampel $recomd_translated $show_retreason \n";
   # ------------------------------
 
@@ -7894,13 +7888,13 @@ sub __getaiFannState {            ## no critic "not used"
   my $linkPromptExport = qq{"FW_cmd('$::FW_ME$::FW_subdir?XHR=1&cmd=get $name valDecTree aiConTrainState LLM', function(data){FW_okDialog(data)})"};
 
   my $privacyHint    = $lang eq 'DE'
-                     ? encode ('utf8', 'Es werden Trainingsmetriken an Google Gemini übertragen (sichtbar im Log mit ctrlDebug=apiCall)')
+                     ? encodeFhem ('Es werden Trainingsmetriken an Google Gemini übertragen (sichtbar im Log mit ctrlDebug=apiCall)')
                      : 'Training metrics are transmitted to Google Gemini (visible in the log with ctrlDebug=apiCall)';
   my $privacyNote    = qq{<span style="font-size:0.75em;color:#888;margin-left:6px">($privacyHint)</span>};
   my $askGemini      = qq{<span title="$privacyHint"> <a style="cursor:pointer" onClick=$linkGemini>Google Gemini</a> </span>};
 
   my $promptExportLabel = $lang eq 'DE'
-                         ? encode('utf8', 'Copy&amp;Paste')
+                         ? encodeFhem ('Copy&amp;Paste')
                          : 'copy&amp;paste';
   my $askPromptExport   = qq{<span> <a style="cursor:pointer" onClick=$linkPromptExport>$promptExportLabel</a> </span>};
 
@@ -7909,12 +7903,12 @@ sub __getaiFannState {            ## no critic "not used"
 
   # ------------------------------
 
-  my $rating         = ___aiFannSection (encode('utf8', $hqtxt{ratovw}{$lang}), $rating_content, 1);
+  my $rating         = ___aiFannSection (encodeFhem ($hqtxt{ratovw}{$lang}), $rating_content, 1);
 
   # Modellparameter
   ###################
   my $model_content = "<b>".$hqtxt{nnmlim}{$lang}.":</b> PV=$pvmaxlim Wh, ".$tgt.": Min=$tgtmin Wh / Max=$tgtmax Wh\n";                                         # Normierungsgrenzen, Hausverbrauch/PV-Prognose
-  $model_content   .= (encode("utf8", "<b>".$hqtxt{tradat}{$lang}.":</b> $dsnum ".$hqtxt{dtsets}{$lang}." (Training=$trdnum, Validation=$tednum)"))."\n";       # Trainingsdaten, Datensätze
+  $model_content   .= (encodeFhem ("<b>".$hqtxt{tradat}{$lang}.":</b> $dsnum ".$hqtxt{dtsets}{$lang}." (Training=$trdnum, Validation=$tednum)"))."\n";       # Trainingsdaten, Datensätze
   $model_content   .= "<b>".$hqtxt{archit}{$lang}.":</b> Inputs=$inpnum, Hidden Layers=$hidlay, Outputs=$outnum\n";                                             # Architektur
   $model_content   .= "<b>".$hqtxt{hyppar}{$lang}.":</b> Learning Rate=$lrnrte, Momentum=$lrnmom, BitFail-Limit=$bflim\n";                                      # Hyperparameter
   $model_content   .= "<b>".$hqtxt{actvat}{$lang}.":</b> Hidden=$conhaf, Steepness=$hidste, Output=$conoaf\n";                                                  # Aktivierungen
@@ -7946,13 +7940,13 @@ sub __getaiFannState {            ## no critic "not used"
   $ermsr_content   .= "<b>RMSE Rating:</b> $rmse_rat\n";
   $ermsr_content   .= "<b>MAPE:</b> $comape %\n";
   $ermsr_content   .= "<b>MdAPE:</b> $codape %\n";
-  $ermsr_content   .= "<b>".(encode('utf8', 'R²')).":</b> $conr2"."\n";
-  my $ermsr         = ___aiFannSection (encode('utf8', $hqtxt{fcerma}{$lang}), $ermsr_content, 0);                                                                # 0 = standardmäßig geschlossen
+  $ermsr_content   .= "<b>".(encodeFhem ('R²')).":</b> $conr2"."\n";
+  my $ermsr         = ___aiFannSection (encodeFhem ($hqtxt{fcerma}{$lang}), $ermsr_content, 0);                                                                # 0 = standardmäßig geschlossen
 
   # Rauschen
   ############
   my $noise_content = "<b>".$hqtxt{nserat}{$lang}.":</b> $nslvl\n";                                                                                             # Rauschen Bewertung
-  $noise_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Bit_Fail')).":</b> $bfsug (".$hqtxt{setof}{$lang}." aiControl->aiConBitFailLimit)\n";       # Empfehlung für Bit_Fail, Einstellung von aiControl
+  $noise_content   .= "<b>".(encodeFhem ($hqtxt{rcdfor}{$lang}.' Bit_Fail')).":</b> $bfsug (".$hqtxt{setof}{$lang}." aiControl->aiConBitFailLimit)\n";       # Empfehlung für Bit_Fail, Einstellung von aiControl
   my $noise         = ___aiFannSection ($hqtxt{noise}{$lang}, $noise_content, 0);
 
   # Drift
@@ -7968,8 +7962,8 @@ sub __getaiFannState {            ## no critic "not used"
   $drift_content   .= "<b>Bias Drift:</b> $drift_bias\n";                                                                                               # wie weit es vom kalibrierten Referenzniveau abgedriftet ist
   $drift_content   .= "<b>Score:</b> $drift_score\n";
   $drift_content   .= "<b>Index:</b> $drift_index\n";
-  $drift_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encode('utf8', $display_driftflag))."\n";
-  $drift_content   .= "<b>".(encode('utf8', $hqtxt{rcdfor}{$lang}.' Retrain')).
+  $drift_content   .= "<b>".$hqtxt{drfrat}{$lang}.":</b> ".(encodeFhem ($display_driftflag))."\n";
+  $drift_content   .= "<b>".(encodeFhem ($hqtxt{rcdfor}{$lang}.' Retrain')).
                       ":</b> $retrampel $recomd_translated $show_retreason \n";
   $drift_content   .= "<b>".$hqtxt{lstrcl}{$lang}.":</b> $last_recaltm\n";
   my $drift_title   = $hqtxt{drftid}{$lang}.' ('.$hqtxt{calasf}{$lang}.' '.$hqtxt{modage}{$lang}.' > '.AIMODELMINAGE.' h)';
@@ -7979,8 +7973,8 @@ sub __getaiFannState {            ## no critic "not used"
   ####################
   my $note_content = ___aiFannExplainKeyFigures ($paref);
   my $note_title   = $lang eq 'DE'
-                   ? (encode('utf8', 'Erläuterungen zu den Kennzahlen'))
-                   : (encode('utf8', 'Explanations of the key figures'));
+                   ? (encodeFhem ('Erläuterungen zu den Kennzahlen'))
+                   : (encodeFhem ('Explanations of the key figures'));
   my $note         = ___aiFannSection ($note_title, $note_content, 0);
 
   # Zusammenstellung
@@ -8039,298 +8033,298 @@ sub ___aiFannExplainKeyFigures {
   }
 
   if ($lang eq 'DE') {
-      $note .= (encode('utf8', "<b>Data-Parameter-Ratio (DPR)</b> → Beschreibt das Verhältnis zwischen der Anzahl der Trainingsdatensätze und der Anzahl der freien Parameter (Gewichte + Bias) im neuronalen Netz."))."\n";
-      $note .= $spc3.(encode('utf8', "Es ist ein Maß dafür, wie gut das Netz durch die vorhandenen Daten bestimmt ist und errechnet sich mit <i>DPR = Trainingsdatensätze / Netzwerkparameter </i>"))."\n";
-      $note .= $spc3.(encode('utf8', "DPR < 5 → gilt als kritisch: das Netz ist unterbestimmt und neigt zu instabilem Training oder toten Neuronen"))."\n";
-      $note .= $spc3.(encode('utf8', "7 < DPR < 20 → das Netz hat genug Freiheitsgrade um zu lernen, wird aber durch ausreichend Daten zuverlässig kontrolliert"))."\n";
-      $note .= $spc3.(encode('utf8', "DPR > 30 → deutet darauf hin, dass die Architektur für die vorhandene Datenmenge zu klein gewählt wurde und ein größeres Netz möglicherweise mehr Muster erfassen könnte"))."\n";
-      $note .= $spc3.(encode('utf8', '<b>Hinweis:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'Bei automatischer Architekturwahl wird die erste Konfiguration gewählt, die einen DPR ≥ 7 erreicht.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Legt der Anwender die Architektur manuell fest, dient der angezeigte DPR-Wert zur Orientierung, ob die Wahl zur aktuellen Datenlage passt.'))."\n";
+      $note .= (encodeFhem ("<b>Data-Parameter-Ratio (DPR)</b> → Beschreibt das Verhältnis zwischen der Anzahl der Trainingsdatensätze und der Anzahl der freien Parameter (Gewichte + Bias) im neuronalen Netz."))."\n";
+      $note .= $spc3.(encodeFhem ("Es ist ein Maß dafür, wie gut das Netz durch die vorhandenen Daten bestimmt ist und errechnet sich mit <i>DPR = Trainingsdatensätze / Netzwerkparameter </i>"))."\n";
+      $note .= $spc3.(encodeFhem ("DPR < 5 → gilt als kritisch: das Netz ist unterbestimmt und neigt zu instabilem Training oder toten Neuronen"))."\n";
+      $note .= $spc3.(encodeFhem ("7 < DPR < 20 → das Netz hat genug Freiheitsgrade um zu lernen, wird aber durch ausreichend Daten zuverlässig kontrolliert"))."\n";
+      $note .= $spc3.(encodeFhem ("DPR > 30 → deutet darauf hin, dass die Architektur für die vorhandene Datenmenge zu klein gewählt wurde und ein größeres Netz möglicherweise mehr Muster erfassen könnte"))."\n";
+      $note .= $spc3.(encodeFhem ('<b>Hinweis:</b>'))."\n";
+      $note .= $spc6.(encodeFhem ('Bei automatischer Architekturwahl wird die erste Konfiguration gewählt, die einen DPR ≥ 7 erreicht.'))."\n";
+      $note .= $spc6.(encodeFhem ('Legt der Anwender die Architektur manuell fest, dient der angezeigte DPR-Wert zur Orientierung, ob die Wahl zur aktuellen Datenlage passt.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Semantic Ratio</b> → Gibt an, wie viele Messpunkte im aktuellen Auswertungsfenster nennenswert falsch vorhergesagt wurden – relativ zur üblichen Modellgenauigkeit."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert < 0.4 → Nur wenige Punkte weichen stark ab. Das Modell ist im Großen und Ganzen treffsicher, einzelne Ausreißer verzerren das Bild – typisch bei seltenen Peaks oder kurzen Störereignissen."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert > 0.4 - 0.7 → unklares Bild – weder eindeutige Drift noch isolierte Peaks."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert > 0.7 → Der Großteil der Punkte weicht merklich ab. Das Modell liegt flächendeckend daneben – typisch bei anhaltender Drift."))."\n";
-      $note .= $spc3.(encode('utf8', '<b>Hinweis:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'Die Schwelle für "nennenswert falsch" wird dynamisch aus der bisherigen Modellgüte berechnet, sodass der Wert immer relativ zur aktuellen Leistung des Modells zu verstehen ist.'))."\n";
+      $note .= (encodeFhem ("<b>Semantic Ratio</b> → Gibt an, wie viele Messpunkte im aktuellen Auswertungsfenster nennenswert falsch vorhergesagt wurden – relativ zur üblichen Modellgenauigkeit."))."\n";
+      $note .= $spc3.(encodeFhem ("Wert < 0.4 → Nur wenige Punkte weichen stark ab. Das Modell ist im Großen und Ganzen treffsicher, einzelne Ausreißer verzerren das Bild – typisch bei seltenen Peaks oder kurzen Störereignissen."))."\n";
+      $note .= $spc3.(encodeFhem ("Wert > 0.4 - 0.7 → unklares Bild – weder eindeutige Drift noch isolierte Peaks."))."\n";
+      $note .= $spc3.(encodeFhem ("Wert > 0.7 → Der Großteil der Punkte weicht merklich ab. Das Modell liegt flächendeckend daneben – typisch bei anhaltender Drift."))."\n";
+      $note .= $spc3.(encodeFhem ('<b>Hinweis:</b>'))."\n";
+      $note .= $spc6.(encodeFhem ('Die Schwelle für "nennenswert falsch" wird dynamisch aus der bisherigen Modellgüte berechnet, sodass der Wert immer relativ zur aktuellen Leistung des Modells zu verstehen ist.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Drift RMSE Ratio</b> → Verhältnis des aktuellen Vorhersagefehlers zum Referenzfehler beim Training."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert = 1.0 → kein Drift"))."\n";
-      $note .= $spc3.(encode('utf8', "Wert > 2.0 → deutliche Verschlechterung"))."\n";
+      $note .= (encodeFhem ("<b>Drift RMSE Ratio</b> → Verhältnis des aktuellen Vorhersagefehlers zum Referenzfehler beim Training."))."\n";
+      $note .= $spc3.(encodeFhem ("Wert = 1.0 → kein Drift"))."\n";
+      $note .= $spc3.(encodeFhem ("Wert > 2.0 → deutliche Verschlechterung"))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Slope Reference</b> → Erwartete Modellsteigung aus dem letzten Training bzw. der letzten Rekalibrierung."))."\n";
-      $note .= $spc3.(encode('utf8', "Dient als Vergleichsbasis für Slope Live."))."\n";
+      $note .= (encodeFhem ("<b>Slope Reference</b> → Erwartete Modellsteigung aus dem letzten Training bzw. der letzten Rekalibrierung."))."\n";
+      $note .= $spc3.(encodeFhem ("Dient als Vergleichsbasis für Slope Live."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Slope Live</b> → Aktuelle Regressionssteigung zwischen Realwerten und Vorhersagen."))."\n";
-      $note .= $spc3.(encode('utf8', "Idealwert: 1.0. Negative Werte oder Werte nahe 0 deuten auf ein strukturelles Problem in den Eingangsdaten hin (z. B. Sensorausfall)."))."\n";
+      $note .= (encodeFhem ("<b>Slope Live</b> → Aktuelle Regressionssteigung zwischen Realwerten und Vorhersagen."))."\n";
+      $note .= $spc3.(encodeFhem ("Idealwert: 1.0. Negative Werte oder Werte nahe 0 deuten auf ein strukturelles Problem in den Eingangsdaten hin (z. B. Sensorausfall)."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Slope Drift</b> → Verhältnis von Slope Live zu Slope Reference."))."\n";
-      $note .= $spc3.(encode('utf8', 'Wert = 1.0 → kein Drift.'))."\n";
-      $note .= $spc3.(encode('utf8', 'Wert = 0.5 → die aktuelle Steigung beträgt nur die Hälfte des Referenzwerts.'))."\n";
-      $note .= $spc3.(encode('utf8', 'Wert < 0.0 → Das Modell läuft mit negativer Steigung. Hinweis auf ein strukturelles Problem in den Eingangsdaten und führt direkt zur Bewertung "structural_block"'))."\n";
+      $note .= (encodeFhem ("<b>Slope Drift</b> → Verhältnis von Slope Live zu Slope Reference."))."\n";
+      $note .= $spc3.(encodeFhem ('Wert = 1.0 → kein Drift.'))."\n";
+      $note .= $spc3.(encodeFhem ('Wert = 0.5 → die aktuelle Steigung beträgt nur die Hälfte des Referenzwerts.'))."\n";
+      $note .= $spc3.(encodeFhem ('Wert < 0.0 → Das Modell läuft mit negativer Steigung. Hinweis auf ein strukturelles Problem in den Eingangsdaten und führt direkt zur Bewertung "structural_block"'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Bias Reference</b> → Erwarteter systematischer Versatz des Modells (in Wh) aus dem letzten Training bzw. der letzten Rekalibrierung."))."\n";
+      $note .= (encodeFhem ("<b>Bias Reference</b> → Erwarteter systematischer Versatz des Modells (in Wh) aus dem letzten Training bzw. der letzten Rekalibrierung."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Bias Live</b> → Aktuell gemessener systematischer Versatz zwischen Realwerten und Vorhersagen (in Wh)."))."\n";
-      $note .= $spc3.(encode('utf8', "Große Abweichungen gegenüber Bias Reference signalisieren Drift."))."\n";
+      $note .= (encodeFhem ("<b>Bias Live</b> → Aktuell gemessener systematischer Versatz zwischen Realwerten und Vorhersagen (in Wh)."))."\n";
+      $note .= $spc3.(encodeFhem ("Große Abweichungen gegenüber Bias Reference signalisieren Drift."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Bias Drift</b> → Differenz zwischen Bias Live und Bias Reference."))."\n";
-      $note .= $spc3.(encode('utf8', "Zeigt, um wie viel sich das Modellniveau seit der letzten Rekalibrierung verschoben hat."))."\n";
+      $note .= (encodeFhem ("<b>Bias Drift</b> → Differenz zwischen Bias Live und Bias Reference."))."\n";
+      $note .= $spc3.(encodeFhem ("Zeigt, um wie viel sich das Modellniveau seit der letzten Rekalibrierung verschoben hat."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Score</b> → Verhältnis des aktuellen Vorhersagefehlers (MAE) zum Fehler beim Training."))."\n";
-      $note .= $spc3.(encode('utf8', "Modell arbeitet wie beim Training, Wert > 2.0 = deutlich höherer Fehler als erwartet."))."\n";
-      $note .= $spc3.(encode('utf8', "<b>Wichtig:</b> Ein hoher Score bedeutet nicht zwingend ein schlechtes Modell – er steigt auch bei unvorhersehbaren Verbrauchsspitzen (Waschmaschine, Trockner, Abwesenheit),"))."\n";
-      $note .= $spc3.(encode('utf8', "die im Training nicht oder kaum vertreten waren. Entscheidend für die Modellbewertung ist der DriftIndex, der solche Ausreißer bereits herausrechnet."))."\n";
+      $note .= (encodeFhem ("<b>Score</b> → Verhältnis des aktuellen Vorhersagefehlers (MAE) zum Fehler beim Training."))."\n";
+      $note .= $spc3.(encodeFhem ("Modell arbeitet wie beim Training, Wert > 2.0 = deutlich höherer Fehler als erwartet."))."\n";
+      $note .= $spc3.(encodeFhem ("<b>Wichtig:</b> Ein hoher Score bedeutet nicht zwingend ein schlechtes Modell – er steigt auch bei unvorhersehbaren Verbrauchsspitzen (Waschmaschine, Trockner, Abwesenheit),"))."\n";
+      $note .= $spc3.(encodeFhem ("die im Training nicht oder kaum vertreten waren. Entscheidend für die Modellbewertung ist der DriftIndex, der solche Ausreißer bereits herausrechnet."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Index</b> → Aggregierter Gesamtindikator aus Score, RMSE Ratio, Slope und Bias."))."\n";
-      $note .= $spc3.(encode('utf8', "Bestimmt die Drift-Bewertung: < 1.1 stabil, > 2.0 moderat, > 3.0 schwer."))."\n";
+      $note .= (encodeFhem ("<b>Index</b> → Aggregierter Gesamtindikator aus Score, RMSE Ratio, Slope und Bias."))."\n";
+      $note .= $spc3.(encodeFhem ("Bestimmt die Drift-Bewertung: < 1.1 stabil, > 2.0 moderat, > 3.0 schwer."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Model Bias</b> → zeigt, ob das Modell den $tgt im Durchschnitt zu niedrig oder zu hoch vorhersagt:"))."\n";
-      $note .= $spc3.(encode('utf8', "Positiver Bias → das Modell unterschätzt den $tgt im Mittel"))."\n";
-      $note .= $spc3.(encode('utf8', "Negativer Bias → das Modell überschätzt den $tgt im Mittel"))."\n";
-      $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'Der Wert wird in Wh angegeben und beschreibt die durchschnittliche Abweichung pro Stunde.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Die interne Bias-Korrektur hebt oder senkt die Vorhersage entsprechend, jedoch nur'))."\n";
-      $note .= $spc6.(encode('utf8', 'im Bereich der Grundlast, um Peaks nicht zu verfälschen.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Wenn eine Drift-Rekalibrierung stattgefunden hat, ersetzt <b>Bias Reference</b> den ursprünglichen Model Bias als neue Basislinie.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Er repräsentiert den neu berechneten durchschnittlichen Modellfehler, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
+      $note .= (encodeFhem ("<b>Model Bias</b> → zeigt, ob das Modell den $tgt im Durchschnitt zu niedrig oder zu hoch vorhersagt:"))."\n";
+      $note .= $spc3.(encodeFhem ("Positiver Bias → das Modell unterschätzt den $tgt im Mittel"))."\n";
+      $note .= $spc3.(encodeFhem ("Negativer Bias → das Modell überschätzt den $tgt im Mittel"))."\n";
+      $note .= $spc3.(encodeFhem ('<b>Interpretation:</b>'))."\n";
+      $note .= $spc6.(encodeFhem ('Der Wert wird in Wh angegeben und beschreibt die durchschnittliche Abweichung pro Stunde.'))."\n";
+      $note .= $spc6.(encodeFhem ('Die interne Bias-Korrektur hebt oder senkt die Vorhersage entsprechend, jedoch nur'))."\n";
+      $note .= $spc6.(encodeFhem ('im Bereich der Grundlast, um Peaks nicht zu verfälschen.'))."\n";
+      $note .= $spc6.(encodeFhem ('Wenn eine Drift-Rekalibrierung stattgefunden hat, ersetzt <b>Bias Reference</b> den ursprünglichen Model Bias als neue Basislinie.'))."\n";
+      $note .= $spc6.(encodeFhem ('Er repräsentiert den neu berechneten durchschnittlichen Modellfehler, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>Model Slope</b> → zeigt, ob das Modell zu flach oder zu steil reagiert.'))."\n";
-      $note .= $spc3.(encode('utf8', 'Der Wert beschreibt das Verhältnis zwischen:'))."\n";
-      $note .= $spc6.(encode('utf8', "- Änderung im echten $tgt"))."\n";
-      $note .= $spc6.(encode('utf8', '- Änderung in der Modellvorhersage'))."\n";
-      $note .= $spc3.(encode('utf8', 'und wird als dimensionsloser Faktor angegeben.'))."\n";
+      $note .= (encodeFhem ('<b>Model Slope</b> → zeigt, ob das Modell zu flach oder zu steil reagiert.'))."\n";
+      $note .= $spc3.(encodeFhem ('Der Wert beschreibt das Verhältnis zwischen:'))."\n";
+      $note .= $spc6.(encodeFhem ("- Änderung im echten $tgt"))."\n";
+      $note .= $spc6.(encodeFhem ('- Änderung in der Modellvorhersage'))."\n";
+      $note .= $spc3.(encodeFhem ('und wird als dimensionsloser Faktor angegeben.'))."\n";
       $note .= $spc3.'<b>Interpretation:</b>'."\n";
-      $note .= $spc6.(encode('utf8', "Slope = 1.0 → Das Modell bildet die Steigung korrekt ab. Steigt der echte $tgt um X, steigt die Vorhersage ebenfalls um X"))."\n";
-      $note .= $spc6.(encode('utf8', 'Slope < 1.0 → Das Modell reagiert zu flach. Peaks werden abgeschwächt. Beispiel: Slope = 0.9 → Das Modell bildet 90% der realen Dynamik ab.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Slope > 1.0 → Das Modell reagiert zu stark. Peaks werden überbetont, Schwankungen überzeichnet.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Wenn eine Drift-Rekalibrierung stattgefunden hat, ersetzt <b>Slope Reference</b> den ursprünglichen Model Slope als neue Steigungsbasis.'))."\n";
-      $note .= $spc6.(encode('utf8', 'Er repräsentiert die neu berechnete Modellreaktion, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
+      $note .= $spc6.(encodeFhem ("Slope = 1.0 → Das Modell bildet die Steigung korrekt ab. Steigt der echte $tgt um X, steigt die Vorhersage ebenfalls um X"))."\n";
+      $note .= $spc6.(encodeFhem ('Slope < 1.0 → Das Modell reagiert zu flach. Peaks werden abgeschwächt. Beispiel: Slope = 0.9 → Das Modell bildet 90% der realen Dynamik ab.'))."\n";
+      $note .= $spc6.(encodeFhem ('Slope > 1.0 → Das Modell reagiert zu stark. Peaks werden überbetont, Schwankungen überzeichnet.'))."\n";
+      $note .= $spc6.(encodeFhem ('Wenn eine Drift-Rekalibrierung stattgefunden hat, ersetzt <b>Slope Reference</b> den ursprünglichen Model Slope als neue Steigungsbasis.'))."\n";
+      $note .= $spc6.(encodeFhem ('Er repräsentiert die neu berechnete Modellreaktion, nachdem längerfristige Drift erkannt und korrigiert wurde.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>Training MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
-      $note .= $spc3.(encode('utf8', 'MSE < 0.01 → sehr gut'))."\n";
-      $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → gut'))."\n";
-      $note .= $spc3.(encode('utf8', 'MSE > 0.1 → schwach'))."\n";
-      $note .= $spc3.(encode('utf8', '<b>Interpretation Verhältnis Train MSE zu Validation MSE:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'Validation ≈ Train → gute Generalisierung'))."\n";
-      $note .= $spc6.(encode('utf8', 'Validation deutlich größer → Überfitting'))."\n";
-      $note .= $spc6.(encode('utf8', 'Validation kleiner → Validierungsdaten sind einfacher oder Split begünstigt'))."\n";
+      $note .= (encodeFhem ('<b>Training MSE / Validation MSE</b> → wie gut das Netz trainiert und generalisiert. Daumenregel:'))."\n";
+      $note .= $spc3.(encodeFhem ('MSE < 0.01 → sehr gut'))."\n";
+      $note .= $spc3.(encodeFhem ('MSE 0.01–0.05 → gut'))."\n";
+      $note .= $spc3.(encodeFhem ('MSE > 0.1 → schwach'))."\n";
+      $note .= $spc3.(encodeFhem ('<b>Interpretation Verhältnis Train MSE zu Validation MSE:</b>'))."\n";
+      $note .= $spc6.(encodeFhem ('Validation ≈ Train → gute Generalisierung'))."\n";
+      $note .= $spc6.(encodeFhem ('Validation deutlich größer → Überfitting'))."\n";
+      $note .= $spc6.(encodeFhem ('Validation kleiner → Validierungsdaten sind einfacher oder Split begünstigt'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>Validation Bit_Fail</b> → Anzahl der Ausreißer'))."\n";
+      $note .= (encodeFhem ('<b>Validation Bit_Fail</b> → Anzahl der Ausreißer'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>MAE</b> (Mean Absolute Error) → mittlere absolute Abweichung in Wh. Richtwerte bei typischem $tgt 500–1500 Wh:"))."\n";
-      $note .= $spc3.(encode('utf8', '< 100 Wh → sehr gut'))."\n";
-      $note .= $spc3.(encode('utf8', '100–300 Wh → gut'))."\n";
-      $note .= $spc3.(encode('utf8', '> 300 Wh → schwach'))."\n";
+      $note .= (encodeFhem ("<b>MAE</b> (Mean Absolute Error) → mittlere absolute Abweichung in Wh. Richtwerte bei typischem $tgt 500–1500 Wh:"))."\n";
+      $note .= $spc3.(encodeFhem ('< 100 Wh → sehr gut'))."\n";
+      $note .= $spc3.(encodeFhem ('100–300 Wh → gut'))."\n";
+      $note .= $spc3.(encodeFhem ('> 300 Wh → schwach'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>MedAE</b> (Median Absolute Error) → Median der absoluten Fehler in Wh (toleriert einzelne Ausreißer besser)'))."\n";
-      $note .= $spc3.(encode('utf8', '< 100 Wh → sehr gut'))."\n";
-      $note .= $spc3.(encode('utf8', '100–200 Wh → gut'))."\n";
-      $note .= $spc3.(encode('utf8', '200–300 Wh → mittelmäßig'))."\n";
-      $note .= $spc3.(encode('utf8', '> 300 Wh → schwach'))."\n";
+      $note .= (encodeFhem ('<b>MedAE</b> (Median Absolute Error) → Median der absoluten Fehler in Wh (toleriert einzelne Ausreißer besser)'))."\n";
+      $note .= $spc3.(encodeFhem ('< 100 Wh → sehr gut'))."\n";
+      $note .= $spc3.(encodeFhem ('100–200 Wh → gut'))."\n";
+      $note .= $spc3.(encodeFhem ('200–300 Wh → mittelmäßig'))."\n";
+      $note .= $spc3.(encodeFhem ('> 300 Wh → schwach'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>RMSE relative</b> (Root Mean Squared Error) → der gewichtete RMSE misst die quadratische Abweichung von Prognose und $tgt in % - mit Gewichtung für hohe Lasten."))."\n";
-      $note .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
-      $note .= $spc3.(encode('utf8', '< 20% → ausgezeichnet, das Modell trifft sowohl Grundlast als auch Peaks sehr präzise'))."\n";
-      $note .= $spc3.(encode('utf8', '20-40% → gut, das Modell ist zuverlässig und bildet typische Verbrauchsmuster sauber ab'))."\n";
-      $note .= $spc3.(encode('utf8', '40-70% → akzeptabel, das Modell ist brauchbar, aber Peaks oder spontane Lasten werden nicht immer gut getroffen'))."\n";
-      $note .= $spc3.(encode('utf8', '70-120% → schwach, das Modell hat deutliche Schwierigkeiten, insbesondere bei Lastspitzen oder unruhigen Haushalten'))."\n";
-      $note .= $spc3.(encode('utf8', "> 120% → unbrauchbar, die Prognosen weichen stark vom realen $tgt ab"))."\n";
+      $note .= (encodeFhem ("<b>RMSE relative</b> (Root Mean Squared Error) → der gewichtete RMSE misst die quadratische Abweichung von Prognose und $tgt in % - mit Gewichtung für hohe Lasten."))."\n";
+      $note .= $spc3.(encodeFhem ('Richtwerte:'))."\n";
+      $note .= $spc3.(encodeFhem ('< 20% → ausgezeichnet, das Modell trifft sowohl Grundlast als auch Peaks sehr präzise'))."\n";
+      $note .= $spc3.(encodeFhem ('20-40% → gut, das Modell ist zuverlässig und bildet typische Verbrauchsmuster sauber ab'))."\n";
+      $note .= $spc3.(encodeFhem ('40-70% → akzeptabel, das Modell ist brauchbar, aber Peaks oder spontane Lasten werden nicht immer gut getroffen'))."\n";
+      $note .= $spc3.(encodeFhem ('70-120% → schwach, das Modell hat deutliche Schwierigkeiten, insbesondere bei Lastspitzen oder unruhigen Haushalten'))."\n";
+      $note .= $spc3.(encodeFhem ("> 120% → unbrauchbar, die Prognosen weichen stark vom realen $tgt ab"))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>MAPE</b> (Mean Absolute Percentage Error) → relative Abweichung in %'))."\n";
-      $note .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
-      $note .= $spc3.(encode('utf8', '< 10 % → sehr gut - Modell liegt fast immer sehr nah an den echten Werten'))."\n";
-      $note .= $spc3.(encode('utf8', '10–20 % → gut - Prognosen sind solide, kleine Abweichungen sind normal'))."\n";
-      $note .= $spc3.(encode('utf8', '20–30 % → mittelmäßig / akzeptabel - Modell ist brauchbar, aber nicht präzise – für grobe Trends ok'))."\n";
-      $note .= $spc3.(encode('utf8', '> 30 % → schwach - Modell verfehlt die Werte deutlich, oft durch Ausreißer oder fehlende Features'))."\n";
-      $note .= $spc3.(encode('utf8', '⚠️ Vorsicht: bei kleinen Werten (<200 Wh) kann MAPE stark verzerren → MdAPE heranziehen'))."\n";
+      $note .= (encodeFhem ('<b>MAPE</b> (Mean Absolute Percentage Error) → relative Abweichung in %'))."\n";
+      $note .= $spc3.(encodeFhem ('Richtwerte:'))."\n";
+      $note .= $spc3.(encodeFhem ('< 10 % → sehr gut - Modell liegt fast immer sehr nah an den echten Werten'))."\n";
+      $note .= $spc3.(encodeFhem ('10–20 % → gut - Prognosen sind solide, kleine Abweichungen sind normal'))."\n";
+      $note .= $spc3.(encodeFhem ('20–30 % → mittelmäßig / akzeptabel - Modell ist brauchbar, aber nicht präzise – für grobe Trends ok'))."\n";
+      $note .= $spc3.(encodeFhem ('> 30 % → schwach - Modell verfehlt die Werte deutlich, oft durch Ausreißer oder fehlende Features'))."\n";
+      $note .= $spc3.(encodeFhem ('⚠️ Vorsicht: bei kleinen Werten (<200 Wh) kann MAPE stark verzerren → MdAPE heranziehen'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>MdAPE</b> (Median Absolute Percentage Error) → Median der prozentualen Fehler in % (robuster gegenüber kleinen Werten)'))."\n";
-      $note .= $spc3.(encode('utf8', 'Richtwerte:'))."\n";
-      $note .= $spc3.(encode('utf8', '< 10 % → sehr gut'))."\n";
-      $note .= $spc3.(encode('utf8', '10–20 % → gut'))."\n";
-      $note .= $spc3.(encode('utf8', '20–30 % → mittelmäßig'))."\n";
-      $note .= $spc3.(encode('utf8', '> 30 % → schwach'))."\n";
+      $note .= (encodeFhem ('<b>MdAPE</b> (Median Absolute Percentage Error) → Median der prozentualen Fehler in % (robuster gegenüber kleinen Werten)'))."\n";
+      $note .= $spc3.(encodeFhem ('Richtwerte:'))."\n";
+      $note .= $spc3.(encodeFhem ('< 10 % → sehr gut'))."\n";
+      $note .= $spc3.(encodeFhem ('10–20 % → gut'))."\n";
+      $note .= $spc3.(encodeFhem ('20–30 % → mittelmäßig'))."\n";
+      $note .= $spc3.(encodeFhem ('> 30 % → schwach'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>R²</b> (Bestimmtheitsmaß) → Maß für die Erklärungskraft des Modells. Je näher R² an 1 liegt, desto besser.'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² = 1.0 → perfekte Vorhersage, alle Punkte liegen exakt auf der Regressionslinie'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² > 0.8 → sehr gut - Modell erfasst den Großteil der Streuung → sehr zuverlässige Prognosen'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² = 0.6 - 0.8 → gut - Modell erklärt einen soliden Teil der Varianz → brauchbar für viele Anwendungen'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² = 0.5-0.6 → mäßig / grenzwertig - Modell liegt knapp über "zufällig" → Muster erkannt, Prognosen nur eingeschränkt nützlich'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² < 0.5 → schwach - Modell erklärt weniger als die Hälfte der Varianz → deutlicher Verbesserungsbedarf'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² = 0.0 → Modell erklärt gar nichts, es ist nicht besser als der Mittelwert der Daten'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² < 0.0 → Modell ist schlechter als einfach immer den Mittelwert vorherzusagen'))."\n";
-      $note .= $spc3.(encode('utf8', '⚠️ R² ist sehr empfindlich gegenüber Ausreißern und Varianz in den Daten.'))."\n";
+      $note .= (encodeFhem ('<b>R²</b> (Bestimmtheitsmaß) → Maß für die Erklärungskraft des Modells. Je näher R² an 1 liegt, desto besser.'))."\n";
+      $note .= $spc3.(encodeFhem ('R² = 1.0 → perfekte Vorhersage, alle Punkte liegen exakt auf der Regressionslinie'))."\n";
+      $note .= $spc3.(encodeFhem ('R² > 0.8 → sehr gut - Modell erfasst den Großteil der Streuung → sehr zuverlässige Prognosen'))."\n";
+      $note .= $spc3.(encodeFhem ('R² = 0.6 - 0.8 → gut - Modell erklärt einen soliden Teil der Varianz → brauchbar für viele Anwendungen'))."\n";
+      $note .= $spc3.(encodeFhem ('R² = 0.5-0.6 → mäßig / grenzwertig - Modell liegt knapp über "zufällig" → Muster erkannt, Prognosen nur eingeschränkt nützlich'))."\n";
+      $note .= $spc3.(encodeFhem ('R² < 0.5 → schwach - Modell erklärt weniger als die Hälfte der Varianz → deutlicher Verbesserungsbedarf'))."\n";
+      $note .= $spc3.(encodeFhem ('R² = 0.0 → Modell erklärt gar nichts, es ist nicht besser als der Mittelwert der Daten'))."\n";
+      $note .= $spc3.(encodeFhem ('R² < 0.0 → Modell ist schlechter als einfach immer den Mittelwert vorherzusagen'))."\n";
+      $note .= $spc3.(encodeFhem ('⚠️ R² ist sehr empfindlich gegenüber Ausreißern und Varianz in den Daten.'))."\n";
   }
   elsif ($lang eq 'EN') {
-      $note .= (encode('utf8', "<b>Data-Parameter-Ratio (DPR)</b> → Describes the relationship between the number of training data points and the number of free parameters (weights + bias) in the neural network."))."\n";
-      $note .= $spc3.(encode('utf8', "It is a measure of how well the network is determined by the available data and is calculated using <i>DPR = training data sets / network parameters </i>"))."\n";
-      $note .= $spc3.(encode('utf8', "DPR < 5 → is considered critical: the network is underdetermined and prone to unstable training or dead neurons"))."\n";
-      $note .= $spc3.(encode('utf8', "7 < DPR < 20 → The network has enough freedom to learn, but is reliably controlled through sufficient data."))."\n";
-      $note .= $spc3.(encode('utf8', "DPR > 30 → suggests that the architecture was chosen to be too small for the existing data set and that a larger network might be able to detect more patterns"))."\n";
-      $note .= $spc3.(encode('utf8', '<b>Note:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'When architecture selection is automatic, the first configuration that achieves a DPR ≥ 7 is selected.'))."\n";
-      $note .= $spc6.(encode('utf8', 'If the user defines the architecture manually, the displayed DPR value serves as a guide to determine whether the choice is appropriate given the current data situation.'))."\n";
+      $note .= (encodeFhem ("<b>Data-Parameter-Ratio (DPR)</b> → Describes the relationship between the number of training data points and the number of free parameters (weights + bias) in the neural network."))."\n";
+      $note .= $spc3.(encodeFhem ("It is a measure of how well the network is determined by the available data and is calculated using <i>DPR = training data sets / network parameters </i>"))."\n";
+      $note .= $spc3.(encodeFhem ("DPR < 5 → is considered critical: the network is underdetermined and prone to unstable training or dead neurons"))."\n";
+      $note .= $spc3.(encodeFhem ("7 < DPR < 20 → The network has enough freedom to learn, but is reliably controlled through sufficient data."))."\n";
+      $note .= $spc3.(encodeFhem ("DPR > 30 → suggests that the architecture was chosen to be too small for the existing data set and that a larger network might be able to detect more patterns"))."\n";
+      $note .= $spc3.(encodeFhem ('<b>Note:</b>'))."\n";
+      $note .= $spc6.(encodeFhem ('When architecture selection is automatic, the first configuration that achieves a DPR ≥ 7 is selected.'))."\n";
+      $note .= $spc6.(encodeFhem ('If the user defines the architecture manually, the displayed DPR value serves as a guide to determine whether the choice is appropriate given the current data situation.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Semantic Ratio</b> → Indicates how many data points in the current evaluation window were predicted with significant error—relative to the model's typical accuracy."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert < 0.4 → Only a few data points deviate significantly. The model is generally accurate; individual outliers distort the picture—which is typical for rare peaks or brief disturbances."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert > 0.4 - 0.7 → Unclear image—neither a distinct drift nor isolated peaks."))."\n";
-      $note .= $spc3.(encode('utf8', "Wert > 0.7 → Most of the points deviate significantly. The model is off the mark across the board—which is typical in the case of persistent drift."))."\n";
-      $note .= $spc3.(encode('utf8', '<b>Note:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'The threshold for "significantly incorrect" is calculated dynamically based on the models performance to date, so the value should always be understood in relation to the models current performance.'))."\n";
+      $note .= (encodeFhem ("<b>Semantic Ratio</b> → Indicates how many data points in the current evaluation window were predicted with significant error—relative to the model's typical accuracy."))."\n";
+      $note .= $spc3.(encodeFhem ("Wert < 0.4 → Only a few data points deviate significantly. The model is generally accurate; individual outliers distort the picture—which is typical for rare peaks or brief disturbances."))."\n";
+      $note .= $spc3.(encodeFhem ("Wert > 0.4 - 0.7 → Unclear image—neither a distinct drift nor isolated peaks."))."\n";
+      $note .= $spc3.(encodeFhem ("Wert > 0.7 → Most of the points deviate significantly. The model is off the mark across the board—which is typical in the case of persistent drift."))."\n";
+      $note .= $spc3.(encodeFhem ('<b>Note:</b>'))."\n";
+      $note .= $spc6.(encodeFhem ('The threshold for "significantly incorrect" is calculated dynamically based on the models performance to date, so the value should always be understood in relation to the models current performance.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Drift RMSE Ratio</b> → Ratio of the current prediction error to the reference error during training."))."\n";
-      $note .= $spc3.(encode('utf8', "Value = 1.0 → no drift"))."\n";
-      $note .= $spc3.(encode('utf8', "Value > 2.0 → significant deterioration"))."\n";
+      $note .= (encodeFhem ("<b>Drift RMSE Ratio</b> → Ratio of the current prediction error to the reference error during training."))."\n";
+      $note .= $spc3.(encodeFhem ("Value = 1.0 → no drift"))."\n";
+      $note .= $spc3.(encodeFhem ("Value > 2.0 → significant deterioration"))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Slope Reference</b> → Expected model slope based on the last training session or recalibration."))."\n";
-      $note .= $spc3.(encode('utf8', "Serves as a basis for comparison in Slope Live."))."\n";
+      $note .= (encodeFhem ("<b>Slope Reference</b> → Expected model slope based on the last training session or recalibration."))."\n";
+      $note .= $spc3.(encodeFhem ("Serves as a basis for comparison in Slope Live."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Slope Live</b> → Current regression slope between actual values and forecasts."))."\n";
-      $note .= $spc3.(encode('utf8', "Ideal value: 1.0. Negative values or values close to 0 indicate a structural problem in the input data (e.g., sensor failure)."))."\n";
+      $note .= (encodeFhem ("<b>Slope Live</b> → Current regression slope between actual values and forecasts."))."\n";
+      $note .= $spc3.(encodeFhem ("Ideal value: 1.0. Negative values or values close to 0 indicate a structural problem in the input data (e.g., sensor failure)."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Slope Drift</b> → Ratio of Slope Live to Slope Reference."))."\n";
-      $note .= $spc3.(encode('utf8', 'Value = 1.0 → no drift.'))."\n";
-      $note .= $spc3.(encode('utf8', 'Value = 0.5 → the current slope is only half the reference value.'))."\n";
-      $note .= $spc3.(encode('utf8', 'Value < 0.0 → The model is running with a negative slope. This indicates a structural problem in the input data and leads directly to the "structural_block" evaluation.'))."\n";
+      $note .= (encodeFhem ("<b>Slope Drift</b> → Ratio of Slope Live to Slope Reference."))."\n";
+      $note .= $spc3.(encodeFhem ('Value = 1.0 → no drift.'))."\n";
+      $note .= $spc3.(encodeFhem ('Value = 0.5 → the current slope is only half the reference value.'))."\n";
+      $note .= $spc3.(encodeFhem ('Value < 0.0 → The model is running with a negative slope. This indicates a structural problem in the input data and leads directly to the "structural_block" evaluation.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Bias Reference</b> → Expected systematic bias of the model (in Wh) from the last training or recalibration."))."\n";
+      $note .= (encodeFhem ("<b>Bias Reference</b> → Expected systematic bias of the model (in Wh) from the last training or recalibration."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Bias Live</b> → Currently measured systematic offset between actual values and predictions (in Wh)."))."\n";
-      $note .= $spc3.(encode('utf8', "Large deviations from the bias reference indicate drift."))."\n";
+      $note .= (encodeFhem ("<b>Bias Live</b> → Currently measured systematic offset between actual values and predictions (in Wh)."))."\n";
+      $note .= $spc3.(encodeFhem ("Large deviations from the bias reference indicate drift."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Bias Drift</b> → Difference between Bias Live and Bias Reference."))."\n";
-      $note .= $spc3.(encode('utf8', "Shows how much the model level has shifted since the last recalibration."))."\n";
+      $note .= (encodeFhem ("<b>Bias Drift</b> → Difference between Bias Live and Bias Reference."))."\n";
+      $note .= $spc3.(encodeFhem ("Shows how much the model level has shifted since the last recalibration."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Score</b> → Ratio of the current MAE to the reference MAE."))."\n";
-      $note .= $spc3.(encode('utf8', "Value 1.0 = no drift, value > 2.0 = significantly increased prediction error."))."\n";
+      $note .= (encodeFhem ("<b>Score</b> → Ratio of the current MAE to the reference MAE."))."\n";
+      $note .= $spc3.(encodeFhem ("Value 1.0 = no drift, value > 2.0 = significantly increased prediction error."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Score</b> → Ratio of the current prediction error (MAE) to the error during training."))."\n";
-      $note .= $spc3.(encode('utf8', "Model performs as it did during training; a value > 2.0 indicates a significantly higher error than expected.")). "\n";
-      $note .= $spc3.(encode('utf8', "<b>Important:</b> A high score does not necessarily mean a bad model – it also increases during unpredictable consumption spikes (washing machine, dryer, absence),"))."\n";
-      $note .= $spc3.(encode('utf8', "which were not or hardly represented in training. The DriftIndex, which already accounts for such outliers, is decisive for the model evaluation."))."\n";
+      $note .= (encodeFhem ("<b>Score</b> → Ratio of the current prediction error (MAE) to the error during training."))."\n";
+      $note .= $spc3.(encodeFhem ("Model performs as it did during training; a value > 2.0 indicates a significantly higher error than expected.")). "\n";
+      $note .= $spc3.(encodeFhem ("<b>Important:</b> A high score does not necessarily mean a bad model – it also increases during unpredictable consumption spikes (washing machine, dryer, absence),"))."\n";
+      $note .= $spc3.(encodeFhem ("which were not or hardly represented in training. The DriftIndex, which already accounts for such outliers, is decisive for the model evaluation."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Index</b> → Aggregate composite indicator based on score, RMSE ratio, slope, and bias."))."\n";
-      $note .= $spc3.(encode('utf8', "Determines the drift rating: < 1.1 stable, > 2.0 moderate, > 3.0 severe."))."\n";
+      $note .= (encodeFhem ("<b>Index</b> → Aggregate composite indicator based on score, RMSE ratio, slope, and bias."))."\n";
+      $note .= $spc3.(encodeFhem ("Determines the drift rating: < 1.1 stable, > 2.0 moderate, > 3.0 severe."))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>Model Bias</b> → shows whether the model predicts average $tgt to be too low or too high:"))."\n";
-      $note .= $spc3.(encode('utf8', "Positive Bias → the model underestimates average $tgt"))."\n";
-      $note .= $spc3.(encode('utf8', "Negative bias → the model overestimates average $tgt"))."\n";
-      $note .= $spc3.(encode('utf8', '<b>Interpretation:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'The value is given in Wh and describes the average deviation per hour.'))."\n";
-      $note .= $spc6.(encode('utf8', 'The internal bias correction raises or lowers the prediction accordingly, but only'))."\n";
-      $note .= $spc6.(encode('utf8', 'in the base load range so as not to distort peaks.'))."\n";
-      $note .= $spc6.(encode('utf8', 'When a drift recalibration has taken place, <b>Bias Reference</b> replaces the original model bias as the new baseline.'))."\n";
-      $note .= $spc6.(encode('utf8', 'It represents the newly calculated average model error after longer-term drift has been detected and corrected.'))."\n";
+      $note .= (encodeFhem ("<b>Model Bias</b> → shows whether the model predicts average $tgt to be too low or too high:"))."\n";
+      $note .= $spc3.(encodeFhem ("Positive Bias → the model underestimates average $tgt"))."\n";
+      $note .= $spc3.(encodeFhem ("Negative bias → the model overestimates average $tgt"))."\n";
+      $note .= $spc3.(encodeFhem ('<b>Interpretation:</b>'))."\n";
+      $note .= $spc6.(encodeFhem ('The value is given in Wh and describes the average deviation per hour.'))."\n";
+      $note .= $spc6.(encodeFhem ('The internal bias correction raises or lowers the prediction accordingly, but only'))."\n";
+      $note .= $spc6.(encodeFhem ('in the base load range so as not to distort peaks.'))."\n";
+      $note .= $spc6.(encodeFhem ('When a drift recalibration has taken place, <b>Bias Reference</b> replaces the original model bias as the new baseline.'))."\n";
+      $note .= $spc6.(encodeFhem ('It represents the newly calculated average model error after longer-term drift has been detected and corrected.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>Model Slope</b> → indicates whether the model responds too flatly or too steeply.'))."\n";
-      $note .= $spc3.(encode('utf8', 'The value describes the ratio between:'))."\n";
-      $note .= $spc6.(encode('utf8', "- Change in actual $tgt"))."\n";
-      $note .= $spc6.(encode('utf8', '- Change in model prediction'))."\n";
-      $note .= $spc3. (encode('utf8', 'and is specified as a dimensionless factor.'))."\n";
+      $note .= (encodeFhem ('<b>Model Slope</b> → indicates whether the model responds too flatly or too steeply.'))."\n";
+      $note .= $spc3.(encodeFhem ('The value describes the ratio between:'))."\n";
+      $note .= $spc6.(encodeFhem ("- Change in actual $tgt"))."\n";
+      $note .= $spc6.(encodeFhem ('- Change in model prediction'))."\n";
+      $note .= $spc3. (encodeFhem ('and is specified as a dimensionless factor.'))."\n";
       $note .= $spc3.'<b>Interpretation:</b>'."\n";
-      $note .= $spc6.(encode('utf8', "Slope = 1.0 → The model correctly reflects $tgt levels. If actual $tgt increases by X, the prediction also increases by X"))."\n";
-      $note .= $spc6.(encode('utf8', 'Slope < 1.0 → The model responds too flatly. Peaks are attenuated. Example: Slope = 0.9 → The model depicts 90% of the actual dynamics.')) ."\n";
-      $note .= $spc6.(encode('utf8', 'Slope > 1.0 → The model reacts too strongly. Peaks are overemphasised, fluctuations are exaggerated.'))."\n";
-      $note .= $spc6.(encode('utf8', 'When a drift recalibration has occurred, <b>Slope Reference</b> replaces the original Model Slope as the new slope basis.'))."\n";
-      $note .= $spc6.(encode('utf8', 'It represents the recalculated model response after longer-term drift has been detected and corrected.'))."\n";
+      $note .= $spc6.(encodeFhem ("Slope = 1.0 → The model correctly reflects $tgt levels. If actual $tgt increases by X, the prediction also increases by X"))."\n";
+      $note .= $spc6.(encodeFhem ('Slope < 1.0 → The model responds too flatly. Peaks are attenuated. Example: Slope = 0.9 → The model depicts 90% of the actual dynamics.')) ."\n";
+      $note .= $spc6.(encodeFhem ('Slope > 1.0 → The model reacts too strongly. Peaks are overemphasised, fluctuations are exaggerated.'))."\n";
+      $note .= $spc6.(encodeFhem ('When a drift recalibration has occurred, <b>Slope Reference</b> replaces the original Model Slope as the new slope basis.'))."\n";
+      $note .= $spc6.(encodeFhem ('It represents the recalculated model response after longer-term drift has been detected and corrected.'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>Train MSE / Validation MSE</b> → how well the network trains and generalizes. Rule of thumb:'))."\n";
-      $note .= $spc3.(encode('utf8', 'MSE < 0.01 → very good'))."\n";
-      $note .= $spc3.(encode('utf8', 'MSE 0.01–0.05 → good'))."\n";
-      $note .= $spc3.(encode('utf8', 'MSE > 0.1 → weak'))."\n";
-      $note .= $spc3.(encode('utf8', '<b>Interpretation of the ratio of train MSE to validation MSE:</b>'))."\n";
-      $note .= $spc6.(encode('utf8', 'Validation ≈ Train → good generalization'))."\n";
-      $note .= $spc6.(encode('utf8', 'Validation significantly larger → overfitting'))."\n";
-      $note .= $spc6.(encode('utf8', 'Validation smaller → validation data is easier or split is favorable'))."\n";
+      $note .= (encodeFhem ('<b>Train MSE / Validation MSE</b> → how well the network trains and generalizes. Rule of thumb:'))."\n";
+      $note .= $spc3.(encodeFhem ('MSE < 0.01 → very good'))."\n";
+      $note .= $spc3.(encodeFhem ('MSE 0.01–0.05 → good'))."\n";
+      $note .= $spc3.(encodeFhem ('MSE > 0.1 → weak'))."\n";
+      $note .= $spc3.(encodeFhem ('<b>Interpretation of the ratio of train MSE to validation MSE:</b>'))."\n";
+      $note .= $spc6.(encodeFhem ('Validation ≈ Train → good generalization'))."\n";
+      $note .= $spc6.(encodeFhem ('Validation significantly larger → overfitting'))."\n";
+      $note .= $spc6.(encodeFhem ('Validation smaller → validation data is easier or split is favorable'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>Validation Bit_Fail</b> → Number of outliers'))."\n";
+      $note .= (encodeFhem ('<b>Validation Bit_Fail</b> → Number of outliers'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>MAE</b> (Mean Absolute Error) → mean absolute deviation in Wh. Reference values for typical $tgt 500–1500 Wh:"))."\n";
-      $note .= $spc3.(encode('utf8', '< 100 Wh → very good'))."\n";
-      $note .= $spc3.(encode('utf8', '100–300 Wh → good'))."\n";
-      $note .= $spc3.(encode('utf8', '> 300 Wh → poor'))."\n";
+      $note .= (encodeFhem ("<b>MAE</b> (Mean Absolute Error) → mean absolute deviation in Wh. Reference values for typical $tgt 500–1500 Wh:"))."\n";
+      $note .= $spc3.(encodeFhem ('< 100 Wh → very good'))."\n";
+      $note .= $spc3.(encodeFhem ('100–300 Wh → good'))."\n";
+      $note .= $spc3.(encodeFhem ('> 300 Wh → poor'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>MedAE</b> (Median Absolute Error) → Median of absolute errors in Wh (better tolerates individual outliers)'))."\n";
-      $note .= $spc3.(encode('utf8', '< 100 Wh → very good'))."\n";
-      $note .= $spc3.(encode('utf8', '100–200 Wh → good'))."\n";
-      $note .= $spc3.(encode('utf8', '200–300 Wh → mediocre'))."\n";
-      $note .= $spc3.(encode('utf8', '> 300 Wh → poor'))."\n";
+      $note .= (encodeFhem ('<b>MedAE</b> (Median Absolute Error) → Median of absolute errors in Wh (better tolerates individual outliers)'))."\n";
+      $note .= $spc3.(encodeFhem ('< 100 Wh → very good'))."\n";
+      $note .= $spc3.(encodeFhem ('100–200 Wh → good'))."\n";
+      $note .= $spc3.(encodeFhem ('200–300 Wh → mediocre'))."\n";
+      $note .= $spc3.(encodeFhem ('> 300 Wh → poor'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', "<b>RMSE relative</b> (Root Mean Squared Error) → the weighted RMSE measures the square deviation between forecast and $tgt in % - with weighting for high loads."))."\n";
-      $note .= $spc3.(encode('utf8', 'Reference values:'))."\n";
-      $note .= $spc3.(encode('utf8', '< 20% → excellent, the model accurately predicts both base load and peaks'))."\n";
-      $note .= $spc3. (encode('utf8', "20-40% → good, the model is reliable and accurately reflects typical $tgt patterns"))."\n";
-      $note .= $spc3.(encode('utf8', '40-70% → acceptable, the model is usable, but peaks or spontaneous loads are not always accurately predicted'))."\n";
-      $note .= $spc3.(encode('utf8', '70-120% → weak, the model has significant difficulties, especially with load peaks or unstable households'))."\n";
-      $note .= $spc3.(encode('utf8', "> 120% → unusable, the forecasts deviate significantly from actual $tgt"))."\n";
+      $note .= (encodeFhem ("<b>RMSE relative</b> (Root Mean Squared Error) → the weighted RMSE measures the square deviation between forecast and $tgt in % - with weighting for high loads."))."\n";
+      $note .= $spc3.(encodeFhem ('Reference values:'))."\n";
+      $note .= $spc3.(encodeFhem ('< 20% → excellent, the model accurately predicts both base load and peaks'))."\n";
+      $note .= $spc3. (encodeFhem ("20-40% → good, the model is reliable and accurately reflects typical $tgt patterns"))."\n";
+      $note .= $spc3.(encodeFhem ('40-70% → acceptable, the model is usable, but peaks or spontaneous loads are not always accurately predicted'))."\n";
+      $note .= $spc3.(encodeFhem ('70-120% → weak, the model has significant difficulties, especially with load peaks or unstable households'))."\n";
+      $note .= $spc3.(encodeFhem ("> 120% → unusable, the forecasts deviate significantly from actual $tgt"))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>MAPE</b> (Mean Absolute Percentage Error) → relative deviation in %'))."\n";
-      $note .= $spc3.(encode('utf8', 'Reference values:'))."\n";
-      $note .= $spc3.(encode('utf8', '< 10% → very good - model is almost always very close to the actual values'))."\n";
-      $note .= $spc3.(encode('utf8', '10–20% → good - forecasts are solid, small deviations are normal'))."\ n";
-      $note .= $spc3.(encode('utf8', '20–30 % → mediocre / acceptable - model is usable but not precise – ok for rough trends'))."\n";
-      $note .= $spc3.(encode('utf8', '> 30% → weak - model significantly misses the values, often due to outliers or missing features'))."\n";
-      $note .= $spc3.(encode('utf8', '⚠️ Caution: for small values (<200 Wh), MAPE can be highly distorted → use MdAPE'))."\n";
+      $note .= (encodeFhem ('<b>MAPE</b> (Mean Absolute Percentage Error) → relative deviation in %'))."\n";
+      $note .= $spc3.(encodeFhem ('Reference values:'))."\n";
+      $note .= $spc3.(encodeFhem ('< 10% → very good - model is almost always very close to the actual values'))."\n";
+      $note .= $spc3.(encodeFhem ('10–20% → good - forecasts are solid, small deviations are normal'))."\ n";
+      $note .= $spc3.(encodeFhem ('20–30 % → mediocre / acceptable - model is usable but not precise – ok for rough trends'))."\n";
+      $note .= $spc3.(encodeFhem ('> 30% → weak - model significantly misses the values, often due to outliers or missing features'))."\n";
+      $note .= $spc3.(encodeFhem ('⚠️ Caution: for small values (<200 Wh), MAPE can be highly distorted → use MdAPE'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>MdAPE</b> (Median Absolute Percentage Error) → Median of percentage errors in % (more robust against small values)'))."\n";
-      $note .= $spc3.(encode('utf8', 'Reference values:'))."\n";
-      $note .= $spc3.(encode('utf8', '< 10% → very good'))."\n";
-      $note .= $spc3.(encode('utf8', '10–20% → good'))."\n";
-      $note .= $spc3.(encode('utf8', '20–30 % → average'))."\n";
-      $note .= $spc3.(encode('utf8', '> 30 % → poor'))."\n";
+      $note .= (encodeFhem ('<b>MdAPE</b> (Median Absolute Percentage Error) → Median of percentage errors in % (more robust against small values)'))."\n";
+      $note .= $spc3.(encodeFhem ('Reference values:'))."\n";
+      $note .= $spc3.(encodeFhem ('< 10% → very good'))."\n";
+      $note .= $spc3.(encodeFhem ('10–20% → good'))."\n";
+      $note .= $spc3.(encodeFhem ('20–30 % → average'))."\n";
+      $note .= $spc3.(encodeFhem ('> 30 % → poor'))."\n";
       $note .= "\n";
 
-      $note .= (encode('utf8', '<b>R²</b> (coefficient of determination) → Measure of the explanatory power of the model. The closer R² is to 1, the better.'))."\n";
-      $note .= $spc3. (encode('utf8', 'R² = 1.0 → perfect prediction, all points lie exactly on the regression line'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² > 0.8 → very good - model captures most of the variance → very reliable predictions'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² = 0.6 - 0.8 → good - model explains a solid portion of the variance → useful for many applications'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² = 0.5-0.6 → moderate / borderline - model is just above "random" → patterns recognized, forecasts only of limited use'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² < 0.5 → weak - model explains less than half of the variance → significant improvement needed'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² = 0.0 → model explains nothing, it is no better than the mean value of the data'))."\n";
-      $note .= $spc3.(encode('utf8', 'R² < 0.0 → model is worse than simply predicting the mean value'))."\n";
-      $note .= $spc3.(encode('utf8', '⚠️ R² is very sensitive to outliers and variance in the data.'))."\n";
+      $note .= (encodeFhem ('<b>R²</b> (coefficient of determination) → Measure of the explanatory power of the model. The closer R² is to 1, the better.'))."\n";
+      $note .= $spc3. (encodeFhem ('R² = 1.0 → perfect prediction, all points lie exactly on the regression line'))."\n";
+      $note .= $spc3.(encodeFhem ('R² > 0.8 → very good - model captures most of the variance → very reliable predictions'))."\n";
+      $note .= $spc3.(encodeFhem ('R² = 0.6 - 0.8 → good - model explains a solid portion of the variance → useful for many applications'))."\n";
+      $note .= $spc3.(encodeFhem ('R² = 0.5-0.6 → moderate / borderline - model is just above "random" → patterns recognized, forecasts only of limited use'))."\n";
+      $note .= $spc3.(encodeFhem ('R² < 0.5 → weak - model explains less than half of the variance → significant improvement needed'))."\n";
+      $note .= $spc3.(encodeFhem ('R² = 0.0 → model explains nothing, it is no better than the mean value of the data'))."\n";
+      $note .= $spc3.(encodeFhem ('R² < 0.0 → model is worse than simply predicting the mean value'))."\n";
+      $note .= $spc3.(encodeFhem ('⚠️ R² is very sensitive to outliers and variance in the data.'))."\n";
   }
 
 return $note;
@@ -8367,7 +8361,7 @@ sub _aiFannGeminiApiAssess {
                 ."Generate a free key at aistudio.google.com -> “Get API key” and enter it in the aiControl->geminiAPIkey attribute.";
 
 
-      return encode ('utf8', $ret);
+      return encodeFhem ($ret);
   }
 
   $model = $model ? $model : 'gemini-2.5-flash';
@@ -8542,6 +8536,8 @@ END_EN
                              systemInstruction => { parts => [{ text => $sysPrompt }], },
                              generationConfig  => { maxOutputTokens => 2048, temperature => 0.3, thinkingConfig  => { thinkingBudget => 512, }, },      # Thinking-Budget begrenzen, reicht für diese Aufgabe völlig
                          } );
+                         
+ $body = decode_utf8 ($body) if(isUnicodeEnc());
 
   my $param = {
       url           => "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey",
@@ -8563,6 +8559,8 @@ END_EN
       Log3 ($name, 1, "$name DEBUG> Google Gemini model $model is used for external analysis.");
       Log3 ($name, 1, "$name DEBUG> The following data are transmitted to Google Gemini for analysis: \n$userMsg");
   }
+  
+  $param->{forceEncoding} = '' if(isUnicodeEnc());                   # Antwort als Rohbytes (decode_json erwartet Bytes)
 
   HttpUtils_NonblockingGet ($param);
 
@@ -8571,7 +8569,7 @@ END_EN
           : 'The request is in progress; the response will take a few seconds...';
 
 
-return encode ('utf8', $msg);
+return encodeFhem ($msg);
 }
 
 ###############################################################
@@ -8609,7 +8607,7 @@ sub __aiFannApiAssessCb {
                       ? "Gemini ist dauerhaft überlastet (503). Bitte später erneut versuchen."
                       : "Gemini is persistently overloaded (503). Please try again later.";
 
-              asyncOutput ($cl, encode('utf8', $msg));
+              asyncOutput ($cl, encodeFhem ($msg));
               return;
           }
 
@@ -8633,7 +8631,7 @@ sub __aiFannApiAssessCb {
                           "gemini_retry503_$name",
                         );
 
-          asyncOutput ($cl, encode('utf8', $msg));
+          asyncOutput ($cl, encodeFhem ($msg));
           return;
       }
 
@@ -8658,7 +8656,7 @@ sub __aiFannApiAssessCb {
   $text =~ s/^\d+\.\s+/<br>/mg;                         # 1. Listenpunkt → Zeilenumbruch
   $text =~ s/\n/<br>/g;                                 # Zeilenumbrüche → <br>
 
-  $text = encode ('utf8', $text);
+  $text = encodeFhem ($text);
 
   asyncOutput ($cl, "<html>$text</html>");
 
@@ -8810,7 +8808,7 @@ sub __httpBlockingGet {
 
   $url =~ s/%/%25/g;
   my %connecthash;
-  my $unicodeEncoding = 1;
+  my $unicodeEncoding = isUnicodeEnc();
 
   $connecthash{url}           = $url;
   $connecthash{keepalive}     = ($url =~ m/localUpdate/ ? 0 : 1);                        # Forum #49798
@@ -8843,7 +8841,7 @@ sub __updWriteFile {
 
   open my $fh, '>:raw', $fPath or return "update ERROR open $fPath failed: $!";
 
-  my $bytes = encode ('UTF-8', $content);
+  my $bytes   = utf8::is_utf8 ($content) ? encode ('UTF-8', $content) : $content;       # Rohbytes unverändert schreiben
   my $written = syswrite $fh, $bytes;
   close $fh or return "update ERROR closing $fPath failed: $!";
 
@@ -9061,7 +9059,7 @@ sub _attrconsumer {                      ## no critic "not used"
 
       # --- Identitätsschutz: sinnstiftende Änderung an bestehendem Consumer verhindern
       if ( __consumerIdentityFp ($name, $aName, $aVal, $codev, $h) ) {
-          my $out = encode ("utf8", $hqtxt{acsmfp}{$lang});
+          my $out = encodeFhem ($hqtxt{acsmfp}{$lang});
           $out =~ s/<ANAME>/$aName/g;
           return $out;
       }
@@ -12054,7 +12052,7 @@ sub readCacheFile {
                                     } );
 
       if (!$err) {
-          my $ijson      = join "", @init;
+          my $ijson      = jsonBytes (join "", @init);
           my ($isuccess) = evaljson ($hash, $ijson);
 
           if ($isuccess) {
@@ -12079,7 +12077,7 @@ sub readCacheFile {
                                      } );
 
   if (!$error) {
-      my $json      = join "", @content;
+      my $json      = jsonBytes (join "", @content);
       my ($success) = evaljson ($hash, $json);
 
       if ($success) {
@@ -12347,7 +12345,7 @@ sub writeCacheFile {
   elsif ($cachename eq 'initfirst') {                                                           # --- Initialisierungswerte (werden beim Load zuerst geladen!)
       _initfirstSync ( { name => $name, cachename => $cachename, direction => 'collect' } );
 
-      push my @inits, encode_json ($data{$name}{$cachename});
+      push my @inits, encJsonFile ($data{$name}{$cachename});
 
       delete $data{$name}{$cachename};                                                          # den Zwischencache löschen
 
@@ -12377,7 +12375,7 @@ sub writeCacheFile {
       return;
   }
 
-  push my @arr, encode_json ($data{$name}{$cachename});
+  push my @arr, encJsonFile ($data{$name}{$cachename});
 
   my $forceType = CurrentVal ($name, 'writeForceType', PERSISTDEST);
 
@@ -18210,7 +18208,7 @@ sub ___resyncPlanStateOnAutoResume {
   delete $paref->{stopts};
   delete $paref->{supplement};
 
-  $data{$name}{consumers}{$c}{autoResumeHint}    = encode ('utf8', $hqtxt{atomrs}{$paref->{lang}}); # Fall 1 - Automatik AUS->EIN-Flanke                              
+  $data{$name}{consumers}{$c}{autoResumeHint}    = encodeFhem ($hqtxt{atomrs}{$paref->{lang}}); # Fall 1 - Automatik AUS->EIN-Flanke                              
   $data{$name}{consumers}{$c}{autoResumeHintTTL} = 2;                                               # für diesen + 1 weiteren Zyklus anzeigen
   $data{$name}{current}{consumerCacheDirty}      = 1;
   
@@ -18722,7 +18720,7 @@ sub ___doPlanning {
               last;
           }
           else {
-              $paref->{supplement} = encode('utf8', $hqtxt{emsple}{$lang});                                 # 'erwarteter max Überschuss weniger als'
+              $paref->{supplement} = encodeFhem ($hqtxt{emsple}{$lang});                                 # 'erwarteter max Überschuss weniger als'
               $paref->{ps}         = 'suspended:';
 
               ___setConsumerPlanningState ($paref);
@@ -18756,7 +18754,7 @@ sub ___doPlanning {
       }
 
       if (!$done) {
-          $paref->{supplement} = encode('utf8', $hqtxt{nmspld}{$lang});                                 # 'kein max Überschuss für den aktuellen Tag gefunden'
+          $paref->{supplement} = encodeFhem ($hqtxt{nmspld}{$lang});                                 # 'kein max Überschuss für den aktuellen Tag gefunden'
           $paref->{ps}         = 'suspended:';
 
           ___setConsumerPlanningState ($paref);
@@ -19323,8 +19321,8 @@ sub ___switchConsumerOn {
 
   my $supplmnt         = ConsumerVal ($name, $c, 'planSupplement', '');
   $paref->{supplement} = '' if($supplmnt =~ /swoncond\snot|swoncond\snicht/xs && $swoncond);
-  $paref->{supplement} = encode('utf8', $hqtxt{swonnm}{$lang}) if(!$swoncond);                      # 'swoncond not met'
-  $paref->{supplement} = encode('utf8', $hqtxt{swofmt}{$lang}) if($swoffcond);                      # 'swoffcond met'
+  $paref->{supplement} = encodeFhem ($hqtxt{swonnm}{$lang}) if(!$swoncond);                      # 'swoncond not met'
+  $paref->{supplement} = encodeFhem ($hqtxt{swofmt}{$lang}) if($swoffcond);                      # 'swoffcond met'
 
   if (defined $paref->{supplement}) {
       ___setConsumerPlanningState ($paref);
@@ -19633,7 +19631,7 @@ sub ___setConsumerSwitchingState {
 
       if ($flag eq 'on') {                                                              # Rundlauf komplett: Baseline war ein, jetzt wieder ein (WaMa-Fall)
           delete $data{$name}{consumers}{$c}{manualInterruptFlag};
-          $data{$name}{consumers}{$c}{autoResumeHint}    = encode ('utf8', $hqtxt{manrst}{$paref->{lang}});
+          $data{$name}{consumers}{$c}{autoResumeHint}    = encodeFhem ($hqtxt{manrst}{$paref->{lang}});
           $data{$name}{consumers}{$c}{autoResumeHintTTL} = 2;
       }
       else {
@@ -19652,7 +19650,7 @@ sub ___setConsumerSwitchingState {
 
       if ($flag eq 'off') {                                                             # Rundlauf komplett: Baseline war aus, jetzt wieder aus
           delete $data{$name}{consumers}{$c}{manualInterruptFlag};
-          $data{$name}{consumers}{$c}{autoResumeHint}    = encode ('utf8', $hqtxt{manrst}{$paref->{lang}});
+          $data{$name}{consumers}{$c}{autoResumeHint}    = encodeFhem ($hqtxt{manrst}{$paref->{lang}});
           $data{$name}{consumers}{$c}{autoResumeHintTTL} = 2;
       }
       else {
@@ -23007,8 +23005,8 @@ sub _graphicHeader {
                           $ydayDvtn =~ /^[1-9]/ ? ($perspective eq 'default' ? $hqtxt{pltp}{$lang} : $hqtxt{pmtp}{$lang}) :
                           $hqtxt{snbefb}{$lang};
 
-      $text_tdayDvtn = encode ('utf8', $text_tdayDvtn);
-      $text_ydayDvtn = encode ('utf8', $text_ydayDvtn);
+      $text_tdayDvtn = encodeFhem ($text_tdayDvtn);
+      $text_ydayDvtn = encodeFhem ($text_ydayDvtn);
 
       ## Abweichung CON Prognose/Erzeugung
       ######################################
@@ -23040,8 +23038,8 @@ sub _graphicHeader {
                              $ydayConDvtn =~ /^[1-9]/ ? ($perspective eq 'default' ? $hqtxt{conltp}{$lang} : $hqtxt{conmtp}{$lang}) :
                              $hqtxt{snbefb}{$lang};
 
-      $text_tdayConDvtn = encode ('utf8', $text_tdayConDvtn);
-      $text_ydayConDvtn = encode ('utf8', $text_ydayConDvtn);
+      $text_tdayConDvtn = encodeFhem ($text_tdayConDvtn);
+      $text_ydayConDvtn = encodeFhem ($text_ydayConDvtn);
 
 
       ## Aufbau Header
@@ -23374,17 +23372,17 @@ sub __createReduceIcon {
   my $img;
 
   if (!defined $rps) {
-      $title = encode ('utf8', $htitles{rdcstat}{$lang});
+      $title = encodeFhem ($htitles{rdcstat}{$lang});
       $title =~ s/<NAME>/$name/xs;
       $img   = '-';
   }
   elsif ($rps) {
-      $title = encode ('utf8', $htitles{rdcactiv}{$lang});
+      $title = encodeFhem ($htitles{rdcactiv}{$lang});
       $title =~ s/<NAME>/$name/xs;
       $img = FW_makeImage ('10px-kreis-gelb.png', $title);
   }
   else {
-      $title = encode ('utf8', $htitles{rdcnoact}{$lang});
+      $title = encodeFhem ($htitles{rdcnoact}{$lang});
       $title =~ s/<NAME>/$name/xs;
       $img = FW_makeImage ('10px-kreis-gruen.png', $title);
   }
@@ -26674,7 +26672,7 @@ sub weather2icon {
   my $txt  = $lang eq "DE" ? "txtd" : "txte";
 
   if (defined $weather_ids{$id}) {
-      return $weather_ids{$id}{icon}, encode('utf8', $weather_ids{$id}{$txt});
+      return $weather_ids{$id}{icon}, encodeFhem ($weather_ids{$id}{$txt});
   }
 
 return ('unknown','');
@@ -26970,8 +26968,8 @@ sub fillupMessageSystem {
           next if($smi >= IDXLIMIT);
           $midx2++;
           $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{preparedmessages}{$smi}{SV});
-          $data{$name}{messages}{$midx2}{DE} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{DE});
-          $data{$name}{messages}{$midx2}{EN} = encode ('utf8', $data{$name}{preparedmessages}{$smi}{EN});
+          $data{$name}{messages}{$midx2}{DE} = encodeFhem ($data{$name}{preparedmessages}{$smi}{DE});
+          $data{$name}{messages}{$midx2}{EN} = encodeFhem ($data{$name}{preparedmessages}{$smi}{EN});
       }
 
       # --- Integration File Messages
@@ -26979,8 +26977,8 @@ sub fillupMessageSystem {
           next if($mfi >= IDXLIMIT);
           $midx2++;
           $data{$name}{messages}{$midx2}{SV} = trim ($data{$name}{filemessages}{$mfi}{SV});
-          $data{$name}{messages}{$midx2}{DE} = $data{$name}{filemessages}{$mfi}{DE};
-          $data{$name}{messages}{$midx2}{EN} = $data{$name}{filemessages}{$mfi}{EN};
+          $data{$name}{messages}{$midx2}{DE} = encodeFhem (healDoubleEnc ($data{$name}{filemessages}{$mfi}{DE}));
+          $data{$name}{messages}{$midx2}{EN} = encodeFhem (healDoubleEnc ($data{$name}{filemessages}{$mfi}{EN}));
       }
 
       $data{$name}{messages}{999000}{TS}     = $data{$name}{filemessages}{999000}{TS}     // 0;
@@ -35977,13 +35975,13 @@ sub checkPlantConfig {
   $out .= "<br>";
 
   if ($cf) {
-      $out .= encode ("utf8", $hqtxt{strnok}{$lang});
+      $out .= encodeFhem ($hqtxt{strnok}{$lang});
   }
   elsif ($wn) {
-      $out .= encode ("utf8", $hqtxt{strwn}{$lang});
+      $out .= encodeFhem ($hqtxt{strwn}{$lang});
   }
   else {
-      $out .= encode ("utf8", $hqtxt{strok}{$lang});
+      $out .= encodeFhem ($hqtxt{strok}{$lang});
   }
 
   $out =~ s/ (Bitte eventuelle Hinweise|Please note any information).*// if(!$io);
@@ -36027,7 +36025,7 @@ sub _checkStringToInverterMap {
   }
 
   if (@errors) {
-      $_       = decode ("latin1", $_) for @errors;                                 # Strings korrekt von Latin-1 nach UTF-8 decodieren
+      $_       = decode ("latin1", $_) for (isUnicodeEnc() ? () : @errors);         # nur bytestream
       $errmsg  = "ERROR in string mapping: <br>";
       $errmsg .= " - $_ <br>" for @errors;
   }
@@ -36697,8 +36695,8 @@ sub askLogtime {
 
     my $now           = time;
     $data{$name}{log} = {} unless ref $data{$name}{log} eq 'HASH';                           # sicherstellen, dass Struktur existiert
-    my $sha1          = sha1_hex ($msg);
-
+    my $sha1          = sha1_hex (isUnicodeEnc() ? encode_utf8 ($msg) : $msg);
+    
     if (my $entry = $data{$name}{log}{$sha1}) {
         $entry->{msg} = $msg unless defined $entry->{msg} && $entry->{msg} eq $msg;          # falls der gespeicherte Text aus irgendeinem Grund anders ist, aktualisiere ihn
 
@@ -38256,12 +38254,83 @@ return $ps;
 }
 
 ################################################################
+#  Läuft FHEM mit "attr global encoding unicode" ?
+#  (1 = unicode, 0 = bytestream = FHEM-Default)
+################################################################
+sub isUnicodeEnc {
+  return $unicodeEncoding ? 1 : 0;
+}
+
+################################################################
+#  Zeichenstring (use utf8 Literale) in die von FHEM erwartete
+#  Darstellung wandeln:
+#    bytestream -> UTF-8 Bytes (wie bisher encode('utf8', ...))
+#    unicode    -> unverändert (Perl-Zeichen)
+################################################################
+sub encodeFhem {
+  my $str = shift;
+
+  return $str if(!defined $str || isUnicodeEnc());
+
+return encode_utf8 ($str);
+}
+
+################################################################
+#  Doppelt kodierten Text (UTF-8-Bytes als Latin-1-Zeichen) in
+#  den ursprünglichen Text zurückwandeln, sonst unverändert
+################################################################
+sub healDoubleEnc {
+  my $str = shift // return;
+
+  return $str if($str !~ /[^\x00-\x7F]/ || $str =~ /[^\x00-\xFF]/);
+
+  my $b = encode ('latin1', $str);
+
+return eval { decode ('UTF-8', $b, Encode::FB_CROAK | Encode::LEAVE_SRC) } // $str;
+}
+
+################################################################
+#  JSON-Text aus FileRead für decode_json / evaljson aufbereiten
+#  (erwarten UTF-8 Bytes; FileRead liefert im unicode-Mode Zeichen)
+################################################################
+sub jsonBytes {
+  my $str = shift // return '';
+
+  return $str if(!isUnicodeEnc() || !utf8::is_utf8 ($str));                     # bytestream bzw. bereits Bytes: unverändert
+
+  if ($str =~ /[^\x00-\x7F]/ && $str !~ /[^\x00-\xFF]/) {                       # nur Latin-1-Zeichen: evtl. doppelt kodierter Altbestand
+      my $b = encode ('latin1', $str);                                          # (frühere Modulversionen im unicode-Mode)
+      return $b if(eval { decode ('UTF-8', $b, Encode::FB_CROAK | Encode::LEAVE_SRC); 1 });
+  }
+
+return encode_utf8 ($str);
+}
+
+################################################################
+#  Datenstruktur als JSON für FileWrite serialisieren
+#  (FileWrite kodiert im unicode-Mode selbst nach UTF-8)
+################################################################
+sub encJsonFile {
+  my $ref  = shift;
+  my $json = encode_json ($ref);
+
+return isUnicodeEnc() ? decode_utf8 ($json) : $json;
+}
+
+################################################################
 #        Länge eines Strings (auch mit Umlauten)
+# - strlength steuert die Spaltenbreiten in Tabellen. 
+#   Im bytestream-Mode sind die Strings UTF-8-Bytes und müssen 
+#   dekodiert werden; im unicode-Mode sind es schon Zeichen. 
+#   decode auf Zeichen mit Codepunkt > 0xFF bricht ab 
+#   ("Cannot decode string with wide characters"), kleinere 
+#    Codepunkte werden falsch gezählt.
+# - bytestream: unverändert.
 ################################################################
 sub strlength {
   my $string = shift // return 0;
 
-  my $decoded = decode ('UTF-8', $string);
+  my $decoded = isUnicodeEnc() ? $string : decode ('UTF-8', $string);
 
 return length ($decoded);
 }
