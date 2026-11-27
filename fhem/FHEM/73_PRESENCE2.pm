@@ -43,7 +43,7 @@ eval "use Net::Async::Ping;1"       or $missingModul .= "Net::Async::Ping ";
 eval "use List::Util qw(pairmap);1" or $missingModul .= "List::Util ";
 
 my $ModuleName = "PRESENCE2";
-my $ModuleVersion = "01.06c";
+my $ModuleVersion = "01.07";
 my %LOG_Text = (
    0 => "SERVER:",
    1 => "ERROR:",
@@ -1863,10 +1863,19 @@ sub PRESENCE2_doEvtCheckReply($){
 # "present":"absent"
 sub PRESENCE2_net_ping($$$) {
 
-  my ($dn, $ip, $pType) = @_;
-  my $result = "unknown";
+   my ($dn, $raw_ip, $pType) = @_;
+   my $result = "unknown";
 
-  eval {
+   # IP-Adresse validieren / Hostname auflösen
+   my $ip = PRESENCE2_validate_ip($dn, $raw_ip, undef);
+
+   # Falls keine gültige IP existiert, abbrechen
+   if ($ip =~ /subError:/ ) {
+     PRESENCE2_Log $dn, 3, $ip;
+     return $ip; 
+   }
+
+   eval {
          my $p = Net::Ping->new($pType, 2);
 
          if ($p->ping($ip)) {
@@ -1874,22 +1883,31 @@ sub PRESENCE2_net_ping($$$) {
          } else {
            $result = "absent";
          }
-  };
+   };
 
-  if ($@) {
-    $result = "subError:" . $@;
-    PRESENCE2_Log $dn, 3, "Net::Ping::" .$pType. ": $@";
-  }
+   if ($@) {
+     $result = "subError:" . $@;
+     PRESENCE2_Log $dn, 3, "Net::Ping::" .$pType. ": $@";
+   }
 
-  return $result;
+   return $result;
 }
 
 sub PRESENCE2_net_async_ping($$) {
 
-  my ($dn, $ip) = @_;
-  my $result = "unknown";
+   my ($dn, $raw_ip) = @_;
+   my $result = "unknown";
 
-  eval {
+   # IP-Adresse validieren / Hostname auflösen
+   my $ip = PRESENCE2_validate_ip($dn, $raw_ip, undef);
+
+   # Falls keine gültige IP existiert, abbrechen
+   if ($ip =~ /subError:/ ) {
+     PRESENCE2_Log $dn, 3, $ip;
+     return $ip; 
+   }
+
+   eval {
          my $p = Net::Async::Ping->new(
                'icmp' => {
                            default_timeout => 2,
@@ -1916,14 +1934,14 @@ sub PRESENCE2_net_async_ping($$) {
          $loop->loop_once();
          $loop->run;
 
-  };
+   };
 
-  if ($@) {
-    $result = "subError:" . $@;
-    PRESENCE2_Log $dn, 3, "Net::Async::Ping: $@";
-  }
+   if ($@) {
+     $result = "subError:" . $@;
+     PRESENCE2_Log $dn, 3, "Net::Async::Ping: $@";
+   }
 
-  return $result;
+   return $result;
 }
 
 sub PRESENCE2_combined_check($$$) {
@@ -1937,32 +1955,13 @@ sub PRESENCE2_combined_check($$$) {
    my $PREMAXRETRIES = AttrVal($dn, "preMaxRetries", 8);
    my $MAXRETRIES    = AttrVal($dn, "prostMaxRetries", 10);
 
-   # 2. IP-Adresse validieren / Hostname auflösen
-   my $ip = "";
-   if ($raw_ip =~ /((?:\d{1,3}\.){3}\d{1,3})/) {
-     $ip = $1;
-   }
+   # IP-Adresse validieren / Hostname auflösen
+   my $ip = PRESENCE2_validate_ip($dn, $raw_ip, undef);
 
-   # Wenn keine IP gefunden wurde, versuchen über 'host -4' aufzulösen
-   if ($ip eq "") {
-     eval {
-       my $host_output = `host -4 $raw_ip 2>/dev/null`;
-       if ($host_output =~ /((?:\d{1,3}\.){3}\d{1,3})/) {
-         $ip = $1;
-       }
-     };
-
-     if ($@) {
-       $result = "subError:" . $@;
-       PRESENCE2_Log $dn, 2, "host: $@";
-       return $result;
-     } 
-   }
-
-   # Falls immer noch keine gültige IP existiert, abbrechen
-   if ($ip eq "") {
-     PRESENCE2_Log $dn, 3, "subError:no valid ip";
-     return "subError:no valid ip"; 
+   # Falls keine gültige IP existiert, abbrechen
+   if ($ip =~ /subError:/ ) {
+     PRESENCE2_Log $dn, 3, $ip;
+     return $ip; 
    }
 
    # 3. MAC-Adresse in Kleinbuchstaben umwandeln
@@ -2030,6 +2029,40 @@ sub PRESENCE2_combined_check($$$) {
    return "absent";
 }
 
+sub PRESENCE2_validate_ip($$$) {
+
+   my ($dn, $raw_ip, $raw_mac) = @_;
+   my $result = "unknown";
+   
+   PRESENCE2_Log $dn, 4, "ip/name: $raw_ip";
+
+   # IP-Adresse validieren / Hostname auflösen
+   my $ip = "";
+
+   if ($raw_ip =~ /((?:\d{1,3}\.){3}\d{1,3})/) {
+     $ip = $1;
+   }
+
+   # Wenn keine IP gefunden wurde, versuchen über 'host -4' aufzulösen
+   if ($ip eq "") {
+     eval {
+       my $host_output = `host -4 $raw_ip 2>/dev/null`;
+       if ($host_output =~ /((?:\d{1,3}\.){3}\d{1,3})/) {
+         $ip = $1;
+       }
+     };
+
+     if ($@) {
+       $ip = "subError:" . $@;
+       PRESENCE2_Log $dn, 2, "host: $@";
+     } 
+   }
+
+   $ip = "subError: no valid ip" if($ip eq "");
+
+   return $ip; 
+}
+
 1;
 
 =pod
@@ -2069,25 +2102,25 @@ The PRESENCE2 module offers several ways to check for the presence of devices su
   <b>Define</b>
   <ul>
     <br><b>Mode: lan-ping</b><br>
-    <code>define &lt;name&gt; PRESENCE2 lan-ping &lt;IP-address&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 lan-ping &lt;IP-address|network_name&gt;</code><br>
     Searches for a network device using the operating system's ping command and reports its presence status.<br>
     <u>Example</u><br>
     <code>define iPhone PRESENCE2 lan-ping 192.168.179.21</code><br>
 
     <br><b>Mode: net-ping-tcp</b><br>
-    <code>define &lt;name&gt; PRESENCE2 net-ping-tcp &lt;IP-address&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 net-ping-tcp &lt;IP-address|network_name&gt;</code><br>
     Searches for a network device using the Perl module net::ping in 'tcp' mode (echo port) and reports its presence status.<br>
     <u>Example</u><br>
     <code>define iPhone PRESENCE2 net-ping-tcp 192.168.179.21</code><br>
   
     <br><b>Mode: net-ping-icmp</b><br>
-    <code>define &lt;name&gt; PRESENCE2 net-ping-icmp &lt;IP-address&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 net-ping-icmp &lt;IP-address|network_name&gt;</code><br>
     Searches for a network device using the Perl module net::ping in 'icmp' mode (requires root privileges) and reports its presence status.<br>
     <u>Example</u><br>
     <code>define iPhone PRESENCE2 net-ping-icmp 192.168.179.21</code><br>
 
     <br><b>Mode: net-ping-async</b><br>
-    <code>define &lt;name&gt; PRESENCE2 net-ping-async &lt;IP-address&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 net-ping-async &lt;IP-address|network_name&gt;</code><br>
     Searches for a network device using the Perl modules IO::Async::Loop and Net::Async::Ping in 'icmp' mode (does not require root privileges) and reports its presence status.<br>
     <u>Example</u><br>
     <code>define iPhone PRESENCE2 net-ping-async 192.168.179.21</code><br>
@@ -2361,9 +2394,37 @@ Options:
     <a id="PRESENCE2-attr-intervalNormal"></a>
     <li>
        <dt><code>attr &lt;name&gt; intervalNormal &lt;seconds&gt;</code></dt>
-       Defines the check interval in seconds when a device/entity is not present (absent), or controls the master daemon polling raster.<br>
-       Set on the daemon device (e.g., PsnceDaemon) to schedule batch-fork/scan cycles.<br>
-       Set on individual PRESENCE2 entities to override or bind check timing into the grid.<br>
+       Sets the check interval in seconds (default: 30 seconds) for cases where a device or entity is "absent," or controls the polling cycle of the master daemon.<br>
+       <br>
+       The daemon runs steadily according to its own interval. It checks the individual entity intervals to see if they have elapsed, and executes any that are due.<br>
+       Example: Daemon: 30s<br>
+       Entity: 1s => checked every 30s.<br>
+       Entity: 40s => checked every 60s, because the 40s interval is added after each check. The daemon arrives at 30s—too early—and then again at 60s, at which point the check is performed.<br>
+       <br>
+       <b>Daemon Device</b><br>
+       Configured on the daemon device (e.g., PsnceDaemon) to schedule batch fork/scan cycles.<br>
+       <br>
+       <b>PRESENCE2 Entities</b><br>
+       For PRESENCE2 entities, setting `intervalNormal` overrides the default check time or aligns it with the daemon's schedule.<br>
+       Ideally, the intervals specified for individual entities should be multiples (or a fraction) of the interval configured for the daemon.<br>
+    </li><br>
+
+    <a id="PRESENCE2-attr-intervalNormal"></a>
+    <li>
+       <dt><code>attr &lt;name&gt; intervalNormal &lt;Sekunden&gt;</code></dt>
+       Legt das Prüfintervall in Sekunden (vorgabe 30 Sekunden) fest, wenn ein Gerät bzw. eine Entität nicht vorhanden (absent) ist, oder steuert den Abfragezyklus des Master-Daemons.<br>
+       <br>
+       Der Deamon läuft stoisch in seinem Interval. Die Intervalle der Entites werden vom Deamon auf Ablauf geprüft und alle Abgelaufenen ausgeführt.<br>
+       Bsp: Deamon: 30s<br>
+       Entity : 1s => es wird alle 30 s geprüft.<br>
+       Entity : 40s => es wird alle 60 s geprüft, da nach dem prüfen die 40s addiert werden. Der Deamon kommt nach 30s, also zu früh. Dann nach 60s: Ausführen<br>
+       <br>
+       <b>Daemon-Gerät</b><br>
+       Wird auf dem Daemon-Gerät (z. B. PsnceDaemon) festgelegt, um Batch-Fork-/Scan-Zyklen zu planen.<br>
+       <br>
+       <b>PRESENCE2-Entitäten</b><br>
+       In den PRESENCE2-Entitäten wird durch setzen des intervalNormal die Prüfzeit überschrieben oder an das Raster gebunden.<br>
+       Die Intervallangaben bei den einzelnen Entitäten müssen (sinnvollerweise) entsprechend Ein- oder Vielfache der am Daemon eingestellten Intervall-Angaben sein.<br>
     </li><br>
 
     <a id="PRESENCE2-attr-nonblockingTimeOut"></a>
@@ -2413,17 +2474,19 @@ Options:
     <a id="PRESENCE2-attr-prGroup"></a>
     <li>
         <dt><code>attr &lt;name&gt; prGroup &lt;static|dynamic|...&gt;</code></dt>
-        By defining a group, several presence devices can be assigned to a group and monitored.<br>
-        &lt;static&gt; predefined.<br>
-        &lt;dynamic&gt; predefined.<br>
-        You can define your own groups.<br>
+        By defining a group, multiple presence devices can be assigned to that group and monitored.<br>
+        In the daemon device (e.g., PsnceDaemon), corresponding readings appear: pGrp_<group name>, containing: dis:&lt;n&gt; ab:&lt;n&gt; pres:&lt;n&gt;<br>
+        !Important! If a group (or multiple groups, separated by commas) is defined in the free-text field, ensure that the spelling matches exactly across the entities<br>
+        so that the aggregation within the daemon functions correctly.<br>
+        For example, you can easily check whether all smartphones are present by entering "SmartPhone" as the group name in the free-text field.<br>
+        Predefined: pGrp_static, pGrp_dynamic<br>
     </li><br>
 
     <a id="PRESENCE2-attr-prGroupDisp"></a>
     <li>
         <dt><code>attr &lt;name&gt; prGroupDisp &lt;condense|verbose&gt;</code></dt>
-        &lt;condense&gt; - Shows presence group information in condensed mode. [default]<br>
-        &lt;verbose&gt; - Shows presence group information in verbose mode.<br>
+        &lt;condense&gt; - Displays information about the presence group in condensed mode. [Default]<br>
+        &lt;verbose&gt; – Displays information about the presence group in verbose mode.<br>
     </li><br>
 
     <b>child-processes only</b>
@@ -2585,25 +2648,25 @@ Options:
   <b>Define</b>
   <ul>
     <br><b>Modus: lan-ping</b><br>
-    <code>define &lt;name&gt; PRESENCE2 lan-ping &lt;IP-Adresse&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 lan-ping &lt;IP-Adresse|Netzwerkname&gt;</code><br>
     Sucht über den Betriebssystem Befehl ping nach einem Netzwerkgerät und meldet seinen Anwesenheits-Status.<br>
     <u>Beispiel</u><br>
     <code>define iPhone PRESENCE2 lan-ping 192.168.179.21</code><br>
 
     <br><b>Modus: net-ping-tcp</b><br>
-    <code>define &lt;name&gt; PRESENCE2 net-ping-tcp &lt;IP-Adresse&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 net-ping-tcp &lt;IP-Adresse|Netzwerkname&gt;</code><br>
     Sucht über das Perl-Modul net::ping im Modus 'tcp' - Echo-Port - nach einem Netzwerkgerät und meldet seinen Anwesenheits-Status.<br>
     <u>Beispiel</u><br>
     <code>define iPhone PRESENCE2 net-ping-tcp 192.168.179.21</code><br>
   
     <br><b>Modus: net-ping-icmp</b><br>
-    <code>define &lt;name&gt; PRESENCE2 net-ping-icmp &lt;IP-Adresse&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 net-ping-icmp &lt;IP-Adresse|Netzwerkname&gt;</code><br>
     Sucht über das Perl-Modul net::ping im Modus 'icmp' - es werden root Rechte benötigt - nach einem Netzwerkgerät und meldet seinen Anwesenheits-Status.<br>
     <u>Beispiel</u><br>
     <code>define iPhone PRESENCE2 net-ping-icmp 192.168.179.21</code><br>
 
     <br><b>Modus: net-ping-async</b><br>
-    <code>define &lt;name&gt; PRESENCE2 net-ping-async &lt;IP-Adresse&gt;</code><br>
+    <code>define &lt;name&gt; PRESENCE2 net-ping-async &lt;IP-Adresse|Netzwerkname&gt;</code><br>
     Sucht über die Perl-Module IO::Async::Loop und Net::Async::Ping im Modus 'icmp' - es werden keine root Rechte benötigt - nach einem Netzwerkgerät und meldet seinen Anwesenheits-Status.<br>
     <u>Beispiel</u><br>
     <code>define iPhone PRESENCE2 net-ping-async 192.168.179.21</code><br>
@@ -2876,9 +2939,19 @@ Optionen:
     <a id="PRESENCE2-attr-intervalNormal"></a>
     <li>
        <dt><code>attr &lt;name&gt; intervalNormal &lt;Sekunden&gt;</code></dt>
-       Legt das Prüfintervall in Sekunden fest, wenn ein Gerät bzw. eine Entität nicht vorhanden (absent) ist, oder steuert den Abfragezyklus des Master-Daemons.<br>
+       Legt das Prüfintervall in Sekunden (vorgabe 30 Sekunden) fest, wenn ein Gerät bzw. eine Entität nicht vorhanden (absent) ist, oder steuert den Abfragezyklus des Master-Daemons.<br>
+       <br>
+       Der Deamon läuft stoisch in seinem Interval. Die Intervalle der Entites werden vom Deamon auf Ablauf geprüft und alle Abgelaufenen ausgeführt.<br>
+       Bsp: Deamon: 30s<br>
+       Entity : 1s => es wird alle 30 s geprüft.<br>
+       Entity : 40s => es wird alle 60 s geprüft, da nach dem prüfen die 40s addiert werden. Der Deamon kommt nach 30s, also zu früh. Dann nach 60s: Ausführen<br>
+       <br>
+       <b>Daemon-Gerät</b><br>
        Wird auf dem Daemon-Gerät (z. B. PsnceDaemon) festgelegt, um Batch-Fork-/Scan-Zyklen zu planen.<br>
-       Wird auf einzelnen PRESENCE2-Entitäten festgelegt, um die Prüfzeiten zu überschreiben oder an das Raster zu binden.<br>
+       <br>
+       <b>PRESENCE2-Entitäten</b><br>
+       In den PRESENCE2-Entitäten wird durch setzen des intervalNormal die Prüfzeit überschrieben oder an das Raster gebunden.<br>
+       Die Intervallangaben bei den einzelnen Entitäten müssen (sinnvollerweise) entsprechend Ein- oder Vielfache der am Daemon eingestellten Intervall-Angaben sein.<br>
     </li><br>
 
     <a id="PRESENCE2-attr-nonblockingTimeOut"></a>
@@ -2929,9 +3002,11 @@ Optionen:
     <li>
         <dt><code>attr &lt;name&gt; prGroup &lt;static|dynamic|...&gt;</code></dt>
         Durch die Definition einer Gruppe können mehrere Präsenzgeräte einer Gruppe zugeordnet und überwacht werden.<br>
-        &lt;static&gt; vordefiniert.<br>
-        &lt;dynamic&gt; vordefiniert.<br>
-        Sie können Ihre eigenen Gruppen definieren.<br>
+        Im Daemon-Gerät (z. B. PsnceDaemon), erscheinen entsprechende Readings: pGrp_<Gruppenname> mit dem Inhalt: dis:&lt;n&gt; ab:&lt;n&gt; pres:&lt;n&gt;<br>
+        !Wichtig! Wird eine Gruppe/Gruppen, getrennt durch Komma, im Freitextfeld definiert, so ist auf eine identische Schreibweise in den Entitäten zu achten,<br>
+        damit im Dämon eine Zusammenfassung funktioniert.<br>
+        So kann z.B. einfach geprüft werden, ob alle SmartPhone anwesend sind, wenn im Freitag SmartPhone als Gruppenname steht.<br>
+        Vordefiniert: pGrp_static, pGrp_dynamic<br>
     </li><br>
 
     <a id="PRESENCE2-attr-prGroupDisp"></a>
