@@ -108,6 +108,7 @@ BEGIN {
 
 # Versions History intern:
 my %vNotesIntern = (
+  "5.13.0" => "27.11.2026  new attribute 'msgReadingName' to create an additional stable reading with the last received message (Collector) ",
   "5.12.9" => "04.10.2026  Fix Syntax Fehler in vNotesIntern ",
   "5.12.8" => "29.09.2026  Fix Notes ",
   "5.12.7" => "28.09.2026  setPayload: \$otp nur kodieren wenn tatsächlich non-ASCII vorhanden sind ".
@@ -131,6 +132,7 @@ my %vNotesIntern = (
 
 # Versions History extern:
 my %vNotesExtern = (
+  "5.13.0" => "27.11.2026 The new attribute 'msgReadingName' creates an additional reading with a fixed name which contains the last received message regardless of the sending host. ",
   "5.12.6" => "10.09.2026 Bugfixes and a complete review of all relevant functions ",
   "5.10.0" => "04.04.2020 The new attribute 'timeSpec' can be set to send and receive/parse messages according to UTC or Local time format. ".
                           "Please refer to <a href=\"https://tools.ietf.org/pdf/rfc3339.pdf\">Date and Time on the Internet: Timestamps</a> for further information  ",
@@ -308,6 +310,7 @@ sub Initialize {
                       "exclErrCond:textField-long ".
                       "logFormat:BSD,IETF ".
                       "makeEvent:no,intern,reading ".
+                      "msgReadingName ".
                       "outputFields:sortable-strict,PRIVAL,FAC,SEV,TS,HOST,DATE,TIME,ID,PID,MID,SDFIELD,CONT ".
                       "parseProfile:Automatic,BSD,IETF,TPLink-Switch,UniFi,raw,ParseFn ".
                       "parseFn:textField-long ".
@@ -536,6 +539,7 @@ sub Read {                                                  ## no critic 'comple
   return if(IsDisabled($name) || isMemLock($hash));
   
   my $mevt   = AttrVal ($name, 'makeEvent',       'intern');            # wie soll Reading/Event erstellt werden
+  my $mrn    = AttrVal ($name, 'msgReadingName',        '');            # Name eines zusätzlichen Readings mit fester Bezeichnung
   my $sevevt = AttrVal ($name, 'respectSeverity',       '');            # welcher Schweregrad soll berücksichtigt werden (default: alle)
   my $uef    = AttrVal ($name, 'useEOF',                 0);            # verwende EOF
   
@@ -623,9 +627,11 @@ sub Read {                                                  ## no critic 'comple
               } 
               elsif ($mevt =~ /reading/x) {                                             # Reading, Event abhängig von event-on-.*
                   readingsSingleUpdate ($hash, "MSG_$phost", $pl, 1);
+                  readingsSingleUpdate ($hash, $mrn, $pl, 1) if($mrn);                  # zusätzliches Reading mit festem Namen
               } 
               else {                                                                    # Reading ohne Event
                   readingsSingleUpdate ($hash, "MSG_$phost", $pl, 0);
+                  readingsSingleUpdate ($hash, $mrn, $pl, 0) if($mrn);                  # zusätzliches Reading mit festem Namen
               }
           }
           
@@ -1691,16 +1697,16 @@ sub Attr {                                            ## no critic 'complexity'
     # $name is device name
     # aName and aVal are Attribute name and value
 
-    if ($cmd eq "set" && $hash->{MODEL} !~ /Collector/x && $aName =~ /parseProfile|parseFn|outputFields|makeEvent|useParsefilter/x) {
+    if ($cmd eq 'set' && $hash->{MODEL} !~ /Collector/x && $aName =~ /parseProfile|parseFn|outputFields|makeEvent|msgReadingName|useParsefilter/x) {
          return qq{"$aName" is only valid for model "Collector"};
     }
     
-    if ($cmd eq "set" && $hash->{MODEL} =~ /Collector/x && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout|exclErrCond/x) {
+    if ($cmd eq 'set' && $hash->{MODEL} =~ /Collector/x && $aName =~ /addTimestamp|contDelimiter|addStateEvent|logFormat|octetCount|ssldebug|timeout|exclErrCond/x) {
          return qq{"$aName" is only valid for model "Sender"};
     }
     
-    if ($aName eq "disable") {
-        if($cmd eq "set") {
+    if ($aName eq 'disable') {
+        if ($cmd eq 'set') {
             return qq{Mode "$aVal" is only valid for model "Sender"} if($aVal eq "maintenance" && $hash->{MODEL} !~ /Sender/);
             $do = $aVal?1:0;
         }
@@ -1711,7 +1717,7 @@ sub Attr {                                            ## no critic 'complexity'
         $hash->{HELPER}{MEMLOCK} = 1;
         InternalTimer(gettimeofday()+2, "FHEM::Log2Syslog::deleteMemLock", $hash, 0);
         
-        if($do==0 || $aVal=~/maintenance/) {
+        if ($do==0 || $aVal=~/maintenance/) {
             if($hash->{MODEL} =~ /Collector/) {
                 downServer($hash,1);                                                 # Serversocket schließen und wieder öffnen
                 InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::initServer", "$name,global", 0);                 
@@ -1724,17 +1730,17 @@ sub Attr {                                            ## no critic 'complexity'
         readingsSingleUpdate ($hash, 'state', $st, 1);        
     }
     
-    if ($aName eq "TLS") {
-        if($cmd eq "set") {
+    if ($aName eq 'TLS') {
+        if ($cmd eq 'set') {
             $do = ($aVal) ? 1 : 0;
         }
-        $do = 0 if($cmd eq "del");
+        $do = 0 if($cmd eq 'del');
         
         if ($do == 0) {
             delete $hash->{SSL};
         } 
         else {
-            if($hash->{MODEL} =~ /Collector/) {
+            if ($hash->{MODEL} =~ /Collector/) {
                 $attr{$name}{protocol} = "TCP" if(AttrVal($name, "protocol", "UDP") ne "TCP");
                 TcpServer_SetSSL($hash);
             }
@@ -1745,7 +1751,7 @@ sub Attr {                                            ## no critic 'complexity'
         closeSocket($hash,1);                                                        # Clientsocket schließen
         downServer ($hash,1);                                                        # Serversocket schließen     
         
-        if($hash->{MODEL} =~ /Collector/) {
+        if ($hash->{MODEL} =~ /Collector/) {
             InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::initServer", "$name,global", 0);  # Serversocket öffnen
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                    # Fehlerzähler für Parse-Errors auf 0
         }              
@@ -1758,7 +1764,7 @@ sub Attr {                                            ## no critic 'complexity'
         InternalTimer(gettimeofday()+5, "FHEM::Log2Syslog::calcTrate", $hash, 0);
     }
     
-    if ($cmd eq "set") {
+    if ($cmd eq 'set') {
         if($aName =~ /port/) {
             if($aVal !~ m/^\d+$/x) { return " The Value of \"$aName\" is not valid. Use only figures !";}
             
@@ -1770,7 +1776,8 @@ sub Attr {                                            ## no critic 'complexity'
                 downServer($hash,1);                                                               # Serversocket schließen
                 InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::initServer", "$name,global", 0);
                 readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
-            } elsif ($hash->{MODEL} !~ /Collector/) {
+            } 
+            elsif ($hash->{MODEL} !~ /Collector/) {
                 closeSocket($hash,1);                                                              # Clientsocket schließen               
             }
         }
@@ -1792,12 +1799,13 @@ sub Attr {                                            ## no critic 'complexity'
             InternalTimer(gettimeofday()+0.5, "FHEM::Log2Syslog::initServer", "$name,global", 0);
             readingsSingleUpdate ($hash, 'Parse_Err_No', 0, 1);                                # Fehlerzähler für Parse-Errors auf 0
             readingsSingleUpdate ($hash, 'Parse_Err_LastData', 'n.a.', 0);
-        } else {
+        } 
+        else {
             closeSocket($hash,1);                                                              # Clientsocket schließen  
         }
     }
     
-    if ($cmd eq "set" && $aName =~ /parseFn/) {
+    if ($cmd eq 'set' && $aName =~ /parseFn/) {
          return qq{The function syntax is wrong. "$aName" must be enclosed by "{...}".} if($aVal !~ m/^\{.*\}$/sx);
          my %specials = (
              "%IGNORE"  => "0",
@@ -1832,8 +1840,19 @@ sub Attr {                                            ## no critic 'complexity'
           readingsSingleUpdate ($hash, 'Parse_Err_LastData', 'n.a.', 0);  
     }
     
-    if ($cmd eq "del" && $aName =~ /parseFn/ && AttrVal($name,"parseProfile","") eq "ParseFn" ) {
+    if ($cmd eq 'del' && $aName =~ /parseFn/ && AttrVal($name,"parseProfile","") eq "ParseFn" ) {
           return qq{You use a parse-function via attribute "parseProfile". Please change/delete attribute "parseProfile" first !};
+    }
+    
+    if ($aName eq 'msgReadingName') {
+        my $old = AttrVal ($name, 'msgReadingName', '');
+        
+        if ($cmd eq 'set') {
+            return qq{The value of "$aName" is not a valid reading name. Allowed are the characters A-Z, a-z, 0-9, '.', '_' and '-'} if($aVal !~ /^[A-Za-z0-9._-]+$/x);
+            return qq{The value of "$aName" is reserved by the module and must not be used (state, Transfered_logs_per_minute, Parse_*, SSL_*)} if($aVal =~ /^(?:state|Transfered_logs_per_minute|Parse_.*|SSL_.*)$/x);
+        }
+        
+        delete $hash->{READINGS}{$old} if($old && $old ne ($aVal // ''));                 # altes Reading bei Änderung/Löschung entfernen
     }
     
     if ($aName =~ /makeEvent/) {
@@ -3157,6 +3176,28 @@ attr &lt;name&gt; exclErrCond Error: none,
     <br>
     
     <ul>
+    <a name="msgReadingName"></a>
+    <li><b>msgReadingName &lt;Reading name&gt;</b><br>
+        <br>
+        The attribute is only usable for device type "Collector". 
+        Normally a reading "MSG_&lt;hostname&gt;" is created for every sending host. 
+        If this attribute is set, the last received message is additionally written into a reading with the 
+        fixed name &lt;Reading name&gt; regardless of the sending host. <br>
+        The attribute is effective only if attribute "makeEvent" is set to "reading" or "no". 
+        Events of this reading are generated in the same way as for the "MSG_&lt;hostname&gt;" readings. 
+        If the attribute is changed or deleted the former reading is removed. 
+        <br><br>
+        
+        <ul>
+           <b>Example:</b> <br>
+           attr &lt;name&gt; msgReadingName MSG_Raw
+        </ul>
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
     <a name="makeEvent"></a>
     <li><b>makeEvent [ intern | no | reading ]</b><br>
         <br>
@@ -3168,7 +3209,7 @@ attr &lt;name&gt; exclErrCond Error: none,
         <table>  
         <colgroup> <col width=10%> <col width=90%> </colgroup>
         <tr><td> <b>intern</b>   </td><td> events are generated by module intern mechanism and only visible in FHEM eventmonitor. Readings are not created. </td></tr>
-        <tr><td> <b>no</b>       </td><td> only readings like "MSG_&lt;hostname&gt;" without event generation are created </td></tr>
+        <tr><td> <b>no</b>       </td><td>tThe "MSG_&lt;Hostname&gt;" readings, or those specified by the 'msgReadingName' attribute, are created without generating an event. </td></tr>
         <tr><td> <b>reading</b>  </td><td> readings like "MSG_&lt;hostname&gt;" are created. Events are created dependent of the "event-on-.*"-attributes </td></tr>
         </table>
         </ul> 
@@ -3930,6 +3971,28 @@ attr &lt;name&gt; exclErrCond Error: none,
     <br>
     
     <ul>
+    <a name="msgReadingName"></a>
+    <li><b>msgReadingName &lt;Readingname&gt;</b><br>
+        <br>
+        Das Attribut ist nur für "Collector" verwendbar. 
+        Normalerweise wird für jeden sendenden Host ein Reading "MSG_&lt;Hostname&gt;" erstellt. 
+        Ist dieses Attribut gesetzt, wird die zuletzt empfangene Nachricht zusätzlich, unabhängig vom sendenden Host, 
+        in ein Reading mit dem festen Namen &lt;Readingname&gt; geschrieben. <br>
+        Das Attribut ist nur wirksam wenn das Attribut "makeEvent" auf "reading" oder "no" gesetzt ist. 
+        Events dieses Readings werden wie bei den Readings "MSG_&lt;Hostname&gt;" generiert. 
+        Wird das Attribut geändert oder gelöscht, wird das bisherige Reading entfernt. 
+        <br><br>
+        
+        <ul>
+           <b>Beispiel:</b> <br>
+           attr &lt;name&gt; msgReadingName MSG_Raw
+        </ul>
+    </li>
+    </ul>
+    <br>
+    <br>
+    
+    <ul>
     <a name="makeEvent"></a>
     <li><b>makeEvent [ intern | no | reading ]</b><br>
         <br>
@@ -3941,8 +4004,8 @@ attr &lt;name&gt; exclErrCond Error: none,
         <table>  
         <colgroup> <col width=10%> <col width=90%> </colgroup>
         <tr><td> <b>intern</b>   </td><td> Events werden modulintern generiert und sind nur im Eventmonitor sichtbar. Readings werden nicht erstellt. </td></tr>
-        <tr><td> <b>no</b>       </td><td> es werden nur Readings der Form "MSG_&lt;Hostname&gt;" ohne Eventfunktion erstellt </td></tr>
-        <tr><td> <b>reading</b>  </td><td> es werden Readings der Form "MSG_&lt;Hostname&gt;" erstellt. Events werden in Abhängigkeit der "event-on-.*"-Attribute generiert </td></tr>
+        <tr><td> <b>no</b>       </td><td> Es werden die Readings "MSG_&lt;Hostname&gt;" bzw. gemäß Attribut 'msgReadingName' ohne Eventgenerierung erstellt. </td></tr>
+        <tr><td> <b>reading</b>  </td><td> Es werden Readings der Form "MSG_&lt;Hostname&gt;" erstellt. Events werden in Abhängigkeit der "event-on-.*"-Attribute generiert. </td></tr>
         </table>
         </ul> 
         
